@@ -403,6 +403,8 @@ export const tr = {
     close: 'Kapat',
   },
   hints: {
+    touchAdded:
+      'Parça eklendi. Sürükle: taşı · pin ucuna dokun: kablo · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil)',
     simulating:
       'Simülasyon sırasında: anahtarı açıp kapatmak için üzerine tıkla · değer değiştirmek için çift tıkla · parça eklemek ya da taşımak simülasyonu durdurur',
     select:

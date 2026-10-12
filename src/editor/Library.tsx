@@ -32,6 +32,9 @@ export interface LibraryProps {
   readonly onClose: () => void;
   readonly activeExample: ExampleId | null;
   readonly onLoadExample: (id: ExampleId) => void;
+  /** Dokunmatik ekran: parçaya dokununca parça doğrudan tuvale eklenir (sürükle-bırak yok). */
+  readonly touch: boolean;
+  readonly onAddPart: (type: DeviceType) => void;
 }
 
 export function Library({
@@ -43,6 +46,8 @@ export function Library({
   onClose,
   activeExample,
   onLoadExample,
+  touch,
+  onAddPart,
 }: LibraryProps) {
   const [query, setQuery] = useState('');
   const [previewType, setPreviewType] = useState<DeviceType>('battery');
@@ -74,7 +79,13 @@ export function Library({
 
   const choose = (type: DeviceType) => {
     setPreviewType(type);
-    dispatch({ type: 'set-tool', tool: { kind: 'place', type, rotation: 0 } });
+    if (touch) {
+      // Dokunmatikte imleci izleyen önizleme olmadığı için "seç, sonra tuvale dokun" belirsizdir:
+      // parça doğrudan görünen alanın ortasına eklenir.
+      onAddPart(type);
+    } else {
+      dispatch({ type: 'set-tool', tool: { kind: 'place', type, rotation: 0 } });
+    }
     onClose();
   };
 
@@ -124,7 +135,7 @@ export function Library({
                   <li key={type}>
                     <button
                       type="button"
-                      draggable
+                      draggable={!touch}
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', type);
                         e.dataTransfer.effectAllowed = 'copy';
@@ -133,9 +144,11 @@ export function Library({
                       }}
                       onDragEnd={() => onDragTypeChange(null)}
                       onClick={() => choose(type)}
-                      onMouseEnter={() => tool.kind !== 'place' && setPreviewType(type)}
+                      // Önizleme yalnızca gerçek farede değişir: iOS Safari'de dokunuşun ürettiği
+                      // "üzerine gelme" olayı sayfayı değiştirirse ilk dokunuşta tıklama gönderilmez.
+                      onPointerEnter={(e) => e.pointerType === 'mouse' && tool.kind !== 'place' && setPreviewType(type)}
                       aria-pressed={active}
-                      className={`flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm ${
+                      className={`no-callout flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm ${
                         active ? 'bg-accent-soft text-accent' : 'hover:bg-app'
                       }`}
                     >

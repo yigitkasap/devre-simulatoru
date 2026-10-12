@@ -95,6 +95,7 @@ altına çıkart. Sayfadaki tüm yollar ve paylaşım bağlantıları `base`'e g
 | Yakınlaştır / kaydır | Fare tekerleği / boşluk tuşu + sürükle ya da orta tuş; telefonda iki parmak |
 | Simülasyon | Alttaki Oynat / Duraklat / Durdur; çalışırken anahtara tıklayınca açılır/kapanır |
 | Yanmış LED | Sağ tıkla → Onar ya da Durdur |
+| Telefon / tablet | Kütüphanede parçaya dokun: parça görünen alanın ortasına eklenir · sürükle: taşı · pin ucuna dokun: kablo · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil, Onar) · iki parmak: yakınlaştır |
 
 ## Dosya biçimi ve paylaşım bağlantısı
 
@@ -256,6 +257,13 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
 - **Otomatik kayıt (kullanıcı isteğiyle Aşama 3'e alındı):** Devre her değişiklikten 0,4 s
   sonra ve sayfa kapanırken `localStorage` içine (`devre-simulatoru:devre`) yazılır; açılışta
   okunur. Bozuk ya da tanınmayan veri sessizce yok sayılır. Ayarlar ayrı anahtarda tutulur.
+- **Dokunmatik ekran:** Birincil işaretçi parmaksa (`pointer: coarse`) kütüphanede parçaya
+  dokunmak onu doğrudan görünen alanın ortasındaki boş bir yere ekler; imleci izleyen önizleme
+  olmadığı için masaüstündeki "seç, sonra tuvale tıkla" akışı kullanılmaz ve HTML sürükle-bırak
+  kapalıdır. iOS Safari'de çift tıklama ve sağ tık olayları güvenilir gelmediği için çift dokunuş
+  ve uzun basış (0,55 s) ayrıca algılanır. Parmakla dokunurken pin ve kablo isabet alanları
+  büyür. Kütüphanedeki önizleme yalnızca gerçek fare üzerine gelince değişir: iOS Safari,
+  dokunuşun ürettiği "üzerine gelme" olayı sayfayı değiştirirse ilk dokunuşta tıklamayı göndermez.
 - **Yükleme:** Örnek açmak, JSON içe aktarmak, paylaşım bağlantısı açmak ve "Yeni devre"
   mevcut devrenin yerine geçer ama geri alma geçmişine girer; Ctrl+Z ile önceki devreye dönülür.
   Bu yüzden onay sorulmaz, kısa bir bildirim gösterilir.

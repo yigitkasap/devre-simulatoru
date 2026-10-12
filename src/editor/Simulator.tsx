@@ -26,6 +26,7 @@ import { SimBar } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { Toast, useToast } from './Toast';
 import { TopBar } from './TopBar';
+import { useCoarsePointer } from './useCoarsePointer';
 import { useSimulation } from './useSimulation';
 
 /** Açılışta: adreste paylaşım bağlantısı varsa o devre, yoksa otomatik kayıt, o da yoksa boş devre. */
@@ -48,6 +49,8 @@ export default function Simulator() {
   const [activeExample, setActiveExample] = useState<ExampleId | null>(null);
   const [answerRevealed, setAnswerRevealed] = useState(false);
   const [toast, showToast] = useToast();
+  const touch = useCoarsePointer();
+  const touchHintShown = useRef(false);
   const canvasRef = useRef<CanvasHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -248,6 +251,14 @@ export default function Simulator() {
           onClose={() => setLibraryOpen(false)}
           activeExample={activeExample}
           onLoadExample={loadExample}
+          touch={touch}
+          onAddPart={(type) => {
+            canvasRef.current?.addPartAtCenter(type);
+            if (!touchHintShown.current) {
+              touchHintShown.current = true;
+              showToast(tr.hints.touchAdded);
+            }
+          }}
         />
         {libraryOpen && (
           <div className="absolute inset-0 z-20 bg-ink/20 md:hidden" onClick={() => setLibraryOpen(false)} aria-hidden="true" />

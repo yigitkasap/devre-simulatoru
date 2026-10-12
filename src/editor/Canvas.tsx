@@ -51,6 +51,8 @@ export interface CanvasHandle {
   fit(): void;
   /** Verilen parçalar ve kablolar ekranda görünmüyorsa görünümü onlara kaydırır. */
   reveal(partIds: readonly string[], wireIds: readonly string[]): void;
+  /** Parçayı görünen alanın ortasındaki boş bir yere ekler ve seçer (dokunmatik ekran). */
+  addPartAtCenter(type: DeviceType): void;
 }
 
 /** Mesaj panelinde seçilen hata/uyarının tuvaldeki vurgusu. */
@@ -104,6 +106,8 @@ type Interaction =
   | {
       readonly kind: 'drag-parts';
       readonly pointerId: number;
+      /** Dokunulan parça (çift dokunuş ve uzun basış için). */
+      readonly tapPartId: string;
       readonly start: Point;
       readonly before: CircuitDoc;
       readonly parts: ReadonlySet<string>;
@@ -138,10 +142,16 @@ type Interaction =
 const CARD_RESERVE_WIDTH = 368;
 const CARD_RESERVE_HEIGHT = 300;
 
-/** Ekran pikseli cinsinden isabet toleransları. */
+/** Ekran pikseli cinsinden isabet toleransları (parmakla dokunurken daha geniş). */
 const PIN_TOLERANCE_PX = 8;
 const WIRE_TOLERANCE_PX = 6;
+const TOUCH_PIN_TOLERANCE_PX = 18;
+const TOUCH_WIRE_TOLERANCE_PX = 12;
 const DRAG_THRESHOLD_PX = 5;
+/** Dokunmatik: bu süre kıpırdamadan basılı tutmak sağ tık menüsünü açar (iOS'ta contextmenu olayı yok). */
+const LONG_PRESS_MS = 550;
+/** Dokunmatik: iki dokunuş arasındaki bu süre çift dokunuş sayılır (iOS'ta dblclick güvenilir değil). */
+const DOUBLE_TAP_MS = 350;
 
 const ZOOM_STEP = 1.25;
 
@@ -184,6 +194,13 @@ export function Canvas({
   /** Kullanıcının kapattığı LED balonları (parça + yanma akımı). */
   const [dismissedBalloons, setDismissedBalloons] = useState<ReadonlySet<string>>(new Set());
   const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pointerType = useRef<string>('mouse');
+  const longPress = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
+  const lastTap = useRef<{ partId: string; time: number } | null>(null);
+  const cancelLongPress = () => {
+    if (longPress.current) window.clearTimeout(longPress.current.timer);
+    longPress.current = null;
+  };
   const pinchRef = useRef<{ distance: number; view: View; cx: number; cy: number } | null>(null);
   const viewInitialized = useRef(false);
 
@@ -251,11 +268,32 @@ export function Canvas({
     // Yalnızca yeni bir sığdırma isteğinde çalışır.
   }, [fitRequest]);
 
+  const addPartAtCenter = (type: DeviceType) => {
+    const center = snap(screenToGrid(view, size.width / 2, size.height / 2));
+    const occupied = doc.parts.map((p) => partBounds(p));
+    // Merkezden başlayıp yakındaki boş bir yer aranır; bulunamazsa merkeze eklenir.
+    const offsets = [
+      [0, 0], [0, 6], [0, -6], [10, 0], [-10, 0], [10, 6], [-10, 6], [10, -6], [-10, -6], [0, 12], [0, -12], [20, 0], [-20, 0],
+    ] as const;
+    let at = center;
+    for (const [dx, dy] of offsets) {
+      const candidate = { x: center.x + dx, y: center.y + dy };
+      const b = partBounds({ type, x: candidate.x, y: candidate.y, rotation: 0 });
+      const padded = { x: b.x - 1, y: b.y - 1, w: b.w + 2, h: b.h + 2 };
+      if (!occupied.some((o) => boxesIntersect(o, padded))) {
+        at = candidate;
+        break;
+      }
+    }
+    placePart(type, at, 0);
+  };
+
   useImperativeHandle(ref, () => ({
     zoomIn: () => setView((v) => zoomAt(v, size.width / 2, size.height / 2, ZOOM_STEP)),
     zoomOut: () => setView((v) => zoomAt(v, size.width / 2, size.height / 2, 1 / ZOOM_STEP)),
     fit,
     reveal,
+    addPartAtCenter,
   }));
 
   // --- Fare tekerleği ile yakınlaştırma (pasif olmayan dinleyici gerekir) ---------------
@@ -285,8 +323,9 @@ export function Canvas({
 
   const hitTest = (g: Point, only?: { pins?: boolean; parts?: boolean; wires?: boolean }): Hit | null => {
     const want = { pins: true, parts: true, wires: true, ...only };
+    const touch = pointerType.current === 'touch';
     if (want.pins) {
-      const tol = pxToGrid(PIN_TOLERANCE_PX);
+      const tol = pxToGrid(touch ? TOUCH_PIN_TOLERANCE_PX : PIN_TOLERANCE_PX);
       let best: Hit | null = null;
       let bestDist = tol;
       for (const part of doc.parts) {
@@ -307,7 +346,7 @@ export function Canvas({
       }
     }
     if (want.wires) {
-      const tol = pxToGrid(WIRE_TOLERANCE_PX);
+      const tol = pxToGrid(touch ? TOUCH_WIRE_TOLERANCE_PX : WIRE_TOLERANCE_PX);
       for (let i = doc.wires.length - 1; i >= 0; i--) {
         const wire = doc.wires[i]!;
         for (let s = 0; s + 1 < wire.points.length; s++) {
@@ -371,11 +410,13 @@ export function Canvas({
   // --- İşaretçi olayları ---------------------------------------------------------------
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     const svg = svgRef.current!;
+    pointerType.current = e.pointerType;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const current = interactionRef.current;
 
     // İki parmak: kıstırarak yakınlaştırma
     if (pointers.current.size === 2) {
+      cancelLongPress();
       const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
       if (current.kind === 'drag-parts' || current.kind === 'drag-segment') dispatch({ type: 'end-preview', before: current.before });
       const center = localPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
@@ -448,9 +489,27 @@ export function Canvas({
       const sel = selection.parts.includes(hit.partId) ? selection : { parts: [hit.partId], wires: [] };
       if (sel !== selection) dispatch({ type: 'select', selection: sel });
       svg.setPointerCapture(e.pointerId);
+      if (e.pointerType === 'touch') {
+        // Uzun basış: sağ tık menüsü (parmak kıpırdamazsa).
+        cancelLongPress();
+        const partId = hit.partId;
+        longPress.current = {
+          x: e.clientX,
+          y: e.clientY,
+          fired: false,
+          timer: window.setTimeout(() => {
+            const state = interactionRef.current;
+            if (state.kind !== 'drag-parts' || state.delta.x !== 0 || state.delta.y !== 0) return;
+            if (longPress.current) longPress.current.fired = true;
+            setInteraction({ kind: 'idle' });
+            setMenu({ partId, x: local.x, y: local.y });
+          }, LONG_PRESS_MS),
+        };
+      }
       setInteraction({
         kind: 'drag-parts',
         pointerId: e.pointerId,
+        tapPartId: hit.partId,
         start: g,
         before: doc,
         parts: new Set(sel.parts),
@@ -497,7 +556,10 @@ export function Canvas({
 
   const onPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 0) pointerType.current = e.pointerType;
     const current = interactionRef.current;
+    const press = longPress.current;
+    if (press && !press.fired && Math.hypot(e.clientX - press.x, e.clientY - press.y) > DRAG_THRESHOLD_PX * 2) cancelLongPress();
 
     if (current.kind === 'pinch' && pinchRef.current && pointers.current.size >= 2) {
       const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
@@ -556,6 +618,8 @@ export function Canvas({
   const onPointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
     pointers.current.delete(e.pointerId);
     const current = interactionRef.current;
+    const longPressFired = longPress.current?.fired ?? false;
+    cancelLongPress();
     if (current.kind === 'pinch') {
       if (pointers.current.size < 2) {
         pinchRef.current = null;
@@ -568,10 +632,23 @@ export function Canvas({
         setInteraction({ kind: 'idle' });
         return;
       case 'drag-parts':
-      case 'drag-segment':
+      case 'drag-segment': {
         setInteraction({ kind: 'idle' });
-        if (current.delta.x !== 0 || current.delta.y !== 0) dispatch({ type: 'end-preview', before: current.before });
+        const moved = current.delta.x !== 0 || current.delta.y !== 0;
+        if (moved) dispatch({ type: 'end-preview', before: current.before });
+        // Dokunmatik çift dokunuş: özellik penceresi.
+        if (current.kind === 'drag-parts' && e.pointerType === 'touch' && !moved && !longPressFired) {
+          const now = performance.now();
+          const previous = lastTap.current;
+          if (previous && previous.partId === current.tapPartId && now - previous.time < DOUBLE_TAP_MS) {
+            lastTap.current = null;
+            onOpenProperties(current.tapPartId);
+          } else {
+            lastTap.current = { partId: current.tapPartId, time: now };
+          }
+        }
         return;
+      }
       case 'rubber': {
         setInteraction({ kind: 'idle' });
         const box = boxFromPoints(current.start, current.current);

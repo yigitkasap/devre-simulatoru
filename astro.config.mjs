@@ -16,5 +16,8 @@ export default defineConfig({
   devToolbar: { enabled: false },
   vite: {
     plugins: [tailwindcss()],
+    // lz-string (CommonJS) açılışta hazırlansın; sonradan keşfedilirse geliştirme sunucusu
+    // yapılandırma değişikliğinden sonra "Outdated Optimize Dep" (504) verip sayfayı yükleyemiyor.
+    optimizeDeps: { include: ['lz-string'] },
   },
 });
