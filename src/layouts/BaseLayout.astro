@@ -1,0 +1,30 @@
+---
+// Tüm sayfaların ortak iskeleti. İleride eklenecek içerik sayfaları (birimler, dönüşümler,
+// formüller) da bu düzeni kullanır.
+import '../styles/global.css';
+import { SITE_DESCRIPTION, SITE_NAME } from '../config';
+
+interface Props {
+  /** Sayfa başlığı; verilmezse yalnızca site adı kullanılır. */
+  title?: string;
+  description?: string;
+}
+
+const { title, description = SITE_DESCRIPTION } = Astro.props;
+const fullTitle = title ? `${title} · ${SITE_NAME}` : SITE_NAME;
+---
+
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#eef0f3" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{fullTitle}</title>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

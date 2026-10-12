@@ -1,0 +1,12 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Simulator from '../editor/Simulator';
+import { tr } from '../i18n/tr';
+---
+
+<BaseLayout>
+  <Simulator client:only="react" />
+  <noscript>
+    <p style="padding: 2rem; font-size: 1.1rem;">{tr.app.noScript}</p>
+  </noscript>
+</BaseLayout>

@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, 'Liberation Mono', monospace;
+
+  /* Arayüz renkleri */
+  --color-app: #eef0f3;
+  --color-panel: #ffffff;
+  --color-line: #dde1e6;
+  --color-ink: #1d2733;
+  --color-muted: #5f6b7a;
+  --color-accent: #1f6feb;
+  --color-accent-soft: #e6effd;
+  --color-danger: #d92d20;
+  --color-warn: #b54708;
+  --color-warn-soft: #fef6e7;
+
+  /* Şema renkleri */
+  --color-paper: #fbfbf9;
+  --color-grid: #d3d7dc;
+  --color-symbol: #1d2733;
+  --color-select: #1f6feb;
+  --color-pin: #f05a28;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-app);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tuval üzerinde metin seçilmesin, dokunmatik ekranda kaydırma tarayıcıya gitmesin. */
+.schematic {
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
