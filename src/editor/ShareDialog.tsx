@@ -9,9 +9,17 @@ export function ShareDialog({ link, onClose }: { link: string; onClose: () => vo
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
+  /** Bağlantıyı seç (iOS Safari salt okunur alanda select() ile seçmiyor; aralık da verilir). */
+  const selectLink = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    input.select();
+    input.setSelectionRange(0, input.value.length);
+  };
+
   useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
+    selectLink();
   }, []);
 
   const copy = async () => {
@@ -19,7 +27,7 @@ export function ShareDialog({ link, onClose }: { link: string; onClose: () => vo
       await navigator.clipboard.writeText(link);
       setState('copied');
     } catch {
-      inputRef.current?.select();
+      selectLink();
       setState('failed');
     }
   };
@@ -47,7 +55,7 @@ export function ShareDialog({ link, onClose }: { link: string; onClose: () => vo
               ref={inputRef}
               readOnly
               value={link}
-              onFocus={(e) => e.target.select()}
+              onFocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
               className="min-w-0 flex-1 rounded-md border border-line bg-app px-3 py-1.5 font-mono text-xs"
             />
             <button

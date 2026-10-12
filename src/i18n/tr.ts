@@ -296,6 +296,8 @@ export const tr = {
     label: 'Devre şeması',
     empty: 'Başlamak için soldaki kütüphaneden bir parça sürükle.',
     emptyMobile: 'Parça eklemek için sol üstteki kütüphane düğmesine dokun.',
+    wiringActive: 'Kablo çiziliyor: bir pine ya da kabloya dokun',
+    cancelWire: 'İptal',
   },
   sim: {
     play: 'Oynat',

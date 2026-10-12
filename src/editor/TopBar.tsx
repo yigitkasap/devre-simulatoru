@@ -30,7 +30,7 @@ export function ToolButton({
       title={title}
       aria-label={label}
       aria-pressed={active}
-      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm transition-colors disabled:opacity-35 ${
+      className={`flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-md px-2 text-sm transition-colors disabled:opacity-35 md:h-8 md:min-w-0 ${
         active ? 'bg-accent-soft text-accent' : 'text-ink hover:bg-app'
       }`}
     >

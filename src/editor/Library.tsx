@@ -35,6 +35,8 @@ export interface LibraryProps {
   /** Dokunmatik ekran: parçaya dokununca parça doğrudan tuvale eklenir (sürükle-bırak yok). */
   readonly touch: boolean;
   readonly onAddPart: (type: DeviceType) => void;
+  /** Fareyle üzerine gelinen parça (masaüstünde tuvalin sağ altındaki bilgi kartı için); null: yok. */
+  readonly onPreview: (type: DeviceType | null) => void;
 }
 
 export function Library({
@@ -48,10 +50,9 @@ export function Library({
   onLoadExample,
   touch,
   onAddPart,
+  onPreview,
 }: LibraryProps) {
   const [query, setQuery] = useState('');
-  const [previewType, setPreviewType] = useState<DeviceType>('battery');
-  const activeType = tool.kind === 'place' ? tool.type : previewType;
 
   const groups = useMemo(() => {
     const q = normalize(query.trim());
@@ -78,7 +79,6 @@ export function Library({
   }, [query]);
 
   const choose = (type: DeviceType) => {
-    setPreviewType(type);
     if (touch) {
       // Dokunmatikte imleci izleyen önizleme olmadığı için "seç, sonra tuvale dokun" belirsizdir:
       // parça doğrudan görünen alanın ortasına eklenir.
@@ -121,7 +121,10 @@ export function Library({
         </label>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <nav
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2"
+        onPointerLeave={(e) => e.pointerType === 'mouse' && onPreview(null)}
+      >
         {groups.length === 0 && examples.length === 0 && (
           <p className="px-2 py-3 text-sm text-muted">{tr.library.noResults}</p>
         )}
@@ -139,14 +142,13 @@ export function Library({
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', type);
                         e.dataTransfer.effectAllowed = 'copy';
-                        setPreviewType(type);
                         onDragTypeChange(type);
                       }}
                       onDragEnd={() => onDragTypeChange(null)}
                       onClick={() => choose(type)}
                       // Önizleme yalnızca gerçek farede değişir: iOS Safari'de dokunuşun ürettiği
                       // "üzerine gelme" olayı sayfayı değiştirirse ilk dokunuşta tıklama gönderilmez.
-                      onPointerEnter={(e) => e.pointerType === 'mouse' && tool.kind !== 'place' && setPreviewType(type)}
+                      onPointerEnter={(e) => e.pointerType === 'mouse' && onPreview(type)}
                       aria-pressed={active}
                       className={`no-callout flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm ${
                         active ? 'bg-accent-soft text-accent' : 'hover:bg-app'
@@ -195,15 +197,6 @@ export function Library({
           </section>
         )}
       </nav>
-
-      <div className="border-t border-line p-3">
-        <div className="flex h-20 items-center justify-center rounded-md bg-paper">
-          <SymbolIcon type={activeType} resistorStyle={settings.resistorStyle} className="h-16 w-32" />
-        </div>
-        <p className="mt-2 text-sm font-semibold">{tr.devices.names[activeType]}</p>
-        <p className="mt-0.5 text-xs leading-snug text-muted">{tr.devices.descriptions[activeType]}</p>
-        <p className="mt-2 hidden text-[11px] text-muted md:block">{tr.library.hint}</p>
-      </div>
     </aside>
   );
 }

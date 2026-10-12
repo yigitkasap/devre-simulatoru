@@ -29,7 +29,17 @@ body {
   height: 100%;
 }
 
+html {
+  /* iOS yatay konumda yazıları kendiliğinden büyütmesin. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Arayüzde çift dokunuş sayfayı yakınlaştırmasın (iki parmakla yakınlaştırma serbest). */
+  touch-action: manipulation;
+}
+
 body {
+  /* iOS'ta sayfanın tamamı esneyip kaymasın; kaydırma yalnızca listelerde olsun. */
+  overscroll-behavior: none;
   margin: 0;
   background: var(--color-app);
   color: var(--color-ink);
@@ -76,5 +86,20 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .alarm-blink {
     animation: none;
+  }
+}
+
+/* Uygulama ekranı: 100dvh desteklenmiyorsa (eski iOS) 100vh. */
+.app-root {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* iOS Safari, 16 px'ten küçük yazılı bir giriş alanına odaklanınca sayfayı yakınlaştırıp öyle bırakır. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
   }
 }

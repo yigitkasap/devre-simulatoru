@@ -91,6 +91,10 @@ export interface CanvasProps {
   readonly fitRequest: number;
   /** Sol üstte örnek kartı açık: sığdırırken kartın kapladığı alan boş bırakılır. */
   readonly reserveCard: boolean;
+  /** Dokunmatik ekran (birincil işaretçi parmak): seçili parçanın V/I/P bilgisi kalıcı gösterilir. */
+  readonly touch: boolean;
+  /** Tuvalin üstünde kaydırılabilir bir katman açık (çekmece, pencere): tuval dokunmayı tutmasın. */
+  readonly overlayOpen: boolean;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -147,6 +151,10 @@ const PIN_TOLERANCE_PX = 8;
 const WIRE_TOLERANCE_PX = 6;
 const TOUCH_PIN_TOLERANCE_PX = 18;
 const TOUCH_WIRE_TOLERANCE_PX = 12;
+/** Dokunmatik: parçanın gövdesi her yöne bu kadar geniş sayılır (parmak hedefi ≥ 44 px olsun). */
+const TOUCH_PART_PADDING_PX = 12;
+/** Dokunmatik: gövdenin içindeyken pin ancak bu kadar yakınsa seçilir (yoksa parça tutulur). */
+const TOUCH_PIN_INSIDE_PX = 12;
 const DRAG_THRESHOLD_PX = 5;
 /** Dokunmatik: bu süre kıpırdamadan basılı tutmak sağ tık menüsünü açar (iOS'ta contextmenu olayı yok). */
 const LONG_PRESS_MS = 550;
@@ -174,6 +182,8 @@ export function Canvas({
   onFlip,
   fitRequest,
   reserveCard,
+  touch,
+  overlayOpen,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -196,12 +206,21 @@ export function Canvas({
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pointerType = useRef<string>('mouse');
   const longPress = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
+  /** Uzun basışla açılan menü: parmak kıpırdarsa kapanır ve sürükleme sürer. */
+  const menuFromLongPress = useRef(false);
   const lastTap = useRef<{ partId: string; time: number } | null>(null);
   const cancelLongPress = () => {
     if (longPress.current) window.clearTimeout(longPress.current.timer);
     longPress.current = null;
   };
   const pinchRef = useRef<{ distance: number; view: View; cx: number; cy: number } | null>(null);
+  const capture = (pointerId: number) => {
+    try {
+      svgRef.current?.setPointerCapture(pointerId);
+    } catch {
+      // Dokunmatikte işaretçi zaten örtük olarak yakalanır; yakalanamazsa olaylar yine SVG'ye gelir.
+    }
+  };
   const viewInitialized = useRef(false);
 
   // --- Boyut ve ilk görünüm ---------------------------------------------------------
@@ -323,7 +342,31 @@ export function Canvas({
 
   const hitTest = (g: Point, only?: { pins?: boolean; parts?: boolean; wires?: boolean }): Hit | null => {
     const want = { pins: true, parts: true, wires: true, ...only };
-    const touch = pointerType.current === 'touch';
+    const touch = pointerType.current !== 'mouse';
+    if (touch && want.parts) {
+      // Parmakla dokunurken: parçanın genişletilmiş gövdesinin içindeyse ve bir pinine çok yakın
+      // değilse parça tutulur. Böylece küçük parçalar da sürüklenebilir.
+      const pad = pxToGrid(TOUCH_PART_PADDING_PX);
+      for (let i = doc.parts.length - 1; i >= 0; i--) {
+        const part = doc.parts[i]!;
+        const b = partBounds(part);
+        if (!boxContains({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }, g)) continue;
+        if (want.pins) {
+          const pins = pinPositions(part);
+          let nearest = -1;
+          let nearestDist = pxToGrid(TOUCH_PIN_INSIDE_PX);
+          pins.forEach((pos, index) => {
+            const d = Math.hypot(pos.x - g.x, pos.y - g.y);
+            if (d <= nearestDist) {
+              nearestDist = d;
+              nearest = index;
+            }
+          });
+          if (nearest >= 0) return { kind: 'pin', partId: part.id, index: nearest, pos: pins[nearest]! };
+        }
+        return { kind: 'part', partId: part.id };
+      }
+    }
     if (want.pins) {
       const tol = pxToGrid(touch ? TOUCH_PIN_TOLERANCE_PX : PIN_TOLERANCE_PX);
       let best: Hit | null = null;
@@ -409,7 +452,6 @@ export function Canvas({
 
   // --- İşaretçi olayları ---------------------------------------------------------------
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
-    const svg = svgRef.current!;
     pointerType.current = e.pointerType;
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const current = interactionRef.current;
@@ -435,7 +477,7 @@ export function Canvas({
     }
     if (e.button === 1 || spaceDown) {
       e.preventDefault();
-      svg.setPointerCapture(e.pointerId);
+      capture(e.pointerId);
       setInteraction({ kind: 'pan', pointerId: e.pointerId, sx: local.x, sy: local.y, view });
       return;
     }
@@ -448,19 +490,19 @@ export function Canvas({
     }
 
     if (current.kind === 'wiring') {
-      svg.setPointerCapture(e.pointerId);
+      capture(e.pointerId);
       wiringClick(current, g);
       return;
     }
 
     const hit = hitTest(g);
     if (hit?.kind === 'pin') {
-      svg.setPointerCapture(e.pointerId);
+      capture(e.pointerId);
       startWiring(hit.pos, e);
       return;
     }
     if (tool.kind === 'wire') {
-      svg.setPointerCapture(e.pointerId);
+      capture(e.pointerId);
       if (hit?.kind === 'wire') {
         const wire = doc.wires.find((w) => w.id === hit.wireId)!;
         startWiring(snapToSegment(g, wire.points[hit.segment]!, wire.points[hit.segment + 1]!), e);
@@ -488,8 +530,8 @@ export function Canvas({
       }
       const sel = selection.parts.includes(hit.partId) ? selection : { parts: [hit.partId], wires: [] };
       if (sel !== selection) dispatch({ type: 'select', selection: sel });
-      svg.setPointerCapture(e.pointerId);
-      if (e.pointerType === 'touch') {
+      capture(e.pointerId);
+      if (e.pointerType !== 'mouse') {
         // Uzun basış: sağ tık menüsü (parmak kıpırdamazsa).
         cancelLongPress();
         const partId = hit.partId;
@@ -501,7 +543,8 @@ export function Canvas({
             const state = interactionRef.current;
             if (state.kind !== 'drag-parts' || state.delta.x !== 0 || state.delta.y !== 0) return;
             if (longPress.current) longPress.current.fired = true;
-            setInteraction({ kind: 'idle' });
+            // Sürükleme iptal edilmez: parmak kıpırdarsa menü kapanır ve parça taşınır.
+            menuFromLongPress.current = true;
             setMenu({ partId, x: local.x, y: local.y });
           }, LONG_PRESS_MS),
         };
@@ -529,7 +572,7 @@ export function Canvas({
       if (!selection.wires.includes(hit.wireId) || selection.parts.length > 0 || selection.wires.length > 1) {
         dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
       }
-      svg.setPointerCapture(e.pointerId);
+      capture(e.pointerId);
       setInteraction({
         kind: 'drag-segment',
         pointerId: e.pointerId,
@@ -543,8 +586,8 @@ export function Canvas({
     }
 
     // Boş alan: dokunmatikte kaydır, farede seçim kutusu
-    svg.setPointerCapture(e.pointerId);
-    if (e.pointerType === 'touch') {
+    capture(e.pointerId);
+    if (e.pointerType !== 'mouse') {
       setInteraction({ kind: 'pan', pointerId: e.pointerId, sx: local.x, sy: local.y, view });
       return;
     }
@@ -587,6 +630,10 @@ export function Canvas({
       case 'drag-parts': {
         const delta = { x: Math.round(g.x - current.start.x), y: Math.round(g.y - current.start.y) };
         if (samePoint(delta, current.delta)) return;
+        if (menuFromLongPress.current) {
+          menuFromLongPress.current = false;
+          setMenu(null);
+        }
         setInteraction({ ...current, delta });
         dispatch({ type: 'preview', doc: moveSelection(current.before, current.parts, current.wires, delta.x, delta.y) });
         return;
@@ -628,16 +675,25 @@ export function Canvas({
       return;
     }
     switch (current.kind) {
-      case 'pan':
+      case 'pan': {
         setInteraction({ kind: 'idle' });
+        const local = localPoint(e.clientX, e.clientY);
+        const still = Math.hypot(local.x - current.sx, local.y - current.sy) <= DRAG_THRESHOLD_PX * 2;
+        if (e.pointerType !== 'mouse' && still) {
+          // Boşluğa dokunmak: seçimi ve menüyü kaldır.
+          setMenu(null);
+          if (selection.parts.length > 0 || selection.wires.length > 0) dispatch({ type: 'select', selection: EMPTY_SELECTION });
+        }
         return;
+      }
       case 'drag-parts':
       case 'drag-segment': {
         setInteraction({ kind: 'idle' });
         const moved = current.delta.x !== 0 || current.delta.y !== 0;
         if (moved) dispatch({ type: 'end-preview', before: current.before });
         // Dokunmatik çift dokunuş: özellik penceresi.
-        if (current.kind === 'drag-parts' && e.pointerType === 'touch' && !moved && !longPressFired) {
+        menuFromLongPress.current = false;
+        if (current.kind === 'drag-parts' && e.pointerType !== 'mouse' && !moved && !longPressFired) {
           const now = performance.now();
           const previous = lastTap.current;
           if (previous && previous.partId === current.tapPartId && now - previous.time < DOUBLE_TAP_MS) {
@@ -861,6 +917,9 @@ export function Canvas({
       <svg
         ref={svgRef}
         className={`schematic block h-full w-full ${cursorClass}`}
+        // iOS/WebKit, touch-action: none bölgesini üstüne binen katmanlara da uygulayabiliyor; o zaman
+        // tuvalin üstündeki çekmece ya da pencere parmakla kaydırılamıyor. Katman açıkken kapatılır.
+        style={overlayOpen ? { touchAction: 'auto' } : undefined}
         role="img"
         aria-label={tr.canvas.label}
         onPointerDown={onPointerDown}
@@ -885,7 +944,9 @@ export function Canvas({
             <circle cx={5} cy={5} r={1.35} fill="var(--color-grid)" />
           </pattern>
         </defs>
-        <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`}>
+        {/* Çizimin hiçbir parçası olay almaz; hedef her zaman SVG'nin kendisidir. Dokunmatikte işaretçi
+            dokunulan öğeye örtük olarak yakalandığı için, yeniden çizilen bir alt öğe sürüklemeyi koparabilirdi. */}
+        <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`} pointerEvents="none">
           {view.scale >= 0.6 && <rect x={visible.x} y={visible.y} width={visible.w} height={visible.h} fill="url(#grid-minor)" />}
           <rect x={visible.x} y={visible.y} width={visible.w} height={visible.h} fill="url(#grid-major)" />
 
@@ -978,6 +1039,14 @@ export function Canvas({
             <circle cx={hoverPin.x * GRID} cy={hoverPin.y * GRID} r={5.5} fill="none" stroke="var(--color-pin)" strokeWidth={2} />
           )}
 
+          {interaction.kind === 'wiring' && (
+            <circle
+              cx={interaction.points[0]!.x * GRID}
+              cy={interaction.points[0]!.y * GRID}
+              r={4.5}
+              fill="var(--color-select)"
+            />
+          )}
           {wiringPreview && (
             <polyline
               points={wiringPreview.map((p) => `${p.x * GRID},${p.y * GRID}`).join(' ')}
@@ -1015,6 +1084,37 @@ export function Canvas({
       )}
 
       {frame && <VoltageLegend vmax={frame.vmax} />}
+
+      {interaction.kind === 'wiring' && (
+        <div className="absolute top-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-panel/95 py-1 pr-1 pl-3 text-xs shadow-md">
+          <span className="text-muted">{tr.canvas.wiringActive}</span>
+          <button
+            type="button"
+            onClick={() => setInteraction({ kind: 'idle' })}
+            className="rounded-full bg-app px-3 py-1.5 font-medium hover:bg-line"
+          >
+            {tr.canvas.cancelWire}
+          </button>
+        </div>
+      )}
+
+      {touch && frame && !menu && interaction.kind === 'idle' && selection.parts.length === 1 && selection.wires.length === 0 && (() => {
+        // Dokunmatikte üzerine gelme yok: seçili parçanın V/I/P bilgisi parçanın yanında gösterilir.
+        const part = doc.parts.find((p) => p.id === selection.parts[0]);
+        const m = part && frame.measurements.get(part.id);
+        const readout = part && m ? partReadout(part, m, frame.statuses.get(part.id)) : null;
+        if (!part || !readout) return null;
+        const box = partBounds(part);
+        const g = GRID * view.scale;
+        return (
+          <ReadoutBox
+            readout={readout}
+            x={(box.x + box.w) * g + view.x}
+            y={(box.y + box.h) * g + view.y}
+            area={size}
+          />
+        );
+      })()}
 
       {frame &&
         frame.runtime
@@ -1145,7 +1245,8 @@ function CurrentDots({ doc, graph, frame }: { doc: CircuitDoc; graph: FlowGraph;
 function VoltageLegend({ vmax }: { vmax: number }) {
   const label = formatSI(vmax, 'V', { trim: true });
   return (
-    <div className="pointer-events-none absolute top-2 right-2 rounded-md border border-line bg-panel/90 px-2.5 py-1.5 text-[11px] shadow-sm">
+    // Telefonda örnek kartı üst kenarı kapladığı için açıklama sol altta durur.
+    <div className="pointer-events-none absolute bottom-10 left-2 rounded-md border border-line bg-panel/90 px-2.5 py-1.5 text-[11px] shadow-sm md:top-2 md:right-2 md:bottom-auto md:left-auto">
       <p className="mb-1 font-medium text-muted">{tr.sim.legend}</p>
       <div className="h-2 w-36 rounded-full" style={{ background: VOLTAGE_GRADIENT }} />
       <div className="mt-0.5 flex w-36 justify-between tabular text-muted">

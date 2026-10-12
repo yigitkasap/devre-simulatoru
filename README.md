@@ -95,7 +95,7 @@ altına çıkart. Sayfadaki tüm yollar ve paylaşım bağlantıları `base`'e g
 | Yakınlaştır / kaydır | Fare tekerleği / boşluk tuşu + sürükle ya da orta tuş; telefonda iki parmak |
 | Simülasyon | Alttaki Oynat / Duraklat / Durdur; çalışırken anahtara tıklayınca açılır/kapanır |
 | Yanmış LED | Sağ tıkla → Onar ya da Durdur |
-| Telefon / tablet | Kütüphanede parçaya dokun: parça görünen alanın ortasına eklenir · sürükle: taşı · pin ucuna dokun: kablo · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil, Onar) · iki parmak: yakınlaştır |
+| Telefon / tablet | Kütüphanede parçaya dokun: parça görünen alanın ortasına eklenir · sürükle: taşı · pin ucuna dokun: kablo (üstteki İptal ile vazgeç) · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil, Onar) · boşluğa dokun: seçimi kaldır · iki parmak: yakınlaştır · simülasyonda seçili parçanın V/I/P bilgisi yanında görünür |
 
 ## Dosya biçimi ve paylaşım bağlantısı
 
@@ -257,13 +257,30 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
 - **Otomatik kayıt (kullanıcı isteğiyle Aşama 3'e alındı):** Devre her değişiklikten 0,4 s
   sonra ve sayfa kapanırken `localStorage` içine (`devre-simulatoru:devre`) yazılır; açılışta
   okunur. Bozuk ya da tanınmayan veri sessizce yok sayılır. Ayarlar ayrı anahtarda tutulur.
-- **Dokunmatik ekran:** Birincil işaretçi parmaksa (`pointer: coarse`) kütüphanede parçaya
-  dokunmak onu doğrudan görünen alanın ortasındaki boş bir yere ekler; imleci izleyen önizleme
-  olmadığı için masaüstündeki "seç, sonra tuvale tıkla" akışı kullanılmaz ve HTML sürükle-bırak
-  kapalıdır. iOS Safari'de çift tıklama ve sağ tık olayları güvenilir gelmediği için çift dokunuş
-  ve uzun basış (0,55 s) ayrıca algılanır. Parmakla dokunurken pin ve kablo isabet alanları
-  büyür. Kütüphanedeki önizleme yalnızca gerçek fare üzerine gelince değişir: iOS Safari,
-  dokunuşun ürettiği "üzerine gelme" olayı sayfayı değiştirirse ilk dokunuşta tıklamayı göndermez.
+- **Dokunmatik ekran ve iOS Safari:** Birincil işaretçi parmaksa (`pointer: coarse`):
+  - Kütüphanede parçaya dokunmak onu görünen alanın ortasındaki boş bir yere ekler; imleci izleyen
+    önizleme olmadığı için masaüstündeki "seç, sonra tuvale tıkla" akışı ve HTML sürükle-bırak
+    kullanılmaz. Kütüphane önizlemesi yalnızca gerçek fareyle değişir (iOS, dokunuşun ürettiği
+    "üzerine gelme" olayı sayfayı değiştirirse ilk dokunuşta tıklamayı göndermez).
+  - Parçanın gövdesi her yöne 12 px geniş sayılır ve gövdenin içindeyken pin ancak 12 px
+    yakınsa seçilir; böylece küçük parçalar da parmakla tutulup taşınabilir.
+  - iOS'ta çift tıklama ve sağ tık olayları güvenilir gelmediği için çift dokunuş (özellikler) ve
+    uzun basış (0,55 s, menü) ayrıca algılanır. Uzun basıştan sonra parmak kıpırdarsa menü kapanır
+    ve parça taşınır; yani "basılı tutup sürükleme" de çalışır.
+  - Boşluğa dokunmak seçimi kaldırır; kablo çizerken üstte bir "İptal" düğmesi çıkar (Esc yok).
+    Simülasyon sırasında seçili parçanın V/I/P bilgisi yanında gösterilir (üzerine gelme yok).
+  - Tuvalin tüm çizimi olay almaz (`pointer-events: none`); hedef her zaman SVG'dir. Dokunmatikte
+    işaretçi dokunulan öğeye örtük olarak yakalandığı için, yeniden çizilen bir alt öğe sürüklemeyi
+    koparabilirdi.
+  - WebKit, `touch-action: none` verilmiş tuvalin dokunma bölgesini üstüne binen katmanlara da
+    uygulayabiliyor; bu yüzden kütüphane çekmecesi ya da bir pencere açıkken tuvalin
+    `touch-action` değeri kaldırılır (aksi halde çekmece parmakla kaydırılamıyordu).
+  - Giriş alanlarının yazısı dokunmatikte 16 px'tir (iOS daha küçük yazılı alana odaklanınca
+    sayfayı yakınlaştırıp öyle bırakır). Arayüzde çift dokunuşla sayfa yakınlaşmaz
+    (`touch-action: manipulation`), sayfa esneyip kaymaz (`overscroll-behavior: none`).
+- **Parça bilgi kartı:** Kütüphanede fareyle üzerine gelinen (ya da yerleştirilmekte olan) parçanın
+  sembolü ve açıklaması masaüstünde tuvalin sağ altında gösterilir; telefonda gösterilmez
+  (kullanıcı isteği; kütüphanede yer kaplıyordu).
 - **Yükleme:** Örnek açmak, JSON içe aktarmak, paylaşım bağlantısı açmak ve "Yeni devre"
   mevcut devrenin yerine geçer ama geri alma geçmişine girer; Ctrl+Z ile önceki devreye dönülür.
   Bu yüzden onay sorulmaz, kısa bir bildirim gösterilir.

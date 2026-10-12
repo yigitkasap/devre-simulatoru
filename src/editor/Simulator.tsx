@@ -19,6 +19,7 @@ import { ExampleCard } from './ExampleCard';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { Library } from './Library';
 import { MessagesPanel, messageKey, type MessageItem } from './MessagesPanel';
+import { PartInfo } from './PartInfo';
 import { PropertiesDialog } from './PropertiesDialog';
 import { useSettings } from './settings';
 import { ShareDialog } from './ShareDialog';
@@ -43,6 +44,7 @@ export default function Simulator() {
   const [settings, updateSettings] = useSettings();
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryDragType, setLibraryDragType] = useState<DeviceType | null>(null);
+  const [hoveredType, setHoveredType] = useState<DeviceType | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [fitRequest, setFitRequest] = useState(0);
@@ -205,7 +207,7 @@ export default function Simulator() {
   }, [doc]);
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
+    <div className="app-root flex flex-col overflow-hidden">
       <TopBar
         toolKind={tool.kind}
         canUndo={state.past.length > 0}
@@ -234,7 +236,10 @@ export default function Simulator() {
         ref={fileInputRef}
         type="file"
         accept=".json,application/json"
-        className="hidden"
+        // display:none yerine görünmez: iOS Safari gizli dosya alanında seçiciyi açmayabiliyor.
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={(e) => {
           void importFile(e.target.files?.[0]);
           e.target.value = '';
@@ -252,6 +257,7 @@ export default function Simulator() {
           activeExample={activeExample}
           onLoadExample={loadExample}
           touch={touch}
+          onPreview={setHoveredType}
           onAddPart={(type) => {
             canvasRef.current?.addPartAtCenter(type);
             if (!touchHintShown.current) {
@@ -284,7 +290,13 @@ export default function Simulator() {
             onFlip={flipSelection}
             fitRequest={fitRequest}
             reserveCard={activeExample !== null}
+            touch={touch}
+            overlayOpen={libraryOpen || Boolean(editingPart) || Boolean(shareLink)}
           />
+          {(() => {
+            const infoType = tool.kind === 'place' ? tool.type : (libraryDragType ?? hoveredType);
+            return infoType && !touch ? <PartInfo type={infoType} resistorStyle={settings.resistorStyle} /> : null;
+          })()}
           {activeExample && (
             <ExampleCard
               key={activeExample}

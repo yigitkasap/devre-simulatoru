@@ -79,7 +79,7 @@ export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: Proper
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 sm:items-center"
       onPointerDown={(e) => e.target === e.currentTarget && onCancel()}
     >
       <form
