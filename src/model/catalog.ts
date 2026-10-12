@@ -61,6 +61,8 @@ export interface PartDef {
   readonly propDefs: readonly PropDef[];
   /** Adı tuvalde gösterilsin mi? (Toprakta gösterilmez.) */
   readonly showLabel: boolean;
+  /** Yönlü parça mı? (Ters çevir komutu yalnızca bunlarda çalışır.) */
+  readonly polarized: boolean;
 }
 
 const TWO_PINS: readonly Point[] = [
@@ -81,6 +83,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
       { kind: 'number', key: 'internalResistance', unit: 'Ω', min: { value: 0, exclusive: false } },
     ],
     showLabel: true,
+    polarized: true,
   },
   ground: {
     type: 'ground',
@@ -91,6 +94,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     defaultProps: {},
     propDefs: [],
     showLabel: false,
+    polarized: false,
   },
   resistor: {
     type: 'resistor',
@@ -101,6 +105,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     defaultProps: { ...RESISTOR_DEFAULTS },
     propDefs: [{ kind: 'number', key: 'resistance', unit: 'Ω', min: { value: 0, exclusive: true } }],
     showLabel: true,
+    polarized: false,
   },
   capacitor: {
     type: 'capacitor',
@@ -114,6 +119,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
       { kind: 'number', key: 'initialVoltage', unit: 'V' },
     ],
     showLabel: true,
+    polarized: false,
   },
   diode: {
     type: 'diode',
@@ -124,6 +130,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     defaultProps: {},
     propDefs: [],
     showLabel: true,
+    polarized: true,
   },
   led: {
     type: 'led',
@@ -134,6 +141,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     defaultProps: { ...LED_DEFAULTS },
     propDefs: [{ kind: 'select', key: 'color', options: LED_COLORS }],
     showLabel: true,
+    polarized: true,
   },
   switch: {
     type: 'switch',
@@ -144,6 +152,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     defaultProps: { ...SWITCH_DEFAULTS },
     propDefs: [{ kind: 'boolean', key: 'closed' }],
     showLabel: true,
+    polarized: false,
   },
   voltmeter: {
     type: 'voltmeter',
@@ -157,6 +166,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
       { kind: 'number', key: 'resistance', unit: 'Ω', min: { value: 0, exclusive: true }, disabledWhen: 'ideal' },
     ],
     showLabel: true,
+    polarized: true,
   },
   ammeter: {
     type: 'ammeter',
@@ -170,6 +180,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
       { kind: 'number', key: 'resistance', unit: 'Ω', min: { value: 0, exclusive: true }, disabledWhen: 'ideal' },
     ],
     showLabel: true,
+    polarized: true,
   },
 };
 

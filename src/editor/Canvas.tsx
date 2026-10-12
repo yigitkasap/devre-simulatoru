@@ -15,8 +15,7 @@ import {
   type Ref,
 } from 'react';
 import { tr } from '../i18n/tr';
-import type { Box } from '../model/catalog';
-import { isDeviceType } from '../model/catalog';
+import { CATALOG, isDeviceType, type Box } from '../model/catalog';
 import type { Connectivity } from '../model/connectivity';
 import { pinKey } from '../model/connectivity';
 import { addPart, addWire, moveSelection, removeItems, replaceWirePoints, updatePart } from '../model/docOps';
@@ -82,8 +81,10 @@ export interface CanvasProps {
   readonly highlight: Highlight | null;
   /** Yanmış LED'i onar. */
   readonly onRepair: (partId: string) => void;
-  /** Parçaları döndür (art arda basışlar tek dönüş sayılır; bkz. Simulator). */
+  /** Parçaları 90° döndür (kablolar pinleri izler). */
   readonly onRotate: (partIds: readonly string[]) => void;
+  /** Yönlü parçaları ters çevir (uçlar yer değiştirir, kablolar yerinde kalır). */
+  readonly onFlip: (partIds: readonly string[]) => void;
   /** Bu sayı değişince görünüm devreye sığdırılır (örnek ya da dosya yüklenince). */
   readonly fitRequest: number;
   /** Sol üstte örnek kartı açık: sığdırırken kartın kapladığı alan boş bırakılır. */
@@ -160,6 +161,7 @@ export function Canvas({
   highlight,
   onRepair,
   onRotate,
+  onFlip,
   fitRequest,
   reserveCard,
   ref,
@@ -677,6 +679,14 @@ export function Canvas({
     } else if (key === 'r' && !ctrl) {
       if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
       else if (selection.parts.length > 0 && current.kind === 'idle') onRotate(selection.parts);
+    } else if (key === 'f' && !ctrl) {
+      // Ters çevir: yerleştirirken hayalet parça 180° döner; seçili yönlü parçaların uçları yer değiştirir.
+      if (tool.kind === 'place') {
+        dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(nextRotation(tool.rotation)) } });
+      } else if (current.kind === 'idle') {
+        const polarized = doc.parts.filter((p) => selection.parts.includes(p.id) && CATALOG[p.type].polarized);
+        if (polarized.length > 0) onFlip(polarized.map((p) => p.id));
+      }
     } else if (key === 'w' && !ctrl) {
       setInteraction({ kind: 'idle' });
       dispatch({ type: 'set-tool', tool: tool.kind === 'wire' ? { kind: 'select' } : { kind: 'wire' } });
@@ -990,6 +1000,7 @@ export function Canvas({
         items.push(
           { label: tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
           { label: tr.contextMenu.rotate, onSelect: () => onRotate([part.id]) },
+          ...(CATALOG[part.type].polarized ? [{ label: tr.contextMenu.flip, onSelect: () => onFlip([part.id]) }] : []),
           {
             label: tr.contextMenu.remove,
             onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),

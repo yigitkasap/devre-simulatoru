@@ -6,7 +6,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, wireKey } from '../model/connectivity';
-import { removeItems, rotatePartsBy, updatePart } from '../model/docOps';
+import { flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { nextRotation } from '../model/geometry';
 import { docFromHash, shareUrl } from '../model/share';
@@ -109,20 +109,14 @@ export default function Simulator() {
     previousStatus.current = sim.status;
   }, [activeExample, sim.status]);
 
-  // --- Döndürme ------------------------------------------------------------------------
-  // Art arda basışlar, ilk basıştan önceki belgeden toplam açıyla tek dönüş olarak hesaplanır:
-  // 180°'de kablolar yerinde kalır ve iki uçlu parça ters döner (bkz. rotatePartsBy).
-  const rotationRun = useRef<{ base: CircuitDoc; result: CircuitDoc; ids: string; steps: number } | null>(null);
+  // --- Döndürme ve ters çevirme ------------------------------------------------------------
+  // Döndür (R): 90°, bağlı kablolar pinleri izler. Ters çevir (F): yönlü parçanın uçları yer
+  // değiştirir, kablolar yerinde kalır.
   const rotateSelection = (ids: readonly string[]) => {
-    if (ids.length === 0) return;
-    const key = [...ids].sort().join(',');
-    const run = rotationRun.current;
-    const continuing = run !== null && run.result === doc && run.ids === key;
-    const base = continuing ? run.base : doc;
-    const steps = continuing ? run.steps + 1 : 1;
-    const next = rotatePartsBy(base, new Set(ids), steps);
-    rotationRun.current = { base, result: next, ids: key, steps };
-    dispatch({ type: 'commit', doc: next });
+    if (ids.length > 0) dispatch({ type: 'commit', doc: rotateParts(doc, new Set(ids)) });
+  };
+  const flipSelection = (ids: readonly string[]) => {
+    if (ids.length > 0) dispatch({ type: 'commit', doc: flipParts(doc, new Set(ids)) });
   };
   const rotate = () => {
     if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
@@ -276,6 +270,7 @@ export default function Simulator() {
             highlight={highlight}
             onRepair={sim.repair}
             onRotate={rotateSelection}
+            onFlip={flipSelection}
             fitRequest={fitRequest}
             reserveCard={activeExample !== null}
           />

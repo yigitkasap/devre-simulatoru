@@ -5,6 +5,8 @@ simülasyon aracı. Arayüz ve çalışma mantığı derslerde kullanılan şema
 alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı yoktur: `npm run build`
 çıktısı (`dist/`) herhangi bir statik hostinge yüklenebilir.
 
+**Yayındaki adres:** <https://thejarrus.github.io/devre-simulatoru/>
+
 > Sitenin adı tek bir yerde tanımlıdır: [`src/config.ts`](src/config.ts).
 
 ## Özellikler (v1)
@@ -28,15 +30,36 @@ Node.js 22.12 ya da üstü gerekir.
 
 ```bash
 npm install        # bağımlılıkları kur
-npm run dev        # geliştirme sunucusu: http://localhost:4321
+npm run dev        # geliştirme sunucusu: http://localhost:4321/devre-simulatoru/
 npm test           # testler (Vitest): çözücü, birimler, model, örnekler
 npm run build      # tür denetimi (astro check) + statik derleme → dist/
-npm run preview    # derlenmiş siteyi yerelde aç: http://localhost:4321
+npm run preview    # derlenmiş siteyi yerelde aç: http://localhost:4321/devre-simulatoru/
 ```
 
-## Hostinger'a yükleme
+Adresteki `/devre-simulatoru/`, GitHub Pages için ayarlanan `base` değeridir (aşağıya bak).
 
-Site tamamen statiktir; PHP, veritabanı ya da Node.js sunucusu gerekmez.
+## Yayın
+
+### GitHub Pages (şu anki yayın)
+
+Site, `main` dalına her push'ta [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) ile
+derlenip yayımlanır. İş akışı Astro'nun resmî GitHub Pages rehberindekidir: `withastro/action`
+bağımlılıkları `package-lock.json`'dan kurar (`npm ci`), `npm run build` çalıştırır (tür denetimi
+dahil) ve `dist/`'i GitHub Pages'e yükler. Depo ayarlarında **Settings → Pages → Source: GitHub
+Actions** seçilidir. Yayının durumu deponun **Actions** sekmesinden izlenir; iş akışı elle de
+(**Run workflow**) çalıştırılabilir.
+
+Adres `https://<kullanıcı>.github.io/<depo>/` biçiminde olduğu için `astro.config.mjs` içinde
+`site: 'https://thejarrus.github.io'` ve `base: '/devre-simulatoru'` ayarlıdır. Depo adı değişirse
+`base` da değişmelidir.
+
+### Hostinger ya da başka bir statik hosting
+
+Site tamamen statiktir; PHP, veritabanı ya da Node.js sunucusu gerekmez. Bir alan adının **kök
+dizinine** yüklemek için önce `astro.config.mjs` içindeki `base` satırını sil ve `site` değerini
+alan adınla değiştir (ör. `site: 'https://alanadi.com'`). Bir **alt klasöre** (ör.
+`alanadi.com/devre/`) yüklemek için `base: '/devre'` yaz ve `dist` içeriğini `public_html/devre/`
+altına çıkart. Sayfadaki tüm yollar ve paylaşım bağlantıları `base`'e göre kurulur.
 
 1. **Derle:** `npm run build`. Sonuç `dist/` klasöründedir: `index.html`, `favicon.svg` ve
    `_astro/` (JavaScript ve CSS dosyaları).
@@ -55,10 +78,6 @@ Site tamamen statiktir; PHP, veritabanı ya da Node.js sunucusu gerekmez.
 6. **Güncelleme:** Adımları tekrarla. Eski `_astro/` dosyaları zararsızdır ama yer kaplamasın diye
    yüklemeden önce `public_html` içindeki eski `index.html`, `favicon.svg` ve `_astro/` silinebilir.
 
-**Alt klasöre yükleme** (ör. `alanadi.com/devre/`): `astro.config.mjs` içinde
-`base: '/devre/'` satırını ekleyip yeniden derle ve `dist` içeriğini `public_html/devre/` altına
-çıkart. Sayfadaki tüm yollar ve paylaşım bağlantıları buna göre kurulur.
-
 ## Kullanım
 
 | İşlem | Nasıl |
@@ -66,7 +85,8 @@ Site tamamen statiktir; PHP, veritabanı ya da Node.js sunucusu gerekmez.
 | Parça ekle | Kütüphaneden sürükleyip bırak ya da seçip tuvale tıkla (Shift + tıkla: art arda) |
 | Kablo çek | Bir pinin ucuna tıkla, ara tıklamalar köşe olur, bir pine ya da kabloya tıklayarak bitir; çift tık: boşta bitir |
 | Kablo aracı | W (boş noktadan ya da bir kablonun üzerinden başlatmak için) |
-| Döndür | R (yerleştirirken de çalışır); R'ye iki kez basmak iki uçlu parçayı ters çevirir |
+| Döndür | R: 90° döndürür, bağlı kablolar pinleri izler (yerleştirirken de çalışır) |
+| Ters çevir | F: yönlü parçanın (diyot, LED, pil, voltmetre, ampermetre) uçlarını yer değiştirir, kablolar yerinde kalır; sağ tık → Ters çevir |
 | Sil | Delete / Backspace |
 | Geri al / yinele | Ctrl+Z / Ctrl+Y (ya da Ctrl+Shift+Z) |
 | Tümünü seç | Ctrl+A |
@@ -144,7 +164,8 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 2. `sim/devices/` altına `Device` sınıfını (stamp fonksiyonları başında denklem yorumuyla) ve
    `DeviceModel`'i yaz; `sim/devices/index.ts` tablosuna ekle. Doğrusal olmayan bileşenler
    `stampNonlinear` + `updateIterate`, zamana bağlı olanlar `stampStep` + `accept` kullanır.
-3. `model/catalog.ts` → pinler, alan, varsayılan değerler, özellik alanları.
+3. `model/catalog.ts` → pinler, alan, varsayılan değerler, özellik alanları; yönlü bir parçaysa
+   `polarized: true` (Ters çevir komutu yalnızca bunlarda çalışır).
 4. `editor/symbols.tsx` → sembol çizimi; `i18n/tr.ts` → ad, açıklama, alan adları.
 5. `tests/` altına sonucu bilinen bir devreyle test ekle.
 
@@ -223,10 +244,15 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   dönülür; Shift + tıklama ile art arda yerleştirilir.
 - **Taşıma:** Parçaya bağlı kablolar esner; esneyen kablo parçasına T ile bağlı kablolar da
   onu izler. Seçili bir kablo parçası sürüklenince kendine dik yönde kayar.
-- **Döndürme:** Art arda R basışları, ilk basıştan önceki duruma göre tek bir dönüş sayılır.
-  90° ve 270°'de bağlı kablolar pinleri izler (bağlantı korunur). 180°'de kablolar yerinde
-  kalır ve iki uçlu parçanın pinleri yer değiştirir; böylece "diyotu R ile çevir" gerçekten
-  diyotu ters bağlar. 360°'de her şey başa döner.
+- **Döndürme ve ters çevirme (kullanıcı kararı):** R parçayı her basışta 90° döndürür ve bağlı
+  kablolar pinleri izler; bağlantı hiçbir zaman değişmez. Kablonun parçanın yakınındaki kuyruğu
+  atılır ve ondan önceki ilk köşeden yeni pine, parçanın gövdesinden geçmeyen yatay/dikey bir
+  yol çizilir (yalnızca ucu kaydırmak 180°'de kabloyu gövdenin üstünden geçirip parçayı kısa
+  devre edebilirdi). Dört dönüşten sonra kablolar başlangıçtaki haline döner. Yönlü parçalarda (diyot, LED, pil,
+  voltmetre, ampermetre) ayrı bir **Ters çevir** komutu (F, sağ tık menüsü) vardır: parça 180° döner,
+  uçları yer değiştirir ve kablolar yerinde kalır; böylece ör. diyot devrede gerçekten ters bağlanır.
+  Kondansatör de + ucu işaretli olduğu için yönlüdür ama istenen listede olmadığından ters
+  çevrilemez (gerekirse `catalog.ts` → `polarized: true`).
 - **Otomatik kayıt (kullanıcı isteğiyle Aşama 3'e alındı):** Devre her değişiklikten 0,4 s
   sonra ve sayfa kapanırken `localStorage` içine (`devre-simulatoru:devre`) yazılır; açılışta
   okunur. Bozuk ya da tanınmayan veri sessizce yok sayılır. Ayarlar ayrı anahtarda tutulur.
@@ -274,7 +300,8 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   dışındaysa görünüm ona kaydırılır.
 - **Yanmış LED:** Yanında açıklama balonu çıkar (Kapat / Onar). Sağ tık menüsünde "Onar"
   vardır; Durdur da onarır. Devre değişmediyse onarılan LED yeniden yanar.
-- **Sağ tık menüsü:** Parçalarda Özellikler, Döndür, Sil (ve yanmış LED'de Onar).
+- **Sağ tık menüsü:** Parçalarda Özellikler, Döndür, Ters çevir (yönlü parçalarda), Sil (ve
+  yanmış LED'de Onar).
 - **Formüllerde alt simge (kullanıcı isteği):** Metinlerde alt simge `_{...}` ile işaretlenir
   (`R_{iç}`, `V_{f}`) ve ekranda gerçek alt simge (`<sub>`) olarak çizilir
   ([`editor/Rich.tsx`](src/editor/Rich.tsx)).

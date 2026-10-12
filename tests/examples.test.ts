@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../src/examples';
 import { tr } from '../src/i18n/tr';
 import { buildConnectivity } from '../src/model/connectivity';
-import { rotatePartsBy, updatePart } from '../src/model/docOps';
+import { flipParts, updatePart } from '../src/model/docOps';
 import { decodeDoc, docFromHash, encodeDoc, shareUrl } from '../src/model/share';
 import type { CircuitDoc } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
@@ -83,12 +83,12 @@ describe('Örnekler', () => {
     expect(Math.abs(v - 6.32) / 6.32).toBeLessThan(0.01);
   });
 
-  it('Diyot yönü: ≈ 4,35 mA; R ile iki kez döndürünce akım neredeyse sıfır', () => {
+  it('Diyot yönü: ≈ 4,35 mA; ters çevirince (F) akım neredeyse sıfır', () => {
     const doc = load('diyot-yonu');
     const i = simulate(doc).measure(idOf(doc, 'A1'))!.current;
     expect(i).toBeGreaterThan(4.3e-3);
     expect(i).toBeLessThan(4.4e-3);
-    const flipped = rotatePartsBy(doc, new Set([idOf(doc, 'D1')]), 2);
+    const flipped = flipParts(doc, new Set([idOf(doc, 'D1')]));
     expect(Math.abs(simulate(flipped).measure(idOf(doc, 'A1'))!.current)).toBeLessThan(1e-6);
   });
 });

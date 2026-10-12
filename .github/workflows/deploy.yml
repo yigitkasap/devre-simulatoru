@@ -1,0 +1,41 @@
+# GitHub Pages'e yayın. Astro'nun resmî rehberindeki iş akışı:
+# https://docs.astro.build/en/guides/deploy/github/
+name: Deploy to GitHub Pages
+
+on:
+  # main dalına her push'ta yayımla.
+  push:
+    branches: [main]
+  # Actions sekmesinden elle de çalıştırılabilir.
+  workflow_dispatch:
+
+# Pages'e yazmak ve kimlik doğrulamak için gereken izinler.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your repository using git
+        uses: actions/checkout@v7
+      - name: Install, build, and upload your site
+        # package-lock.json'dan npm ile kurar, `npm run build` çalıştırır (Node 24).
+        uses: withastro/action@v6
+        # with:
+        #   path: . # Projenin depodaki yeri (varsayılan: kök)
+        #   node-version: 24 # Node sürümü (varsayılan: 24)
+        #   package-manager: npm # Paket yöneticisi (varsayılan: lockfile'dan anlaşılır)
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

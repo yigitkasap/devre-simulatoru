@@ -3,9 +3,10 @@
 
 import type { DeviceType, PropValue } from '../sim/netlist';
 import { CATALOG } from './catalog';
-import { nextRotation, onSegmentInterior, pinPositions, pointKey, samePoint } from './geometry';
+import { nextRotation, onSegmentInterior, partBounds, pinPositions, pointKey, samePoint } from './geometry';
 import type { CircuitDoc, Part, Point, Rotation, Wire } from './types';
-import { moveEndpoint, normalizePoints, translatePoints } from './wires';
+import type { Box } from './catalog';
+import { moveEndpoint, normalizePoints, rerouteEndpoint, translatePoints } from './wires';
 
 function nextId(items: ReadonlyArray<{ id: string }>, prefix: string): string {
   let max = 0;
@@ -119,12 +120,13 @@ function onWire(p: Point, points: readonly Point[]): boolean {
  * kabloların uçları da aynı miktarda kayar; böylece bağlantı kopmaz.
  */
 function followTJunctions(before: readonly Wire[], after: Wire[]): Wire[] {
+  const beforeById = new Map(before.map((w) => [w.id, w]));
   const changed = after
-    .map((wire, i) => ({ old: before[i]!, neu: wire }))
-    .filter(({ old, neu }) => old.points !== neu.points);
+    .map((wire) => ({ old: beforeById.get(wire.id)!, neu: wire }))
+    .filter(({ old, neu }) => old !== undefined && old.points !== neu.points);
   if (changed.length === 0) return after;
-  return after.map((wire, i) => {
-    if (wire.points !== before[i]!.points) return wire; // bu kablo zaten taşındı/esnedi
+  return after.map((wire) => {
+    if (wire.points !== beforeById.get(wire.id)?.points) return wire; // bu kablo zaten taşındı/esnedi
     let points = wire.points;
     for (const which of ['start', 'end'] as const) {
       const end = which === 'start' ? points[0]! : points[points.length - 1]!;
@@ -191,36 +193,54 @@ export function moveSelection(
 }
 
 /**
- * Parçaları kendi merkezleri etrafında `steps` × 90° döndürür.
- *
- * Bağlı kablolar için kural: bir pinin eski konumuna döndürmeden sonra (herhangi bir) pin
- * geliyorsa o kablo ucu yerinde kalır; gelmiyorsa ucu aynı pinin yeni konumuna esner.
- * Böylece 90°/270°'de kablolar pinleri izler (bağlantı korunur), 180°'de ise iki uçlu bir
- * parçanın pinleri yer değiştirir ve kablolar yerinde kalır: diyot gerçekten ters çevrilir.
+ * Parçaları kendi merkezleri etrafında 90° döndürür; bağlı kablolar pinleri izler. Kablonun ucu
+ * yeni pin konumuna, parçanın gövdesinden geçmeyen bir yolla yeniden yönlendirilir.
  */
-export function rotatePartsBy(doc: CircuitDoc, partIds: ReadonlySet<string>, steps: number): CircuitDoc {
-  const quarterTurns = ((steps % 4) + 4) % 4;
-  if (partIds.size === 0 || quarterTurns === 0) return doc;
-  const moves = new Map<string, Point>();
+export function rotateParts(doc: CircuitDoc, partIds: ReadonlySet<string>): CircuitDoc {
+  if (partIds.size === 0) return doc;
+  const moves = new Map<string, { to: Point; avoid: Box; vicinity: Box }>();
   const parts = doc.parts.map((part) => {
     if (!partIds.has(part.id)) return part;
-    let rotation = part.rotation;
-    for (let i = 0; i < quarterTurns; i++) rotation = nextRotation(rotation);
-    const rotated = { ...part, rotation };
+    const rotated = { ...part, rotation: nextRotation(part.rotation) };
     const before = pinPositions(part);
     const after = pinPositions(rotated);
-    const landing = new Set(after.map(pointKey));
+    const avoid = partBounds(rotated);
+    // Parçanın her dönüşte kapladığı kare (pinler + 2 ızgara pay): kablonun bu alandaki kuyruğu yeniden çizilir.
+    const reach = Math.max(...CATALOG[part.type].pins.map((p) => Math.max(Math.abs(p.x), Math.abs(p.y)))) + 2;
+    const vicinity = { x: part.x - reach, y: part.y - reach, w: 2 * reach, h: 2 * reach };
     before.forEach((p, i) => {
-      if (!landing.has(pointKey(p))) moves.set(pointKey(p), after[i]!);
+      if (!samePoint(p, after[i]!)) moves.set(pointKey(p), { to: after[i]!, avoid, vicinity });
     });
     return rotated;
   });
-  return { ...doc, parts, wires: followMoves(doc.wires, moves, new Set(), 0, 0) };
+  if (moves.size === 0) return { ...doc, parts };
+  const wires = doc.wires
+    .map((wire) => {
+      const startMove = moves.get(pointKey(wire.points[0]!));
+      const endMove = moves.get(pointKey(wire.points[wire.points.length - 1]!));
+      if (!startMove && !endMove) return wire;
+      let points: Point[] = [...wire.points];
+      if (startMove) points = rerouteEndpoint(points, 'start', startMove.to, startMove.avoid, startMove.vicinity);
+      if (endMove) points = rerouteEndpoint(points, 'end', endMove.to, endMove.avoid, endMove.vicinity);
+      return { ...wire, points };
+    })
+    .filter((wire) => wire.points.length >= 2);
+  return { ...doc, parts, wires: followTJunctions(doc.wires, wires) };
 }
 
-/** Parçaları kendi merkezleri etrafında 90° döndürür; bağlı kablolar esner. */
-export function rotateParts(doc: CircuitDoc, partIds: ReadonlySet<string>): CircuitDoc {
-  return rotatePartsBy(doc, partIds, 1);
+/**
+ * Yönlü parçaları (diyot, LED, pil, ölçü aletleri) ters çevirir: parça 180° döner, pinleri yer
+ * değiştirir ve kablolar yerinde kalır. Böylece ör. diyotun anodu ile katodu devrede yer değiştirir.
+ * Yönsüz parçalara dokunulmaz.
+ */
+export function flipParts(doc: CircuitDoc, partIds: ReadonlySet<string>): CircuitDoc {
+  let changed = false;
+  const parts = doc.parts.map((part) => {
+    if (!partIds.has(part.id) || !CATALOG[part.type].polarized) return part;
+    changed = true;
+    return { ...part, rotation: nextRotation(nextRotation(part.rotation)) };
+  });
+  return changed ? { ...doc, parts } : doc;
 }
 
 export function replaceWirePoints(doc: CircuitDoc, wireId: string, points: readonly Point[]): CircuitDoc {

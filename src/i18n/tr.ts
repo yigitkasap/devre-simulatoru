@@ -234,7 +234,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     question:
       'Ampermetre kaç mA gösterir? Diyotun üzerinde yaklaşık 0,65 V düştüğünü düşünerek önce hesapla, sonra Oynat’a bas.',
     answer:
-      'Yaklaşık 4,35 mA: I = (5 V − 0,65 V) / 1 kΩ. Şimdi diyotu seçip R’ye iki kez bas (diyot ters döner) ve yeniden Oynat’a bas: akım neredeyse sıfıra düşer, çünkü ters yönde diyot yalnızca çok küçük bir sızıntı akımı geçirir.',
+      'Yaklaşık 4,35 mA: I = (5 V − 0,65 V) / 1 kΩ. Şimdi diyotu seçip F’ye bas (ya da sağ tıklayıp “Ters çevir”i seç) ve yeniden Oynat’a bas: akım neredeyse sıfıra düşer, çünkü ters yönde diyot yalnızca çok küçük bir sızıntı akımı geçirir.',
   },
 };
 
@@ -393,7 +393,8 @@ export const tr = {
   },
   contextMenu: {
     properties: 'Özellikler…',
-    rotate: 'Döndür',
+    rotate: 'Döndür (R)',
+    flip: 'Ters çevir (F)',
     remove: 'Sil',
     repair: 'Onar',
   },
@@ -405,11 +406,12 @@ export const tr = {
     simulating:
       'Simülasyon sırasında: anahtarı açıp kapatmak için üzerine tıkla · değer değiştirmek için çift tıkla · parça eklemek ya da taşımak simülasyonu durdurur',
     select:
-      'Kablo çekmek için bir pinin ucuna tıkla. Çift tık: özellikler · R: döndür · Delete: sil · Boşluk + sürükle: tuvali kaydır',
-    place: (name: string) => `${name}: yerleştirmek için tuvale tıkla · R: döndür · Shift + tıkla: birden çok · Esc: iptal`,
+      'Kablo çekmek için bir pinin ucuna tıkla. Çift tık: özellikler · R: döndür · F: ters çevir · Delete: sil · Boşluk + sürükle: tuvali kaydır',
+    place: (name: string) =>
+      `${name}: yerleştirmek için tuvale tıkla · R: döndür · F: ters çevir · Shift + tıkla: birden çok · Esc: iptal`,
     wireIdle: 'Kablo: başlamak için bir pine, kabloya ya da boş bir noktaya tıkla · Esc: seçme aracına dön',
     wiring: 'Köşe için tıkla · bitirmek için bir pine ya da kabloya tıkla · çift tık: boşta bitir · Esc: iptal',
-    selected: (count: number) => `${count} öğe seçili · R: döndür · Delete: sil · Ctrl+Z: geri al`,
+    selected: (count: number) => `${count} öğe seçili · R: döndür · F: ters çevir · Delete: sil · Ctrl+Z: geri al`,
   },
   status: {
     zoom: 'Yakınlık',
