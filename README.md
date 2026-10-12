@@ -275,6 +275,14 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   - WebKit, `touch-action: none` verilmiş tuvalin dokunma bölgesini üstüne binen katmanlara da
     uygulayabiliyor; bu yüzden kütüphane çekmecesi ya da bir pencere açıkken tuvalin
     `touch-action` değeri kaldırılır (aksi halde çekmece parmakla kaydırılamıyordu).
+  - iOS Safari dokunuşları sayfaya yalnızca o olay türünü dinleyen bir öğenin alanında iletir.
+    React dinleyicilerini Astro'nun kutusuz (`display: contents`) `astro-island` öğesine bağladığı
+    için bu alan boş kalabiliyor ve tuvale hiçbir işaretçi olayı gelmiyordu (düğmeler tıklama
+    olayıyla ayrı yoldan çalışıyordu). Bu yüzden belgeye boş ve pasif dokunma/işaretçi dinleyicileri
+    bağlanır; SVG'ye de doğrudan, varsayılanı engelleyen `touchstart`/`touchmove` dinleyicileri
+    bağlanır (Safari'nin kendi kaydırma/yakınlaştırma hareketi işaretçi akışını kesmesin diye).
+  - Birincil işaretçi her basıldığında eski işaretçi kayıtları silinir; kaçırılmış bir `pointerup`
+    yüzünden tek parmağın iki parmak sanılıp tuvalin kıstırma kipinde takılması önlenir.
   - Giriş alanlarının yazısı dokunmatikte 16 px'tir (iOS daha küçük yazılı alana odaklanınca
     sayfayı yakınlaştırıp öyle bırakır). Arayüzde çift dokunuşla sayfa yakınlaşmaz
     (`touch-action: manipulation`), sayfa esneyip kaymaz (`overscroll-behavior: none`).

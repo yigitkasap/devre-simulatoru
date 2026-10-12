@@ -84,6 +84,19 @@ export default function Simulator() {
     if (initial.shared === 'error') showToast(tr.file.sharedError, 'error');
   }, [initial, showToast]);
 
+  // iOS Safari dokunuşları sayfaya yalnızca o olay türünü dinleyen bir öğenin alanında iletir. React ise
+  // dinleyicilerini Astro'nun kutusuz (display: contents) ada öğesine bağlar; bu alan boş kalınca tuvale
+  // hiçbir işaretçi olayı gelmez (düğmeler, tıklama ayrı yoldan geldiği için yine çalışır). Belgeye
+  // bağlanan boş ve pasif dinleyiciler bütün sayfayı dokunma alanı yapar; kaydırmayı da yavaşlatmaz.
+  useEffect(() => {
+    const noop = () => {};
+    const types = ['touchstart', 'touchmove', 'touchend', 'touchcancel', 'pointerdown', 'pointermove', 'pointerup', 'pointercancel'];
+    for (const type of types) document.addEventListener(type, noop, { passive: true });
+    return () => {
+      for (const type of types) document.removeEventListener(type, noop);
+    };
+  }, []);
+
   // Aynı sekmede başka bir paylaşım bağlantısı açılırsa.
   const loadDocRef = useRef(loadDoc);
   loadDocRef.current = loadDoc;

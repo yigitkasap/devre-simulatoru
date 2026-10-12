@@ -222,6 +222,26 @@ export function Canvas({
     }
   };
   const viewInitialized = useRef(false);
+  const overlayOpenRef = useRef(overlayOpen);
+  overlayOpenRef.current = overlayOpen;
+
+  // iOS Safari: SVG'ye doğrudan bağlanan, varsayılanı engelleyen dokunma dinleyicileri tuvali kesin bir
+  // dokunma alanı yapar ve Safari'nin kendi kaydırma/yakınlaştırma hareketini baştan durdurur
+  // (touch-action'ı SVG'de yok sayarsa işaretçi akışı pointercancel ile kesilirdi). İşaretçi olayları
+  // dokunma olaylarından önce geldiği için etkilenmez; yalnızca öykünülen fare olayları ve tıklama düşer.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return undefined;
+    const block = (e: TouchEvent) => {
+      if (!overlayOpenRef.current && e.cancelable) e.preventDefault();
+    };
+    svg.addEventListener('touchstart', block, { passive: false });
+    svg.addEventListener('touchmove', block, { passive: false });
+    return () => {
+      svg.removeEventListener('touchstart', block);
+      svg.removeEventListener('touchmove', block);
+    };
+  }, []);
 
   // --- Boyut ve ilk görünüm ---------------------------------------------------------
   useLayoutEffect(() => {
@@ -453,6 +473,19 @@ export function Canvas({
   // --- İşaretçi olayları ---------------------------------------------------------------
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     pointerType.current = e.pointerType;
+    if (e.isPrimary) {
+      // Yeni bir dokunuş ya da tıklama: kaçırılmış bir pointerup'tan (iOS'ta olabiliyor) kalan kayıtlar
+      // silinir; yoksa tek parmak iki parmak sanılır ve tuval kıstırma kipinde takılı kalır.
+      pointers.current.clear();
+      const stale = interactionRef.current;
+      if (stale.kind === 'drag-parts' || stale.kind === 'drag-segment') {
+        dispatch({ type: 'end-preview', before: stale.before });
+        setInteraction({ kind: 'idle' });
+      } else if (stale.kind === 'pinch' || stale.kind === 'pan' || stale.kind === 'rubber') {
+        pinchRef.current = null;
+        setInteraction({ kind: 'idle' });
+      }
+    }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const current = interactionRef.current;
 
