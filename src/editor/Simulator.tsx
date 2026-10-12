@@ -1,20 +1,25 @@
-// Simülatörün kök bileşeni: üst çubuk, parça kütüphanesi, tuval ve özellik penceresi.
+// Simülatörün kök bileşeni: üst çubuk, parça kütüphanesi, tuval, simülasyon çubuğu ve özellik penceresi.
 
 import { useMemo, useReducer, useRef, useState } from 'react';
+import type { DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity } from '../model/connectivity';
 import { removeItems, rotateParts, updatePart } from '../model/docOps';
+import { buildFlowGraph } from '../model/flow';
 import { nextRotation } from '../model/geometry';
 import { emptyDoc } from '../model/types';
 import type { DeviceType } from '../sim/netlist';
+import { loadSavedDoc, useAutosave } from './autosave';
 import { Canvas, type CanvasHandle } from './Canvas';
 import { Library } from './Library';
 import { PropertiesDialog } from './PropertiesDialog';
 import { useSettings } from './settings';
+import { SimBar } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { TopBar } from './TopBar';
+import { useSimulation } from './useSimulation';
 
 export default function Simulator() {
-  const [state, dispatch] = useReducer(editorReducer, undefined, () => initialEditorState(emptyDoc()));
+  const [state, dispatch] = useReducer(editorReducer, undefined, () => initialEditorState(loadSavedDoc() ?? emptyDoc()));
   const [settings, updateSettings] = useSettings();
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryDragType, setLibraryDragType] = useState<DeviceType | null>(null);
@@ -22,9 +27,20 @@ export default function Simulator() {
   const canvasRef = useRef<CanvasHandle>(null);
 
   const { doc, selection, tool } = state;
+  useAutosave(doc);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
+  const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
+  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow);
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
   const editingPart = propertiesFor ? doc.parts.find((p) => p.id === propertiesFor) : undefined;
+
+  const diagnosticContext = useMemo<DiagnosticContext>(() => {
+    const byId = new Map(doc.parts.map((p) => [p.id, p]));
+    return {
+      label: (id) => byId.get(id)?.label ?? id,
+      type: (id) => byId.get(id)?.type,
+    };
+  }, [doc]);
 
   const rotate = () => {
     if (tool.kind === 'place') {
@@ -81,9 +97,26 @@ export default function Simulator() {
             libraryDragType={libraryDragType}
             onOpenProperties={setPropertiesFor}
             keyboardEnabled={!editingPart}
+            flowGraph={flowGraph}
+            simActive={sim.status !== 'stopped'}
+            frame={sim.frame}
           />
         </main>
       </div>
+
+      <SimBar
+        status={sim.status}
+        time={sim.frame?.time ?? 0}
+        speed={sim.speed}
+        notice={sim.notice}
+        electronFlow={settings.electronFlow}
+        diagnosticContext={diagnosticContext}
+        onPlay={sim.play}
+        onPause={sim.pause}
+        onStop={sim.stop}
+        onSpeed={sim.setSpeed}
+        onElectronFlow={(on) => updateSettings({ electronFlow: on })}
+      />
 
       {editingPart && (
         <PropertiesDialog

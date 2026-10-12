@@ -19,7 +19,8 @@ import type { Box } from '../model/catalog';
 import { isDeviceType } from '../model/catalog';
 import type { Connectivity } from '../model/connectivity';
 import { pinKey } from '../model/connectivity';
-import { addPart, addWire, moveSelection, removeItems, replaceWirePoints, rotateParts } from '../model/docOps';
+import { addPart, addWire, moveSelection, removeItems, replaceWirePoints, rotateParts, updatePart } from '../model/docOps';
+import { partAxis, type FlowGraph } from '../model/flow';
 import {
   boxesIntersect,
   boxFromPoints,
@@ -34,10 +35,13 @@ import {
 } from '../model/geometry';
 import { GRID, type CircuitDoc, type Point, type Rotation } from '../model/types';
 import { moveSegment, routeL } from '../model/wires';
-import type { DeviceType } from '../sim/netlist';
+import { boolProp, type DeviceType } from '../sim/netlist';
+import { formatSI } from '../sim/units';
+import { CURRENT_DOT_COLOR, UNKNOWN_WIRE_COLOR, VOLTAGE_GRADIENT, voltageColor } from './colors';
 import { PartView, type PartTone } from './PartView';
 import type { Settings } from './settings';
 import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from './state';
+import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
 import { clampScale, fitView, screenToGrid, snap, zoomAt, type View } from './view';
 
 export interface CanvasHandle {
@@ -58,6 +62,12 @@ export interface CanvasProps {
   readonly onOpenProperties: (partId: string) => void;
   /** Bir pencere açıkken klavye kısayolları devre dışı. */
   readonly keyboardEnabled: boolean;
+  /** Akım çizgesi (kablo parçalarının akımları SimFrame'de bu sırayla gelir). */
+  readonly flowGraph: FlowGraph;
+  /** Simülasyon çalışıyor ya da duraklatılmış mı? (anahtarlar tıklanarak değiştirilir) */
+  readonly simActive: boolean;
+  /** Son simülasyon karesi; simülasyon durdurulmuşsa null. */
+  readonly frame: SimFrame | null;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -120,6 +130,9 @@ export function Canvas({
   libraryDragType,
   onOpenProperties,
   keyboardEnabled,
+  flowGraph,
+  simActive,
+  frame,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -345,6 +358,13 @@ export function Canvas({
 
     // Seçme aracı
     if (hit?.kind === 'part') {
+      const part = doc.parts.find((p) => p.id === hit.partId);
+      if (simActive && part?.type === 'switch' && !e.shiftKey) {
+        // Simülasyon sırasında anahtara tıklamak onu açar/kapatır.
+        const closed = boolProp(part.props, 'closed', false);
+        commit(updatePart(doc, part.id, { props: { ...part.props, closed: !closed } }));
+        return;
+      }
       if (e.shiftKey) {
         const parts = selection.parts.includes(hit.partId)
           ? selection.parts.filter((id) => id !== hit.partId)
@@ -630,7 +650,9 @@ export function Canvas({
               : 'cursor-default';
 
   const hint =
-    interaction.kind === 'wiring'
+    simActive && tool.kind === 'select' && interaction.kind === 'idle'
+      ? tr.hints.simulating
+      : interaction.kind === 'wiring'
       ? tr.hints.wiring
       : tool.kind === 'place'
         ? tr.hints.place(tr.devices.names[tool.type])
@@ -679,13 +701,18 @@ export function Canvas({
           {doc.wires.map((wire) => {
             const selected = selectedWires.has(wire.id);
             const hovered = hover?.kind === 'wire' && hover.wireId === wire.id;
+            let stroke = selected ? 'var(--color-select)' : hovered ? '#3d63b8' : 'var(--color-symbol)';
+            if (frame && !selected) {
+              const v = frame.wireVoltages.get(wire.id);
+              stroke = v === undefined ? UNKNOWN_WIRE_COLOR : voltageColor(v / frame.vmax);
+            }
             return (
               <polyline
                 key={wire.id}
                 points={wire.points.map((p) => `${p.x * GRID},${p.y * GRID}`).join(' ')}
                 fill="none"
-                stroke={selected ? 'var(--color-select)' : hovered ? '#3d63b8' : 'var(--color-symbol)'}
-                strokeWidth={selected ? 3 : 2}
+                stroke={stroke}
+                strokeWidth={selected || frame ? 3 : 2}
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
@@ -706,9 +733,20 @@ export function Canvas({
             />
           ))}
 
-          {doc.parts.map((part) => (
-            <PartView key={part.id} part={part} tone={toneOf(part.id)} resistorStyle={settings.resistorStyle} />
-          ))}
+          {doc.parts.map((part) => {
+            const live = frame?.live.get(part.id);
+            return (
+              <PartView
+                key={part.id}
+                part={part}
+                tone={toneOf(part.id)}
+                resistorStyle={settings.resistorStyle}
+                {...(live ? { live } : {})}
+              />
+            );
+          })}
+
+          {frame && <CurrentDots doc={doc} graph={flowGraph} frame={frame} />}
 
           {doc.parts.map((part) =>
             pinPositions(part).map((pos, i) =>
@@ -766,12 +804,73 @@ export function Canvas({
         </div>
       )}
 
+      {frame && <VoltageLegend vmax={frame.vmax} />}
+
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-2 text-xs text-muted">
         <p className="hidden rounded bg-panel/85 px-2 py-1 shadow-sm md:block">{hint}</p>
         <p className="ml-auto rounded bg-panel/85 px-2 py-1 shadow-sm tabular">
           {cursor ? `x ${Math.round(cursor.x)} · y ${Math.round(cursor.y)} · ` : ''}
           {tr.status.zoom} %{Math.round(view.scale * 100)}
         </p>
+      </div>
+    </div>
+  );
+}
+
+/** Akım noktaları aralığı (dünya pikseli). */
+const DOT_SPACING = 16;
+
+function dotLine(key: string, a: Point, b: Point, phase: number, width: number) {
+  return (
+    <line
+      key={key}
+      x1={a.x * GRID}
+      y1={a.y * GRID}
+      x2={b.x * GRID}
+      y2={b.y * GRID}
+      stroke={CURRENT_DOT_COLOR}
+      strokeWidth={width}
+      strokeLinecap="round"
+      strokeDasharray={`0 ${DOT_SPACING}`}
+      // Desen, kaydırma arttıkça başa doğru gider; ileri hareket için kaydırma negatif.
+      strokeDashoffset={-(phase % DOT_SPACING)}
+    />
+  );
+}
+
+/** Kablolarda ve iki uçlu bileşenlerde akımın yönünü ve büyüklüğünü gösteren hareketli noktalar. */
+function CurrentDots({ doc, graph, frame }: { doc: CircuitDoc; graph: FlowGraph; frame: SimFrame }) {
+  const lines = [];
+  for (let i = 0; i < graph.segments.length; i++) {
+    const current = frame.segmentFlows[i] ?? 0;
+    if (Math.abs(current) < MIN_ANIMATED_CURRENT) continue;
+    const segment = graph.segments[i]!;
+    lines.push(dotLine(segment.key, segment.a, segment.b, frame.segmentPhases[i] ?? 0, 4));
+  }
+  for (const part of doc.parts) {
+    const flow = frame.partFlows.get(part.id);
+    if (!flow || Math.abs(flow.current) < MIN_ANIMATED_CURRENT) continue;
+    const axis = partAxis(part);
+    if (axis) lines.push(dotLine(`part-${part.id}`, axis[0], axis[1], flow.phase, 3.4));
+  }
+  return (
+    <g pointerEvents="none" opacity={0.95}>
+      {lines}
+    </g>
+  );
+}
+
+/** Kablo renklerinin açıklaması (köşede). */
+function VoltageLegend({ vmax }: { vmax: number }) {
+  const label = formatSI(vmax, 'V', { trim: true });
+  return (
+    <div className="pointer-events-none absolute top-2 right-2 rounded-md border border-line bg-panel/90 px-2.5 py-1.5 text-[11px] shadow-sm">
+      <p className="mb-1 font-medium text-muted">{tr.sim.legend}</p>
+      <div className="h-2 w-36 rounded-full" style={{ background: VOLTAGE_GRADIENT }} />
+      <div className="mt-0.5 flex w-36 justify-between tabular text-muted">
+        <span>−{label}</span>
+        <span>0 V</span>
+        <span>+{label}</span>
       </div>
     </div>
   );

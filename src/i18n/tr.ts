@@ -233,7 +233,25 @@ export const tr = {
     empty: 'Başlamak için soldaki kütüphaneden bir parça sürükle.',
     emptyMobile: 'Parça eklemek için sol üstteki kütüphane düğmesine dokun.',
   },
+  sim: {
+    play: 'Oynat',
+    pause: 'Duraklat',
+    stop: 'Durdur',
+    stopTitle: 'Durdur: LED’ler onarılır, kondansatörler başlangıç gerilimine döner',
+    time: 'Zaman',
+    speed: 'Hız',
+    speedTitle: 'Simülasyon hızı: simülasyon zamanının gerçek zamana oranı',
+    electronFlow: 'Elektron akışını göster',
+    electronNote: 'Elektronlar, geleneksel akım yönünün tersine hareket eder.',
+    conventionalNote: 'Noktalar geleneksel akım yönünü gösterir: dış devrede + uçtan − uca.',
+    stoppedByEdit: 'Devrenin yapısı değiştiği için simülasyon durduruldu.',
+    cannotRun: 'Simülasyon çalışamıyor:',
+    status: { running: 'Çalışıyor', paused: 'Duraklatıldı', stopped: 'Durduruldu' },
+    legend: 'Kablo gerilimi',
+  },
   hints: {
+    simulating:
+      'Simülasyon sırasında: anahtarı açıp kapatmak için üzerine tıkla · değer değiştirmek için çift tıkla · parça eklemek ya da taşımak simülasyonu durdurur',
     select:
       'Kablo çekmek için bir pinin ucuna tıkla. Çift tık: özellikler · R: döndür · Delete: sil · Boşluk + sürükle: tuvali kaydır',
     place: (name: string) => `${name}: yerleştirmek için tuvale tıkla · R: döndür · Shift + tıkla: birden çok · Esc: iptal`,

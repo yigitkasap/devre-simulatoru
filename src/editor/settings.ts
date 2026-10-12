@@ -6,10 +6,13 @@ export type ResistorStyle = 'zigzag' | 'iec';
 
 export interface Settings {
   readonly resistorStyle: ResistorStyle;
+  /** Akım noktaları elektronların hareket yönünde (geleneksel akımın tersine) gitsin. */
+  readonly electronFlow: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   resistorStyle: 'zigzag',
+  electronFlow: false,
 };
 
 const STORAGE_KEY = 'devre-simulatoru:ayarlar';
@@ -23,6 +26,7 @@ function loadSettings(): Settings {
     const record = parsed as Record<string, unknown>;
     return {
       resistorStyle: record.resistorStyle === 'iec' ? 'iec' : 'zigzag',
+      electronFlow: record.electronFlow === true,
     };
   } catch {
     return DEFAULT_SETTINGS;

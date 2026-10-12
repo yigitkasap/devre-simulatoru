@@ -127,6 +127,12 @@ export const PartView = memo(function PartView({ part, tone, resistorStyle, live
         />
       </g>
       {display && <g transform={`translate(${displayX} ${displayY})`}>{display}</g>}
+      {live?.charge !== undefined &&
+        (horizontal ? (
+          <ChargeBar charge={live.charge} x={cx - CHARGE_LENGTH / 2} y={valueY + 5} vertical={false} />
+        ) : (
+          <ChargeBar charge={live.charge} x={left - 10} y={cy - CHARGE_LENGTH / 2} vertical />
+        ))}
       {def.showLabel && (
         <text x={nameX} y={nameY} textAnchor={anchor} style={LABEL_STYLE} fontWeight={600} fill="var(--color-ink)">
           {part.label}
@@ -140,6 +146,29 @@ export const PartView = memo(function PartView({ part, tone, resistorStyle, live
     </g>
   );
 });
+
+const CHARGE_LENGTH = 30;
+
+/**
+ * Kondansatörün dolma oranı: |V| / (devredeki en büyük kaynak gerilimi). Kırmızı: + ucu daha
+ * yüksek gerilimde; mavi: ters yönde dolu. Dikey parçada aşağıdan yukarı dolar.
+ */
+function ChargeBar({ charge, x, y, vertical }: { charge: number; x: number; y: number; vertical: boolean }) {
+  const ratio = Math.min(1, Math.abs(charge));
+  const fill = charge >= 0 ? '#e5484d' : '#3e7bfa';
+  const filled = CHARGE_LENGTH * ratio;
+  return vertical ? (
+    <g transform={`translate(${x} ${y})`}>
+      <rect width={4} height={CHARGE_LENGTH} rx={2} fill="#d9dde3" />
+      <rect y={CHARGE_LENGTH - filled} width={4} height={filled} rx={2} fill={fill} />
+    </g>
+  ) : (
+    <g transform={`translate(${x} ${y})`}>
+      <rect width={CHARGE_LENGTH} height={4} rx={2} fill="#d9dde3" />
+      <rect width={filled} height={4} rx={2} fill={fill} />
+    </g>
+  );
+}
 
 const DISPLAY_W = 70;
 const DISPLAY_H = 19;

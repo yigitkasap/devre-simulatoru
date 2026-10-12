@@ -117,10 +117,13 @@ export function TopBar(props: TopBarProps) {
         <Separator />
         <ToolButton icon="undo" label={tr.toolbar.undo} title={tr.toolbar.undoTitle} onClick={props.onUndo} disabled={!props.canUndo} />
         <ToolButton icon="redo" label={tr.toolbar.redo} title={tr.toolbar.redoTitle} onClick={props.onRedo} disabled={!props.canRedo} />
-        <Separator />
-        <ToolButton icon="zoomOut" label={tr.toolbar.zoomOut} title={tr.toolbar.zoomOut} onClick={props.onZoomOut} />
-        <ToolButton icon="zoomIn" label={tr.toolbar.zoomIn} title={tr.toolbar.zoomIn} onClick={props.onZoomIn} />
-        <ToolButton icon="fit" label={tr.toolbar.fit} title={tr.toolbar.fit} onClick={props.onFit} />
+        {/* Telefonda iki parmakla yakınlaştırılır; yer açmak için bu düğmeler gizlenir. */}
+        <div className="hidden items-center gap-0.5 sm:flex">
+          <Separator />
+          <ToolButton icon="zoomOut" label={tr.toolbar.zoomOut} title={tr.toolbar.zoomOut} onClick={props.onZoomOut} />
+          <ToolButton icon="zoomIn" label={tr.toolbar.zoomIn} title={tr.toolbar.zoomIn} onClick={props.onZoomIn} />
+          <ToolButton icon="fit" label={tr.toolbar.fit} title={tr.toolbar.fit} onClick={props.onFit} />
+        </div>
         {props.extra}
       </div>
 

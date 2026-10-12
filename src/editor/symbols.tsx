@@ -107,8 +107,7 @@ function Resistor({ style }: { style: ResistorStyle }) {
   );
 }
 
-function Capacitor({ live }: { live: LiveVisual | undefined }) {
-  const charge = live?.charge;
+function Capacitor() {
   return (
     <g>
       <Lead from={-40} to={-4} />
@@ -116,19 +115,6 @@ function Capacitor({ live }: { live: LiveVisual | undefined }) {
       <line x1={-4} y1={-13} x2={-4} y2={13} stroke="currentColor" strokeWidth={2.6} />
       <line x1={4} y1={-13} x2={4} y2={13} stroke="currentColor" strokeWidth={2.6} />
       <Plus x={-13} y={-10} />
-      {charge !== undefined && <ChargeBar charge={charge} />}
-    </g>
-  );
-}
-
-/** Kondansatörün dolma oranını gösteren küçük çubuk (sembolün altında). */
-function ChargeBar({ charge }: { charge: number }) {
-  const ratio = Math.min(1, Math.abs(charge));
-  const width = 30;
-  return (
-    <g transform="translate(-15 17)">
-      <rect x={0} y={0} width={width} height={4} rx={2} fill="#d9dde3" />
-      <rect x={0} y={0} width={width * ratio} height={4} rx={2} fill={charge >= 0 ? '#e5484d' : '#3e7bfa'} />
     </g>
   );
 }
@@ -236,7 +222,7 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
     case 'resistor':
       return <Resistor style={resistorStyle} />;
     case 'capacitor':
-      return <Capacitor live={live} />;
+      return <Capacitor />;
     case 'diode':
       return <DiodeBody fill="currentColor" />;
     case 'led':

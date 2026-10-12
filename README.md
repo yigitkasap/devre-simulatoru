@@ -93,6 +93,42 @@ Görev tanımında açık bırakılan ya da ortamdan kaynaklanan kararlar.
 - **Değer girişi:** Görevdeki önekler dışında `K` (kilo) ve `4k7` yazımı da kabul edilir.
   Rakamlar arasındaki boşluk hata sayılır ("1 2").
 
+### Editör
+
+- **Bağlantı kuralları:** Aynı noktadaki pinler ve kablo köşeleri bağlıdır. Bir kablonun ucu
+  başka bir kablonun ortasına denk gelirse bağlanır (T bağlantısı, dolu nokta). Köşesiz
+  kesişen kablolar ve bir kablonun ortasından geçtiği pinler bağlı değildir. Bağlanmamış
+  pinler ve kablo uçları küçük halkayla gösterilir.
+- **Kablo çekme:** Pinden pine tıklanır; araya yatay/dikey (L biçimli) yol otomatik çizilir.
+  Kablo aracında (W) boş bir noktadan ya da bir kablonun üzerinden de başlanabilir.
+- **Yerleştirme:** Kütüphaneden seçilen parça bir kez yerleştirilir ve seçme aracına
+  dönülür; Shift + tıklama ile art arda yerleştirilir.
+- **Taşıma:** Parçaya bağlı kablolar esner; esneyen kablo parçasına T ile bağlı kablolar da
+  onu izler. Seçili bir kablo parçası sürüklenince kendine dik yönde kayar.
+- **Otomatik kayıt (Aşama 3'e alındı):** Devre her değişiklikten 0,4 s sonra ve sayfa
+  kapanırken `localStorage` içine (`devre-simulatoru:devre`) yazılır; açılışta okunur.
+  Bozuk ya da tanınmayan veri sessizce yok sayılır.
+
+### Simülasyon ve animasyon
+
+- **Yapı değişikliği:** Parça ya da kablo eklemek, silmek, taşımak ya da döndürmek
+  simülasyonu durdurur. Değer, ad ve anahtar değişiklikleri simülasyonu durdurmaz;
+  kondansatör gerilimleri ve yanmış LED'ler korunarak devre yeniden derlenir.
+- **Hız:** Kaydırıcı logaritmiktir (×0,01 … ×1) ve ×1, ×0,5, ×0,1, ×0,05, ×0,01
+  değerlerine yapışır. Bir karede en fazla 6000 adım atılır; bilgisayar yetişemezse
+  simülasyon gerçek zamandan geri kalır (donmaz).
+- **Kablo akımları:** Çözücü kabloları tek düğümde birleştirdiği için kablo parçası
+  başına akım ayrıca bulunur: pinlerin akımları bir kapsayan ağaç üzerinde toplanır, toprak
+  sembolleri kendi kablo adasındaki dengesizliği karşılar. Kablolar kendi aralarında döngü
+  oluşturuyorsa döngüyü kapatan parçada nokta gösterilmez.
+- **Akım noktalarının hızı:** 8 + 22·log₁₀(I / 1 µA) piksel/s, 4 ile 150 arasında
+  sınırlı (1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140). 1 nA'in altında nokta çizilmez. Nokta hızı
+  simülasyon hızı ayarından bağımsızdır; akımın büyüklüğünü gösterir.
+- **Kablo rengi:** Ton (hue) üzerinden mavi (−Vmax) → yeşil (0 V) → sarı/turuncu → kırmızı
+  (+Vmax). Vmax, devredeki en büyük pil gerilimidir. Devreye bağlı olmayan kablolar gri.
+- **Kondansatör çubuğu:** |V| / Vmax oranında dolar; kırmızı: + ucu yüksek, mavi: ters
+  yönde dolu. Dikey kondansatörde aşağıdan yukarı dolar.
+
 ## Lisans notu
 
 Bu projenin kodu sıfırdan yazıldı. Falstad CircuitJS1 (GPL) ve PhET Circuit Construction Kit
