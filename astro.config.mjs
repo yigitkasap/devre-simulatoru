@@ -7,6 +7,8 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   output: 'static',
   integrations: [react()],
+  // Geliştirme araç çubuğu tuvalin alt kenarını kapattığı için kapalı.
+  devToolbar: { enabled: false },
   vite: {
     plugins: [tailwindcss()],
   },

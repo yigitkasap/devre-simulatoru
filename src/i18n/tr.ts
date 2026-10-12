@@ -145,6 +145,35 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
   }
 }
 
+const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
+  battery: 'Uçları arasında sabit bir gerilim tutan doğru akım kaynağı; iç direnci ayarlanabilir.',
+  ground: 'Devrenin 0 V referans noktası; her devrede en az bir tane olmalı.',
+  resistor: 'Üzerinden geçen akımla orantılı bir gerilim düşümü oluşturur: V = I · R.',
+  capacitor: 'Yük depolar; bir direnç üzerinden zamanla dolar ya da boşalır.',
+  diode: 'Akımı yalnızca bir yönde, anottan katoda geçirir; ileri yönde yaklaşık 0,6-0,7 V düşürür.',
+  led: 'Işık yayan diyot; fazla akım geçerse yanar, bu yüzden seri bir ön direnç gerekir.',
+  switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
+  voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
+  ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
+};
+
+/** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
+function fieldLabel(type: DeviceType, key: string): string {
+  if ((type === 'voltmeter' || type === 'ammeter') && key === 'resistance') return 'İç direnç';
+  if (type === 'voltmeter' && key === 'ideal') return 'İdeal voltmetre (iç direnç ∞)';
+  if (type === 'ammeter' && key === 'ideal') return 'İdeal ampermetre (iç direnç 0 Ω)';
+  const labels: Record<string, string> = {
+    voltage: 'Gerilim',
+    internalResistance: 'İç direnç',
+    resistance: 'Direnç',
+    capacitance: 'Kapasite',
+    initialVoltage: 'Başlangıç gerilimi',
+    color: 'Renk',
+    closed: 'Anahtar kapalı (akım geçirir)',
+  };
+  return labels[key] ?? key;
+}
+
 export const tr = {
   site: {
     name: SITE_NAME,
@@ -156,6 +185,91 @@ export const tr = {
   devices: {
     names: DEVICE_NAMES,
     pins: PIN_NAMES,
+    descriptions: DEVICE_DESCRIPTIONS,
+    ledColors: { red: 'Kırmızı', green: 'Yeşil', blue: 'Mavi' } as Record<string, string>,
+  },
+  library: {
+    title: 'Parçalar',
+    search: 'Parça ara…',
+    searchLabel: 'Parça ara',
+    noResults: 'Bu aramayla eşleşen parça yok.',
+    categories: {
+      sources: 'Kaynaklar',
+      passive: 'Pasif',
+      semiconductors: 'Yarı iletkenler',
+      switches: 'Anahtarlar',
+      meters: 'Ölçü aletleri',
+    },
+    hint: 'Sürükleyip tuvale bırak ya da seçip tuvale tıkla.',
+    close: 'Kütüphaneyi kapat',
+  },
+  toolbar: {
+    library: 'Parça kütüphanesi',
+    select: 'Seç',
+    selectTitle: 'Seç ve taşı',
+    wire: 'Kablo',
+    wireTitle: 'Kablo çek (W)',
+    rotate: 'Döndür',
+    rotateTitle: 'Döndür (R)',
+    remove: 'Sil',
+    removeTitle: 'Seçileni sil (Delete)',
+    undo: 'Geri al',
+    undoTitle: 'Geri al (Ctrl+Z)',
+    redo: 'Yinele',
+    redoTitle: 'Yinele (Ctrl+Y)',
+    zoomIn: 'Yakınlaştır',
+    zoomOut: 'Uzaklaştır',
+    fit: 'Devreyi ekrana sığdır',
+    settings: 'Ayarlar',
+  },
+  settings: {
+    title: 'Ayarlar',
+    resistorStyle: 'Direnç sembolü',
+    zigzag: 'Zigzag',
+    iec: 'Kutu (IEC)',
+  },
+  canvas: {
+    label: 'Devre şeması',
+    empty: 'Başlamak için soldaki kütüphaneden bir parça sürükle.',
+    emptyMobile: 'Parça eklemek için sol üstteki kütüphane düğmesine dokun.',
+  },
+  hints: {
+    select:
+      'Kablo çekmek için bir pinin ucuna tıkla. Çift tık: özellikler · R: döndür · Delete: sil · Boşluk + sürükle: tuvali kaydır',
+    place: (name: string) => `${name}: yerleştirmek için tuvale tıkla · R: döndür · Shift + tıkla: birden çok · Esc: iptal`,
+    wireIdle: 'Kablo: başlamak için bir pine, kabloya ya da boş bir noktaya tıkla · Esc: seçme aracına dön',
+    wiring: 'Köşe için tıkla · bitirmek için bir pine ya da kabloya tıkla · çift tık: boşta bitir · Esc: iptal',
+    selected: (count: number) => `${count} öğe seçili · R: döndür · Delete: sil · Ctrl+Z: geri al`,
+  },
+  status: {
+    zoom: 'Yakınlık',
+  },
+  properties: {
+    title: (label: string) => `${label} — özellikler`,
+    name: 'Ad',
+    ok: 'Tamam',
+    cancel: 'İptal',
+    fieldLabel,
+    unitHint: 'SI önekleri: p, n, µ (ya da u), m, k, M, G. Büyük M mega, küçük m mili demektir.',
+    notes: {
+      battery: 'İç direnç, pilin verebileceği akımı sınırlar: kısa devrede I = V / R_iç.',
+      capacitor: 'Başlangıç gerilimi, simülasyon başladığında (ve Durdur’dan sonra) kondansatörün + ucu ile − ucu arasındaki gerilimdir.',
+      diode: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer.',
+      voltmeter:
+        'Gerçek voltmetrelerin iç direnci sonludur. Ölçtüğün kaynağın iç direnci büyükse voltmetre gerçek değerden düşük okur (yükleme etkisi).',
+      ammeter:
+        'Gerçek ampermetrelerin de küçük bir iç direnci vardır; seri bağlandığı devrenin akımını biraz azaltır.',
+    } as Partial<Record<DeviceType, string>>,
+    ledSpec: (vf: string, max: string) => `20 mA’de ileri gerilim ≈ ${vf}; en fazla ${max} akıma dayanır.`,
+    errors: {
+      empty: 'Bir değer yaz.',
+      invalid: 'Bu bir sayı değil. Örnekler: 4,7k · 100µ · 2,2M · 0,5',
+      wrongUnit: (unit: string) => `Bu alanın birimi ${unit}.`,
+      positive: 'Değer sıfırdan büyük olmalı.',
+      nonNegative: 'Değer negatif olamaz.',
+      labelEmpty: 'Bir ad yaz.',
+      labelTaken: 'Bu ad başka bir parçada kullanılıyor.',
+    },
   },
   diagnostics: {
     describe: describeDiagnostic,

@@ -47,3 +47,22 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Kısa devre gibi alarm durumlarında yanıp sönen çerçeve */
+@keyframes alarm-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+.alarm-blink {
+  animation: alarm-blink 0.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .alarm-blink {
+    animation: none;
+  }
+}
