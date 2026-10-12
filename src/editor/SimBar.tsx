@@ -3,6 +3,7 @@
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { formatNumber, formatSI } from '../sim/units';
 import { Icon, type IconName } from './icons';
+import { Rich } from './Rich';
 import type { SimNotice, SimStatus } from './useSimulation';
 
 export interface SimBarProps {
@@ -131,7 +132,7 @@ export function SimBar(props: SimBarProps) {
           className={`min-w-0 basis-full text-xs lg:basis-0 lg:flex-1 ${message.tone === 'error' ? 'text-danger' : 'text-muted'}`}
           role={message.tone === 'error' ? 'alert' : undefined}
         >
-          {message.text}
+          <Rich text={message.text} />
         </p>
       )}
     </footer>

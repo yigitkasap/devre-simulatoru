@@ -1,6 +1,7 @@
 // Sol panel: parça kütüphanesi. Arama, kategoriler, sürükle-bırak ve seçili parçanın önizlemesi.
 
 import { useMemo, useState, type Dispatch } from 'react';
+import { EXAMPLE_IDS, type ExampleId } from '../examples';
 import { tr } from '../i18n/tr';
 import { CATEGORIES } from '../model/catalog';
 import type { DeviceType } from '../sim/netlist';
@@ -29,9 +30,20 @@ export interface LibraryProps {
   /** Telefonda çekmece olarak açık mı? */
   readonly open: boolean;
   readonly onClose: () => void;
+  readonly activeExample: ExampleId | null;
+  readonly onLoadExample: (id: ExampleId) => void;
 }
 
-export function Library({ tool, settings, dispatch, onDragTypeChange, open, onClose }: LibraryProps) {
+export function Library({
+  tool,
+  settings,
+  dispatch,
+  onDragTypeChange,
+  open,
+  onClose,
+  activeExample,
+  onLoadExample,
+}: LibraryProps) {
   const [query, setQuery] = useState('');
   const [previewType, setPreviewType] = useState<DeviceType>('battery');
   const activeType = tool.kind === 'place' ? tool.type : previewType;
@@ -48,6 +60,16 @@ export function Library({ tool, settings, dispatch, onDragTypeChange, open, onCl
           normalize(tr.library.categories[cat.id]).includes(q),
       ),
     })).filter((cat) => cat.types.length > 0);
+  }, [query]);
+
+  const examples = useMemo(() => {
+    const q = normalize(query.trim());
+    return EXAMPLE_IDS.filter(
+      (id) =>
+        q === '' ||
+        normalize(tr.examples.texts[id].title).includes(q) ||
+        normalize(tr.examples.section).includes(q),
+    );
   }, [query]);
 
   const choose = (type: DeviceType) => {
@@ -89,7 +111,9 @@ export function Library({ tool, settings, dispatch, onDragTypeChange, open, onCl
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {groups.length === 0 && <p className="px-2 py-3 text-sm text-muted">{tr.library.noResults}</p>}
+        {groups.length === 0 && examples.length === 0 && (
+          <p className="px-2 py-3 text-sm text-muted">{tr.library.noResults}</p>
+        )}
         {groups.map((cat) => (
           <section key={cat.id} className="mb-2">
             <h3 className="px-2 pt-2 pb-1 text-[11px] font-semibold text-muted">{tr.library.categories[cat.id]}</h3>
@@ -126,6 +150,37 @@ export function Library({ tool, settings, dispatch, onDragTypeChange, open, onCl
             </ul>
           </section>
         ))}
+
+        {examples.length > 0 && (
+          <section className="mt-1 border-t border-line pt-1">
+            <h3 className="px-2 pt-2 pb-1 text-[11px] font-semibold text-muted">{tr.examples.section}</h3>
+            <ul>
+              {examples.map((id, index) => (
+                <li key={id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onLoadExample(id);
+                      onClose();
+                    }}
+                    aria-pressed={activeExample === id}
+                    className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm ${
+                      activeExample === id ? 'bg-accent-soft text-accent' : 'hover:bg-app'
+                    }`}
+                  >
+                    <span
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app text-[11px] font-semibold text-muted"
+                      aria-hidden="true"
+                    >
+                      {index + 1}
+                    </span>
+                    <span className="font-medium">{tr.examples.texts[id].title}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </nav>
 
       <div className="border-t border-line p-3">

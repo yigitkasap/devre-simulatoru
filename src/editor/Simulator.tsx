@@ -1,32 +1,55 @@
-// Simülatörün kök bileşeni: üst çubuk, parça kütüphanesi, tuval, simülasyon çubuğu ve özellik penceresi.
+// Simülatörün kök bileşeni: üst çubuk, parça kütüphanesi, tuval, mesaj paneli, simülasyon çubuğu,
+// özellik ve paylaşım pencereleri. Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım
+// bağlantısı) ve döndürme gibi birden çok bileşenin kullandığı işlemler de buradadır.
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { DiagnosticContext } from '../i18n/tr';
+import { exampleDoc, type ExampleId } from '../examples';
+import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, wireKey } from '../model/connectivity';
-import { removeItems, rotateParts, updatePart } from '../model/docOps';
+import { removeItems, rotatePartsBy, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { nextRotation } from '../model/geometry';
-import { emptyDoc } from '../model/types';
+import { docFromHash, shareUrl } from '../model/share';
+import { emptyDoc, type CircuitDoc } from '../model/types';
 import { compileNetlist, type CompiledCircuit, type Diagnostic } from '../sim';
 import type { DeviceType } from '../sim/netlist';
 import { loadSavedDoc, useAutosave } from './autosave';
 import { Canvas, type CanvasHandle, type Highlight } from './Canvas';
+import { ExampleCard } from './ExampleCard';
+import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { Library } from './Library';
 import { MessagesPanel, messageKey, type MessageItem } from './MessagesPanel';
 import { PropertiesDialog } from './PropertiesDialog';
 import { useSettings } from './settings';
+import { ShareDialog } from './ShareDialog';
 import { SimBar } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
+import { Toast, useToast } from './Toast';
 import { TopBar } from './TopBar';
 import { useSimulation } from './useSimulation';
 
+/** Açılışta: adreste paylaşım bağlantısı varsa o devre, yoksa otomatik kayıt, o da yoksa boş devre. */
+function initialDoc(): { doc: CircuitDoc; shared: 'loaded' | 'error' | null } {
+  const shared = docFromHash(window.location.hash);
+  if (shared !== undefined) clearHash();
+  if (shared) return { doc: shared, shared: 'loaded' };
+  return { doc: loadSavedDoc() ?? emptyDoc(), shared: shared === null ? 'error' : null };
+}
+
 export default function Simulator() {
-  const [state, dispatch] = useReducer(editorReducer, undefined, () => initialEditorState(loadSavedDoc() ?? emptyDoc()));
+  const [initial] = useState(initialDoc);
+  const [state, dispatch] = useReducer(editorReducer, initial.doc, initialEditorState);
   const [settings, updateSettings] = useSettings();
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryDragType, setLibraryDragType] = useState<DeviceType | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [fitRequest, setFitRequest] = useState(0);
+  const [activeExample, setActiveExample] = useState<ExampleId | null>(null);
+  const [answerRevealed, setAnswerRevealed] = useState(false);
+  const [toast, showToast] = useToast();
   const canvasRef = useRef<CanvasHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { doc, selection, tool } = state;
   useAutosave(doc);
@@ -35,6 +58,78 @@ export default function Simulator() {
   const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow);
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
 
+  // --- Yükleme (örnek, dosya, paylaşım bağlantısı, yeni devre) ---------------------------
+  /** Yeni bir belge yükler; önceki belge geri alma geçmişinde kalır. */
+  const loadDoc = (next: CircuitDoc, message: string, example: ExampleId | null = null) => {
+    dispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
+    dispatch({ type: 'set-tool', tool: { kind: 'select' } });
+    setActiveExample(example);
+    setAnswerRevealed(false);
+    setFitRequest((n) => n + 1);
+    showToast(message);
+  };
+
+  const loadExample = (id: ExampleId) => {
+    const next = exampleDoc(id);
+    if (next) loadDoc(next, tr.examples.loaded, id);
+  };
+
+  useEffect(() => {
+    if (initial.shared === 'loaded') showToast(tr.file.sharedLoaded);
+    if (initial.shared === 'error') showToast(tr.file.sharedError, 'error');
+  }, [initial, showToast]);
+
+  // Aynı sekmede başka bir paylaşım bağlantısı açılırsa.
+  const loadDocRef = useRef(loadDoc);
+  loadDocRef.current = loadDoc;
+  useEffect(() => {
+    const onHash = () => {
+      const shared = docFromHash(window.location.hash);
+      if (shared === undefined) return;
+      clearHash();
+      if (shared) loadDocRef.current(shared, tr.file.sharedLoaded);
+      else showToast(tr.file.sharedError, 'error');
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, [showToast]);
+
+  const importFile = async (file: File | undefined) => {
+    if (!file) return;
+    const next = await readDocFile(file);
+    if (next) loadDoc(next, tr.file.imported);
+    else showToast(tr.file.importError, 'error');
+  };
+
+  // Örneğin cevabı, örnek yüklendikten sonra Oynat'a basılınca açılır. (Simülasyon çalışırken başka
+  // bir örnek yüklenirse simülasyon bir sonraki çizimde durur; bu arada cevap açılmamalı.)
+  const previousStatus = useRef(sim.status);
+  useEffect(() => {
+    if (activeExample && sim.status === 'running' && previousStatus.current !== 'running') setAnswerRevealed(true);
+    previousStatus.current = sim.status;
+  }, [activeExample, sim.status]);
+
+  // --- Döndürme ------------------------------------------------------------------------
+  // Art arda basışlar, ilk basıştan önceki belgeden toplam açıyla tek dönüş olarak hesaplanır:
+  // 180°'de kablolar yerinde kalır ve iki uçlu parça ters döner (bkz. rotatePartsBy).
+  const rotationRun = useRef<{ base: CircuitDoc; result: CircuitDoc; ids: string; steps: number } | null>(null);
+  const rotateSelection = (ids: readonly string[]) => {
+    if (ids.length === 0) return;
+    const key = [...ids].sort().join(',');
+    const run = rotationRun.current;
+    const continuing = run !== null && run.result === doc && run.ids === key;
+    const base = continuing ? run.base : doc;
+    const steps = continuing ? run.steps + 1 : 1;
+    const next = rotatePartsBy(base, new Set(ids), steps);
+    rotationRun.current = { base, result: next, ids: key, steps };
+    dispatch({ type: 'commit', doc: next });
+  };
+  const rotate = () => {
+    if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
+    else rotateSelection(selection.parts);
+  };
+
+  // --- Tanılama ve mesaj paneli ----------------------------------------------------------
   // Topoloji kontrolleri devre her değiştiğinde çalışır (simülasyon durdurulmuş olsa da).
   const compiled = useMemo<CompiledCircuit | null>(() => {
     try {
@@ -101,6 +196,7 @@ export default function Simulator() {
       setSelectedMessage(messageKey(sim.notice.diagnostic));
     }
   }, [sim.notice]);
+
   const editingPart = propertiesFor ? doc.parts.find((p) => p.id === propertiesFor) : undefined;
 
   const diagnosticContext = useMemo<DiagnosticContext>(() => {
@@ -110,14 +206,6 @@ export default function Simulator() {
       type: (id) => byId.get(id)?.type,
     };
   }, [doc]);
-
-  const rotate = () => {
-    if (tool.kind === 'place') {
-      dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
-    } else if (selection.parts.length > 0) {
-      dispatch({ type: 'commit', doc: rotateParts(doc, new Set(selection.parts)) });
-    }
-  };
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
@@ -140,6 +228,20 @@ export default function Simulator() {
         onZoomIn={() => canvasRef.current?.zoomIn()}
         onZoomOut={() => canvasRef.current?.zoomOut()}
         onFit={() => canvasRef.current?.fit()}
+        onNew={() => loadDoc(emptyDoc(), tr.file.newDone)}
+        onExport={() => downloadDoc(doc)}
+        onImport={() => fileInputRef.current?.click()}
+        onShare={() => setShareLink(shareUrl(doc, window.location.href))}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={(e) => {
+          void importFile(e.target.files?.[0]);
+          e.target.value = '';
+        }}
       />
 
       <div className="relative flex min-h-0 flex-1">
@@ -150,6 +252,8 @@ export default function Simulator() {
           onDragTypeChange={setLibraryDragType}
           open={libraryOpen}
           onClose={() => setLibraryOpen(false)}
+          activeExample={activeExample}
+          onLoadExample={loadExample}
         />
         {libraryOpen && (
           <div className="absolute inset-0 z-20 bg-ink/20 md:hidden" onClick={() => setLibraryOpen(false)} aria-hidden="true" />
@@ -165,13 +269,24 @@ export default function Simulator() {
             dispatch={dispatch}
             libraryDragType={libraryDragType}
             onOpenProperties={setPropertiesFor}
-            keyboardEnabled={!editingPart}
+            keyboardEnabled={!editingPart && !shareLink}
             flowGraph={flowGraph}
             simActive={sim.status !== 'stopped'}
             frame={sim.frame}
             highlight={highlight}
             onRepair={sim.repair}
+            onRotate={rotateSelection}
+            fitRequest={fitRequest}
+            reserveCard={activeExample !== null}
           />
+          {activeExample && (
+            <ExampleCard
+              key={activeExample}
+              id={activeExample}
+              revealed={answerRevealed}
+              onClose={() => setActiveExample(null)}
+            />
+          )}
         </main>
       </div>
 
@@ -209,6 +324,8 @@ export default function Simulator() {
           }}
         />
       )}
+      {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
+      <Toast toast={toast} />
     </div>
   );
 }

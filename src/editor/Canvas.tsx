@@ -19,7 +19,7 @@ import type { Box } from '../model/catalog';
 import { isDeviceType } from '../model/catalog';
 import type { Connectivity } from '../model/connectivity';
 import { pinKey } from '../model/connectivity';
-import { addPart, addWire, moveSelection, removeItems, replaceWirePoints, rotateParts, updatePart } from '../model/docOps';
+import { addPart, addWire, moveSelection, removeItems, replaceWirePoints, updatePart } from '../model/docOps';
 import { partAxis, type FlowGraph } from '../model/flow';
 import {
   boxesIntersect,
@@ -82,6 +82,12 @@ export interface CanvasProps {
   readonly highlight: Highlight | null;
   /** Yanmış LED'i onar. */
   readonly onRepair: (partId: string) => void;
+  /** Parçaları döndür (art arda basışlar tek dönüş sayılır; bkz. Simulator). */
+  readonly onRotate: (partIds: readonly string[]) => void;
+  /** Bu sayı değişince görünüm devreye sığdırılır (örnek ya da dosya yüklenince). */
+  readonly fitRequest: number;
+  /** Sol üstte örnek kartı açık: sığdırırken kartın kapladığı alan boş bırakılır. */
+  readonly reserveCard: boolean;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -127,6 +133,10 @@ type Interaction =
       readonly downClient: { readonly x: number; readonly y: number };
     };
 
+/** Örnek kartının (ExampleCard) kapladığı alan; sığdırırken boş bırakılır. */
+const CARD_RESERVE_WIDTH = 368;
+const CARD_RESERVE_HEIGHT = 300;
+
 /** Ekran pikseli cinsinden isabet toleransları. */
 const PIN_TOLERANCE_PX = 8;
 const WIRE_TOLERANCE_PX = 6;
@@ -149,6 +159,9 @@ export function Canvas({
   frame,
   highlight,
   onRepair,
+  onRotate,
+  fitRequest,
+  reserveCard,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -194,8 +207,16 @@ export function Canvas({
 
   const fit = () => {
     const bounds = docBounds(doc);
-    if (bounds) setView(fitView(bounds, size.width, size.height));
-    else setView((v) => ({ ...v, x: size.width / 2, y: size.height / 2 }));
+    if (!bounds) {
+      setView((v) => ({ ...v, x: size.width / 2, y: size.height / 2 }));
+      return;
+    }
+    // Örnek kartı açıksa devre kartın yanındaki (geniş ekran) ya da altındaki (telefon) alana sığdırılır.
+    const wide = size.width >= 760;
+    const left = reserveCard && wide ? CARD_RESERVE_WIDTH : 0;
+    const top = reserveCard && !wide ? Math.min(CARD_RESERVE_HEIGHT, size.height / 2) : 0;
+    const fitted = fitView(bounds, size.width - left, size.height - top);
+    setView({ ...fitted, x: fitted.x + left, y: fitted.y + top });
   };
 
   const reveal = (partIds: readonly string[], wireIds: readonly string[]) => {
@@ -222,6 +243,11 @@ export function Canvas({
       setView(fitView(box, size.width, size.height));
     }
   };
+
+  useEffect(() => {
+    if (fitRequest > 0 && size.width > 0) fit();
+    // Yalnızca yeni bir sığdırma isteğinde çalışır.
+  }, [fitRequest]);
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => setView((v) => zoomAt(v, size.width / 2, size.height / 2, ZOOM_STEP)),
@@ -650,7 +676,7 @@ export function Canvas({
       commit(removeItems(doc, selection.parts, selection.wires), EMPTY_SELECTION);
     } else if (key === 'r' && !ctrl) {
       if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
-      else if (selection.parts.length > 0 && current.kind === 'idle') commit(rotateParts(doc, new Set(selection.parts)));
+      else if (selection.parts.length > 0 && current.kind === 'idle') onRotate(selection.parts);
     } else if (key === 'w' && !ctrl) {
       setInteraction({ kind: 'idle' });
       dispatch({ type: 'set-tool', tool: tool.kind === 'wire' ? { kind: 'select' } : { kind: 'wire' } });
@@ -963,7 +989,7 @@ export function Canvas({
         }
         items.push(
           { label: tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
-          { label: tr.contextMenu.rotate, onSelect: () => commit(rotateParts(doc, new Set([part.id]))) },
+          { label: tr.contextMenu.rotate, onSelect: () => onRotate([part.id]) },
           {
             label: tr.contextMenu.remove,
             onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
@@ -1062,7 +1088,11 @@ function RubberBand({ box, scale }: { box: Box; scale: number }) {
 /** Belgedeki her şeyi kapsayan kutu (ızgara birimi). */
 function docBounds(doc: CircuitDoc): Box | null {
   let box: Box | null = null;
-  for (const part of doc.parts) box = unionBox(box, partBounds(part));
+  for (const part of doc.parts) {
+    box = unionBox(box, partBounds(part));
+    // Ölçü aleti ekranı da görünsün.
+    if (part.type === 'voltmeter' || part.type === 'ammeter') box = unionBox(box, meterDisplayRect(part, false));
+  }
   for (const wire of doc.wires) {
     for (const p of wire.points) box = unionBox(box, { x: p.x, y: p.y, w: 0, h: 0 });
   }

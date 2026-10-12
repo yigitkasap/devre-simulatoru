@@ -3,6 +3,7 @@
 
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import type { Diagnostic } from '../sim/diagnostics';
+import { Rich } from './Rich';
 
 export interface MessageItem {
   readonly key: string;
@@ -79,7 +80,9 @@ export function MessagesPanel({ items, open, onToggle, selectedKey, onSelect, co
                 >
                   <SeverityIcon severity={item.diagnostic.severity} />
                   <span>
-                    <span className="font-semibold">{title}.</span> <span className="text-ink/85">{detail}</span>
+                    <span className="font-semibold">{title}.</span> <span className="text-ink/85">
+                      <Rich text={detail} />
+                    </span>
                   </span>
                 </button>
               </li>

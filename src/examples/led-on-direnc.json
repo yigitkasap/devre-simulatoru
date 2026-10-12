@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "parts": [
+    { "id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": { "voltage": 5, "internalResistance": 0 } },
+    { "id": "p2", "type": "resistor", "label": "R1", "x": 8, "y": -8, "rotation": 0, "props": { "resistance": 330 } },
+    { "id": "p3", "type": "ammeter", "label": "A1", "x": 24, "y": -8, "rotation": 0, "props": { "resistance": 0.1, "ideal": false } },
+    { "id": "p4", "type": "led", "label": "LED1", "x": 32, "y": 0, "rotation": 90, "props": { "color": "red" } },
+    { "id": "p5", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {} }
+  ],
+  "wires": [
+    { "id": "w1", "points": [[0, -4], [0, -8], [4, -8]] },
+    { "id": "w2", "points": [[12, -8], [20, -8]] },
+    { "id": "w3", "points": [[28, -8], [32, -8], [32, -4]] },
+    { "id": "w4", "points": [[32, 4], [32, 8], [0, 8]] },
+    { "id": "w5", "points": [[0, 4], [0, 8]] }
+  ]
+}

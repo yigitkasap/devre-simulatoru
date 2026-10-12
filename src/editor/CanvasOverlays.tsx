@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { tr } from '../i18n/tr';
 import type { Readout } from './readouts';
+import { Rich } from './Rich';
 
 /** Kutunun kapsayıcıdan taşmaması için konumu ayarlar (imlecin sağına, sığmazsa soluna). */
 function place(x: number, y: number, width: number, height: number, area: { width: number; height: number }, gap = 14) {
@@ -42,7 +43,11 @@ export function ReadoutBox({
           </div>
         ))}
       </dl>
-      {readout.note && <p className="mt-1.5 border-t border-line pt-1.5 leading-snug text-ink/85 tabular">{readout.note}</p>}
+      {readout.note && (
+        <p className="mt-1.5 border-t border-line pt-1.5 leading-snug text-ink/85 tabular">
+          <Rich text={readout.note} />
+        </p>
+      )}
     </div>
   );
 }
@@ -144,7 +149,9 @@ export function BurnBalloon({
         aria-hidden="true"
       />
       <p className="font-semibold text-danger">{title}</p>
-      <p className="mt-1 leading-snug text-ink">{detail}</p>
+      <p className="mt-1 leading-snug text-ink">
+        <Rich text={detail} />
+      </p>
       <div className="mt-2 flex justify-end gap-2">
         <button type="button" onClick={onClose} className="rounded px-2 py-1 text-muted hover:bg-white">
           {tr.balloon.close}

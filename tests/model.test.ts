@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { buildConnectivity, pinKey, wireKey } from '../src/model/connectivity';
-import { addPart, addWire, moveSelection, nextLabel, rotateParts } from '../src/model/docOps';
+import { addPart, addWire, moveSelection, nextLabel, rotateParts, rotatePartsBy } from '../src/model/docOps';
 import { pinPositions } from '../src/model/geometry';
 import { emptyDoc, type CircuitDoc, type Point } from '../src/model/types';
 import { moveEndpoint, moveSegment, normalizePoints, routeL } from '../src/model/wires';
@@ -155,6 +155,23 @@ describe('Taşıma ve döndürme', () => {
     const w2 = doc.wires[1]!.points;
     expect(w2[w2.length - 1]).toEqual(P(3, -6));
     expect(buildConnectivity(doc).junctions).toContainEqual(P(3, -6));
+  });
+
+  it('art arda iki döndürme (180°) diyotu ters çevirir: kablolar yerinde, pinler yer değiştirir', () => {
+    let doc = emptyDoc();
+    const d = place(doc, 'diode', 0, 0); // anot (-4,0), katot (4,0)
+    doc = addWire(d.doc, [P(-10, 0), P(-4, 0)]).doc; // w1 anoda
+    doc = addWire(doc, [P(4, 0), P(10, 0)]).doc; // w2 katoda
+    const flipped = rotatePartsBy(doc, new Set([d.id]), 2);
+    expect(flipped.wires).toEqual(doc.wires);
+    expect(flipped.parts[0]!.rotation).toBe(180);
+    const links = buildConnectivity(flipped).netlist.links;
+    expect(links).toContainEqual({ a: pinKey(d.id, 1), b: wireKey('w1') }); // katot artık w1'de
+    expect(links).toContainEqual({ a: pinKey(d.id, 0), b: wireKey('w2') });
+    // 90°'de kablolar pinleri izler; 360°'de her şey başa döner
+    const quarter = rotatePartsBy(doc, new Set([d.id]), 1);
+    expect(buildConnectivity(quarter).unconnectedPins.size).toBe(0);
+    expect(rotatePartsBy(doc, new Set([d.id]), 4)).toBe(doc);
   });
 
   it('otomatik adlar', () => {

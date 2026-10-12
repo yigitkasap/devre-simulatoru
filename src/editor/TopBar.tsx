@@ -61,8 +61,12 @@ export interface TopBarProps {
   readonly onZoomIn: () => void;
   readonly onZoomOut: () => void;
   readonly onFit: () => void;
-  /** Sağ tarafa eklenecek ek düğmeler (dosya işlemleri vb.). */
+  /** Sağ tarafa eklenecek ek düğmeler. */
   readonly extra?: ReactNode;
+  readonly onNew: () => void;
+  readonly onExport: () => void;
+  readonly onImport: () => void;
+  readonly onShare: () => void;
 }
 
 export function TopBar(props: TopBarProps) {
@@ -78,9 +82,12 @@ export function TopBar(props: TopBarProps) {
         <Icon name="menu" />
       </button>
       <div className="mr-2 flex shrink-0 items-center gap-2 pl-1">
-        <img src="/favicon.svg" alt="" className="h-6 w-6" />
+        <img src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/favicon.svg`} alt="" className="h-6 w-6" />
         <h1 className="hidden text-sm font-semibold sm:block">{tr.site.name}</h1>
       </div>
+
+      <FileMenu onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
+      <Separator />
 
       <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
         <ToolButton
@@ -132,8 +139,8 @@ export function TopBar(props: TopBarProps) {
   );
 }
 
-function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (patch: Partial<Settings>) => void }) {
-  const [open, setOpen] = useState(false);
+/** Açılır menülerin ortak davranışı: dışarı tıklayınca ya da Esc ile kapanır. */
+function useDismiss(open: boolean, setOpen: (open: boolean) => void) {
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return undefined;
@@ -147,7 +154,66 @@ function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (p
       window.removeEventListener('pointerdown', close);
       window.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, setOpen]);
+  return rootRef;
+}
+
+function FileMenu({
+  onNew,
+  onExport,
+  onImport,
+  onShare,
+}: {
+  onNew: () => void;
+  onExport: () => void;
+  onImport: () => void;
+  onShare: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useDismiss(open, setOpen);
+  const items: Array<{ label: string; action: () => void }> = [
+    { label: tr.file.newCircuit, action: onNew },
+    { label: tr.file.exportJson, action: onExport },
+    { label: tr.file.importJson, action: onImport },
+    { label: tr.file.share, action: onShare },
+  ];
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={`flex h-8 items-center gap-1.5 rounded-md px-2 text-sm ${open ? 'bg-accent-soft text-accent' : 'hover:bg-app'}`}
+      >
+        <Icon name="file" className="h-[18px] w-[18px]" />
+        <span className="hidden sm:inline">{tr.file.menu}</span>
+      </button>
+      {open && (
+        <div role="menu" className="absolute top-10 left-0 z-40 w-60 rounded-lg border border-line bg-panel py-1 text-sm shadow-lg">
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                item.action();
+              }}
+              className="block w-full px-3 py-1.5 text-left hover:bg-app"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (patch: Partial<Settings>) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useDismiss(open, setOpen);
 
   return (
     <div ref={rootRef} className="relative shrink-0">

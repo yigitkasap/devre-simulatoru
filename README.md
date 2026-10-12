@@ -1,10 +1,26 @@
 # Devre Simülatörü
 
 Fizik bölümü öğrencileri için tarayıcıda çalışan, şematik görünümlü, Türkçe bir devre kurma ve
-simülasyon aracı. Sunucu ya da veritabanı yok; `npm run build` çıktısı (`dist/`) herhangi bir statik
-hostinge yüklenebilir.
+simülasyon aracı. Arayüz ve çalışma mantığı derslerde kullanılan şematik simülatörlerden ilham
+alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı yoktur: `npm run build`
+çıktısı (`dist/`) herhangi bir statik hostinge yüklenebilir.
 
 > Sitenin adı tek bir yerde tanımlıdır: [`src/config.ts`](src/config.ts).
+
+## Özellikler (v1)
+
+- **Parçalar:** pil (iç dirençli), toprak, direnç, kondansatör, diyot, LED (kırmızı/yeşil/mavi),
+  anahtar, voltmetre, ampermetre.
+- **Şematik editör:** ızgaralı tuval, sürükle-bırak ya da seç-tıkla yerleştirme, pinden pine kablo,
+  T bağlantısı, taşıma (kablolar esner), döndürme, seçim kutusu, geri alma/yineleme, özellik
+  penceresi (SI önekli değer girişi), zigzag ya da kutu (IEC) direnç sembolü.
+- **Simülasyon:** Oynat / Duraklat / Durdur, ×0,01 … ×1 hız, çalışırken değer değiştirme ve
+  anahtara tıklama.
+- **Eğitsel görünüm:** akım noktaları (geleneksel akım ya da elektron akışı), gerilime göre kablo
+  rengi, LED parlaklığı ve yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, V/I/P bilgi
+  kutusu (Ohm yasası kontrolü), kısa devre uyarısı, mesaj paneli.
+- **Örnekler:** 6 hazır devre; her birinde tahmin sorusu, cevap simülasyon çalışınca açılır.
+- **Kaydetme ve paylaşma:** tarayıcıya otomatik kayıt, JSON dışa/içe aktarma, paylaşım bağlantısı.
 
 ## Kurulum ve komutlar
 
@@ -13,41 +29,142 @@ Node.js 22.12 ya da üstü gerekir.
 ```bash
 npm install        # bağımlılıkları kur
 npm run dev        # geliştirme sunucusu: http://localhost:4321
-npm test           # çözücü testleri (Vitest)
+npm test           # testler (Vitest): çözücü, birimler, model, örnekler
 npm run build      # tür denetimi (astro check) + statik derleme → dist/
-npm run preview    # derlenmiş siteyi yerelde aç
+npm run preview    # derlenmiş siteyi yerelde aç: http://localhost:4321
 ```
 
-## Mimari (özet)
+## Hostinger'a yükleme
+
+Site tamamen statiktir; PHP, veritabanı ya da Node.js sunucusu gerekmez.
+
+1. **Derle:** `npm run build`. Sonuç `dist/` klasöründedir: `index.html`, `favicon.svg` ve
+   `_astro/` (JavaScript ve CSS dosyaları).
+2. **Paketle:** `dist` klasörünün **içindekileri** (klasörün kendisini değil) zip'le. PowerShell'de:
+
+   ```powershell
+   Compress-Archive -Path dist\* -DestinationPath devre-simulatoru.zip -Force
+   ```
+
+3. **hPanel → Web Siteleri → Yönet → Dosyalar → Dosya Yöneticisi** ile `public_html` klasörünü aç.
+   Hostinger'ın yeni sitelerde koyduğu `default.php` dosyası varsa sil.
+4. Zip dosyasını `public_html` içine yükle, sağ tıklayıp **Çıkart (Extract)** de ve zip'i sil.
+   `index.html` doğrudan `public_html` altında olmalı (`public_html/dist/index.html` değil).
+5. Alan adını tarayıcıda aç. SSL kapalıysa **hPanel → Güvenlik → SSL** bölümünden aç; paylaşım
+   bağlantısını panoya kopyalama düğmesi tarayıcıda yalnızca HTTPS'te çalışır.
+6. **Güncelleme:** Adımları tekrarla. Eski `_astro/` dosyaları zararsızdır ama yer kaplamasın diye
+   yüklemeden önce `public_html` içindeki eski `index.html`, `favicon.svg` ve `_astro/` silinebilir.
+
+**Alt klasöre yükleme** (ör. `alanadi.com/devre/`): `astro.config.mjs` içinde
+`base: '/devre/'` satırını ekleyip yeniden derle ve `dist` içeriğini `public_html/devre/` altına
+çıkart. Sayfadaki tüm yollar ve paylaşım bağlantıları buna göre kurulur.
+
+## Kullanım
+
+| İşlem | Nasıl |
+|---|---|
+| Parça ekle | Kütüphaneden sürükleyip bırak ya da seçip tuvale tıkla (Shift + tıkla: art arda) |
+| Kablo çek | Bir pinin ucuna tıkla, ara tıklamalar köşe olur, bir pine ya da kabloya tıklayarak bitir; çift tık: boşta bitir |
+| Kablo aracı | W (boş noktadan ya da bir kablonun üzerinden başlatmak için) |
+| Döndür | R (yerleştirirken de çalışır); R'ye iki kez basmak iki uçlu parçayı ters çevirir |
+| Sil | Delete / Backspace |
+| Geri al / yinele | Ctrl+Z / Ctrl+Y (ya da Ctrl+Shift+Z) |
+| Tümünü seç | Ctrl+A |
+| İptal | Esc |
+| Özellikler | Parçaya çift tıkla ya da sağ tıkla → Özellikler |
+| Yakınlaştır / kaydır | Fare tekerleği / boşluk tuşu + sürükle ya da orta tuş; telefonda iki parmak |
+| Simülasyon | Alttaki Oynat / Duraklat / Durdur; çalışırken anahtara tıklayınca açılır/kapanır |
+| Yanmış LED | Sağ tıkla → Onar ya da Durdur |
+
+## Dosya biçimi ve paylaşım bağlantısı
+
+Dışa aktarılan JSON (sürüm 1). Koordinatlar ızgara birimindedir (1 birim = 10 piksel);
+noktalar `[x, y]` dizisidir. Değerler SI temel birimlerindedir (Ω, V, F).
+
+```json
+{
+  "version": 1,
+  "parts": [
+    { "id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90,
+      "props": { "voltage": 9, "internalResistance": 1 } },
+    { "id": "p2", "type": "resistor", "label": "R1", "x": 8, "y": -8, "rotation": 0,
+      "props": { "resistance": 1000 } }
+  ],
+  "wires": [{ "id": "w1", "points": [[0, -4], [0, -8], [4, -8]] }]
+}
+```
+
+Paylaşım bağlantısı bu JSON'un `lz-string` ile sıkıştırılmış halini adresin `#d=` kısmına yazar.
+`#` sonrası tarayıcıdan sunucuya gönderilmez; devre yalnızca bağlantının kendisindedir. Bağlantı
+açılınca devre yüklenir ve adresten `#d=` kaldırılır (yenileyince kullanıcının kendi devresi
+otomatik kayıttan gelir).
+
+## Mimari
 
 ```
 src/
-  config.ts       site adı ve açıklaması (tek yer)
-  sim/            saf TypeScript çözüm motoru (React'ten bağımsız)
-    netlist.ts    çözücünün girdisi: bileşenler + pinlerin bağlı olduğu ağlar + kablolar
-    compile.ts    union-find ile düğüm numaralama, iç düğümler, akım bilinmeyenleri
-    topology.ts   toprak, boşta uç, direnç içermeyen döngü, kopuk parça kontrolleri
-    mna.ts        MNA sistemi (A·x = z) ve stamp yardımcıları
-    lu.ts         kısmi pivotlamalı yoğun LU ayrıştırması
-    engine.ts     zaman adımı, Newton-Raphson, LU önbelleği, LED yanması
-    units.ts      SI önekli değer ayrıştırma ve Türkçe sayı biçimi
-    devices/      her bileşenin stamp ve durum kodu ayrı dosyada
-  i18n/tr.ts      arayüzdeki tüm metinler
-  editor/         React arayüzü (SVG tuval, kütüphane, özellik penceresi...)
-  pages/          Astro sayfaları
-tests/            Vitest testleri
+  config.ts          site adı ve açıklaması (tek yer)
+  sim/               saf TypeScript çözüm motoru (React'ten bağımsız)
+    netlist.ts       çözücünün girdisi: bileşenler, pinlerin ağları, kablo bağlantıları
+    compile.ts       union-find ile düğüm numaralama, iç düğümler, akım bilinmeyenleri
+    topology.ts      toprak, boşta uç, direnç içermeyen döngü, kopuk parça, paralel ampermetre
+    mna.ts           MNA sistemi (A·x = z) ve stamp yardımcıları
+    lu.ts            kısmi pivotlamalı yoğun LU ayrıştırması
+    engine.ts        zaman adımı, Newton-Raphson, LU önbelleği, LED yanması, kısa devre
+    units.ts         SI önekli değer ayrıştırma ve Türkçe sayı biçimi
+    devices/         her bileşenin stamp ve durum kodu ayrı dosyada
+  model/             şema belgesi (React'ten bağımsız)
+    types.ts         belge, parça, kablo (sürüm 1)
+    catalog.ts       parça kataloğu: pinler, kapladığı alan, özellik alanları
+    connectivity.ts  geometriden netlist'e: pin, köşe, T bağlantısı
+    flow.ts          kablo parçalarındaki akım (animasyon için)
+    docOps.ts        ekleme, taşıma (kablo esnetme), döndürme, silme
+    serialize.ts     JSON biçimi ve doğrulaması
+    share.ts         paylaşım bağlantısı (lz-string)
+  editor/            React arayüzü
+    Simulator.tsx    kök bileşen: durum, yükleme, döndürme, mesajlar
+    Canvas.tsx       SVG tuval ve tüm fare/dokunma etkileşimleri
+    useSimulation.ts simülasyon döngüsü (requestAnimationFrame)
+    readouts.ts      V/I/P bilgi kutusu ve ölçü aleti ekranı metinleri
+    ...              kütüphane, özellik penceresi, mesaj paneli, örnek kartı, simgeler
+  examples/          hazır örneklerin JSON dosyaları
+  i18n/tr.ts         arayüzdeki tüm metinler (Türkçe)
+  layouts/, pages/   Astro sayfaları; simülatör tek bir React adası: <Simulator client:only="react" />
+tests/               Vitest testleri
 ```
 
-Arayüz motoru yalnızca [`src/sim/index.ts`](src/sim/index.ts) üzerinden kullanır. Çözücü metin
-üretmez; hata ve uyarıları kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
+**Veri akışı:** Editör belgeyi (`model/types.ts`) değiştirir → `connectivity.ts` belgeden netlist
+üretir → `sim/` netlist'i derler ve çözer → `useSimulation.ts` her animasyon karesinde motoru
+ilerletip gerilimleri, akımları ve durumları tuvale aktarır. Arayüz motoru yalnızca
+[`src/sim/index.ts`](src/sim/index.ts) üzerinden kullanır. Çözücü metin üretmez; hata ve uyarıları
+kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
+
+**Yeni bileşen eklemek** (ör. transistör, op-amp, AC kaynak):
+1. `sim/netlist.ts` → `DeviceType` birleşimine türü ekle.
+2. `sim/devices/` altına `Device` sınıfını (stamp fonksiyonları başında denklem yorumuyla) ve
+   `DeviceModel`'i yaz; `sim/devices/index.ts` tablosuna ekle. Doğrusal olmayan bileşenler
+   `stampNonlinear` + `updateIterate`, zamana bağlı olanlar `stampStep` + `accept` kullanır.
+3. `model/catalog.ts` → pinler, alan, varsayılan değerler, özellik alanları.
+4. `editor/symbols.tsx` → sembol çizimi; `i18n/tr.ts` → ad, açıklama, alan adları.
+5. `tests/` altına sonucu bilinen bir devreyle test ekle.
+
+İçerik sayfaları (birimler, dönüşümler, formüller) `src/pages/` altına `BaseLayout` kullanan
+`.astro` ya da `.md` sayfaları olarak eklenebilir; simülatörden bağımsızdırlar.
+
+## Testler
+
+`npm test` 90 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
+topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
+hazır örneklerin cevapları ve paylaşım bağlantısı.
 
 ## Kararlar
 
-Görev tanımında açık bırakılan ya da ortamdan kaynaklanan kararlar.
+Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklanan kararlar.
 
 ### Araçlar ve sürümler
 
-- **Astro 6.4.8 (7 değil).** Bu geliştirme bilgisayarında Windows *Smart App Control* açık ve
+- **Astro 6.4.8 (7 değil).** Geliştirme bilgisayarında Windows *Smart App Control* açık ve
   Astro 7'nin derleyicisinin yerel modülünü (`@astrojs/compiler-binding-*.node`) engelliyor.
   Astro 6 derleyicisi WebAssembly olduğu için engellenmiyor. Smart App Control kapalı bir
   ortamda Astro 7'ye geçmek, `astro` ve `@astrojs/react` sürümlerini yükseltmekten ibaret.
@@ -58,13 +175,14 @@ Görev tanımında açık bırakılan ya da ortamdan kaynaklanan kararlar.
   görünüm geçişleri (view transitions) ve görsel optimizasyonu ile ilgili. Bu site statik,
   kullanıcı içeriği işlemiyor ve bu özellikleri kullanmıyor; uyarılar burada tetiklenmez.
 - **TypeScript 6.** `@astrojs/check`, TypeScript 7'yi henüz desteklemiyor.
+- **Ek kütüphane:** yalnızca `lz-string` (paylaşım bağlantısı). Simgeler projeye özel çizildi.
 
 ### Çözücü
 
 - **Pil:** İç direnç > 0 ise ideal kaynak + seri direnç (bir iç düğüm). Yapının değer
   değişikliklerinde sabit kalması için iç düğüm ve akım satırı her zaman ayrılır; iç direnç 0
   ise iç düğüm yalnızca gmin ile toprağa bağlı kalır.
-- **İdeal pilde kısa devre eşiği:** Görevdeki kural (akım > V / (2·R_iç)) iç direnç 0 iken
+- **İdeal pilde kısa devre eşiği:** Görevdeki kural (akım > V / (2·Riç)) iç direnç 0 iken
   tanımsız. Bu durumda dış yük 0,1 Ω'un altına düşerse kısa devre uyarısı verilir.
 - **Ampermetre:** İdeal/gerçek geçişinde yapı değişmesin diye akım satırı her zaman ayrılır;
   gerçek ampermetrede bu satır kullanılmaz (A[k][k] = 1, z[k] = 0).
@@ -105,9 +223,16 @@ Görev tanımında açık bırakılan ya da ortamdan kaynaklanan kararlar.
   dönülür; Shift + tıklama ile art arda yerleştirilir.
 - **Taşıma:** Parçaya bağlı kablolar esner; esneyen kablo parçasına T ile bağlı kablolar da
   onu izler. Seçili bir kablo parçası sürüklenince kendine dik yönde kayar.
-- **Otomatik kayıt (Aşama 3'e alındı):** Devre her değişiklikten 0,4 s sonra ve sayfa
-  kapanırken `localStorage` içine (`devre-simulatoru:devre`) yazılır; açılışta okunur.
-  Bozuk ya da tanınmayan veri sessizce yok sayılır.
+- **Döndürme:** Art arda R basışları, ilk basıştan önceki duruma göre tek bir dönüş sayılır.
+  90° ve 270°'de bağlı kablolar pinleri izler (bağlantı korunur). 180°'de kablolar yerinde
+  kalır ve iki uçlu parçanın pinleri yer değiştirir; böylece "diyotu R ile çevir" gerçekten
+  diyotu ters bağlar. 360°'de her şey başa döner.
+- **Otomatik kayıt (kullanıcı isteğiyle Aşama 3'e alındı):** Devre her değişiklikten 0,4 s
+  sonra ve sayfa kapanırken `localStorage` içine (`devre-simulatoru:devre`) yazılır; açılışta
+  okunur. Bozuk ya da tanınmayan veri sessizce yok sayılır. Ayarlar ayrı anahtarda tutulur.
+- **Yükleme:** Örnek açmak, JSON içe aktarmak, paylaşım bağlantısı açmak ve "Yeni devre"
+  mevcut devrenin yerine geçer ama geri alma geçmişine girer; Ctrl+Z ile önceki devreye dönülür.
+  Bu yüzden onay sorulmaz, kısa bir bildirim gösterilir.
 
 ### Simülasyon ve animasyon
 
@@ -140,7 +265,7 @@ Görev tanımında açık bırakılan ya da ortamdan kaynaklanan kararlar.
 - **V/I/P kutusu:** Simülasyon çalışırken ya da duraklatılmışken parçanın üzerine gelince
   çıkar. Pasif bileşenlerde gerilim ve akım büyüklük olarak (yönü noktalar gösterir), pilde
   ve ölçü aletlerinde işaretiyle yazılır. Dirençte Ohm yasası, iç dirençli pilde
-  V = E − I·R_iç kontrolü, kondansatörde depolanan enerji, ölçü aletlerinde iç direncin
+  V = E − I·Riç kontrolü, kondansatörde depolanan enerji, ölçü aletlerinde iç direncin
   etkisi gösterilir.
 - **Mesaj paneli:** Topoloji kontrolleri devre her değiştiğinde (simülasyon durdurulmuşken
   de) çalışır. Panel, kurulum sırasında sık çıkan "boşta uç" uyarılarıyla kendiliğinden
@@ -150,8 +275,26 @@ Görev tanımında açık bırakılan ya da ortamdan kaynaklanan kararlar.
 - **Yanmış LED:** Yanında açıklama balonu çıkar (Kapat / Onar). Sağ tık menüsünde "Onar"
   vardır; Durdur da onarır. Devre değişmediyse onarılan LED yeniden yanar.
 - **Sağ tık menüsü:** Parçalarda Özellikler, Döndür, Sil (ve yanmış LED'de Onar).
+- **Formüllerde alt simge (kullanıcı isteği):** Metinlerde alt simge `_{...}` ile işaretlenir
+  (`R_{iç}`, `V_{f}`) ve ekranda gerçek alt simge (`<sub>`) olarak çizilir
+  ([`editor/Rich.tsx`](src/editor/Rich.tsx)).
+
+### Örnekler
+
+- Altı örnek: görevdeki beş örnek ve kullanıcı isteğiyle eklenen "Ampermetrenin etkisi".
+  Devreler `src/examples/*.json` dosyalarında, metinleri (başlık, açıklama, tahmin sorusu,
+  cevap) `i18n/tr.ts` içindedir; böylece arayüz metinlerinin tamamı tek dosyada kalır.
+- **Tahmin sorusu (kullanıcı isteği):** Örnek kartında önce açıklama ve soru görünür; cevap,
+  örnek yüklendikten sonra Oynat'a basılınca açılır. Görevde açıklamada verilen sonuç cümleleri
+  (ör. "Voltmetre 12 V yerine 10 V gösterir…") cevabı önceden söylememek için cevap bölümüne
+  taşındı.
+- Elle hesabın temiz çıkması için örneklerdeki pillerin iç direnci 0'dır (açıklamada "ideal"
+  yazar). Her örneğin cevabı `tests/examples.test.ts` ile simülasyona karşı doğrulanır.
+- Örnek yüklenince görünüm, sol üstteki örnek kartının kapladığı alan boş kalacak şekilde
+  devreye sığdırılır (telefonda kartın altına).
 
 ## Lisans notu
 
 Bu projenin kodu sıfırdan yazıldı. Falstad CircuitJS1 (GPL) ve PhET Circuit Construction Kit
-(GPL) kaynak kodlarından hiçbir şey kopyalanmadı ya da uyarlanmadı.
+(GPL) kaynak kodlarından hiçbir şey kopyalanmadı ya da uyarlanmadı. Sitede başka bir simülatörün
+adı, logosu ya da ekran görüntüsü kullanılmaz.

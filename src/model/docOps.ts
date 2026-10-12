@@ -190,19 +190,37 @@ export function moveSelection(
   };
 }
 
-/** Parçaları kendi merkezleri etrafında 90° döndürür; bağlı kablolar esner. */
-export function rotateParts(doc: CircuitDoc, partIds: ReadonlySet<string>): CircuitDoc {
-  if (partIds.size === 0) return doc;
+/**
+ * Parçaları kendi merkezleri etrafında `steps` × 90° döndürür.
+ *
+ * Bağlı kablolar için kural: bir pinin eski konumuna döndürmeden sonra (herhangi bir) pin
+ * geliyorsa o kablo ucu yerinde kalır; gelmiyorsa ucu aynı pinin yeni konumuna esner.
+ * Böylece 90°/270°'de kablolar pinleri izler (bağlantı korunur), 180°'de ise iki uçlu bir
+ * parçanın pinleri yer değiştirir ve kablolar yerinde kalır: diyot gerçekten ters çevrilir.
+ */
+export function rotatePartsBy(doc: CircuitDoc, partIds: ReadonlySet<string>, steps: number): CircuitDoc {
+  const quarterTurns = ((steps % 4) + 4) % 4;
+  if (partIds.size === 0 || quarterTurns === 0) return doc;
   const moves = new Map<string, Point>();
   const parts = doc.parts.map((part) => {
     if (!partIds.has(part.id)) return part;
-    const rotated = { ...part, rotation: nextRotation(part.rotation) };
+    let rotation = part.rotation;
+    for (let i = 0; i < quarterTurns; i++) rotation = nextRotation(rotation);
+    const rotated = { ...part, rotation };
     const before = pinPositions(part);
     const after = pinPositions(rotated);
-    before.forEach((p, i) => moves.set(pointKey(p), after[i]!));
+    const landing = new Set(after.map(pointKey));
+    before.forEach((p, i) => {
+      if (!landing.has(pointKey(p))) moves.set(pointKey(p), after[i]!);
+    });
     return rotated;
   });
   return { ...doc, parts, wires: followMoves(doc.wires, moves, new Set(), 0, 0) };
+}
+
+/** Parçaları kendi merkezleri etrafında 90° döndürür; bağlı kablolar esner. */
+export function rotateParts(doc: CircuitDoc, partIds: ReadonlySet<string>): CircuitDoc {
+  return rotatePartsBy(doc, partIds, 1);
 }
 
 export function replaceWirePoints(doc: CircuitDoc, wireId: string, points: readonly Point[]): CircuitDoc {

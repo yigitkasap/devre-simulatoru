@@ -9,6 +9,7 @@ import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { PropValue } from '../sim/netlist';
 import { formatEditable, formatSI, parseValue } from '../sim/units';
 import { Icon } from './icons';
+import { Rich } from './Rich';
 
 export interface PropertiesDialogProps {
   readonly part: Part;
@@ -190,7 +191,11 @@ export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: Proper
           })}
 
           {def.propDefs.some((p) => p.kind === 'number') && <p className="text-xs text-muted">{tr.properties.unitHint}</p>}
-          {note && <p className="rounded-md bg-app px-3 py-2 text-xs leading-relaxed text-ink">{note}</p>}
+          {note && (
+            <p className="rounded-md bg-app px-3 py-2 text-xs leading-relaxed text-ink">
+              <Rich text={note} />
+            </p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-line px-4 py-3">

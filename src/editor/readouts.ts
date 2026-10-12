@@ -68,7 +68,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
       return {
         title,
         rows,
-        ...(r > 0 ? { note: `V = E − I · R_iç → ${v(m.voltage)} = ${v(emf)} − ${a(out)} × ${ohm(r)}` } : {}),
+        ...(r > 0 ? { note: `V = E − I · R_{iç} → ${v(m.voltage)} = ${v(emf)} − ${a(out)} × ${ohm(r)}` } : {}),
       };
     }
     case 'capacitor': {

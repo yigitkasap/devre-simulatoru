@@ -5,9 +5,12 @@
 //   - Bileşen adlarına (R1, B1...) ek getirilmez; okunuşa göre değişen ekler yerine
 //     "R1 direncinin", "B1 pilinin" gibi yapılar kullanılır.
 //   - Sayılar src/sim/units.ts ile Türkçe biçimde (4,7 kΩ) yazılır.
+//   - Formüllerdeki alt simgeler `_{...}` ile işaretlenir (R_{iç}); ekranda editor/Rich.tsx
+//     bunları gerçek alt simge (<sub>) olarak çizer.
 
 import { SITE_NAME } from '../config';
 import type { Diagnostic } from '../sim/diagnostics';
+import type { ExampleId } from '../examples';
 import type { DeviceType } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 
@@ -123,8 +126,8 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
         detail:
           `${firstLabel}: LED’den ${formatSI(p.current ?? 0, 'A')} geçti, ama bu LED en fazla ` +
           `${formatSI(p.maxCurrent ?? 0, 'A', { trim: true })}’e dayanabilir. ` +
-          'Seri bir ön direnç ekle: R = (Vkaynak − Vf) / I. ' +
-          `(Bu LED için Vf ≈ ${formatSI(p.forwardVoltage ?? 0, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`,
+          'Seri bir ön direnç ekle: R = (V_{kaynak} − V_{f}) / I. ' +
+          `(Bu LED için V_{f} ≈ ${formatSI(p.forwardVoltage ?? 0, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`,
       };
     case 'nr-failed':
       return {
@@ -173,6 +176,67 @@ function fieldLabel(type: DeviceType, key: string): string {
   };
   return labels[key] ?? key;
 }
+
+export interface ExampleTexts {
+  readonly title: string;
+  /** Devrenin kurulumu (cevabı vermeden). */
+  readonly description: string;
+  /** Simülasyonu başlatmadan önce öğrencinin tahmin etmesi için soru. */
+  readonly question: string;
+  /** Simülasyon çalıştırılınca gösterilen cevap ve deneme önerisi. */
+  readonly answer: string;
+}
+
+const EXAMPLES: Record<ExampleId, ExampleTexts> = {
+  'led-on-direnc': {
+    title: 'LED ve ön direnç',
+    description:
+      'İdeal 5 V’luk pil, 330 Ω’luk ön direnç ve kırmızı bir LED seri bağlı; ampermetre devreden geçen akımı ölçüyor. Ön direnç, LED’den geçen akımı sınırlar.',
+    question: 'Ampermetre kaç mA gösterir? LED’in üzerinde yaklaşık 1,8 V düştüğünü düşünerek önce hesapla, sonra Oynat’a bas.',
+    answer:
+      'Yaklaşık 9,7 mA: I = (5 V − 1,8 V) / 330 Ω. Ön direnci 100 Ω’a düşürürsen akım 30 mA’i aşar ve LED yanar; dene ve açıklamayı oku.',
+  },
+  'gerilim-bolucu': {
+    title: 'Gerilim bölücü',
+    description:
+      'İki eşit direnç (1 kΩ + 1 kΩ) ideal 9 V’luk bir pile seri bağlı. Voltmetre, dirençlerin birleştiği orta noktanın gerilimini ölçüyor.',
+    question: 'Voltmetre kaç volt gösterir? Önce hesapla, sonra Oynat’a bas.',
+    answer:
+      '4,5 V: V_{çıkış} = V · R_{2} / (R_{1} + R_{2}) = 9 V · 1 kΩ / 2 kΩ. Dirençlerden birinin değerini değiştirip çıkış geriliminin nasıl değiştiğine bak.',
+  },
+  'voltmetre-yukleme': {
+    title: 'Voltmetrenin yükleme etkisi',
+    description:
+      '12 V’luk ideal kaynağa seri bağlı 200 kΩ’luk direnç, iç direnci büyük bir sensörü temsil ediyor. Çıkışı iç direnci 1 MΩ olan bir voltmetreyle ölçüyoruz.',
+    question: 'Voltmetre kaç volt gösterir? Önce hesapla, sonra Oynat’a bas.',
+    answer:
+      'Voltmetre 12 V yerine 10 V gösterir: voltmetre de devrenin bir parçasıdır ve 200 kΩ ile bir gerilim bölücü kurar, V = 12 V · R_{V} / (200 kΩ + R_{V}) = 10 V. Voltmetrenin iç direncini 20 MΩ’a çıkarıp farkı gör.',
+  },
+  'ampermetre-etkisi': {
+    title: 'Ampermetrenin etkisi',
+    description: '12 V’luk ideal kaynak, 100 Ω’luk direnç ve seri bağlı, iç direnci 1 Ω olan bir ampermetre.',
+    question: 'Ampermetre kaç mA gösterir? Önce hesapla, sonra Oynat’a bas.',
+    answer:
+      'Ampermetre 120 mA yerine 118,8 mA gösterir: ampermetrenin iç direnci de akıma karşı koyar, I = 12 V / (100 Ω + R_{A}) = 12 V / 101 Ω. İdeal ampermetreye geçip farkı gör.',
+  },
+  'rc-dolma': {
+    title: 'RC dolma',
+    description:
+      '10 V’luk pil, anahtar, 1 kΩ’luk direnç ve 100 µF’lık kondansatör seri bağlı; voltmetre kondansatörün gerilimini ölçüyor. Zaman sabiti τ = R · C = 0,1 s; t = τ anında kondansatör yaklaşık %63 dolar.',
+    question:
+      'Anahtarı kapattıktan 0,1 s sonra voltmetre kaç volt gösterir? Önce hesapla; sonra hızı ×0,1’e çek, Oynat’a bas ve anahtara tıkla.',
+    answer:
+      'Yaklaşık 6,3 V: V = 10 V · (1 − e⁻¹), yani 10 V’un %63’ü. 5τ = 0,5 s sonra kondansatör neredeyse tamamen dolar (≈ 9,9 V). Anahtarı açınca kondansatör yükünü korur; yalnızca voltmetrenin 10 MΩ’luk iç direnci üzerinden çok yavaş boşalır.',
+  },
+  'diyot-yonu': {
+    title: 'Diyot yönü',
+    description: 'İdeal 5 V’luk pil, 1 kΩ’luk direnç, ileri yönde bağlı bir silisyum diyot ve seri bir ampermetre.',
+    question:
+      'Ampermetre kaç mA gösterir? Diyotun üzerinde yaklaşık 0,65 V düştüğünü düşünerek önce hesapla, sonra Oynat’a bas.',
+    answer:
+      'Yaklaşık 4,35 mA: I = (5 V − 0,65 V) / 1 kΩ. Şimdi diyotu seçip R’ye iki kez bas (diyot ters döner) ve yeniden Oynat’a bas: akım neredeyse sıfıra düşer, çünkü ters yönde diyot yalnızca çok küçük bir sızıntı akımı geçirir.',
+  },
+};
 
 export const tr = {
   site: {
@@ -283,6 +347,41 @@ export const tr = {
     idealAmmeter: 'İdeal ampermetrenin direnci sıfırdır; üzerinde gerilim düşmez.',
     realAmmeter: (r: string, drop: string) => `İç direnci ${r}: devrede ${drop} gerilim düşümüne yol açıyor.`,
   },
+  examples: {
+    section: 'Örnekler',
+    texts: EXAMPLES,
+    badge: 'Örnek',
+    predict: 'Tahmin et',
+    answer: 'Cevap',
+    answerHidden: 'Cevabı görmek için Oynat’a bas.',
+    close: 'Örnek açıklamasını kapat',
+    collapse: 'Örnek açıklamasını küçült',
+    expand: 'Örnek açıklamasını aç',
+    loaded: 'Örnek yüklendi. Önceki devrene dönmek için Geri al (Ctrl+Z).',
+  },
+  file: {
+    menu: 'Dosya',
+    newCircuit: 'Yeni devre',
+    exportJson: 'JSON olarak dışa aktar',
+    importJson: 'JSON dosyası içe aktar…',
+    share: 'Paylaşım bağlantısı…',
+    fileName: 'devre',
+    newDone: 'Yeni devre açıldı. Önceki devrene dönmek için Geri al (Ctrl+Z).',
+    imported: 'Devre içe aktarıldı. Önceki devrene dönmek için Geri al (Ctrl+Z).',
+    importError: 'Bu dosya geçerli bir devre dosyası değil (sürüm 1 JSON bekleniyor).',
+    sharedLoaded: 'Paylaşılan devre açıldı.',
+    sharedError: 'Paylaşım bağlantısındaki devre okunamadı; bağlantı eksik kopyalanmış olabilir.',
+  },
+  shareDialog: {
+    title: 'Paylaşım bağlantısı',
+    description:
+      'Devre bu bağlantının içine sıkıştırılarak yazıldı; bir sunucuya gönderilmedi. Bağlantıyı açan kişi aynı devreyi görür.',
+    copy: 'Kopyala',
+    copied: 'Kopyalandı',
+    copyFailed: 'Kopyalanamadı; bağlantıyı seçip elle kopyala.',
+    close: 'Kapat',
+    length: (n: number) => `${n} karakter`,
+  },
   messages: {
     title: 'Mesajlar',
     errors: (n: number) => `${n} hata`,
@@ -323,7 +422,7 @@ export const tr = {
     fieldLabel,
     unitHint: 'SI önekleri: p, n, µ (ya da u), m, k, M, G. Büyük M mega, küçük m mili demektir.',
     notes: {
-      battery: 'İç direnç, pilin verebileceği akımı sınırlar: kısa devrede I = V / R_iç.',
+      battery: 'İç direnç, pilin verebileceği akımı sınırlar: kısa devrede I = V / R_{iç}.',
       capacitor: 'Başlangıç gerilimi, simülasyon başladığında (ve Durdur’dan sonra) kondansatörün + ucu ile − ucu arasındaki gerilimdir.',
       diode: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer.',
       voltmeter:

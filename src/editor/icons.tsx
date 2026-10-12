@@ -18,7 +18,10 @@ export type IconName =
   | 'search'
   | 'play'
   | 'pause'
-  | 'stop';
+  | 'stop'
+  | 'file'
+  | 'share'
+  | 'chevron';
 
 const PATHS: Record<IconName, ReactNode> = {
   menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
@@ -76,6 +79,19 @@ const PATHS: Record<IconName, ReactNode> = {
   play: <path d="M6 4.2v11.6L15.5 10z" fill="currentColor" strokeLinejoin="round" />,
   pause: <path d="M6.5 4.5v11M13.5 4.5v11" strokeWidth={2.6} />,
   stop: <rect x="5" y="5" width="10" height="10" rx="1.2" fill="currentColor" />,
+  file: (
+    <>
+      <path d="M5.5 2.8h6l3 3v11.4h-9z" strokeLinejoin="round" />
+      <path d="M11.5 2.8v3h3M7.8 10h4.4M7.8 13h4.4" strokeLinejoin="round" />
+    </>
+  ),
+  share: (
+    <>
+      <path d="M8.6 11.4a3 3 0 0 0 4.2 0l2.6-2.6a3 3 0 0 0-4.2-4.2l-.9.9" />
+      <path d="M11.4 8.6a3 3 0 0 0-4.2 0l-2.6 2.6a3 3 0 0 0 4.2 4.2l.9-.9" />
+    </>
+  ),
+  chevron: <path d="M7.5 5l5 5-5 5" strokeLinejoin="round" />,
 };
 
 export function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {

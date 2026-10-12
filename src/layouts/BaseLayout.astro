@@ -12,6 +12,8 @@ interface Props {
 
 const { title, description = SITE_DESCRIPTION } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE_NAME}` : SITE_NAME;
+// Site bir alt klasörde yayımlanırsa (astro.config.mjs → base) yollar ona göre kurulur.
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <!doctype html>
@@ -21,7 +23,7 @@ const fullTitle = title ? `${title} · ${SITE_NAME}` : SITE_NAME;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#eef0f3" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
     <title>{fullTitle}</title>
   </head>
   <body>
