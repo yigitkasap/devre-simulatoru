@@ -5,7 +5,7 @@ simülasyon aracı. Arayüz ve çalışma mantığı derslerde kullanılan şema
 alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı yoktur: `npm run build`
 çıktısı (`dist/`) herhangi bir statik hostinge yüklenebilir.
 
-**Yayındaki adres:** <https://thejarrus.github.io/devre-simulatoru/>
+**Yayındaki adres:** <https://yigitkasap.github.io/devre-simulatoru/>
 
 > Sitenin adı tek bir yerde tanımlıdır: [`src/config.ts`](src/config.ts).
 
@@ -50,7 +50,7 @@ Actions** seçilidir. Yayının durumu deponun **Actions** sekmesinden izlenir; 
 (**Run workflow**) çalıştırılabilir.
 
 Adres `https://<kullanıcı>.github.io/<depo>/` biçiminde olduğu için `astro.config.mjs` içinde
-`site: 'https://thejarrus.github.io'` ve `base: '/devre-simulatoru'` ayarlıdır. Depo adı değişirse
+`site: 'https://yigitkasap.github.io'` ve `base: '/devre-simulatoru'` ayarlıdır. Depo adı değişirse
 `base` da değişmelidir.
 
 ### Hostinger ya da başka bir statik hosting
