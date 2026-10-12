@@ -46,11 +46,21 @@ export interface PartViewProps {
   readonly meterText?: string | null;
   /** Kırmızı yanıp sönen çerçeve (ör. kısa devre). */
   readonly alarm?: boolean;
+  /** Ölçü aleti ekranı öbür tarafa açılsın (yanında başka bir parça varsa). */
+  readonly displayFlip?: boolean;
 }
 
 const LABEL_STYLE = { fontFamily: 'var(--font-sans)', fontSize: 11 } as const;
 
-export const PartView = memo(function PartView({ part, tone, resistorStyle, live, meterText, alarm }: PartViewProps) {
+export const PartView = memo(function PartView({
+  part,
+  tone,
+  resistorStyle,
+  live,
+  meterText,
+  alarm,
+  displayFlip = false,
+}: PartViewProps) {
   const def = CATALOG[part.type];
   const box = rotatedBox(def.bounds, part.rotation, { x: 0, y: 0 });
   const left = box.x * GRID;
@@ -65,43 +75,41 @@ export const PartView = memo(function PartView({ part, tone, resistorStyle, live
   const color = TONE_COLORS[tone];
 
   // Yazıların konumu: yatay parçada ad üstte, değer altta; dikey parçada ikisi de sağda.
+  // Ölçü aletinde ekran üstte (dikeyde sağda), ad karşı tarafta; displayFlip ile yer değiştirir.
   const display = isMeter ? meterDisplay(part.type === 'voltmeter' ? 'V' : 'A', meterText ?? null) : null;
+  const displayRect = meterDisplayRect(part, displayFlip);
+  const displayX = displayRect.x * GRID - part.x * GRID;
+  const displayY = displayRect.y * GRID - part.y * GRID;
   let nameX: number;
   let nameY: number;
   let valueY: number;
-  let anchor: 'middle' | 'start';
-  let displayX: number;
-  let displayY: number;
+  let anchor: 'middle' | 'start' | 'end';
   if (horizontal) {
     anchor = 'middle';
     nameX = cx;
-    nameY = isMeter ? bottom + 13 : top - 5;
+    nameY = isMeter && !displayFlip ? bottom + 13 : top - 5;
     valueY = bottom + 13;
-    displayX = cx - DISPLAY_W / 2;
-    displayY = top - DISPLAY_H - 6;
   } else {
-    anchor = 'start';
-    nameX = right + 6;
+    anchor = isMeter && displayFlip ? 'end' : 'start';
+    nameX = anchor === 'end' ? left - 6 : right + 6;
     nameY = isMeter ? cy + DISPLAY_H / 2 + 14 : cy - 3;
     valueY = cy + 11;
-    displayX = right + 6;
-    displayY = cy - DISPLAY_H / 2;
   }
 
   return (
     <g transform={`translate(${part.x * GRID} ${part.y * GRID})`} style={{ color }}>
-      {tone === 'selected' && (
+      {(tone === 'selected' || tone === 'error' || tone === 'warning') && (
         <rect
           x={left - 4}
           y={top - 4}
           width={right - left + 8}
           height={bottom - top + 8}
           rx={3}
-          fill="var(--color-accent-soft)"
-          fillOpacity={0.55}
-          stroke="var(--color-select)"
-          strokeWidth={1}
-          strokeDasharray="4 3"
+          fill={tone === 'selected' ? 'var(--color-accent-soft)' : tone === 'error' ? '#fde8e6' : 'var(--color-warn-soft)'}
+          fillOpacity={tone === 'selected' ? 0.55 : 0.9}
+          stroke={color}
+          strokeWidth={tone === 'selected' ? 1 : 1.6}
+          strokeDasharray={tone === 'selected' ? '4 3' : undefined}
         />
       )}
       {alarm && (
@@ -172,6 +180,23 @@ function ChargeBar({ charge, x, y, vertical }: { charge: number; x: number; y: n
 
 const DISPLAY_W = 70;
 const DISPLAY_H = 19;
+
+/**
+ * Ölçü aleti ekranının dünya konumu (ızgara birimi). Yatay alette ekran üstte (flip: altta),
+ * dikey alette sağda (flip: solda).
+ */
+export function meterDisplayRect(part: Part, flip: boolean): { x: number; y: number; w: number; h: number } {
+  const b = rotatedBox(CATALOG[part.type].bounds, part.rotation, part);
+  const w = DISPLAY_W / GRID;
+  const h = DISPLAY_H / GRID;
+  const gap = 0.6;
+  if (part.rotation % 180 === 0) {
+    const x = b.x + b.w / 2 - w / 2;
+    return { x, y: flip ? b.y + b.h + gap : b.y - h - gap, w, h };
+  }
+  const y = b.y + b.h / 2 - h / 2;
+  return { x: flip ? b.x - gap - w : b.x + b.w + gap, y, w, h };
+}
 
 /** Ölçü aletinin küçük ekranı. */
 function meterDisplay(unit: string, text: string | null) {

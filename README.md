@@ -122,12 +122,34 @@ Görev tanımında açık bırakılan ya da ortamdan kaynaklanan kararlar.
   sembolleri kendi kablo adasındaki dengesizliği karşılar. Kablolar kendi aralarında döngü
   oluşturuyorsa döngüyü kapatan parçada nokta gösterilmez.
 - **Akım noktalarının hızı:** 8 + 22·log₁₀(I / 1 µA) piksel/s, 4 ile 150 arasında
-  sınırlı (1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140). 1 nA'in altında nokta çizilmez. Nokta hızı
-  simülasyon hızı ayarından bağımsızdır; akımın büyüklüğünü gösterir.
+  sınırlı (1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140). 10 nA'in altında noktalar hareketsizdir:
+  ters diyot sızıntısı ve gmin kaynaklı 10⁻¹¹ A düzeyindeki akımlar gösterilmez, 10 MΩ'luk
+  voltmetrenin çektiği µA düzeyindeki akım gösterilir (kullanıcı kararı). Nokta hızı
+  simülasyon hızı ayarından bağımsızdır; yalnızca akımın büyüklüğünü gösterir (kullanıcı kararı).
 - **Kablo rengi:** Ton (hue) üzerinden mavi (−Vmax) → yeşil (0 V) → sarı/turuncu → kırmızı
   (+Vmax). Vmax, devredeki en büyük pil gerilimidir. Devreye bağlı olmayan kablolar gri.
 - **Kondansatör çubuğu:** |V| / Vmax oranında dolar; kırmızı: + ucu yüksek, mavi: ters
   yönde dolu. Dikey kondansatörde aşağıdan yukarı dolar.
+
+### Ölçü aletleri ve eğitsel özellikler
+
+- **Ölçü aleti ekranı:** Otomatik ölçekli (V/mV/µV, A/mA/µA), 4 anlamlı basamak; yuvarlama
+  bir basamak eklerse (9,9999 → 10,00) basamak sayısı korunur. Voltmetre v(+) − v(−),
+  ampermetre + uçtan giren akımı gösterir; ters bağlanırsa değer eksi çıkar. Ekran yatay
+  alette üstte, dikey alette sağdadır; o tarafta başka bir parça varsa karşı tarafa açılır.
+- **V/I/P kutusu:** Simülasyon çalışırken ya da duraklatılmışken parçanın üzerine gelince
+  çıkar. Pasif bileşenlerde gerilim ve akım büyüklük olarak (yönü noktalar gösterir), pilde
+  ve ölçü aletlerinde işaretiyle yazılır. Dirençte Ohm yasası, iç dirençli pilde
+  V = E − I·R_iç kontrolü, kondansatörde depolanan enerji, ölçü aletlerinde iç direncin
+  etkisi gösterilir.
+- **Mesaj paneli:** Topoloji kontrolleri devre her değiştiğinde (simülasyon durdurulmuşken
+  de) çalışır. Panel, kurulum sırasında sık çıkan "boşta uç" uyarılarıyla kendiliğinden
+  açılmaz; simülasyon hatası ya da yeni bir çalışma uyarısı (kısa devre, yanan LED) gelince
+  açılır. Simülasyon başlatılamazsa hatanın parçaları vurgulanır. Vurgulanan parça ekran
+  dışındaysa görünüm ona kaydırılır.
+- **Yanmış LED:** Yanında açıklama balonu çıkar (Kapat / Onar). Sağ tık menüsünde "Onar"
+  vardır; Durdur da onarır. Devre değişmediyse onarılan LED yeniden yanar.
+- **Sağ tık menüsü:** Parçalarda Özellikler, Döndür, Sil (ve yanmış LED'de Onar).
 
 ## Lisans notu
 

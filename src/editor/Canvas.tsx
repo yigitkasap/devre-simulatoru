@@ -38,7 +38,9 @@ import { moveSegment, routeL } from '../model/wires';
 import { boolProp, type DeviceType } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { CURRENT_DOT_COLOR, UNKNOWN_WIRE_COLOR, VOLTAGE_GRADIENT, voltageColor } from './colors';
-import { PartView, type PartTone } from './PartView';
+import { BurnBalloon, ContextMenu, ReadoutBox, type MenuItem } from './CanvasOverlays';
+import { meterDisplayRect, PartView, type PartTone } from './PartView';
+import { meterText, partReadout } from './readouts';
 import type { Settings } from './settings';
 import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from './state';
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
@@ -48,6 +50,15 @@ export interface CanvasHandle {
   zoomIn(): void;
   zoomOut(): void;
   fit(): void;
+  /** Verilen parçalar ve kablolar ekranda görünmüyorsa görünümü onlara kaydırır. */
+  reveal(partIds: readonly string[], wireIds: readonly string[]): void;
+}
+
+/** Mesaj panelinde seçilen hata/uyarının tuvaldeki vurgusu. */
+export interface Highlight {
+  readonly parts: ReadonlySet<string>;
+  readonly wires: ReadonlySet<string>;
+  readonly severity: 'error' | 'warning';
 }
 
 export interface CanvasProps {
@@ -68,6 +79,9 @@ export interface CanvasProps {
   readonly simActive: boolean;
   /** Son simülasyon karesi; simülasyon durdurulmuşsa null. */
   readonly frame: SimFrame | null;
+  readonly highlight: Highlight | null;
+  /** Yanmış LED'i onar. */
+  readonly onRepair: (partId: string) => void;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -133,6 +147,8 @@ export function Canvas({
   flowGraph,
   simActive,
   frame,
+  highlight,
+  onRepair,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -149,6 +165,9 @@ export function Canvas({
     interactionRef.current = next;
     setInteractionState(next);
   };
+  const [menu, setMenu] = useState<{ partId: string; x: number; y: number } | null>(null);
+  /** Kullanıcının kapattığı LED balonları (parça + yanma akımı). */
+  const [dismissedBalloons, setDismissedBalloons] = useState<ReadonlySet<string>>(new Set());
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinchRef = useRef<{ distance: number; view: View; cx: number; cy: number } | null>(null);
   const viewInitialized = useRef(false);
@@ -179,10 +198,36 @@ export function Canvas({
     else setView((v) => ({ ...v, x: size.width / 2, y: size.height / 2 }));
   };
 
+  const reveal = (partIds: readonly string[], wireIds: readonly string[]) => {
+    let box: Box | null = null;
+    for (const part of doc.parts) if (partIds.includes(part.id)) box = unionBox(box, partBounds(part));
+    for (const wire of doc.wires) {
+      if (!wireIds.includes(wire.id)) continue;
+      for (const p of wire.points) box = unionBox(box, { x: p.x, y: p.y, w: 0, h: 0 });
+    }
+    if (!box) return;
+    const g = GRID * view.scale;
+    const inside =
+      box.x * g + view.x >= 0 &&
+      box.y * g + view.y >= 0 &&
+      (box.x + box.w) * g + view.x <= size.width &&
+      (box.y + box.h) * g + view.y <= size.height;
+    if (inside) return;
+    const fits = box.w * g < size.width - 80 && box.h * g < size.height - 80;
+    if (fits) {
+      const cx = (box.x + box.w / 2) * GRID;
+      const cy = (box.y + box.h / 2) * GRID;
+      setView({ ...view, x: size.width / 2 - cx * view.scale, y: size.height / 2 - cy * view.scale });
+    } else {
+      setView(fitView(box, size.width, size.height));
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     zoomIn: () => setView((v) => zoomAt(v, size.width / 2, size.height / 2, ZOOM_STEP)),
     zoomOut: () => setView((v) => zoomAt(v, size.width / 2, size.height / 2, 1 / ZOOM_STEP)),
     fit,
+    reveal,
   }));
 
   // --- Fare tekerleği ile yakınlaştırma (pasif olmayan dinleyici gerekir) ---------------
@@ -530,6 +575,19 @@ export function Canvas({
     }
   };
 
+  const onContextMenu = (e: ReactMouseEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    if (interactionRef.current.kind !== 'idle' || tool.kind !== 'select') return;
+    const hit = hitTest(toGrid(e.clientX, e.clientY), { pins: false, wires: false });
+    if (hit?.kind !== 'part') {
+      setMenu(null);
+      return;
+    }
+    if (!selection.parts.includes(hit.partId)) dispatch({ type: 'select', selection: { parts: [hit.partId], wires: [] } });
+    const local = localPoint(e.clientX, e.clientY);
+    setMenu({ partId: hit.partId, x: local.x, y: local.y });
+  };
+
   const onDoubleClick = (e: ReactMouseEvent<SVGSVGElement>) => {
     const current = interactionRef.current;
     if (current.kind === 'wiring') {
@@ -644,7 +702,9 @@ export function Canvas({
         : tool.kind === 'place' || tool.kind === 'wire' || interaction.kind === 'wiring' || hoverPin
           ? 'cursor-crosshair'
           : hover?.kind === 'part'
-            ? 'cursor-move'
+            ? simActive && doc.parts.find((p) => p.id === hover.partId)?.type === 'switch'
+              ? 'cursor-pointer'
+              : 'cursor-move'
             : hover?.kind === 'wire'
               ? 'cursor-pointer'
               : 'cursor-default';
@@ -662,8 +722,26 @@ export function Canvas({
             ? tr.hints.selected(selection.parts.length + selection.wires.length)
             : tr.hints.select;
 
+  // Ölçü aleti ekranı başka bir parçanın üstüne biniyorsa ve öbür taraf boşsa, ekran öbür tarafa açılır.
+  const displayFlips = new Set<string>();
+  for (const part of doc.parts) {
+    if (part.type !== 'voltmeter' && part.type !== 'ammeter') continue;
+    const others = doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p));
+    const blocked = (flip: boolean) => {
+      const r = meterDisplayRect(part, flip);
+      return others.some((b) => boxesIntersect(b, r));
+    };
+    if (blocked(false) && !blocked(true)) displayFlips.add(part.id);
+  }
+
   const toneOf = (id: string): PartTone =>
-    selectedParts.has(id) ? 'selected' : hover?.kind === 'part' && hover.partId === id ? 'hover' : 'normal';
+    highlight?.parts.has(id)
+      ? highlight.severity
+      : selectedParts.has(id)
+        ? 'selected'
+        : hover?.kind === 'part' && hover.partId === id
+          ? 'hover'
+          : 'normal';
 
   return (
     <div className="absolute inset-0 overflow-hidden bg-paper">
@@ -681,7 +759,7 @@ export function Canvas({
           if (interactionRef.current.kind !== 'wiring') setCursor(null);
         }}
         onDoubleClick={onDoubleClick}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={onContextMenu}
         onDragOver={onDragOver}
         onDragLeave={() => setDropGhost(null)}
         onDrop={onDrop}
@@ -698,6 +776,21 @@ export function Canvas({
           {view.scale >= 0.6 && <rect x={visible.x} y={visible.y} width={visible.w} height={visible.h} fill="url(#grid-minor)" />}
           <rect x={visible.x} y={visible.y} width={visible.w} height={visible.h} fill="url(#grid-major)" />
 
+          {highlight &&
+            doc.wires
+              .filter((wire) => highlight.wires.has(wire.id))
+              .map((wire) => (
+                <polyline
+                  key={`hl-${wire.id}`}
+                  points={wire.points.map((p) => `${p.x * GRID},${p.y * GRID}`).join(' ')}
+                  fill="none"
+                  stroke={highlight.severity === 'error' ? 'var(--color-danger)' : '#e8a317'}
+                  strokeOpacity={0.35}
+                  strokeWidth={10}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              ))}
           {doc.wires.map((wire) => {
             const selected = selectedWires.has(wire.id);
             const hovered = hover?.kind === 'wire' && hover.wireId === wire.id;
@@ -735,12 +828,16 @@ export function Canvas({
 
           {doc.parts.map((part) => {
             const live = frame?.live.get(part.id);
+            const measurement = frame?.measurements.get(part.id);
             return (
               <PartView
                 key={part.id}
                 part={part}
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
+                meterText={measurement ? meterText(part, measurement) : null}
+                alarm={frame?.alarms.has(part.id) ?? false}
+                displayFlip={displayFlips.has(part.id)}
                 {...(live ? { live } : {})}
               />
             );
@@ -805,6 +902,76 @@ export function Canvas({
       )}
 
       {frame && <VoltageLegend vmax={frame.vmax} />}
+
+      {frame &&
+        frame.runtime
+          .filter((d) => d.code === 'led-burned')
+          .map((d) => {
+            const id = d.elementIds[0]!;
+            const part = doc.parts.find((p) => p.id === id);
+            const dismissKey = `${id}:${d.params?.current ?? 0}`;
+            if (!part || dismissedBalloons.has(dismissKey)) return null;
+            const box = partBounds(part);
+            const g = GRID * view.scale;
+            const right = (box.x + box.w) * g + view.x;
+            const left = box.x * g + view.x;
+            // Dikey LED'in adı ve rengi sağında yazar; balon tercihen bu yazıların ötesinde açılır.
+            // Sığmazsa LED'in hemen sağında, o da sığmazsa solunda açılır.
+            const BALLOON = 282;
+            const besideLabel = part.rotation % 180 === 0 ? 0 : 62 * view.scale;
+            const labelSpace = right + besideLabel + BALLOON <= size.width ? besideLabel : 0;
+            const flip = right + labelSpace + BALLOON > size.width;
+            const { title, detail } = tr.diagnostics.describe(d, {
+              label: (pid) => doc.parts.find((p) => p.id === pid)?.label ?? pid,
+              type: (pid) => doc.parts.find((p) => p.id === pid)?.type,
+            });
+            return (
+              <BurnBalloon
+                key={dismissKey}
+                title={title}
+                detail={detail}
+                x={flip ? left - 10 : right + labelSpace + 10}
+                y={box.y * g + view.y - 6}
+                flip={flip}
+                onRepair={() => onRepair(id)}
+                onClose={() => setDismissedBalloons((s) => new Set([...s, dismissKey]))}
+              />
+            );
+          })}
+
+      {frame && hover?.kind === 'part' && cursor && !menu && interaction.kind === 'idle' && (() => {
+        const part = doc.parts.find((p) => p.id === hover.partId);
+        const m = part && frame.measurements.get(part.id);
+        const readout = part && m ? partReadout(part, m, frame.statuses.get(part.id)) : null;
+        if (!readout) return null;
+        return (
+          <ReadoutBox
+            readout={readout}
+            x={cursor.x * GRID * view.scale + view.x}
+            y={cursor.y * GRID * view.scale + view.y}
+            area={size}
+          />
+        );
+      })()}
+
+      {menu && (() => {
+        const part = doc.parts.find((p) => p.id === menu.partId);
+        if (!part) return null;
+        const items: MenuItem[] = [];
+        if (part.type === 'led' && frame?.statuses.get(part.id)?.burned) {
+          items.push({ label: tr.contextMenu.repair, onSelect: () => onRepair(part.id), tone: 'accent' });
+        }
+        items.push(
+          { label: tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
+          { label: tr.contextMenu.rotate, onSelect: () => commit(rotateParts(doc, new Set([part.id]))) },
+          {
+            label: tr.contextMenu.remove,
+            onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
+            tone: 'danger',
+          },
+        );
+        return <ContextMenu x={menu.x} y={menu.y} items={items} area={size} onClose={() => setMenu(null)} />;
+      })()}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-2 text-xs text-muted">
         <p className="hidden rounded bg-panel/85 px-2 py-1 shadow-sm md:block">{hint}</p>

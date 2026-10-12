@@ -1,16 +1,18 @@
 // Simülatörün kök bileşeni: üst çubuk, parça kütüphanesi, tuval, simülasyon çubuğu ve özellik penceresi.
 
-import { useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { DiagnosticContext } from '../i18n/tr';
-import { buildConnectivity } from '../model/connectivity';
+import { buildConnectivity, wireKey } from '../model/connectivity';
 import { removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { nextRotation } from '../model/geometry';
 import { emptyDoc } from '../model/types';
+import { compileNetlist, type CompiledCircuit, type Diagnostic } from '../sim';
 import type { DeviceType } from '../sim/netlist';
 import { loadSavedDoc, useAutosave } from './autosave';
-import { Canvas, type CanvasHandle } from './Canvas';
+import { Canvas, type CanvasHandle, type Highlight } from './Canvas';
 import { Library } from './Library';
+import { MessagesPanel, messageKey, type MessageItem } from './MessagesPanel';
 import { PropertiesDialog } from './PropertiesDialog';
 import { useSettings } from './settings';
 import { SimBar } from './SimBar';
@@ -32,6 +34,73 @@ export default function Simulator() {
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
   const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow);
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
+
+  // Topoloji kontrolleri devre her değiştiğinde çalışır (simülasyon durdurulmuş olsa da).
+  const compiled = useMemo<CompiledCircuit | null>(() => {
+    try {
+      return compileNetlist(connectivity.netlist);
+    } catch {
+      return null;
+    }
+  }, [connectivity]);
+
+  const messages = useMemo<MessageItem[]>(() => {
+    const list: Diagnostic[] = [...(compiled?.diagnostics ?? []), ...(sim.frame?.runtime ?? [])];
+    if (sim.notice?.kind === 'error') list.push(sim.notice.diagnostic);
+    const seen = new Set<string>();
+    const items: MessageItem[] = [];
+    for (const d of list) {
+      const key = messageKey(d);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      items.push({ key, diagnostic: d });
+    }
+    // Önce hatalar, sonra uyarılar (kendi içlerinde sıra korunur).
+    return items.sort((a, b) => Number(b.diagnostic.severity === 'error') - Number(a.diagnostic.severity === 'error'));
+  }, [compiled, sim.frame?.runtime, sim.notice]);
+
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+
+  /** Bir tanılamanın vurgulayacağı parçalar ve kablolar. */
+  const highlightOf = (d: Diagnostic): Highlight => {
+    const nets = new Set(d.netKeys);
+    const wires = new Set<string>();
+    if (compiled && nets.size > 0) {
+      for (const wire of doc.wires) {
+        const key = wireKey(wire.id);
+        if (!compiled.nets.has(key)) continue;
+        if (nets.has(compiled.nets.findKey(key)) || nets.has(compiled.wiring.findKey(key))) wires.add(wire.id);
+      }
+    }
+    return { parts: new Set(d.elementIds), wires, severity: d.severity };
+  };
+  const selectedItem = messages.find((m) => m.key === selectedMessage);
+  const highlight = selectedItem ? highlightOf(selectedItem.diagnostic) : null;
+
+  const selectMessage = (item: MessageItem | null) => {
+    setSelectedMessage(item?.key ?? null);
+    if (item) {
+      const h = highlightOf(item.diagnostic);
+      canvasRef.current?.reveal([...h.parts], [...h.wires]);
+    }
+  };
+
+  // Simülasyon hatası ya da yeni bir çalışma uyarısı (kısa devre, yanan LED) gelince panel açılır;
+  // simülasyon başlatılamadıysa hata vurgulanır. Kurulum sırasındaki boşta uç uyarıları paneli açmaz.
+  const runtimeKeys = (sim.frame?.runtime ?? []).map(messageKey).join(';');
+  const previousRuntime = useRef('');
+  useEffect(() => {
+    const before = new Set(previousRuntime.current.split(';'));
+    previousRuntime.current = runtimeKeys;
+    if (runtimeKeys && runtimeKeys.split(';').some((k) => !before.has(k))) setPanelOpen(true);
+  }, [runtimeKeys]);
+  useEffect(() => {
+    if (sim.notice?.kind === 'error') {
+      setPanelOpen(true);
+      setSelectedMessage(messageKey(sim.notice.diagnostic));
+    }
+  }, [sim.notice]);
   const editingPart = propertiesFor ? doc.parts.find((p) => p.id === propertiesFor) : undefined;
 
   const diagnosticContext = useMemo<DiagnosticContext>(() => {
@@ -100,9 +169,20 @@ export default function Simulator() {
             flowGraph={flowGraph}
             simActive={sim.status !== 'stopped'}
             frame={sim.frame}
+            highlight={highlight}
+            onRepair={sim.repair}
           />
         </main>
       </div>
+
+      <MessagesPanel
+        items={messages}
+        open={panelOpen}
+        onToggle={() => setPanelOpen((o) => !o)}
+        selectedKey={selectedItem ? selectedItem.key : null}
+        onSelect={selectMessage}
+        context={diagnosticContext}
+      />
 
       <SimBar
         status={sim.status}

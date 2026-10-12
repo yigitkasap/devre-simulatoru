@@ -79,6 +79,12 @@ describe('Türkçe sayı biçimi', () => {
     expect(formatSI(12.5e-6, 'V', { digits: 4 })).toBe('12,50 µV');
   });
 
+  it('yuvarlamada anlamlı basamak sayısı korunur', () => {
+    expect(formatSI(9.99999, 'V', { digits: 4 })).toBe('10,00 V');
+    expect(formatSI(0.0999999, 'A', { digits: 4 })).toBe('100,0 mA');
+    expect(formatSI(9.996, 'V')).toBe('10,0 V');
+  });
+
   it('yuvarlama bir üst öneke taşır', () => {
     expect(formatSI(999.96, 'Ω')).toBe('1,00 kΩ');
     expect(formatSI(0.99999, 'A')).toBe('1,00 A');

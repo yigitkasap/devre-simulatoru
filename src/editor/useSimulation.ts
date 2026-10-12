@@ -6,7 +6,7 @@ import { wireKey, type Connectivity } from '../model/connectivity';
 import { solveFlows, type FlowGraph } from '../model/flow';
 import { structureKey } from '../model/serialize';
 import type { CircuitDoc } from '../model/types';
-import { CircuitSimulator, type Diagnostic, type Measurement } from '../sim';
+import { CircuitSimulator, type DeviceStatus, type Diagnostic, type Measurement } from '../sim';
 import type { LiveVisual } from './symbols';
 
 export type SimStatus = 'stopped' | 'running' | 'paused';
@@ -30,6 +30,11 @@ export interface SimFrame {
   readonly partFlows: ReadonlyMap<string, PartFlow>;
   readonly live: ReadonlyMap<string, LiveVisual>;
   readonly measurements: ReadonlyMap<string, Measurement>;
+  readonly statuses: ReadonlyMap<string, DeviceStatus>;
+  /** Simülasyon sırasında oluşan uyarılar (kısa devre, yanmış LED). */
+  readonly runtime: readonly Diagnostic[];
+  /** Kısa devre olan pillerin kimlikleri (kırmızı yanıp sönen çerçeve). */
+  readonly alarms: ReadonlySet<string>;
 }
 
 export type SimNotice =
@@ -46,14 +51,20 @@ export interface SimulationApi {
   readonly play: () => void;
   readonly pause: () => void;
   readonly stop: () => void;
+  /** Yanmış bir LED'i onarır. */
+  readonly repair: (partId: string) => void;
 }
 
-/** Bu akımın altında nokta çizilmez (sayısal gürültü, gmin sızıntısı). */
-export const MIN_ANIMATED_CURRENT = 1e-9;
+/**
+ * Bu akımın altında noktalar hareketsiz kalır: ters diyot sızıntısı ve gmin kaynaklı
+ * 10⁻¹¹ A düzeyindeki akımlar gösterilmez, voltmetrenin çektiği µA düzeyindeki akım gösterilir.
+ */
+export const MIN_ANIMATED_CURRENT = 10e-9;
 
 /**
  * Akım noktalarının hızı (dünya pikseli/saniye), logaritmik ölçek:
  * 1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140 piksel/s; böylece hem µA hem A düzeyi görülebilir.
+ * Simülasyon hızı ayarından bağımsızdır: yalnızca akımın büyüklüğünü gösterir.
  */
 export function dotSpeed(current: number): number {
   const abs = Math.abs(current);
@@ -125,18 +136,22 @@ export function useSimulation(
 
     const partFlows = new Map<string, PartFlow>();
     const live = new Map<string, LiveVisual>();
+    const statuses = new Map<string, DeviceStatus>();
+    const alarms = new Set<string>();
     for (const part of d.parts) {
       const m = measurements.get(part.id);
       if (!m || part.type === 'ground') continue;
+      const status = sim.status(part.id);
+      statuses.set(part.id, status);
+      if (status.shortCircuit) alarms.add(part.id);
       const phase = ((ph.parts.get(part.id) ?? 0) + direction * Math.sign(m.current) * dotSpeed(m.current) * dtReal) % 1e6;
       ph.parts.set(part.id, phase);
       partFlows.set(part.id, { current: m.current, phase });
       if (part.type === 'led') {
-        const s = sim.status(part.id);
         live.set(part.id, {
-          brightness: s.brightness ?? 0,
-          burned: s.burned ?? false,
-          overCurrent: s.overCurrent ?? false,
+          brightness: status.brightness ?? 0,
+          burned: status.burned ?? false,
+          overCurrent: status.overCurrent ?? false,
         });
       } else if (part.type === 'capacitor') {
         live.set(part.id, { charge: m.voltage / vmax });
@@ -152,6 +167,9 @@ export function useSimulation(
       partFlows,
       live,
       measurements,
+      statuses,
+      runtime: sim.runtimeDiagnostics,
+      alarms,
     };
   }, []);
 
@@ -185,6 +203,19 @@ export function useSimulation(
   const pause = useCallback(() => {
     if (statusRef.current === 'running') setStatus('paused');
   }, [setStatus]);
+
+  const repair = useCallback(
+    (partId: string) => {
+      const sim = simRef.current;
+      if (!sim?.repair(partId)) return;
+      // Duraklatılmışsa sonucu hemen göster (LED aşırı akımda yeniden yanabilir).
+      if (statusRef.current === 'paused') {
+        sim.advance(0);
+        setFrame(buildFrame(sim, 0));
+      }
+    },
+    [buildFrame],
+  );
 
   const setSpeed = useCallback((value: number) => {
     speedRef.current = value;
@@ -243,5 +274,5 @@ export function useSimulation(
     return () => cancelAnimationFrame(raf);
   }, [status, buildFrame, setStatus]);
 
-  return { status, frame, notice, speed, setSpeed, play, pause, stop };
+  return { status, frame, notice, speed, setSpeed, play, pause, stop, repair };
 }

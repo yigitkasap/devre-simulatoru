@@ -162,8 +162,13 @@ export function formatSI(value: number, unit: string, options: FormatOptions = {
   for (let attempt = 0; attempt < 2; attempt++) {
     const mantissa = abs / 10 ** exp3;
     const intDigits = mantissa >= 1 ? Math.floor(Math.log10(mantissa)) + 1 : 1;
-    const decimals = Math.max(0, digits - intDigits);
+    let decimals = Math.max(0, digits - intDigits);
     text = mantissa.toFixed(decimals);
+    // Yuvarlama bir basamak eklediyse (9,9999 → 10,000) anlamlı basamak sayısını koru: 10,00.
+    if (decimals > 0 && Number(text) >= 10 ** intDigits) {
+      decimals -= 1;
+      text = mantissa.toFixed(decimals);
+    }
     // Yuvarlama 1000'e ulaştıysa bir üst öneke geç (999,96 → 1,00 k).
     if (Number(text) >= 1000 && exp3 < 9) {
       exp3 += 3;
