@@ -55,6 +55,8 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
   for (const el of netlist.elements) {
     if (el.type === 'ground' && !groundConnected) continue; // zaten hata olarak bildirildi
     el.pins.forEach((pin, index) => {
+      // Osiloskobun kullanılmayan bir kanalı (A ya da B) normaldir; ortak ucu ise bağlanmalıdır.
+      if (el.type === 'oscilloscope' && index < 2) return;
       const root = wiring.findKey(pin);
       if ((pinCount.get(root) ?? 0) <= 1) {
         diagnostics.push({
@@ -166,11 +168,11 @@ function findPath(
   return { ids, nodes };
 }
 
-/** Ampermetre doğrudan bir pilin iki ucuna bağlanmışsa (paralel) eğitsel uyarı. */
+/** Ampermetre doğrudan bir pilin (ya da AC kaynağın) iki ucuna bağlanmışsa (paralel) eğitsel uyarı. */
 function findAmmetersAcrossBatteries(input: TopologyInput): Diagnostic[] {
   const result: Diagnostic[] = [];
   const ammeters = input.devices.filter((d) => d.type === 'ammeter');
-  const batteries = input.devices.filter((d) => d.type === 'battery');
+  const batteries = input.devices.filter((d) => d.type === 'battery' || d.type === 'acsource');
   for (const ammeter of ammeters) {
     const [a0, a1] = ammeter.nodes;
     if (a0 === a1) continue;
@@ -198,6 +200,8 @@ function findFloatingIslands(input: TopologyInput): Diagnostic[] {
   const uf = new UnionFind();
   for (let i = 0; i <= groundIndex; i++) uf.add();
   for (const device of input.devices) {
+    // Osiloskobun girişleri ideal (akım çekmez); uçlarını elektriksel olarak birleştirmez.
+    if (device.type === 'oscilloscope') continue;
     const first = device.nodes[0];
     if (first === undefined) continue;
     for (const node of device.nodes) uf.union(ufIndex(first, groundIndex), ufIndex(node, groundIndex));
@@ -205,7 +209,7 @@ function findFloatingIslands(input: TopologyInput): Diagnostic[] {
   const groundRoot = uf.find(groundIndex);
   const islands = new Map<number, Device[]>();
   for (const device of input.devices) {
-    if (device.type === 'ground') continue;
+    if (device.type === 'ground' || device.type === 'oscilloscope') continue;
     const root = uf.find(ufIndex(device.nodes[0]!, groundIndex));
     if (root === groundRoot) continue;
     if (!islands.has(root)) islands.set(root, []);

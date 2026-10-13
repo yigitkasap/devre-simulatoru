@@ -1,7 +1,9 @@
 // Simülasyon motoru: derlenmiş devreyi zaman içinde ilerletir.
 //
-// - Kondansatör yoksa devre zamandan bağımsızdır: her karede (gerekirse) tek bir DC çözüm yapılır.
-// - Kondansatör varsa geri Euler ile h adımlarıyla ilerlenir (varsayılan 50 µs).
+// - Kondansatör ve AC kaynak yoksa devre zamandan bağımsızdır: her karede (gerekirse) tek bir DC
+//   çözüm yapılır.
+// - Kondansatör ya da AC kaynak varsa geri Euler ile h adımlarıyla ilerlenir (varsayılan 50 µs;
+//   AC kaynakta en fazla periyodun 1/100'ü).
 // - Doğrusal olmayan bileşen (diyot, LED) varsa her adım Newton-Raphson ile çözülür. NR
 //   yakınsamazsa h yarıya indirilir (en az 1 ns); birkaç başarılı adımdan sonra yeniden büyütülür.
 // - Doğrusal devrelerde aynı h için LU ayrıştırması saklanır; adımlar yalnızca ileri/geri
@@ -20,6 +22,7 @@ import {
 } from './constants';
 import { hasErrors, type Diagnostic } from './diagnostics';
 import {
+  AcSourceDevice,
   BatteryDevice,
   LedDevice,
   type Device,
@@ -53,6 +56,9 @@ const DEFAULT_OPTIONS: SimulatorOptions = { timeStep: DEFAULT_TIME_STEP, minTime
 /** Kaynak adımlama yedeğinde kullanılan ölçekler (DC çözüm yakınsamazsa). */
 const SOURCE_STEPS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
 
+/** AC kaynaklı devrede en büyük zaman adımı: en kısa periyodun 1/100'ü. */
+const STEPS_PER_PERIOD = 100;
+
 export class CircuitSimulator {
   private circuit: CompiledCircuit;
   private readonly options: SimulatorOptions;
@@ -78,6 +84,19 @@ export class CircuitSimulator {
   time = 0;
   /** Şu anki zaman adımı (s). */
   private h: number;
+  /** Bu devre için en büyük zaman adımı (AC kaynağın periyoduna göre küçülür). */
+  private maxStep: number;
+  /** Ölçü aletlerinin ortalama penceresi: AC kaynakların en uzun periyodu (yoksa 0). */
+  private window = 0;
+  /**
+   * Son advance() çağrısı (bir animasyon karesi) boyunca düğüm gerilimlerinin ve bileşen
+   * akımlarının zaman integrali. AC devrede tuvaldeki renkler, akım noktaları ve LED parlaklığı
+   * bu ortalamalardan çizilir; anlık değerler kare hızında örneklenince titrerdi.
+   */
+  private intervalTime = 0;
+  private xSum: Float64Array;
+  private currentSum: Float64Array;
+  private deviceIndex = new Map<string, number>();
   /** Henüz adımlanmamış simülasyon zamanı. */
   private pending = 0;
   private successStreak = 0;
@@ -88,14 +107,41 @@ export class CircuitSimulator {
   constructor(netlist: Netlist, options: Partial<SimulatorOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
     this.h = this.options.timeStep;
+    this.maxStep = this.options.timeStep;
     this.circuit = compileNetlist(netlist);
     const n = this.circuit.size;
     this.x = new Float64Array(n);
     this.xNew = new Float64Array(n);
     this.xIter = new Float64Array(n);
+    this.xSum = new Float64Array(n);
+    this.currentSum = new Float64Array(this.circuit.devices.length);
     this.staticSys = new MnaSystem(n);
     this.stepSys = new MnaSystem(n);
     this.iterSys = new MnaSystem(n);
+    this.configure();
+  }
+
+  /** Devreye göre zaman adımı sınırı, ortalama penceresi ve bileşen sırası. */
+  private configure(): void {
+    let shortest = Number.POSITIVE_INFINITY;
+    let longest = 0;
+    for (const device of this.circuit.devices) {
+      const period = device.timeVarying ? device.period : 0;
+      if (period > 0) {
+        shortest = Math.min(shortest, period);
+        longest = Math.max(longest, period);
+      }
+    }
+    this.window = longest;
+    this.maxStep = Number.isFinite(shortest)
+      ? Math.min(this.options.timeStep, shortest / STEPS_PER_PERIOD)
+      : this.options.timeStep;
+    if (this.h > this.maxStep) this.h = this.maxStep;
+    this.deviceIndex = new Map(this.circuit.devices.map((d, i) => [d.id, i]));
+    if (this.currentSum.length !== this.circuit.devices.length) {
+      this.currentSum = new Float64Array(this.circuit.devices.length);
+    }
+    this.intervalTime = 0;
   }
 
   // ---------------------------------------------------------------------------
@@ -117,11 +163,13 @@ export class CircuitSimulator {
       this.x = new Float64Array(n);
       this.xNew = new Float64Array(n);
       this.xIter = new Float64Array(n);
+      this.xSum = new Float64Array(n);
       this.staticSys = new MnaSystem(n);
       this.stepSys = new MnaSystem(n);
       this.iterSys = new MnaSystem(n);
       this.luWork = undefined;
     }
+    this.configure();
     this.invalidate();
   }
 
@@ -153,6 +201,19 @@ export class CircuitSimulator {
           },
         });
       }
+      if (device instanceof AcSourceDevice && device.isShortCircuited(this.x)) {
+        result.push({
+          severity: 'warning',
+          code: 'short-circuit',
+          elementIds: [device.id],
+          netKeys: [],
+          params: {
+            current: device.peakOutputCurrent(this.x),
+            voltage: device.peakVoltage,
+            internalResistance: device.internalResistance,
+          },
+        });
+      }
       if (device instanceof LedDevice && device.burned) {
         result.push({
           severity: 'warning',
@@ -179,9 +240,14 @@ export class CircuitSimulator {
     return !hasErrors(this.circuit.diagnostics);
   }
 
-  /** Devrede zamana bağlı (kondansatör gibi) bileşen var mı? */
+  /** Devrede zamana bağlı bileşen (kondansatör, AC kaynak) var mı? */
   get isTransient(): boolean {
-    return this.circuit.devices.some((d) => d.reactive);
+    return this.circuit.devices.some((d) => d.reactive || d.timeVarying);
+  }
+
+  /** Devrede AC kaynak var mı? */
+  get hasAcSources(): boolean {
+    return this.window > 0;
   }
 
   get timeStep(): number {
@@ -228,20 +294,38 @@ export class CircuitSimulator {
     return this.circuit.deviceById.get(id)?.status(this.x) ?? {};
   }
 
-  /** Devredeki en büyük kaynak gerilimi (kablo renk ölçeği için). */
+  /** Devredeki en büyük kaynak (tepe) gerilimi (kablo renk ölçeği için). */
   maxSourceVoltage(): number {
     let max = 0;
-    for (const d of this.circuit.devices) {
-      if (d instanceof BatteryDevice) max = Math.max(max, Math.abs(d.voltage));
-    }
+    for (const d of this.circuit.devices) max = Math.max(max, d.peakVoltage);
     return max;
+  }
+
+  /**
+   * Son advance() çağrısı boyunca bir ağın ortalama gerilimi; o çağrıda zaman adımı atılmadıysa
+   * (DC devre, duraklatılmış simülasyon) anlık değer.
+   */
+  averageVoltageAt(key: string): number | null {
+    if (this.intervalTime <= 0) return this.voltageAt(key);
+    if (!this.circuit.nets.has(key)) return null;
+    const node = this.circuit.nodeOfRoot.get(this.circuit.nets.findKey(key));
+    if (node === undefined) return null;
+    return node < 0 ? 0 : this.xSum[node]! / this.intervalTime;
+  }
+
+  /** Son advance() çağrısı boyunca bir bileşenin ortalama akımı (yoksa anlık). */
+  averageCurrent(id: string): number | null {
+    const index = this.deviceIndex.get(id);
+    if (index === undefined) return null;
+    if (this.intervalTime <= 0) return this.circuit.devices[index]!.measure(this.x).current;
+    return this.currentSum[index]! / this.intervalTime;
   }
 
   // ---------------------------------------------------------------------------
   // Zaman ilerletme
 
   /**
-   * Simülasyonu `dt` saniye ilerletir. Kondansatörsüz devrede yalnızca zamanı ilerletir ve
+   * Simülasyonu `dt` saniye ilerletir. Zamandan bağımsız devrede yalnızca zamanı ilerletir ve
    * devre değiştiyse yeniden çözer.
    * @param maxSteps Bu çağrıda en fazla kaç adım atılacağı (yavaş bilgisayarda donmayı önler);
    *                 aşılırsa kalan süre atlanır.
@@ -252,10 +336,12 @@ export class CircuitSimulator {
       const error = this.circuit.diagnostics.find((d) => d.severity === 'error');
       return { ok: false, steps: 0, burned: [], ...(error ? { error } : {}) };
     }
+    this.beginInterval();
     try {
       if (!this.isTransient) {
         this.time += dt;
         const error = this.solvedVersion === this.version ? null : this.solveDC();
+        if (!error) this.observe();
         return this.result(0, error);
       }
       return this.advanceTransient(dt, maxSteps);
@@ -282,27 +368,50 @@ export class CircuitSimulator {
         this.pending = 0;
         break;
       }
-      const ctx: StepContext = { h: this.h, sourceScale: 1 };
+      const ctx: StepContext = { h: this.h, sourceScale: 1, time: this.time + this.h, window: this.window };
       if (this.step(ctx)) {
         this.time += this.h;
         this.pending -= this.h;
         steps++;
+        this.observe();
+        this.accumulate(ctx.h);
         this.successStreak++;
-        if (this.h < this.options.timeStep && this.successStreak >= STEP_GROWTH_AFTER) {
-          this.h = Math.min(this.options.timeStep, this.h * 2);
+        if (this.h < this.maxStep && this.successStreak >= STEP_GROWTH_AFTER) {
+          this.h = Math.min(this.maxStep, this.h * 2);
           this.successStreak = 0;
         }
       } else {
         this.h /= 2;
         this.successStreak = 0;
         if (this.h < this.options.minTimeStep) {
-          this.h = this.options.timeStep;
+          this.h = this.maxStep;
           return this.result(steps, this.nrFailedDiagnostic());
         }
       }
     }
     if (this.pending < 0) this.pending = 0;
     return this.result(steps, null);
+  }
+
+  /** Yeni bir ilerletme aralığı (animasyon karesi): ortalamalar sıfırlanır. */
+  private beginInterval(): void {
+    this.intervalTime = 0;
+    this.xSum.fill(0);
+    this.currentSum.fill(0);
+  }
+
+  /** Kabul edilen çözüm, kayıt tutan bileşenlere (osiloskop) iletilir. */
+  private observe(): void {
+    for (const device of this.circuit.devices) device.observe(this.x, this.time);
+  }
+
+  /** AC devrede aralık ortalamaları için integraller (zamandan bağımsız devrede gereksiz). */
+  private accumulate(h: number): void {
+    if (!this.hasAcSources) return;
+    this.intervalTime += h;
+    for (let i = 0; i < this.x.length; i++) this.xSum[i]! += this.x[i]! * h;
+    const devices = this.circuit.devices;
+    for (let i = 0; i < devices.length; i++) this.currentSum[i]! += devices[i]!.measure(this.x).current * h;
   }
 
   /**
@@ -333,12 +442,12 @@ export class CircuitSimulator {
 
   /** DC çözüm; yakınsamazsa kaynak adımlama dener. Hata varsa tanılamayı döndürür. */
   private solveDC(): Diagnostic | null {
-    const ctx: StepContext = { h: 0, sourceScale: 1 };
+    const ctx: StepContext = { h: 0, sourceScale: 1, time: this.time, window: 0 };
     if (!this.step(ctx)) {
       // Kaynak adımlama: kaynakları %10'dan başlayarak artır, her çözümü bir sonrakinin
       // başlangıç noktası yap.
       for (const scale of SOURCE_STEPS) {
-        const scaled: StepContext = { h: 0, sourceScale: scale };
+        const scaled: StepContext = { ...ctx, sourceScale: scale };
         if (!this.step(scaled)) return this.nrFailedDiagnostic();
       }
     }

@@ -7,6 +7,8 @@
 //   3. stampNonlinear — Newton-Raphson iterasyonuna bağlı katkılar (diyot, LED).
 //   4. updateIterate — NR çözümünden sonra eklem gerilimlerini sınırla/güncelle.
 //   5. accept        — adım kabul edilince durumu kaydet (kondansatör gerilimi vb.).
+//   6. observe       — adım kabul edildikten sonra ölçüm kaydı (osiloskop). Kondansatörsüz ve AC
+//                      kaynaksız (zamandan bağımsız) devrede her ilerletmede bir kez çağrılır.
 
 import { MnaSystem, nodeVoltage } from '../mna';
 import type { DeviceType, Props } from '../netlist';
@@ -16,6 +18,13 @@ export interface StepContext {
   readonly h: number;
   /** Bağımsız kaynakların ölçeği (0..1). Yalnızca "kaynak adımlama" yedeğinde 1'den küçüktür. */
   readonly sourceScale: number;
+  /** Çözülen anın simülasyon zamanı (s): geri Euler'de adımın sonu, DC çözümde şu an. */
+  readonly time: number;
+  /**
+   * Ölçü aletlerinin ortalama/etkin değer penceresi (s): devredeki AC kaynakların en uzun
+   * periyodu. AC kaynak yoksa 0 (ölçü aletleri anlık değeri gösterir).
+   */
+  readonly window: number;
 }
 
 export interface Measurement {
@@ -38,6 +47,8 @@ export interface DeviceStatus {
   readonly overCurrent?: boolean;
   /** LED: 0..1 arası, gamma düzeltmeli parlaklık. */
   readonly brightness?: number;
+  /** Ölçü aleti: ekrandaki değer (DC kipinde ortalama, AC kipinde etkin değer). */
+  readonly reading?: number;
 }
 
 export interface DeviceInit {
@@ -73,6 +84,21 @@ export abstract class Device {
     return false;
   }
 
+  /** Değeri zamanla değişen bir kaynak mı (AC kaynak)? Devre o zaman adım adım çözülür. */
+  get timeVarying(): boolean {
+    return false;
+  }
+
+  /** Zamanla değişen kaynağın periyodu (s); öbür bileşenlerde 0. */
+  get period(): number {
+    return 0;
+  }
+
+  /** Kaynağın tepe gerilimi (kablo renk ölçeği için); kaynak olmayanlarda 0. */
+  get peakVoltage(): number {
+    return 0;
+  }
+
   stampStatic(_sys: MnaSystem, _ctx: StepContext): void {}
   stampStep(_sys: MnaSystem, _ctx: StepContext): void {}
   stampNonlinear(_sys: MnaSystem): void {}
@@ -87,6 +113,9 @@ export abstract class Device {
 
   /** Adım kabul edildi: durumu kaydet. */
   accept(_x: Float64Array, _ctx: StepContext): void {}
+
+  /** Kabul edilen çözümü `time` anının ölçümü olarak kaydet (osiloskop). */
+  observe(_x: Float64Array, _time: number): void {}
 
   /** Akım sınırı aşıldıysa durumu değiştirir (ör. LED yanar) ve true döner. */
   checkLimits(_x: Float64Array): boolean {

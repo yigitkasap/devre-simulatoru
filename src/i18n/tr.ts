@@ -23,6 +23,7 @@ export interface DiagnosticContext {
 
 const DEVICE_NAMES: Record<DeviceType, string> = {
   battery: 'Pil',
+  acsource: 'AC kaynak',
   ground: 'Toprak',
   resistor: 'Direnç',
   capacitor: 'Kondansatör',
@@ -31,11 +32,13 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   switch: 'Anahtar',
   voltmeter: 'Voltmetre',
   ammeter: 'Ampermetre',
+  oscilloscope: 'Osiloskop',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
 const DEVICE_GENITIVE: Record<DeviceType, string> = {
   battery: 'pilinin',
+  acsource: 'AC kaynağının',
   ground: 'toprak sembolünün',
   resistor: 'direncinin',
   capacitor: 'kondansatörünün',
@@ -44,10 +47,12 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   switch: 'anahtarının',
   voltmeter: 'voltmetresinin',
   ammeter: 'ampermetresinin',
+  oscilloscope: 'osiloskobunun',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   battery: ['+ ucu', '− ucu'],
+  acsource: ['+ ucu', '− ucu'],
   ground: ['ucu'],
   resistor: ['1. ucu', '2. ucu'],
   capacitor: ['+ ucu', '− ucu'],
@@ -56,6 +61,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   switch: ['1. ucu', '2. ucu'],
   voltmeter: ['+ ucu', '− ucu'],
   ammeter: ['+ ucu', '− ucu'],
+  oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
 };
 
 function list(labels: readonly string[]): string {
@@ -101,23 +107,28 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
         title: 'Toprağa bağlı olmayan parça',
         detail: `${list(labels)} toprağa bağlı değil. Bu parçadaki gerilimler belirsizdir; parçayı bir kabloyla toprağa bağla.`,
       };
-    case 'ammeter-parallel':
+    case 'ammeter-parallel': {
+      const source = d.elementIds[1] && ctx.type(d.elementIds[1]) === 'acsource' ? 'AC kaynağının' : 'pilinin';
       return {
         title: 'Ampermetre paralel bağlanmış',
         detail:
-          `${labels[0] ?? ''} ampermetresi doğrudan ${labels[1] ?? ''} pilinin iki ucuna bağlanmış. ` +
+          `${labels[0] ?? ''} ampermetresi doğrudan ${labels[1] ?? ''} ${source} iki ucuna bağlanmış. ` +
           'Ampermetre seri bağlanır; iç direnci çok küçük olduğu için paralel bağlanınca kısa devre olur.',
       };
+    }
     case 'short-circuit': {
       const r = p.internalResistance ?? 0;
+      const ac = first !== undefined && ctx.type(first) === 'acsource';
       return {
         title: 'Kısa devre',
         detail:
-          `${firstLabel} pilinden ${formatSI(p.current ?? 0, 'A')} akım çekiliyor. ` +
+          (ac
+            ? `${firstLabel} AC kaynağından tepe değeri ${formatSI(p.current ?? 0, 'A')} olan bir akım çekiliyor. `
+            : `${firstLabel} pilinden ${formatSI(p.current ?? 0, 'A')} akım çekiliyor. `) +
           (r > 0
-            ? `Dış devrenin direnci pilin iç direncinden (${formatSI(r, 'Ω', { trim: true })}) küçük. `
+            ? `Dış devrenin direnci ${ac ? 'kaynağın' : 'pilin'} iç direncinden (${formatSI(r, 'Ω', { trim: true })}) küçük. `
             : 'Dış devrenin direnci neredeyse sıfır. ') +
-          'Gerçek bir pil bu durumda hızla ısınır ve boşalır.',
+          (ac ? 'Gerçek bir kaynak bu durumda aşırı ısınır ya da sigortası atar.' : 'Gerçek bir pil bu durumda hızla ısınır ve boşalır.'),
       };
     }
     case 'led-burned':
@@ -150,6 +161,8 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
 
 const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   battery: 'Uçları arasında sabit bir gerilim tutan doğru akım kaynağı; iç direnci ayarlanabilir.',
+  acsource:
+    'Yönü zamanla değişen gerilim üreten alternatif akım kaynağı: sinüs, kare ya da üçgen dalga; tepe gerilimi ve frekansı ayarlanır.',
   ground: 'Devrenin 0 V referans noktası; her devrede en az bir tane olmalı.',
   resistor: 'Üzerinden geçen akımla orantılı bir gerilim düşümü oluşturur: V = I · R.',
   capacitor: 'Yük depolar; bir direnç üzerinden zamanla dolar ya da boşalır.',
@@ -158,6 +171,7 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
+  oscilloscope: 'Gerilimin zamanla nasıl değiştiğini ekranda çizer; iki kanalı (A, B) ortak uca göre ölçer.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -166,6 +180,11 @@ function fieldLabel(type: DeviceType, key: string): string {
   if (type === 'voltmeter' && key === 'ideal') return 'İdeal voltmetre (iç direnç ∞)';
   if (type === 'ammeter' && key === 'ideal') return 'İdeal ampermetre (iç direnç 0 Ω)';
   const labels: Record<string, string> = {
+    mode: 'Ölçüm kipi',
+    waveform: 'Dalga biçimi',
+    amplitude: 'Tepe gerilimi',
+    frequency: 'Frekans',
+    offset: 'DC kayma',
     voltage: 'Gerilim',
     internalResistance: 'İç direnç',
     resistance: 'Direnç',
@@ -175,6 +194,17 @@ function fieldLabel(type: DeviceType, key: string): string {
     closed: 'Anahtar kapalı (akım geçirir)',
   };
   return labels[key] ?? key;
+}
+
+/** Seçmeli özelliklerin seçenek adları. */
+const OPTION_LABELS: Record<string, Record<string, string>> = {
+  color: { red: 'Kırmızı', green: 'Yeşil', blue: 'Mavi' },
+  waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
+  mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)' },
+};
+
+function optionLabel(key: string, option: string): string {
+  return OPTION_LABELS[key]?.[option] ?? option;
 }
 
 export interface ExampleTexts {
@@ -236,6 +266,24 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     answer:
       'Yaklaşık 4,35 mA: I = (5 V − 0,65 V) / 1 kΩ. Şimdi diyotu seçip F’ye bas (ya da sağ tıklayıp “Ters çevir”i seç) ve yeniden Oynat’a bas: akım neredeyse sıfıra düşer, çünkü ters yönde diyot yalnızca çok küçük bir sızıntı akımı geçirir.',
   },
+  'yarim-dalga': {
+    title: 'Yarım dalga doğrultmaç',
+    description:
+      'Tepe değeri 10 V, frekansı 50 Hz olan sinüs veren AC kaynak, bir diyot ve 1 kΩ’luk yük direnci seri bağlı. Osiloskobun A kanalı kaynağın, B kanalı yükün gerilimini gösteriyor; DC kipindeki voltmetre yükteki ortalama gerilimi ölçüyor.',
+    question:
+      'B kanalında yükün gerilimi nasıl bir şekil çizer, tepe değeri kaç volt olur? Voltmetre ne gösterir? Önce tahmin et, sonra Oynat’a bas.',
+    answer:
+      'Yalnızca pozitif yarım dalgalar geçer: negatif yarıda diyot ters kutuplanır ve akım kesilir. Tepe değeri ≈ 9,3 V’tur (10 V − diyotta düşen ≈ 0,7 V). Voltmetre bir periyodun ortalamasını gösterir: ≈ 9,3 V / π ≈ 2,9 V. Diyotu seçip F ile ters çevir: bu kez yalnızca negatif yarım dalgalar geçer.',
+  },
+  'rc-kare-dalga': {
+    title: 'Kare dalga ile RC',
+    description:
+      'AC kaynak 0 V ile 10 V arasında gidip gelen 1 Hz’lik kare dalga veriyor (5 V tepe + 5 V DC kayma). 1 kΩ’luk direnç üzerinden 100 µF’lık kondansatör dolup boşalıyor; A kanalı kaynağı, B kanalı kondansatörün gerilimini gösteriyor. Zaman sabiti τ = R · C = 0,1 s.',
+    question:
+      'Kare dalganın her yarım periyodu (0,5 s) kaç τ eder? B kanalındaki eğri yarım periyodun sonunda kaç volta ulaşır? Önce tahmin et, sonra Oynat’a bas.',
+    answer:
+      'Yarım periyot 5τ’dur: kondansatör her yarım periyotta ≈ %99,3 dolar (≈ 9,93 V) ve sonraki yarıda neredeyse tamamen boşalır. B kanalı üstel dolma ve boşalma eğrilerini çizer. Kaynağın frekansını 5 Hz’e çıkar (yarım periyot = τ): kondansatör artık tam dolup boşalamaz, eğri 10 V ile 0 V’a hiç ulaşmaz.',
+  },
 };
 
 export const tr = {
@@ -250,7 +298,8 @@ export const tr = {
     names: DEVICE_NAMES,
     pins: PIN_NAMES,
     descriptions: DEVICE_DESCRIPTIONS,
-    ledColors: { red: 'Kırmızı', green: 'Yeşil', blue: 'Mavi' } as Record<string, string>,
+    ledColors: OPTION_LABELS.color!,
+    waveforms: OPTION_LABELS.waveform!,
   },
   library: {
     title: 'Parçalar',
@@ -348,6 +397,44 @@ export const tr = {
     realVoltmeter: (r: string, i: string) => `İç direnci ${r}: ölçtüğü devreden ${i} çekiyor.`,
     idealAmmeter: 'İdeal ampermetrenin direnci sıfırdır; üzerinde gerilim düşmez.',
     realAmmeter: (r: string, drop: string) => `İç direnci ${r}: devrede ${drop} gerilim düşümüne yol açıyor.`,
+    instant: 'Anlık değer',
+    dcMode: 'DC kipi: son periyottaki ortalama değer.',
+    acMode: 'AC kipi: etkin değer, √(ortalama v²).',
+    instantVoltage: 'Anlık gerilim',
+    peakVoltage: 'Tepe gerilimi',
+    rmsVoltage: 'Etkin değer',
+    frequency: 'Frekans',
+    period: 'Periyot',
+    acFormula: {
+      sine: 'v(t) = V_{m} · sin(2π · f · t); etkin değer V_{m} / √2.',
+      square: 'Kare dalga: yarım periyot +V_{m}, yarım periyot −V_{m}; etkin değer V_{m}.',
+      triangle: 'Üçgen dalga: gerilim doğrusal artıp azalır; etkin değer V_{m} / √3.',
+    } as Record<string, string>,
+    withOffset: (offset: string) => `DC kayma ${offset}: bütün dalga bu kadar yukarı kayar.`,
+    channel: (c: string) => `Kanal ${c}`,
+    scopeNote: 'Ekran, tuvalin köşesindeki osiloskop panelinde çizilir.',
+  },
+  scope: {
+    title: 'Osiloskop',
+    choose: 'Gösterilen osiloskop',
+    collapse: 'Osiloskop panelini küçült',
+    expand: 'Osiloskop panelini aç',
+    screen: 'Osiloskop ekranı',
+    timePerDiv: 'Zaman/bölme',
+    voltsPerDiv: 'Volt/bölme',
+    up: 'Yukarı kaydır',
+    down: 'Aşağı kaydır',
+    trigger: 'Tetik',
+    auto: 'Oto',
+    autoTitle: 'Bölme ayarlarını sinyale göre seç',
+    channel: (c: string) => `Kanal ${c}`,
+    notConnected: 'bağlı değil',
+    stopped: 'Ekranı görmek için Oynat’a bas.',
+    rolling: 'Tetiklenmiyor; ekran kayıyor.',
+    peakToPeak: 'Tepe-tepe',
+    rms: 'Etkin',
+    frequency: 'f',
+    perDiv: '/b',
   },
   examples: {
     section: 'Örnekler',
@@ -426,6 +513,7 @@ export const tr = {
     ok: 'Tamam',
     cancel: 'İptal',
     fieldLabel,
+    optionLabel,
     unitHint: 'SI önekleri: p, n, µ (ya da u), m, k, M, G. Büyük M mega, küçük m mili demektir.',
     notes: {
       battery: 'İç direnç, pilin verebileceği akımı sınırlar: kısa devrede I = V / R_{iç}.',
@@ -435,13 +523,20 @@ export const tr = {
         'Gerçek voltmetrelerin iç direnci sonludur. Ölçtüğün kaynağın iç direnci büyükse voltmetre gerçek değerden düşük okur (yükleme etkisi).',
       ammeter:
         'Gerçek ampermetrelerin de küçük bir iç direnci vardır; seri bağlandığı devrenin akımını biraz azaltır.',
+      oscilloscope:
+        'Kanallar ortak uca (COM) göre gerilimi ölçer; girişleri ideal olduğu için devreden akım çekmez. Bölme ayarları tuvalin köşesindeki osiloskop panelindedir.',
     } as Partial<Record<DeviceType, string>>,
+    meterModeNote:
+      'AC kaynaklı devrede DC kipi bir periyottaki ortalamayı, AC kipi etkin değeri (√(ortalama v²)) gösterir; gösterge her periyotta bir güncellenir.',
+    acSpec: (rms: string, period: string) =>
+      `Etkin değer ≈ ${rms} · periyot T = 1 / f = ${period}. Türkiye’de şebeke gerilimi 230 V etkin değerli (tepe ≈ 325 V), 50 Hz’liktir.`,
     ledSpec: (vf: string, max: string) => `20 mA’de ileri gerilim ≈ ${vf}; en fazla ${max} akıma dayanır.`,
     errors: {
       empty: 'Bir değer yaz.',
       invalid: 'Bu bir sayı değil. Örnekler: 4,7k · 100µ · 2,2M · 0,5',
       wrongUnit: (unit: string) => `Bu alanın birimi ${unit}.`,
       positive: 'Değer sıfırdan büyük olmalı.',
+      max: (limit: string) => `Değer en fazla ${limit} olabilir.`,
       nonNegative: 'Değer negatif olamaz.',
       labelEmpty: 'Bir ad yaz.',
       labelTaken: 'Bu ad başka bir parçada kullanılıyor.',

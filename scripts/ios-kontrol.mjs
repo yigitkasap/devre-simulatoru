@@ -186,6 +186,34 @@ try {
   await shot(page, 'ios-3-vip.png');
   await page.context().close();
 
+  // --- Osiloskop paneli (telefon) -----------------------------------------------------
+  {
+    const { page: sp, cdp: scdp } = await phone();
+    await sp.getByRole('button', { name: 'Parça kütüphanesi' }).tap(); await sp.waitForTimeout(400);
+    await sp.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).tap(); await sp.waitForTimeout(600);
+    await sp.getByRole('button', { name: 'Örnek açıklamasını küçült' }).tap().catch(() => {});
+    const expand = sp.getByRole('button', { name: 'Osiloskop panelini aç' });
+    check('telefonda osiloskop paneli küçültülmüş başlıyor', await expand.isVisible().catch(() => false));
+    await sp.getByRole('button', { name: 'Oynat' }).tap(); await sp.waitForTimeout(300);
+    await expand.tap(); await sp.waitForTimeout(1200);
+    const strip = await sp.locator('section[aria-labelledby] .tabular').first().textContent().catch(() => '');
+    check('dokununca panel açılıyor; ekran ve ölçümler görünüyor', /Tepe-tepe 20,0 V/.test(strip ?? ''), (strip ?? '').slice(0, 50));
+    await sp.getByLabel('Kanal B Volt/bölme').selectOption('2'); await sp.waitForTimeout(200);
+    const scopePart = await part(sp, 'OSC1');
+    check('panelden ayar değişince parçaya kaydediliyor', scopePart.props.voltsPerDivB === 2, String(scopePart.props.voltsPerDivB));
+    await sp.getByRole('button', { name: 'Oto' }).tap(); await sp.waitForTimeout(200);
+    const auto = (await part(sp, 'OSC1')).props;
+    check('Oto ayar 5 ms/bölme ve 5 V/bölme seçiyor', auto.timePerDiv === 0.005 && auto.voltsPerDivA === 5, `${auto.timePerDiv} s, ${auto.voltsPerDivA} V`);
+    // Panel açıkken tuvaldeki bir parçaya dokunmak yine seçmeli.
+    const d1 = await part(sp, 'D1');
+    const p = await screen(sp, d1.x, d1.y);
+    await tap(sp, scdp, p); await sp.waitForTimeout(200);
+    const chosen = await sp.locator('svg.schematic rect[stroke-dasharray="4 3"]').count();
+    check('panel açıkken tuvalde parçaya dokununca seçiliyor', chosen > 0);
+    await shot(sp, 'ios-4-osiloskop.png');
+    await sp.context().close();
+  }
+
   // --- Masaüstü: bilgi kartı tuvalin sağ altında --------------------------------------
   const desk = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
   const dp = await desk.newPage();

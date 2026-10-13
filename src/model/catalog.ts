@@ -1,15 +1,20 @@
 // Parça kataloğu: her bileşen türünün pinleri, kapladığı alan, varsayılan değerleri ve
 // özellik penceresindeki alanları. Türkçe adlar ve açıklamalar i18n/tr.ts içindedir.
 
+import { METER_MODES } from '../sim/averager';
 import {
+  AC_MAX_FREQUENCY,
+  AC_SOURCE_DEFAULTS,
   AMMETER_DEFAULTS,
   BATTERY_DEFAULTS,
   CAPACITOR_DEFAULTS,
   LED_COLORS,
   LED_DEFAULTS,
+  OSCILLOSCOPE_DEFAULTS,
   RESISTOR_DEFAULTS,
   SWITCH_DEFAULTS,
   VOLTMETER_DEFAULTS,
+  WAVEFORMS,
 } from '../sim/devices';
 import type { DeviceType, PropValue } from '../sim/netlist';
 import type { UnitSymbol } from '../sim/units';
@@ -23,6 +28,8 @@ export interface NumberPropDef {
   readonly unit: UnitSymbol;
   /** En küçük değer; `exclusive` ise bu değer de kabul edilmez (ör. direnç > 0). */
   readonly min?: { readonly value: number; readonly exclusive: boolean };
+  /** En büyük değer (dahil). */
+  readonly max?: number;
   /** Bu boolean özellik true iken alan devre dışıdır (ör. ideal voltmetrede iç direnç). */
   readonly disabledWhen?: string;
 }
@@ -70,6 +77,9 @@ const TWO_PINS: readonly Point[] = [
   { x: 4, y: 0 },
 ];
 
+/** Ölçü aletlerinin DC / AC kipi. */
+const METER_MODE_PROP: PropDef = { kind: 'select', key: 'mode', options: METER_MODES };
+
 export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
   battery: {
     type: 'battery',
@@ -80,6 +90,23 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     defaultProps: { ...BATTERY_DEFAULTS },
     propDefs: [
       { kind: 'number', key: 'voltage', unit: 'V' },
+      { kind: 'number', key: 'internalResistance', unit: 'Ω', min: { value: 0, exclusive: false } },
+    ],
+    showLabel: true,
+    polarized: true,
+  },
+  acsource: {
+    type: 'acsource',
+    category: 'sources',
+    labelPrefix: 'AC',
+    pins: TWO_PINS,
+    bounds: { x: -4, y: -1.8, w: 8, h: 3.6 },
+    defaultProps: { ...AC_SOURCE_DEFAULTS },
+    propDefs: [
+      { kind: 'select', key: 'waveform', options: WAVEFORMS },
+      { kind: 'number', key: 'amplitude', unit: 'V', min: { value: 0, exclusive: false } },
+      { kind: 'number', key: 'frequency', unit: 'Hz', min: { value: 0, exclusive: true }, max: AC_MAX_FREQUENCY },
+      { kind: 'number', key: 'offset', unit: 'V' },
       { kind: 'number', key: 'internalResistance', unit: 'Ω', min: { value: 0, exclusive: false } },
     ],
     showLabel: true,
@@ -162,6 +189,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     bounds: { x: -4, y: -1.7, w: 8, h: 3.4 },
     defaultProps: { ...VOLTMETER_DEFAULTS },
     propDefs: [
+      METER_MODE_PROP,
       { kind: 'boolean', key: 'ideal' },
       { kind: 'number', key: 'resistance', unit: 'Ω', min: { value: 0, exclusive: true }, disabledWhen: 'ideal' },
     ],
@@ -176,21 +204,39 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     bounds: { x: -4, y: -1.7, w: 8, h: 3.4 },
     defaultProps: { ...AMMETER_DEFAULTS },
     propDefs: [
+      METER_MODE_PROP,
       { kind: 'boolean', key: 'ideal' },
       { kind: 'number', key: 'resistance', unit: 'Ω', min: { value: 0, exclusive: true }, disabledWhen: 'ideal' },
     ],
     showLabel: true,
     polarized: true,
   },
+  oscilloscope: {
+    type: 'oscilloscope',
+    category: 'meters',
+    labelPrefix: 'OSC',
+    // Girişler sol kenarda: A, B ve ortak uç (COM).
+    pins: [
+      { x: -5, y: -2 },
+      { x: -5, y: 0 },
+      { x: -5, y: 2 },
+    ],
+    bounds: { x: -5, y: -3, w: 9, h: 6 },
+    // Ayarlar (bölme başına süre/gerilim, konum, tetik) osiloskop panelinden değiştirilir.
+    defaultProps: { ...OSCILLOSCOPE_DEFAULTS },
+    propDefs: [],
+    showLabel: true,
+    polarized: false,
+  },
 };
 
 /** Kütüphane panelindeki sıra. */
 export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: readonly DeviceType[] }> = [
-  { id: 'sources', types: ['battery', 'ground'] },
+  { id: 'sources', types: ['battery', 'acsource', 'ground'] },
   { id: 'passive', types: ['resistor', 'capacitor'] },
   { id: 'semiconductors', types: ['diode', 'led'] },
   { id: 'switches', types: ['switch'] },
-  { id: 'meters', types: ['voltmeter', 'ammeter'] },
+  { id: 'meters', types: ['voltmeter', 'ammeter', 'oscilloscope'] },
 ];
 
 export function isDeviceType(value: unknown): value is DeviceType {

@@ -16,6 +16,14 @@ export function partValueText(part: Part): string {
   switch (part.type) {
     case 'battery':
       return formatSI(numProp(p, 'voltage', 0), 'V', { trim: true, digits: 4 });
+    case 'acsource': {
+      const peak = formatSI(numProp(p, 'amplitude', 0), 'V', { trim: true, digits: 4 });
+      const offset = numProp(p, 'offset', 0);
+      const frequency = formatSI(numProp(p, 'frequency', 0), 'Hz', { trim: true, digits: 4 });
+      return offset === 0
+        ? `${peak} · ${frequency}`
+        : `${peak} ${formatSI(offset, 'V', { trim: true, digits: 4, plusSign: true })} · ${frequency}`;
+    }
     case 'resistor':
       return formatSI(numProp(p, 'resistance', 0), 'Ω', { trim: true, digits: 4 });
     case 'capacitor':

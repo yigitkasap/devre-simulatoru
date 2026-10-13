@@ -2,11 +2,22 @@
 // tuvalde gösterilecek değerleri (kablo gerilimleri, akımlar, LED parlaklığı...) hazırlama.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { wireKey, type Connectivity } from '../model/connectivity';
+import { pinKey, wireKey, type Connectivity } from '../model/connectivity';
 import { solveFlows, type FlowGraph } from '../model/flow';
 import { structureKey } from '../model/serialize';
 import type { CircuitDoc } from '../model/types';
-import { CircuitSimulator, type DeviceStatus, type Diagnostic, type Measurement } from '../sim';
+import {
+  CircuitSimulator,
+  LED_NOMINAL_CURRENT,
+  OscilloscopeDevice,
+  ledBrightness,
+  scopeSettings,
+  type DeviceStatus,
+  type Diagnostic,
+  type Measurement,
+  type ScopeRecorder,
+} from '../sim';
+import { buildScopeView, type ScopeView } from './scopeView';
 import type { LiveVisual } from './symbols';
 
 export type SimStatus = 'stopped' | 'running' | 'paused';
@@ -35,6 +46,8 @@ export interface SimFrame {
   readonly runtime: readonly Diagnostic[];
   /** Kısa devre olan pillerin kimlikleri (kırmızı yanıp sönen çerçeve). */
   readonly alarms: ReadonlySet<string>;
+  /** Osiloskopların ekran görüntüleri. */
+  readonly scopes: ReadonlyMap<string, ScopeView>;
 }
 
 export type SimNotice =
@@ -53,6 +66,8 @@ export interface SimulationApi {
   readonly stop: () => void;
   /** Yanmış bir LED'i onarır. */
   readonly repair: (partId: string) => void;
+  /** Çalışan simülasyondaki bir osiloskobun kaydı (Oto ayar için); yoksa null. */
+  readonly scopeRecorder: (partId: string) => ScopeRecorder | null;
 }
 
 /**
@@ -76,6 +91,11 @@ export function dotSpeed(current: number): number {
 const MAX_STEPS_PER_FRAME = 6000;
 /** Gerçek zamanlı kare süresinin üst sınırı: sekme arka planda kalınca büyük sıçramaları önler. */
 const MAX_FRAME_SECONDS = 0.1;
+/**
+ * AC devrede LED parlaklığının gerçek zamandaki yumuşatma süresi (s): göz hızlı yanıp sönmeyi
+ * ortalama bir parlaklık olarak görür. Yavaşlatılmış simülasyonda LED'in yanıp söndüğü yine görülür.
+ */
+const LED_PERSISTENCE = 0.06;
 
 export function useSimulation(
   doc: CircuitDoc,
@@ -93,6 +113,8 @@ export function useSimulation(
   const structure = useMemo(() => structureKey(doc), [doc]);
   const startedStructure = useRef<string | null>(null);
   const phases = useRef({ segments: new Float64Array(0), parts: new Map<string, number>() });
+  /** AC devrede LED'lerin yumuşatılmış parlaklığı. */
+  const ledGlow = useRef(new Map<string, number>());
 
   const latest = useRef({ doc, connectivity, flowGraph, electronFlow, structure });
   latest.current = { doc, connectivity, flowGraph, electronFlow, structure };
@@ -102,30 +124,39 @@ export function useSimulation(
     setStatusState(next);
   }, []);
 
-  /** Motorun şu anki durumundan bir kare hazırlar; noktaları dtReal kadar ilerletir. */
+  /**
+   * Motorun şu anki durumundan bir kare hazırlar; noktaları dtReal kadar ilerletir.
+   * AC devrede kablo renkleri, akım noktaları ve LED parlaklığı karenin ortalamasından çizilir:
+   * anlık değerler kare hızında örneklenince titrer ya da yanıltıcı biçimde yavaş dalgalanırdı.
+   */
   const buildFrame = useCallback((sim: CircuitSimulator, dtReal: number): SimFrame => {
-    const { doc: d, flowGraph: graph, electronFlow: electrons } = latest.current;
+    const { doc: d, flowGraph: graph, electronFlow: electrons, connectivity: conn } = latest.current;
     const vmax = Math.max(sim.maxSourceVoltage(), 1e-6);
     const direction = electrons ? -1 : 1;
+    const averaged = sim.hasAcSources;
+    const voltageOf = (key: string) => (averaged ? sim.averageVoltageAt(key) : sim.voltageAt(key));
 
     const wireVoltages = new Map<string, number>();
     for (const wire of d.wires) {
-      const v = sim.voltageAt(wireKey(wire.id));
+      const v = voltageOf(wireKey(wire.id));
       if (v !== null) wireVoltages.set(wire.id, v);
     }
     const measurements = new Map<string, Measurement>();
+    const flowCurrents = new Map<string, number>();
     const types = new Map<string, string>();
     for (const part of d.parts) {
       types.set(part.id, part.type);
       const m = sim.measure(part.id);
-      if (m) measurements.set(part.id, m);
+      if (!m) continue;
+      measurements.set(part.id, m);
+      flowCurrents.set(part.id, averaged ? (sim.averageCurrent(part.id) ?? m.current) : m.current);
     }
 
     const flows = solveFlows(graph, (id, pin) => {
       if (types.get(id) === 'ground') return null;
-      const m = measurements.get(id);
-      if (!m) return null;
-      return pin === 0 ? m.current : -m.current;
+      const current = flowCurrents.get(id);
+      if (current === undefined) return null;
+      return pin === 0 ? current : -current;
     });
     const ph = phases.current;
     if (ph.segments.length !== flows.length) ph.segments = new Float64Array(flows.length);
@@ -138,23 +169,41 @@ export function useSimulation(
     const live = new Map<string, LiveVisual>();
     const statuses = new Map<string, DeviceStatus>();
     const alarms = new Set<string>();
+    const scopes = new Map<string, ScopeView>();
+    const glow = ledGlow.current;
+    const smoothing = 1 - Math.exp(-dtReal / LED_PERSISTENCE);
     for (const part of d.parts) {
       const m = measurements.get(part.id);
       if (!m || part.type === 'ground') continue;
       const status = sim.status(part.id);
       statuses.set(part.id, status);
       if (status.shortCircuit) alarms.add(part.id);
-      const phase = ((ph.parts.get(part.id) ?? 0) + direction * Math.sign(m.current) * dotSpeed(m.current) * dtReal) % 1e6;
+      const current = flowCurrents.get(part.id) ?? m.current;
+      const phase = ((ph.parts.get(part.id) ?? 0) + direction * Math.sign(current) * dotSpeed(current) * dtReal) % 1e6;
       ph.parts.set(part.id, phase);
-      partFlows.set(part.id, { current: m.current, phase });
+      partFlows.set(part.id, { current, phase });
       if (part.type === 'led') {
-        live.set(part.id, {
-          brightness: status.brightness ?? 0,
-          burned: status.burned ?? false,
-          overCurrent: status.overCurrent ?? false,
-        });
+        const burned = status.burned ?? false;
+        let brightness = status.brightness ?? 0;
+        let overCurrent = status.overCurrent ?? false;
+        if (averaged && !burned) {
+          const target = ledBrightness(current);
+          const previous = glow.get(part.id);
+          brightness = previous === undefined || dtReal === 0 ? target : previous + (target - previous) * smoothing;
+          glow.set(part.id, brightness);
+          overCurrent = current > LED_NOMINAL_CURRENT;
+        }
+        live.set(part.id, { brightness: burned ? 0 : brightness, burned, overCurrent });
       } else if (part.type === 'capacitor') {
-        live.set(part.id, { charge: m.voltage / vmax });
+        const a = voltageOf(pinKey(part.id, 0));
+        const b = voltageOf(pinKey(part.id, 1));
+        live.set(part.id, { charge: (averaged && a !== null && b !== null ? a - b : m.voltage) / vmax });
+      } else if (part.type === 'oscilloscope') {
+        const device = sim.device(part.id);
+        if (device instanceof OscilloscopeDevice) {
+          const connected = [0, 1].map((pin) => !conn.unconnectedPins.has(pinKey(part.id, pin))) as [boolean, boolean];
+          scopes.set(part.id, buildScopeView(device.recorder, scopeSettings(part.props), connected));
+        }
       }
     }
 
@@ -170,6 +219,7 @@ export function useSimulation(
       statuses,
       runtime: sim.runtimeDiagnostics,
       alarms,
+      scopes,
     };
   }, []);
 
@@ -177,6 +227,7 @@ export function useSimulation(
     simRef.current = null;
     startedStructure.current = null;
     phases.current = { segments: new Float64Array(0), parts: new Map() };
+    ledGlow.current = new Map();
     setStatus('stopped');
     setFrame(null);
     setNotice(null);
@@ -274,5 +325,10 @@ export function useSimulation(
     return () => cancelAnimationFrame(raf);
   }, [status, buildFrame, setStatus]);
 
-  return { status, frame, notice, speed, setSpeed, play, pause, stop, repair };
+  const scopeRecorder = useCallback((partId: string) => {
+    const device = simRef.current?.device(partId);
+    return device instanceof OscilloscopeDevice ? device.recorder : null;
+  }, []);
+
+  return { status, frame, notice, speed, setSpeed, play, pause, stop, repair, scopeRecorder };
 }

@@ -89,8 +89,10 @@ export interface CanvasProps {
   readonly onFlip: (partIds: readonly string[]) => void;
   /** Bu sayı değişince görünüm devreye sığdırılır (örnek ya da dosya yüklenince). */
   readonly fitRequest: number;
-  /** Sol üstte örnek kartı açık: sığdırırken kartın kapladığı alan boş bırakılır. */
-  readonly reserveCard: boolean;
+  /** Sol üstteki örnek kartı: sığdırırken kartın kapladığı alan boş bırakılır. */
+  readonly reserveCard: 'none' | 'collapsed' | 'open';
+  /** Osiloskop paneli: sığdırırken panelin kapladığı alan (sağda ya da altta) boş bırakılır. */
+  readonly reserveScope: 'none' | 'collapsed' | 'open';
   /** Dokunmatik ekran (birincil işaretçi parmak): seçili parçanın V/I/P bilgisi kalıcı gösterilir. */
   readonly touch: boolean;
   /** Tuvalin üstünde kaydırılabilir bir katman açık (çekmece, pencere): tuval dokunmayı tutmasın. */
@@ -145,6 +147,17 @@ type Interaction =
 /** Örnek kartının (ExampleCard) kapladığı alan; sığdırırken boş bırakılır. */
 const CARD_RESERVE_WIDTH = 368;
 const CARD_RESERVE_HEIGHT = 300;
+/** Küçültülmüş kart yalnızca başlık satırıdır. */
+const CARD_RESERVE_COLLAPSED = 52;
+/**
+ * Osiloskop panelinin (ScopePanel) kapladığı alan: geniş ekranda sağ altta (genişlik ya da
+ * yükseklik ayrılır), telefonda tuvalin altında.
+ */
+const SCOPE_RESERVE_WIDTH = 396;
+const SCOPE_RESERVE_TALL = 450;
+const SCOPE_RESERVE_HEIGHT = 300;
+/** Küçültülmüş panel yalnızca başlık satırıdır. */
+const SCOPE_RESERVE_COLLAPSED = 56;
 
 /** Ekran pikseli cinsinden isabet toleransları (parmakla dokunurken daha geniş). */
 const PIN_TOLERANCE_PX = 8;
@@ -182,6 +195,7 @@ export function Canvas({
   onFlip,
   fitRequest,
   reserveCard,
+  reserveScope,
   touch,
   overlayOpen,
   ref,
@@ -258,8 +272,8 @@ export function Canvas({
   useEffect(() => {
     if (viewInitialized.current || size.width === 0) return;
     viewInitialized.current = true;
-    const bounds = docBounds(doc);
-    if (bounds) setView(fitView(bounds, size.width, size.height));
+    // Açılışta da (kayıtlı ya da paylaşılan devre) örnek kartının ve osiloskop panelinin yeri ayrılır.
+    if (docBounds(doc)) fit();
     else setView({ x: size.width / 2, y: size.height / 2, scale: size.width < 640 ? 1.1 : 1.5 });
   }, [size, doc]);
 
@@ -270,11 +284,30 @@ export function Canvas({
       return;
     }
     // Örnek kartı açıksa devre kartın yanındaki (geniş ekran) ya da altındaki (telefon) alana sığdırılır.
+    // Osiloskop paneli açıksa onun yeri de ayrılır: telefonda altta; geniş ekranda panel sağ altta
+    // durduğu için sağdaki şerit ya da alttaki şerit, hangisi devreyi daha büyük gösteriyorsa.
     const wide = size.width >= 760;
-    const left = reserveCard && wide ? CARD_RESERVE_WIDTH : 0;
-    const top = reserveCard && !wide ? Math.min(CARD_RESERVE_HEIGHT, size.height / 2) : 0;
-    const fitted = fitView(bounds, size.width - left, size.height - top);
-    setView({ ...fitted, x: fitted.x + left, y: fitted.y + top });
+    const left = reserveCard === 'open' && wide ? CARD_RESERVE_WIDTH : 0;
+    const top =
+      reserveCard === 'none' || (wide && reserveCard === 'open')
+        ? 0
+        : Math.min(reserveCard === 'open' ? CARD_RESERVE_HEIGHT : CARD_RESERVE_COLLAPSED, size.height / 2);
+    const scopeHeight =
+      reserveScope === 'collapsed' ? SCOPE_RESERVE_COLLAPSED : wide ? SCOPE_RESERVE_TALL : SCOPE_RESERVE_HEIGHT;
+    // Panelin altında en az 120 piksellik bir şerit devreye kalsın.
+    const bottomOption = { right: 0, bottom: Math.max(0, Math.min(scopeHeight, size.height - top - 120)) };
+    const options: Array<{ right: number; bottom: number }> =
+      reserveScope === 'none'
+        ? [{ right: 0, bottom: 0 }]
+        : wide
+          ? [{ right: SCOPE_RESERVE_WIDTH, bottom: 0 }, bottomOption]
+          : [bottomOption];
+    let best: View | null = null;
+    for (const { right, bottom } of options) {
+      const fitted = fitView(bounds, Math.max(1, size.width - left - right), Math.max(1, size.height - top - bottom));
+      if (!best || fitted.scale > best.scale) best = { ...fitted, x: fitted.x + left, y: fitted.y + top };
+    }
+    if (best) setView(best);
   };
 
   const reveal = (partIds: readonly string[], wireIds: readonly string[]) => {
@@ -1042,7 +1075,7 @@ export function Canvas({
                 part={part}
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
-                meterText={measurement ? meterText(part, measurement) : null}
+                meterText={measurement ? meterText(part, measurement, frame?.statuses.get(part.id)) : null}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
                 {...(live ? { live } : {})}

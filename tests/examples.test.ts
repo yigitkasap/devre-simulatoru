@@ -91,6 +91,48 @@ describe('Örnekler', () => {
     const flipped = flipParts(doc, new Set([idOf(doc, 'D1')]));
     expect(Math.abs(simulate(flipped).measure(idOf(doc, 'A1'))!.current)).toBeLessThan(1e-6);
   });
+
+  /** Bir periyot boyunca küçük adımlarla ilerleyip voltmetrenin anlık değerinin uç noktalarını bulur. */
+  function swing(sim: CircuitSimulator, id: string, duration: number): { max: number; min: number } {
+    let max = Number.NEGATIVE_INFINITY;
+    let min = Number.POSITIVE_INFINITY;
+    const end = sim.time + duration;
+    while (sim.time < end - 1e-12) {
+      expect(sim.advance(5e-5).ok).toBe(true);
+      const v = sim.measure(id)!.voltage;
+      max = Math.max(max, v);
+      min = Math.min(min, v);
+    }
+    return { max, min };
+  }
+
+  it('Yarım dalga doğrultmaç: yükte ≈ 9,3 V tepe, DC voltmetre ≈ 2,9 V; ters diyotla negatif yarılar', () => {
+    const doc = load('yarim-dalga');
+    const sim = simulate(doc, 0.1);
+    const reading = sim.status(idOf(doc, 'V1')).reading!;
+    expect(reading).toBeGreaterThan(2.85);
+    expect(reading).toBeLessThan(3.0);
+    const { max, min } = swing(sim, idOf(doc, 'V1'), 0.02);
+    expect(max).toBeGreaterThan(9.25);
+    expect(max).toBeLessThan(9.4);
+    expect(min).toBeGreaterThan(-0.01);
+    const flipped = simulate(flipParts(doc, new Set([idOf(doc, 'D1')])), 0.1);
+    const reverse = swing(flipped, idOf(doc, 'V1'), 0.02);
+    expect(reverse.max).toBeLessThan(0.01);
+    expect(reverse.min).toBeLessThan(-9.25);
+  });
+
+  it('Kare dalga ile RC: yarım periyot sonunda ≈ 9,93 V; 5 Hz’de kondansatör tam dolamaz', () => {
+    const doc = load('rc-kare-dalga');
+    const sim = simulate(doc, 0.4999);
+    const c = idOf(doc, 'C1');
+    expect(sim.measure(c)!.voltage).toBeGreaterThan(9.9);
+    expect(sim.measure(c)!.voltage).toBeLessThan(9.96);
+    const fast = simulate(withProps(doc, 'AC1', { frequency: 5 }), 2);
+    const { max, min } = swing(fast, c, 0.2);
+    expect(max).toBeLessThan(8);
+    expect(min).toBeGreaterThan(2);
+  });
 });
 
 describe('Paylaşım bağlantısı', () => {

@@ -9,7 +9,9 @@ import diyotYonu from './diyot-yonu.json';
 import gerilimBolucu from './gerilim-bolucu.json';
 import ledOnDirenc from './led-on-direnc.json';
 import rcDolma from './rc-dolma.json';
+import rcKareDalga from './rc-kare-dalga.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
+import yarimDalga from './yarim-dalga.json';
 
 export const EXAMPLE_IDS = [
   'led-on-direnc',
@@ -18,6 +20,8 @@ export const EXAMPLE_IDS = [
   'ampermetre-etkisi',
   'rc-dolma',
   'diyot-yonu',
+  'yarim-dalga',
+  'rc-kare-dalga',
 ] as const;
 
 export type ExampleId = (typeof EXAMPLE_IDS)[number];
@@ -29,6 +33,8 @@ const DATA: Record<ExampleId, unknown> = {
   'ampermetre-etkisi': ampermetreEtkisi,
   'rc-dolma': rcDolma,
   'diyot-yonu': diyotYonu,
+  'yarim-dalga': yarimDalga,
+  'rc-kare-dalga': rcKareDalga,
 };
 
 /** Örneğin devresi; JSON bozuksa null (testler bunu yakalar). */

@@ -9,10 +9,11 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 
 > Sitenin adı tek bir yerde tanımlıdır: [`src/config.ts`](src/config.ts).
 
-## Özellikler (v1)
+## Özellikler
 
-- **Parçalar:** pil (iç dirençli), toprak, direnç, kondansatör, diyot, LED (kırmızı/yeşil/mavi),
-  anahtar, voltmetre, ampermetre.
+- **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç, kondansatör,
+  diyot, LED (kırmızı/yeşil/mavi), anahtar, voltmetre, ampermetre (DC/AC kipi), iki kanallı
+  osiloskop.
 - **Şematik editör:** ızgaralı tuval, sürükle-bırak ya da seç-tıkla yerleştirme, pinden pine kablo,
   T bağlantısı, taşıma (kablolar esner), döndürme, seçim kutusu, geri alma/yineleme, özellik
   penceresi (SI önekli değer girişi), zigzag ya da kutu (IEC) direnç sembolü.
@@ -21,7 +22,9 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 - **Eğitsel görünüm:** akım noktaları (geleneksel akım ya da elektron akışı), gerilime göre kablo
   rengi, LED parlaklığı ve yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, V/I/P bilgi
   kutusu (Ohm yasası kontrolü), kısa devre uyarısı, mesaj paneli.
-- **Örnekler:** 6 hazır devre; her birinde tahmin sorusu, cevap simülasyon çalışınca açılır.
+- **Osiloskop:** iki kanal (A, B) ortak uca göre; volt/bölme, zaman/bölme, kanal konumu,
+  otomatik tetikleme, "Oto" ayar; ekranın altında tepe-tepe, etkin değer ve frekans.
+- **Örnekler:** 8 hazır devre; her birinde tahmin sorusu, cevap simülasyon çalışınca açılır.
 - **Kaydetme ve paylaşma:** tarayıcıya otomatik kayıt, JSON dışa/içe aktarma, paylaşım bağlantısı.
 
 ## Kurulum ve komutlar
@@ -176,10 +179,12 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 90 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 123 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
-hazır örneklerin cevapları ve paylaşım bağlantısı.
+AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
+osiloskop kaydı ve ekranı (tetikleme, ölçümler, Oto ayar), hazır örneklerin cevapları ve
+paylaşım bağlantısı. Dokunmatik/iOS kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır.
 
 ## Kararlar
 
@@ -349,9 +354,42 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   (`R_{iç}`, `V_{f}`) ve ekranda gerçek alt simge (`<sub>`) olarak çizilir
   ([`editor/Rich.tsx`](src/editor/Rich.tsx)).
 
+### AC kaynak, osiloskop ve DC/AC kipi
+
+- **AC kaynak:** e(t) = kayma + tepe · dalga(f · t); sinüs, kare ve üçgen t = 0'da ilk yarım
+  periyodun başındadır. İç yapı pil ile aynıdır (iç direnç, iç düğüm). Kaynağın matris katkısı
+  sabittir, yalnızca sağ taraf her adımda değişir; doğrusal devrelerde LU yine bir kez yapılır.
+  Frekans en fazla 1 kHz'tir.
+- **Zaman adımı:** AC kaynaklı devre kondansatörsüz de olsa adım adım çözülür; en büyük adım
+  50 µs ile en kısa periyodun 1/100'ünden küçük olanıdır (1 kHz'te 10 µs).
+- **Ölçü aletlerinin kipi (kullanıcı kararı):** Voltmetre ve ampermetrede DC (ortalama) ve AC
+  (etkin değer, √(ortalama v²), DC bileşen dahil) kipi vardır. AC kaynaklı devrede gösterge
+  devredeki AC kaynakların en uzun periyodu üzerinden hesaplanır ve her periyotta bir
+  güncellenir (rakamlar sinyalle titremez). AC kaynak yoksa gösterge anlık değerdir (AC kipinde
+  büyüklüğü); eski devreler aynı davranır. AC kipinde değerin sonuna "~" eklenir (7,071 V~).
+- **AC'de tuvaldeki çizim:** Kablo renkleri, akım noktaları ve kondansatör çubuğu her animasyon
+  karesindeki ortalamadan çizilir; anlık değer kare hızında örneklenince titrer ya da yanıltıcı
+  biçimde yavaş dalgalanırdı. LED parlaklığı ayrıca 60 ms'lik bir yumuşatmadan geçer (göz hızlı
+  yanıp sönmeyi ortalama parlaklık olarak görür); simülasyon yavaşlatılınca LED'in yanıp söndüğü
+  görülür. Kısa devre uyarısı AC kaynakta son periyodun tepe akımına bakar.
+- **Osiloskop (kullanıcı kararı: ayrı panel, iki kanal + ortak uç):** Girişleri idealdir (akım
+  çekmez); kullanılmayan A ya da B kanalı uyarı vermez, boşta ortak uç verir. Kayıt ekran
+  çözünürlüğünde kovalara (bir ekran = 500 kova) bölünür, her kovada en küçük/en büyük/son değer
+  tutulur; ekrandan hızlı sinyal bant olarak görünür. Dört ekranlık geçmiş saklanır.
+- **Tetikleme:** Tetik kanalının orta seviyesi ((en küçük + en büyük) / 2), %10'luk ölü bantla
+  yukarı yönde kesildiği en son an, ardından tam bir ekranlık kayıt varsa ekranın sol kenarıdır;
+  kesim yoksa ekran kayar. Frekans, kayıttaki ardışık kesimlerden ölçülür.
+- **Oto ayar:** Ekranda ≈ 2,5 periyot görünecek zaman/bölme ve sinyalin ±3,5 bölmeye sığacağı
+  volt/bölme (1-2-5 dizisi); kayıt yoksa devredeki AC kaynağın frekansı ve kaynak gerilimleri.
+- **Panelin yeri:** Masaüstünde tuvalin sağ altında (380 px); telefonda tuvalin altında ve
+  küçültülmüş başlar. Ayarlar parçanın özelliklerinde saklanır (kaydedilir, paylaşılır, geri
+  alınabilir; simülasyonu durdurmaz). Devre sığdırılırken panelin ve örnek kartının o anki
+  (açık/küçük) yeri boş bırakılır; panel ya da kart açılıp kapanınca devre yeniden sığdırılır.
+
 ### Örnekler
 
-- Altı örnek: görevdeki beş örnek ve kullanıcı isteğiyle eklenen "Ampermetrenin etkisi".
+- Görevdeki beş örnek, kullanıcı isteğiyle eklenen "Ampermetrenin etkisi" ve osiloskoplu iki
+  örnek: "Yarım dalga doğrultmaç" ve "Kare dalga ile RC".
   Devreler `src/examples/*.json` dosyalarında, metinleri (başlık, açıklama, tahmin sorusu,
   cevap) `i18n/tr.ts` içindedir; böylece arayüz metinlerinin tamamı tek dosyada kalır.
 - **Tahmin sorusu (kullanıcı isteği):** Örnek kartında önce açıklama ve soru görünür; cevap,

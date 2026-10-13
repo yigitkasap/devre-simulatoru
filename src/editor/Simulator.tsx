@@ -5,14 +5,14 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
-import { buildConnectivity, wireKey } from '../model/connectivity';
+import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
 import { flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { nextRotation } from '../model/geometry';
 import { docFromHash, shareUrl } from '../model/share';
 import { emptyDoc, type CircuitDoc } from '../model/types';
-import { compileNetlist, type CompiledCircuit, type Diagnostic } from '../sim';
-import type { DeviceType } from '../sim/netlist';
+import { compileNetlist, scopeSettings, type CompiledCircuit, type Diagnostic } from '../sim';
+import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
 import { loadSavedDoc, useAutosave } from './autosave';
 import { Canvas, type CanvasHandle, type Highlight } from './Canvas';
 import { ExampleCard } from './ExampleCard';
@@ -21,6 +21,8 @@ import { Library } from './Library';
 import { MessagesPanel, messageKey, type MessageItem } from './MessagesPanel';
 import { PartInfo } from './PartInfo';
 import { PropertiesDialog } from './PropertiesDialog';
+import { ScopePanel } from './ScopePanel';
+import { autoSettings } from './scopeView';
 import { useSettings } from './settings';
 import { ShareDialog } from './ShareDialog';
 import { SimBar } from './SimBar';
@@ -50,6 +52,10 @@ export default function Simulator() {
   const [fitRequest, setFitRequest] = useState(0);
   const [activeExample, setActiveExample] = useState<ExampleId | null>(null);
   const [answerRevealed, setAnswerRevealed] = useState(false);
+  const [exampleCollapsed, setExampleCollapsed] = useState(false);
+  const [chosenScope, setChosenScope] = useState<string | null>(null);
+  // Telefonda ve kısa ekranda osiloskop paneli küçültülmüş başlar (devreye yer kalsın).
+  const [scopeCollapsed, setScopeCollapsed] = useState(() => window.innerWidth < 768 || window.innerHeight < 640);
   const [toast, showToast] = useToast();
   const touch = useCoarsePointer();
   const touchHintShown = useRef(false);
@@ -69,6 +75,7 @@ export default function Simulator() {
     dispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
     dispatch({ type: 'set-tool', tool: { kind: 'select' } });
     setActiveExample(example);
+    setExampleCollapsed(false);
     setAnswerRevealed(false);
     setFitRequest((n) => n + 1);
     showToast(message);
@@ -211,6 +218,38 @@ export default function Simulator() {
 
   const editingPart = propertiesFor ? doc.parts.find((p) => p.id === propertiesFor) : undefined;
 
+  // --- Osiloskop paneli ------------------------------------------------------------------
+  // Gösterilen osiloskop: seçili osiloskop, yoksa paneldeki seçim, o da yoksa ilki.
+  const scopes = doc.parts.filter((p) => p.type === 'oscilloscope');
+  const selectedScope = scopes.find((p) => selection.parts.includes(p.id));
+  const scope = selectedScope ?? scopes.find((p) => p.id === chosenScope) ?? scopes[0];
+  useEffect(() => {
+    if (selectedScope) setChosenScope(selectedScope.id);
+  }, [selectedScope]);
+  const scopeConnected = scope
+    ? ([0, 1].map((pin) => !connectivity.unconnectedPins.has(pinKey(scope.id, pin))) as [boolean, boolean])
+    : ([false, false] as const);
+  const changeScope = (patch: Record<string, PropValue>) => {
+    if (scope) dispatch({ type: 'commit', doc: updatePart(doc, scope.id, { props: { ...scope.props, ...patch } }) });
+  };
+  /** Oto ayar: kayıt varsa sinyalden, yoksa devredeki AC kaynakların frekansından ve kaynak gerilimlerinden. */
+  const autoScope = () => {
+    if (!scope) return;
+    let frequency: number | null = null;
+    let peak: number | null = null;
+    for (const part of doc.parts) {
+      if (part.type === 'acsource') {
+        const f = numProp(part.props, 'frequency', 0);
+        if (f > 0) frequency = frequency === null ? f : Math.min(frequency, f);
+        const v = Math.abs(numProp(part.props, 'offset', 0)) + Math.abs(numProp(part.props, 'amplitude', 0));
+        peak = Math.max(peak ?? 0, v);
+      } else if (part.type === 'battery') {
+        peak = Math.max(peak ?? 0, Math.abs(numProp(part.props, 'voltage', 0)));
+      }
+    }
+    changeScope(autoSettings(sim.scopeRecorder(scope.id), scopeSettings(scope.props), scopeConnected, { frequency, peak }));
+  };
+
   const diagnosticContext = useMemo<DiagnosticContext>(() => {
     const byId = new Map(doc.parts.map((p) => [p.id, p]));
     return {
@@ -302,19 +341,44 @@ export default function Simulator() {
             onRotate={rotateSelection}
             onFlip={flipSelection}
             fitRequest={fitRequest}
-            reserveCard={activeExample !== null}
+            reserveCard={activeExample === null ? 'none' : exampleCollapsed ? 'collapsed' : 'open'}
+            reserveScope={!scope ? 'none' : scopeCollapsed ? 'collapsed' : 'open'}
             touch={touch}
             overlayOpen={libraryOpen || Boolean(editingPart) || Boolean(shareLink)}
           />
           {(() => {
             const infoType = tool.kind === 'place' ? tool.type : (libraryDragType ?? hoveredType);
-            return infoType && !touch ? <PartInfo type={infoType} resistorStyle={settings.resistorStyle} /> : null;
+            return infoType && !touch ? (
+              <PartInfo type={infoType} resistorStyle={settings.resistorStyle} beside={Boolean(scope)} />
+            ) : null;
           })()}
+          {scope && (
+            <ScopePanel
+              scopes={scopes}
+              scope={scope}
+              onChoose={setChosenScope}
+              view={sim.frame?.scopes.get(scope.id) ?? null}
+              connected={scopeConnected}
+              collapsed={scopeCollapsed}
+              onCollapsed={(next) => {
+                setScopeCollapsed(next);
+                // Panel büyüyüp küçülünce devre kalan alana yeniden sığdırılır.
+                setFitRequest((n) => n + 1);
+              }}
+              onChange={changeScope}
+              onAuto={autoScope}
+            />
+          )}
           {activeExample && (
             <ExampleCard
               key={activeExample}
               id={activeExample}
               revealed={answerRevealed}
+              collapsed={exampleCollapsed}
+              onCollapsed={(next) => {
+                setExampleCollapsed(next);
+                setFitRequest((n) => n + 1);
+              }}
               onClose={() => setActiveExample(null)}
             />
           )}

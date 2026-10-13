@@ -6,10 +6,21 @@ import type { DeviceType } from '../sim/netlist';
 import type { ResistorStyle } from './settings';
 import { SymbolIcon } from './symbols';
 
-export function PartInfo({ type, resistorStyle }: { type: DeviceType; resistorStyle: ResistorStyle }) {
+export function PartInfo({
+  type,
+  resistorStyle,
+  beside = false,
+}: {
+  type: DeviceType;
+  resistorStyle: ResistorStyle;
+  /** Osiloskop paneli sağ altta açık: kart onun soluna geçer. */
+  beside?: boolean;
+}) {
   return (
     <aside
-      className="pointer-events-none absolute right-2 bottom-10 z-10 hidden w-60 rounded-lg border border-line bg-panel/95 p-3 shadow-md md:block"
+      className={`pointer-events-none absolute bottom-10 z-30 hidden w-60 rounded-lg border border-line bg-panel/95 p-3 shadow-md md:block ${
+        beside ? 'right-[396px]' : 'right-2'
+      }`}
       aria-live="polite"
     >
       <div className="flex items-center gap-3">

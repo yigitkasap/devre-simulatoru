@@ -1,13 +1,24 @@
 // Yüklenen örneğin açıklama kartı: kurulum, tahmin sorusu ve simülasyon çalışınca açılan cevap.
 
-import { useState } from 'react';
 import type { ExampleId } from '../examples';
 import { tr } from '../i18n/tr';
 import { Icon } from './icons';
 import { Rich } from './Rich';
 
-export function ExampleCard({ id, revealed, onClose }: { id: ExampleId; revealed: boolean; onClose: () => void }) {
-  const [collapsed, setCollapsed] = useState(false);
+export function ExampleCard({
+  id,
+  revealed,
+  collapsed,
+  onCollapsed,
+  onClose,
+}: {
+  id: ExampleId;
+  revealed: boolean;
+  /** Küçültülmüş kart yalnızca başlığı gösterir (devreyi sığdırırken bilinsin diye durum yukarıdadır). */
+  collapsed: boolean;
+  onCollapsed: (collapsed: boolean) => void;
+  onClose: () => void;
+}) {
   const texts = tr.examples.texts[id];
   return (
     <aside
@@ -17,8 +28,9 @@ export function ExampleCard({ id, revealed, onClose }: { id: ExampleId; revealed
       <div className="flex items-center gap-2 px-3 py-2">
         <button
           type="button"
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => onCollapsed(!collapsed)}
           aria-expanded={!collapsed}
+          aria-label={collapsed ? tr.examples.expand : tr.examples.collapse}
           title={collapsed ? tr.examples.expand : tr.examples.collapse}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
         >

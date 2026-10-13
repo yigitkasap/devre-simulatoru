@@ -1,6 +1,9 @@
 // Çözüm motorunun genel API'si. Arayüz motoru yalnızca bu dosya üzerinden kullanır.
 
 export { CircuitSimulator, type AdvanceResult, type SimulatorOptions } from './engine';
+export { METER_MODES, type MeterMode } from './averager';
+export { SCOPE_BUCKETS, SCOPE_DIVISIONS_X, SCOPE_DIVISIONS_Y, ScopeRecorder } from './scope';
+export type { ScopeChannelData } from './scope';
 export { compileNetlist, type CompiledCircuit } from './compile';
 export { hasErrors, type Diagnostic, type DiagnosticCode, type DiagnosticSeverity } from './diagnostics';
 export {
@@ -16,7 +19,10 @@ export {
   type Props,
 } from './netlist';
 export {
+  AC_MAX_FREQUENCY,
+  AC_SOURCE_DEFAULTS,
   AMMETER_DEFAULTS,
+  AcSourceDevice,
   BATTERY_DEFAULTS,
   CAPACITOR_DEFAULTS,
   DEVICE_MODELS,
@@ -26,13 +32,26 @@ export {
   LED_DEFAULTS,
   LED_MODELS,
   LED_NOMINAL_CURRENT,
+  OSCILLOSCOPE_DEFAULTS,
+  OscilloscopeDevice,
   RESISTOR_DEFAULTS,
+  SCOPE_TRIGGERS,
+  TIME_PER_DIV_STEPS,
+  VOLTS_PER_DIV_STEPS,
+  WAVEFORMS,
+  acRms,
+  rmsFactor,
+  scopeSettings,
+  waveValue,
   SWITCH_DEFAULTS,
   VOLTMETER_DEFAULTS,
   ledBrightness,
   type DeviceStatus,
   type LedColor,
   type Measurement,
+  type ScopeSettings,
+  type ScopeTrigger,
+  type Waveform,
 } from './devices';
 export {
   formatEditable,

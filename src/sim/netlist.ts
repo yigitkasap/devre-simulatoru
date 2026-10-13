@@ -4,9 +4,10 @@
 // aynı anahtarı paylaşan pinler aynı düğümdedir. Kablolar `links` ile iki anahtarı birleştirir
 // (union-find); matrise eleman olarak girmez.
 
-/** v1'de desteklenen bileşen türleri. Yeni bileşenler buraya ve devices/index.ts'e eklenir. */
+/** Desteklenen bileşen türleri. Yeni bileşenler buraya ve devices/index.ts'e eklenir. */
 export type DeviceType =
   | 'battery'
+  | 'acsource'
   | 'ground'
   | 'resistor'
   | 'capacitor'
@@ -14,7 +15,8 @@ export type DeviceType =
   | 'led'
   | 'switch'
   | 'voltmeter'
-  | 'ammeter';
+  | 'ammeter'
+  | 'oscilloscope';
 
 export type PropValue = number | string | boolean;
 export type Props = Readonly<Record<string, PropValue>>;

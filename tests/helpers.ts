@@ -40,12 +40,32 @@ export class NetlistBuilder {
     return this.add('switch', id, [a, b], { closed });
   }
 
-  voltmeter(id: string, plus: string, minus: string, resistance: number | 'ideal' = 10e6): this {
-    return this.add('voltmeter', id, [plus, minus], resistance === 'ideal' ? { ideal: true } : { resistance, ideal: false });
+  voltmeter(id: string, plus: string, minus: string, resistance: number | 'ideal' = 10e6, mode: 'dc' | 'ac' = 'dc'): this {
+    return this.add(
+      'voltmeter',
+      id,
+      [plus, minus],
+      resistance === 'ideal' ? { ideal: true, mode } : { resistance, ideal: false, mode },
+    );
   }
 
-  ammeter(id: string, plus: string, minus: string, resistance: number | 'ideal' = 0.1): this {
-    return this.add('ammeter', id, [plus, minus], resistance === 'ideal' ? { ideal: true } : { resistance, ideal: false });
+  ammeter(id: string, plus: string, minus: string, resistance: number | 'ideal' = 0.1, mode: 'dc' | 'ac' = 'dc'): this {
+    return this.add(
+      'ammeter',
+      id,
+      [plus, minus],
+      resistance === 'ideal' ? { ideal: true, mode } : { resistance, ideal: false, mode },
+    );
+  }
+
+  /** AC kaynak: + ucu `plus`, − ucu `minus`; varsayılan ideal (iç direnç 0). */
+  acsource(id: string, plus: string, minus: string, props: Record<string, PropValue> = {}): this {
+    return this.add('acsource', id, [plus, minus], { internalResistance: 0, ...props });
+  }
+
+  /** Osiloskop: A, B ve ortak uç. */
+  oscilloscope(id: string, a: string, b: string, com: string, props: Record<string, PropValue> = {}): this {
+    return this.add('oscilloscope', id, [a, b, com], props);
   }
 
   /** İki ağı kabloyla birleştirir. */

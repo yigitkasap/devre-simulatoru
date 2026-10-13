@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, type ReactNode, type SubmitEvent } 
 import { tr } from '../i18n/tr';
 import { CATALOG, type NumberPropDef } from '../model/catalog';
 import type { Part } from '../model/types';
+import { acRms, WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { PropValue } from '../sim/netlist';
 import { formatEditable, formatSI, parseValue } from '../sim/units';
@@ -29,6 +30,9 @@ function validateNumber(def: NumberPropDef, text: string): { value: number } | {
   if (def.min) {
     if (def.min.exclusive && parsed.value <= def.min.value) return { error: tr.properties.errors.positive };
     if (!def.min.exclusive && parsed.value < def.min.value) return { error: tr.properties.errors.nonNegative };
+  }
+  if (def.max !== undefined && parsed.value > def.max) {
+    return { error: tr.properties.errors.max(formatSI(def.max, def.unit, { trim: true })) };
   }
   return { value: parsed.value };
 }
@@ -75,7 +79,14 @@ export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: Proper
     if (Object.keys(nextErrors).length === 0) onSave({ label: trimmed, props });
   };
 
-  const note = part.type === 'led' ? ledNote(values.color) : tr.properties.notes[part.type];
+  const note =
+    part.type === 'led'
+      ? ledNote(values.color)
+      : part.type === 'acsource'
+        ? acNote(values)
+        : part.type === 'voltmeter' || part.type === 'ammeter'
+          ? `${tr.properties.notes[part.type] ?? ''} ${tr.properties.meterModeNote}`
+          : tr.properties.notes[part.type];
 
   return (
     <div
@@ -161,7 +172,7 @@ export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: Proper
             return (
               <fieldset key={prop.key}>
                 <legend className="mb-1.5 text-sm font-medium">{tr.properties.fieldLabel(part.type, prop.key)}</legend>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {prop.options.map((option) => {
                     const checked = values[prop.key] === option;
                     const swatch = part.type === 'led' ? LED_MODELS[option as LedColor]?.lightColor : undefined;
@@ -181,7 +192,7 @@ export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: Proper
                           className="sr-only"
                         />
                         {swatch && <span className="h-3 w-3 rounded-full" style={{ background: swatch }} />}
-                        {tr.devices.ledColors[option] ?? option}
+                        {tr.properties.optionLabel(prop.key, option)}
                       </label>
                     );
                   })}
@@ -216,6 +227,23 @@ function ledNote(color: PropValue | undefined): string {
   return tr.properties.ledSpec(
     formatSI(model.forwardVoltage, 'V', { trim: true }),
     formatSI(model.maxCurrent, 'A', { trim: true }),
+  );
+}
+
+/** AC kaynağın etkin değeri ve periyodu (alanlar geçerliyse; yazılırken güncellenir). */
+function acNote(values: Record<string, PropValue>): string | undefined {
+  const read = (key: string) => {
+    const parsed = parseValue(String(values[key] ?? ''));
+    return parsed.ok ? parsed.value : null;
+  };
+  const amplitude = read('amplitude');
+  const frequency = read('frequency');
+  const offset = read('offset') ?? 0;
+  const waveform = (WAVEFORMS as readonly PropValue[]).includes(values.waveform ?? '') ? (values.waveform as Waveform) : 'sine';
+  if (amplitude === null || frequency === null || frequency <= 0) return undefined;
+  return tr.properties.acSpec(
+    formatSI(acRms(waveform, Math.abs(amplitude), offset), 'V'),
+    formatSI(1 / frequency, 's', { trim: true, digits: 4 }),
   );
 }
 

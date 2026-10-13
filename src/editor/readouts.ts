@@ -3,11 +3,18 @@
 
 import { tr } from '../i18n/tr';
 import type { Part } from '../model/types';
-import type { DeviceStatus, Measurement } from '../sim/devices';
+import { METER_MODES } from '../sim/averager';
+import { acRms, AC_SOURCE_DEFAULTS, WAVEFORMS, type DeviceStatus, type Measurement } from '../sim/devices';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import { SWITCH_ON_RESISTANCE } from '../sim/constants';
-import { boolProp, numProp, strProp } from '../sim/netlist';
+import { boolProp, numProp, strProp, type Props } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
+
+/** Ölçü aletinin kipi ve gösterdiği değer (durum yoksa anlık değer). */
+function meterValue(props: Props, instantaneous: number, status: DeviceStatus): { ac: boolean; value: number } {
+  const ac = strProp(props, 'mode', METER_MODES, 'dc') === 'ac';
+  return { ac, value: status.reading ?? (ac ? Math.abs(instantaneous) : instantaneous) };
+}
 
 export interface ReadoutRow {
   readonly label: string;
@@ -71,6 +78,35 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         ...(r > 0 ? { note: `V = E − I · R_{iç} → ${v(m.voltage)} = ${v(emf)} − ${a(out)} × ${ohm(r)}` } : {}),
       };
     }
+    case 'acsource': {
+      const waveform = strProp(p, 'waveform', WAVEFORMS, AC_SOURCE_DEFAULTS.waveform);
+      const peak = numProp(p, 'amplitude', AC_SOURCE_DEFAULTS.amplitude);
+      const offset = numProp(p, 'offset', AC_SOURCE_DEFAULTS.offset);
+      const f = numProp(p, 'frequency', AC_SOURCE_DEFAULTS.frequency);
+      const out = -m.current;
+      const formula = t.acFormula[waveform] ?? '';
+      return {
+        title,
+        rows: [
+          { label: t.instantVoltage, value: v(m.voltage) },
+          { label: t.outputCurrent, value: a(out) },
+          { label: t.peakVoltage, value: formatSI(peak, 'V', { trim: true, digits: 4 }) },
+          { label: t.rmsVoltage, value: v(acRms(waveform, peak, offset)) },
+          { label: t.frequency, value: formatSI(f, 'Hz', { trim: true, digits: 4 }) },
+          { label: t.period, value: formatSI(1 / f, 's', { trim: true, digits: 4 }) },
+        ],
+        note: offset === 0 ? formula : `${formula} ${t.withOffset(v(offset))}`,
+      };
+    }
+    case 'oscilloscope':
+      return {
+        title,
+        rows: [
+          { label: t.channel('A'), value: v(m.voltage) },
+          { label: t.channel('B'), value: v(status.reading ?? 0) },
+        ],
+        note: t.scopeNote,
+      };
     case 'capacitor': {
       const C = numProp(p, 'capacitance', 100e-6);
       return {
@@ -118,36 +154,38 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
       };
     }
-    case 'voltmeter': {
-      const ideal = boolProp(p, 'ideal', false);
-      const R = numProp(p, 'resistance', 10e6);
-      return {
-        title,
-        rows: [
-          { label: t.reading, value: formatSI(m.voltage, 'V', { digits: 4 }) },
-          { label: t.drawnCurrent, value: a(I) },
-        ],
-        note: ideal ? t.idealVoltmeter : t.realVoltmeter(ohmValue(R), a(I)),
-      };
-    }
+    case 'voltmeter':
     case 'ammeter': {
+      const voltmeter = part.type === 'voltmeter';
       const ideal = boolProp(p, 'ideal', false);
-      const R = numProp(p, 'resistance', 0.1);
-      return {
-        title,
-        rows: [
-          { label: t.reading, value: formatSI(m.current, 'A', { digits: 4 }) },
-          { label: t.voltageDrop, value: v(V) },
-        ],
-        note: ideal ? t.idealAmmeter : t.realAmmeter(ohmValue(R), v(V)),
-      };
+      const R = numProp(p, 'resistance', voltmeter ? 10e6 : 0.1);
+      const instantaneous = voltmeter ? m.voltage : m.current;
+      const { ac, value } = meterValue(p, instantaneous, status);
+      // Gösterge anlık değerden ayrıysa (AC kaynaklı devre ya da AC kipi) ikisi de gösterilir.
+      const averaged = ac || Math.abs(value - instantaneous) > 1e-12 + 1e-9 * Math.abs(instantaneous);
+      const rows: ReadoutRow[] = [{ label: t.reading, value: meterText(part, m, status) ?? '' }];
+      if (averaged) rows.push({ label: t.instant, value: formatSI(instantaneous, voltmeter ? 'V' : 'A', { digits: 4 }) });
+      rows.push(voltmeter ? { label: t.drawnCurrent, value: a(I) } : { label: t.voltageDrop, value: v(V) });
+      const base = voltmeter
+        ? ideal
+          ? t.idealVoltmeter
+          : t.realVoltmeter(ohmValue(R), a(I))
+        : ideal
+          ? t.idealAmmeter
+          : t.realAmmeter(ohmValue(R), v(V));
+      return { title, rows, note: averaged ? `${ac ? t.acMode : t.dcMode} ${base}` : base };
     }
   }
 }
 
-/** Ölçü aletinin ekranındaki metin: otomatik ölçekli, 4 anlamlı basamak. */
-export function meterText(part: Part, m: Measurement): string | null {
-  if (part.type === 'voltmeter') return formatSI(m.voltage, 'V', { digits: 4 });
-  if (part.type === 'ammeter') return formatSI(m.current, 'A', { digits: 4 });
-  return null;
+/**
+ * Ölçü aletinin ekranındaki metin: otomatik ölçekli, 4 anlamlı basamak. AC kipinde değerin
+ * sonuna "~" eklenir (230 V~ gibi).
+ */
+export function meterText(part: Part, m: Measurement, status: DeviceStatus = {}): string | null {
+  if (part.type !== 'voltmeter' && part.type !== 'ammeter') return null;
+  const voltmeter = part.type === 'voltmeter';
+  const { ac, value } = meterValue(part.props, voltmeter ? m.voltage : m.current, status);
+  const text = formatSI(value, voltmeter ? 'V' : 'A', { digits: 4 });
+  return ac ? `${text}~` : text;
 }

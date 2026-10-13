@@ -5,9 +5,9 @@
 //     "K" de kilo kabul edilir (başka bir anlamı olmadığı için).
 //   - Ondalık ayırıcı virgül ya da nokta olabilir: "4,7k" = "4.7k" = 4700.
 //   - Elektronikteki "4k7" yazımı da kabul edilir (= 4,7k).
-//   - Sondaki birim isteğe bağlıdır: "4,7 kΩ", "100 µF", "9 V".
+//   - Sondaki birim isteğe bağlıdır: "4,7 kΩ", "100 µF", "9 V", "50 Hz".
 
-export type UnitSymbol = 'Ω' | 'V' | 'A' | 'F' | 'W' | 's';
+export type UnitSymbol = 'Ω' | 'V' | 'A' | 'F' | 'W' | 's' | 'Hz';
 
 export type ParseError = 'empty' | 'invalid' | 'wrong-unit';
 export type ParseResult = { ok: true; value: number } | { ok: false; error: ParseError };
@@ -33,6 +33,7 @@ const UNIT_ALIASES: Record<UnitSymbol, string[]> = {
   F: ['f', 'farad'],
   W: ['w', 'watt'],
   s: ['s', 'sn', 'saniye'],
+  Hz: ['hz', 'hertz'],
 };
 
 const PREFIX_CLASS = 'pnuµμmkKMG';

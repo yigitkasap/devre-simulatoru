@@ -49,6 +49,10 @@ export class BatteryDevice extends Device {
     }
   }
 
+  override get peakVoltage(): number {
+    return Math.abs(this.voltage);
+  }
+
   override idealVoltageBranches(): Array<readonly [number, number]> {
     // İç dirençli pilin ideal kaynağı yalnızca kendi iç düğümüne bağlı; döngü oluşturamaz.
     return this.internalResistance > 0 ? [] : [[this.plus, this.minus]];

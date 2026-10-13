@@ -4,6 +4,7 @@
 
 import { CATALOG } from '../model/catalog';
 import { GRID } from '../model/types';
+import { WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { Rotation } from '../model/types';
 import { boolProp, strProp, type DeviceType, type Props } from '../sim/netlist';
@@ -213,10 +214,95 @@ function Meter({ letter, rotation }: { letter: string; rotation: Rotation }) {
   );
 }
 
+/** Dalga biçiminin küçük çizimi: (cx, cy) merkezli, genişliği 2·w, yüksekliği 2·h. */
+export function wavePath(waveform: Waveform, w: number, h: number, cx = 0, cy = 0): string {
+  const p = (x: number, y: number) => `${(cx + x).toFixed(2)},${(cy + y).toFixed(2)}`;
+  switch (waveform) {
+    case 'sine': {
+      const points: string[] = [];
+      for (let i = 0; i <= 24; i++) points.push(p(-w + (2 * w * i) / 24, -h * Math.sin((Math.PI * 2 * i) / 24)));
+      return `M${points.join(' L')}`;
+    }
+    case 'square':
+      return `M${p(-w, 0)} L${p(-w, -h)} L${p(0, -h)} L${p(0, h)} L${p(w, h)} L${p(w, 0)}`;
+    case 'triangle':
+      return `M${p(-w, 0)} L${p(-w / 2, -h)} L${p(w / 2, h)} L${p(w, 0)}`;
+  }
+}
+
+function AcSource({ waveform, rotation }: { waveform: Waveform; rotation: Rotation }) {
+  return (
+    <g>
+      <Lead from={-40} to={-15} />
+      <Lead from={15} to={40} />
+      <circle cx={0} cy={0} r={15} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      {/* Dalga, parça dönse de yatay kalır. */}
+      <path
+        d={wavePath(waveform, 8.5, 6)}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        transform={rotation ? `rotate(${-rotation})` : undefined}
+      />
+      <Plus x={-27} y={-8} />
+    </g>
+  );
+}
+
+/** Osiloskop: küçük ekranlı bir kutu; girişler sol kenarda (A, B ve ortak uç). */
+function Oscilloscope({ rotation }: { rotation: Rotation }) {
+  const upright = (x: number, y: number) => (rotation ? `rotate(${-rotation} ${x} ${y})` : undefined);
+  const pinLabel = (text: string, y: number) => (
+    <text
+      x={-23}
+      y={y + 0.5}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={9}
+      fontWeight={700}
+      fill="currentColor"
+      transform={upright(-23, y)}
+      style={{ fontFamily: 'var(--font-sans)' }}
+    >
+      {text}
+    </text>
+  );
+  return (
+    <g>
+      <line x1={-50} y1={-20} x2={-30} y2={-20} {...line} />
+      <line x1={-50} y1={0} x2={-30} y2={0} {...line} />
+      <line x1={-50} y1={20} x2={-30} y2={20} {...line} />
+      <rect x={-30} y={-28} width={68} height={56} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <g transform={upright(10, -3)}>
+        <rect x={-12} y={-20} width={44} height={34} rx={2} fill="#1e2a25" />
+        <path d={wavePath('sine', 17, 9, 10, -3)} fill="none" stroke="#e8c547" strokeWidth={1.6} strokeLinecap="round" />
+      </g>
+      {pinLabel('A', -20)}
+      {pinLabel('B', 0)}
+      {/* Ortak uç: küçük toprak işareti */}
+      <g stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" transform={upright(-23, 20)}>
+        <line x1={-23} y1={15} x2={-23} y2={19} />
+        <line x1={-28} y1={19} x2={-18} y2={19} />
+        <line x1={-26} y1={22} x2={-20} y2={22} />
+        <line x1={-24} y1={25} x2={-22} y2={25} />
+      </g>
+      <circle cx={0} cy={20} r={2} fill="currentColor" />
+      <circle cx={10} cy={20} r={2} fill="currentColor" />
+      <circle cx={20} cy={20} r={2} fill="currentColor" />
+    </g>
+  );
+}
+
 export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: SymbolProps) {
   switch (type) {
     case 'battery':
       return <Battery rotation={rotation} />;
+    case 'acsource':
+      return <AcSource waveform={strProp(props, 'waveform', WAVEFORMS, 'sine')} rotation={rotation} />;
+    case 'oscilloscope':
+      return <Oscilloscope rotation={rotation} />;
     case 'ground':
       return <Ground />;
     case 'resistor':

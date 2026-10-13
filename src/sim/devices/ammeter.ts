@@ -1,20 +1,27 @@
+import { METER_MODES, WindowAverager, type MeterMode } from '../averager';
 import { MIN_RESISTANCE } from '../constants';
 import type { MnaSystem } from '../mna';
-import { boolProp, numProp } from '../netlist';
-import { Device, type DeviceInit, type DeviceModel, type Measurement } from './device';
+import { boolProp, numProp, strProp } from '../netlist';
+import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type StepContext } from './device';
 
-export const AMMETER_DEFAULTS = { resistance: 0.1, ideal: false };
+export const AMMETER_DEFAULTS = { mode: 'dc' as MeterMode, resistance: 0.1, ideal: false };
 
-/** Ampermetre. Pinler: [0] = + uç (akım girer), [1] = − uç. Gösterge: + uçtan giren akım. */
+/**
+ * Ampermetre. Pinler: [0] = + uç (akım girer), [1] = − uç. Anlık değer: + uçtan giren akım.
+ * Gösterge voltmetredeki gibi kipine göre ortalama ya da etkin değerdir.
+ */
 export class AmmeterDevice extends Device {
   readonly type = 'ammeter';
   readonly resistance: number;
   readonly ideal: boolean;
+  readonly mode: MeterMode;
+  private averager = new WindowAverager();
 
   constructor(init: DeviceInit) {
     super(init);
     this.resistance = Math.max(MIN_RESISTANCE, numProp(init.props, 'resistance', AMMETER_DEFAULTS.resistance));
     this.ideal = boolProp(init.props, 'ideal', AMMETER_DEFAULTS.ideal);
+    this.mode = strProp(init.props, 'mode', METER_MODES, AMMETER_DEFAULTS.mode);
   }
 
   private get branch(): number {
@@ -41,14 +48,31 @@ export class AmmeterDevice extends Device {
     return this.ideal ? [[this.nodes[0]!, this.nodes[1]!]] : [];
   }
 
-  /** Ampermetrenin gösterdiği değer. */
-  reading(x: Float64Array): number {
+  /** İçinden geçen anlık akım. */
+  instantaneous(x: Float64Array): number {
     if (this.ideal) return x[this.branch]!;
     return (this.v(x, 0) - this.v(x, 1)) / this.resistance;
   }
 
+  /** Ampermetrenin gösterdiği değer (kipine göre). */
+  reading(x: Float64Array): number {
+    return this.averager.reading(this.mode, this.instantaneous(x));
+  }
+
+  override accept(x: Float64Array, ctx: StepContext): void {
+    this.averager.add(this.instantaneous(x), ctx.h, ctx.window);
+  }
+
   measure(x: Float64Array): Measurement {
-    return this.twoTerminal(x, this.reading(x));
+    return this.twoTerminal(x, this.instantaneous(x));
+  }
+
+  override status(x: Float64Array): DeviceStatus {
+    return { reading: this.reading(x) };
+  }
+
+  override adoptState(prev: Device): void {
+    if (prev instanceof AmmeterDevice && prev.mode === this.mode) this.averager.adopt(prev.averager);
   }
 }
 
