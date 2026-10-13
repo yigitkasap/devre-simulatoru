@@ -21,7 +21,7 @@ export interface PropertiesDialogProps {
 }
 
 function validateNumber(def: NumberPropDef, text: string): { value: number } | { error: string } {
-  const parsed = parseValue(text, def.unit);
+  const parsed = parseValue(text, def.unit || undefined);
   if (!parsed.ok) {
     if (parsed.error === 'empty') return { error: tr.properties.errors.empty };
     if (parsed.error === 'wrong-unit') return { error: tr.properties.errors.wrongUnit(def.unit) };
@@ -148,9 +148,11 @@ export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: Proper
                         onChange={(e) => setValues((v) => ({ ...v, [prop.key]: e.target.value }))}
                         className={`${inputClass(Boolean(errors[prop.key]) && !disabled)} pr-10 tabular`}
                       />
-                      <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted">
-                        {prop.unit}
-                      </span>
+                      {prop.unit && (
+                        <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted">
+                          {prop.unit}
+                        </span>
+                      )}
                     </div>
                   )}
                 </Field>

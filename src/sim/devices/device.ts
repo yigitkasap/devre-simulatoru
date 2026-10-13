@@ -49,7 +49,16 @@ export interface DeviceStatus {
   readonly brightness?: number;
   /** Ölçü aleti: ekrandaki değer (DC kipinde ortalama, AC kipinde etkin değer). */
   readonly reading?: number;
+  /** Transistör: çalışma bölgesi. */
+  readonly region?: TransistorRegion;
+  /** Zener diyot: kırılma bölgesinde (ters yönde iletimde). */
+  readonly breakdown?: boolean;
+  /** Transistör: kontrol gerilimi (V_BE ya da V_GS) ve kontrol akımı (I_B ya da I_G). */
+  readonly control?: { readonly voltage: number; readonly current: number };
 }
+
+/** Transistörün çalışma bölgesi: BJT'de kesim/aktif/doyum, FET'te kesim/omik (doğrusal)/doyum. */
+export type TransistorRegion = 'cutoff' | 'active' | 'saturation' | 'ohmic';
 
 export interface DeviceInit {
   readonly id: string;
@@ -128,6 +137,15 @@ export abstract class Device {
   }
 
   abstract measure(x: Float64Array): Measurement;
+
+  /**
+   * Her uca dışarıdan giren akım (kablo akımları ve akım noktaları için). İki uçlu bileşenlerde
+   * ölçümden türetilir; üç uçlular kendi akımlarını verir.
+   */
+  pinCurrents(x: Float64Array): number[] {
+    const { current } = this.measure(x);
+    return [current, -current];
+  }
 
   status(_x: Float64Array): DeviceStatus {
     return {};

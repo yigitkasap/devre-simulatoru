@@ -7,6 +7,11 @@ import { Device, type DeviceInit, type DeviceModel, type Measurement } from './d
 export class GroundDevice extends Device {
   readonly type = 'ground';
 
+  /** Toprağın akımı kablo akımı hesabında bilinmeyen kabul edilir (adasının dengesini karşılar). */
+  override pinCurrents(): number[] {
+    return [0];
+  }
+
   constructor(init: DeviceInit) {
     super(init);
   }

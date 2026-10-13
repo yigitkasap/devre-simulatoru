@@ -7,6 +7,12 @@ import {
   AC_SOURCE_DEFAULTS,
   AMMETER_DEFAULTS,
   BATTERY_DEFAULTS,
+  BJT_DEFAULTS,
+  JFET_DEFAULTS,
+  MOSFET_DEFAULTS,
+  PJFET_DEFAULTS,
+  PMOSFET_DEFAULTS,
+  ZENER_DEFAULTS,
   CAPACITOR_DEFAULTS,
   LED_COLORS,
   LED_DEFAULTS,
@@ -20,12 +26,13 @@ import type { DeviceType, PropValue } from '../sim/netlist';
 import type { UnitSymbol } from '../sim/units';
 import type { Point } from './types';
 
-export type Category = 'sources' | 'passive' | 'semiconductors' | 'switches' | 'meters';
+export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'switches' | 'meters';
 
 export interface NumberPropDef {
   readonly kind: 'number';
   readonly key: string;
-  readonly unit: UnitSymbol;
+  /** Birimsiz büyüklükte (ör. β) boş. */
+  readonly unit: UnitSymbol | '';
   /** En küçük değer; `exclusive` ise bu değer de kabul edilmez (ör. direnç > 0). */
   readonly min?: { readonly value: number; readonly exclusive: boolean };
   /** En büyük değer (dahil). */
@@ -70,12 +77,40 @@ export interface PartDef {
   readonly showLabel: boolean;
   /** Yönlü parça mı? (Ters çevir komutu yalnızca bunlarda çalışır.) */
   readonly polarized: boolean;
+  /** Ad ve değer yazısı parçanın sağında (üç uçlu transistörlerde üst ve alt uçlar kablolu olur). */
+  readonly labelRight?: boolean;
 }
 
 const TWO_PINS: readonly Point[] = [
   { x: -4, y: 0 },
   { x: 4, y: 0 },
 ];
+
+/**
+ * Transistörlerin uçları: BJT'de [C, B, E], FET'te [D, G, S]. Kontrol ucu (B, G) solda,
+ * öbür ikisi sağda üstte ve altta.
+ */
+const TRANSISTOR_PINS: readonly Point[] = [
+  { x: 2, y: -4 },
+  { x: -4, y: 0 },
+  { x: 2, y: 4 },
+];
+const TRANSISTOR_BOUNDS: Box = { x: -4, y: -4, w: 7, h: 8 };
+
+function transistor(type: DeviceType, labelPrefix: string, defaultProps: Readonly<Record<string, PropValue>>, propDefs: readonly PropDef[]): PartDef {
+  return {
+    type,
+    category: 'transistors',
+    labelPrefix,
+    pins: TRANSISTOR_PINS,
+    bounds: TRANSISTOR_BOUNDS,
+    defaultProps,
+    propDefs,
+    showLabel: true,
+    polarized: false,
+    labelRight: true,
+  };
+}
 
 /** Ölçü aletlerinin DC / AC kipi. */
 const METER_MODE_PROP: PropDef = { kind: 'select', key: 'mode', options: METER_MODES };
@@ -159,6 +194,39 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: true,
   },
+  zener: {
+    type: 'zener',
+    category: 'semiconductors',
+    labelPrefix: 'Z',
+    pins: TWO_PINS,
+    bounds: { x: -4, y: -1.4, w: 8, h: 2.8 },
+    defaultProps: { ...ZENER_DEFAULTS },
+    propDefs: [{ kind: 'number', key: 'zenerVoltage', unit: 'V', min: { value: 0.5, exclusive: false }, max: 200 }],
+    showLabel: true,
+    polarized: true,
+  },
+  npn: transistor('npn', 'Q', { ...BJT_DEFAULTS }, [
+    { kind: 'number', key: 'beta', unit: '', min: { value: 1, exclusive: false }, max: 2000 },
+  ]),
+  pnp: transistor('pnp', 'Q', { ...BJT_DEFAULTS }, [
+    { kind: 'number', key: 'beta', unit: '', min: { value: 1, exclusive: false }, max: 2000 },
+  ]),
+  njfet: transistor('njfet', 'J', { ...JFET_DEFAULTS }, [
+    { kind: 'number', key: 'idss', unit: 'A', min: { value: 0, exclusive: true } },
+    { kind: 'number', key: 'pinchOff', unit: 'V', max: -0.1 },
+  ]),
+  pjfet: transistor('pjfet', 'J', { ...PJFET_DEFAULTS }, [
+    { kind: 'number', key: 'idss', unit: 'A', min: { value: 0, exclusive: true } },
+    { kind: 'number', key: 'pinchOff', unit: 'V', min: { value: 0.1, exclusive: false } },
+  ]),
+  nmos: transistor('nmos', 'M', { ...MOSFET_DEFAULTS }, [
+    { kind: 'number', key: 'threshold', unit: 'V', min: { value: 0, exclusive: true } },
+    { kind: 'number', key: 'k', unit: 'A/V²', min: { value: 0, exclusive: true } },
+  ]),
+  pmos: transistor('pmos', 'M', { ...PMOSFET_DEFAULTS }, [
+    { kind: 'number', key: 'threshold', unit: 'V', max: -0.01 },
+    { kind: 'number', key: 'k', unit: 'A/V²', min: { value: 0, exclusive: true } },
+  ]),
   led: {
     type: 'led',
     category: 'semiconductors',
@@ -234,7 +302,8 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
 export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: readonly DeviceType[] }> = [
   { id: 'sources', types: ['battery', 'acsource', 'ground'] },
   { id: 'passive', types: ['resistor', 'capacitor'] },
-  { id: 'semiconductors', types: ['diode', 'led'] },
+  { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
+  { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'switches', types: ['switch'] },
   { id: 'meters', types: ['voltmeter', 'ammeter', 'oscilloscope'] },
 ];

@@ -67,6 +67,7 @@ export interface TopBarProps {
   readonly onExport: () => void;
   readonly onImport: () => void;
   readonly onShare: () => void;
+  readonly onExamples: () => void;
 }
 
 export function TopBar(props: TopBarProps) {
@@ -87,6 +88,16 @@ export function TopBar(props: TopBarProps) {
       </div>
 
       <FileMenu onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
+      <button
+        type="button"
+        onClick={props.onExamples}
+        title={tr.examples.dialogTitle}
+        aria-label={tr.examples.button}
+        className="flex h-10 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-ink hover:bg-app md:h-8"
+      >
+        <Icon name="book" className="h-[18px] w-[18px]" />
+        <span className="hidden sm:inline">{tr.examples.button}</span>
+      </button>
       <Separator />
 
       <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">

@@ -142,21 +142,23 @@ export function useSimulation(
       if (v !== null) wireVoltages.set(wire.id, v);
     }
     const measurements = new Map<string, Measurement>();
-    const flowCurrents = new Map<string, number>();
+    /** Uçlara giren akımlar (AC devrede karenin ortalaması). */
+    const pinFlows = new Map<string, readonly number[]>();
     const types = new Map<string, string>();
     for (const part of d.parts) {
       types.set(part.id, part.type);
       const m = sim.measure(part.id);
       if (!m) continue;
       measurements.set(part.id, m);
-      flowCurrents.set(part.id, averaged ? (sim.averageCurrent(part.id) ?? m.current) : m.current);
+      const pins = averaged ? sim.averagePinCurrents(part.id) : sim.pinCurrents(part.id);
+      if (pins) pinFlows.set(part.id, pins);
     }
+    const flowCurrents = new Map<string, number>();
+    for (const [id, pins] of pinFlows) flowCurrents.set(id, pins[0] ?? 0);
 
     const flows = solveFlows(graph, (id, pin) => {
       if (types.get(id) === 'ground') return null;
-      const current = flowCurrents.get(id);
-      if (current === undefined) return null;
-      return pin === 0 ? current : -current;
+      return pinFlows.get(id)?.[pin] ?? null;
     });
     const ph = phases.current;
     if (ph.segments.length !== flows.length) ph.segments = new Float64Array(flows.length);

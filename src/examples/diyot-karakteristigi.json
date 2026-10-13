@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "acsource", "label": "AC1", "x": 0, "y": 0, "rotation": 90, "props": {"waveform": "triangle", "amplitude": 5, "frequency": 1, "offset": 0, "internalResistance": 0}},
+    {"id": "p2", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 8, "y": -8, "rotation": 0, "props": {"resistance": 1000}},
+    {"id": "p4", "type": "diode", "label": "D1", "x": 16, "y": 0, "rotation": 90, "props": {}},
+    {"id": "p5", "type": "resistor", "label": "Rs", "x": 16, "y": 10, "rotation": 90, "props": {"resistance": 100}},
+    {"id": "p6", "type": "ground", "label": "GND2", "x": 16, "y": 14, "rotation": 0, "props": {}},
+    {"id": "p7", "type": "ground", "label": "GND3", "x": 20, "y": 0, "rotation": 0, "props": {}},
+    {"id": "p8", "type": "oscilloscope", "label": "OSC1", "x": 30, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.1, "voltsPerDivA": 0.2, "voltsPerDivB": 0.1, "positionA": 0, "positionB": -3, "trigger": "A", "mode": "xy", "invertB": true}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, 4], [0, 8]]},
+    {"id": "w2", "points": [[0, -4], [0, -8], [4, -8]]},
+    {"id": "w3", "points": [[12, -8], [16, -8], [16, -4]]},
+    {"id": "w4", "points": [[16, 4], [16, 6]]},
+    {"id": "w5", "points": [[16, -8], [23, -8], [23, -2], [25, -2]]},
+    {"id": "w6", "points": [[25, 0], [20, 0]]},
+    {"id": "w7", "points": [[25, 2], [22, 2], [22, 5], [16, 5]]}
+  ]
+}

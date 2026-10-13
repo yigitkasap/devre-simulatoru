@@ -6,7 +6,7 @@ import { rotatedBox } from '../model/geometry';
 import { GRID, type Part } from '../model/types';
 import { tr } from '../i18n/tr';
 import { numProp, strProp } from '../sim/netlist';
-import { formatSI } from '../sim/units';
+import { formatNumber, formatSI } from '../sim/units';
 import type { ResistorStyle } from './settings';
 import { PartSymbol, type LiveVisual } from './symbols';
 
@@ -30,6 +30,11 @@ export function partValueText(part: Part): string {
       return formatSI(numProp(p, 'capacitance', 0), 'F', { trim: true, digits: 4 });
     case 'led':
       return tr.devices.ledColors[strProp(p, 'color', ['red', 'green', 'blue'] as const, 'red')] ?? '';
+    case 'zener':
+      return formatSI(numProp(p, 'zenerVoltage', 5.1), 'V', { trim: true, digits: 4 });
+    case 'npn':
+    case 'pnp':
+      return `β = ${formatNumber(numProp(p, 'beta', 200), 0)}`;
     default:
       return '';
   }
@@ -92,7 +97,13 @@ export const PartView = memo(function PartView({
   let nameY: number;
   let valueY: number;
   let anchor: 'middle' | 'start' | 'end';
-  if (horizontal) {
+  if (def.labelRight && part.rotation === 0) {
+    // Transistör: üst ve alt uçlar kablolu olduğu için yazılar sağda (dönmüşse eski kurallar).
+    anchor = 'start';
+    nameX = right + 4;
+    nameY = cy - 3;
+    valueY = cy + 11;
+  } else if (horizontal) {
     anchor = 'middle';
     nameX = cx;
     nameY = isMeter && !displayFlip ? bottom + 13 : top - 5;

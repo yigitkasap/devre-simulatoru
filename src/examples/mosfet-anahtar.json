@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "VG", "x": 0, "y": 4, "rotation": 90, "props": {"voltage": 5, "internalResistance": 0}},
+    {"id": "p2", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}},
+    {"id": "p3", "type": "switch", "label": "S1", "x": 8, "y": 0, "rotation": 0, "props": {"closed": false}},
+    {"id": "p4", "type": "resistor", "label": "RG", "x": 14, "y": 6, "rotation": 90, "props": {"resistance": 100000.0}},
+    {"id": "p5", "type": "ground", "label": "GND2", "x": 14, "y": 10, "rotation": 0, "props": {}},
+    {"id": "p6", "type": "nmos", "label": "M1", "x": 20, "y": 0, "rotation": 0, "props": {"threshold": 2.1, "k": 0.05}},
+    {"id": "p7", "type": "ground", "label": "GND3", "x": 22, "y": 8, "rotation": 0, "props": {}},
+    {"id": "p8", "type": "resistor", "label": "RD", "x": 22, "y": -20, "rotation": 90, "props": {"resistance": 390}},
+    {"id": "p9", "type": "led", "label": "LED1", "x": 22, "y": -10, "rotation": 90, "props": {"color": "green"}},
+    {"id": "p10", "type": "battery", "label": "VDD", "x": 34, "y": -20, "rotation": 90, "props": {"voltage": 9, "internalResistance": 0}},
+    {"id": "p11", "type": "ground", "label": "GND4", "x": 34, "y": -16, "rotation": 0, "props": {}},
+    {"id": "p12", "type": "voltmeter", "label": "V1", "x": 30, "y": 0, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000.0, "ideal": false}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, 0], [4, 0]]},
+    {"id": "w2", "points": [[12, 0], [16, 0]]},
+    {"id": "w3", "points": [[14, 0], [14, 2]]},
+    {"id": "w4", "points": [[22, 4], [22, 8]]},
+    {"id": "w5", "points": [[22, -16], [22, -14]]},
+    {"id": "w6", "points": [[22, -6], [22, -4]]},
+    {"id": "w7", "points": [[22, -24], [34, -24]]},
+    {"id": "w8", "points": [[22, -5], [30, -5], [30, -4]]},
+    {"id": "w9", "points": [[30, 4], [30, 8], [22, 8]]}
+  ]
+}

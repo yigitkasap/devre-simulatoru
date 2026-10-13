@@ -21,7 +21,8 @@ export type IconName =
   | 'stop'
   | 'file'
   | 'share'
-  | 'chevron';
+  | 'chevron'
+  | 'book';
 
 const PATHS: Record<IconName, ReactNode> = {
   menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
@@ -92,6 +93,12 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   chevron: <path d="M7.5 5l5 5-5 5" strokeLinejoin="round" />,
+  book: (
+    <>
+      <path d="M10 5.2C8.4 4 6.2 3.6 3.5 3.8v11.4c2.7-.2 4.9.2 6.5 1.4 1.6-1.2 3.8-1.6 6.5-1.4V3.8C13.8 3.6 11.6 4 10 5.2z" strokeLinejoin="round" />
+      <path d="M10 5.2v11.4" />
+    </>
+  ),
 };
 
 export function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {

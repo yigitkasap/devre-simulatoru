@@ -1,7 +1,7 @@
-// Sol panel: parça kütüphanesi. Arama, kategoriler, sürükle-bırak ve seçili parçanın önizlemesi.
+// Sol panel: parça kütüphanesi. Arama, kategoriler ve sürükle-bırak. Örnekler üst çubuktaki
+// "Örnekler" penceresindedir.
 
 import { useMemo, useState, type Dispatch } from 'react';
-import { EXAMPLE_IDS, type ExampleId } from '../examples';
 import { tr } from '../i18n/tr';
 import { CATEGORIES } from '../model/catalog';
 import type { DeviceType } from '../sim/netlist';
@@ -30,8 +30,6 @@ export interface LibraryProps {
   /** Telefonda çekmece olarak açık mı? */
   readonly open: boolean;
   readonly onClose: () => void;
-  readonly activeExample: ExampleId | null;
-  readonly onLoadExample: (id: ExampleId) => void;
   /** Dokunmatik ekran: parçaya dokununca parça doğrudan tuvale eklenir (sürükle-bırak yok). */
   readonly touch: boolean;
   readonly onAddPart: (type: DeviceType) => void;
@@ -46,8 +44,6 @@ export function Library({
   onDragTypeChange,
   open,
   onClose,
-  activeExample,
-  onLoadExample,
   touch,
   onAddPart,
   onPreview,
@@ -66,16 +62,6 @@ export function Library({
           normalize(tr.library.categories[cat.id]).includes(q),
       ),
     })).filter((cat) => cat.types.length > 0);
-  }, [query]);
-
-  const examples = useMemo(() => {
-    const q = normalize(query.trim());
-    return EXAMPLE_IDS.filter(
-      (id) =>
-        q === '' ||
-        normalize(tr.examples.texts[id].title).includes(q) ||
-        normalize(tr.examples.section).includes(q),
-    );
   }, [query]);
 
   const choose = (type: DeviceType) => {
@@ -125,7 +111,7 @@ export function Library({
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2"
         onPointerLeave={(e) => e.pointerType === 'mouse' && onPreview(null)}
       >
-        {groups.length === 0 && examples.length === 0 && (
+        {groups.length === 0 && (
           <p className="px-2 py-3 text-sm text-muted">{tr.library.noResults}</p>
         )}
         {groups.map((cat) => (
@@ -166,36 +152,6 @@ export function Library({
           </section>
         ))}
 
-        {examples.length > 0 && (
-          <section className="mt-1 border-t border-line pt-1">
-            <h3 className="px-2 pt-2 pb-1 text-[11px] font-semibold text-muted">{tr.examples.section}</h3>
-            <ul>
-              {examples.map((id, index) => (
-                <li key={id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onLoadExample(id);
-                      onClose();
-                    }}
-                    aria-pressed={activeExample === id}
-                    className={`flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-sm ${
-                      activeExample === id ? 'bg-accent-soft text-accent' : 'hover:bg-app'
-                    }`}
-                  >
-                    <span
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-app text-[11px] font-semibold text-muted"
-                      aria-hidden="true"
-                    >
-                      {index + 1}
-                    </span>
-                    <span className="font-medium">{tr.examples.texts[id].title}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
       </nav>
     </aside>
   );

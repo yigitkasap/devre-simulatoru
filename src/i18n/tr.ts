@@ -10,7 +10,7 @@
 
 import { SITE_NAME } from '../config';
 import type { Diagnostic } from '../sim/diagnostics';
-import type { ExampleId } from '../examples';
+import type { ExampleGroupId, ExampleId } from '../examples';
 import type { DeviceType } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 
@@ -28,7 +28,14 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   resistor: 'Direnç',
   capacitor: 'Kondansatör',
   diode: 'Diyot',
+  zener: 'Zener diyot',
   led: 'LED',
+  npn: 'NPN transistör',
+  pnp: 'PNP transistör',
+  njfet: 'N kanallı JFET',
+  pjfet: 'P kanallı JFET',
+  nmos: 'N kanallı MOSFET',
+  pmos: 'P kanallı MOSFET',
   switch: 'Anahtar',
   voltmeter: 'Voltmetre',
   ammeter: 'Ampermetre',
@@ -43,7 +50,14 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   resistor: 'direncinin',
   capacitor: 'kondansatörünün',
   diode: 'diyotunun',
+  zener: 'zener diyotunun',
   led: 'LED’inin',
+  npn: 'transistörünün',
+  pnp: 'transistörünün',
+  njfet: 'JFET’inin',
+  pjfet: 'JFET’inin',
+  nmos: 'MOSFET’inin',
+  pmos: 'MOSFET’inin',
   switch: 'anahtarının',
   voltmeter: 'voltmetresinin',
   ammeter: 'ampermetresinin',
@@ -57,7 +71,14 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   resistor: ['1. ucu', '2. ucu'],
   capacitor: ['+ ucu', '− ucu'],
   diode: ['anot ucu', 'katot ucu'],
+  zener: ['anot ucu', 'katot ucu'],
   led: ['anot ucu', 'katot ucu'],
+  npn: ['kollektör (C) ucu', 'baz (B) ucu', 'emetör (E) ucu'],
+  pnp: ['kollektör (C) ucu', 'baz (B) ucu', 'emetör (E) ucu'],
+  njfet: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
+  pjfet: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
+  nmos: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
+  pmos: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
   switch: ['1. ucu', '2. ucu'],
   voltmeter: ['+ ucu', '− ucu'],
   ammeter: ['+ ucu', '− ucu'],
@@ -167,7 +188,14 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   resistor: 'Üzerinden geçen akımla orantılı bir gerilim düşümü oluşturur: V = I · R.',
   capacitor: 'Yük depolar; bir direnç üzerinden zamanla dolar ya da boşalır.',
   diode: 'Akımı yalnızca bir yönde, anottan katoda geçirir; ileri yönde yaklaşık 0,6-0,7 V düşürür.',
+  zener: 'Ters yönde, kırılma (zener) geriliminde iletime geçen diyot; gerilimi sınırlamak ve kırpmak için kullanılır.',
   led: 'Işık yayan diyot; fazla akım geçerse yanar, bu yüzden seri bir ön direnç gerekir.',
+  npn: 'Küçük bir baz akımıyla büyük kollektör akımını kontrol eder (IC = β · IB); yükselteç ve anahtar olarak kullanılır.',
+  pnp: 'NPN’in ters kutuplusu: akım emetörden girer, kollektörden çıkar; baz emetörden düşük gerilimde olunca iletir.',
+  njfet: 'Drain akımını kapı-kaynak gerilimi (VGS) kontrol eder; kapı neredeyse akım çekmez. VGS = 0’da en büyük akım (IDSS) akar.',
+  pjfet: 'N kanallı JFET’in ters kutuplusu: kapıya pozitif gerilim verildikçe akım azalır.',
+  nmos: 'Kapısı yalıtılmış alan etkili transistör; VGS eşik gerilimini (VT) aşınca iletime geçer. Anahtar ve yükselteç olarak kullanılır.',
+  pmos: 'P kanallı MOSFET: kapı kaynaktan yeterince düşük olunca (VGS < VT < 0) iletime geçer.',
   switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
@@ -181,6 +209,12 @@ function fieldLabel(type: DeviceType, key: string): string {
   if (type === 'ammeter' && key === 'ideal') return 'İdeal ampermetre (iç direnç 0 Ω)';
   const labels: Record<string, string> = {
     mode: 'Ölçüm kipi',
+    beta: 'Akım kazancı β (hFE)',
+    idss: 'Doyma akımı IDSS (VGS = 0)',
+    pinchOff: 'Kısılma gerilimi VP',
+    threshold: 'Eşik gerilimi VT',
+    k: 'İletkenlik katsayısı k',
+    zenerVoltage: 'Zener gerilimi (20 mA’de)',
     waveform: 'Dalga biçimi',
     amplitude: 'Tepe gerilimi',
     frequency: 'Frekans',
@@ -284,6 +318,123 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     answer:
       'Yarım periyot 5τ’dur: kondansatör her yarım periyotta ≈ %99,3 dolar (≈ 9,93 V) ve sonraki yarıda neredeyse tamamen boşalır. B kanalı üstel dolma ve boşalma eğrilerini çizer. Kaynağın frekansını 5 Hz’e çıkar (yarım periyot = τ): kondansatör artık tam dolup boşalamaz, eğri 10 V ile 0 V’a hiç ulaşmaz.',
   },
+  'diyot-karakteristigi': {
+    title: 'Diyot karakteristiği (akım-gerilim eğrisi)',
+    description:
+      '−5 V ile +5 V arasında gidip gelen 1 Hz’lik üçgen dalga, 1 kΩ’luk direnç üzerinden bir silisyum diyodu sürüyor. Diyodun akımı 100 Ω’luk ölçme direncinin geriliminden okunuyor. Osiloskop X-Y kipinde: yatay eksen diyot gerilimi (A, 0,2 V/bölme), dikey eksen akım (B ters çevrilmiş; 0,1 V = 1 mA).',
+    question:
+      'Eğri hangi gerilimden sonra hızla yükselir? En büyük akım kaç mA olur ve o anda diyodun gerilimi kaç volttur? Önce tahmin et, sonra Oynat’a bas.',
+    answer:
+      'Diyot ≈ 0,5–0,6 V’a kadar neredeyse hiç akım geçirmez, sonra akım üstel olarak artar. En büyük akım ≈ 4 mA’dir: I = (5 V − 0,65 V) / (1 kΩ + 100 Ω) ≈ 3,96 mA; o anda V_{D} ≈ 0,65 V. Ters yönde (eğrinin sol kısmı) akım yok denecek kadar küçüktür. Diyodun yerine bir LED koyup A’yı 0,5 V/bölmeye al: eğri ≈ 1,6–1,8 V’ta yükselir.',
+  },
+  'tam-dalga-orta-uclu': {
+    title: 'Orta uçlu tam dalga doğrultmaç',
+    description:
+      'Orta uçlu bir transformatörün iki yarısı, seri bağlı iki AC kaynakla (her biri 10 V tepe, 50 Hz) gösteriliyor; orta uç toprakta. İki diyot 1 kΩ’luk yükü besliyor. A kanalı üst ucun, B kanalı yükün gerilimini gösteriyor.',
+    question: 'B kanalında her periyotta kaç tepe görürsün? Çıkışın frekansı ve tepe değeri ne olur?',
+    answer:
+      'Pozitif yarıda D1, negatif yarıda D2 iletir; yükten hep aynı yönde akım geçer. Çıkış, girişin iki katı frekansta (100 Hz) tam dalga doğrultulmuş gerilimdir; tepe değeri ≈ 10 V − 0,67 V ≈ 9,3 V. Ortalama (DC) değer ≈ 2 · 9,3 V / π ≈ 5,9 V’tur, yarım dalga doğrultmacın iki katı.',
+  },
+  'kopru-filtre': {
+    title: 'Köprü doğrultmaç ve filtre kondansatörü',
+    description:
+      '10 V tepe değerli, 50 Hz’lik AC kaynak dört diyotlu bir köprüyü besliyor; 1 kΩ’luk yükün alt ucu toprakta. S1 anahtarı yüke paralel 100 µF’lık filtre kondansatörünü bağlıyor (başta açık). A kanalı yükün gerilimini gösteriyor.',
+    question:
+      'Anahtar açıkken çıkışın tepe değeri kaç volt olur? Simülasyon çalışırken anahtara tıklayıp kondansatörü bağlayınca çıkış nasıl değişir?',
+    answer:
+      'Her yarım periyotta seri iki diyot iletir: tepe ≈ 10 V − 2 · 0,67 V ≈ 8,7 V, frekans 100 Hz. Kondansatör bağlanınca çıkış neredeyse düz bir DC olur: tepelerde dolar, aralarda yük üzerinden boşalır. Dalgalanma ≈ 0,7 V tepe-tepedir (yaklaşık formül V_{r} ≈ V_{tepe} / (2 · f · R · C) ≈ 0,86 V biraz fazlasını verir, çünkü kondansatör yarım periyodun tamamında boşalmaz). Kondansatörü büyüttükçe dalgalanma küçülür.',
+  },
+  'pozitif-kenetleyici': {
+    title: 'Pozitif kenetleyici',
+    description:
+      '5 V tepe değerli, 50 Hz’lik sinüs, seri bir 10 µF’lık kondansatör ve çıkışa paralel bir diyot (anodu toprakta). 100 kΩ’luk yük, kondansatörün bir periyotta boşalmasını önlüyor. A girişi, B çıkışı gösteriyor.',
+    question: 'Çıkışın en küçük ve en büyük değeri kaç volt olur? Dalganın tepe-tepe değeri değişir mi?',
+    answer:
+      'İlk negatif yarıda diyot iletir ve kondansatör ≈ 5 V − 0,6 V ≈ 4,4 V’a dolar; sonra çıkış, girişin bu kadar yukarı kaydırılmış halidir: ≈ −0,6 V ile ≈ 9,4 V arasında gidip gelir. Tepe-tepe değer (10 V) ve dalganın biçimi değişmez; yalnızca DC seviyesi değişir. Diyodu F ile ters çevir: negatif kenetleyici olur.',
+  },
+  'gerilim-ikileyici': {
+    title: 'Gerilim ikileyici (katlayıcı)',
+    description:
+      '5 V tepe değerli, 50 Hz’lik sinüs; C1 ile D1 bir kenetleyici, D2 ile C2 bir tepe dedektörü oluşturuyor. DC kipindeki voltmetre çıkışı ölçüyor; A girişi, B çıkışı gösteriyor.',
+    question: 'Çıkıştaki DC gerilim kaç volt olur? Kaynağın tepe değeriyle karşılaştır.',
+    answer:
+      'C1 negatif yarıda ≈ 4,4 V’a dolar; pozitif yarıda kaynakla seri bağlanır ve C2’yi kaynağın tepe değerinin yaklaşık iki katına doldurur: V_{çıkış} ≈ 2 · 5 V − 2 · 0,65 V ≈ 8,7 V. C2 birkaç periyotta (≈ 0,2 s) dolar. Devreye bu yüzden gerilim ikileyici denir; benzer basamaklar eklenerek üçleyici, dörtleyici yapılır.',
+  },
+  'paralel-kirpici': {
+    title: 'Öngerilimli paralel kırpıcı',
+    description:
+      '10 V tepe değerli sinüs, 1 kΩ’luk seri direnç ve çıkışa paralel bir diyot; diyodun katodu 3 V’luk bir pile bağlı. A girişi, B çıkışı gösteriyor.',
+    question: 'Çıkış hangi gerilimin üstüne çıkamaz? Negatif yarım dalgada ne olur?',
+    answer:
+      'Çıkış ≈ 3 V + 0,66 V ≈ 3,7 V’u aşmaya çalışınca diyot iletime geçer; fazlası R1’in üzerinde düşer ve pozitif tepeler kırpılır. Negatif yarıda diyot ters kutuplanır ve çıkış girişi aynen izler (−10 V’a iner). Pilin gerilimini değiştirerek kırpma seviyesini ayarlayabilirsin.',
+  },
+  'zener-kirpici': {
+    title: 'Çift yönlü zener kırpıcı',
+    description:
+      '10 V tepe değerli sinüs, 1 kΩ’luk seri direnç ve çıkışa paralel, sırt sırta bağlı iki 5,1 V’luk zener diyot. A girişi, B çıkışı gösteriyor.',
+    question: 'Çıkış hangi gerilimlerde kırpılır?',
+    answer:
+      'Pozitif yarıda Z1 kırılmada (≈ 4,9 V; birkaç mA’de zener gerilimi 20 mA’deki değerden biraz düşüktür), Z2 ileri yönde (≈ 0,65 V) iletir: çıkış ≈ +5,5 V’ta kırpılır. Negatif yarıda roller değişir: ≈ −5,5 V. Zenerlerden birinin yerine kablo koyup tek yönlü kırpmayı gör.',
+  },
+  'fet-cikis-karakteristigi': {
+    title: 'JFET çıkış karakteristiği',
+    description:
+      'N kanallı JFET’in (I_{DSS} = 3 mA, V_{P} = −1,5 V) drain-source gerilimi, 0–10 V arasında gidip gelen 1 Hz’lik üçgen dalgayla taranıyor; V_{GG} pili kapıyı −0,5 V’ta tutuyor. Drain akımı 10 Ω’luk ölçme direncinden okunuyor. Osiloskop X-Y kipinde: yatay V_{DS} (1 V/bölme), dikey I_{D} (B ters; 10 mV = 1 mA).',
+    question: 'V_{GS} = −0,5 V iken doyum bölgesindeki drain akımı kaç mA olur? Eğri hangi V_{DS}’de düzleşir?',
+    answer:
+      'I_{D} = I_{DSS} · (1 − V_{GS} / V_{P})² = 3 mA · (1 − 0,5 / 1,5)² ≈ 1,33 mA; kanal boyu modülasyonu yüzünden V_{DS} = 10 V’ta ≈ 1,47 mA’e çıkar. Eğri V_{DS} ≈ V_{GS} − V_{P} = 1 V’tan sonra düzleşir: solda omik bölge, sağda doyum. V_{GG} pilini 0 V ve 1 V yap: doyum akımı ≈ 3,3 mA ve ≈ 0,37 mA olur; eğri ailesinin öbür üyelerini görürsün.',
+  },
+  'fet-transfer-karakteristigi': {
+    title: 'JFET transfer karakteristiği',
+    description:
+      'Kapı gerilimi, −2 V ile 0 V arasında gidip gelen 1 Hz’lik üçgen dalgayla taranıyor; drain 10 V’ta. Osiloskop X-Y kipinde: yatay V_{GS} (0,2 V/bölme, sağ kenar 0 V), dikey I_{D} (B ters; 10 mV = 1 mA).',
+    question: 'V_{GS} = 0’da ve V_{GS} = −0,75 V’ta drain akımı kaç mA olur? Eğrinin biçimi nasıldır?',
+    answer:
+      'V_{GS} = 0’da I_{D} = I_{DSS} ≈ 3 mA (V_{DS} = 10 V’ta λ yüzünden ≈ 3,3 mA); V_{GS} = −0,75 V’ta 3 mA · (1 − 0,5)² ≈ 0,75 mA (≈ 0,83 mA). Eğri bir paraboldür (kare yasası) ve V_{GS} = V_{P} = −1,5 V’ta sıfıra iner; kapı daha negatifken transistör kesimdedir.',
+  },
+  'fet-yukseltec': {
+    title: 'JFET’li yükselteç (ortak kaynak)',
+    description:
+      '12 V besleme, R_{D} = 4,7 kΩ, kendinden öngerilim için R_{S} = 330 Ω (100 µF ile köprülü), R_{G} = 1 MΩ. Girişe 50 mV tepe değerli, 1 kHz’lik sinüs uygulanıyor; çıkış 10 µF ile 100 kΩ’luk yüke aktarılıyor. A girişi, B çıkışı gösteriyor.',
+    question:
+      'Çalışma noktasında I_{D} kaç mA olur? Gerilim kazancı ve çıkışın tepe değeri ne olur, giriş ile çıkış arasında faz farkı var mı?',
+    answer:
+      'I_{D} = I_{DSS} · (1 + I_{D} R_{S} / V_{P})² denkleminden I_{D} ≈ 1,45 mA, V_{GS} ≈ −0,48 V. g_{m} = (2 I_{DSS} / |V_{P}|) · (1 − V_{GS} / V_{P}) ≈ 2,8 mS; kazanç A_{v} ≈ −g_{m} · (R_{D} ∥ r_{o} ∥ R_{L}) ≈ −12. Çıkış ≈ 0,6 V tepe değerlidir ve girişle 180° ters fazdadır. C_{S}’yi silersen R_{S} köprülenmez ve kazanç yaklaşık yarıya düşer.',
+  },
+  'bjt-yukseltec': {
+    title: 'BJT’li yükselteç (ortak emetör)',
+    description:
+      '12 V besleme, gerilim bölücülü öngerilim (R_{1} = 56 kΩ, R_{2} = 12 kΩ), R_{C} = 4,7 kΩ, R_{E} = 1,5 kΩ (100 µF ile köprülü), β = 200. Girişe 5 mV tepe değerli, 1 kHz’lik sinüs; çıkış 100 kΩ’luk yüke aktarılıyor. A girişi (2 mV/bölme), B çıkışı (0,2 V/bölme) gösteriyor.',
+    question: 'I_{C} kaç mA olur? Gerilim kazancı ve çıkışın tepe değeri yaklaşık ne olur?',
+    answer:
+      'V_{B} ≈ 12 V · 12 / 68 ≈ 2,1 V, V_{E} ≈ 2,1 V − 0,63 V ≈ 1,45 V, I_{C} ≈ I_{E} ≈ 1,45 V / 1,5 kΩ ≈ 0,96 mA. g_{m} = I_{C} / V_{T} ≈ 37 mS; kazanç A_{v} ≈ −g_{m} · (R_{C} ∥ r_{o} ∥ R_{L}) ≈ −155. Çıkış ≈ 0,78 V tepe değerlidir ve girişle ters fazdadır. Pozitif ve negatif tepeler biraz farklıdır (≈ 0,75 V ve 0,81 V): üstel karakteristik küçük bir bozulmaya yol açar; girişi 20 mV’a çıkarıp bozulmanın arttığını gör.',
+  },
+  'mosfet-yukseltec': {
+    title: 'MOSFET’li yükselteç (ortak kaynak)',
+    description:
+      '12 V besleme, gerilim bölücülü öngerilim (R_{G1} = 2,2 MΩ, R_{G2} = 1 MΩ → V_{G} = 3,75 V), R_{D} = 3,3 kΩ, R_{S} = 1 kΩ (100 µF ile köprülü); MOSFET 2N7000 benzeri (V_{T} = 2,1 V, k = 50 mA/V²). Girişe 10 mV tepe değerli, 1 kHz’lik sinüs uygulanıyor. A girişi, B çıkışı gösteriyor.',
+    question: 'Çalışma noktasında I_{D} kaç mA olur? Gerilim kazancı yaklaşık ne olur?',
+    answer:
+      'I_{D} = k · (V_{G} − I_{D} R_{S} − V_{T})² denkleminden I_{D} ≈ 1,48 mA, V_{GS} − V_{T} ≈ 0,17 V. g_{m} = 2k · (V_{GS} − V_{T}) ≈ 18 mS (λ dahil); kazanç A_{v} ≈ −g_{m} · (R_{D} ∥ r_{o} ∥ R_{L}) ≈ −54, çıkış ≈ 0,54 V tepe değerli ve ters fazdadır. Kapı yalıtılmış olduğundan giriş direnci çok büyüktür (R_{G1} ∥ R_{G2} ≈ 690 kΩ).',
+  },
+  'bjt-anahtar': {
+    title: 'BJT’nin anahtar olarak kullanılması',
+    description:
+      'AC kaynak, 0 V ile 5 V arasında gidip gelen 1 Hz’lik kare dalga veriyor (bir lojik çıkış gibi). NPN transistör 10 kΩ’luk baz direnciyle sürülüyor; kollektörde 390 Ω ve kırmızı LED 9 V’luk beslemeye bağlı. A girişi, B kollektör gerilimini (V_{CE}) gösteriyor.',
+    question:
+      'Giriş 5 V iken transistör doyumda mı? LED’den kaç mA geçer, V_{CE} kaç volt olur? Giriş 0 V iken ne olur?',
+    answer:
+      'I_{B} = (5 V − 0,75 V) / 10 kΩ ≈ 0,43 mA; β · I_{B} ≈ 85 mA olurdu, ama kollektör akımı en fazla (9 V − 1,9 V − 0,1 V) / 390 Ω ≈ 18 mA olabilir. β · I_{B} bundan çok büyük olduğu için transistör doyumdadır: V_{CE} ≈ 0,06 V ve LED yanar. Giriş 0 V’ta baz akımı yoktur: transistör kesimde, LED sönük, V_{CE} yüksek. Küçük bir baz akımı büyük bir akımı açıp kapatır.',
+  },
+  'mosfet-anahtar': {
+    title: 'MOSFET’in anahtar olarak kullanılması',
+    description:
+      'N kanallı MOSFET’in (2N7000 benzeri, V_{T} = 2,1 V) drain’inde 390 Ω ve yeşil LED 9 V’luk beslemeye bağlı. S1 anahtarı kapıyı 5 V’a bağlıyor; 100 kΩ’luk direnç anahtar açıkken kapıyı toprağa çekiyor. Voltmetre V_{DS}’yi ölçüyor.',
+    question:
+      'Oynat’a bas ve anahtara tıkla. Kapı 5 V olunca MOSFET hangi bölgeye geçer, V_{DS} kaç volt olur? Kapı ne kadar akım çeker?',
+    answer:
+      'V_{GS} = 5 V eşik geriliminden büyük olduğu için kanal oluşur ve LED yanar. Akım LED ve 390 Ω ile ≈ (9 V − 2,2 V) / 390 Ω ≈ 17 mA’de sınırlandığından MOSFET omik bölgededir: R_{DS(on)} ≈ 1 / (2k · (V_{GS} − V_{T})) ≈ 3,4 Ω, V_{DS} ≈ 0,06 V. Kapı yalıtılmıştır, hiç akım çekmez (BJT’de 0,43 mA baz akımı gerekiyordu). Anahtar açılınca kapı toprağa çekilir, MOSFET kesime geçer ve LED söner.',
+  },
 };
 
 export const tr = {
@@ -310,6 +461,7 @@ export const tr = {
       sources: 'Kaynaklar',
       passive: 'Pasif',
       semiconductors: 'Yarı iletkenler',
+      transistors: 'Transistörler',
       switches: 'Anahtarlar',
       meters: 'Ölçü aletleri',
     },
@@ -411,6 +563,33 @@ export const tr = {
       triangle: 'Üçgen dalga: gerilim doğrusal artıp azalır; etkin değer V_{m} / √3.',
     } as Record<string, string>,
     withOffset: (offset: string) => `DC kayma ${offset}: bütün dalga bu kadar yukarı kayar.`,
+    collectorCurrent: 'Kollektör akımı I_{C}',
+    baseCurrent: 'Baz akımı I_{B}',
+    vce: 'V_{CE}',
+    vbe: 'V_{BE}',
+    gain: 'I_{C} / I_{B}',
+    drainCurrent: 'Drain akımı I_{D}',
+    vds: 'V_{DS}',
+    vgs: 'V_{GS}',
+    region: 'Bölge',
+    regions: {
+      cutoff: 'Kesim',
+      active: 'Aktif',
+      saturation: 'Doyum',
+      ohmic: 'Omik (doğrusal)',
+    } as Record<string, string>,
+    bjtNotes: {
+      cutoff: 'Kesim: B-E eklemi iletimde değil; transistör açık bir anahtar gibi, I_{C} ≈ 0.',
+      active: 'Aktif bölge: I_{C} ≈ β · I_{B}; transistör yükselteç gibi çalışır.',
+      saturation: 'Doyum: transistör kapalı bir anahtar gibi; I_{C} artık β · I_{B}’den küçüktür ve dış devre belirler.',
+    } as Record<string, string>,
+    fetNotes: {
+      cutoff: 'Kesim: kanal kapalı, I_{D} ≈ 0.',
+      ohmic: 'Omik bölge: kanal V_{GS} ile değişen bir direnç gibi davranır (anahtar kapalı).',
+      saturation: 'Doyum (sabit akım) bölgesi: I_{D} neredeyse yalnızca V_{GS}’ye bağlıdır; yükselteç burada çalışır.',
+    } as Record<string, string>,
+    zenerBreakdown: 'Kırılma bölgesinde: uçlarındaki gerilim ≈ V_{Z} ve akımla çok az değişir.',
+    zenerOff: 'Kırılma geriliminin altında: ters yönde yalnızca çok küçük bir sızıntı akımı geçer.',
     channel: (c: string) => `Kanal ${c}`,
     scopeNote: 'Ekran, tuvalin köşesindeki osiloskop panelinde çizilir.',
   },
@@ -435,9 +614,29 @@ export const tr = {
     rms: 'Etkin',
     frequency: 'f',
     perDiv: '/b',
+    mode: 'Kip',
+    modes: { yt: 'Y-t', xy: 'X-Y (A yatay, B dikey)' } as Record<string, string>,
+    invertB: 'B ters',
+    inverted: 'ters',
   },
   examples: {
     section: 'Örnekler',
+    button: 'Örnekler',
+    dialogTitle: 'Örnek devreler',
+    dialogHint: 'Bir örneğe tıkla: devre açılır; açıklaması ve tahmin sorusu tuvalin köşesinde çıkar.',
+    dialogClose: 'Örnekler penceresini kapat',
+    groups: {
+      temel: 'Temel devreler',
+      'diyot-karakteristigi': 'Diyot karakteristiklerinin incelenmesi',
+      dogrultucu: 'Doğrultucu devreler',
+      kenetleyici: 'Kenetleyici ve gerilim katlayıcı devreler',
+      kirpici: 'Kırpıcı devreler',
+      'fet-karakteristigi': 'FET karakteristiklerinin incelenmesi',
+      'fet-yukseltec': 'FET yükselteci',
+      'bjt-yukseltec': 'BJT’li yükselteç',
+      'mosfet-yukseltec': 'MOSFET’li yükselteç devresi',
+      anahtar: 'Transistörlerin anahtar olarak kullanılması',
+    } as Record<ExampleGroupId, string>,
     texts: EXAMPLES,
     badge: 'Örnek',
     predict: 'Tahmin et',
@@ -525,6 +724,20 @@ export const tr = {
         'Gerçek ampermetrelerin de küçük bir iç direnci vardır; seri bağlandığı devrenin akımını biraz azaltır.',
       oscilloscope:
         'Kanallar ortak uca (COM) göre gerilimi ölçer; girişleri ideal olduğu için devreden akım çekmez. Bölme ayarları tuvalin köşesindeki osiloskop panelindedir.',
+      zener:
+        '1N4733A benzeri. Kırılma bölgesinde uçlarındaki gerilim akımla çok az değişir: 20 mA’de tam V_{Z}, 1 mA’de ≈ %3 daha düşük. İleri yönde sıradan bir diyot gibi ≈ 0,65 V düşer.',
+      npn:
+        'BC547B benzeri: I_{S} ≈ 2,4·10⁻¹⁴ A (1 mA’de V_{BE} ≈ 0,63 V), Early gerilimi ≈ 63 V. Aktif bölgede I_{C} ≈ β · I_{B}; doyumda V_{CE} ≈ 0,1–0,2 V. BC547B için β 200–450 arasıdır.',
+      pnp:
+        'BC557B benzeri, NPN ile aynı parametreler; bütün gerilim ve akımların yönü terstir (V_{EB} ≈ 0,63 V).',
+      njfet:
+        '2N5457 benzeri (veri sayfası: I_{DSS} 1–5 mA, V_{P} −0,5…−6 V). Doyumda I_{D} = I_{DSS} · (1 − V_{GS} / V_{P})²; kanal boyu modülasyonu λ = 0,01 V⁻¹.',
+      pjfet:
+        'N kanallı JFET ile aynı denklemler; V_{P} pozitiftir, gerilim ve akımların yönü terstir.',
+      nmos:
+        '2N7000 benzeri (V_{GS(th)} tipik 2,1 V). Doyumda I_{D} = k · (V_{GS} − V_{T})², omik bölgede I_{D} = k · (2(V_{GS} − V_{T})V_{DS} − V_{DS}²); λ = 0,01 V⁻¹.',
+      pmos:
+        'N kanallı MOSFET ile aynı denklemler; V_{T} negatiftir, gerilim ve akımların yönü terstir.',
     } as Partial<Record<DeviceType, string>>,
     meterModeNote:
       'AC kaynaklı devrede DC kipi bir periyottaki ortalamayı, AC kipi etkin değeri (√(ortalama v²)) gösterir; gösterge her periyotta bir güncellenir.',

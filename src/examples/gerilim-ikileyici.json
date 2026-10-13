@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "acsource", "label": "AC1", "x": 0, "y": 0, "rotation": 90, "props": {"waveform": "sine", "amplitude": 5, "frequency": 50, "offset": 0, "internalResistance": 0}},
+    {"id": "p2", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}},
+    {"id": "p3", "type": "capacitor", "label": "C1", "x": 8, "y": -8, "rotation": 180, "props": {"capacitance": 0.0001, "initialVoltage": 0}},
+    {"id": "p4", "type": "diode", "label": "D1", "x": 16, "y": 0, "rotation": 270, "props": {}},
+    {"id": "p5", "type": "diode", "label": "D2", "x": 20, "y": -8, "rotation": 0, "props": {}},
+    {"id": "p6", "type": "capacitor", "label": "C2", "x": 28, "y": 0, "rotation": 90, "props": {"capacitance": 0.0001, "initialVoltage": 0}},
+    {"id": "p7", "type": "resistor", "label": "RL", "x": 36, "y": 0, "rotation": 90, "props": {"resistance": 100000.0}},
+    {"id": "p8", "type": "voltmeter", "label": "V1", "x": 44, "y": 0, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000.0, "ideal": false}},
+    {"id": "p9", "type": "oscilloscope", "label": "OSC1", "x": 63, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.005, "voltsPerDivA": 5, "voltsPerDivB": 5, "positionA": 0, "positionB": 0, "trigger": "A", "mode": "yt", "invertB": false}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, 4], [0, 8]]},
+    {"id": "w2", "points": [[0, -4], [0, -8], [4, -8]]},
+    {"id": "w3", "points": [[12, -8], [16, -8]]},
+    {"id": "w4", "points": [[16, -8], [16, -4]]},
+    {"id": "w5", "points": [[24, -8], [28, -8], [28, -4]]},
+    {"id": "w6", "points": [[28, -8], [36, -8], [36, -4]]},
+    {"id": "w7", "points": [[36, -8], [44, -8], [44, -4]]},
+    {"id": "w8", "points": [[16, 4], [16, 8], [0, 8]]},
+    {"id": "w9", "points": [[28, 4], [28, 8], [16, 8]]},
+    {"id": "w10", "points": [[36, 4], [36, 8], [28, 8]]},
+    {"id": "w11", "points": [[44, 4], [44, 8], [36, 8]]},
+    {"id": "w12", "points": [[0, -8], [0, -12], [57, -12], [57, -2], [58, -2]]},
+    {"id": "w13", "points": [[44, -8], [56, -8], [56, 0], [58, 0]]},
+    {"id": "w14", "points": [[44, 8], [54, 8], [54, 2], [58, 2]]}
+  ]
+}

@@ -7,7 +7,7 @@
 //   - Elektronikteki "4k7" yazımı da kabul edilir (= 4,7k).
 //   - Sondaki birim isteğe bağlıdır: "4,7 kΩ", "100 µF", "9 V", "50 Hz".
 
-export type UnitSymbol = 'Ω' | 'V' | 'A' | 'F' | 'W' | 's' | 'Hz';
+export type UnitSymbol = 'Ω' | 'V' | 'A' | 'F' | 'W' | 's' | 'Hz' | 'A/V²';
 
 export type ParseError = 'empty' | 'invalid' | 'wrong-unit';
 export type ParseResult = { ok: true; value: number } | { ok: false; error: ParseError };
@@ -34,6 +34,7 @@ const UNIT_ALIASES: Record<UnitSymbol, string[]> = {
   W: ['w', 'watt'],
   s: ['s', 'sn', 'saniye'],
   Hz: ['hz', 'hertz'],
+  'A/V²': ['a/v²', 'a/v2', 'a/v^2'],
 };
 
 const PREFIX_CLASS = 'pnuµμmkKMG';

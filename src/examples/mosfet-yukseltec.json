@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "VDD", "x": 4, "y": -12, "rotation": 90, "props": {"voltage": 12, "internalResistance": 0}},
+    {"id": "p2", "type": "ground", "label": "GND1", "x": 4, "y": -8, "rotation": 0, "props": {}},
+    {"id": "p3", "type": "nmos", "label": "M1", "x": 20, "y": 0, "rotation": 0, "props": {"threshold": 2.1, "k": 0.05}},
+    {"id": "p4", "type": "resistor", "label": "RD", "x": 22, "y": -10, "rotation": 90, "props": {"resistance": 3300}},
+    {"id": "p5", "type": "resistor", "label": "RS", "x": 22, "y": 10, "rotation": 90, "props": {"resistance": 1000}},
+    {"id": "p6", "type": "capacitor", "label": "CS", "x": 28, "y": 10, "rotation": 90, "props": {"capacitance": 0.0001, "initialVoltage": 1.482}},
+    {"id": "p7", "type": "resistor", "label": "RG2", "x": 12, "y": 8, "rotation": 90, "props": {"resistance": 1000000.0}},
+    {"id": "p8", "type": "resistor", "label": "RG1", "x": 12, "y": -8, "rotation": 90, "props": {"resistance": 2200000.0}},
+    {"id": "p9", "type": "capacitor", "label": "C1", "x": 8, "y": 0, "rotation": 0, "props": {"capacitance": 1e-06, "initialVoltage": -3.75}},
+    {"id": "p10", "type": "acsource", "label": "AC1", "x": 0, "y": 8, "rotation": 90, "props": {"waveform": "sine", "amplitude": 0.01, "frequency": 1000, "offset": 0, "internalResistance": 0}},
+    {"id": "p11", "type": "ground", "label": "GND2", "x": 0, "y": 16, "rotation": 0, "props": {}},
+    {"id": "p12", "type": "capacitor", "label": "C2", "x": 34, "y": -5, "rotation": 0, "props": {"capacitance": 1e-05, "initialVoltage": 7.113}},
+    {"id": "p13", "type": "resistor", "label": "RL", "x": 40, "y": 2, "rotation": 90, "props": {"resistance": 100000.0}},
+    {"id": "p14", "type": "oscilloscope", "label": "OSC1", "x": 60, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.0002, "voltsPerDivA": 0.005, "voltsPerDivB": 0.2, "positionA": 0, "positionB": 0, "trigger": "A", "mode": "yt", "invertB": false}},
+    {"id": "p15", "type": "ground", "label": "GND3", "x": 55, "y": 2, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[4, -16], [22, -16], [22, -14]]},
+    {"id": "w2", "points": [[22, -6], [22, -4]]},
+    {"id": "w3", "points": [[22, 4], [22, 6]]},
+    {"id": "w4", "points": [[22, 5], [28, 5], [28, 6]]},
+    {"id": "w5", "points": [[16, 0], [12, 0], [12, 4]]},
+    {"id": "w6", "points": [[12, -16], [12, -12]]},
+    {"id": "w7", "points": [[12, -4], [12, 0]]},
+    {"id": "w8", "points": [[0, 4], [0, 0], [4, 0]]},
+    {"id": "w9", "points": [[0, 12], [0, 16]]},
+    {"id": "w10", "points": [[0, 16], [40, 16], [40, 6]]},
+    {"id": "w11", "points": [[12, 12], [12, 16]]},
+    {"id": "w12", "points": [[22, 14], [22, 16]]},
+    {"id": "w13", "points": [[28, 14], [28, 16]]},
+    {"id": "w14", "points": [[22, -5], [30, -5]]},
+    {"id": "w15", "points": [[38, -5], [40, -5], [40, -2]]},
+    {"id": "w16", "points": [[0, 0], [0, -20], [53, -20], [53, -2], [55, -2]]},
+    {"id": "w17", "points": [[40, -5], [51, -5], [51, 0], [55, 0]]}
+  ]
+}

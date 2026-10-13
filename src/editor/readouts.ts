@@ -142,6 +142,52 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
       }
       return { title, rows, note: m.voltage < 0 ? t.reverseBiased : t.forwardBiased };
     }
+    case 'zener': {
+      const Vz = numProp(p, 'zenerVoltage', 5.1);
+      return {
+        title,
+        rows: [
+          { label: t.forwardVoltage, value: v(m.voltage) },
+          { label: t.current, value: a(m.current) },
+          { label: t.powerUsed, value: w(P) },
+        ],
+        note: status.breakdown
+          ? `${t.zenerBreakdown} (V_{Z} = ${formatSI(Vz, 'V', { trim: true })})`
+          : m.voltage < 0
+            ? t.zenerOff
+            : t.forwardBiased,
+      };
+    }
+    case 'npn':
+    case 'pnp': {
+      const region = status.region ?? 'active';
+      const ib = status.control?.current ?? 0;
+      const rows: ReadoutRow[] = [
+        { label: t.collectorCurrent, value: a(m.current) },
+        { label: t.baseCurrent, value: a(ib) },
+        { label: t.vce, value: v(m.voltage) },
+        { label: t.vbe, value: v(status.control?.voltage ?? 0) },
+      ];
+      if (region === 'active' && Math.abs(ib) > 1e-12) rows.push({ label: t.gain, value: formatNumber(m.current / ib, 0) });
+      rows.push({ label: t.region, value: t.regions[region] ?? region });
+      return { title, rows, note: t.bjtNotes[region] ?? '' };
+    }
+    case 'njfet':
+    case 'pjfet':
+    case 'nmos':
+    case 'pmos': {
+      const region = status.region ?? 'saturation';
+      return {
+        title,
+        rows: [
+          { label: t.drainCurrent, value: a(m.current) },
+          { label: t.vds, value: v(m.voltage) },
+          { label: t.vgs, value: v(status.control?.voltage ?? 0) },
+          { label: t.region, value: region === 'saturation' ? `${t.regions.saturation}` : (t.regions[region] ?? region) },
+        ],
+        note: t.fetNotes[region] ?? '',
+      };
+    }
     case 'switch': {
       const closed = boolProp(p, 'closed', false);
       return {

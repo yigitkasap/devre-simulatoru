@@ -1,6 +1,10 @@
 // Osiloskop ekranının içeriği: kayıttan (sim/scope.ts) gösterilecek pencereyi seçer (tetikleme),
 // iki kanalın çizgisini ve ölçümlerini hazırlar. Saf fonksiyonlar; arayüzden bağımsız test edilir.
 //
+// X-Y kipinde son bir ekran süresindeki (10 · zaman/bölme) ölçümler, A yatay ve B dikey eksende
+// noktalar olarak çizilir: diyot ve transistör karakteristikleri böyle görülür. B kanalı ters
+// çevrilebilir (akım ölçme direnci ters yönde bağlıysa); ters çevirme çizime ve ölçümlere uygulanır.
+//
 // Tetikleme (otomatik kip): tetik kanalının son birkaç ekranlık kaydında orta seviye
 // ((en küçük + en büyük) / 2) bulunur; sinyalin bu seviyeyi yukarı doğru kestiği en son an,
 // ardından tam bir ekranlık kayıt varsa ekranın sol kenarı olur. Böylece periyodik bir sinyal
@@ -39,17 +43,35 @@ export interface ScopeView {
   readonly channels: readonly [ScopeChannelView, ScopeChannelView];
   /** Ekran bir tetik anına kilitlendi mi (yoksa kayıyor). */
   readonly triggered: boolean;
+  /** X-Y kipinde A–B eğrisi (ekran birimlerinde); Y-t kipinde boş. */
+  readonly xyPath: string;
 }
 
 type Channel = 0 | 1;
 
-/** Kayıt aralığındaki bir kanalın `last` değerlerinin en küçüğü/en büyüğü. */
-function range(rec: ScopeRecorder, channel: Channel, from: number, to: number): { lo: number; hi: number } {
-  const last = rec.channels[channel].last;
+/**
+ * Bir kanalın kovaları, ters çevirme uygulanmış olarak: ters çevrilen kanalda değerlerin işareti
+ * değişir, en küçük ile en büyük yer değiştirir.
+ */
+interface ChannelData {
+  readonly min: (s: number) => number;
+  readonly max: (s: number) => number;
+  readonly last: (s: number) => number;
+}
+
+function channelData(rec: ScopeRecorder, channel: Channel, inverted: boolean): ChannelData {
+  const { min, max, last } = rec.channels[channel];
+  return inverted
+    ? { min: (s) => -max[s]!, max: (s) => -min[s]!, last: (s) => -last[s]! }
+    : { min: (s) => min[s]!, max: (s) => max[s]!, last: (s) => last[s]! };
+}
+
+/** Kayıt aralığındaki `last` değerlerinin en küçüğü/en büyüğü. */
+function range(rec: ScopeRecorder, data: ChannelData, from: number, to: number): { lo: number; hi: number } {
   let lo = Number.POSITIVE_INFINITY;
   let hi = Number.NEGATIVE_INFINITY;
   for (let k = from; k < to; k++) {
-    const v = last[rec.slot(k)]!;
+    const v = data.last(rec.slot(k));
     if (v < lo) lo = v;
     if (v > hi) hi = v;
   }
@@ -61,18 +83,17 @@ function range(rec: ScopeRecorder, channel: Channel, from: number, to: number): 
  * altındaki ölü bandın altına inildikten sonra sayılır (gürültüde art arda tetiklenmesin).
  * Dönen değerler kesimin kova cinsinden (kesirli) konumudur.
  */
-function risingCrossings(rec: ScopeRecorder, channel: Channel, from: number, to: number): number[] {
-  const { lo, hi } = range(rec, channel, from, to);
+function risingCrossings(rec: ScopeRecorder, data: ChannelData, from: number, to: number): number[] {
+  const { lo, hi } = range(rec, data, from, to);
   const span = hi - lo;
   if (!(span > 1e-9 * Math.max(1, Math.abs(hi), Math.abs(lo)))) return [];
   const level = (lo + hi) / 2;
   const armLevel = level - HYSTERESIS * span;
-  const last = rec.channels[channel].last;
   const result: number[] = [];
   let armed = false;
   for (let k = from + 1; k < to; k++) {
-    const previous = last[rec.slot(k - 1)]!;
-    const current = last[rec.slot(k)]!;
+    const previous = data.last(rec.slot(k - 1));
+    const current = data.last(rec.slot(k));
     if (previous <= armLevel) armed = true;
     if (armed && previous < level && current >= level) {
       result.push(k - 1 + (level - previous) / (current - previous));
@@ -82,8 +103,8 @@ function risingCrossings(rec: ScopeRecorder, channel: Channel, from: number, to:
   return result;
 }
 
-function frequencyOf(rec: ScopeRecorder, channel: Channel): number | null {
-  const crossings = risingCrossings(rec, channel, rec.start, rec.end);
+function frequencyOf(rec: ScopeRecorder, data: ChannelData): number | null {
+  const crossings = risingCrossings(rec, data, rec.start, rec.end);
   if (crossings.length < 2) return null;
   const first = crossings[0]!;
   const last = crossings[crossings.length - 1]!;
@@ -91,12 +112,12 @@ function frequencyOf(rec: ScopeRecorder, channel: Channel): number | null {
 }
 
 /** Gösterilecek pencerenin ilk kovası ve tetiklenip tetiklenmediği. */
-function windowStart(rec: ScopeRecorder, channel: Channel | null): { start: number; triggered: boolean } {
+function windowStart(rec: ScopeRecorder, data: ChannelData | null): { start: number; triggered: boolean } {
   const latest = rec.end - SCOPE_BUCKETS;
-  if (channel !== null && latest > rec.start) {
+  if (data !== null && latest > rec.start) {
     // Kesim, ardından tam bir ekranlık kayıt kalacak kadar önce olmalı.
     const from = Math.max(rec.start, rec.end - 3 * SCOPE_BUCKETS);
-    const crossings = risingCrossings(rec, channel, from, latest + 1);
+    const crossings = risingCrossings(rec, data, from, latest + 1);
     const trigger = crossings[crossings.length - 1];
     if (trigger !== undefined) return { start: Math.ceil(trigger), triggered: true };
   }
@@ -105,12 +126,12 @@ function windowStart(rec: ScopeRecorder, channel: Channel | null): { start: numb
 
 function channelView(
   rec: ScopeRecorder,
-  channel: Channel,
+  data: ChannelData,
   start: number,
   voltsPerDiv: number,
   position: number,
+  draw: boolean,
 ): ScopeChannelView {
-  const { min, max, last } = rec.channels[channel];
   const end = Math.min(rec.end, start + SCOPE_BUCKETS);
   if (end <= start) return { connected: true, path: '', stats: null };
   const dx = SCREEN_W / SCOPE_BUCKETS;
@@ -126,26 +147,31 @@ function channelView(
   let sumSquares = 0;
   for (let k = start; k < end; k++) {
     const s = rec.slot(k);
-    const x = ((k - start) * dx).toFixed(1);
-    const yMax = toY(max[s]!);
-    const yMin = toY(min[s]!);
-    const command = parts.length === 0 ? 'M' : 'L';
-    if (Math.abs(yMin - yMax) < 0.75) {
-      const y = toY(last[s]!);
-      parts.push(`${command}${x},${y.toFixed(1)}`);
-      previousY = y;
-    } else {
-      // Kovanın içinde sinyal hızla değişmiş: en küçükten en büyüğe dikey çizgi (önceki noktaya yakın uçtan).
-      const nearMax = previousY !== null && Math.abs(previousY - yMax) < Math.abs(previousY - yMin);
-      const first: number = nearMax ? yMax : yMin;
-      const second: number = nearMax ? yMin : yMax;
-      parts.push(`${command}${x},${first.toFixed(1)} L${x},${second.toFixed(1)}`);
-      previousY = second;
+    const max = data.max(s);
+    const min = data.min(s);
+    const last = data.last(s);
+    if (draw) {
+      const x = ((k - start) * dx).toFixed(1);
+      const yMax = toY(max);
+      const yMin = toY(min);
+      const command = parts.length === 0 ? 'M' : 'L';
+      if (Math.abs(yMin - yMax) < 0.75) {
+        const y = toY(last);
+        parts.push(`${command}${x},${y.toFixed(1)}`);
+        previousY = y;
+      } else {
+        // Kovanın içinde sinyal hızla değişmiş: en küçükten en büyüğe dikey çizgi (önceki noktaya yakın uçtan).
+        const nearMax = previousY !== null && Math.abs(previousY - yMax) < Math.abs(previousY - yMin);
+        const first: number = nearMax ? yMax : yMin;
+        const second: number = nearMax ? yMin : yMax;
+        parts.push(`${command}${x},${first.toFixed(1)} L${x},${second.toFixed(1)}`);
+        previousY = second;
+      }
     }
-    hi = Math.max(hi, max[s]!);
-    lo = Math.min(lo, min[s]!);
-    sum += last[s]!;
-    sumSquares += last[s]! * last[s]!;
+    hi = Math.max(hi, max);
+    lo = Math.min(lo, min);
+    sum += last;
+    sumSquares += last * last;
   }
   const n = end - start;
   return {
@@ -157,9 +183,22 @@ function channelView(
       peakToPeak: hi - lo,
       mean: sum / n,
       rms: Math.sqrt(sumSquares / n),
-      frequency: frequencyOf(rec, channel),
+      frequency: frequencyOf(rec, data),
     },
   };
+}
+
+/** X-Y eğrisi: son bir ekran süresindeki (A, B) noktaları. */
+function xyPath(rec: ScopeRecorder, a: ChannelData, b: ChannelData, settings: ScopeSettings): string {
+  const start = Math.max(rec.start, rec.end - SCOPE_BUCKETS);
+  const toX = (v: number) => Math.min(SCREEN_W + 2, Math.max(-2, SCREEN_W / 2 + (v / settings.voltsPerDiv[0] + settings.position[0]) * SCREEN_DIV));
+  const toY = (v: number) => Math.min(SCREEN_H + 2, Math.max(-2, SCREEN_H / 2 - (v / settings.voltsPerDiv[1] + settings.position[1]) * SCREEN_DIV));
+  const parts: string[] = [];
+  for (let k = start; k < rec.end; k++) {
+    const s = rec.slot(k);
+    parts.push(`${parts.length === 0 ? 'M' : 'L'}${toX(a.last(s)).toFixed(1)},${toY(b.last(s)).toFixed(1)}`);
+  }
+  return parts.join(' ');
 }
 
 const EMPTY_CHANNEL: ScopeChannelView = { connected: false, path: '', stats: null };
@@ -170,12 +209,25 @@ export function buildScopeView(
   settings: ScopeSettings,
   connected: readonly [boolean, boolean],
 ): ScopeView {
+  const data = [channelData(rec, 0, false), channelData(rec, 1, settings.invertB)] as const;
+  if (settings.mode === 'xy') {
+    // X-Y: son ekran süresi; ölçümler de o pencereden.
+    const start = Math.max(rec.start, rec.end - SCOPE_BUCKETS);
+    const view = (channel: Channel) =>
+      connected[channel]
+        ? channelView(rec, data[channel], start, settings.voltsPerDiv[channel], settings.position[channel], false)
+        : EMPTY_CHANNEL;
+    const both = connected[0] && connected[1] && rec.end > rec.start;
+    return { channels: [view(0), view(1)], triggered: false, xyPath: both ? xyPath(rec, data[0], data[1], settings) : '' };
+  }
   const preferred: Channel = settings.trigger === 'B' ? 1 : 0;
   const triggerChannel: Channel | null = connected[preferred] ? preferred : connected[1 - preferred] ? ((1 - preferred) as Channel) : null;
-  const { start, triggered } = windowStart(rec, triggerChannel);
+  const { start, triggered } = windowStart(rec, triggerChannel === null ? null : data[triggerChannel]);
   const view = (channel: Channel) =>
-    connected[channel] ? channelView(rec, channel, start, settings.voltsPerDiv[channel], settings.position[channel]) : EMPTY_CHANNEL;
-  return { channels: [view(0), view(1)], triggered };
+    connected[channel]
+      ? channelView(rec, data[channel], start, settings.voltsPerDiv[channel], settings.position[channel], true)
+      : EMPTY_CHANNEL;
+  return { channels: [view(0), view(1)], triggered, xyPath: '' };
 }
 
 /** Değeri karşılayan en küçük adım (1-2-5 dizisi); hiçbiri yetmezse en büyüğü. */
@@ -203,7 +255,9 @@ export function autoSettings(
   const patch: Record<string, number> = { positionA: 0, positionB: 0 };
   const hasData = rec !== null && rec.end > rec.start;
   const triggerChannel: Channel = settings.trigger === 'B' && connected[1] ? 1 : connected[0] ? 0 : 1;
-  const frequency = (hasData ? frequencyOf(rec, triggerChannel) : null) ?? fallback.frequency;
+  const frequency =
+    (hasData ? frequencyOf(rec, channelData(rec, triggerChannel, triggerChannel === 1 && settings.invertB)) : null) ??
+    fallback.frequency;
   if (frequency !== null && frequency > 0) {
     patch.timePerDiv = stepAtLeast(TIME_PER_DIV_STEPS, 2.5 / frequency / SCOPE_DIVISIONS_X);
   }
@@ -211,7 +265,7 @@ export function autoSettings(
     const channel = index as Channel;
     let peak: number | null = fallback.peak;
     if (hasData && connected[channel]) {
-      const { lo, hi } = range(rec, channel, rec.start, rec.end);
+      const { lo, hi } = range(rec, channelData(rec, channel, false), rec.start, rec.end);
       peak = Math.max(Math.abs(lo), Math.abs(hi));
     }
     if (peak !== null && peak > 1e-6) patch[`voltsPerDiv${name}`] = stepAtLeast(VOLTS_PER_DIV_STEPS, peak / 3.5);

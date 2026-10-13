@@ -33,10 +33,13 @@ function withProps(doc: CircuitDoc, label: string, props: Record<string, number 
 
 describe('Örnekler', () => {
   for (const id of EXAMPLE_IDS) {
-    it(`${id}: hatasız açılır, bütün uçlar bağlı, metinleri var`, () => {
+    it(`${id}: hatasız açılır, bütün uçlar bağlı (osiloskobun kullanılmayan kanalı dışında), metinleri var`, () => {
       const doc = load(id);
       const connectivity = buildConnectivity(doc);
-      expect(connectivity.unconnectedPins.size).toBe(0);
+      const scopeChannels = new Set(
+        doc.parts.filter((p) => p.type === 'oscilloscope').flatMap((p) => [`${p.id}#0`, `${p.id}#1`]),
+      );
+      expect([...connectivity.unconnectedPins].filter((pin) => !scopeChannels.has(pin))).toEqual([]);
       expect(connectivity.danglingEnds).toEqual([]);
       expect(new CircuitSimulator(connectivity.netlist).topologyDiagnostics).toEqual([]);
       const texts = tr.examples.texts[id];

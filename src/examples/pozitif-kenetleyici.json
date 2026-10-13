@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "acsource", "label": "AC1", "x": 0, "y": 0, "rotation": 90, "props": {"waveform": "sine", "amplitude": 5, "frequency": 50, "offset": 0, "internalResistance": 0}},
+    {"id": "p2", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}},
+    {"id": "p3", "type": "capacitor", "label": "C1", "x": 8, "y": -8, "rotation": 180, "props": {"capacitance": 1e-05, "initialVoltage": 0}},
+    {"id": "p4", "type": "diode", "label": "D1", "x": 16, "y": 0, "rotation": 270, "props": {}},
+    {"id": "p5", "type": "resistor", "label": "RL", "x": 24, "y": 0, "rotation": 90, "props": {"resistance": 100000.0}},
+    {"id": "p6", "type": "oscilloscope", "label": "OSC1", "x": 38, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.005, "voltsPerDivA": 2, "voltsPerDivB": 2, "positionA": -1, "positionB": -1, "trigger": "A", "mode": "yt", "invertB": false}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, 4], [0, 8]]},
+    {"id": "w2", "points": [[0, -4], [0, -8], [4, -8]]},
+    {"id": "w3", "points": [[12, -8], [16, -8], [16, -4]]},
+    {"id": "w4", "points": [[16, -8], [24, -8], [24, -4]]},
+    {"id": "w5", "points": [[16, 4], [16, 8], [0, 8]]},
+    {"id": "w6", "points": [[24, 4], [24, 8], [16, 8]]},
+    {"id": "w7", "points": [[0, -8], [0, -12], [31, -12], [31, -2], [33, -2]]},
+    {"id": "w8", "points": [[24, -8], [29, -8], [29, 0], [33, 0]]},
+    {"id": "w9", "points": [[24, 8], [30, 8], [30, 2], [33, 2]]}
+  ]
+}

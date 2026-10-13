@@ -295,10 +295,113 @@ function Oscilloscope({ rotation }: { rotation: Rotation }) {
   );
 }
 
+/** Zener diyot: katot çizgisinin uçları kıvrık (Z biçimi). */
+function Zener() {
+  return (
+    <g>
+      <Lead from={-40} to={-9} />
+      <Lead from={9} to={40} />
+      <path d="M-9,-10 L-9,10 L9,0 Z" fill="currentColor" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <path d="M14,-14 L9,-10 L9,10 L4,14" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinejoin="round" />
+    </g>
+  );
+}
+
+/** (tipX, tipY) ucunda, (dx, dy) yönünü gösteren dolu ok başı. */
+function arrowHead(tipX: number, tipY: number, dx: number, dy: number, length = 9, half = 4.2): string {
+  const n = Math.hypot(dx, dy);
+  const ux = dx / n;
+  const uy = dy / n;
+  const bx = tipX - ux * length;
+  const by = tipY - uy * length;
+  return `M${tipX.toFixed(2)},${tipY.toFixed(2)} L${(bx - uy * half).toFixed(2)},${(by + ux * half).toFixed(2)} L${(bx + uy * half).toFixed(2)},${(by - ux * half).toFixed(2)} Z`;
+}
+
+/** Transistör gövdesi: çevresindeki daire. Uçlar (−40, 0), (20, −40), (20, 40). */
+function Envelope() {
+  return <circle cx={6} cy={0} r={25} style={PAPER} stroke="currentColor" strokeWidth={1.4} />;
+}
+
+/** Bipolar transistör: baz çubuğu, kollektör ve emetör eğik çizgileri; ok emetörde (NPN dışa, PNP içe). */
+function Bjt({ pnp }: { pnp: boolean }) {
+  // Emetör çizgisi (−10, 7) → (20, 24)
+  const dx = 30;
+  const dy = 17;
+  const arrow = pnp ? arrowHead(-10 + dx * 0.35, 7 + dy * 0.35, -dx, -dy) : arrowHead(-10 + dx * 0.85, 7 + dy * 0.85, dx, dy);
+  return (
+    <g>
+      <Envelope />
+      <g {...line}>
+        <line x1={-40} y1={0} x2={-10} y2={0} />
+        <line x1={-10} y1={-7} x2={20} y2={-24} />
+        <line x1={20} y1={-24} x2={20} y2={-40} />
+        <line x1={-10} y1={7} x2={20} y2={24} />
+        <line x1={20} y1={24} x2={20} y2={40} />
+      </g>
+      <line x1={-10} y1={-14} x2={-10} y2={14} stroke="currentColor" strokeWidth={3.4} />
+      <path d={arrow} fill="currentColor" stroke="currentColor" strokeWidth={0.8} strokeLinejoin="round" />
+    </g>
+  );
+}
+
+/** JFET: kanal çubuğu; kapı ucundaki ok N kanalda kanala doğru, P kanalda dışa doğru. */
+function Jfet({ p }: { p: boolean }) {
+  const arrow = p ? arrowHead(-26, 0, -1, 0) : arrowHead(-10, 0, 1, 0);
+  return (
+    <g>
+      <Envelope />
+      <g {...line}>
+        <line x1={-40} y1={0} x2={-10} y2={0} />
+        <polyline points="-8,-12 20,-12 20,-40" fill="none" strokeLinejoin="round" />
+        <polyline points="-8,12 20,12 20,40" fill="none" strokeLinejoin="round" />
+      </g>
+      <line x1={-8} y1={-18} x2={-8} y2={18} stroke="currentColor" strokeWidth={3.4} />
+      <path d={arrow} fill="currentColor" stroke="currentColor" strokeWidth={0.8} strokeLinejoin="round" />
+    </g>
+  );
+}
+
+/**
+ * Kanal oluşturmalı MOSFET: yalıtılmış kapı plakası, kesik kanal (kanal ancak V_GS > V_T iken
+ * oluşur); gövde source'a bağlı, gövde okunun yönü N kanalda kanala doğru, P kanalda dışa doğru.
+ */
+function Mosfet({ p }: { p: boolean }) {
+  const arrow = p ? arrowHead(16, 0, 1, 0) : arrowHead(-4, 0, -1, 0);
+  return (
+    <g>
+      <Envelope />
+      <g {...line}>
+        <line x1={-40} y1={0} x2={-15} y2={0} />
+        <line x1={-15} y1={-14} x2={-15} y2={14} />
+        <polyline points="-7,-12 20,-12 20,-40" fill="none" strokeLinejoin="round" />
+        <polyline points="-7,12 20,12 20,40" fill="none" strokeLinejoin="round" />
+        <polyline points="-7,0 20,0 20,12" fill="none" strokeLinejoin="round" />
+      </g>
+      <g stroke="currentColor" strokeWidth={3.4}>
+        <line x1={-7} y1={-17} x2={-7} y2={-7} />
+        <line x1={-7} y1={-4} x2={-7} y2={4} />
+        <line x1={-7} y1={7} x2={-7} y2={17} />
+      </g>
+      <path d={arrow} fill="currentColor" stroke="currentColor" strokeWidth={0.8} strokeLinejoin="round" />
+    </g>
+  );
+}
+
 export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: SymbolProps) {
   switch (type) {
     case 'battery':
       return <Battery rotation={rotation} />;
+    case 'zener':
+      return <Zener />;
+    case 'npn':
+    case 'pnp':
+      return <Bjt pnp={type === 'pnp'} />;
+    case 'njfet':
+    case 'pjfet':
+      return <Jfet p={type === 'pjfet'} />;
+    case 'nmos':
+    case 'pmos':
+      return <Mosfet p={type === 'pmos'} />;
     case 'acsource':
       return <AcSource waveform={strProp(props, 'waveform', WAVEFORMS, 'sine')} rotation={rotation} />;
     case 'oscilloscope':

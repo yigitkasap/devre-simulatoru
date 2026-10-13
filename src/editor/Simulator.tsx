@@ -16,6 +16,7 @@ import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
 import { loadSavedDoc, useAutosave } from './autosave';
 import { Canvas, type CanvasHandle, type Highlight } from './Canvas';
 import { ExampleCard } from './ExampleCard';
+import { ExamplesDialog } from './ExamplesDialog';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { Library } from './Library';
 import { MessagesPanel, messageKey, type MessageItem } from './MessagesPanel';
@@ -49,6 +50,7 @@ export default function Simulator() {
   const [hoveredType, setHoveredType] = useState<DeviceType | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [examplesOpen, setExamplesOpen] = useState(false);
   const [fitRequest, setFitRequest] = useState(0);
   const [activeExample, setActiveExample] = useState<ExampleId | null>(null);
   const [answerRevealed, setAnswerRevealed] = useState(false);
@@ -283,6 +285,7 @@ export default function Simulator() {
         onExport={() => downloadDoc(doc)}
         onImport={() => fileInputRef.current?.click()}
         onShare={() => setShareLink(shareUrl(doc, window.location.href))}
+        onExamples={() => setExamplesOpen(true)}
       />
       <input
         ref={fileInputRef}
@@ -306,8 +309,6 @@ export default function Simulator() {
           onDragTypeChange={setLibraryDragType}
           open={libraryOpen}
           onClose={() => setLibraryOpen(false)}
-          activeExample={activeExample}
-          onLoadExample={loadExample}
           touch={touch}
           onPreview={setHoveredType}
           onAddPart={(type) => {
@@ -332,7 +333,7 @@ export default function Simulator() {
             dispatch={dispatch}
             libraryDragType={libraryDragType}
             onOpenProperties={setPropertiesFor}
-            keyboardEnabled={!editingPart && !shareLink}
+            keyboardEnabled={!editingPart && !shareLink && !examplesOpen}
             flowGraph={flowGraph}
             simActive={sim.status !== 'stopped'}
             frame={sim.frame}
@@ -344,7 +345,7 @@ export default function Simulator() {
             reserveCard={activeExample === null ? 'none' : exampleCollapsed ? 'collapsed' : 'open'}
             reserveScope={!scope ? 'none' : scopeCollapsed ? 'collapsed' : 'open'}
             touch={touch}
-            overlayOpen={libraryOpen || Boolean(editingPart) || Boolean(shareLink)}
+            overlayOpen={libraryOpen || Boolean(editingPart) || Boolean(shareLink) || examplesOpen}
           />
           {(() => {
             const infoType = tool.kind === 'place' ? tool.type : (libraryDragType ?? hoveredType);
@@ -420,6 +421,16 @@ export default function Simulator() {
         />
       )}
       {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
+      {examplesOpen && (
+        <ExamplesDialog
+          activeExample={activeExample}
+          onClose={() => setExamplesOpen(false)}
+          onLoad={(id) => {
+            setExamplesOpen(false);
+            loadExample(id);
+          }}
+        />
+      )}
       <Toast toast={toast} />
     </div>
   );

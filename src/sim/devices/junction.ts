@@ -1,4 +1,5 @@
-// pn eklemi (diyot ve LED'in ortak çekirdeği): Shockley denklemi ve Newton-Raphson doğrusallaştırması.
+// pn eklemi (diyot, LED ve zener diyotun ortak çekirdeği): Shockley denklemi ve Newton-Raphson
+// doğrusallaştırması. Gerilim sınırlaması transistörlerin eklemlerinde de kullanılır.
 //
 //   Id = Is·(exp(Vd/(N·VT)) − 1)
 
@@ -9,8 +10,29 @@ import type { MnaSystem } from '../mna';
 const MAX_EXP_ARG = 80;
 const EXP_AT_MAX = Math.exp(MAX_EXP_ARG);
 
-function safeExp(arg: number): number {
+export function safeExp(arg: number): number {
   return arg <= MAX_EXP_ARG ? Math.exp(arg) : EXP_AT_MAX * (1 + arg - MAX_EXP_ARG);
+}
+
+/** Vcrit = N·VT·ln(N·VT/(√2·Is)): bunun üstünde eklem gerilimi adımı sınırlanır. */
+export function criticalVoltage(nvt: number, saturationCurrent: number): number {
+  return nvt * Math.log(nvt / (Math.SQRT2 * saturationCurrent));
+}
+
+/**
+ * Eklem geriliminin Newton-Raphson adımını sınırlar: Vnew > Vcrit ve |Vnew − Vold| > 2·N·VT ise
+ *   Vold > 0:  Vnew = Vold + N·VT·ln(1 + (Vnew − Vold)/(N·VT))
+ *   Vold ≤ 0:  Vnew = N·VT·ln(Vnew/(N·VT))   (ters kutuplanmadan hızlı çıkış için)
+ */
+export function limitJunction(vnew: number, vold: number, nvt: number, vcrit: number): { v: number; limited: boolean } {
+  if (vnew > vcrit && Math.abs(vnew - vold) > 2 * nvt) {
+    if (vold > 0) {
+      const arg = 1 + (vnew - vold) / nvt;
+      return { v: arg > 0 ? vold + nvt * Math.log(arg) : vcrit, limited: true };
+    }
+    return { v: nvt * Math.log(vnew / nvt), limited: true };
+  }
+  return { v: vnew, limited: false };
 }
 
 export class Junction {
@@ -31,7 +53,7 @@ export class Junction {
   constructor(saturationCurrent: number, emissionCoefficient: number) {
     this.saturationCurrent = saturationCurrent;
     this.nvt = emissionCoefficient * THERMAL_VOLTAGE;
-    this.vcrit = this.nvt * Math.log(this.nvt / (Math.SQRT2 * saturationCurrent));
+    this.vcrit = criticalVoltage(this.nvt, saturationCurrent);
   }
 
   /** Eklem akımı (paralel gmin dahil). */
@@ -62,25 +84,13 @@ export class Junction {
   }
 
   /**
-   * NR çözümünden gelen yeni eklem gerilimini sınırlar ve bir sonraki doğrusallaştırma noktası yapar.
-   * Gerilim adımı sınırlaması: Vnew > Vcrit ve |Vnew − Vold| > 2·N·VT ise
-   *   Vold > 0:  Vnew = Vold + N·VT·ln(1 + (Vnew − Vold)/(N·VT))
-   *   Vold ≤ 0:  Vnew = N·VT·ln(Vnew/(N·VT))   (ters kutuplanmadan hızlı çıkış için)
+   * NR çözümünden gelen yeni eklem gerilimini sınırlar (limitJunction) ve bir sonraki
+   * doğrusallaştırma noktası yapar.
    * @returns gerilim sınırlanmadıysa ve akım doğrusal tahmine yeterince yakınsa true
    */
   update(vnew: number): boolean {
     const vold = this.vd;
-    let v = vnew;
-    let limited = false;
-    if (v > this.vcrit && Math.abs(v - vold) > 2 * this.nvt) {
-      if (vold > 0) {
-        const arg = 1 + (v - vold) / this.nvt;
-        v = arg > 0 ? vold + this.nvt * Math.log(arg) : this.vcrit;
-      } else {
-        v = this.nvt * Math.log(v / this.nvt);
-      }
-      limited = true;
-    }
+    const { v, limited } = limitJunction(vnew, vold, this.nvt, this.vcrit);
     // Akım yakınsaması: doğrusal modelin öngördüğü akım ile gerçek eğri arasındaki fark.
     const predicted = this.linCurrent + this.linConductance * (vnew - vold);
     const actual = this.current(vnew);

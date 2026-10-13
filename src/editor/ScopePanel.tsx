@@ -5,7 +5,13 @@
 import { useId } from 'react';
 import { tr } from '../i18n/tr';
 import type { Part } from '../model/types';
-import { SCOPE_TRIGGERS, TIME_PER_DIV_STEPS, VOLTS_PER_DIV_STEPS, scopeSettings } from '../sim/devices/oscilloscope';
+import {
+  SCOPE_MODES,
+  SCOPE_TRIGGERS,
+  TIME_PER_DIV_STEPS,
+  VOLTS_PER_DIV_STEPS,
+  scopeSettings,
+} from '../sim/devices/oscilloscope';
 import type { PropValue } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { Icon } from './icons';
@@ -50,7 +56,8 @@ export function ScopePanel(props: ScopePanelProps) {
   const { scope, view, connected, collapsed } = props;
   const settings = scopeSettings(scope.props);
   const titleId = useId();
-  const status = view ? (view.triggered ? null : tr.scope.rolling) : null;
+  const xy = settings.mode === 'xy';
+  const status = view && !xy ? (view.triggered ? null : tr.scope.rolling) : null;
 
   return (
     <section
@@ -139,6 +146,31 @@ export function ScopePanel(props: ScopePanelProps) {
             </div>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <label className="flex items-center gap-1.5">
+                <span className="text-muted">{tr.scope.mode}</span>
+                <select
+                  value={settings.mode}
+                  onChange={(e) => props.onChange({ mode: e.target.value })}
+                  className={selectClass}
+                >
+                  {SCOPE_MODES.map((m) => (
+                    <option key={m} value={m}>
+                      {tr.scope.modes[m]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={settings.invertB}
+                  onChange={(e) => props.onChange({ invertB: e.target.checked })}
+                  className="h-3.5 w-3.5 accent-accent"
+                />
+                <span>{tr.scope.invertB}</span>
+              </label>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <label className="flex items-center gap-1.5">
                 <span className="text-muted">{tr.scope.timePerDiv}</span>
                 <select
                   value={settings.timePerDiv}
@@ -152,7 +184,7 @@ export function ScopePanel(props: ScopePanelProps) {
                   ))}
                 </select>
               </label>
-              <label className="flex items-center gap-1.5">
+              <label className={`flex items-center gap-1.5 ${xy ? 'hidden' : ''}`}>
                 <span className="text-muted">{tr.scope.trigger}</span>
                 <select
                   value={settings.trigger}
@@ -218,12 +250,31 @@ function Screen({
       >
         <path d={grid.join(' ')} stroke="#2a3a32" strokeWidth={1} style={stroke} fill="none" />
         <path d={ticks.join(' ')} stroke="#3c5246" strokeWidth={1} style={stroke} fill="none" />
-        {[0, 1].map((index) => {
-          const y = SCREEN_H / 2 - settings.position[index]! * SCREEN_DIV;
-          return (
-            <path key={`zero-${index}`} d={`M0,${y - 7} L9,${y} L0,${y + 7} Z`} fill={SCOPE_COLORS[index]} opacity={0.85} />
-          );
-        })}
+        {settings.mode === 'xy' ? (
+          <>
+            {/* X-Y: A'nın sıfırı üst kenarda, B'ninki sol kenarda işaretlenir. */}
+            <path
+              d={`M${SCREEN_W / 2 + settings.position[0] * SCREEN_DIV - 7},0 L${SCREEN_W / 2 + settings.position[0] * SCREEN_DIV},9 L${SCREEN_W / 2 + settings.position[0] * SCREEN_DIV + 7},0 Z`}
+              fill={SCOPE_COLORS[0]}
+              opacity={0.85}
+            />
+            <path
+              d={`M0,${SCREEN_H / 2 - settings.position[1] * SCREEN_DIV - 7} L9,${SCREEN_H / 2 - settings.position[1] * SCREEN_DIV} L0,${SCREEN_H / 2 - settings.position[1] * SCREEN_DIV + 7} Z`}
+              fill={SCOPE_COLORS[1]}
+              opacity={0.85}
+            />
+            {view?.xyPath && (
+              <path d={view.xyPath} fill="none" stroke="#9be37a" strokeWidth={2} strokeLinejoin="round" style={stroke} />
+            )}
+          </>
+        ) : (
+          [0, 1].map((index) => {
+            const y = SCREEN_H / 2 - settings.position[index]! * SCREEN_DIV;
+            return (
+              <path key={`zero-${index}`} d={`M0,${y - 7} L9,${y} L0,${y + 7} Z`} fill={SCOPE_COLORS[index]} opacity={0.85} />
+            );
+          })
+        )}
         {view?.channels.map((channel, index) =>
           channel.path ? (
             <path
@@ -244,7 +295,7 @@ function Screen({
           const text = !connected[index] ? tr.scope.notConnected : stats ? statsText(stats) : '';
           return text ? (
             <p key={name} style={{ color: SCOPE_COLORS[index] }}>
-              {name} · {text}
+              {index === 1 && settings.invertB ? `${name} (${tr.scope.inverted})` : name} · {text}
             </p>
           ) : null;
         })}

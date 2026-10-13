@@ -58,6 +58,11 @@ const screen = (page, gx, gy) => page.evaluate(([x, y]) => {
 }, [gx, gy]);
 const doc = async (page) => { await page.waitForTimeout(500); return page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre'))); };
 const part = async (page, label) => (await doc(page)).parts.find((p) => p.label === label);
+/** Üst çubuktaki "Örnekler" penceresinden bir örneği dokunarak açar. */
+async function openExample(page, name) {
+  await page.getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
+  await page.getByRole('button', { name, exact: true }).tap(); await page.waitForTimeout(600);
+}
 /** Bir nesneye doğrudan bağlı olay dinleyicileri (CDP). */
 async function listeners(cdp, expression) {
   const { result } = await cdp.send('Runtime.evaluate', { expression });
@@ -104,8 +109,25 @@ try {
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
     check('çekmece açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
     if (w === 390) await shot(page, 'ios-1-cekmece.png');
-    await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).tap(); await page.waitForTimeout(500);
-    check(`çekmecenin sonundaki örneğe ulaşılıp açılıyor (${w}x${h})`, (await doc(page)).parts.length === 5);
+    await page.getByRole('button', { name: 'P kanallı MOSFET', exact: true }).tap(); await page.waitForTimeout(500);
+    check(`çekmecenin sonundaki parçaya ulaşılıp ekleniyor (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'pmos'));
+    await page.context().close();
+  }
+
+  // --- Örnekler penceresi -------------------------------------------------------------
+  for (const [w, h] of [[390, 844], [375, 667]]) {
+    const { page, cdp } = await phone(w, h);
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
+    const list = page.locator('[role=dialog] .overflow-y-auto');
+    const box = await list.boundingBox();
+    await drag(page, cdp, { x: box.x + box.width / 2, y: box.y + box.height - 40 }, { x: box.x + box.width / 2, y: box.y + 40 });
+    await page.waitForTimeout(300);
+    const top = await list.evaluate((el) => el.scrollTop);
+    check(`örnekler penceresi parmakla kaydırılıyor (${w}x${h})`, top > 0, `scrollTop ${top}`);
+    const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
+    check('örnekler penceresi açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
+    await page.getByRole('button', { name: 'MOSFET’in anahtar olarak kullanılması', exact: true }).tap(); await page.waitForTimeout(600);
+    check(`penceredeki son örneğe ulaşılıp açılıyor (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'nmos'));
     await page.context().close();
   }
 
@@ -174,8 +196,7 @@ try {
   await drag(page, cdp, s, { x: s.x + 80, y: s.y });
   const r1f = await part(page, 'R1');
   check('yakınlaştırmadan sonra parça yine tek parmakla taşınıyor', r1f.x !== r1e.x, `(${r1e.x},${r1e.y}) → (${r1f.x},${r1f.y}); dokunuş (${Math.round(s.x)},${Math.round(s.y)})`);
-  await page.getByRole('button', { name: 'Parça kütüphanesi' }).tap(); await page.waitForTimeout(400);
-  await page.getByRole('button', { name: 'Voltmetrenin yükleme etkisi', exact: true }).tap(); await page.waitForTimeout(600);
+  await openExample(page, 'Voltmetrenin yükleme etkisi');
   await page.getByRole('button', { name: 'Örnek açıklamasını küçült' }).tap().catch(() => {});
   await page.getByRole('button', { name: 'Oynat' }).tap(); await page.waitForTimeout(600);
   const v1 = await part(page, 'V1');
@@ -189,8 +210,7 @@ try {
   // --- Osiloskop paneli (telefon) -----------------------------------------------------
   {
     const { page: sp, cdp: scdp } = await phone();
-    await sp.getByRole('button', { name: 'Parça kütüphanesi' }).tap(); await sp.waitForTimeout(400);
-    await sp.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).tap(); await sp.waitForTimeout(600);
+    await openExample(sp, 'Yarım dalga doğrultmaç');
     await sp.getByRole('button', { name: 'Örnek açıklamasını küçült' }).tap().catch(() => {});
     const expand = sp.getByRole('button', { name: 'Osiloskop panelini aç' });
     check('telefonda osiloskop paneli küçültülmüş başlıyor', await expand.isVisible().catch(() => false));

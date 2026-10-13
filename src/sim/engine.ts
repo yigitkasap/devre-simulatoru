@@ -95,7 +95,8 @@ export class CircuitSimulator {
    */
   private intervalTime = 0;
   private xSum: Float64Array;
-  private currentSum: Float64Array;
+  /** Bileşen başına uç akımlarının integrali (bileşen sırasıyla). */
+  private pinSums: Float64Array[] = [];
   private deviceIndex = new Map<string, number>();
   /** Henüz adımlanmamış simülasyon zamanı. */
   private pending = 0;
@@ -114,7 +115,6 @@ export class CircuitSimulator {
     this.xNew = new Float64Array(n);
     this.xIter = new Float64Array(n);
     this.xSum = new Float64Array(n);
-    this.currentSum = new Float64Array(this.circuit.devices.length);
     this.staticSys = new MnaSystem(n);
     this.stepSys = new MnaSystem(n);
     this.iterSys = new MnaSystem(n);
@@ -138,9 +138,7 @@ export class CircuitSimulator {
       : this.options.timeStep;
     if (this.h > this.maxStep) this.h = this.maxStep;
     this.deviceIndex = new Map(this.circuit.devices.map((d, i) => [d.id, i]));
-    if (this.currentSum.length !== this.circuit.devices.length) {
-      this.currentSum = new Float64Array(this.circuit.devices.length);
-    }
+    this.pinSums = this.circuit.devices.map((d) => new Float64Array(d.pinCurrents(this.x).length));
     this.intervalTime = 0;
   }
 
@@ -313,12 +311,22 @@ export class CircuitSimulator {
     return node < 0 ? 0 : this.xSum[node]! / this.intervalTime;
   }
 
-  /** Son advance() çağrısı boyunca bir bileşenin ortalama akımı (yoksa anlık). */
-  averageCurrent(id: string): number | null {
+  /** Bir bileşenin uçlarına giren anlık akımlar. */
+  pinCurrents(id: string): number[] | null {
+    return this.circuit.deviceById.get(id)?.pinCurrents(this.x) ?? null;
+  }
+
+  /** Son advance() çağrısı boyunca uçlara giren ortalama akımlar (adım atılmadıysa anlık). */
+  averagePinCurrents(id: string): number[] | null {
     const index = this.deviceIndex.get(id);
     if (index === undefined) return null;
-    if (this.intervalTime <= 0) return this.circuit.devices[index]!.measure(this.x).current;
-    return this.currentSum[index]! / this.intervalTime;
+    if (this.intervalTime <= 0) return this.circuit.devices[index]!.pinCurrents(this.x);
+    return Array.from(this.pinSums[index]!, (sum) => sum / this.intervalTime);
+  }
+
+  /** Son advance() çağrısı boyunca bir bileşenin (1. ucuna giren) ortalama akımı. */
+  averageCurrent(id: string): number | null {
+    return this.averagePinCurrents(id)?.[0] ?? null;
   }
 
   // ---------------------------------------------------------------------------
@@ -397,7 +405,7 @@ export class CircuitSimulator {
   private beginInterval(): void {
     this.intervalTime = 0;
     this.xSum.fill(0);
-    this.currentSum.fill(0);
+    for (const sums of this.pinSums) sums.fill(0);
   }
 
   /** Kabul edilen çözüm, kayıt tutan bileşenlere (osiloskop) iletilir. */
@@ -411,7 +419,11 @@ export class CircuitSimulator {
     this.intervalTime += h;
     for (let i = 0; i < this.x.length; i++) this.xSum[i]! += this.x[i]! * h;
     const devices = this.circuit.devices;
-    for (let i = 0; i < devices.length; i++) this.currentSum[i]! += devices[i]!.measure(this.x).current * h;
+    for (let i = 0; i < devices.length; i++) {
+      const currents = devices[i]!.pinCurrents(this.x);
+      const sums = this.pinSums[i]!;
+      for (let k = 0; k < sums.length; k++) sums[k]! += (currents[k] ?? 0) * h;
+    }
   }
 
   /**

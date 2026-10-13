@@ -38,7 +38,9 @@ export function ReadoutBox({
       <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5">
         {readout.rows.map((row) => (
           <div key={row.label} className="contents">
-            <dt className="text-muted">{row.label}</dt>
+            <dt className="text-muted">
+              <Rich text={row.label} />
+            </dt>
             <dd className="text-right font-medium tabular">{row.value}</dd>
           </div>
         ))}

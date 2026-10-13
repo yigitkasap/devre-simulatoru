@@ -7,15 +7,18 @@ import type { DeviceType } from '../netlist';
 import { acSourceModel } from './acsource';
 import { ammeterModel } from './ammeter';
 import { batteryModel } from './battery';
+import { npnModel, pnpModel } from './bjt';
 import { capacitorModel } from './capacitor';
 import type { DeviceModel } from './device';
 import { diodeModel } from './diode';
+import { njfetModel, nmosModel, pjfetModel, pmosModel } from './fet';
 import { groundModel } from './ground';
 import { ledModel } from './led';
 import { oscilloscopeModel } from './oscilloscope';
 import { resistorModel } from './resistor';
 import { switchModel } from './switch';
 import { voltmeterModel } from './voltmeter';
+import { zenerModel } from './zener';
 
 export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   battery: batteryModel,
@@ -24,7 +27,14 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   resistor: resistorModel,
   capacitor: capacitorModel,
   diode: diodeModel,
+  zener: zenerModel,
   led: ledModel,
+  npn: npnModel,
+  pnp: pnpModel,
+  njfet: njfetModel,
+  pjfet: pjfetModel,
+  nmos: nmosModel,
+  pmos: pmosModel,
   switch: switchModel,
   voltmeter: voltmeterModel,
   ammeter: ammeterModel,
@@ -44,6 +54,18 @@ export {
 } from './acsource';
 export { AmmeterDevice, AMMETER_DEFAULTS } from './ammeter';
 export { BatteryDevice, BATTERY_DEFAULTS } from './battery';
+export { BjtDevice, BJT_DEFAULTS, BJT_PARAMS, evaluateBjt } from './bjt';
+export {
+  FET_LAMBDA,
+  JFET_DEFAULTS,
+  JfetDevice,
+  MOSFET_DEFAULTS,
+  MosfetDevice,
+  PJFET_DEFAULTS,
+  PMOSFET_DEFAULTS,
+  channelCurrent,
+} from './fet';
+export { ZENER_DEFAULTS, ZENER_TEST_CURRENT, ZenerDevice } from './zener';
 export { CapacitorDevice, CAPACITOR_DEFAULTS } from './capacitor';
 export { DiodeDevice, DIODE_EMISSION, DIODE_SATURATION } from './diode';
 export { GroundDevice } from './ground';
@@ -61,10 +83,12 @@ export {
 export {
   OscilloscopeDevice,
   OSCILLOSCOPE_DEFAULTS,
+  SCOPE_MODES,
   SCOPE_TRIGGERS,
   TIME_PER_DIV_STEPS,
   VOLTS_PER_DIV_STEPS,
   scopeSettings,
+  type ScopeMode,
   type ScopeSettings,
   type ScopeTrigger,
 } from './oscilloscope';
