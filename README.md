@@ -34,6 +34,7 @@ npm run dev        # geliştirme sunucusu: http://localhost:4321/devre-simulator
 npm test           # testler (Vitest): çözücü, birimler, model, örnekler
 npm run build      # tür denetimi (astro check) + statik derleme → dist/
 npm run preview    # derlenmiş siteyi yerelde aç: http://localhost:4321/devre-simulatoru/
+npm run ios-kontrol  # iOS/dokunmatik kontrol listesi (dev sunucusu açıkken; aşağıya bak)
 ```
 
 Adresteki `/devre-simulatoru/`, GitHub Pages için ayarlanan `base` değeridir (aşağıya bak).
@@ -283,6 +284,15 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
     bağlanır (Safari'nin kendi kaydırma/yakınlaştırma hareketi işaretçi akışını kesmesin diye).
   - Birincil işaretçi her basıldığında eski işaretçi kayıtları silinir; kaçırılmış bir `pointerup`
     yüzünden tek parmağın iki parmak sanılıp tuvalin kıstırma kipinde takılması önlenir.
+  - **Kontrol listesi:** Tuvale, çekmeceye, pencerelere ya da olay işleyicilerine dokunan her
+    değişiklikten sonra `npm run dev` açıkken `npm run ios-kontrol` çalıştırılır
+    (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için adresi ver:
+    `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un iPhone
+    öykünmesiyle 28 madde dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma
+    alanı hatasını göremiyordu (bütün davranış maddeleri yine geçiyordu); bu yüzden listenin ilk
+    bölümü bu kuralların yerinde durduğunu doğrudan denetler. `playwright-core` bu projeye kurulu
+    değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir. Dokunmatik davranışı değiştiren
+    işler ayrıca gerçek bir iPhone'da denenmelidir.
   - Giriş alanlarının yazısı dokunmatikte 16 px'tir (iOS daha küçük yazılı alana odaklanınca
     sayfayı yakınlaştırıp öyle bırakır). Arayüzde çift dokunuşla sayfa yakınlaşmaz
     (`touch-action: manipulation`), sayfa esneyip kaymaz (`overscroll-behavior: none`).

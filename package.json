@@ -12,7 +12,8 @@
     "preview": "astro preview",
     "check": "astro check",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "ios-kontrol": "node scripts/ios-kontrol.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.7",
