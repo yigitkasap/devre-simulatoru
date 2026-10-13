@@ -240,16 +240,22 @@ export default function Simulator() {
     let frequency: number | null = null;
     let peak: number | null = null;
     for (const part of doc.parts) {
-      if (part.type === 'acsource') {
+      if (part.type === 'acsource' || part.type === 'funcgen') {
         const f = numProp(part.props, 'frequency', 0);
         if (f > 0) frequency = frequency === null ? f : Math.min(frequency, f);
-        const v = Math.abs(numProp(part.props, 'offset', 0)) + Math.abs(numProp(part.props, 'amplitude', 0));
-        peak = Math.max(peak ?? 0, v);
+        // Fonksiyon üretecinin genliği tepe-tepedir.
+        const amplitude = Math.abs(numProp(part.props, 'amplitude', 0)) / (part.type === 'funcgen' ? 2 : 1);
+        peak = Math.max(peak ?? 0, Math.abs(numProp(part.props, 'offset', 0)) + amplitude);
       } else if (part.type === 'battery') {
         peak = Math.max(peak ?? 0, Math.abs(numProp(part.props, 'voltage', 0)));
       }
     }
-    changeScope(autoSettings(sim.scopeRecorder(scope.id), scopeSettings(scope.props), scopeConnected, { frequency, peak }));
+    const settings = scopeSettings(scope.props);
+    const patch = autoSettings(sim.scopeRecorder(scope.id), settings, scopeConnected, { frequency, peak });
+    changeScope(patch);
+    // Hız: bir ekran taraması ≈ 0,2 s sürsün (yüksek frekansta simülasyon yavaşlatılır, en fazla ×1).
+    const timePerDiv = patch.timePerDiv ?? settings.timePerDiv;
+    sim.setSpeed(Math.min(1, Math.max(1e-6, 50 * timePerDiv)));
   };
 
   const diagnosticContext = useMemo<DiagnosticContext>(() => {
@@ -400,6 +406,7 @@ export default function Simulator() {
         time={sim.frame?.time ?? 0}
         speed={sim.speed}
         notice={sim.notice}
+        lagging={sim.frame?.lagging ?? false}
         electronFlow={settings.electronFlow}
         diagnosticContext={diagnosticContext}
         onPlay={sim.play}

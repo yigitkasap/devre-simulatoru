@@ -5,6 +5,7 @@ import { CATALOG } from '../model/catalog';
 import { rotatedBox } from '../model/geometry';
 import { GRID, type Part } from '../model/types';
 import { tr } from '../i18n/tr';
+import { funcgenSettings } from '../sim/devices/funcgen';
 import { numProp, strProp } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
 import type { ResistorStyle } from './settings';
@@ -35,6 +36,11 @@ export function partValueText(part: Part): string {
     case 'npn':
     case 'pnp':
       return `β = ${formatNumber(numProp(p, 'beta', 200), 0)}`;
+    case 'funcgen': {
+      const s = funcgenSettings(p);
+      const amplitude = formatSI(s.amplitude * (s.attenuate ? 0.1 : 1), 'V', { trim: true, digits: 3 });
+      return `${formatSI(s.frequency, 'Hz', { trim: true, digits: 4 })} · ${amplitude} t-t`;
+    }
     default:
       return '';
   }

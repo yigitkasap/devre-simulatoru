@@ -48,6 +48,8 @@ export interface SimFrame {
   readonly alarms: ReadonlySet<string>;
   /** Osiloskopların ekran görüntüleri. */
   readonly scopes: ReadonlyMap<string, ScopeView>;
+  /** Bu karede istenen simülasyon süresinin hepsi hesaplanamadı (hız, bilgisayara göre fazla). */
+  readonly lagging: boolean;
 }
 
 export type SimNotice =
@@ -129,7 +131,7 @@ export function useSimulation(
    * AC devrede kablo renkleri, akım noktaları ve LED parlaklığı karenin ortalamasından çizilir:
    * anlık değerler kare hızında örneklenince titrer ya da yanıltıcı biçimde yavaş dalgalanırdı.
    */
-  const buildFrame = useCallback((sim: CircuitSimulator, dtReal: number): SimFrame => {
+  const buildFrame = useCallback((sim: CircuitSimulator, dtReal: number, lagging = false): SimFrame => {
     const { doc: d, flowGraph: graph, electronFlow: electrons, connectivity: conn } = latest.current;
     const vmax = Math.max(sim.maxSourceVoltage(), 1e-6);
     const direction = electrons ? -1 : 1;
@@ -200,6 +202,8 @@ export function useSimulation(
         const a = voltageOf(pinKey(part.id, 0));
         const b = voltageOf(pinKey(part.id, 1));
         live.set(part.id, { charge: (averaged && a !== null && b !== null ? a - b : m.voltage) / vmax });
+      } else if (part.type === 'dcsupply') {
+        live.set(part.id, { currentLimited: status.currentLimited ?? [] });
       } else if (part.type === 'oscilloscope') {
         const device = sim.device(part.id);
         if (device instanceof OscilloscopeDevice) {
@@ -222,6 +226,7 @@ export function useSimulation(
       runtime: sim.runtimeDiagnostics,
       alarms,
       scopes,
+      lagging,
     };
   }, []);
 
@@ -306,6 +311,8 @@ export function useSimulation(
     if (status !== 'running') return undefined;
     let raf = 0;
     let last = performance.now();
+    /** Son karelerde adım sınırına takılma oranı (yumuşatılmış; uyarı titremesin). */
+    let lagSamples = 0;
     const tick = (now: number) => {
       const sim = simRef.current;
       if (!sim) return;
@@ -314,13 +321,15 @@ export function useSimulation(
       const simDt = dtReal * speedRef.current;
       const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.timeStep) * 4 + 8);
       const result = sim.advance(simDt, maxSteps);
+      // Adım sınırına takıldıysa istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
+      lagSamples = (lagSamples * 0.9) + (result.steps >= maxSteps ? 0.1 : 0);
       if (!result.ok) {
         setStatus('paused');
         if (result.error) setNotice({ kind: 'error', diagnostic: result.error });
         setFrame(buildFrame(sim, 0));
         return;
       }
-      setFrame(buildFrame(sim, dtReal));
+      setFrame(buildFrame(sim, dtReal, lagSamples > 0.5));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

@@ -11,6 +11,8 @@ export interface SimBarProps {
   readonly time: number;
   readonly speed: number;
   readonly notice: SimNotice;
+  /** Simülasyon istenen hıza yetişemiyor. */
+  readonly lagging: boolean;
   readonly electronFlow: boolean;
   readonly diagnosticContext: DiagnosticContext;
   readonly onPlay: () => void;
@@ -20,8 +22,22 @@ export interface SimBarProps {
   readonly onElectronFlow: (on: boolean) => void;
 }
 
-/** Hız kaydırıcısı logaritmiktir: 0 → ×0,01, 1 → ×0,1, 2 → ×1. */
-const MIN_SPEED_LOG = -2;
+/**
+ * Hız kaydırıcısı logaritmiktir: ×10⁻⁶ … ×1. Yüksek frekanslı sinyaller (fonksiyon üreteci
+ * 2 MHz'e kadar) yalnızca çok yavaşlatılınca izlenebilir.
+ */
+const MIN_SPEED_LOG = -6;
+const SUPERSCRIPT: Record<string, string> = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+
+/** Hızın yazımı: ×1, ×0,5, ×0,01; daha küçüklerde ×2·10⁻⁵ gibi. */
+export function speedLabel(speed: number): string {
+  if (speed >= 0.01) return `×${formatNumber(speed, speed >= 0.1 ? 2 : 3).replace(/0+$/, '').replace(/,$/, '')}`;
+  const exp = Math.floor(Math.log10(speed) + 1e-9);
+  const mantissa = speed / 10 ** exp;
+  const power = String(exp).replace(/./g, (c) => SUPERSCRIPT[c] ?? c);
+  const m = Math.abs(mantissa - 1) < 0.05 ? '' : `${formatNumber(mantissa, 1).replace(/,0$/, '')}·`;
+  return `×${m}10${power}`;
+}
 
 function SimButton({
   icon,
@@ -71,6 +87,8 @@ export function SimBar(props: SimBarProps) {
     message = { text: `${tr.sim.cannotRun} ${detail}`, tone: 'error' };
   } else if (notice?.kind === 'stopped-by-edit') {
     message = { text: tr.sim.stoppedByEdit, tone: 'info' };
+  } else if (active && props.lagging) {
+    message = { text: tr.sim.lagging, tone: 'error' };
   } else if (active) {
     message = { text: props.electronFlow ? tr.sim.electronNote : tr.sim.conventionalNote, tone: 'info' };
   }
@@ -109,12 +127,12 @@ export function SimBar(props: SimBarProps) {
           onChange={(e) => {
             const value = 10 ** (Number(e.target.value) + MIN_SPEED_LOG);
             // 1×, 0,1× ve 0,01× değerlerine yakınken tam değere yapış.
-            const snapped = [1, 0.5, 0.1, 0.05, 0.01].find((s) => Math.abs(Math.log10(value / s)) < 0.03);
+            const snapped = [1, 0.5, 0.1, 0.05, 0.01, 1e-3, 1e-4, 1e-5, 1e-6].find((s) => Math.abs(Math.log10(value / s)) < 0.03);
             props.onSpeed(snapped ?? value);
           }}
           className="w-24 accent-accent sm:w-32"
         />
-        <span className="w-12 tabular">×{formatNumber(props.speed, 2)}</span>
+        <span className="w-16 tabular">{speedLabel(props.speed)}</span>
       </label>
 
       <label className="flex cursor-pointer items-center gap-2">

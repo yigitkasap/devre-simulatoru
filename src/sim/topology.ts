@@ -14,6 +14,8 @@ export interface TopologyInput {
   readonly nodeOfRoot: ReadonlyMap<string, number>;
   readonly devices: readonly Device[];
   readonly hasGround: boolean;
+  /** Şebeke toprağına bağlı cihaz uçları: devrenin toprağı sayılır. */
+  readonly earthedPins: readonly string[];
   readonly nodeUnknowns: number;
 }
 
@@ -33,14 +35,17 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
   }
 
   // --- Toprak ----------------------------------------------------------------------
+  // Topraklı bir laboratuvar cihazı (osiloskop, fonksiyon üreteci) varsa devrenin toprağı odur.
   const grounds = netlist.elements.filter((el) => el.type === 'ground');
-  let groundConnected = false;
+  const earthed = input.earthedPins.length > 0;
+  let groundConnected = earthed;
   if (grounds.length === 0) {
-    if (netlist.elements.length > 0) {
+    if (netlist.elements.length > 0 && !earthed) {
       diagnostics.push({ severity: 'error', code: 'no-ground', elementIds: [], netKeys: [] });
     }
   } else {
-    groundConnected = grounds.some((g) => g.pins.some((pin) => (nonGroundPinCount.get(wiring.findKey(pin)) ?? 0) > 0));
+    groundConnected =
+      earthed || grounds.some((g) => g.pins.some((pin) => (nonGroundPinCount.get(wiring.findKey(pin)) ?? 0) > 0));
     if (!groundConnected) {
       diagnostics.push({
         severity: 'error',
@@ -55,8 +60,10 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
   for (const el of netlist.elements) {
     if (el.type === 'ground' && !groundConnected) continue; // zaten hata olarak bildirildi
     el.pins.forEach((pin, index) => {
-      // Osiloskobun kullanılmayan bir kanalı (A ya da B) normaldir; ortak ucu ise bağlanmalıdır.
+      // Osiloskobun kullanılmayan bir kanalı (A ya da B) ve fonksiyon üretecinin kullanılmayan TTL
+      // çıkışı normaldir; ortak uçlar ise bağlanmalıdır.
       if (el.type === 'oscilloscope' && index < 2) return;
+      if (el.type === 'funcgen' && index === 1) return;
       const root = wiring.findKey(pin);
       if ((pinCount.get(root) ?? 0) <= 1) {
         diagnostics.push({
@@ -172,7 +179,7 @@ function findPath(
 function findAmmetersAcrossBatteries(input: TopologyInput): Diagnostic[] {
   const result: Diagnostic[] = [];
   const ammeters = input.devices.filter((d) => d.type === 'ammeter');
-  const batteries = input.devices.filter((d) => d.type === 'battery' || d.type === 'acsource');
+  const batteries = input.devices.filter((d) => d.type === 'battery' || d.type === 'acsource' || d.type === 'funcgen');
   for (const ammeter of ammeters) {
     const [a0, a1] = ammeter.nodes;
     if (a0 === a1) continue;

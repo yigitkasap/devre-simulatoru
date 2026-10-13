@@ -14,8 +14,11 @@ export const AC_SOURCE_DEFAULTS = {
   internalResistance: 1,
 };
 
-/** En büyük frekans: zaman adımı periyodun 1/100'ü olduğundan daha yükseği simülasyonu çok yavaşlatır. */
-export const AC_MAX_FREQUENCY = 1000;
+/**
+ * En büyük frekans (laboratuvardaki fonksiyon üreteci gibi 2 MHz). Zaman adımı periyodun 1/100'ü
+ * olduğundan yüksek frekanslarda simülasyon hızı düşürülmelidir (osiloskopta "Oto").
+ */
+export const AC_MAX_FREQUENCY = 2e6;
 
 /**
  * Birim genlikli dalga biçiminin t anındaki değeri (−1..1). Üçü de t = 0'da ilk yarım
@@ -23,7 +26,11 @@ export const AC_MAX_FREQUENCY = 1000;
  */
 export function waveValue(waveform: Waveform, frequency: number, t: number): number {
   const cycles = t * frequency;
-  const phase = cycles - Math.floor(cycles);
+  return waveAtPhase(waveform, cycles - Math.floor(cycles));
+}
+
+/** Birim genlikli dalganın periyot içindeki konumuna (0 ≤ faz < 1) göre değeri. */
+export function waveAtPhase(waveform: Waveform, phase: number): number {
   switch (waveform) {
     case 'sine':
       return Math.sin(2 * Math.PI * phase);

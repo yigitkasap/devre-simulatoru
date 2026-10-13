@@ -220,6 +220,22 @@ export function buildScopeView(
     const both = connected[0] && connected[1] && rec.end > rec.start;
     return { channels: [view(0), view(1)], triggered: false, xyPath: both ? xyPath(rec, data[0], data[1], settings) : '' };
   }
+  if (settings.mode === 'add') {
+    // ADD: tek çizgi A + B (B ters çevrilmişse A − B), A'nın volt/bölme ve konumuyla; tetik bu toplamdan.
+    if (!connected[0] && !connected[1]) return { channels: [EMPTY_CHANNEL, EMPTY_CHANNEL], triggered: false, xyPath: '' };
+    const [a, b] = data;
+    const sum: ChannelData = {
+      min: (s) => a.min(s) + b.min(s),
+      max: (s) => a.max(s) + b.max(s),
+      last: (s) => a.last(s) + b.last(s),
+    };
+    const { start, triggered } = windowStart(rec, sum);
+    return {
+      channels: [channelView(rec, sum, start, settings.voltsPerDiv[0], settings.position[0], true), EMPTY_CHANNEL],
+      triggered,
+      xyPath: '',
+    };
+  }
   const preferred: Channel = settings.trigger === 'B' ? 1 : 0;
   const triggerChannel: Channel | null = connected[preferred] ? preferred : connected[1 - preferred] ? ((1 - preferred) as Channel) : null;
   const { start, triggered } = windowStart(rec, triggerChannel === null ? null : data[triggerChannel]);
@@ -236,7 +252,7 @@ function stepAtLeast(steps: readonly number[], value: number): number {
 }
 
 export interface AutoSetFallback {
-  /** Kayıttan frekans bulunamazsa kullanılacak frekans (ör. devredeki AC kaynağın). */
+  /** Devredeki kaynağın frekansı (varsa kayıttaki ölçüme tercih edilir); yoksa null. */
   readonly frequency: number | null;
   /** Kayıt yoksa kullanılacak tepe gerilimi (ör. devredeki en büyük kaynak gerilimi). */
   readonly peak: number | null;
@@ -255,9 +271,11 @@ export function autoSettings(
   const patch: Record<string, number> = { positionA: 0, positionB: 0 };
   const hasData = rec !== null && rec.end > rec.start;
   const triggerChannel: Channel = settings.trigger === 'B' && connected[1] ? 1 : connected[0] ? 0 : 1;
+  // Devrede bir kaynağın frekansı biliniyorsa o esas alınır: frekans yeni değiştirildiyse kayıtta
+  // hâlâ eski sinyal vardır.
   const frequency =
-    (hasData ? frequencyOf(rec, channelData(rec, triggerChannel, triggerChannel === 1 && settings.invertB)) : null) ??
-    fallback.frequency;
+    fallback.frequency ??
+    (hasData ? frequencyOf(rec, channelData(rec, triggerChannel, triggerChannel === 1 && settings.invertB)) : null);
   if (frequency !== null && frequency > 0) {
     patch.timePerDiv = stepAtLeast(TIME_PER_DIV_STEPS, 2.5 / frequency / SCOPE_DIVISIONS_X);
   }

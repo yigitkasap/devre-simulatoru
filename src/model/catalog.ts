@@ -8,6 +8,11 @@ import {
   AMMETER_DEFAULTS,
   BATTERY_DEFAULTS,
   BJT_DEFAULTS,
+  DCSUPPLY_DEFAULTS,
+  DCSUPPLY_MAX_VOLTAGE,
+  FUNCGEN_DEFAULTS,
+  FUNCGEN_LIMITS,
+  SCOPE_INPUTS,
   JFET_DEFAULTS,
   MOSFET_DEFAULTS,
   PJFET_DEFAULTS,
@@ -26,7 +31,7 @@ import type { DeviceType, PropValue } from '../sim/netlist';
 import type { UnitSymbol } from '../sim/units';
 import type { Point } from './types';
 
-export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'switches' | 'meters';
+export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'switches' | 'meters' | 'instruments';
 
 export interface NumberPropDef {
   readonly kind: 'number';
@@ -146,6 +151,58 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     ],
     showLabel: true,
     polarized: true,
+  },
+  funcgen: {
+    type: 'funcgen',
+    category: 'instruments',
+    labelPrefix: 'FG',
+    // Çıkışlar sağ kenarda: OUT, TTL, COM.
+    pins: [
+      { x: 5, y: -2 },
+      { x: 5, y: 0 },
+      { x: 5, y: 2 },
+    ],
+    bounds: { x: -4, y: -3, w: 9, h: 6 },
+    defaultProps: { ...FUNCGEN_DEFAULTS },
+    propDefs: [
+      { kind: 'select', key: 'waveform', options: WAVEFORMS },
+      {
+        kind: 'number',
+        key: 'frequency',
+        unit: 'Hz',
+        min: { value: FUNCGEN_LIMITS.minFrequency, exclusive: false },
+        max: FUNCGEN_LIMITS.maxFrequency,
+      },
+      { kind: 'number', key: 'amplitude', unit: 'V', min: { value: 0, exclusive: false }, max: FUNCGEN_LIMITS.maxAmplitude },
+      { kind: 'number', key: 'offset', unit: 'V', min: { value: -FUNCGEN_LIMITS.maxOffset, exclusive: false }, max: FUNCGEN_LIMITS.maxOffset },
+      { kind: 'number', key: 'duty', unit: '%', min: { value: FUNCGEN_LIMITS.minDuty, exclusive: false }, max: FUNCGEN_LIMITS.maxDuty },
+      { kind: 'boolean', key: 'attenuate' },
+      { kind: 'boolean', key: 'earthed' },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
+  dcsupply: {
+    type: 'dcsupply',
+    category: 'instruments',
+    labelPrefix: 'PS',
+    // Çıkışlar sağ kenarda: 1+, 1−, 2+, 2−.
+    pins: [
+      { x: 5, y: -3 },
+      { x: 5, y: -1 },
+      { x: 5, y: 1 },
+      { x: 5, y: 3 },
+    ],
+    bounds: { x: -4, y: -4, w: 9, h: 8 },
+    defaultProps: { ...DCSUPPLY_DEFAULTS },
+    propDefs: [
+      { kind: 'number', key: 'voltage1', unit: 'V', min: { value: 0, exclusive: false }, max: DCSUPPLY_MAX_VOLTAGE },
+      { kind: 'number', key: 'currentLimit1', unit: 'A', min: { value: 0, exclusive: true }, max: 5 },
+      { kind: 'number', key: 'voltage2', unit: 'V', min: { value: 0, exclusive: false }, max: DCSUPPLY_MAX_VOLTAGE },
+      { kind: 'number', key: 'currentLimit2', unit: 'A', min: { value: 0, exclusive: true }, max: 5 },
+    ],
+    showLabel: true,
+    polarized: false,
   },
   ground: {
     type: 'ground',
@@ -281,7 +338,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
   },
   oscilloscope: {
     type: 'oscilloscope',
-    category: 'meters',
+    category: 'instruments',
     labelPrefix: 'OSC',
     // Girişler sol kenarda: A, B ve ortak uç (COM).
     pins: [
@@ -290,9 +347,13 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
       { x: -5, y: 2 },
     ],
     bounds: { x: -5, y: -3, w: 9, h: 6 },
-    // Ayarlar (bölme başına süre/gerilim, konum, tetik) osiloskop panelinden değiştirilir.
+    // Ön panel ayarları (bölme, kuplaj, konum, tetik, ADD/INV) osiloskop panelinden değiştirilir;
+    // giriş ve toprak bağlantısı özellik penceresinden.
     defaultProps: { ...OSCILLOSCOPE_DEFAULTS },
-    propDefs: [],
+    propDefs: [
+      { kind: 'select', key: 'input', options: SCOPE_INPUTS },
+      { kind: 'boolean', key: 'earthed' },
+    ],
     showLabel: true,
     polarized: false,
   },
@@ -305,7 +366,8 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'switches', types: ['switch'] },
-  { id: 'meters', types: ['voltmeter', 'ammeter', 'oscilloscope'] },
+  { id: 'meters', types: ['voltmeter', 'ammeter'] },
+  { id: 'instruments', types: ['funcgen', 'dcsupply', 'oscilloscope'] },
 ];
 
 export function isDeviceType(value: unknown): value is DeviceType {

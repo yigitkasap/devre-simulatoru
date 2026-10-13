@@ -1,7 +1,8 @@
 // Netlist → çözülebilir devre.
 //
 // 1. Kablolar (links) union-find ile birleştirilir: aynı kümedeki anahtarlar aynı düğümdür.
-// 2. Toprak sembollerinin uçları özel toprak ağına bağlanır.
+// 2. Toprak sembollerinin uçları ve topraklı laboratuvar cihazlarının COM uçları (şebeke toprağı)
+//    özel toprak ağına bağlanır.
 // 3. Toprak dışındaki her düğüme bir bilinmeyen indeksi verilir; ardından bileşenlerin iç
 //    düğümleri ve akım bilinmeyenleri (gerilim kaynağı satırları) eklenir.
 // 4. Her bileşen için Device örneği oluşturulur ve topoloji kontrolleri çalıştırılır.
@@ -30,6 +31,8 @@ export interface CompiledCircuit {
   /** Kök ağ anahtarı → bilinmeyen indeksi (toprak = −1). */
   readonly nodeOfRoot: ReadonlyMap<string, number>;
   readonly hasGround: boolean;
+  /** Şebeke toprağına bağlı cihaz uçlarının anahtarları (osiloskop ve fonksiyon üretecinin COM'u). */
+  readonly earthedPins: readonly string[];
   readonly diagnostics: readonly Diagnostic[];
 }
 
@@ -53,10 +56,16 @@ export function compileNetlist(netlist: Netlist): CompiledCircuit {
   }
 
   const groundElements = netlist.elements.filter((el) => el.type === 'ground');
-  const hasGround = groundElements.length > 0;
+  const earthedPins: string[] = [];
+  for (const el of netlist.elements) {
+    const pin = DEVICE_MODELS[el.type].earthPin?.(el.props);
+    if (pin !== null && pin !== undefined && el.pins[pin] !== undefined) earthedPins.push(el.pins[pin]!);
+  }
+  const hasGround = groundElements.length > 0 || earthedPins.length > 0;
   if (hasGround) {
     nets.add(GROUND_NET);
     for (const g of groundElements) for (const pin of g.pins) nets.union(pin, GROUND_NET);
+    for (const pin of earthedPins) nets.union(pin, GROUND_NET);
   }
   const groundRoot = hasGround ? nets.findKey(GROUND_NET) : null;
 
@@ -93,7 +102,7 @@ export function compileNetlist(netlist: Netlist): CompiledCircuit {
     deviceById.set(el.id, device);
   });
 
-  const partial = { netlist, wiring, nets, nodeOfRoot, devices, hasGround, nodeUnknowns };
+  const partial = { netlist, wiring, nets, nodeOfRoot, devices, hasGround, earthedPins, nodeUnknowns };
   return {
     ...partial,
     size: next,

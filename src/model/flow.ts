@@ -9,6 +9,7 @@
 //     altındaki alt ağacın toplam enjeksiyonuna eşittir. Kablolar kendi aralarında döngü
 //     oluşturuyorsa döngüyü kapatan kenara akım verilmez (dağılım belirsizdir, görünüm için yeterli).
 
+import { DEVICE_MODELS } from '../sim/devices';
 import { CATALOG } from './catalog';
 import { onSegmentInterior, pinPositions, pointKey } from './geometry';
 import type { CircuitDoc, Point } from './types';
@@ -42,6 +43,11 @@ export interface FlowGraph {
   /** Her köşenin ada (bağlı bileşen) numarası. */
   readonly island: Int32Array;
   readonly islandCount: number;
+}
+
+/** Parçanın şebeke toprağına bağlı ucu (osiloskop ve fonksiyon üretecinin COM'u); yoksa null. */
+function earthPin(part: CircuitDoc['parts'][number]): number | null {
+  return DEVICE_MODELS[part.type].earthPin?.(part.props) ?? null;
 }
 
 /** Belgenin geometrisinden akım çizgesini kurar (belge değişmedikçe yeniden kullanılır). */
@@ -88,7 +94,9 @@ export function buildFlowGraph(doc: CircuitDoc): FlowGraph {
   for (const part of doc.parts) {
     pinPositions(part).forEach((pos, pin) => {
       const index = vertexIndex.get(pointKey(pos));
-      if (index !== undefined) pins.push({ partId: part.id, pin, vertex: index, ground: part.type === 'ground' });
+      // Toprak sembolü ve şebeke toprağına bağlı cihaz uçları (COM): akımı bilinmez, adanın dengesini karşılar.
+      const ground = part.type === 'ground' || earthPin(part) === pin;
+      if (index !== undefined) pins.push({ partId: part.id, pin, vertex: index, ground });
     });
   }
 

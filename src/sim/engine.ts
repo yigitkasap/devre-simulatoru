@@ -3,7 +3,7 @@
 // - Kondansatör ve AC kaynak yoksa devre zamandan bağımsızdır: her karede (gerekirse) tek bir DC
 //   çözüm yapılır.
 // - Kondansatör ya da AC kaynak varsa geri Euler ile h adımlarıyla ilerlenir (varsayılan 50 µs;
-//   AC kaynakta en fazla periyodun 1/100'ü).
+//   AC kaynakta en fazla periyodun 1/50'si).
 // - Doğrusal olmayan bileşen (diyot, LED) varsa her adım Newton-Raphson ile çözülür. NR
 //   yakınsamazsa h yarıya indirilir (en az 1 ns); birkaç başarılı adımdan sonra yeniden büyütülür.
 // - Doğrusal devrelerde aynı h için LU ayrıştırması saklanır; adımlar yalnızca ileri/geri
@@ -56,8 +56,13 @@ const DEFAULT_OPTIONS: SimulatorOptions = { timeStep: DEFAULT_TIME_STEP, minTime
 /** Kaynak adımlama yedeğinde kullanılan ölçekler (DC çözüm yakınsamazsa). */
 const SOURCE_STEPS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
 
-/** AC kaynaklı devrede en büyük zaman adımı: en kısa periyodun 1/100'ü. */
-const STEPS_PER_PERIOD = 100;
+/**
+ * AC kaynaklı devrede en büyük zaman adımı: en kısa periyodun 1/50'si. Osiloskopta düzgün bir
+ * dalga ve doğru tepe değerleri için yeterli; 1 kHz'i gerçek zamanda izlemek saniyede 50 000 adım.
+ */
+const STEPS_PER_PERIOD = 50;
+/** Kare ortalamaları için periyot başına alınan örnek (her adımda değil; hesap yükünü azaltır). */
+const AVERAGE_SAMPLES_PER_PERIOD = 25;
 
 export class CircuitSimulator {
   private circuit: CompiledCircuit;
@@ -94,6 +99,11 @@ export class CircuitSimulator {
    * bu ortalamalardan çizilir; anlık değerler kare hızında örneklenince titrerdi.
    */
   private intervalTime = 0;
+  /** Son örnekten bu yana geçen süre ve örnekler arası süre (ortalamalar için). */
+  private sampleClock = 0;
+  private sampleSpacing = 0;
+  /** Doğrusal olmayan bileşenler (her adımda yeniden süzülmesin diye). */
+  private nonlinearDevices: readonly Device[] = [];
   private xSum: Float64Array;
   /** Bileşen başına uç akımlarının integrali (bileşen sırasıyla). */
   private pinSums: Float64Array[] = [];
@@ -136,6 +146,8 @@ export class CircuitSimulator {
     this.maxStep = Number.isFinite(shortest)
       ? Math.min(this.options.timeStep, shortest / STEPS_PER_PERIOD)
       : this.options.timeStep;
+    this.sampleSpacing = Number.isFinite(shortest) ? shortest / AVERAGE_SAMPLES_PER_PERIOD : 0;
+    this.nonlinearDevices = this.circuit.devices.filter((d) => d.nonlinear);
     if (this.h > this.maxStep) this.h = this.maxStep;
     this.deviceIndex = new Map(this.circuit.devices.map((d, i) => [d.id, i]));
     this.pinSums = this.circuit.devices.map((d) => new Float64Array(d.pinCurrents(this.x).length));
@@ -173,6 +185,7 @@ export class CircuitSimulator {
 
   private invalidate(): void {
     this.version++;
+    this.nonlinearDevices = this.circuit.devices.filter((d) => d.nonlinear);
     this.staticKey = '';
     this.luCache = null;
   }
@@ -404,6 +417,7 @@ export class CircuitSimulator {
   /** Yeni bir ilerletme aralığı (animasyon karesi): ortalamalar sıfırlanır. */
   private beginInterval(): void {
     this.intervalTime = 0;
+    this.sampleClock = 0;
     this.xSum.fill(0);
     for (const sums of this.pinSums) sums.fill(0);
   }
@@ -413,16 +427,24 @@ export class CircuitSimulator {
     for (const device of this.circuit.devices) device.observe(this.x, this.time);
   }
 
-  /** AC devrede aralık ortalamaları için integraller (zamandan bağımsız devrede gereksiz). */
+  /**
+   * AC devrede aralık ortalamaları için integraller (zamandan bağımsız devrede gereksiz).
+   * Her adımda değil, periyot başına ≈ 25 örnekle alınır; her örnek, önceki örnekten bu yana
+   * geçen süreyle ağırlıklandırılır.
+   */
   private accumulate(h: number): void {
     if (!this.hasAcSources) return;
-    this.intervalTime += h;
-    for (let i = 0; i < this.x.length; i++) this.xSum[i]! += this.x[i]! * h;
+    this.sampleClock += h;
+    if (this.sampleClock < this.sampleSpacing * (1 - 1e-9)) return;
+    const weight = this.sampleClock;
+    this.sampleClock = 0;
+    this.intervalTime += weight;
+    for (let i = 0; i < this.x.length; i++) this.xSum[i]! += this.x[i]! * weight;
     const devices = this.circuit.devices;
     for (let i = 0; i < devices.length; i++) {
       const currents = devices[i]!.pinCurrents(this.x);
       const sums = this.pinSums[i]!;
-      for (let k = 0; k < sums.length; k++) sums[k]! += (currents[k] ?? 0) * h;
+      for (let k = 0; k < sums.length; k++) sums[k]! += (currents[k] ?? 0) * weight;
     }
   }
 
@@ -491,7 +513,7 @@ export class CircuitSimulator {
     this.stepSys.copyFrom(this.staticSys);
     for (const device of this.circuit.devices) device.stampStep(this.stepSys, ctx);
 
-    const nonlinear = this.circuit.devices.filter((d) => d.nonlinear);
+    const nonlinear = this.nonlinearDevices;
     if (nonlinear.length === 0) {
       if (this.luCache?.key !== key) {
         this.luCache = { key, factor: luFactor(this.staticSys.A, n) };

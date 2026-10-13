@@ -24,6 +24,7 @@ import pozitifKenetleyici from './pozitif-kenetleyici.json';
 import rcDolma from './rc-dolma.json';
 import rcKareDalga from './rc-kare-dalga.json';
 import tamDalgaOrtaUclu from './tam-dalga-orta-uclu.json';
+import toprakTuzagi from './toprak-tuzagi.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
 import zenerKirpici from './zener-kirpici.json';
@@ -34,6 +35,7 @@ export const EXAMPLE_GROUPS = [
     id: 'temel',
     ids: ['led-on-direnc', 'gerilim-bolucu', 'voltmetre-yukleme', 'ampermetre-etkisi', 'rc-dolma', 'rc-kare-dalga', 'diyot-yonu'],
   },
+  { id: 'aletler', ids: ['toprak-tuzagi'] },
   { id: 'diyot-karakteristigi', ids: ['diyot-karakteristigi'] },
   { id: 'dogrultucu', ids: ['yarim-dalga', 'tam-dalga-orta-uclu', 'kopru-filtre'] },
   { id: 'kenetleyici', ids: ['pozitif-kenetleyici', 'gerilim-ikileyici'] },
@@ -74,6 +76,7 @@ const DATA: Record<ExampleId, unknown> = {
   'mosfet-yukseltec': mosfetYukseltec,
   'bjt-anahtar': bjtAnahtar,
   'mosfet-anahtar': mosfetAnahtar,
+  'toprak-tuzagi': toprakTuzagi,
 };
 
 /** Örneğin devresi; JSON bozuksa null (testler bunu yakalar). */

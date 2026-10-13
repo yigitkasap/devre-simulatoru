@@ -9,9 +9,11 @@ import { ammeterModel } from './ammeter';
 import { batteryModel } from './battery';
 import { npnModel, pnpModel } from './bjt';
 import { capacitorModel } from './capacitor';
+import { dcsupplyModel } from './dcsupply';
 import type { DeviceModel } from './device';
 import { diodeModel } from './diode';
 import { njfetModel, nmosModel, pjfetModel, pmosModel } from './fet';
+import { funcgenModel } from './funcgen';
 import { groundModel } from './ground';
 import { ledModel } from './led';
 import { oscilloscopeModel } from './oscilloscope';
@@ -23,6 +25,8 @@ import { zenerModel } from './zener';
 export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   battery: batteryModel,
   acsource: acSourceModel,
+  funcgen: funcgenModel,
+  dcsupply: dcsupplyModel,
   ground: groundModel,
   resistor: resistorModel,
   capacitor: capacitorModel,
@@ -49,9 +53,20 @@ export {
   WAVEFORMS,
   acRms,
   rmsFactor,
+  waveAtPhase,
   waveValue,
   type Waveform,
 } from './acsource';
+export { DCSUPPLY_DEFAULTS, DCSUPPLY_MAX_VOLTAGE, DcSupplyDevice, dcsupplySettings } from './dcsupply';
+export {
+  FUNCGEN_DEFAULTS,
+  FUNCGEN_LIMITS,
+  FUNCGEN_OUTPUT_RESISTANCE,
+  FUNCGEN_TTL_HIGH,
+  FuncgenDevice,
+  funcgenSettings,
+  warpPhase,
+} from './funcgen';
 export { AmmeterDevice, AMMETER_DEFAULTS } from './ammeter';
 export { BatteryDevice, BATTERY_DEFAULTS } from './battery';
 export { BjtDevice, BJT_DEFAULTS, BJT_PARAMS, evaluateBjt } from './bjt';
@@ -83,11 +98,18 @@ export {
 export {
   OscilloscopeDevice,
   OSCILLOSCOPE_DEFAULTS,
+  SCOPE_AC_CUTOFF,
+  SCOPE_COUPLINGS,
+  SCOPE_INPUTS,
+  SCOPE_INPUT_CAPACITANCE,
+  SCOPE_INPUT_RESISTANCE,
   SCOPE_MODES,
   SCOPE_TRIGGERS,
   TIME_PER_DIV_STEPS,
   VOLTS_PER_DIV_STEPS,
   scopeSettings,
+  type ScopeCoupling,
+  type ScopeInput,
   type ScopeMode,
   type ScopeSettings,
   type ScopeTrigger,

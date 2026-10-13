@@ -126,7 +126,11 @@ try {
     check(`örnekler penceresi parmakla kaydırılıyor (${w}x${h})`, top > 0, `scrollTop ${top}`);
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
     check('örnekler penceresi açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
-    await page.getByRole('button', { name: 'MOSFET’in anahtar olarak kullanılması', exact: true }).tap(); await page.waitForTimeout(600);
+    // Parmakla kaydırmanın ardından liste bir süre kaymaya devam eder; durunca dokunulur.
+    await page.waitForTimeout(1000);
+    const last = page.getByRole('button', { name: 'MOSFET’in anahtar olarak kullanılması', exact: true });
+    await last.scrollIntoViewIfNeeded(); await page.waitForTimeout(300);
+    await last.tap(); await page.waitForTimeout(600);
     check(`penceredeki son örneğe ulaşılıp açılıyor (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'nmos'));
     await page.context().close();
   }

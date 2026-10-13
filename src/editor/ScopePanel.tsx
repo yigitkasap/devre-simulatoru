@@ -6,6 +6,7 @@ import { useId } from 'react';
 import { tr } from '../i18n/tr';
 import type { Part } from '../model/types';
 import {
+  SCOPE_COUPLINGS,
   SCOPE_MODES,
   SCOPE_TRIGGERS,
   TIME_PER_DIV_STEPS,
@@ -119,6 +120,18 @@ export function ScopePanel(props: ScopePanelProps) {
                       {VOLTS_PER_DIV_STEPS.map((v) => (
                         <option key={v} value={v}>
                           {voltsLabel(v)}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label={`${tr.scope.channel(name)} ${tr.scope.coupling}`}
+                      value={settings.coupling[index]}
+                      onChange={(e) => props.onChange({ [`coupling${name}`]: e.target.value })}
+                      className={selectClass}
+                    >
+                      {SCOPE_COUPLINGS.map((c) => (
+                        <option key={c} value={c}>
+                          {tr.scope.couplings[c]}
                         </option>
                       ))}
                     </select>
@@ -268,7 +281,7 @@ function Screen({
             )}
           </>
         ) : (
-          [0, 1].map((index) => {
+          (settings.mode === 'add' ? [0] : [0, 1]).map((index) => {
             const y = SCREEN_H / 2 - settings.position[index]! * SCREEN_DIV;
             return (
               <path key={`zero-${index}`} d={`M0,${y - 7} L9,${y} L0,${y + 7} Z`} fill={SCOPE_COLORS[index]} opacity={0.85} />
@@ -292,10 +305,17 @@ function Screen({
       <div className="min-h-8 px-1.5 pt-1 text-[11px] leading-4 tabular">
         {CHANNELS.map((name, index) => {
           const stats = view?.channels[index]?.stats;
-          const text = !connected[index] ? tr.scope.notConnected : stats ? statsText(stats) : '';
+          if (settings.mode === 'add' && index === 1) return null;
+          const unconnected = settings.mode === 'add' ? !connected[0] && !connected[1] : !connected[index];
+          const text = unconnected ? tr.scope.notConnected : stats ? statsText(stats) : '';
           return text ? (
             <p key={name} style={{ color: SCOPE_COLORS[index] }}>
-              {index === 1 && settings.invertB ? `${name} (${tr.scope.inverted})` : name} · {text}
+              {settings.mode === 'add'
+                ? tr.scope.sum(settings.invertB)
+                : index === 1 && settings.invertB
+                  ? `${name} (${tr.scope.inverted})`
+                  : name}{' '}
+              · {text}
             </p>
           ) : null;
         })}

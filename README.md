@@ -13,19 +13,24 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 
 - **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç, kondansatör,
   diyot, zener diyot, LED (kırmızı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
-  N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi), iki kanallı osiloskop.
+  N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi).
+- **Laboratuvar cihazları:** fonksiyon üreteci (GFG-8015G benzeri: 0,2 Hz – 2 MHz, 50 Ω, offset,
+  simetri, −20 dB, TTL çıkışı), iki çıkışlı akım sınırlamalı DC güç kaynağı (CV/CC), iki kanallı
+  osiloskop. Üretecin ve osiloskobun COM ucu laboratuvardaki gibi şebeke toprağına bağlıdır.
 - **Şematik editör:** ızgaralı tuval, sürükle-bırak ya da seç-tıkla yerleştirme, pinden pine kablo,
   T bağlantısı, taşıma (kablolar esner), döndürme, seçim kutusu, geri alma/yineleme, özellik
   penceresi (SI önekli değer girişi), zigzag ya da kutu (IEC) direnç sembolü.
-- **Simülasyon:** Oynat / Duraklat / Durdur, ×0,01 … ×1 hız, çalışırken değer değiştirme ve
-  anahtara tıklama.
+- **Simülasyon:** Oynat / Duraklat / Durdur, ×10⁻⁶ … ×1 hız (MHz'lik sinyaller için), çalışırken
+  değer değiştirme ve anahtara tıklama.
 - **Eğitsel görünüm:** akım noktaları (geleneksel akım ya da elektron akışı), gerilime göre kablo
   rengi, LED parlaklığı ve yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, V/I/P bilgi
   kutusu (Ohm yasası kontrolü), kısa devre uyarısı, mesaj paneli.
-- **Osiloskop:** iki kanal (A, B) ortak uca göre; Y-t ve X-Y kipi (karakteristik eğrileri),
-  B kanalını ters çevirme, volt/bölme, zaman/bölme, kanal konumu, otomatik tetikleme, "Oto" ayar;
-  ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 10 grupta 22 hazır devre (temel devreler,
+- **Osiloskop:** iki kanal (A, B) ortak uca göre; DC/AC/GND kuplaj, A ve B, ADD (A + B; INV ile
+  A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
+  volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
+  ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 11 grupta 23 hazır devre (temel devreler,
+  laboratuvar cihazları: köprüde toprak tuzağı,
   diyot karakteristiği, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET karakteristikleri,
   FET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması); her birinde tahmin
   sorusu, cevap simülasyon çalışınca açılır.
@@ -184,12 +189,14 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 164 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 178 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
 osiloskop kaydı ve ekranı (tetikleme, X-Y, ölçümler, Oto ayar), zener ve transistörlerin el
-hesabıyla bilinen çalışma noktaları (`tests/transistor.test.ts`), bütün hazır örneklerin
+hesabıyla bilinen çalışma noktaları (`tests/transistor.test.ts`), laboratuvar cihazları
+(50 Ω çıkış, offset, simetri, TTL, CV/CC, 1 MΩ giriş, AC kuplaj, toprak tuzağı ve ADD ile doğru
+ölçüm; `tests/instruments.test.ts`), bütün hazır örneklerin
 cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`) ve paylaşım bağlantısı. Dokunmatik/iOS kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır.
 
 ## Kararlar
@@ -319,9 +326,10 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
 - **Yapı değişikliği:** Parça ya da kablo eklemek, silmek, taşımak ya da döndürmek
   simülasyonu durdurur. Değer, ad ve anahtar değişiklikleri simülasyonu durdurmaz;
   kondansatör gerilimleri ve yanmış LED'ler korunarak devre yeniden derlenir.
-- **Hız:** Kaydırıcı logaritmiktir (×0,01 … ×1) ve ×1, ×0,5, ×0,1, ×0,05, ×0,01
-  değerlerine yapışır. Bir karede en fazla 6000 adım atılır; bilgisayar yetişemezse
-  simülasyon gerçek zamandan geri kalır (donmaz).
+- **Hız:** Kaydırıcı logaritmiktir (×10⁻⁶ … ×1) ve ×1, ×0,5, ×0,1, ×0,05, ×0,01, ×10⁻³ …
+  ×10⁻⁶ değerlerine yapışır. Bir karede en fazla 6000 adım atılır; bilgisayar yetişemezse
+  simülasyon gerçek zamandan geri kalır (donmaz) ve alt çubukta "gerçek zamana yetişemiyor"
+  uyarısı çıkar (son karelerin yarısından çoğu adım sınırına takıldıysa).
 - **Kablo akımları:** Çözücü kabloları tek düğümde birleştirdiği için kablo parçası
   başına akım ayrıca bulunur: pinlerin akımları bir kapsayan ağaç üzerinde toplanır, toprak
   sembolleri kendi kablo adasındaki dengesizliği karşılar. Kablolar kendi aralarında döngü
@@ -365,9 +373,13 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
 - **AC kaynak:** e(t) = kayma + tepe · dalga(f · t); sinüs, kare ve üçgen t = 0'da ilk yarım
   periyodun başındadır. İç yapı pil ile aynıdır (iç direnç, iç düğüm). Kaynağın matris katkısı
   sabittir, yalnızca sağ taraf her adımda değişir; doğrusal devrelerde LU yine bir kez yapılır.
-  Frekans en fazla 1 kHz'tir.
+  Frekans en fazla 2 MHz'tir.
 - **Zaman adımı:** AC kaynaklı devre kondansatörsüz de olsa adım adım çözülür; en büyük adım
-  50 µs ile en kısa periyodun 1/100'ünden küçük olanıdır (1 kHz'te 10 µs).
+  50 µs ile en kısa periyodun 1/50'sinden küçük olanıdır (1 kHz'te 20 µs, 1 MHz'te 20 ns).
+  Periyot başına 50 adım düzgün bir dalga ve doğru tepe değerleri için yeterlidir; 1 kHz'i
+  gerçek zamanda izlemek saniyede 50 000 adım ister (dört diyotlu köprüde motor ≈ 180 000
+  adım/s atabiliyor). Kare ortalamaları (renkler, noktalar) her adımda değil, periyot başına
+  ≈ 25 örnekle alınır.
 - **Ölçü aletlerinin kipi (kullanıcı kararı):** Voltmetre ve ampermetrede DC (ortalama) ve AC
   (etkin değer, √(ortalama v²), DC bileşen dahil) kipi vardır. AC kaynaklı devrede gösterge
   devredeki AC kaynakların en uzun periyodu üzerinden hesaplanır ve her periyotta bir
@@ -391,6 +403,37 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   küçültülmüş başlar. Ayarlar parçanın özelliklerinde saklanır (kaydedilir, paylaşılır, geri
   alınabilir; simülasyonu durdurmaz). Devre sığdırılırken panelin ve örnek kartının o anki
   (açık/küçük) yeri boş bırakılır; panel ya da kart açılıp kapanınca devre yeniden sığdırılır.
+
+### Laboratuvar cihazları (föy için 1. aşama)
+
+Fizik 2. sınıf Elektronik Laboratuvarı föyündeki dokuz deney ve laboratuvardaki cihazlar
+(Protek 6502A / Matrix MOS-620CH osiloskop, GW Instek GFG-8015G fonksiyon üreteci, DC güç
+kaynağı) esas alındı.
+
+- **Şebeke toprağı:** Bir cihaz modeli `earthPin` ile bir ucunu (COM) şebeke toprağına
+  bağlayabilir: derleyici bu ucu devrenin toprak düğümüne birleştirir. Topraklı bir cihaz varsa
+  devrede toprak sembolü gerekmez; akım çizgesinde bu uç toprak gibi davranır. Bu sayede
+  laboratuvardaki **toprak tuzağı** gerçekten oluşur: köprü doğrultmaçta prob toprağını yükün
+  eksi ucuna takmak, üretecin COM'u ile birleşip bir diyodu kısa devre eder ve ekranda yarım
+  dalga görülür. Doğru ölçüm iki kanal + B INV + ADD (A − B) ya da topraksız (yalıtılmış)
+  osiloskopla yapılır ("Toprak tuzağı" örneği).
+- **Fonksiyon üreteci:** COM ─ ideal kaynak ─ 50 Ω ─ OUT; TTL çıkışı aynı yapıda 0/5 V.
+  Genlik açık devre tepe-tepe değeridir (ön paneldeki gibi), 50 Ω'luk yükte yarıya iner.
+  Simetri (%10–90) fazı büker: kare dalgada darbe genişliği, üçgende testere dişi, sinüste eğik
+  sinüs. −20 dB zayıflatıcı bütün çıkışı (offset dahil) 10'da 1'e indirir.
+- **DC güç kaynağı:** İki yüzer çıkış; her biri ideal kaynak + akım sınırlayıcıdır:
+  I = I_sınır · tanh(v / 10 mV). Küçük akımda neredeyse kısa devre (CV, 12 mA'de ≈ 1 mV düşüm),
+  yük sınırı aşmaya çalışınca akım sınırda kalır (CC) ve sembolde CC lambası yanar.
+- **Osiloskop girişi:** Gerçek girişte her kanal COM'a 1 MΩ ‖ 25 pF ile bağlıdır (GND
+  kuplajında giriş kesik). AC kuplaj, kaydedilen değere 10 Hz'lik birinci dereceden yüksek
+  geçiren süzgeç olarak uygulanır (kuplaj kondansatörü + 1 MΩ; analog osiloskoplarda tipik alt
+  sınır). **Geriye uyumluluk:** Bu özellikler eklenmeden önce kaydedilmiş devrelerde osiloskop
+  ideal girişli ve topraksız kalır; yeni yerleştirilen osiloskop gerçek girişli ve topraklıdır.
+- **ADD:** Tek çizgi A + B (B ters çevrilmişse A − B), A'nın volt/bölme ve konumuyla; tetik ve
+  ölçümler bu toplamdan.
+- **Oto ve hız:** Oto, devrede bir üreteç ya da AC kaynak varsa frekansı oradan alır (kayıtta
+  frekans değişikliğinden önceki sinyal kalabilir); ayrıca simülasyon hızını bir ekran taraması
+  ≈ 0,2 s sürecek biçimde ayarlar (en fazla ×1): 1 MHz'te 0,5 µs/bölme ve ×2,5·10⁻⁵.
 
 ### Yarı iletken modelleri
 

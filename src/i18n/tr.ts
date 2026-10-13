@@ -24,6 +24,8 @@ export interface DiagnosticContext {
 const DEVICE_NAMES: Record<DeviceType, string> = {
   battery: 'Pil',
   acsource: 'AC kaynak',
+  funcgen: 'Fonksiyon üreteci',
+  dcsupply: 'DC güç kaynağı',
   ground: 'Toprak',
   resistor: 'Direnç',
   capacitor: 'Kondansatör',
@@ -46,6 +48,8 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
 const DEVICE_GENITIVE: Record<DeviceType, string> = {
   battery: 'pilinin',
   acsource: 'AC kaynağının',
+  funcgen: 'fonksiyon üretecinin',
+  dcsupply: 'güç kaynağının',
   ground: 'toprak sembolünün',
   resistor: 'direncinin',
   capacitor: 'kondansatörünün',
@@ -67,6 +71,8 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   battery: ['+ ucu', '− ucu'],
   acsource: ['+ ucu', '− ucu'],
+  funcgen: ['çıkış (OUT) ucu', 'TTL darbe çıkışı', 'ortak ucu (COM)'],
+  dcsupply: ['1. çıkışının + ucu', '1. çıkışının − ucu', '2. çıkışının + ucu', '2. çıkışının − ucu'],
   ground: ['ucu'],
   resistor: ['1. ucu', '2. ucu'],
   capacitor: ['+ ucu', '− ucu'],
@@ -184,6 +190,10 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   battery: 'Uçları arasında sabit bir gerilim tutan doğru akım kaynağı; iç direnci ayarlanabilir.',
   acsource:
     'Yönü zamanla değişen gerilim üreten alternatif akım kaynağı: sinüs, kare ya da üçgen dalga; tepe gerilimi ve frekansı ayarlanır.',
+  funcgen:
+    'Laboratuvardaki fonksiyon üreteci (GFG-8015G benzeri): sinüs, kare, üçgen; 0,2 Hz – 2 MHz, genlik, DC offset, simetri, −20 dB, 50 Ω çıkış, TTL darbe çıkışı. COM ucu şebeke toprağına bağlıdır.',
+  dcsupply:
+    'İki çıkışlı laboratuvar DC güç kaynağı: her çıkışın gerilimi (0–30 V) ve akım sınırı ayarlanır; çıkışlar topraktan yalıtılmıştır, seri bağlanabilir.',
   ground: 'Devrenin 0 V referans noktası; her devrede en az bir tane olmalı.',
   resistor: 'Üzerinden geçen akımla orantılı bir gerilim düşümü oluşturur: V = I · R.',
   capacitor: 'Yük depolar; bir direnç üzerinden zamanla dolar ya da boşalır.',
@@ -199,7 +209,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
-  oscilloscope: 'Gerilimin zamanla nasıl değiştiğini ekranda çizer; iki kanalı (A, B) ortak uca göre ölçer.',
+  oscilloscope:
+    'Gerilimin zamanla nasıl değiştiğini çizer; iki kanal (A, B) ortak uca göre, DC/AC/GND kuplaj, ADD, INV ve X-Y. Girişi 1 MΩ, COM ucu şebeke toprağına bağlıdır.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -207,8 +218,18 @@ function fieldLabel(type: DeviceType, key: string): string {
   if ((type === 'voltmeter' || type === 'ammeter') && key === 'resistance') return 'İç direnç';
   if (type === 'voltmeter' && key === 'ideal') return 'İdeal voltmetre (iç direnç ∞)';
   if (type === 'ammeter' && key === 'ideal') return 'İdeal ampermetre (iç direnç 0 Ω)';
+  if (type === 'funcgen' && key === 'amplitude') return 'Genlik (tepe-tepe, açık devre)';
+  if (type === 'funcgen' && key === 'offset') return 'DC offset (açık devre)';
   const labels: Record<string, string> = {
     mode: 'Ölçüm kipi',
+    duty: 'Simetri (DUTY)',
+    attenuate: '−20 dB zayıflatıcı (çıkış 10’da 1)',
+    earthed: 'COM şebeke toprağına bağlı (gerçek cihazdaki gibi)',
+    input: 'Giriş',
+    voltage1: '1. çıkış gerilimi',
+    currentLimit1: '1. çıkış akım sınırı',
+    voltage2: '2. çıkış gerilimi',
+    currentLimit2: '2. çıkış akım sınırı',
     beta: 'Akım kazancı β (hFE)',
     idss: 'Doyma akımı IDSS (VGS = 0)',
     pinchOff: 'Kısılma gerilimi VP',
@@ -235,6 +256,7 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   color: { red: 'Kırmızı', green: 'Yeşil', blue: 'Mavi' },
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
   mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)' },
+  input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
 };
 
 function optionLabel(key: string, option: string): string {
@@ -426,6 +448,14 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     answer:
       'I_{B} = (5 V − 0,75 V) / 10 kΩ ≈ 0,43 mA; β · I_{B} ≈ 85 mA olurdu, ama kollektör akımı en fazla (9 V − 1,9 V − 0,1 V) / 390 Ω ≈ 18 mA olabilir. β · I_{B} bundan çok büyük olduğu için transistör doyumdadır: V_{CE} ≈ 0,06 V ve LED yanar. Giriş 0 V’ta baz akımı yoktur: transistör kesimde, LED sönük, V_{CE} yüksek. Küçük bir baz akımı büyük bir akımı açıp kapatır.',
   },
+  'toprak-tuzagi': {
+    title: 'Toprak tuzağı: köprüde prob toprağı',
+    description:
+      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe) dört diyotlu bir köprüyü besliyor; yük 100 kΩ. Osiloskobun A ucu yükün + ucunda, prob toprağı (COM) yükün − ucunda. Laboratuvardaki gibi hem üretecin hem osiloskobun COM ucu şebeke toprağına bağlı.',
+    question: 'Osiloskopta tam dalga mı, yarım dalga mı görürsün? Neden? Önce tahmin et, sonra Oynat’a bas.',
+    answer:
+      'Yarım dalga! İki cihazın COM ucu şebeke toprağı üzerinden birbirine bağlıdır. Prob toprağı yükün − ucuna takılınca D4 kısa devre olur; negatif yarıda üretecin çıkışı D3 üzerinden toprağa kısa devre olur ve yükten akım geçmez. Doğru ölçüm: COM’u üretecin COM’una (sağdaki düğüm) taşı, A’yı yükün + ucuna, B’yi − ucuna bağla; panelde B ters (INV) ve A + B (ADD) seç: ekranda A − B, yani yükün gerilimi (tam dalga, tepe ≈ 3,6 V) görünür. Osiloskobun özelliklerinden toprak bağlantısını kaldırmak (yalıtılmış osiloskop) da sorunu çözer.',
+  },
   'mosfet-anahtar': {
     title: 'MOSFET’in anahtar olarak kullanılması',
     description:
@@ -462,6 +492,7 @@ export const tr = {
       passive: 'Pasif',
       semiconductors: 'Yarı iletkenler',
       transistors: 'Transistörler',
+      instruments: 'Laboratuvar cihazları',
       switches: 'Anahtarlar',
       meters: 'Ölçü aletleri',
     },
@@ -512,6 +543,8 @@ export const tr = {
     electronNote: 'Elektronlar, geleneksel akım yönünün tersine hareket eder.',
     conventionalNote: 'Noktalar geleneksel akım yönünü gösterir: dış devrede + uçtan − uca.',
     stoppedByEdit: 'Devrenin yapısı değiştiği için simülasyon durduruldu.',
+    lagging:
+      'Bu hızda simülasyon gerçek zamana yetişemiyor (yüksek frekans). Hızı düşür ya da osiloskopta Oto’ya bas.',
     cannotRun: 'Simülasyon çalışamıyor:',
     status: { running: 'Çalışıyor', paused: 'Duraklatıldı', stopped: 'Durduruldu' },
     legend: 'Kablo gerilimi',
@@ -563,6 +596,20 @@ export const tr = {
       triangle: 'Üçgen dalga: gerilim doğrusal artıp azalır; etkin değer V_{m} / √3.',
     } as Record<string, string>,
     withOffset: (offset: string) => `DC kayma ${offset}: bütün dalga bu kadar yukarı kayar.`,
+    outputVoltage: 'Çıkış gerilimi (OUT − COM)',
+    openCircuit: 'Açık devre genliği',
+    output: (n: number) => `${n}. çıkış`,
+    cc: 'akım sınırında (CC)',
+    cv: 'sabit gerilim (CV)',
+    funcgenNote:
+      'Çıkış direnci 50 Ω: yük akımı arttıkça çıkış gerilimi düşer (50 Ω’luk yükte genlik yarıya iner).',
+    funcgenEarthed: ' COM ucu şebeke toprağına bağlı: devrenin toprağıyla aynı noktadır.',
+    dcsupplyNote:
+      'Yük, akım sınırını aşmaya çalışınca kaynak sabit akıma (CC) geçer ve çıkış gerilimi düşer; kısa devrede akım sınırda kalır.',
+    scopeInput: (real: boolean, earthed: boolean) =>
+      `${real ? 'Giriş 1 MΩ ‖ 25 pF: devreden çok küçük bir akım çeker.' : 'İdeal giriş: devreden akım çekmez.'}${
+        earthed ? ' COM şebeke toprağına bağlı: devrenin toprağıyla aynı noktadır.' : ''
+      }`,
     collectorCurrent: 'Kollektör akımı I_{C}',
     baseCurrent: 'Baz akımı I_{B}',
     vce: 'V_{CE}',
@@ -615,9 +662,12 @@ export const tr = {
     frequency: 'f',
     perDiv: '/b',
     mode: 'Kip',
-    modes: { yt: 'Y-t', xy: 'X-Y (A yatay, B dikey)' } as Record<string, string>,
-    invertB: 'B ters',
+    modes: { yt: 'A ve B (Y-t)', add: 'A + B (ADD)', xy: 'X-Y (A yatay, B dikey)' } as Record<string, string>,
+    invertB: 'B ters (INV)',
     inverted: 'ters',
+    coupling: 'Kuplaj',
+    couplings: { dc: 'DC', ac: 'AC', gnd: 'GND' } as Record<string, string>,
+    sum: (inverted: boolean) => (inverted ? 'A − B' : 'A + B'),
   },
   examples: {
     section: 'Örnekler',
@@ -627,6 +677,7 @@ export const tr = {
     dialogClose: 'Örnekler penceresini kapat',
     groups: {
       temel: 'Temel devreler',
+      aletler: 'Laboratuvar cihazları',
       'diyot-karakteristigi': 'Diyot karakteristiklerinin incelenmesi',
       dogrultucu: 'Doğrultucu devreler',
       kenetleyici: 'Kenetleyici ve gerilim katlayıcı devreler',
@@ -723,7 +774,11 @@ export const tr = {
       ammeter:
         'Gerçek ampermetrelerin de küçük bir iç direnci vardır; seri bağlandığı devrenin akımını biraz azaltır.',
       oscilloscope:
-        'Kanallar ortak uca (COM) göre gerilimi ölçer; girişleri ideal olduğu için devreden akım çekmez. Bölme ayarları tuvalin köşesindeki osiloskop panelindedir.',
+        'Kanallar ortak uca (COM) göre gerilimi ölçer. Gerçek girişte her kanal COM’a 1 MΩ ‖ 25 pF ile bağlıdır (laboratuvardaki osiloskoplar gibi). COM şebeke toprağına bağlıysa devrenin toprağıyla aynı noktadır: köprü doğrultmaçta prob toprağını yük tarafına takmak bir diyodu kısa devre eder. Bölme, kuplaj, ADD ve INV ayarları tuvalin köşesindeki panelde.',
+      funcgen:
+        'GFG-8015G benzeri: 0,2 Hz – 2 MHz, açık devrede en fazla 20 V tepe-tepe, ±10 V offset, %10–90 simetri, −20 dB zayıflatıcı, 50 Ω çıkış direnci. TTL çıkışı aynı frekansta 0/5 V darbe verir. Yüksek frekansta simülasyon hızını düşür (osiloskopta Oto).',
+      dcsupply:
+        'Her çıkış, akım sınırı aşılana kadar ayarlanan gerilimi verir (CV); aşılınca akım sınırda kalır (CC) ve sembolde CC yanar. Çıkışlar topraktan yalıtılmıştır: seri bağlayıp 3 V + 2 V gibi gerilimler elde edebilirsin.',
       zener:
         '1N4733A benzeri. Kırılma bölgesinde uçlarındaki gerilim akımla çok az değişir: 20 mA’de tam V_{Z}, 1 mA’de ≈ %3 daha düşük. İleri yönde sıradan bir diyot gibi ≈ 0,65 V düşer.',
       npn:

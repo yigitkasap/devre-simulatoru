@@ -56,7 +56,7 @@ describe('AC kaynak', () => {
     expect(sim.voltageAt('orta')).toBeCloseTo(-5, 6);
   });
 
-  it('kondansatörsüz devre de adım adım çözülür; adım periyodun 1/100’ünü aşmaz', () => {
+  it('kondansatörsüz devre de adım adım çözülür; adım periyodun 1/50’sini aşmaz', () => {
     const sim = new CircuitSimulator(divider().build());
     expect(sim.isTransient).toBe(true);
     expect(sim.hasAcSources).toBe(true);
@@ -64,7 +64,7 @@ describe('AC kaynak', () => {
     const fast = new CircuitSimulator(
       circuit().acsource('AC1', 'a', 'gnd', { frequency: 1000 }).ground('G1', 'gnd').resistor('R1', 'a', 'gnd', 1000).build(),
     );
-    expect(fast.timeStep).toBeCloseTo(10e-6, 12);
+    expect(fast.timeStep).toBeCloseTo(20e-6, 12);
   });
 
   it('iç direnç: 10 V tepe, R_iç = 1 Ω, yük 9 Ω → yükte 9 V tepe', () => {

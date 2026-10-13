@@ -55,6 +55,10 @@ export interface DeviceStatus {
   readonly breakdown?: boolean;
   /** Transistör: kontrol gerilimi (V_BE ya da V_GS) ve kontrol akımı (I_B ya da I_G). */
   readonly control?: { readonly voltage: number; readonly current: number };
+  /** DC güç kaynağı: hangi çıkışlar akım sınırında (CC). */
+  readonly currentLimited?: readonly boolean[];
+  /** DC güç kaynağı: çıkışların uç gerilimi ve verdiği akım. */
+  readonly outputs?: ReadonlyArray<{ readonly voltage: number; readonly current: number }>;
 }
 
 /** Transistörün çalışma bölgesi: BJT'de kesim/aktif/doyum, FET'te kesim/omik (doğrusal)/doyum. */
@@ -177,5 +181,10 @@ export interface DeviceModel {
   readonly internalNodes: number;
   /** MNA'ya eklediği akım bilinmeyeni sayısı. */
   readonly branchCount: number;
+  /**
+   * Şebeke toprağına bağlı uç (laboratuvar cihazlarının kasası/BNC gövdesi): bu uç, devrenin
+   * toprağıyla aynı düğümdür. Yoksa null.
+   */
+  earthPin?(props: Props): number | null;
   create(init: DeviceInit): Device;
 }

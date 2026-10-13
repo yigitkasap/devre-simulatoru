@@ -8,6 +8,7 @@ import { WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { Rotation } from '../model/types';
 import { boolProp, strProp, type DeviceType, type Props } from '../sim/netlist';
+import { formatSI } from '../sim/units';
 import type { ResistorStyle } from './settings';
 
 /** Simülasyon sırasında sembolün görünümünü değiştiren değerler (Aşama 3-4). */
@@ -18,6 +19,8 @@ export interface LiveVisual {
   readonly overCurrent?: boolean;
   /** Kondansatör: dolma oranı (−1..1). */
   readonly charge?: number;
+  /** DC güç kaynağı: akım sınırındaki (CC) çıkışlar. */
+  readonly currentLimited?: readonly boolean[];
 }
 
 export interface SymbolProps {
@@ -252,7 +255,7 @@ function AcSource({ waveform, rotation }: { waveform: Waveform; rotation: Rotati
 }
 
 /** Osiloskop: küçük ekranlı bir kutu; girişler sol kenarda (A, B ve ortak uç). */
-function Oscilloscope({ rotation }: { rotation: Rotation }) {
+function Oscilloscope({ rotation, earthed }: { rotation: Rotation; earthed: boolean }) {
   const upright = (x: number, y: number) => (rotation ? `rotate(${-rotation} ${x} ${y})` : undefined);
   const pinLabel = (text: string, y: number) => (
     <text
@@ -281,8 +284,8 @@ function Oscilloscope({ rotation }: { rotation: Rotation }) {
       </g>
       {pinLabel('A', -20)}
       {pinLabel('B', 0)}
-      {/* Ortak uç: küçük toprak işareti */}
-      <g stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" transform={upright(-23, 20)}>
+      {/* Ortak uç: küçük toprak işareti (şebeke toprağına bağlıysa yeşil) */}
+      <g stroke={earthed ? '#1f8a4c' : 'currentColor'} strokeWidth={1.4} strokeLinecap="round" transform={upright(-23, 20)}>
         <line x1={-23} y1={15} x2={-23} y2={19} />
         <line x1={-28} y1={19} x2={-18} y2={19} />
         <line x1={-26} y1={22} x2={-20} y2={22} />
@@ -387,10 +390,149 @@ function Mosfet({ p }: { p: boolean }) {
   );
 }
 
+/** Cihaz üzerindeki küçük yazı (parça dönse de dik kalır). */
+function DeviceText({
+  x,
+  y,
+  rotation,
+  children,
+  size = 8.5,
+  anchor = 'middle',
+  color = 'currentColor',
+  weight = 700,
+}: {
+  x: number;
+  y: number;
+  rotation: Rotation;
+  children: string;
+  size?: number;
+  anchor?: 'start' | 'middle' | 'end';
+  color?: string;
+  weight?: number;
+}) {
+  return (
+    <text
+      x={x}
+      y={y + 0.5}
+      textAnchor={anchor}
+      dominantBaseline="central"
+      fontSize={size}
+      fontWeight={weight}
+      fill={color}
+      transform={rotation ? `rotate(${-rotation} ${x} ${y})` : undefined}
+      style={{ fontFamily: 'var(--font-sans)' }}
+    >
+      {children}
+    </text>
+  );
+}
+
+/** Şebeke toprağı işareti (topraklı cihazın COM ucunda yeşil). */
+function EarthGlyph({ x, y, rotation, earthed }: { x: number; y: number; rotation: Rotation; earthed: boolean }) {
+  return (
+    <g
+      stroke={earthed ? '#1f8a4c' : 'currentColor'}
+      strokeWidth={1.4}
+      strokeLinecap="round"
+      transform={rotation ? `rotate(${-rotation} ${x} ${y})` : undefined}
+    >
+      <line x1={x} y1={y - 5} x2={x} y2={y - 1} />
+      <line x1={x - 5} y1={y - 1} x2={x + 5} y2={y - 1} />
+      <line x1={x - 3} y1={y + 2} x2={x + 3} y2={y + 2} />
+      <line x1={x - 1} y1={y + 5} x2={x + 1} y2={y + 5} />
+    </g>
+  );
+}
+
+/** Fonksiyon üreteci: çıkışlar sağ kenarda (OUT, TTL, COM); ön yüzde frekans göstergesi. */
+function FunctionGenerator({ props, rotation }: { props: Props; rotation: Rotation }) {
+  const waveform = strProp(props, 'waveform', WAVEFORMS, 'sine');
+  const earthed = boolProp(props, 'earthed', true);
+  const frequency = formatSI(Math.max(0, Number(props.frequency ?? 1000)), 'Hz', { trim: true, digits: 4 });
+  return (
+    <g>
+      <line x1={30} y1={-20} x2={50} y2={-20} {...line} />
+      <line x1={30} y1={0} x2={50} y2={0} {...line} />
+      <line x1={30} y1={20} x2={50} y2={20} {...line} />
+      <rect x={-40} y={-28} width={70} height={56} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <g transform={rotation ? `rotate(${-rotation} -14 -8)` : undefined}>
+        <rect x={-34} y={-20} width={40} height={24} rx={2} fill="#1e2a25" />
+        <path d={wavePath(waveform, 6.5, 5, -26.5, -8)} fill="none" stroke="#a6f4bd" strokeWidth={1.4} strokeLinecap="round" />
+        <text x={2} y={-8.5} textAnchor="end" dominantBaseline="central" fontSize={6.5} fill="#a6f4bd" style={{ fontFamily: 'var(--font-mono)' }}>
+          {frequency}
+        </text>
+      </g>
+      <DeviceText x={21} y={-20} rotation={rotation} size={7}>
+        OUT
+      </DeviceText>
+      <DeviceText x={21} y={0} rotation={rotation} size={7}>
+        TTL
+      </DeviceText>
+      <EarthGlyph x={21} y={20} rotation={rotation} earthed={earthed} />
+      <circle cx={-26} cy={16} r={4} fill="none" stroke="currentColor" strokeWidth={1.2} />
+      <circle cx={-12} cy={16} r={4} fill="none" stroke="currentColor" strokeWidth={1.2} />
+    </g>
+  );
+}
+
+/** DC güç kaynağı: iki çıkış (+/−) sağ kenarda; her çıkışın ayar gerilimi ve CC lambası. */
+function DcSupply({ props, rotation, live }: { props: Props; rotation: Rotation; live: LiveVisual | undefined }) {
+  const volts = (key: string) => formatSI(Math.max(0, Number(props[key] ?? 0)), 'V', { digits: 3 });
+  const outputs = [
+    { y: -20, text: volts('voltage1'), cc: live?.currentLimited?.[0] ?? false },
+    { y: 20, text: volts('voltage2'), cc: live?.currentLimited?.[1] ?? false },
+  ];
+  return (
+    <g>
+      {[-30, -10, 10, 30].map((y) => (
+        <line key={y} x1={30} y1={y} x2={50} y2={y} {...line} />
+      ))}
+      <rect x={-40} y={-38} width={70} height={76} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <line x1={-40} y1={0} x2={30} y2={0} stroke="currentColor" strokeWidth={1} opacity={0.4} />
+      {outputs.map(({ y, text, cc }) => (
+        <g key={y}>
+          <g transform={rotation ? `rotate(${-rotation} -12 ${y - 6})` : undefined}>
+            <rect x={-34} y={y - 15} width={44} height={17} rx={2} fill="#1e2a25" />
+            <text
+              x={6}
+              y={y - 6}
+              textAnchor="end"
+              dominantBaseline="central"
+              fontSize={8}
+              fill="#a6f4bd"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              {text}
+            </text>
+          </g>
+          <circle cx={-28} cy={y + 9} r={3.2} fill={cc ? '#e5484d' : '#d0d5db'} stroke="currentColor" strokeWidth={0.8} />
+          <DeviceText x={-20} y={y + 9} rotation={rotation} size={6.5} anchor="start" color={cc ? '#e5484d' : 'currentColor'}>
+            CC
+          </DeviceText>
+        </g>
+      ))}
+      {[
+        { y: -30, sign: '+' },
+        { y: -10, sign: '−' },
+        { y: 10, sign: '+' },
+        { y: 30, sign: '−' },
+      ].map(({ y, sign }) => (
+        <DeviceText key={y} x={22} y={y} rotation={rotation} size={10}>
+          {sign}
+        </DeviceText>
+      ))}
+    </g>
+  );
+}
+
 export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: SymbolProps) {
   switch (type) {
     case 'battery':
       return <Battery rotation={rotation} />;
+    case 'funcgen':
+      return <FunctionGenerator props={props} rotation={rotation} />;
+    case 'dcsupply':
+      return <DcSupply props={props} rotation={rotation} live={live} />;
     case 'zener':
       return <Zener />;
     case 'npn':
@@ -405,7 +547,7 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
     case 'acsource':
       return <AcSource waveform={strProp(props, 'waveform', WAVEFORMS, 'sine')} rotation={rotation} />;
     case 'oscilloscope':
-      return <Oscilloscope rotation={rotation} />;
+      return <Oscilloscope rotation={rotation} earthed={props.earthed === true} />;
     case 'ground':
       return <Ground />;
     case 'resistor':

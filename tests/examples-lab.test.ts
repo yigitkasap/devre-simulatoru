@@ -127,6 +127,23 @@ describe('Diyot uygulamaları', () => {
   });
 });
 
+describe('Laboratuvar cihazları', () => {
+  it('Toprak tuzağı: topraklı prob yükün − ucundayken yük yalnızca pozitif yarıda akım alır', () => {
+    const doc = load('toprak-tuzagi');
+    const sim = run(doc, 0.00425);
+    const vl = () => sim.measure(idOf(doc, 'RL'))!.voltage;
+    expect(vl()).toBeGreaterThan(3.2);
+    sim.runUntil(0.00475);
+    expect(Math.abs(vl())).toBeLessThan(0.1);
+    // Topraksız (yalıtılmış) osiloskopla köprü tam dalga verir.
+    const isolated = run(withProps(doc, 'OSC1', { earthed: false }), 0.00425);
+    const vi = () => isolated.measure(idOf(doc, 'RL'))!.voltage;
+    expect(vi()).toBeGreaterThan(3.2);
+    isolated.runUntil(0.00475);
+    expect(vi()).toBeGreaterThan(3.2);
+  });
+});
+
 describe('Transistörler', () => {
   const drainSwing = (doc: CircuitDoc) => {
     const sim = run(doc, 1);

@@ -1,21 +1,36 @@
-import { boolProp, numProp, strProp } from '../netlist';
+import type { MnaSystem } from '../mna';
+import { boolProp, numProp, strProp, type Props } from '../netlist';
 import { ScopeRecorder } from '../scope';
-import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement } from './device';
+import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type StepContext } from './device';
 
 export type ScopeTrigger = 'A' | 'B';
 export const SCOPE_TRIGGERS: readonly ScopeTrigger[] = ['A', 'B'];
-/** Y-t: iki kanal zamana göre; X-Y: A yatay, B dikey eksende (karakteristik eğrileri için). */
-export type ScopeMode = 'yt' | 'xy';
-export const SCOPE_MODES: readonly ScopeMode[] = ['yt', 'xy'];
+/** Y-t: iki kanal zamana göre; ADD: A + B (B ters çevrilirse A − B); X-Y: A yatay, B dikey eksende. */
+export type ScopeMode = 'yt' | 'add' | 'xy';
+export const SCOPE_MODES: readonly ScopeMode[] = ['yt', 'add', 'xy'];
+/** Kanal kuplajı: DC (olduğu gibi), AC (DC bileşen süzülür), GND (giriş kesilir, sıfır çizgisi). */
+export type ScopeCoupling = 'dc' | 'ac' | 'gnd';
+export const SCOPE_COUPLINGS: readonly ScopeCoupling[] = ['dc', 'ac', 'gnd'];
+/** Giriş: gerçek (1 MΩ ‖ 25 pF, devreyi yükler) ya da ideal (akım çekmez). */
+export type ScopeInput = 'real' | 'ideal';
+export const SCOPE_INPUTS: readonly ScopeInput[] = ['real', 'ideal'];
 
 /** Bölme başına süre ve gerilim seçenekleri (1-2-5 dizisi). */
 export const TIME_PER_DIV_STEPS: readonly number[] = [
-  10e-6, 20e-6, 50e-6, 100e-6, 200e-6, 500e-6, 1e-3, 2e-3, 5e-3, 10e-3, 20e-3, 50e-3, 0.1, 0.2, 0.5, 1,
+  0.1e-6, 0.2e-6, 0.5e-6, 1e-6, 2e-6, 5e-6, 10e-6, 20e-6, 50e-6, 100e-6, 200e-6, 500e-6, 1e-3, 2e-3, 5e-3, 10e-3, 20e-3,
+  50e-3, 0.1, 0.2, 0.5, 1,
 ];
 export const VOLTS_PER_DIV_STEPS: readonly number[] = [
   0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50,
 ];
 
+/** Gerçek girişin direnci ve kapasitesi (analog osiloskoplarda tipik 1 MΩ ‖ 25 pF). */
+export const SCOPE_INPUT_RESISTANCE = 1e6;
+export const SCOPE_INPUT_CAPACITANCE = 25e-12;
+/** AC kuplajın alt kesim frekansı (analog osiloskoplarda tipik ≈ 10 Hz). */
+export const SCOPE_AC_CUTOFF = 10;
+
+/** Yeni yerleştirilen osiloskobun ayarları (laboratuvardaki gibi gerçek giriş ve topraklı COM). */
 export const OSCILLOSCOPE_DEFAULTS = {
   timePerDiv: 5e-3,
   voltsPerDivA: 2,
@@ -23,82 +38,177 @@ export const OSCILLOSCOPE_DEFAULTS = {
   /** Kanalın dikey konumu (bölme): 0'da sıfır çizgisi ekranın ortasındadır. */
   positionA: 0,
   positionB: 0,
+  couplingA: 'dc' as ScopeCoupling,
+  couplingB: 'dc' as ScopeCoupling,
   trigger: 'A' as ScopeTrigger,
   mode: 'yt' as ScopeMode,
-  /** B kanalını ters çevir (ör. akım ölçme direnci ters yönde bağlıysa). */
+  /** B kanalını ters çevir (INV): ADD ile birlikte A − B ölçülür. */
   invertB: false,
+  input: 'real' as ScopeInput,
+  /** COM ucu şebeke toprağına bağlı (gerçek osiloskoplarda BNC gövdesi topraklıdır). */
+  earthed: true,
 };
 
 /**
- * Osiloskop. Pinler: [0] = A kanalı, [1] = B kanalı, [2] = ortak uç (COM).
- * Kanallar ortak uca göre gerilimi ölçer: A = v(A) − v(COM), B = v(B) − v(COM).
- * Girişleri idealdir (iç direnç ∞): devreden akım çekmez, matrise hiçbir şey eklemez.
+ * Belgede bu özellikler yoksa (bu özellikler eklenmeden önce kaydedilmiş devreler) eski davranış
+ * korunur: ideal giriş, topraksız COM.
  */
-export class OscilloscopeDevice extends Device {
-  readonly type = 'oscilloscope';
-  readonly timePerDiv: number;
-  recorder: ScopeRecorder;
+const LEGACY = { input: 'ideal' as ScopeInput, earthed: false };
 
-  constructor(init: DeviceInit) {
-    super(init);
-    this.timePerDiv = Math.max(1e-7, numProp(init.props, 'timePerDiv', OSCILLOSCOPE_DEFAULTS.timePerDiv));
-    this.recorder = new ScopeRecorder(this.timePerDiv);
-  }
-
-  /** İki kanalın anlık değerleri. */
-  channels(x: Float64Array): [number, number] {
-    const com = this.v(x, 2);
-    return [this.v(x, 0) - com, this.v(x, 1) - com];
-  }
-
-  override observe(x: Float64Array, time: number): void {
-    const [a, b] = this.channels(x);
-    this.recorder.record(time, a, b);
-  }
-
-  /** Ölçüm: A kanalı (gerilim olarak); B kanalı durumda `reading` olarak verilir. */
-  measure(x: Float64Array): Measurement {
-    return { voltage: this.channels(x)[0], current: 0, power: 0 };
-  }
-
-  override status(x: Float64Array): DeviceStatus {
-    return { reading: this.channels(x)[1] };
-  }
-
-  override pinCurrents(): number[] {
-    return [0, 0, 0];
-  }
-
-  /** Yalnızca bölme başına süre aynı kaldıysa kayıt devralınır (öbür ayarlar yalnızca çizimi değiştirir). */
-  override adoptState(prev: Device): void {
-    if (prev instanceof OscilloscopeDevice && prev.timePerDiv === this.timePerDiv) this.recorder = prev.recorder;
-  }
-}
-
-/** Ayar özelliklerini okur (çizim için). */
-export function scopeSettings(props: Parameters<typeof numProp>[0]) {
+/** Ayar özelliklerini okur. */
+export function scopeSettings(props: Props) {
+  const d = OSCILLOSCOPE_DEFAULTS;
   return {
-    timePerDiv: numProp(props, 'timePerDiv', OSCILLOSCOPE_DEFAULTS.timePerDiv),
-    voltsPerDiv: [
-      numProp(props, 'voltsPerDivA', OSCILLOSCOPE_DEFAULTS.voltsPerDivA),
-      numProp(props, 'voltsPerDivB', OSCILLOSCOPE_DEFAULTS.voltsPerDivB),
+    timePerDiv: numProp(props, 'timePerDiv', d.timePerDiv),
+    voltsPerDiv: [numProp(props, 'voltsPerDivA', d.voltsPerDivA), numProp(props, 'voltsPerDivB', d.voltsPerDivB)] as const,
+    position: [numProp(props, 'positionA', d.positionA), numProp(props, 'positionB', d.positionB)] as const,
+    coupling: [
+      strProp(props, 'couplingA', SCOPE_COUPLINGS, d.couplingA),
+      strProp(props, 'couplingB', SCOPE_COUPLINGS, d.couplingB),
     ] as const,
-    position: [
-      numProp(props, 'positionA', OSCILLOSCOPE_DEFAULTS.positionA),
-      numProp(props, 'positionB', OSCILLOSCOPE_DEFAULTS.positionB),
-    ] as const,
-    trigger: strProp(props, 'trigger', SCOPE_TRIGGERS, OSCILLOSCOPE_DEFAULTS.trigger),
-    mode: strProp(props, 'mode', SCOPE_MODES, OSCILLOSCOPE_DEFAULTS.mode),
-    invertB: boolProp(props, 'invertB', OSCILLOSCOPE_DEFAULTS.invertB),
+    trigger: strProp(props, 'trigger', SCOPE_TRIGGERS, d.trigger),
+    mode: strProp(props, 'mode', SCOPE_MODES, d.mode),
+    invertB: boolProp(props, 'invertB', d.invertB),
+    input: strProp(props, 'input', SCOPE_INPUTS, LEGACY.input),
+    earthed: boolProp(props, 'earthed', LEGACY.earthed),
   };
 }
 
 export type ScopeSettings = ReturnType<typeof scopeSettings>;
+
+/**
+ * Osiloskop. Pinler: [0] = A kanalı, [1] = B kanalı, [2] = ortak uç (COM).
+ * Kanallar ortak uca göre gerilimi ölçer: A = v(A) − v(COM), B = v(B) − v(COM).
+ *
+ * - Gerçek girişte her kanal (GND kuplajı dışında) COM'a 1 MΩ ‖ 25 pF ile bağlıdır: devreyi
+ *   gerçek bir osiloskop gibi yükler. İdeal girişte matrise hiçbir şey eklenmez.
+ * - AC kuplaj, kaydedilen değere 10 Hz'lik birinci dereceden yüksek geçiren süzgeç (giriş
+ *   kondansatörü + 1 MΩ) olarak uygulanır: y(n) = a·(y(n−1) + x(n) − x(n−1)), a = RC / (RC + Δt).
+ * - COM topraklıysa (varsayılan) devrenin toprağıyla aynı düğümdür.
+ */
+export class OscilloscopeDevice extends Device {
+  readonly type = 'oscilloscope';
+  readonly timePerDiv: number;
+  readonly settings: ScopeSettings;
+  recorder: ScopeRecorder;
+  /** Giriş kapasitelerinin gerilimi (geri Euler durumu). */
+  private capVoltage: [number, number] = [0, 0];
+  /** AC kuplaj süzgecinin durumu. */
+  private filter: [{ x: number; y: number } | null, { x: number; y: number } | null] = [null, null];
+  private lastTime: number | null = null;
+  /** Son kaydedilen (kuplajdan geçmiş) kanal değerleri. */
+  private shown: [number, number] = [0, 0];
+
+  constructor(init: DeviceInit) {
+    super(init);
+    this.settings = scopeSettings(init.props);
+    this.timePerDiv = Math.max(1e-8, this.settings.timePerDiv);
+    this.recorder = new ScopeRecorder(this.timePerDiv);
+  }
+
+  /** Gerçek girişle yüklenen kanallar (GND kuplajında giriş kesiktir). */
+  private loaded(channel: 0 | 1): boolean {
+    return this.settings.input === 'real' && this.settings.coupling[channel] !== 'gnd';
+  }
+
+  override get reactive(): boolean {
+    return this.loaded(0) || this.loaded(1);
+  }
+
+  override stampStatic(sys: MnaSystem, ctx: StepContext): void {
+    for (const c of [0, 1] as const) {
+      if (!this.loaded(c)) continue;
+      sys.conductance(this.nodes[c]!, this.nodes[2]!, 1 / SCOPE_INPUT_RESISTANCE);
+      if (ctx.h > 0) sys.conductance(this.nodes[c]!, this.nodes[2]!, SCOPE_INPUT_CAPACITANCE / ctx.h);
+    }
+  }
+
+  override stampStep(sys: MnaSystem, ctx: StepContext): void {
+    if (ctx.h <= 0) return;
+    for (const c of [0, 1] as const) {
+      if (!this.loaded(c)) continue;
+      sys.currentSource(this.nodes[2]!, this.nodes[c]!, (SCOPE_INPUT_CAPACITANCE / ctx.h) * this.capVoltage[c]);
+    }
+  }
+
+  override accept(x: Float64Array): void {
+    const [a, b] = this.raw(x);
+    this.capVoltage = [a, b];
+  }
+
+  /** İki kanalın uçlarındaki ham gerilimler. */
+  raw(x: Float64Array): [number, number] {
+    const com = this.v(x, 2);
+    return [this.v(x, 0) - com, this.v(x, 1) - com];
+  }
+
+  /** Kuplajdan geçmiş (ekranda görünen, ters çevirmesiz) kanal değerleri. */
+  channels(): [number, number] {
+    return this.shown;
+  }
+
+  override observe(x: Float64Array, time: number): void {
+    const raw = this.raw(x);
+    const dt = this.lastTime === null ? 0 : Math.max(0, time - this.lastTime);
+    this.lastTime = time;
+    const rc = 1 / (2 * Math.PI * SCOPE_AC_CUTOFF);
+    for (const c of [0, 1] as const) {
+      const coupling = this.settings.coupling[c];
+      if (coupling === 'gnd') {
+        this.shown[c] = 0;
+        this.filter[c] = null;
+      } else if (coupling === 'dc') {
+        this.shown[c] = raw[c];
+        this.filter[c] = null;
+      } else {
+        // Kuplaj kondansatörü başlangıçta boştur: ilk değer olduğu gibi görünür, sonra DC bileşen söner.
+        const prev = this.filter[c];
+        const y = prev === null ? raw[c] : (rc / (rc + dt)) * (prev.y + raw[c] - prev.x);
+        this.filter[c] = { x: raw[c], y };
+        this.shown[c] = y;
+      }
+    }
+    this.recorder.record(time, this.shown[0], this.shown[1]);
+  }
+
+  /** Ölçüm: A kanalı (gerilim olarak) ve girişlerin çektiği akım; B kanalı durumda `reading`. */
+  measure(x: Float64Array): Measurement {
+    return { voltage: this.shown[0], current: this.pinCurrents(x)[0]!, power: 0 };
+  }
+
+  override status(): DeviceStatus {
+    return { reading: this.shown[1] };
+  }
+
+  /** Girişlerin çektiği akım (gerçek girişte 1 MΩ üzerinden; kapasitif akım ihmal edilir). */
+  override pinCurrents(x: Float64Array): number[] {
+    const [a, b] = this.raw(x);
+    const ia = this.loaded(0) ? a / SCOPE_INPUT_RESISTANCE : 0;
+    const ib = this.loaded(1) ? b / SCOPE_INPUT_RESISTANCE : 0;
+    return [ia, ib, -(ia + ib)];
+  }
+
+  /**
+   * Bölme başına süre aynı kaldıysa kayıt devralınır (öbür ayarlar yalnızca çizimi değiştirir);
+   * giriş kapasiteleri ve AC süzgeci her durumda sürer.
+   */
+  override adoptState(prev: Device): void {
+    if (!(prev instanceof OscilloscopeDevice)) return;
+    if (prev.timePerDiv === this.timePerDiv) this.recorder = prev.recorder;
+    this.capVoltage = prev.capVoltage;
+    this.lastTime = prev.lastTime;
+    this.shown = prev.shown;
+    for (const c of [0, 1] as const) {
+      if (prev.settings.coupling[c] === this.settings.coupling[c]) this.filter[c] = prev.filter[c];
+    }
+  }
+}
 
 export const oscilloscopeModel: DeviceModel = {
   type: 'oscilloscope',
   pinCount: 3,
   internalNodes: 0,
   branchCount: 0,
+  earthPin: (props) => (scopeSettings(props).earthed ? 2 : null),
   create: (init) => new OscilloscopeDevice(init),
 };

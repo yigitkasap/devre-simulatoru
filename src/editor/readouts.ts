@@ -4,7 +4,16 @@
 import { tr } from '../i18n/tr';
 import type { Part } from '../model/types';
 import { METER_MODES } from '../sim/averager';
-import { acRms, AC_SOURCE_DEFAULTS, WAVEFORMS, type DeviceStatus, type Measurement } from '../sim/devices';
+import {
+  acRms,
+  AC_SOURCE_DEFAULTS,
+  dcsupplySettings,
+  funcgenSettings,
+  scopeSettings,
+  WAVEFORMS,
+  type DeviceStatus,
+  type Measurement,
+} from '../sim/devices';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import { SWITCH_ON_RESISTANCE } from '../sim/constants';
 import { boolProp, numProp, strProp, type Props } from '../sim/netlist';
@@ -98,15 +107,47 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: offset === 0 ? formula : `${formula} ${t.withOffset(v(offset))}`,
       };
     }
-    case 'oscilloscope':
+    case 'oscilloscope': {
+      const s = scopeSettings(p);
       return {
         title,
         rows: [
           { label: t.channel('A'), value: v(m.voltage) },
           { label: t.channel('B'), value: v(status.reading ?? 0) },
         ],
-        note: t.scopeNote,
+        note: `${t.scopeInput(s.input === 'real', s.earthed)} ${t.scopeNote}`,
       };
+    }
+    case 'funcgen': {
+      const s = funcgenSettings(p);
+      const gain = s.attenuate ? 0.1 : 1;
+      return {
+        title,
+        rows: [
+          { label: t.outputVoltage, value: v(m.voltage) },
+          { label: t.outputCurrent, value: a(-m.current) },
+          { label: t.openCircuit, value: `${formatSI(s.amplitude * gain, 'V', { trim: true, digits: 4 })} tepe-tepe` },
+          { label: t.frequency, value: formatSI(s.frequency, 'Hz', { trim: true, digits: 4 }) },
+          { label: t.period, value: formatSI(1 / s.frequency, 's', { trim: true, digits: 4 }) },
+        ],
+        note: `${t.funcgenNote}${s.earthed ? t.funcgenEarthed : ''}`,
+      };
+    }
+    case 'dcsupply': {
+      const s = dcsupplySettings(p);
+      const outputs = status.outputs ?? [];
+      const rows: ReadoutRow[] = outputs.map((o, k) => ({
+        label: t.output(k + 1),
+        value: `${v(o.voltage)} · ${a(o.current)} · ${status.currentLimited?.[k] ? t.cc : t.cv}`,
+      }));
+      rows.push(
+        ...s.currentLimit.map((limit, k) => ({
+          label: `${t.output(k + 1)} · sınır`,
+          value: `${formatSI(s.voltage[k]!, 'V', { trim: true })} / ${formatSI(limit, 'A', { trim: true })}`,
+        })),
+      );
+      return { title, rows, note: t.dcsupplyNote };
+    }
     case 'capacitor': {
       const C = numProp(p, 'capacitance', 100e-6);
       return {

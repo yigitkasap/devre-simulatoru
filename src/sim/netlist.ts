@@ -8,6 +8,8 @@
 export type DeviceType =
   | 'battery'
   | 'acsource'
+  | 'funcgen'
+  | 'dcsupply'
   | 'ground'
   | 'resistor'
   | 'capacitor'
