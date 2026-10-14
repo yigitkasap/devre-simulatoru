@@ -93,6 +93,13 @@
   --color-danger-soft: #fdecea;
   --color-paused: #e8a317;
   --color-stopped: #9aa3ad;
+  /* Çizimlerdeki şerit ve basılı düğme tonları (M01–M07, C-SimCubugu) */
+  --color-ink-2: #3d4957;
+  --color-ok-ink: #14613a;
+  --color-ok-line: #b9dfc8;
+  --color-accent-line: #c7dafb;
+  --color-danger-ink: #a3241a;
+  --color-danger-line: #f5c2bd;
 
   /* Şema */
   --color-paper: #fbfbf9;
@@ -150,6 +157,10 @@
   --text-readout: 28px;
   --text-readout--line-height: 32px;
   --ease-sheet: cubic-bezier(0.2, 0.9, 0.3, 1);
+
+  /* Düzen: < 900 px telefon, ≥ 900 px masaüstü (desk:), ≥ 1280 px geniş masaüstü (wide:) */
+  --breakpoint-desk: 900px;
+  --breakpoint-wide: 1280px;
 }
 
 /* Koyu tema (isteğe bağlı; henüz bir ayarla açılmıyor) */

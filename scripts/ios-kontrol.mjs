@@ -238,19 +238,41 @@ try {
     await sp.context().close();
   }
 
-  // --- Masaüstü: bilgi kartı tuvalin sağ altında --------------------------------------
+  // --- Masaüstü kabuğu: kütüphane bilgi alanı, ipucu şeridi, hız penceresi ---------------
   const desk = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
   const dp = await desk.newPage();
+  dp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await dp.goto(URL0, { waitUntil: 'networkidle' });
-  const before = await dp.locator('aside[aria-live="polite"]').count();
   await dp.getByRole('button', { name: 'Kondansatör', exact: true }).hover(); await dp.waitForTimeout(200);
-  const card = dp.locator('aside[aria-live="polite"]');
-  const box = await card.boundingBox();
+  const info = dp.locator('aside[aria-label="Parçalar"] [aria-live="polite"]');
+  const infoText = (await info.textContent().catch(() => '')) ?? '';
+  const infoBox = await info.boundingBox();
   const canvas = await dp.locator('svg.schematic').boundingBox();
-  check('masaüstü: bilgi kartı fareyle gelince tuvalin sağ altında', before === 0 && box !== null && box.x > canvas.x + canvas.width / 2 && box.y > canvas.y + canvas.height / 2, box ? `(${Math.round(box.x)},${Math.round(box.y)})` : 'yok');
-  await dp.mouse.move(800, 400); await dp.waitForTimeout(200);
-  check('masaüstü: fare ayrılınca kart kayboluyor', (await card.count()) === 0);
+  check('masaüstü: fareyle gelinen parça kütüphanenin bilgi alanında anlatılıyor', infoText.includes('Kondansatör') && infoText.includes('Yük depolar') && infoBox !== null && infoBox.x + infoBox.width <= canvas.x + 1, infoText.slice(0, 40));
+  const strip = await dp.locator('main + div').first().boundingBox();
+  check('masaüstü: ipucu şeridi tuvalin altında, üstüne binmiyor', strip !== null && strip.y >= canvas.y + canvas.height - 1 && strip.height <= 30, strip ? `y ${Math.round(strip.y)} · tuval altı ${Math.round(canvas.y + canvas.height)}` : 'yok');
+  await dp.getByRole('button', { name: /^Hız/ }).click(); await dp.waitForTimeout(200);
+  await dp.getByRole('radio', { name: /Ağır çekim/ }).click(); await dp.waitForTimeout(200);
+  const speedText = (await dp.getByRole('button', { name: /^Hız/ }).textContent()) ?? '';
+  check('masaüstü: hız penceresinde "Ağır çekim" ×10⁻⁶ yapıyor', speedText.includes('10⁻⁶') && speedText.includes('1 µs'), speedText);
+  await dp.keyboard.press('Escape'); await dp.waitForTimeout(100);
+  check('masaüstü: hız penceresi Esc ile kapanıyor', (await dp.getByRole('dialog', { name: 'Simülasyon hızı' }).count()) === 0);
   await desk.close();
+
+  // --- Sıkışık masaüstü (1100 px): kütüphane şerit, açılır kart --------------------------
+  const compact = await browser.newContext({ viewport: { width: 1100, height: 760 }, locale: 'tr-TR' });
+  const cp = await compact.newPage();
+  cp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  await cp.goto(URL0, { waitUntil: 'networkidle' });
+  const railVisible = await cp.getByRole('button', { name: 'Parça kütüphanesini aç' }).isVisible();
+  const listHidden = (await cp.getByRole('button', { name: 'Kondansatör', exact: true }).count()) === 0;
+  check('1100 px: kütüphane 56 px şerit olarak başlıyor', railVisible && listHidden);
+  await cp.getByRole('button', { name: 'Parça kütüphanesini aç' }).click(); await cp.waitForTimeout(200);
+  await cp.getByRole('button', { name: 'Kondansatör', exact: true }).click(); await cp.waitForTimeout(200);
+  const flyoutClosed = (await cp.getByRole('button', { name: 'Kondansatör', exact: true }).count()) === 0;
+  const placeHint = (await cp.locator('main + div').first().textContent().catch(() => '')) ?? '';
+  check('1100 px: açılır karttan parça seçilince kart kapanıyor, yerleştirme başlıyor', flyoutClosed && placeHint.includes('Kondansatör:'), placeHint.slice(0, 40));
+  await compact.close();
 } finally {
   await browser.close();
 }

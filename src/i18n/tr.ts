@@ -498,6 +498,11 @@ export const tr = {
     },
     hint: 'Sürükleyip tuvale bırak ya da seçip tuvale tıkla.',
     close: 'Kütüphaneyi kapat',
+    collapse: 'Kütüphaneyi daralt',
+    open: 'Parça kütüphanesini aç',
+    recent: 'Son',
+    recentLabel: 'Son kullanılan parçalar',
+    add: (name: string) => `${name} ekle`,
   },
   toolbar: {
     library: 'Parça kütüphanesi',
@@ -507,6 +512,8 @@ export const tr = {
     wireTitle: 'Kablo çek (W)',
     rotate: 'Döndür',
     rotateTitle: 'Döndür (R)',
+    flip: 'Ters çevir',
+    flipTitle: 'Ters çevir (F)',
     remove: 'Sil',
     removeTitle: 'Seçileni sil (Delete)',
     undo: 'Geri al',
@@ -517,6 +524,13 @@ export const tr = {
     zoomOut: 'Uzaklaştır',
     fit: 'Devreyi ekrana sığdır',
     settings: 'Ayarlar',
+    tools: 'Araç',
+    view: 'Görünüm',
+    zoom: 'Yakınlık',
+    saved: 'Tarayıcıda kaydedildi',
+    saveFailed: 'Kaydedilemedi',
+    saveFailedTitle:
+      'Bu tarayıcı devreyi saklamıyor (gizli pencere ya da kapalı site verisi). Devreyi korumak için Dosya → JSON olarak dışa aktar.',
   },
   settings: {
     title: 'Ayarlar',
@@ -530,6 +544,7 @@ export const tr = {
   canvas: {
     label: 'Devre şeması',
     empty: 'Başlamak için soldaki kütüphaneden bir parça sürükle.',
+    emptyAction: 'Örneklerden başla',
     emptyMobile: 'Parça eklemek için sol üstteki kütüphane düğmesine dokun.',
     wiringActive: 'Kablo çiziliyor: bir pine ya da kabloya dokun',
     cancelWire: 'İptal',
@@ -542,6 +557,21 @@ export const tr = {
     time: 'Zaman',
     speed: 'Hız',
     speedTitle: 'Simülasyon hızı: simülasyon zamanının gerçek zamana oranı',
+    speedDialog: 'Simülasyon hızı',
+    realtime: 'gerçek zaman',
+    speedNote: (time: string) => `1 s’de ${time}`,
+    speedPresets: {
+      realtime: 'Gerçek zaman',
+      slow: 'Yavaş',
+      verySlow: 'Çok yavaş',
+      slowMotion: 'Ağır çekim',
+      scope: 'Osiloskoba göre',
+    },
+    scopeSweep: 'tarama ≈ 0,2 s',
+    scopeSweepMissing: 'devrede osiloskop yok',
+    fineSpeed: 'İnce ayar',
+    speedSentence: (time: string) => `Gerçek 1 saniyede simülasyonda **${time}** geçer.`,
+    region: 'Simülasyon',
     electronFlow: 'Elektron akışını göster',
     electronNote: 'Elektronlar, geleneksel akım yönünün tersine hareket eder.',
     conventionalNote: 'Noktalar geleneksel akım yönünü gösterir: dış devrede + uçtan − uca.',
@@ -551,6 +581,10 @@ export const tr = {
     cannotRun: 'Simülasyon çalışamıyor:',
     status: { running: 'Çalışıyor', paused: 'Duraklatıldı', stopped: 'Durduruldu' },
     legend: 'Kablo gerilimi',
+    legendRms: 'Kablo gerilimi · etkin',
+    legendTitle: 'Gösterim',
+    legendConventional: 'Akım · geleneksel yön',
+    legendElectron: 'Akım · elektron yönü',
   },
   readout: {
     voltage: 'Gerilim',
@@ -707,6 +741,12 @@ export const tr = {
     exportJson: 'JSON olarak dışa aktar',
     importJson: 'JSON dosyası içe aktar…',
     share: 'Paylaşım bağlantısı…',
+    newCircuitNote: 'Önceki devrene Geri al (Ctrl+Z) ile dönebilirsin.',
+    exportNote: 'Devreyi .json dosyası olarak indir.',
+    importNote: 'Bilgisayarındaki bir devre dosyasını aç.',
+    shareNote: 'Devreyi bağlantının içine yaz, kopyala.',
+    autosaveNote:
+      'Devren her değişiklikten sonra bu tarayıcıya kendiliğinden kaydedilir. Kaydet düğmesi gerekmez; başka bilgisayara taşımak için dışa aktar ya da bağlantı paylaş.',
     fileName: 'devre',
     newDone: 'Yeni devre açıldı. Önceki devrene dönmek için Geri al (Ctrl+Z).',
     imported: 'Devre içe aktarıldı. Önceki devrene dönmek için Geri al (Ctrl+Z).',
@@ -747,15 +787,17 @@ export const tr = {
   hints: {
     touchAdded:
       'Parça eklendi. Sürükle: taşı · pin ucuna dokun: kablo · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil)',
+    // Tuvalin altındaki ipucu şeridi: **kalın**, [[tuş]].
     simulating:
-      'Simülasyon sırasında: anahtarı açıp kapatmak için üzerine tıkla · değer değiştirmek için çift tıkla · parça eklemek ya da taşımak simülasyonu durdurur',
+      '**Simülasyon sırasında:** anahtarı açıp kapatmak için üzerine tıkla · değer değiştirmek için çift tıkla · parça eklemek ya da taşımak simülasyonu durdurur',
+    empty: 'Parça sürükle ya da tıklayıp tuvale tıkla · [[W]] kablo · [[R]] döndür',
     select:
-      'Kablo çekmek için bir pinin ucuna tıkla. Çift tık: özellikler · R: döndür · F: ters çevir · Delete: sil · Boşluk + sürükle: tuvali kaydır',
+      'Kablo çekmek için bir parçanın ucuna tıkla · çift tık: özellikler · [[R]] döndür · [[F]] ters çevir · [[Delete]] sil · [[Boşluk]] + sürükle: kaydır',
     place: (name: string) =>
-      `${name}: yerleştirmek için tuvale tıkla · R: döndür · F: ters çevir · Shift + tıkla: birden çok · Esc: iptal`,
-    wireIdle: 'Kablo: başlamak için bir pine, kabloya ya da boş bir noktaya tıkla · Esc: seçme aracına dön',
-    wiring: 'Köşe için tıkla · bitirmek için bir pine ya da kabloya tıkla · çift tık: boşta bitir · Esc: iptal',
-    selected: (count: number) => `${count} öğe seçili · R: döndür · F: ters çevir · Delete: sil · Ctrl+Z: geri al`,
+      `**${name}:** yerleştirmek için tuvale bırak ya da tıkla · [[R]] döndür · [[F]] ters çevir · [[Shift]] + tıkla: birden çok · [[Esc]] iptal`,
+    wireIdle: '**Kablo:** başlamak için bir uca, kabloya ya da boş bir noktaya tıkla · [[Esc]] seçme aracına dön',
+    wiring: '**Kablo çiziliyor:** köşe için tıkla · bitirmek için bir uca ya da kabloya tıkla · çift tık: boşta bitir · [[Esc]] iptal',
+    selected: (count: number) => `**${count} öğe seçili** · [[R]] döndür · [[F]] ters çevir · [[Delete]] sil · [[Ctrl+Z]] geri al`,
   },
   status: {
     zoom: 'Yakınlık',

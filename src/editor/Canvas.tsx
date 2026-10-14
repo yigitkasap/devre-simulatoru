@@ -63,6 +63,22 @@ export interface CanvasHandle {
   addPartAtCenter(type: DeviceType): void;
 }
 
+/** Tuvalin altındaki ipucu şeridinin gösterdiği durum. */
+export type CanvasHint =
+  | { readonly kind: 'empty' }
+  | { readonly kind: 'select' }
+  | { readonly kind: 'selected'; readonly count: number }
+  | { readonly kind: 'place'; readonly type: DeviceType }
+  | { readonly kind: 'wireTool' }
+  | { readonly kind: 'wiring' }
+  | { readonly kind: 'simulating' };
+
+/** Tuvalin dışarıya bildirdiği durum: ipucu ve yakınlık (üst çubuktaki yüzde). */
+export interface CanvasStatus {
+  readonly hint: CanvasHint;
+  readonly scale: number;
+}
+
 /** Mesaj panelinde seçilen hata/uyarının tuvaldeki vurgusu. */
 export interface Highlight {
   readonly parts: ReadonlySet<string>;
@@ -105,6 +121,12 @@ export interface CanvasProps {
   readonly touch: boolean;
   /** Tuvalin üstünde kaydırılabilir bir katman açık (çekmece, pencere): tuval dokunmayı tutmasın. */
   readonly overlayOpen: boolean;
+  /** İpucu ya da yakınlık değişince çağrılır. */
+  readonly onStatusChange?: (status: CanvasStatus) => void;
+  /** Bir parça yerleştirildi (kütüphanenin "Son" listesi için). */
+  readonly onPartPlaced?: (type: DeviceType) => void;
+  /** Boş tuvaldeki "Örneklerden başla" düğmesi. */
+  readonly onExamples?: () => void;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -206,6 +228,9 @@ export function Canvas({
   reserveScope,
   touch,
   overlayOpen,
+  onStatusChange,
+  onPartPlaced,
+  onExamples,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -509,6 +534,7 @@ export function Canvas({
   const placePart = (type: DeviceType, at: Point, rotation: Rotation) => {
     const result = addPart(doc, type, at, rotation);
     commit(result.doc, { parts: [result.id], wires: [] });
+    onPartPlaced?.(type);
   };
 
   // --- İşaretçi olayları ---------------------------------------------------------------
@@ -952,18 +978,27 @@ export function Canvas({
               ? 'cursor-pointer'
               : 'cursor-default';
 
-  const hint =
+  const selectedCount = selection.parts.length + selection.wires.length;
+  const hint: CanvasHint =
     simActive && tool.kind === 'select' && interaction.kind === 'idle'
-      ? tr.hints.simulating
+      ? { kind: 'simulating' }
       : interaction.kind === 'wiring'
-      ? tr.hints.wiring
-      : tool.kind === 'place'
-        ? tr.hints.place(tr.devices.names[tool.type])
-        : tool.kind === 'wire'
-          ? tr.hints.wireIdle
-          : selection.parts.length + selection.wires.length > 0
-            ? tr.hints.selected(selection.parts.length + selection.wires.length)
-            : tr.hints.select;
+        ? { kind: 'wiring' }
+        : tool.kind === 'place'
+          ? { kind: 'place', type: tool.type }
+          : tool.kind === 'wire'
+            ? { kind: 'wireTool' }
+            : selectedCount > 0
+              ? { kind: 'selected', count: selectedCount }
+              : doc.parts.length === 0 && doc.wires.length === 0
+                ? { kind: 'empty' }
+                : { kind: 'select' };
+  const hintKey = JSON.stringify(hint);
+  const statusRef = useRef(onStatusChange);
+  statusRef.current = onStatusChange;
+  useEffect(() => {
+    statusRef.current?.({ hint: JSON.parse(hintKey) as CanvasHint, scale: view.scale });
+  }, [hintKey, view.scale]);
 
   // Ölçü aleti ekranı başka bir parçanın üstüne biniyorsa ve öbür taraf boşsa, ekran öbür tarafa açılır.
   const displayFlips = new Set<string>();
@@ -1152,15 +1187,41 @@ export function Canvas({
       </svg>
 
       {doc.parts.length === 0 && doc.wires.length === 0 && tool.kind === 'select' && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6 text-center text-muted">
-          <p className="max-w-xs text-sm">
-            <span className="hidden md:inline">{tr.canvas.empty}</span>
-            <span className="md:hidden">{tr.canvas.emptyMobile}</span>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-muted">
+          <svg width="64" height="40" viewBox="0 0 64 40" aria-hidden="true">
+            <path
+              d="M4 20H20L23 13L29 27L35 13L41 27L44 20H60"
+              fill="none"
+              stroke="var(--color-line-2)"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <p className="max-w-xs text-[15px]">
+            <span className="hidden desk:inline">{tr.canvas.empty}</span>
+            <span className="desk:hidden">{tr.canvas.emptyMobile}</span>
           </p>
+          {onExamples && (
+            <button
+              type="button"
+              onClick={onExamples}
+              className="pointer-events-auto h-9 rounded-md border border-line-2 bg-panel px-3.5 text-sm font-medium text-ink hover:bg-panel-2"
+            >
+              {tr.canvas.emptyAction}
+            </button>
+          )}
         </div>
       )}
 
-      {frame && <VoltageLegend vmax={frame.vmax} scale={settings.wireScale} />}
+      {frame && (
+        <VoltageLegend
+          vmax={frame.vmax}
+          scale={settings.wireScale}
+          electronFlow={settings.electronFlow}
+          rms={doc.parts.some((p) => p.type === 'acsource' || p.type === 'funcgen')}
+        />
+      )}
 
       {interaction.kind === 'wiring' && (
         <div className="absolute top-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-panel/95 py-1 pr-1 pl-3 text-xs shadow-md">
@@ -1264,13 +1325,10 @@ export function Canvas({
         return <ContextMenu x={menu.x} y={menu.y} items={items} area={size} onClose={() => setMenu(null)} />;
       })()}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-2 text-xs text-muted">
-        <p className="hidden rounded bg-panel/85 px-2 py-1 shadow-sm md:block">{hint}</p>
-        <p className="ml-auto rounded bg-panel/85 px-2 py-1 shadow-sm tabular">
-          {cursor ? `x ${Math.round(cursor.x)} · y ${Math.round(cursor.y)} · ` : ''}
-          {tr.status.zoom} %{Math.round(view.scale * 100)}
-        </p>
-      </div>
+      {/* Telefonda yakınlık tuvalin köşesinde; masaüstünde üst çubukta. */}
+      <p className="pointer-events-none absolute right-2 bottom-2 rounded bg-panel/85 px-2 py-1 text-xs text-muted shadow-sm tabular desk:hidden">
+        {tr.status.zoom} %{Math.round(view.scale * 100)}
+      </p>
     </div>
   );
 }
@@ -1328,18 +1386,43 @@ function CurrentDots({ doc, graph, frame }: { doc: CircuitDoc; graph: FlowGraph;
   );
 }
 
-/** Kablo renklerinin açıklaması (köşede). */
-function VoltageLegend({ vmax, scale }: { vmax: number; scale: WireScale }) {
+/**
+ * Gösterim: kablo renklerinin ve akım noktalarının açıklaması (tuvalin sol alt köşesi; tasarım: M04).
+ * Renk tek ipucu olmasın diye ölçeğin uçlarında gerilim değerleri yazılıdır.
+ */
+function VoltageLegend({
+  vmax,
+  scale,
+  electronFlow,
+  rms,
+}: {
+  vmax: number;
+  scale: WireScale;
+  electronFlow: boolean;
+  /** AC devrede renkler etkin değerden (kare ortalamasından) çizilir. */
+  rms: boolean;
+}) {
   const label = formatSI(vmax, 'V', { trim: true });
   return (
-    // Telefonda örnek kartı üst kenarı kapladığı için açıklama sol altta durur.
-    <div className="pointer-events-none absolute bottom-10 left-2 rounded-md border border-line bg-panel/90 px-2.5 py-1.5 text-[11px] shadow-sm md:top-2 md:right-2 md:bottom-auto md:left-auto">
-      <p className="mb-1 font-medium text-muted">{tr.sim.legend}</p>
-      <div className="h-2 w-36 rounded-full" style={{ background: voltageGradient(scale) }} />
-      <div className="mt-0.5 flex w-36 justify-between tabular text-muted">
+    <div
+      role="note"
+      aria-label={tr.sim.legendTitle}
+      className="pointer-events-none absolute bottom-3 left-3 flex flex-col gap-1.5 rounded-[10px] border border-line bg-panel/95 px-3 py-2.5 shadow-sm max-desk:bottom-10 max-desk:left-2 max-desk:gap-1 max-desk:px-2.5 max-desk:py-2"
+    >
+      <span className="text-label font-semibold text-muted">{rms ? tr.sim.legendRms : tr.sim.legend}</span>
+      <div className="h-2.5 w-44 rounded-[5px] max-desk:h-2 max-desk:w-36" style={{ background: voltageGradient(scale) }} />
+      <div className="flex w-44 justify-between font-mono text-[11.5px] text-ink-2 tabular max-desk:w-36 max-desk:text-[11px]">
         <span>−{label}</span>
         <span>0 V</span>
         <span>+{label}</span>
+      </div>
+      <div className="flex items-center gap-2 pt-0.5 text-label text-ink-2 max-desk:hidden">
+        <svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true">
+          {[5, 17, 29].map((cx) => (
+            <circle key={cx} cx={cx} cy={5} r={3.4} fill={CURRENT_DOT_COLOR} stroke={CURRENT_DOT_EDGE} />
+          ))}
+        </svg>
+        {electronFlow ? tr.sim.legendElectron : tr.sim.legendConventional}
       </div>
     </div>
   );

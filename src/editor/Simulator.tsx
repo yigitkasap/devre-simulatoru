@@ -1,8 +1,8 @@
-// Simülatörün kök bileşeni: üst çubuk, parça kütüphanesi, tuval, mesaj paneli, simülasyon çubuğu,
-// özellik ve paylaşım pencereleri. Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım
+// Simülatörün kök bileşeni: üst çubuk, parça kütüphanesi, tuval, ipucu şeridi, mesaj paneli,
+// simülasyon çubuğu, özellik ve paylaşım pencereleri. Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım
 // bağlantısı) ve döndürme gibi birden çok bileşenin kullandığı işlemler de buradadır.
 
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
@@ -10,18 +10,20 @@ import { flipParts, removeItems, rotateParts, updatePart } from '../model/docOps
 import { buildFlowGraph } from '../model/flow';
 import { nextRotation } from '../model/geometry';
 import { docFromHash, shareUrl } from '../model/share';
+import { CATALOG } from '../model/catalog';
 import { emptyDoc, type CircuitDoc } from '../model/types';
 import { compileNetlist, scopeSettings, type CompiledCircuit, type Diagnostic } from '../sim';
 import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
 import { loadSavedDoc, useAutosave } from './autosave';
-import { Canvas, type CanvasHandle, type Highlight } from './Canvas';
+import { Canvas, type CanvasHandle, type CanvasStatus, type Highlight } from './Canvas';
 import { ExampleCard } from './ExampleCard';
 import { ExamplesDialog } from './ExamplesDialog';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
-import { Library } from './Library';
+import { HintStrip } from './HintStrip';
+import { Library, LibraryFlyout, type LibraryMode } from './Library';
 import { MessagesPanel, messageKey, type MessageItem } from './MessagesPanel';
-import { PartInfo } from './PartInfo';
 import { PropertiesDialog } from './PropertiesDialog';
+import { useRecentParts } from './recentParts';
 import { ScopePanel } from './ScopePanel';
 import { autoSettings } from './scopeView';
 import { useSettings } from './settings';
@@ -31,6 +33,7 @@ import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { Toast, useToast } from './Toast';
 import { TopBar } from './TopBar';
 import { useCoarsePointer } from './useCoarsePointer';
+import { useLayout } from './useLayout';
 import { useSimulation } from './useSimulation';
 
 /** Açılışta: adreste paylaşım bağlantısı varsa o devre, yoksa otomatik kayıt, o da yoksa boş devre. */
@@ -41,13 +44,43 @@ function initialDoc(): { doc: CircuitDoc; shared: 'loaded' | 'error' | null } {
   return { doc: loadSavedDoc() ?? emptyDoc(), shared: shared === null ? 'error' : null };
 }
 
+/** Masaüstünde kütüphanenin açık ya da şerit olduğu tarayıcıda hatırlanır. */
+const LIBRARY_KEY = 'devre-simulatoru:kutuphane';
+function loadLibraryPref(): 'open' | 'rail' {
+  try {
+    return window.localStorage.getItem(LIBRARY_KEY) === 'rail' ? 'rail' : 'open';
+  } catch {
+    return 'open';
+  }
+}
+function saveLibraryPref(pref: 'open' | 'rail'): void {
+  try {
+    window.localStorage.setItem(LIBRARY_KEY, pref);
+  } catch {
+    // Depolama kapalı: tercih yalnızca bu oturumda geçerli.
+  }
+}
+
+/** Osiloskop ekranının bir taraması ≈ 0,2 s sürecek simülasyon hızı (en fazla ×1). */
+function sweepSpeed(timePerDiv: number): number {
+  return Math.min(1, Math.max(1e-6, 50 * timePerDiv));
+}
+
 export default function Simulator() {
   const [initial] = useState(initialDoc);
   const [state, dispatch] = useReducer(editorReducer, initial.doc, initialEditorState);
   const [settings, updateSettings] = useSettings();
+  const layout = useLayout();
+  const phone = layout.kind === 'phone';
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryPref, setLibraryPref] = useState(loadLibraryPref);
+  const [flyoutOpen, setFlyoutOpen] = useState(false);
+  const [focusSearch, setFocusSearch] = useState(0);
+  const [recentParts, rememberPart] = useRecentParts();
   const [libraryDragType, setLibraryDragType] = useState<DeviceType | null>(null);
   const [hoveredType, setHoveredType] = useState<DeviceType | null>(null);
+  const [lastInfoType, setLastInfoType] = useState<DeviceType>('battery');
+  const [canvasStatus, setCanvasStatus] = useState<CanvasStatus>({ hint: { kind: 'select' }, scale: 1 });
   const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
@@ -57,7 +90,7 @@ export default function Simulator() {
   const [exampleCollapsed, setExampleCollapsed] = useState(false);
   const [chosenScope, setChosenScope] = useState<string | null>(null);
   // Telefonda ve kısa ekranda osiloskop paneli küçültülmüş başlar (devreye yer kalsın).
-  const [scopeCollapsed, setScopeCollapsed] = useState(() => window.innerWidth < 768 || window.innerHeight < 640);
+  const [scopeCollapsed, setScopeCollapsed] = useState(() => window.innerWidth < 900 || window.innerHeight < 640);
   const [toast, showToast] = useToast();
   const touch = useCoarsePointer();
   const touchHintShown = useRef(false);
@@ -65,11 +98,29 @@ export default function Simulator() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { doc, selection, tool } = state;
-  useAutosave(doc);
+  const saveState = useAutosave(doc);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
   const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow);
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
+  const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
+  const canFlip = selectedParts.some((p) => CATALOG[p.type].polarized);
+
+  // --- Kütüphane ---------------------------------------------------------------------------
+  const libraryMode: LibraryMode = phone ? 'drawer' : layout.kind === 'compact' || libraryPref === 'rail' ? 'rail' : 'full';
+  const showFlyout = layout.kind === 'compact' && flyoutOpen;
+  const setLibraryPrefSaved = (pref: 'open' | 'rail') => {
+    setLibraryPref(pref);
+    saveLibraryPref(pref);
+  };
+  // Bilgi alanındaki parça: üzerine gelinen, yerleştirilen, sürüklenen ya da seçili tek parça; hiçbiri
+  // yoksa en son anlatılan.
+  const singleSelected = selectedParts.length === 1 && selection.wires.length === 0 ? selectedParts[0]!.type : null;
+  const currentInfo = hoveredType ?? (tool.kind === 'place' ? tool.type : null) ?? libraryDragType ?? singleSelected;
+  useEffect(() => {
+    if (currentInfo) setLastInfoType(currentInfo);
+  }, [currentInfo]);
+  const infoType = currentInfo ?? lastInfoType;
 
   // --- Yükleme (örnek, dosya, paylaşım bağlantısı, yeni devre) ---------------------------
   /** Yeni bir belge yükler; önceki belge geri alma geçmişinde kalır. */
@@ -231,6 +282,7 @@ export default function Simulator() {
   const scopeConnected = scope
     ? ([0, 1].map((pin) => !connectivity.unconnectedPins.has(pinKey(scope.id, pin))) as [boolean, boolean])
     : ([false, false] as const);
+  const scopeSpeed = scope ? sweepSpeed(scopeSettings(scope.props).timePerDiv) : null;
   const changeScope = (patch: Record<string, PropValue>) => {
     if (scope) dispatch({ type: 'commit', doc: updatePart(doc, scope.id, { props: { ...scope.props, ...patch } }) });
   };
@@ -254,8 +306,40 @@ export default function Simulator() {
     const patch = autoSettings(sim.scopeRecorder(scope.id), settings, scopeConnected, { frequency, peak });
     changeScope(patch);
     // Hız: bir ekran taraması ≈ 0,2 s sürsün (yüksek frekansta simülasyon yavaşlatılır, en fazla ×1).
-    const timePerDiv = patch.timePerDiv ?? settings.timePerDiv;
-    sim.setSpeed(Math.min(1, Math.max(1e-6, 50 * timePerDiv)));
+    sim.setSpeed(sweepSpeed(patch.timePerDiv ?? settings.timePerDiv));
+  };
+
+  const closeLibrary = useCallback(() => {
+    setLibraryOpen(false);
+    setFlyoutOpen(false);
+  }, []);
+  const libraryProps = {
+    width: layout.libraryWidth,
+    tool,
+    settings,
+    dispatch,
+    onDragTypeChange: setLibraryDragType,
+    drawerOpen: libraryOpen,
+    onClose: closeLibrary,
+    onCollapse: () => setLibraryPrefSaved('rail'),
+    onExpand: (search: boolean) => {
+      if (layout.kind === 'compact') setFlyoutOpen(true);
+      else setLibraryPrefSaved('open');
+      if (search) setFocusSearch((n) => n + 1);
+    },
+    focusSearch,
+    touch,
+    onPreview: setHoveredType,
+    infoType,
+    recent: recentParts,
+    flyoutOpen: showFlyout,
+    onAddPart: (type: DeviceType) => {
+      canvasRef.current?.addPartAtCenter(type);
+      if (phone && !touchHintShown.current) {
+        touchHintShown.current = true;
+        showToast(tr.hints.touchAdded);
+      }
+    },
   };
 
   const diagnosticContext = useMemo<DiagnosticContext>(() => {
@@ -269,16 +353,21 @@ export default function Simulator() {
   return (
     <div className="app-root flex flex-col overflow-hidden">
       <TopBar
+        phone={phone}
         toolKind={tool.kind}
         canUndo={state.past.length > 0}
         canRedo={state.future.length > 0}
         hasSelection={hasSelection}
+        canFlip={canFlip}
+        zoom={canvasStatus.scale}
+        saveState={saveState}
         settings={settings}
         onSettings={updateSettings}
         onToggleLibrary={() => setLibraryOpen((o) => !o)}
         onSelectTool={() => dispatch({ type: 'set-tool', tool: { kind: 'select' } })}
         onWireTool={() => dispatch({ type: 'set-tool', tool: tool.kind === 'wire' ? { kind: 'select' } : { kind: 'wire' } })}
         onRotate={rotate}
+        onFlip={() => flipSelection(selection.parts)}
         onDelete={() =>
           dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION })
         }
@@ -308,113 +397,99 @@ export default function Simulator() {
       />
 
       <div className="relative flex min-h-0 flex-1">
-        <Library
-          tool={tool}
-          settings={settings}
-          dispatch={dispatch}
-          onDragTypeChange={setLibraryDragType}
-          open={libraryOpen}
-          onClose={() => setLibraryOpen(false)}
-          touch={touch}
-          onPreview={setHoveredType}
-          onAddPart={(type) => {
-            canvasRef.current?.addPartAtCenter(type);
-            if (!touchHintShown.current) {
-              touchHintShown.current = true;
-              showToast(tr.hints.touchAdded);
-            }
-          }}
-        />
-        {libraryOpen && (
-          <div className="absolute inset-0 z-20 bg-ink/20 md:hidden" onClick={() => setLibraryOpen(false)} aria-hidden="true" />
+        <Library mode={libraryMode} {...libraryProps} />
+        {phone && libraryOpen && (
+          <div className="absolute inset-0 z-20 bg-ink/20" onClick={() => setLibraryOpen(false)} aria-hidden="true" />
         )}
-        <main className="relative min-w-0 flex-1">
-          <Canvas
-            ref={canvasRef}
-            doc={doc}
-            selection={selection}
-            tool={tool}
-            settings={settings}
-            connectivity={connectivity}
-            dispatch={dispatch}
-            libraryDragType={libraryDragType}
-            onOpenProperties={setPropertiesFor}
-            keyboardEnabled={!editingPart && !shareLink && !examplesOpen}
-            flowGraph={flowGraph}
-            simActive={sim.status !== 'stopped'}
-            frame={sim.frame}
-            highlight={highlight}
-            onRepair={sim.repair}
-            onRotate={rotateSelection}
-            onFlip={flipSelection}
-            fitRequest={fitRequest}
-            reserveCard={activeExample === null ? 'none' : exampleCollapsed ? 'collapsed' : 'open'}
-            reserveScope={!scope ? 'none' : scopeCollapsed ? 'collapsed' : 'open'}
-            touch={touch}
-            overlayOpen={libraryOpen || Boolean(editingPart) || Boolean(shareLink) || examplesOpen}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main className="relative min-h-0 flex-1">
+            {showFlyout && <LibraryFlyout {...libraryProps} />}
+            <Canvas
+              ref={canvasRef}
+              doc={doc}
+              selection={selection}
+              tool={tool}
+              settings={settings}
+              connectivity={connectivity}
+              dispatch={dispatch}
+              libraryDragType={libraryDragType}
+              onOpenProperties={setPropertiesFor}
+              keyboardEnabled={!editingPart && !shareLink && !examplesOpen}
+              flowGraph={flowGraph}
+              simActive={sim.status !== 'stopped'}
+              frame={sim.frame}
+              highlight={highlight}
+              onRepair={sim.repair}
+              onRotate={rotateSelection}
+              onFlip={flipSelection}
+              fitRequest={fitRequest}
+              reserveCard={activeExample === null ? 'none' : exampleCollapsed ? 'collapsed' : 'open'}
+              reserveScope={!scope ? 'none' : scopeCollapsed ? 'collapsed' : 'open'}
+              touch={touch}
+              overlayOpen={libraryOpen || showFlyout || Boolean(editingPart) || Boolean(shareLink) || examplesOpen}
+              onStatusChange={setCanvasStatus}
+              onPartPlaced={rememberPart}
+              onExamples={() => setExamplesOpen(true)}
+            />
+            {scope && (
+              <ScopePanel
+                scopes={scopes}
+                scope={scope}
+                onChoose={setChosenScope}
+                view={sim.frame?.scopes.get(scope.id) ?? null}
+                connected={scopeConnected}
+                collapsed={scopeCollapsed}
+                onCollapsed={(next) => {
+                  setScopeCollapsed(next);
+                  // Panel büyüyüp küçülünce devre kalan alana yeniden sığdırılır.
+                  setFitRequest((n) => n + 1);
+                }}
+                onChange={changeScope}
+                onAuto={autoScope}
+              />
+            )}
+            {activeExample && (
+              <ExampleCard
+                key={activeExample}
+                id={activeExample}
+                revealed={answerRevealed}
+                collapsed={exampleCollapsed}
+                onCollapsed={(next) => {
+                  setExampleCollapsed(next);
+                  setFitRequest((n) => n + 1);
+                }}
+                onClose={() => setActiveExample(null)}
+              />
+            )}
+          </main>
+          {!phone && <HintStrip hint={canvasStatus.hint} />}
+
+          <MessagesPanel
+            items={messages}
+            open={panelOpen}
+            onToggle={() => setPanelOpen((o) => !o)}
+            selectedKey={selectedItem ? selectedItem.key : null}
+            onSelect={selectMessage}
+            context={diagnosticContext}
           />
-          {(() => {
-            const infoType = tool.kind === 'place' ? tool.type : (libraryDragType ?? hoveredType);
-            return infoType && !touch ? (
-              <PartInfo type={infoType} resistorStyle={settings.resistorStyle} beside={Boolean(scope)} />
-            ) : null;
-          })()}
-          {scope && (
-            <ScopePanel
-              scopes={scopes}
-              scope={scope}
-              onChoose={setChosenScope}
-              view={sim.frame?.scopes.get(scope.id) ?? null}
-              connected={scopeConnected}
-              collapsed={scopeCollapsed}
-              onCollapsed={(next) => {
-                setScopeCollapsed(next);
-                // Panel büyüyüp küçülünce devre kalan alana yeniden sığdırılır.
-                setFitRequest((n) => n + 1);
-              }}
-              onChange={changeScope}
-              onAuto={autoScope}
-            />
-          )}
-          {activeExample && (
-            <ExampleCard
-              key={activeExample}
-              id={activeExample}
-              revealed={answerRevealed}
-              collapsed={exampleCollapsed}
-              onCollapsed={(next) => {
-                setExampleCollapsed(next);
-                setFitRequest((n) => n + 1);
-              }}
-              onClose={() => setActiveExample(null)}
-            />
-          )}
-        </main>
+
+          <SimBar
+            status={sim.status}
+            time={sim.frame?.time ?? 0}
+            speed={sim.speed}
+            notice={sim.notice}
+            lagging={sim.frame?.lagging ?? false}
+            electronFlow={settings.electronFlow}
+            diagnosticContext={diagnosticContext}
+            scopeSpeed={scopeSpeed}
+            onPlay={sim.play}
+            onPause={sim.pause}
+            onStop={sim.stop}
+            onSpeed={sim.setSpeed}
+            onElectronFlow={(on) => updateSettings({ electronFlow: on })}
+          />
+        </div>
       </div>
-
-      <MessagesPanel
-        items={messages}
-        open={panelOpen}
-        onToggle={() => setPanelOpen((o) => !o)}
-        selectedKey={selectedItem ? selectedItem.key : null}
-        onSelect={selectMessage}
-        context={diagnosticContext}
-      />
-
-      <SimBar
-        status={sim.status}
-        time={sim.frame?.time ?? 0}
-        speed={sim.speed}
-        notice={sim.notice}
-        lagging={sim.frame?.lagging ?? false}
-        electronFlow={settings.electronFlow}
-        diagnosticContext={diagnosticContext}
-        onPlay={sim.play}
-        onPause={sim.pause}
-        onStop={sim.stop}
-        onSpeed={sim.setSpeed}
-        onElectronFlow={(on) => updateSettings({ electronFlow: on })}
-      />
 
       {editingPart && (
         <PropertiesDialog
