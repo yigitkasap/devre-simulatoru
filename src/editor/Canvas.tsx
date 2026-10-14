@@ -100,6 +100,8 @@ export interface PhoneCanvas {
   readonly onLockChipClose: () => void;
   /** Tuval, tam boy alt sayfanın üstünde ince bir şerit: bilgi katmanları gizlenir. */
   readonly strip?: boolean;
+  /** Boş tuvaldeki ipucu (tablette Parça düğmesi solda). */
+  readonly emptyHint?: string;
 }
 
 /** Tuvalin altındaki ipucu şeridinin gösterdiği durum. */
@@ -1693,7 +1695,7 @@ export function Canvas({
             />
           </svg>
           <p className="max-w-xs text-[15px]">
-            {phone ? <HintText text={tr.canvas.emptyMobile} /> : tr.canvas.empty}
+            {phone ? <HintText text={phone.emptyHint ?? tr.canvas.emptyMobile} /> : tr.canvas.empty}
           </p>
           {onExamples && (
             <button

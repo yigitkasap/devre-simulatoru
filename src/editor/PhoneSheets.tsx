@@ -110,9 +110,11 @@ export interface PartsSheetProps {
   readonly onDrop: (type: DeviceType, clientX: number, clientY: number) => void;
   /** Sürükleme sürerken sayfa saydamlaşır (devre görünsün). */
   readonly onDragging: (dragging: boolean) => void;
+  /** Tablet (T02): kategori çipleri yerine başlıklı gruplar, hepsi alt alta. */
+  readonly grouped?: boolean;
 }
 
-export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, onDrop, onDragging }: PartsSheetProps) {
+export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, onDrop, onDragging, grouped = false }: PartsSheetProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<PartsCategory>('favorites');
   const [ghost, setGhost] = useState<{ type: DeviceType; x: number; y: number } | null>(null);
@@ -121,8 +123,22 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
   const gridRef = useRef<HTMLDivElement>(null);
 
   const favorites = useMemo(() => [...new Set([...recent, ...FAVORITES])].slice(0, 9), [recent]);
+  const q = normalize(query.trim());
+  const sections = useMemo(
+    () =>
+      CATEGORIES.map((c) => ({
+        id: c.id,
+        types: c.types.filter(
+          (type) =>
+            q === '' ||
+            normalize(tr.devices.names[type]).includes(q) ||
+            normalize(tr.devices.descriptions[type]).includes(q) ||
+            normalize(tr.library.categories[c.id]).includes(q),
+        ),
+      })).filter((c) => c.types.length > 0),
+    [q],
+  );
   const types = useMemo(() => {
-    const q = normalize(query.trim());
     if (q) {
       return CATEGORIES.flatMap((c) =>
         c.types.filter(
@@ -135,7 +151,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
     }
     if (category === 'favorites') return favorites;
     return CATEGORIES.find((c) => c.id === category)?.types ?? [];
-  }, [query, category, favorites]);
+  }, [q, category, favorites]);
 
   // Sürüklerken liste kaymasın (iOS: ilk touchmove'da varsayılanı engelle).
   useEffect(() => {
@@ -195,7 +211,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
           className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
         />
       </label>
-      {!query.trim() && (
+      {!query.trim() && !grouped && (
         <div role="tablist" aria-label={tr.library.title} className="-mr-4 flex shrink-0 gap-1.5 overflow-x-auto overscroll-contain pr-4 pb-0.5">
           {categories.map((c) => {
             const selected = c.id === category;
@@ -217,11 +233,14 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
         </div>
       )}
       <div ref={gridRef} className="-mx-4 min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-2">
-        {types.length === 0 ? (
+        {(grouped ? sections.length === 0 : types.length === 0) ? (
           <p className="py-3 text-sm text-muted">{tr.library.noResults}</p>
         ) : (
-          <ul className="grid grid-cols-3 gap-2">
-            {types.map((type) => (
+          (grouped ? sections : [{ id: null, types }]).map((section) => (
+          <section key={section.id ?? 'all'} aria-label={section.id ? tr.library.categories[section.id] : undefined}>
+          {section.id && <h3 className="pt-1 pb-1.5 text-label font-semibold text-muted">{tr.library.categories[section.id]}</h3>}
+          <ul className="grid grid-cols-3 gap-2 pb-2">
+            {section.types.map((type) => (
               <li key={type}>
                 <button
                   type="button"
@@ -272,6 +291,8 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
               </li>
             ))}
           </ul>
+          </section>
+          ))
         )}
       </div>
       <p className="-mx-4 shrink-0 border-t border-app px-4 pt-2 pb-2.5 text-[12.5px] text-muted">{tr.phone.addFooter}</p>
@@ -573,9 +594,12 @@ export interface PartSheetProps {
   readonly focusRequest: number;
   readonly onUpdatePart: (partId: string, patch: PartPatch) => void;
   readonly onOpenDevices: (partId: string) => void;
+  /** Tablet: bütün özellikler hep açık (Tümü / Daha az yok). */
+  readonly alwaysExpanded?: boolean;
 }
 
-export function PartSheetBody({ part, doc, settings, expanded, onExpand, focusRequest, onUpdatePart, onOpenDevices }: PartSheetProps) {
+export function PartSheetBody({ part, doc, settings, expanded: expandedState, onExpand, focusRequest, onUpdatePart, onOpenDevices, alwaysExpanded = false }: PartSheetProps) {
+  const expanded = alwaysExpanded || expandedState;
   const def = CATALOG[part.type];
   const firstRef = useRef<HTMLInputElement>(null);
   const values = partValues(part);
@@ -583,7 +607,7 @@ export function PartSheetBody({ part, doc, settings, expanded, onExpand, focusRe
   const primary = device ? undefined : (def.propDefs.find((p) => p.kind === 'number') ?? def.propDefs[0]);
   const otherLabels = new Set(doc.parts.filter((p) => p.id !== part.id).map((p) => p.label));
   const note = device ? undefined : partNote(part.type, values);
-  const canExpand = !device && (def.propDefs.length > 1 || primary !== undefined);
+  const canExpand = !alwaysExpanded && !device && (def.propDefs.length > 1 || primary !== undefined);
 
   useEffect(() => {
     if (focusRequest === 0) return;
@@ -679,11 +703,14 @@ export interface MeasureSheetProps {
   readonly onExpand: (expanded: boolean) => void;
   readonly onUpdatePart: (partId: string, patch: PartPatch) => void;
   readonly onOpenDevices: (partId: string) => void;
+  /** Tablet: bütün ölçümler ve alanlar hep açık. */
+  readonly alwaysExpanded?: boolean;
 }
 
 const ZERO = { voltage: 0, current: 0, power: 0 };
 
-export function MeasureSheetBody({ part, doc, frame, status, settings, expanded, onExpand, onUpdatePart, onOpenDevices }: MeasureSheetProps) {
+export function MeasureSheetBody({ part, doc, frame, status, settings, expanded: expandedState, onExpand, onUpdatePart, onOpenDevices, alwaysExpanded = false }: MeasureSheetProps) {
+  const expanded = alwaysExpanded || expandedState;
   const def = CATALOG[part.type];
   const values = partValues(part);
   const device = DEVICE_TYPES.has(part.type);
@@ -707,7 +734,7 @@ export function MeasureSheetBody({ part, doc, frame, status, settings, expanded,
         compact
         subtitle={`${tr.devices.names[part.type]} · ${running ? tr.phone.live : tr.phone.paused}`}
         expanded={expanded}
-        canExpand={!device}
+        canExpand={!device && !alwaysExpanded}
         onExpand={onExpand}
       />
       {/* Dar yan panelde (yatay telefon, L01) ölçümler satır satır; genişte üç kutu yan yana. */}

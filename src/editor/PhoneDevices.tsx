@@ -37,7 +37,8 @@ export interface PhoneDevicesProps {
   readonly devices: readonly Part[];
   readonly activeId: string;
   readonly onActive: (id: string) => void;
-  readonly onClose: () => void;
+  /** Kapat (dikey) ya da "Devre" (yatay); tabletin İnceleme panelinde verilmez. */
+  readonly onClose?: () => void;
   readonly scopeView: (id: string) => ScopeView | null;
   readonly status: (id: string) => DeviceStatus;
   /** Fonksiyon üretecinin çıkış gerilimi (OUT − COM); simülasyon durmuşsa null. */
@@ -154,7 +155,7 @@ export function PhoneDevicesBody(props: PhoneDevicesProps) {
             <span className="font-mono text-[13px] text-muted">{active.label}</span>
           </h2>
         )}
-        {!landscape && (
+        {!landscape && props.onClose && (
           <button
             type="button"
             onClick={props.onClose}

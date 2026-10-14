@@ -1,6 +1,7 @@
 // Simülatörün kök bileşeni. Masaüstünde: üst çubuk, parça kütüphanesi, tuval, ipucu şeridi, cihaz rafı,
 // simülasyon çubuğu ve İnceleme paneli. Telefonda: üst şerit, tuval, tek alt sayfa ve alt çubuk (Kur,
-// Bağla ve Ölç kipleri). Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım bağlantısı) ve
+// Bağla ve Ölç kipleri). Tablette: sade üst çubuk, araç şeridi, dokunmatik kipli tuval, alt çubuk ve
+// dokunmatik İnceleme paneli (cihazlar panelin bir sekmesinde). Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım bağlantısı) ve
 // döndürme gibi birden çok bileşenin kullandığı işlemler de buradadır.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
@@ -36,6 +37,7 @@ import {
   suggestedResistor,
   type MessageItem,
 } from './messages';
+import { Icon } from './icons';
 import { MessagesTab, type MessageAction } from './MessagesTab';
 import { partValueText } from './PartView';
 import { PhoneBar, type PhoneBarActive, type PhoneBarState } from './PhoneBar';
@@ -51,7 +53,8 @@ import { ShareDialog } from './ShareDialog';
 import { SimBar, SpeedOptions, speedLabel } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { Toast, useToast } from './Toast';
-import { TopBar } from './TopBar';
+import { TabletBar, TabletPartsCard, TabletRail } from './TabletChrome';
+import { TabletTopBar, TopBar } from './TopBar';
 import { TouchUi } from './touchUi';
 import { useCoarsePointer } from './useCoarsePointer';
 import { useLayout } from './useLayout';
@@ -118,6 +121,10 @@ export default function Simulator() {
   const [settings, updateSettings] = useSettings();
   const layout = useLayout();
   const phone = layout.kind === 'phone';
+  const tablet = layout.kind === 'tablet';
+  /** Dokunmatik düzen (telefon ya da tablet): tuvalde Kur / Bağla / Ölç kipleri. */
+  const touchUi = phone || tablet;
+  const [speedOpen, setSpeedOpen] = useState(false);
   const [libraryPref, setLibraryPref] = useState(loadLibraryPref);
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [focusSearch, setFocusSearch] = useState(0);
@@ -212,7 +219,7 @@ export default function Simulator() {
     }
     setFitRequest((n) => n + 1);
     // Telefonda klavye kısayolu anılmaz; Geri al alttaki çubukta.
-    showToast(phone ? message.replace(/ \(Ctrl\+Z\)/g, '') : message);
+    showToast(touchUi ? message.replace(/ \(Ctrl\+Z\)/g, '') : message);
   };
 
   const loadExample = (id: ExampleId) => {
@@ -583,7 +590,8 @@ export default function Simulator() {
 
   // --- Cihaz rafı ---------------------------------------------------------------------------
   const instruments = doc.parts.filter((p) => RACK_TYPES.has(p.type));
-  const showRack = !phone && instruments.length > 0;
+  // Tablette cihazlar İnceleme panelinin Cihazlar sekmesinde (raf yok).
+  const showRack = !touchUi && instruments.length > 0;
   // Tuvalde bir cihaz seçilince raf (telefonda Cihazlar sayfası) onu gösterir.
   const selectedInstrument = singlePart && RACK_TYPES.has(singlePart.type) ? singlePart.id : null;
   useEffect(() => {
@@ -607,11 +615,15 @@ export default function Simulator() {
     previousRunStatus.current = sim.status;
     if (sim.status === 'stopped') setMeasureLayout(false);
     else if (sim.status === 'running' && before === 'stopped' && showRack) setMeasureLayout(true);
+    // Oynat'ta Bağla kipi ve parça ekleme kapanır (Ölç'te yapı kilitli).
+    if (sim.status !== 'stopped' && before === 'stopped') {
+      setConnect(null);
+      setSheet((s) => (s?.kind === 'parts' ? null : s));
+    }
     if (!phoneRef.current) return;
     // Telefon: Oynat'ta Kur'un sayfaları Ölç'ünkilere döner (parça sayfası → ölçümler); Durdur'da tersi.
     if (sim.status !== 'stopped' && before === 'stopped') {
-      setConnect(null);
-      setSheet((s) => (s?.kind === 'part' ? (setPanelTab('circuit'), { kind: 'panel', size: 'peek' }) : s?.kind === 'parts' ? null : s));
+      setSheet((s) => (s?.kind === 'part' ? (setPanelTab('circuit'), { kind: 'panel', size: 'peek' }) : s));
     } else if (sim.status === 'stopped' && before !== 'stopped') {
       setSheet((s) => (s?.kind === 'devices' || s?.kind === 'speed' ? null : s));
     }
@@ -703,14 +715,16 @@ export default function Simulator() {
   useEffect(() => {
     if (!sheet) setSheetHeight(0);
   }, [sheet]);
-  // Telefondan masaüstüne geçince telefonun durumları kapanır.
+  // Telefondan tablete ya da masaüstüne geçince telefonun durumları kapanır (tablette Bağla ve parça kartı sürer).
   useEffect(() => {
     if (phone) return;
-    setSheet(null);
-    setConnect(null);
     setModal(null);
-    setStopAsk(false);
-  }, [phone]);
+    setSheet((s) => (tablet && s?.kind === 'parts' ? s : null));
+    if (!tablet) {
+      setConnect(null);
+      setStopAsk(false);
+    }
+  }, [phone, tablet]);
   // Parça sayfası her açılışta "Zincirle ekle" açık başlar.
   useEffect(() => {
     if (sheet?.kind === 'parts') setChainOff(false);
@@ -816,7 +830,7 @@ export default function Simulator() {
       fitRequest={fitRequest}
       keepVisible={selection.parts}
       phone={
-        phone
+        touchUi
           ? {
               mode: canvasMode,
               connectStart: connect?.start ?? null,
@@ -827,15 +841,18 @@ export default function Simulator() {
                 setConnect({ start });
               },
               onExitConnect: () => setConnect(null),
-              onInspect: () => openPanel('circuit', sheet?.kind === 'panel' ? sheet.size : 'peek'),
+              onInspect: () => (tablet ? setInspectorTab('inspect') : openPanel('circuit', sheet?.kind === 'panel' ? sheet.size : 'peek')),
               onEditAttempt: () => setStopAsk(true),
               lockChip: !lockChipClosed,
               onLockChipClose: () => setLockChipClosed(true),
-              strip: sheet?.size === 'full',
+              strip: phone && sheet?.size === 'full',
+              ...(tablet ? { emptyHint: tr.tablet.empty } : {}),
             }
           : null
       }
-      overlayOpen={showFlyout || Boolean(shareLink) || examplesOpen || modal !== null || stopAsk}
+      overlayOpen={
+        showFlyout || Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || (tablet && (sheet?.kind === 'parts' || speedOpen))
+      }
       onStatusChange={setCanvasStatus}
       onPartPlaced={rememberPart}
       onExamples={() => setExamplesOpen(true)}
@@ -885,6 +902,202 @@ export default function Simulator() {
       }}
     />
   );
+
+  if (tablet) {
+    const tabletState = connect ? 'bagla' : sim.status === 'running' ? 'olc' : sim.status === 'paused' ? 'pause' : hasSelection ? 'sec' : 'kur';
+    const tabletHint: { text: string; tone?: 'error' | 'warn' } =
+      sim.notice?.kind === 'error'
+        ? { text: tr.messages.stripBlocked(summary), tone: 'error' }
+        : sim.status !== 'stopped'
+          ? runtimeIssues
+            ? { text: tr.messages.stripRuntime(summary), tone: errorCount > 0 ? 'error' : 'warn' }
+            : { text: settings.electronFlow ? tr.sim.electronNote : tr.sim.conventionalNote }
+          : activeExample && !answerRevealed
+            ? { text: tr.hints.example }
+            : doc.parts.length === 0 && doc.wires.length === 0
+              ? { text: tr.tablet.empty }
+              : { text: hasSelection ? tr.tablet.hintSelected : tr.tablet.hintSelect };
+    const showDevices = (partId: string) => {
+      setRackActive(partId);
+      setInspectorTab('devices');
+    };
+    const inspectBody = singlePart ? (
+      <div className="flex min-h-0 flex-1 flex-col pt-3">
+        {sim.status === 'stopped' ? (
+          <PartSheetBody
+            key={singlePart.id}
+            part={singlePart}
+            doc={doc}
+            settings={settings}
+            expanded
+            alwaysExpanded
+            onExpand={() => {}}
+            focusRequest={focusRequest}
+            onUpdatePart={updatePartFromPanel}
+            onOpenDevices={showDevices}
+          />
+        ) : (
+          <MeasureSheetBody
+            key={singlePart.id}
+            part={singlePart}
+            doc={doc}
+            frame={sim.frame}
+            status={sim.status}
+            settings={settings}
+            expanded
+            alwaysExpanded
+            onExpand={() => {}}
+            onUpdatePart={updatePartFromPanel}
+            onOpenDevices={showDevices}
+          />
+        )}
+      </div>
+    ) : undefined;
+    const devicesBody =
+      instruments.length > 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col bg-panel-2 pt-2">
+          <PhoneDevicesBody
+            devices={instruments}
+            activeId={rackActive ?? instruments[0]!.id}
+            onActive={setRackActive}
+            scopeView={(id) => sim.frame?.scopes.get(id) ?? null}
+            status={(id) => sim.frame?.statuses.get(id) ?? {}}
+            outputVoltage={(id) => sim.frame?.measurements.get(id)?.voltage ?? null}
+            running={sim.status !== 'stopped'}
+            pinConnected={(id, pin) => !connectivity.unconnectedPins.has(pinKey(id, pin))}
+            onChange={changeInstrument}
+            onAuto={(id) => {
+              const target = doc.parts.find((p) => p.id === id);
+              if (target) autoScopeFor(target);
+            }}
+            onJack={flashPin}
+          />
+        </div>
+      ) : undefined;
+    const rackDevice = instruments.find((p) => p.id === rackActive) ?? instruments[0];
+    return (
+      <div className="app-root flex flex-col overflow-hidden">
+        <TabletTopBar
+          title={circuitTitle}
+          mode={phoneMode}
+          time={sim.frame?.time ?? 0}
+          canUndo={state.past.length > 0}
+          canRedo={state.future.length > 0}
+          saveState={saveState}
+          settings={settings}
+          onSettings={updateSettings}
+          onUndo={() => dispatch({ type: 'undo' })}
+          onRedo={() => dispatch({ type: 'redo' })}
+          onFit={() => canvasRef.current?.fit()}
+          onNew={() => loadDoc(emptyDoc(), tr.file.newDone)}
+          onExport={() => downloadDoc(doc)}
+          onImport={() => fileInputRef.current?.click()}
+          onShare={() => setShareLink(shareUrl(doc, window.location.href))}
+          onExamples={() => setExamplesOpen(true)}
+        />
+        {fileInput}
+        <div className="relative flex min-h-0 flex-1">
+          <TabletRail
+            partsOpen={sheet?.kind === 'parts'}
+            connecting={connect !== null}
+            locked={sim.status !== 'stopped'}
+            onParts={() => {
+              setConnect(null);
+              setSheet((s) => (s?.kind === 'parts' ? null : { kind: 'parts', size: 'half' }));
+            }}
+            onConnect={() => {
+              dispatch({ type: 'select', selection: EMPTY_SELECTION });
+              setSheet(null);
+              setConnect((c) => (c ? null : { start: null }));
+            }}
+          />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <main className="relative min-h-0 flex-1" style={{ boxShadow: canvasMode === 'olc' ? 'inset 0 3px 0 var(--color-ok)' : undefined }}>
+              {canvas}
+              {sheet?.kind === 'parts' && (
+                <TabletPartsCard
+                  settings={settings}
+                  recent={recentParts}
+                  chainTo={chainTo}
+                  onChainOff={() => setChainOff(true)}
+                  onAdd={addFromSheet}
+                  onDrop={(type, x, y) => canvasRef.current?.placeAtClient(type, x, y)}
+                  onDragging={setPartDragging}
+                  dragging={partDragging}
+                  onClose={() => setSheet(null)}
+                />
+              )}
+              {rackDevice && inspectorTab !== 'devices' && (
+                <button
+                  type="button"
+                  onClick={() => setInspectorTab('devices')}
+                  aria-label={tr.tablet.rackLabel(rackDevice.label)}
+                  className="absolute right-3 bottom-3 z-10 flex h-11 items-center gap-2 rounded-full border border-stopped bg-face px-3.5 text-[13.5px] font-semibold text-ink shadow-sm active:brightness-95"
+                >
+                  <Icon name="devices" />
+                  {tr.tablet.rack(rackDevice.label)} ▴
+                </button>
+              )}
+            </main>
+            <TabletBar
+              state={tabletState}
+              hint={tabletHint.text}
+              hintTone={tabletHint.tone}
+              statusText={tr.sim.status[sim.status]}
+              canRotate={selection.parts.length > 0}
+              canFlip={canFlip}
+              onRotate={() => rotateSelection(selection.parts)}
+              onFlip={() => flipSelection(selectedParts.filter((p) => CATALOG[p.type].polarized).map((p) => p.id))}
+              onDelete={deleteSelection}
+              connectMessage={connect?.start ? tr.phone.connectSecond : tr.phone.connectFirst}
+              connectDetail={
+                connect?.start
+                  ? connectStartPart && connect.start.pin !== null
+                    ? tr.phone.connectFrom(connectStartPart.label, tr.devices.pinShort[connectStartPart.type][connect.start.pin] ?? '')
+                    : tr.phone.connectFromWire
+                  : tr.phone.connectEnlarged
+              }
+              canUndo={state.past.length > 0}
+              onUndo={() => dispatch({ type: 'undo' })}
+              onDone={() => setConnect(null)}
+              speed={sim.speed}
+              scopeSpeed={scopeSpeed}
+              onSpeed={sim.setSpeed}
+              onSpeedOpen={setSpeedOpen}
+              onStop={sim.stop}
+              onPlay={sim.play}
+              onPause={sim.pause}
+            />
+          </div>
+          <Inspector
+            width={layout.inspectorWidth}
+            collapsed={false}
+            onExpand={setInspectorTab}
+            tab={inspectorTab}
+            onTab={setInspectorTab}
+            inspect={inspectProps}
+            example={exampleProps}
+            messages={messagesProps}
+            touch
+            devices={devicesBody}
+            inspectBody={inspectBody}
+          />
+        </div>
+        {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
+        {stopAsk && (
+          <StopToEditDialog
+            onStop={() => {
+              setStopAsk(false);
+              sim.stop();
+            }}
+            onCancel={() => setStopAsk(false)}
+          />
+        )}
+        {examplesDialog}
+        <Toast toast={toast} offset={84} />
+      </div>
+    );
+  }
 
   if (phone) {
     const landscape = layout.landscape;

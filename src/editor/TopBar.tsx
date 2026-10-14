@@ -1,9 +1,11 @@
 // Üst çubuk (tasarım: C-UstCubuk): Dosya, Örnekler, araç seçici (Seç / Kablo), seçili parça eylemleri,
-// geri al / yinele, kayıt durumu, görünüm (yakınlık) ve Ayarlar. Yalnızca masaüstünde ve tablette;
-// telefonda üst şerit (PhoneTopStrip) ve alt çubuk (PhoneBar) kullanılır.
+// geri al / yinele, kayıt durumu, görünüm (yakınlık) ve Ayarlar. Tablette (T01, T02) sade ve dokunmatik
+// boyutlu hâli: devrenin adı ▾ (Dosya), Örnekler, Geri al / Yinele, kip rozeti, sığdır ve Ayarlar.
+// Telefonda üst şerit (PhoneTopStrip) ve alt çubuk (PhoneBar) kullanılır.
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { tr } from '../i18n/tr';
+import { formatSI } from '../sim/units';
 import type { SaveState } from './autosave';
 import { voltageGradient } from './colors';
 import { Kbd } from './HintStrip';
@@ -220,6 +222,101 @@ function ViewButton({ icon, label, onClick }: { icon: IconName; label: string; o
   );
 }
 
+/** Tablet: 44 px kare simge düğmesi. */
+function TouchIconButton({
+  icon,
+  label,
+  onClick,
+  active = false,
+  disabled = false,
+}: {
+  icon: IconName;
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      aria-pressed={active || undefined}
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:text-stopped ${
+        active ? 'bg-accent-soft text-accent-ink' : 'text-ink enabled:active:bg-app'
+      }`}
+    >
+      <Icon name={icon} />
+    </button>
+  );
+}
+
+export interface TabletTopBarProps {
+  readonly title: string;
+  readonly mode: 'kur' | 'bagla' | 'olc' | 'pause';
+  readonly time: number;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  readonly saveState: SaveState;
+  readonly settings: Settings;
+  readonly onSettings: (patch: Partial<Settings>) => void;
+  readonly onUndo: () => void;
+  readonly onRedo: () => void;
+  readonly onFit: () => void;
+  readonly onNew: () => void;
+  readonly onExport: () => void;
+  readonly onImport: () => void;
+  readonly onShare: () => void;
+  readonly onExamples: () => void;
+  /** Yardım düğmesi (8. aşamadan sonra). */
+  readonly extra?: ReactNode;
+}
+
+const MODE_CHIP: Record<TabletTopBarProps['mode'], string> = {
+  kur: 'bg-app text-ink-2',
+  bagla: 'bg-accent-soft text-accent-ink',
+  olc: 'bg-ok-soft text-ok-ink',
+  pause: 'bg-warn-soft text-warn',
+};
+
+/** Tabletin üst çubuğu (tasarım: T01, T02). */
+export function TabletTopBar(props: TabletTopBarProps) {
+  const timed = props.mode === 'olc' || props.mode === 'pause';
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-line bg-panel pr-2 pl-3" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <Logo />
+      <h1 className="sr-only">{tr.site.name}</h1>
+      <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
+      <button
+        type="button"
+        onClick={props.onExamples}
+        className="flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] px-3 text-[15px] font-medium text-ink active:bg-app"
+      >
+        <Icon name="book" />
+        {tr.examples.button}
+      </button>
+      <span className="mx-1.5 h-7 w-px shrink-0 bg-line" aria-hidden="true" />
+      <TouchIconButton icon="undo" label={tr.toolbar.undo} onClick={props.onUndo} disabled={!props.canUndo} />
+      <TouchIconButton icon="redo" label={tr.toolbar.redo} onClick={props.onRedo} disabled={!props.canRedo} />
+      <span className="flex-1" />
+      <span
+        role="status"
+        className={`flex h-[30px] shrink-0 items-center gap-1.5 rounded-full px-3 text-small font-semibold whitespace-nowrap ${MODE_CHIP[props.mode]}`}
+      >
+        {props.mode === 'olc' && <i className="block h-2 w-2 rounded-full bg-ok" aria-hidden="true" />}
+        {tr.phone.modes[props.mode]}
+        {timed && <span className="font-mono font-medium tabular">· {formatSI(props.time, 's', { digits: 4 })}</span>}
+      </span>
+      <SaveStatus state={props.saveState} />
+      <TouchIconButton icon="fit" label={tr.toolbar.fit} onClick={props.onFit} />
+      {props.extra}
+      <SettingsMenu settings={props.settings} onChange={props.onSettings} touch />
+    </header>
+  );
+}
+
 /** "Tarayıcıda kaydedildi": otomatik kaydın durumu (Kaydet düğmesi yok). */
 function SaveStatus({ state }: { state: SaveState }) {
   const failed = state === 'failed';
@@ -274,11 +371,14 @@ function FileMenu({
   onExport,
   onImport,
   onShare,
+  title,
 }: {
   onNew: () => void;
   onExport: () => void;
   onImport: () => void;
   onShare: () => void;
+  /** Tablet: düğmede "Dosya" yerine devrenin adı (44 px). */
+  title?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useDismiss(open, setOpen);
@@ -300,12 +400,13 @@ function FileMenu({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`flex h-9 items-center gap-1 rounded-md pr-2 pl-2.5 text-sm font-medium ${
+        aria-label={title ? tr.phone.fileButton(title) : undefined}
+        className={`flex items-center gap-1 rounded-md pr-2 pl-2.5 font-medium ${title ? 'h-11 min-w-0 rounded-[10px] text-[15px] font-semibold' : 'h-9 text-sm'} ${
           open ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-app'
         }`}
       >
-        {tr.file.menu}
-        <Icon name="chevronDown" className="h-4 w-4" />
+        <span className="truncate">{title ?? tr.file.menu}</span>
+        <Icon name="chevronDown" className="h-4 w-4 shrink-0" />
       </button>
       {open && (
         <div
@@ -345,16 +446,24 @@ function FileMenu({
   );
 }
 
-function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (patch: Partial<Settings>) => void }) {
+function SettingsMenu({ settings, onChange, touch = false }: { settings: Settings; onChange: (patch: Partial<Settings>) => void; touch?: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useDismiss(open, setOpen);
 
   return (
     <div ref={rootRef} className="relative shrink-0">
-      <ToolButton icon="settings" label={tr.toolbar.settings} title={tr.toolbar.settings} onClick={() => setOpen((o) => !o)} active={open} />
+      {touch ? (
+        <TouchIconButton icon="settings" label={tr.toolbar.settings} onClick={() => setOpen((o) => !o)} active={open} />
+      ) : (
+        <ToolButton icon="settings" label={tr.toolbar.settings} title={tr.toolbar.settings} onClick={() => setOpen((o) => !o)} active={open} />
+      )}
       {open && (
-        <div className="absolute top-11 right-0 z-40 w-60 rounded-lg border border-line bg-panel p-3 shadow-lg" role="dialog" aria-label={tr.settings.title}>
-          <SettingsFields settings={settings} onChange={onChange} />
+        <div
+          className={`absolute right-0 z-40 rounded-lg border border-line bg-panel p-3 shadow-lg ${touch ? 'top-12 w-72' : 'top-11 w-60'}`}
+          role="dialog"
+          aria-label={tr.settings.title}
+        >
+          <SettingsFields settings={settings} onChange={onChange} touch={touch} />
         </div>
       )}
     </div>

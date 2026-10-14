@@ -1,6 +1,7 @@
 // Ekran genişliğine göre düzen (tasarım: DS-Tipo ve Main kırılma noktaları):
 //   < 900 px        telefon: üst şerit, alt çubuk ve tek alt sayfa; yatay telefonda (yükseklik
 //                   < 500 px) sağda yan panel ve dikey çubuk (L01, L02)
+//   ≥ 900 px, dokunmatik   tablet (T01, T02): 72 px araç şeridi, dokunmatik İnceleme paneli, alt çubuk
 //   900–1279 px     sıkışık masaüstü: kütüphane 56 px şerit, açılır kart olarak açılır
 //   1280–1439 px    masaüstü: kütüphane 232 px
 //   ≥ 1440 px       masaüstü: kütüphane 256 px
@@ -11,7 +12,7 @@
 
 import { useEffect, useState } from 'react';
 
-export type LayoutKind = 'phone' | 'compact' | 'desktop';
+export type LayoutKind = 'phone' | 'tablet' | 'compact' | 'desktop';
 
 export interface Layout {
   readonly kind: LayoutKind;
@@ -33,9 +34,11 @@ function coarsePointer(): boolean {
 
 function layoutFor(width: number, height: number): Layout {
   const short = height <= LANDSCAPE_MAX_HEIGHT && width > height;
-  if (width <= PHONE_MAX_WIDTH || (short && coarsePointer())) {
+  const coarse = coarsePointer();
+  if (width <= PHONE_MAX_WIDTH || (short && coarse)) {
     return { kind: 'phone', landscape: short, libraryWidth: 256, inspectorWidth: 0 };
   }
+  if (coarse) return { kind: 'tablet', landscape: false, libraryWidth: 340, inspectorWidth: width < 1100 ? 320 : 340 };
   if (width < 1280) return { kind: 'compact', landscape: false, libraryWidth: 256, inspectorWidth: 320 };
   return width < 1440
     ? { kind: 'desktop', landscape: false, libraryWidth: 232, inspectorWidth: 320 }

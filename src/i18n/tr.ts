@@ -855,7 +855,7 @@ export const tr = {
     label: 'İnceleme paneli',
     collapsedLabel: 'İnceleme paneli (daraltılmış)',
     open: 'İnceleme panelini aç',
-    tabs: { inspect: 'İncele', example: 'Örnek', messages: 'Mesajlar' },
+    tabs: { inspect: 'İncele', example: 'Örnek', devices: 'Cihazlar', messages: 'Mesajlar' },
     emptyTitle: 'Henüz parça yok',
     emptyText: 'Bir parçayı seçince canlı ölçümleri, formül notunu ve özelliklerini burada görürsün.',
     steps: [
@@ -1178,6 +1178,15 @@ export const tr = {
     examplesHint: 'Bir örneğe dokun: devre açılır, tahmin sorusu alttaki sayfada çıkar.',
     exampleOpen: 'Açık',
     examplesNone: 'Bu aramayla eşleşen örnek yok.',
+  },
+  tablet: {
+    tools: 'Araçlar',
+    locked: 'Ölç’te kapalı',
+    empty: 'Parça eklemek için soldaki **Parça** düğmesine dokun.',
+    hintSelect: '**Parçaya dokun:** seç · **uca dokun:** kablo · **basılı tut:** menü · iki parmak: yakınlaştır',
+    hintSelected: '**Parçayı 150 ms basılı tutup sürükle:** taşı · değerini sağdaki panelden değiştir',
+    rack: (label: string) => `Cihaz rafı · ${label}`,
+    rackLabel: (label: string) => `Cihazlar sekmesini aç: ${label}`,
   },
   diagnostics: {
     describe: describeDiagnostic,

@@ -1,17 +1,19 @@
-// Sağdaki İnceleme paneli (masaüstü, 320–336 px; tasarım: M01–M07, N01). Sekmeler: İncele (seçili
-// parçanın canlı ölçümleri ve özellikleri), Örnek (açık örneğin sorusu ve cevabı), Mesajlar (hata ve
-// uyarılar). Telefonda 6. aşamaya kadar eski özellik penceresi, örnek kartı ve mesaj paneli kullanılır.
+// Sağdaki İnceleme paneli (masaüstü 320–336 px, tablet 320–340 px; tasarım: M01–M07, N01, T01, T02).
+// Sekmeler: İncele (seçili parçanın canlı ölçümleri ve özellikleri), Örnek (açık örneğin sorusu ve
+// cevabı), tablette Cihazlar (ön paneller; masaüstünde raf tuvalin altında) ve Mesajlar (hata ve
+// uyarılar). Tablette dokunmatik boyutlar.
 
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { tr } from '../i18n/tr';
 import { ExampleTab, type ExampleTabProps } from './ExampleTab';
 import { Icon, type IconName } from './icons';
 import { InspectTab, type InspectTabProps } from './InspectTab';
 import { MessagesTab, type MessagesTabProps } from './MessagesTab';
+import { TouchUi } from './touchUi';
 
-export type InspectorTab = 'inspect' | 'example' | 'messages';
+export type InspectorTab = 'inspect' | 'example' | 'devices' | 'messages';
 
-const TABS: readonly InspectorTab[] = ['inspect', 'example', 'messages'];
+const DESK_TABS: readonly InspectorTab[] = ['inspect', 'example', 'messages'];
 
 export interface InspectorProps {
   readonly width: number;
@@ -24,11 +26,19 @@ export interface InspectorProps {
   readonly inspect: InspectTabProps;
   readonly example: ExampleTabProps;
   readonly messages: MessagesTabProps;
+  /** Tablet: dokunmatik boyutlar. */
+  readonly touch?: boolean;
+  /** Tablet: Cihazlar sekmesinin içeriği (devrede cihaz varken). */
+  readonly devices?: ReactNode;
+  /** Tablet: İncele sekmesinde seçili parçanın dokunmatik sayfası (yoksa İncele sekmesi). */
+  readonly inspectBody?: ReactNode;
 }
 
-const TAB_ICONS: Record<InspectorTab, IconName> = { inspect: 'search', example: 'book', messages: 'chat' };
+const TAB_ICONS: Record<InspectorTab, IconName> = { inspect: 'search', example: 'book', devices: 'devices', messages: 'chat' };
 
-export function Inspector({ width, collapsed, onExpand, tab, onTab, inspect, example, messages }: InspectorProps) {
+export function Inspector({ width, collapsed, onExpand, tab: requested, onTab, inspect, example, messages, touch = false, devices, inspectBody }: InspectorProps) {
+  const TABS: readonly InspectorTab[] = devices ? ['inspect', 'example', 'devices', 'messages'] : DESK_TABS;
+  const tab = TABS.includes(requested) ? requested : 'inspect';
   const errors = messages.items.filter((i) => i.severity === 'error').length;
   const count = messages.items.length;
 
@@ -101,7 +111,7 @@ export function Inspector({ width, collapsed, onExpand, tab, onTab, inspect, exa
               aria-controls={`inspector-panel-${t}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => onTab(t)}
-              className={`-mb-px flex h-11 items-center gap-1.5 border-b-2 px-3 text-sm font-medium ${
+              className={`-mb-px flex items-center gap-1.5 border-b-2 font-medium ${touch ? 'h-12 px-2.5 text-[15px]' : 'h-11 px-3 text-sm'} ${
                 selected ? 'border-ink text-ink' : 'border-transparent text-muted hover:text-ink'
               }`}
             >
@@ -123,9 +133,12 @@ export function Inspector({ width, collapsed, onExpand, tab, onTab, inspect, exa
         aria-labelledby={`inspector-tab-${tab}`}
         className="flex min-h-0 flex-1 flex-col"
       >
-        {tab === 'inspect' && <InspectTab {...inspect} />}
-        {tab === 'example' && <ExampleTab {...example} />}
-        {tab === 'messages' && <MessagesTab {...messages} />}
+        <TouchUi.Provider value={touch}>
+          {tab === 'inspect' && (inspectBody ?? <InspectTab {...inspect} />)}
+          {tab === 'example' && <ExampleTab {...example} />}
+          {tab === 'devices' && devices}
+          {tab === 'messages' && <MessagesTab {...messages} />}
+        </TouchUi.Provider>
       </div>
     </aside>
   );

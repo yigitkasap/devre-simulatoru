@@ -406,6 +406,58 @@ try {
     await page.context().close();
   }
 
+  // --- Tablet (T01, T02): dokunmatik, ≥ 900 px ---------------------------------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const cdp = await ctx.newCDPSession(page);
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const rail = await page.getByRole('navigation', { name: 'Araçlar' }).boundingBox();
+    const library = await page.locator('aside[aria-label="Parçalar"]').count();
+    check('tablette solda 72 px araç şeridi, kütüphane paneli yok', rail !== null && Math.round(rail.width) === 72 && library === 0, rail ? `${Math.round(rail.width)} px` : 'yok');
+    await page.getByRole('button', { name: 'Parça', exact: true }).tap(); await page.waitForTimeout(300);
+    const card = page.getByRole('dialog', { name: 'Parça ekle' });
+    const ta = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
+    check('tablette parça kartı açılıyor; açıkken tuvalin touch-action değeri none değil', (await card.count()) === 1 && ta !== 'none', ta);
+    await card.getByRole('button', { name: 'Direnç ekle' }).tap(); await page.waitForTimeout(400);
+    await card.getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
+    const field = page.getByLabel('Direnç', { exact: true });
+    const fs = await field.evaluate((el) => getComputedStyle(el).fontSize).catch(() => '');
+    check('tablette eklenen parça seçili; İncele sekmesinde dokunmatik alan (≥ 16 px)', parseFloat(fs) >= 16, fs);
+    const r1 = await part(page, 'R1');
+    let s = await screen(page, r1.x, r1.y);
+    await drag(page, cdp, s, { x: s.x + 80, y: s.y + 40 }, 250);
+    const moved = await part(page, 'R1');
+    check('tablette parça basılı tutup sürüklenerek taşınıyor', moved.x !== r1.x || moved.y !== r1.y);
+    // Ölç: toprağı olan bir örnek devre.
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'LED ve ön direnç', exact: true }).tap(); await page.waitForTimeout(600);
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).tap(); await page.waitForTimeout(500);
+    const partsDisabled = await page.getByRole('button', { name: 'Parça', exact: true }).isDisabled();
+    const before = await part(page, 'R1');
+    s = await screen(page, before.x, before.y);
+    await drag(page, cdp, s, { x: s.x + 60, y: s.y }, 250);
+    const locked = await part(page, 'R1');
+    check('tablette Ölç’te Parça kapalı ve devre kilitli', partsDisabled && locked.x === before.x && locked.y === before.y);
+    await shot(page, 'ios-10-tablet.png');
+    await ctx.close();
+  }
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).tap(); await page.waitForTimeout(600);
+    const exampleTab = await page.getByRole('tab', { name: 'Örnek' }).getAttribute('aria-selected');
+    await page.getByRole('button', { name: /^Cihazlar sekmesini aç/ }).tap(); await page.waitForTimeout(300);
+    const devicesTab = await page.getByRole('tab', { name: 'Cihazlar' }).getAttribute('aria-selected');
+    const panel = (await page.getByRole('tabpanel').textContent()) ?? '';
+    check('tablette örnek Örnek sekmesinde; cihaz düğmesi Cihazlar sekmesini açıyor', exampleTab === 'true' && devicesTab === 'true' && panel.includes('Osiloskop'), panel.slice(0, 30));
+    await ctx.close();
+  }
+
   // --- Masaüstü kabuğu: kütüphane bilgi alanı, ipucu şeridi, hız penceresi ---------------
   const desk = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
   const dp = await desk.newPage();
