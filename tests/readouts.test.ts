@@ -54,9 +54,9 @@ describe('V/I/P bilgi kutusu', () => {
     const readout = partReadout(part(ids.resistor), sim.measure(ids.resistor)!)!;
     expect(readout.title).toBe('R1 · Direnç');
     expect(readout.rows).toEqual([
-      { label: 'Gerilim', value: '9,40 V' },
-      { label: 'Akım', value: '9,40 mA' },
-      { label: 'Harcanan güç', value: '88,4 mW' },
+      { label: 'Gerilim', value: '9,400 V' },
+      { label: 'Akım', value: '9,400 mA' },
+      { label: 'Harcanan güç', value: '88,36 mW' },
     ]);
     expect(readout.note).toBe('V = I · R → 9,40 V = 9,40 mA × 1,00 kΩ');
   });
@@ -64,14 +64,14 @@ describe('V/I/P bilgi kutusu', () => {
   it('pilde verilen akım ve güç pozitif', () => {
     const { sim, part, ids } = meteredCircuit();
     const readout = partReadout(part(ids.battery), sim.measure(ids.battery)!)!;
-    expect(readout.rows[1]).toEqual({ label: 'Verdiği akım', value: '9,40 mA' });
-    expect(readout.rows[2]).toEqual({ label: 'Verdiği güç', value: '88,4 mW' });
+    expect(readout.rows[1]).toEqual({ label: 'Verdiği akım', value: '9,400 mA' });
+    expect(readout.rows[2]).toEqual({ label: 'Verdiği güç', value: '88,36 mW' });
   });
 
   it('ideal voltmetre akım çekmez', () => {
     const { sim, part, ids } = meteredCircuit();
     const readout = partReadout(part(ids.voltmeter), sim.measure(ids.voltmeter)!)!;
-    expect(readout.rows[1]).toEqual({ label: 'Devreden çektiği akım', value: '0,00 A' });
+    expect(readout.rows[1]).toEqual({ label: 'Devreden çektiği akım', value: '0,000 A' });
     expect(readout.note).toContain('hiç akım çekmez');
   });
 });

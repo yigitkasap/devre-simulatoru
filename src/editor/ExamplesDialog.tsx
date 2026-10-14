@@ -8,12 +8,14 @@ import { Icon } from './icons';
 import { Rich } from './Rich';
 
 export interface ExamplesDialogProps {
+  /** Telefon düzeni: örneğin açıklaması tuvalin köşesindeki kartta çıkar (masaüstünde Örnek sekmesinde). */
+  readonly phone: boolean;
   readonly activeExample: ExampleId | null;
   readonly onLoad: (id: ExampleId) => void;
   readonly onClose: () => void;
 }
 
-export function ExamplesDialog({ activeExample, onLoad, onClose }: ExamplesDialogProps) {
+export function ExamplesDialog({ phone, activeExample, onLoad, onClose }: ExamplesDialogProps) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -44,7 +46,7 @@ export function ExamplesDialog({ activeExample, onLoad, onClose }: ExamplesDialo
             <h2 id={titleId} className="font-semibold">
               {tr.examples.dialogTitle}
             </h2>
-            <p className="text-xs text-muted">{tr.examples.dialogHint}</p>
+            <p className="text-xs text-muted">{phone ? tr.examples.dialogHintPhone : tr.examples.dialogHint}</p>
           </div>
           <button
             ref={closeRef}

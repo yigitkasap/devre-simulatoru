@@ -40,7 +40,10 @@ const TONES: Record<Tone, string> = {
   accent: 'border-accent-line bg-accent-soft text-accent-ink',
 };
 
-function hintText(hint: CanvasHint): { text: string; tone: Tone } {
+/** Şeridin gösterdiği durum: tuvalin ipucu ya da açık bir örneğin yönlendirmesi. */
+export type StripHint = CanvasHint | { readonly kind: 'example' };
+
+function hintText(hint: StripHint): { text: string; tone: Tone; right?: string } {
   switch (hint.kind) {
     case 'simulating':
       return { text: tr.hints.simulating, tone: 'ok' };
@@ -54,13 +57,15 @@ function hintText(hint: CanvasHint): { text: string; tone: Tone } {
       return { text: tr.hints.selected(hint.count), tone: 'neutral' };
     case 'empty':
       return { text: tr.hints.empty, tone: 'neutral' };
+    case 'example':
+      return { text: tr.hints.example, tone: 'neutral', right: tr.hints.exampleUndo };
     default:
       return { text: tr.hints.select, tone: 'neutral' };
   }
 }
 
-export function HintStrip({ hint }: { hint: CanvasHint }) {
-  const { text, tone } = hintText(hint);
+export function HintStrip({ hint }: { hint: StripHint }) {
+  const { text, tone, right } = hintText(hint);
   return (
     <div
       className={`flex h-7 shrink-0 items-center justify-between gap-3 overflow-hidden border-t px-3 text-small whitespace-nowrap max-desk:hidden ${TONES[tone]}`}
@@ -68,6 +73,11 @@ export function HintStrip({ hint }: { hint: CanvasHint }) {
       <p className="min-w-0 truncate">
         <HintText text={text} />
       </p>
+      {right && (
+        <p className="shrink-0">
+          <HintText text={right} />
+        </p>
+      )}
     </div>
   );
 }

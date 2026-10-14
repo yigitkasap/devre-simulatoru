@@ -38,9 +38,13 @@ export interface Readout {
 }
 
 const t = tr.readout;
-const v = (x: number) => formatSI(x, 'V');
-const a = (x: number) => formatSI(x, 'A');
-const w = (x: number) => formatSI(x, 'W');
+// Satırlardaki değerler 4 anlamlı basamakla (ölçü aletlerinin ekranıyla aynı: 14,46 mA); formül
+// notlarındakiler 3 basamakla (okunur kalsın diye).
+const v = (x: number) => formatSI(x, 'V', { digits: 4 });
+const a = (x: number) => formatSI(x, 'A', { digits: 4 });
+const w = (x: number) => formatSI(x, 'W', { digits: 4 });
+const vn = (x: number) => formatSI(x, 'V');
+const an = (x: number) => formatSI(x, 'A');
 const ohm = (x: number) => formatSI(x, 'Ω');
 /** Parça değerleri (iç direnç vb.) tuvaldeki etiketlerle aynı biçimde: "1 MΩ", "0,1 Ω". */
 const ohmValue = (x: number) => formatSI(x, 'Ω', { trim: true, digits: 4 });
@@ -68,7 +72,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
           { label: t.powerUsed, value: w(P) },
         ],
         // Ohm yasası: hesaplanan V ile I·R aynı çıkmalı.
-        note: `V = I · R → ${v(V)} = ${a(I)} × ${ohm(R)}`,
+        note: `V = I · R → ${vn(V)} = ${an(I)} × ${ohm(R)}`,
       };
     }
     case 'battery': {
@@ -84,7 +88,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
       return {
         title,
         rows,
-        ...(r > 0 ? { note: `V = E − I · R_{iç} → ${v(m.voltage)} = ${v(emf)} − ${a(out)} × ${ohm(r)}` } : {}),
+        ...(r > 0 ? { note: `V = E − I · R_{iç} → ${vn(m.voltage)} = ${vn(emf)} − ${an(out)} × ${ohm(r)}` } : {}),
       };
     }
     case 'acsource': {
@@ -104,7 +108,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
           { label: t.frequency, value: formatSI(f, 'Hz', { trim: true, digits: 4 }) },
           { label: t.period, value: formatSI(1 / f, 's', { trim: true, digits: 4 }) },
         ],
-        note: offset === 0 ? formula : `${formula} ${t.withOffset(v(offset))}`,
+        note: offset === 0 ? formula : `${formula} ${t.withOffset(vn(offset))}`,
       };
     }
     case 'oscilloscope': {

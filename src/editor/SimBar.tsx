@@ -75,63 +75,63 @@ export function SimBar(props: SimBarProps) {
   }
 
   return (
-    <div
-      role="region"
-      aria-label={tr.sim.region}
-      className="flex min-h-[52px] shrink-0 items-center gap-2.5 border-t border-line bg-panel px-3 text-sm max-desk:flex-wrap max-desk:gap-x-2 max-desk:gap-y-1 max-desk:px-2 max-desk:py-1.5"
-    >
-      <div className="flex items-center gap-2.5 max-desk:gap-1.5">
-        <button
-          type="button"
-          onClick={running ? undefined : props.onPlay}
-          aria-pressed={running}
-          className={`flex h-9 items-center gap-1.5 rounded-md border pr-3.5 pl-3 font-semibold text-white ${
-            running ? 'border-ok-ink bg-ok-ink' : 'border-ok bg-ok hover:brightness-110'
-          }`}
-        >
-          <Icon name="play" />
-          {tr.sim.play}
-        </button>
-        <SimButton icon="pause" label={tr.sim.pause} onClick={props.onPause} disabled={!running} />
-        <SimButton icon="stop" label={tr.sim.stop} title={tr.sim.stopTitle} onClick={props.onStop} disabled={!active} />
+    // Çubuğun genişliğine göre (container query): sütun daraldıkça önce hız açıklaması, sonra düğme ve
+    // durum yazıları simgeye iner (yazı ekran okuyucuya kalır); çok darda satırlara taşar.
+    <div role="region" aria-label={tr.sim.region} className="@container shrink-0 border-t border-line bg-panel">
+      <div className="flex min-h-[52px] items-center gap-2.5 px-3 text-sm @max-[780px]:gap-2 @max-[640px]:flex-wrap @max-[640px]:gap-y-1 @max-[640px]:px-2 @max-[640px]:py-1.5">
+        <div className="flex items-center gap-2.5 @max-[640px]:gap-1.5">
+          <button
+            type="button"
+            onClick={running ? undefined : props.onPlay}
+            aria-pressed={running}
+            className={`flex h-9 items-center gap-1.5 rounded-md border pr-3.5 pl-3 font-semibold text-white ${
+              running ? 'border-ok-ink bg-ok-ink' : 'border-ok bg-ok hover:brightness-110'
+            }`}
+          >
+            <Icon name="play" />
+            {tr.sim.play}
+          </button>
+          <SimButton icon="pause" label={tr.sim.pause} onClick={props.onPause} disabled={!running} />
+          <SimButton icon="stop" label={tr.sim.stop} title={tr.sim.stopTitle} onClick={props.onStop} disabled={!active} />
+        </div>
+        <span className="mx-1 h-6 w-px bg-line @max-[640px]:hidden" aria-hidden="true" />
+
+        <span role="status" className="flex min-w-[118px] items-center gap-2 font-semibold @max-[960px]:min-w-0">
+          <StatusMark status={status} />
+          <span className="@max-[780px]:sr-only">{tr.sim.status[status]}</span>
+        </span>
+        <span className="text-small whitespace-nowrap text-muted">
+          {tr.sim.time}:{' '}
+          <span className="font-mono font-semibold text-ink tabular">{formatSI(active ? props.time : 0, 's', { digits: 4 })}</span>
+        </span>
+
+        <SpeedControl speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} />
+
+        <label className="flex cursor-pointer items-center gap-2 px-1 text-small whitespace-nowrap">
+          <input
+            type="checkbox"
+            checked={props.electronFlow}
+            onChange={(e) => props.onElectronFlow(e.target.checked)}
+            className="h-[18px] w-[18px] accent-accent"
+          />
+          {tr.sim.electronFlow}
+        </label>
+
+        {message && (
+          <p
+            className={`flex min-w-0 flex-1 items-center justify-end gap-2 text-small @max-[640px]:basis-full @max-[640px]:justify-start ${
+              message.tone === 'error' ? 'text-danger' : 'text-muted'
+            }`}
+            role={message.tone === 'error' ? 'alert' : undefined}
+            title={plainText(message.text)}
+          >
+            <Icon name="info" className="h-5 w-5 shrink-0" />
+            <span className="truncate whitespace-nowrap @max-[640px]:whitespace-normal">
+              <Rich text={message.text} />
+            </span>
+          </p>
+        )}
       </div>
-      <span className="mx-1 h-6 w-px bg-line max-desk:hidden" aria-hidden="true" />
-
-      <span role="status" className="flex min-w-[118px] items-center gap-2 font-semibold max-desk:min-w-0">
-        <StatusMark status={status} />
-        <span className="max-desk:sr-only">{tr.sim.status[status]}</span>
-      </span>
-      <span className="text-small whitespace-nowrap text-muted">
-        {tr.sim.time}:{' '}
-        <span className="font-mono font-semibold text-ink tabular">{formatSI(active ? props.time : 0, 's', { digits: 4 })}</span>
-      </span>
-
-      <SpeedControl speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} />
-
-      <label className="flex cursor-pointer items-center gap-2 px-1 text-small whitespace-nowrap">
-        <input
-          type="checkbox"
-          checked={props.electronFlow}
-          onChange={(e) => props.onElectronFlow(e.target.checked)}
-          className="h-[18px] w-[18px] accent-accent"
-        />
-        {tr.sim.electronFlow}
-      </label>
-
-      {message && (
-        <p
-          className={`flex min-w-0 flex-1 items-center justify-end gap-2 text-small max-desk:basis-full max-desk:justify-start ${
-            message.tone === 'error' ? 'text-danger' : 'text-muted'
-          }`}
-          role={message.tone === 'error' ? 'alert' : undefined}
-          title={plainText(message.text)}
-        >
-          <Icon name="info" className="h-5 w-5 shrink-0" />
-          <span className="truncate desk:whitespace-nowrap">
-            <Rich text={message.text} />
-          </span>
-        </p>
-      )}
     </div>
   );
 }
@@ -155,10 +155,10 @@ function SimButton({
       onClick={onClick}
       disabled={disabled}
       title={title ?? label}
-      className="flex h-9 items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 font-medium text-ink enabled:hover:bg-panel-2 disabled:text-stopped max-desk:w-10 max-desk:justify-center max-desk:px-0"
+      className="flex h-9 items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 font-medium text-ink enabled:hover:bg-panel-2 disabled:text-stopped @max-[880px]:w-10 @max-[880px]:justify-center @max-[880px]:px-0"
     >
       <Icon name={icon} />
-      <span className="max-desk:sr-only">{label}</span>
+      <span className="@max-[880px]:sr-only">{label}</span>
     </button>
   );
 }
@@ -241,7 +241,7 @@ function SpeedControl({
         <Icon name="speed" />
         {tr.sim.speed}
         <span className="font-mono text-small font-semibold">{speedLabel(speed)}</span>
-        <span className="text-small font-normal text-muted max-desk:hidden">{speedNote(speed)}</span>
+        <span className="text-small font-normal text-muted @max-[960px]:hidden">{speedNote(speed)}</span>
         <Icon name="chevronUp" className="h-4 w-4" />
       </button>
       {open && (

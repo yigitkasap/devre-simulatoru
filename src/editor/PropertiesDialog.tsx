@@ -1,15 +1,15 @@
-// Özellik penceresi: bir parçaya çift tıklayınca açılır. Değerler SI önekleriyle yazılır;
-// hatalı girişte alanın altında Türkçe bir uyarı çıkar.
+// Özellik penceresi (telefonda; masaüstünde İnceleme paneli kullanılır): bir parçaya çift dokununca
+// açılır. Değerler SI önekleriyle yazılır; hatalı girişte alanın altında Türkçe bir uyarı çıkar.
 
 import { useEffect, useId, useRef, useState, type ReactNode, type SubmitEvent } from 'react';
 import { tr } from '../i18n/tr';
-import { CATALOG, type NumberPropDef } from '../model/catalog';
+import { CATALOG } from '../model/catalog';
 import type { Part } from '../model/types';
-import { acRms, WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { PropValue } from '../sim/netlist';
-import { formatEditable, formatSI, parseValue } from '../sim/units';
+import { formatEditable } from '../sim/units';
 import { Icon } from './icons';
+import { partNote, validateNumber } from './propertyForm';
 import { Rich } from './Rich';
 
 export interface PropertiesDialogProps {
@@ -18,23 +18,6 @@ export interface PropertiesDialogProps {
   readonly otherLabels: ReadonlySet<string>;
   readonly onCancel: () => void;
   readonly onSave: (patch: { label: string; props: Record<string, PropValue> }) => void;
-}
-
-function validateNumber(def: NumberPropDef, text: string): { value: number } | { error: string } {
-  const parsed = parseValue(text, def.unit || undefined);
-  if (!parsed.ok) {
-    if (parsed.error === 'empty') return { error: tr.properties.errors.empty };
-    if (parsed.error === 'wrong-unit') return { error: tr.properties.errors.wrongUnit(def.unit) };
-    return { error: tr.properties.errors.invalid };
-  }
-  if (def.min) {
-    if (def.min.exclusive && parsed.value <= def.min.value) return { error: tr.properties.errors.positive };
-    if (!def.min.exclusive && parsed.value < def.min.value) return { error: tr.properties.errors.nonNegative };
-  }
-  if (def.max !== undefined && parsed.value > def.max) {
-    return { error: tr.properties.errors.max(formatSI(def.max, def.unit, { trim: true })) };
-  }
-  return { value: parsed.value };
 }
 
 export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: PropertiesDialogProps) {
@@ -79,14 +62,7 @@ export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: Proper
     if (Object.keys(nextErrors).length === 0) onSave({ label: trimmed, props });
   };
 
-  const note =
-    part.type === 'led'
-      ? ledNote(values.color)
-      : part.type === 'acsource'
-        ? acNote(values)
-        : part.type === 'voltmeter' || part.type === 'ammeter'
-          ? `${tr.properties.notes[part.type] ?? ''} ${tr.properties.meterModeNote}`
-          : tr.properties.notes[part.type];
+  const note = partNote(part.type, values);
 
   return (
     <div
@@ -221,31 +197,6 @@ export function PropertiesDialog({ part, otherLabels, onCancel, onSave }: Proper
         </div>
       </form>
     </div>
-  );
-}
-
-function ledNote(color: PropValue | undefined): string {
-  const model = LED_MODELS[(typeof color === 'string' && color in LED_MODELS ? color : 'red') as LedColor];
-  return tr.properties.ledSpec(
-    formatSI(model.forwardVoltage, 'V', { trim: true }),
-    formatSI(model.maxCurrent, 'A', { trim: true }),
-  );
-}
-
-/** AC kaynağın etkin değeri ve periyodu (alanlar geçerliyse; yazılırken güncellenir). */
-function acNote(values: Record<string, PropValue>): string | undefined {
-  const read = (key: string) => {
-    const parsed = parseValue(String(values[key] ?? ''));
-    return parsed.ok ? parsed.value : null;
-  };
-  const amplitude = read('amplitude');
-  const frequency = read('frequency');
-  const offset = read('offset') ?? 0;
-  const waveform = (WAVEFORMS as readonly PropValue[]).includes(values.waveform ?? '') ? (values.waveform as Waveform) : 'sine';
-  if (amplitude === null || frequency === null || frequency <= 0) return undefined;
-  return tr.properties.acSpec(
-    formatSI(acRms(waveform, Math.abs(amplitude), offset), 'V'),
-    formatSI(1 / frequency, 's', { trim: true, digits: 4 }),
   );
 }
 

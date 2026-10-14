@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
+import type { PartPatch } from './InspectTab';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
 import { flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
@@ -18,8 +19,9 @@ import { loadSavedDoc, useAutosave } from './autosave';
 import { Canvas, type CanvasHandle, type CanvasStatus, type Highlight } from './Canvas';
 import { ExampleCard } from './ExampleCard';
 import { ExamplesDialog } from './ExamplesDialog';
+import { Inspector, type InspectorTab } from './Inspector';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
-import { HintStrip } from './HintStrip';
+import { HintStrip, type StripHint } from './HintStrip';
 import { Library, LibraryFlyout, type LibraryMode } from './Library';
 import { MessagesPanel, messageKey, type MessageItem } from './MessagesPanel';
 import { PropertiesDialog } from './PropertiesDialog';
@@ -81,6 +83,11 @@ export default function Simulator() {
   const [hoveredType, setHoveredType] = useState<DeviceType | null>(null);
   const [lastInfoType, setLastInfoType] = useState<DeviceType>('battery');
   const [canvasStatus, setCanvasStatus] = useState<CanvasStatus>({ hint: { kind: 'select' }, scale: 1 });
+  const [inspectorTab, setInspectorTab] = useState<InspectorTab>('inspect');
+  /** Artınca İncele sekmesindeki ilk değer alanına odaklanılır (çift tık). */
+  const [focusRequest, setFocusRequest] = useState(0);
+  /** Öğrencinin örneklere yazdığı tahminler (yalnızca bu oturumda). */
+  const [predictions, setPredictions] = useState<Partial<Record<ExampleId, string>>>({});
   const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
@@ -130,6 +137,7 @@ export default function Simulator() {
     setActiveExample(example);
     setExampleCollapsed(false);
     setAnswerRevealed(false);
+    if (example) setInspectorTab('example');
     setFitRequest((n) => n + 1);
     showToast(message);
   };
@@ -260,14 +268,43 @@ export default function Simulator() {
   useEffect(() => {
     const before = new Set(previousRuntime.current.split(';'));
     previousRuntime.current = runtimeKeys;
-    if (runtimeKeys && runtimeKeys.split(';').some((k) => !before.has(k))) setPanelOpen(true);
+    if (runtimeKeys && runtimeKeys.split(';').some((k) => !before.has(k))) {
+      setPanelOpen(true);
+      // Yeni hata/uyarıda Mesajlar sekmesi öne gelir (odak alınmaz).
+      setInspectorTab('messages');
+    }
   }, [runtimeKeys]);
   useEffect(() => {
     if (sim.notice?.kind === 'error') {
       setPanelOpen(true);
+      setInspectorTab('messages');
       setSelectedMessage(messageKey(sim.notice.diagnostic));
     }
   }, [sim.notice]);
+
+  // Tuvalde bir şey seçilince İncele sekmesi açılır.
+  const selectionKey = [...selection.parts, '|', ...selection.wires].join(',');
+  useEffect(() => {
+    if (selection.parts.length + selection.wires.length > 0) setInspectorTab('inspect');
+  }, [selectionKey]);
+
+  /** Çift tık: masaüstünde parçayı seçip İncele'deki ilk değer alanına odaklanır; telefonda pencere açar. */
+  const openProperties = (partId: string) => {
+    if (phone) {
+      setPropertiesFor(partId);
+      return;
+    }
+    dispatch({ type: 'select', selection: { parts: [partId], wires: [] } });
+    setInspectorTab('inspect');
+    setFocusRequest((n) => n + 1);
+  };
+  const updatePartFromPanel = (partId: string, patch: PartPatch) => {
+    dispatch({ type: 'commit', doc: updatePart(doc, partId, patch) });
+  };
+  const stripHint: StripHint =
+    activeExample && !answerRevealed && (canvasStatus.hint.kind === 'select' || canvasStatus.hint.kind === 'empty')
+      ? { kind: 'example' }
+      : canvasStatus.hint;
 
   const editingPart = propertiesFor ? doc.parts.find((p) => p.id === propertiesFor) : undefined;
 
@@ -413,7 +450,7 @@ export default function Simulator() {
               connectivity={connectivity}
               dispatch={dispatch}
               libraryDragType={libraryDragType}
-              onOpenProperties={setPropertiesFor}
+              onOpenProperties={openProperties}
               keyboardEnabled={!editingPart && !shareLink && !examplesOpen}
               flowGraph={flowGraph}
               simActive={sim.status !== 'stopped'}
@@ -423,13 +460,14 @@ export default function Simulator() {
               onRotate={rotateSelection}
               onFlip={flipSelection}
               fitRequest={fitRequest}
-              reserveCard={activeExample === null ? 'none' : exampleCollapsed ? 'collapsed' : 'open'}
+              reserveCard={!phone || activeExample === null ? 'none' : exampleCollapsed ? 'collapsed' : 'open'}
               reserveScope={!scope ? 'none' : scopeCollapsed ? 'collapsed' : 'open'}
               touch={touch}
               overlayOpen={libraryOpen || showFlyout || Boolean(editingPart) || Boolean(shareLink) || examplesOpen}
               onStatusChange={setCanvasStatus}
               onPartPlaced={rememberPart}
               onExamples={() => setExamplesOpen(true)}
+              readoutBoxes={phone}
             />
             {scope && (
               <ScopePanel
@@ -448,7 +486,7 @@ export default function Simulator() {
                 onAuto={autoScope}
               />
             )}
-            {activeExample && (
+            {phone && activeExample && (
               <ExampleCard
                 key={activeExample}
                 id={activeExample}
@@ -462,16 +500,18 @@ export default function Simulator() {
               />
             )}
           </main>
-          {!phone && <HintStrip hint={canvasStatus.hint} />}
+          {!phone && <HintStrip hint={stripHint} />}
 
-          <MessagesPanel
-            items={messages}
-            open={panelOpen}
-            onToggle={() => setPanelOpen((o) => !o)}
-            selectedKey={selectedItem ? selectedItem.key : null}
-            onSelect={selectMessage}
-            context={diagnosticContext}
-          />
+          {phone && (
+            <MessagesPanel
+              items={messages}
+              open={panelOpen}
+              onToggle={() => setPanelOpen((o) => !o)}
+              selectedKey={selectedItem ? selectedItem.key : null}
+              onSelect={selectMessage}
+              context={diagnosticContext}
+            />
+          )}
 
           <SimBar
             status={sim.status}
@@ -489,6 +529,46 @@ export default function Simulator() {
             onElectronFlow={(on) => updateSettings({ electronFlow: on })}
           />
         </div>
+        {!phone && (
+          <Inspector
+            width={layout.inspectorWidth}
+            tab={inspectorTab}
+            onTab={setInspectorTab}
+            inspect={{
+              doc,
+              selection,
+              frame: sim.frame,
+              status: sim.status,
+              settings,
+              focusRequest,
+              onUpdatePart: updatePartFromPanel,
+              onRotate: rotateSelection,
+              onFlip: flipSelection,
+              onDelete: () =>
+                dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION }),
+              onRepair: sim.repair,
+              onSelectPart: (partId) => dispatch({ type: 'select', selection: { parts: [partId], wires: [] } }),
+            }}
+            example={{
+              id: activeExample,
+              revealed: answerRevealed,
+              prediction: activeExample ? (predictions[activeExample] ?? '') : '',
+              onPrediction: (text) => {
+                if (activeExample) setPredictions((p) => ({ ...p, [activeExample]: text }));
+              },
+              onPlay: sim.play,
+              onOpen: loadExample,
+              onClose: () => setActiveExample(null),
+              onBrowse: () => setExamplesOpen(true),
+            }}
+            messages={{
+              items: messages,
+              selectedKey: selectedItem ? selectedItem.key : null,
+              onSelect: selectMessage,
+              context: diagnosticContext,
+            }}
+          />
+        )}
       </div>
 
       {editingPart && (
@@ -505,6 +585,7 @@ export default function Simulator() {
       {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
       {examplesOpen && (
         <ExamplesDialog
+          phone={phone}
           activeExample={activeExample}
           onClose={() => setExamplesOpen(false)}
           onLoad={(id) => {

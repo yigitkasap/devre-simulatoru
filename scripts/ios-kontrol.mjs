@@ -257,6 +257,39 @@ try {
   check('masaüstü: hız penceresinde "Ağır çekim" ×10⁻⁶ yapıyor', speedText.includes('10⁻⁶') && speedText.includes('1 µs'), speedText);
   await dp.keyboard.press('Escape'); await dp.waitForTimeout(100);
   check('masaüstü: hız penceresi Esc ile kapanıyor', (await dp.getByRole('dialog', { name: 'Simülasyon hızı' }).count()) === 0);
+  // Hızı gerçek zamana geri al (aşağıdaki denetimler için).
+  await dp.getByRole('button', { name: /^Hız/ }).click(); await dp.getByRole('radio', { name: /Gerçek zaman/ }).click();
+  await dp.keyboard.press('Escape');
+
+  // --- Masaüstü: İnceleme paneli (İncele, Örnek, Mesajlar) ----------------------------
+  await dp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await dp.waitForTimeout(200);
+  await dp.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await dp.waitForTimeout(500);
+  const exampleTab = await dp.getByRole('tab', { name: 'Örnek' }).getAttribute('aria-selected');
+  const exampleText = (await dp.getByRole('tabpanel').textContent()) ?? '';
+  check('masaüstü: örnek açılınca Örnek sekmesi soruyla açılıyor', exampleTab === 'true' && exampleText.includes('Tahmin et') && exampleText.includes('Cevabı görmek için'));
+  const stripText = (await dp.locator('main + div').first().textContent()) ?? '';
+  check('masaüstü: ipucu şeridi örnek yönlendirmesini gösteriyor', stripText.includes('Örnek açık'), stripText.slice(0, 40));
+  const deskR1 = await part(dp, 'R1');
+  const r1At = await screen(dp, deskR1.x, deskR1.y);
+  await dp.mouse.dblclick(r1At.x, r1At.y); await dp.waitForTimeout(250);
+  const focused = await dp.evaluate(() => (document.activeElement instanceof HTMLInputElement ? document.activeElement.value : null));
+  check('masaüstü: çift tıklayınca İncele sekmesinde ilk değer alanına odaklanıyor', focused === '330', `odak: ${focused}`);
+  await dp.keyboard.type('1k'); await dp.keyboard.press('Enter');
+  check('masaüstü: değer Enter ile uygulanıyor', (await part(dp, 'R1')).props.resistance === 1000);
+  const valueField = dp.getByLabel('Direnç', { exact: true });
+  await valueField.fill('abc'); await valueField.press('Enter'); await dp.waitForTimeout(150);
+  const alert = (await dp.getByRole('tabpanel').getByRole('alert').textContent().catch(() => '')) ?? '';
+  check('masaüstü: geçersiz değer uygulanmıyor, hata alanın altında', alert.includes('sayı değil') && (await part(dp, 'R1')).props.resistance === 1000, alert.slice(0, 30));
+  await valueField.press('Escape');
+  await dp.getByRole('button', { name: 'Oynat' }).first().click(); await dp.waitForTimeout(600);
+  await valueField.fill('470'); await valueField.press('Tab'); await dp.waitForTimeout(400);
+  const statusText = (await dp.getByRole('region', { name: 'Simülasyon' }).getByRole('status').textContent()) ?? '';
+  check('masaüstü: çalışırken alandan çıkınca değer uygulanıyor, simülasyon durmuyor', (await part(dp, 'R1')).props.resistance === 470 && statusText.includes('Çalışıyor'), statusText);
+  const live = (await dp.getByRole('tabpanel').textContent()) ?? '';
+  check('masaüstü: İncele sekmesinde canlı ölçüm görünüyor', live.includes('canlı') && /Akım\s*[\d,]+\s*mA/.test(live), live.slice(0, 60));
+  await dp.getByRole('tab', { name: 'Örnek' }).click(); await dp.waitForTimeout(150);
+  const answer = (await dp.getByRole('tabpanel').getByRole('status').textContent().catch(() => '')) ?? '';
+  check('masaüstü: Oynat’tan sonra Örnek sekmesinde cevap açık', answer.includes('Cevap'), answer.slice(0, 30));
   await desk.close();
 
   // --- Sıkışık masaüstü (1100 px): kütüphane şerit, açılır kart --------------------------

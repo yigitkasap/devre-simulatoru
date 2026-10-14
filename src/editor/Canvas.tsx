@@ -127,6 +127,11 @@ export interface CanvasProps {
   readonly onPartPlaced?: (type: DeviceType) => void;
   /** Boş tuvaldeki "Örneklerden başla" düğmesi. */
   readonly onExamples?: () => void;
+  /**
+   * Parçanın yanında V/I/P kutusu (fareyle üzerine gelince ya da dokunmatikte seçiliyken). Masaüstünde
+   * bu bilgiler İnceleme panelinde olduğu için kapalıdır.
+   */
+  readonly readoutBoxes?: boolean;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -231,6 +236,7 @@ export function Canvas({
   onStatusChange,
   onPartPlaced,
   onExamples,
+  readoutBoxes = true,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1236,7 +1242,7 @@ export function Canvas({
         </div>
       )}
 
-      {touch && frame && !menu && interaction.kind === 'idle' && selection.parts.length === 1 && selection.wires.length === 0 && (() => {
+      {readoutBoxes && touch && frame && !menu && interaction.kind === 'idle' && selection.parts.length === 1 && selection.wires.length === 0 && (() => {
         // Dokunmatikte üzerine gelme yok: seçili parçanın V/I/P bilgisi parçanın yanında gösterilir.
         const part = doc.parts.find((p) => p.id === selection.parts[0]);
         const m = part && frame.measurements.get(part.id);
@@ -1290,7 +1296,7 @@ export function Canvas({
             );
           })}
 
-      {frame && hover?.kind === 'part' && cursor && !menu && interaction.kind === 'idle' && (() => {
+      {readoutBoxes && frame && hover?.kind === 'part' && cursor && !menu && interaction.kind === 'idle' && (() => {
         const part = doc.parts.find((p) => p.id === hover.partId);
         const m = part && frame.measurements.get(part.id);
         const readout = part && m ? partReadout(part, m, frame.statuses.get(part.id)) : null;

@@ -75,7 +75,7 @@ describe('AC bilgi kutuları', () => {
     expect(meterText(part('voltmeter', { mode: 'ac', ideal: true }), m, { reading: 7.0711 })).toBe('7,071 V~');
     expect(meterText(part('voltmeter', { mode: 'dc', ideal: true }), m, { reading: 0.0012 })).toBe('1,200 mV');
     const readout = partReadout(part('voltmeter', { mode: 'ac', ideal: true }), m, { reading: 7.0711 })!;
-    expect(readout.rows.map((r) => r.value)).toEqual(['7,071 V~', '4,200 V', '0,00 A']);
+    expect(readout.rows.map((r) => r.value)).toEqual(['7,071 V~', '4,200 V', '0,000 A']);
   });
 
   it('AC kaynak: tepe, etkin değer, frekans ve periyot', () => {
@@ -85,9 +85,9 @@ describe('AC bilgi kutuları', () => {
     )!;
     const rows = Object.fromEntries(readout.rows.map((r) => [r.label, r.value]));
     expect(rows['Tepe gerilimi']).toBe('10 V');
-    expect(rows['Etkin değer']).toBe('7,07 V');
+    expect(rows['Etkin değer']).toBe('7,071 V');
     expect(rows['Frekans']).toBe('50 Hz');
     expect(rows['Periyot']).toBe('20 ms');
-    expect(rows['Verdiği akım']).toBe('3,00 mA');
+    expect(rows['Verdiği akım']).toBe('3,000 mA');
   });
 });

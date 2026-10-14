@@ -100,6 +100,11 @@
   --color-accent-line: #c7dafb;
   --color-danger-ink: #a3241a;
   --color-danger-line: #f5c2bd;
+  --color-warn-line: #f3d9a8;
+  /* "Neden bu değer?" kutusu (M04) */
+  --color-info-soft: #eef3f8;
+  --color-info-line: #d6e2ee;
+  --color-info-ink: #3d5a78;
 
   /* Şema */
   --color-paper: #fbfbf9;
