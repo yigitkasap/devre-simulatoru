@@ -66,7 +66,7 @@ async function openExample(page, name) {
   await page.getByRole('button', { name, exact: true }).tap(); await page.waitForTimeout(600);
 }
 /** Üst şeritteki kip rozeti (Kur, Bağla, Ölç, Duraklatıldı). */
-const mode = async (page) => (await page.locator('header [role=status]').first().textContent()) ?? '';
+const mode = async (page) => (await page.locator('header [role=status], aside [role=status]').first().textContent()) ?? '';
 const selectedCount = (page) => page.locator('svg.schematic rect[stroke-dasharray="4 3"]').count();
 /** Bir nesneye doğrudan bağlı olay dinleyicileri (CDP). */
 async function listeners(cdp, expression) {
@@ -353,6 +353,57 @@ try {
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
     check('Dosya sayfası açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
     await ctx.close();
+  }
+
+  // --- Yatay telefon (L01, L02) ----------------------------------------------------------
+  {
+    const { page, cdp } = await phone(844, 390);
+    const strip = await page.locator('header').count();
+    const rail = await page.getByRole('navigation', { name: 'Eylemler' }).boundingBox();
+    const side = await page.locator('aside').boundingBox();
+    check('yatay telefonda üst şerit yok; sağda yan panel ve dikey çubuk', strip === 0 && rail !== null && rail.width <= 80 && rail.height > 300 && side !== null && Math.round(side.width) === 280, rail ? `çubuk ${Math.round(rail.width)}×${Math.round(rail.height)}` : 'çubuk yok');
+    await openExample(page, 'LED ve ön direnç');
+    await page.getByRole('navigation', { name: 'Eylemler' }).getByRole('button', { name: 'Oynat' }).tap(); await page.waitForTimeout(600);
+    const r1 = await part(page, 'R1');
+    await tap(page, cdp, await screen(page, r1.x, r1.y)); await page.waitForTimeout(300);
+    const measure = (await page.getByRole('region', { name: 'Ölçümler' }).textContent().catch(() => '')) ?? '';
+    check('yatayda parçaya dokununca ölçümler yan panelde', measure.includes('R1') && measure.includes('Gerilim') && (await mode(page)).includes('Ölç'), measure.slice(0, 40));
+    const ta = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
+    check('yatayda tuvalin touch-action değeri none', ta === 'none', ta);
+    await shot(page, 'ios-7-yatay.png');
+    await page.context().close();
+  }
+  {
+    const { page } = await phone(844, 390);
+    await openExample(page, 'Yarım dalga doğrultmaç');
+    await page.getByRole('navigation', { name: 'Eylemler' }).getByRole('button', { name: 'Oynat' }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Cihazlar' }).tap(); await page.waitForTimeout(800);
+    const devices = await page.getByRole('region', { name: 'Cihazlar' }).boundingBox();
+    const canvasHidden = await page.locator('svg.schematic').evaluate((el) => el.getBoundingClientRect().width === 0);
+    check('yatayda Cihazlar tam genişlik (tuvalin ve yan panelin yerine)', devices !== null && devices.width > 600 && canvasHidden, devices ? `${Math.round(devices.width)} px` : 'yok');
+    await shot(page, 'ios-8-yatay-osiloskop.png');
+    await page.getByRole('button', { name: 'Devreye dön' }).tap(); await page.waitForTimeout(300);
+    const back = await page.locator('svg.schematic').boundingBox();
+    check('"Devre" ile tuvale dönülüyor', back !== null && back.width > 300);
+    await page.context().close();
+  }
+
+  // --- 375 × 667 (S01, S02) ----------------------------------------------------------------
+  {
+    const { page, cdp } = await phone(375, 667);
+    await openExample(page, 'Gerilim bölücü');
+    const scale = (await screen(page, 0, 0)).scale;
+    check('375×667: örnek açılınca devre alt sayfanın üstündeki alana okunur büyüklükte sığıyor', scale >= 0.45, `yakınlık ${scale.toFixed(2)}`);
+    await page.getByRole('button', { name: 'Oynat' }).last().tap(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Ölçümler' }).last().tap(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Ölçümler' }).last().tap(); await page.waitForTimeout(300);
+    const r1 = await part(page, 'R1');
+    await tap(page, cdp, await screen(page, r1.x, r1.y)); await page.waitForTimeout(300);
+    const sheet = await page.getByRole('region', { name: 'Ölçümler' }).boundingBox();
+    const svgBox = await page.locator('svg.schematic').boundingBox();
+    check('375×667: Ölç’te parçanın küçük sayfası 150 px; tuval sayfanın üstünde bitiyor', sheet !== null && Math.round(sheet.height) === 150 && svgBox.y + svgBox.height <= sheet.y + 1, sheet ? `sayfa ${Math.round(sheet.height)} px` : 'yok');
+    await shot(page, 'ios-9-kucuk.png');
+    await page.context().close();
   }
 
   // --- Masaüstü kabuğu: kütüphane bilgi alanı, ipucu şeridi, hız penceresi ---------------

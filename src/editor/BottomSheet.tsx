@@ -12,6 +12,8 @@ export type SheetSize = 'peek' | 'half' | 'full';
 /** Tam boyda sayfanın üstünde kalan devre şeridi (px). */
 export const SHEET_FULL_TOP = 112;
 export const PEEK_HEIGHT = 200;
+/** Kısa ekranda (375×667; S01) küçük sayfa. */
+const PEEK_HEIGHT_SMALL = 150;
 const DRAG_PX = 28;
 
 export interface BottomSheetProps {
@@ -65,7 +67,7 @@ export function BottomSheet({ size, sizes, onSize, onClose, label, role = 'regio
     size === 'full'
       ? { height: Math.max(PEEK_HEIGHT, areaHeight - SHEET_FULL_TOP) }
       : size === 'peek'
-        ? { height: Math.min(PEEK_HEIGHT, areaHeight - 80) }
+        ? { height: Math.min(areaHeight < 600 ? PEEK_HEIGHT_SMALL : PEEK_HEIGHT, areaHeight - 80) }
         : { maxHeight: halfMax };
 
   return (

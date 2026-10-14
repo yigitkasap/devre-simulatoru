@@ -710,12 +710,16 @@ export function MeasureSheetBody({ part, doc, frame, status, settings, expanded,
         canExpand={!device}
         onExpand={onExpand}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4">
-        <div aria-live="polite" className="grid grid-cols-3 gap-2.5">
+      {/* Dar yan panelde (yatay telefon, L01) ölçümler satır satır; genişte üç kutu yan yana. */}
+      <div className="@container flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4">
+        <div aria-live="polite" className="grid grid-cols-1 @[330px]:grid-cols-3 @[330px]:gap-2.5">
           {(expanded ? rows : rows.slice(0, 3)).map((row) => {
             const [number, unit] = splitUnit(m ? row.value : '');
             return (
-              <div key={row.label} className="flex min-w-0 flex-col rounded-[10px] bg-panel-2 px-2.5 py-2">
+              <div
+                key={row.label}
+                className="flex min-w-0 items-baseline justify-between gap-2 border-b border-app py-1.5 @[330px]:flex-col @[330px]:items-start @[330px]:justify-start @[330px]:rounded-[10px] @[330px]:border-0 @[330px]:bg-panel-2 @[330px]:px-2.5 @[330px]:py-2"
+              >
                 <span className="truncate text-label text-muted">
                   <Rich text={row.label} />
                 </span>

@@ -1,5 +1,6 @@
 // Telefonda Cihazlar sayfası (tasarım: P08, P09): osiloskop, fonksiyon üreteci ve DC güç kaynağı alt
-// alta dizilmiş, dokunmatik boyutta denetimlerle. Birden çok cihaz varsa üstte sekmeler. Ayarlar
+// alta dizilmiş, dokunmatik boyutta denetimlerle. Birden çok cihaz varsa üstte sekmeler. Yatay telefonda
+// (L02) tam genişlik: osiloskobun ekranı solda, ayarlar sağda; "Devre" ile tuvale dönülür. Ayarlar
 // parçanın özelliklerinde saklanır (kaydedilir, paylaşılır, geri alınabilir; simülasyonu durdurmaz).
 
 import type { ReactNode } from 'react';
@@ -46,6 +47,8 @@ export interface PhoneDevicesProps {
   readonly onChange: (id: string, patch: Record<string, PropValue>) => void;
   readonly onAuto: (id: string) => void;
   readonly onJack: (id: string, pin: number) => void;
+  /** Yatay telefon (L02). */
+  readonly landscape?: boolean;
 }
 
 function numberDef(part: Part, key: string): NumberPropDef {
@@ -108,10 +111,25 @@ export function PhoneDevicesBody(props: PhoneDevicesProps) {
   if (!active) return null;
   const change = (patch: Record<string, PropValue>) => props.onChange(active.id, patch);
   const jack = (pin: number) => props.onJack(active.id, pin);
+  const landscape = props.landscape === true;
+  const scopeWide = landscape && active.type === 'oscilloscope';
 
   return (
     <>
-      <div className="flex shrink-0 items-center gap-2 pr-1 pl-3">
+      <div className={`flex shrink-0 items-center gap-2 pr-1 ${landscape ? 'h-12 pl-2' : 'pl-3'}`}>
+        {landscape && (
+          <button
+            type="button"
+            onClick={props.onClose}
+            aria-label={tr.phone.backToCircuitLabel}
+            className="flex h-11 shrink-0 items-center gap-1 rounded-[10px] border border-rack-line bg-panel pr-3 pl-1.5 text-[13px] font-medium"
+          >
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12.5 5l-5 5 5 5" />
+            </svg>
+            {tr.phone.circuit}
+          </button>
+        )}
         {devices.length > 1 ? (
           <div role="tablist" aria-label={tr.phone.deviceTabs} className="flex min-w-0 flex-1 gap-0.5 rounded-[10px] bg-seg p-0.5">
             {devices.map((d) => {
@@ -136,18 +154,28 @@ export function PhoneDevicesBody(props: PhoneDevicesProps) {
             <span className="font-mono text-[13px] text-muted">{active.label}</span>
           </h2>
         )}
-        <button
-          type="button"
-          onClick={props.onClose}
-          aria-label={tr.phone.devicesClose}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink-2 active:bg-face"
-        >
-          <Icon name="chevronDown" />
-        </button>
+        {!landscape && (
+          <button
+            type="button"
+            onClick={props.onClose}
+            aria-label={tr.phone.devicesClose}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink-2 active:bg-face"
+          >
+            <Icon name="chevronDown" />
+          </button>
+        )}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pt-2.5 pb-4">
+      <div
+        className={
+          scopeWide
+            ? 'flex min-h-0 flex-1 gap-3 px-3 pt-1'
+            : `flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pt-2.5 pb-4 ${landscape ? 'px-3' : 'px-4'}`
+        }
+        style={landscape ? { paddingBottom: 'max(12px, env(safe-area-inset-bottom))' } : undefined}
+      >
         {active.type === 'oscilloscope' && (
           <PhoneScope
+            wide={scopeWide}
             part={active}
             view={props.scopeView(active.id)}
             connected={[props.pinConnected(active.id, 0), props.pinConnected(active.id, 1)]}
@@ -178,6 +206,7 @@ export function PhoneDevicesBody(props: PhoneDevicesProps) {
 // --- Osiloskop (P08) -----------------------------------------------------------------------
 
 function PhoneScope({
+  wide,
   part,
   view,
   connected,
@@ -185,6 +214,8 @@ function PhoneScope({
   onAuto,
   onJack,
 }: {
+  /** Yatay: ekran solda, ayarlar sağda (kendi içinde kayar). */
+  wide: boolean;
   part: Part;
   view: ScopeView | null;
   connected: readonly [boolean, boolean];
@@ -194,8 +225,7 @@ function PhoneScope({
 }) {
   const s = scopeSettings(part.props);
   const xy = s.mode === 'xy';
-  return (
-    <>
+  const status = (
       <div className="flex items-center justify-between gap-2 text-[12.5px]">
         {view && !xy ? (
           <span className={`flex items-center gap-1.5 ${view.triggered ? 'text-ink' : 'text-warn'}`}>
@@ -209,8 +239,11 @@ function PhoneScope({
           {tr.scope.auto}
         </button>
       </div>
-      <Screen part={part} view={view} settings={s} height="fill" onChange={onChange} />
-      <StatsLines view={view} settings={s} connected={connected} />
+  );
+  // Yatay telefonda ekranın yüksekliği: başlık, durum ve ölçüm satırlarından kalan alan.
+  const wideHeight = Math.max(150, Math.min(280, window.innerHeight - 150));
+  const controls = (
+    <>
       {CHANNELS.map((name, index) => {
         const volts = s.voltsPerDiv[index as 0 | 1];
         return (
@@ -285,6 +318,26 @@ function PhoneScope({
         <Jack color="var(--color-ch-b)" name="B" label={tr.rack.jack(`${part.label} B`)} onClick={() => onJack(1)} />
         <Jack color="#2c3846" ring={s.earthed} name="COM" earthed={s.earthed} label={tr.rack.jack(`${part.label} COM`)} onClick={() => onJack(2)} />
       </Jacks>
+    </>
+  );
+  if (wide) {
+    return (
+      <>
+        <div className="flex shrink-0 flex-col gap-1.5">
+          {status}
+          <Screen part={part} view={view} settings={s} height={wideHeight} onChange={onChange} />
+          <StatsLines view={view} settings={s} connected={connected} />
+        </div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain pb-3">{controls}</div>
+      </>
+    );
+  }
+  return (
+    <>
+      {status}
+      <Screen part={part} view={view} settings={s} height="fill" onChange={onChange} />
+      <StatsLines view={view} settings={s} connected={connected} />
+      {controls}
     </>
   );
 }

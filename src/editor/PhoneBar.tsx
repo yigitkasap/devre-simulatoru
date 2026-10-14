@@ -1,6 +1,7 @@
 // Telefonda alt çubuk (tasarım: C-TelAlt, P00): aynı anda en çok dört eylem ve sağda Oynat. Çubuğun
 // dört hâli: Kur (Parça, Bağla, Geri al, Panel), parça seçili (Değer, Döndür, Çevir, Sil), Bağla (durum,
-// Geri al, Bitti) ve Ölç (Ölçümler, Cihazlar, Hız, Durdur). Oynat her hâlde aynı yerde.
+// Geri al, Bitti) ve Ölç (Ölçümler, Cihazlar, Hız, Durdur). Oynat her hâlde aynı yerde. Yatay telefonda
+// sağ kenarda dikey şerit (L01): düğmeler alt alta, Oynat en altta; Bağla'nın durumu tuvaldeki kartta.
 
 import type { ReactNode } from 'react';
 import { tr } from '../i18n/tr';
@@ -43,6 +44,8 @@ export interface PhoneBarProps {
   // Oynat
   readonly onPlay: () => void;
   readonly onPause: () => void;
+  /** Yatay telefon: sağ kenarda 76 px dikey şerit. */
+  readonly vertical?: boolean;
 }
 
 function BarButton({
@@ -55,6 +58,7 @@ function BarButton({
   top,
   ariaLabel,
   grow = 1,
+  vertical = false,
 }: {
   icon?: IconName;
   label: string;
@@ -66,6 +70,7 @@ function BarButton({
   top?: ReactNode;
   ariaLabel?: string;
   grow?: number;
+  vertical?: boolean;
 }) {
   const color = disabled
     ? 'text-stopped'
@@ -81,8 +86,10 @@ function BarButton({
       disabled={disabled}
       aria-pressed={active || undefined}
       aria-label={ariaLabel}
-      style={{ flexGrow: grow, flexBasis: 0 }}
-      className={`flex h-14 min-w-0 flex-col items-center justify-center gap-[3px] rounded-xl text-[11.5px] leading-4 font-medium ${color} ${
+      style={vertical ? undefined : { flexGrow: grow, flexBasis: 0 }}
+      className={`flex h-14 min-w-0 shrink-0 flex-col items-center justify-center gap-[3px] rounded-xl leading-4 font-medium ${
+        vertical ? 'w-16 text-[11px]' : 'text-[11.5px]'
+      } ${color} ${
         active || tone === 'accent' ? 'bg-accent-soft' : 'enabled:active:bg-app'
       }`}
     >
@@ -94,6 +101,7 @@ function BarButton({
 
 export function PhoneBar(props: PhoneBarProps) {
   const { state } = props;
+  const vertical = props.vertical === true;
   const olc = state === 'olc' || state === 'pause';
   const line =
     state === 'bagla' || state === 'sec' ? 'border-accent' : olc ? 'border-ok' : 'border-line';
@@ -102,16 +110,17 @@ export function PhoneBar(props: PhoneBarProps) {
   if (state === 'kur') {
     actions = (
       <>
-        <BarButton icon="plus" label={tr.phone.parts} active={props.active === 'parts'} onClick={props.onParts} />
-        <BarButton icon="wire" label={tr.phone.connect} onClick={props.onConnect} />
-        <BarButton icon="undo" label={tr.phone.undo} disabled={!props.canUndo} onClick={props.onUndo} />
-        <BarButton icon="panel" label={tr.phone.panel} active={props.active === 'panel'} onClick={props.onPanel} />
+        <BarButton vertical={vertical} icon="plus" label={tr.phone.parts} active={props.active === 'parts'} onClick={props.onParts} />
+        <BarButton vertical={vertical} icon="wire" label={tr.phone.connect} onClick={props.onConnect} />
+        <BarButton vertical={vertical} icon="undo" label={tr.phone.undo} disabled={!props.canUndo} onClick={props.onUndo} />
+        <BarButton vertical={vertical} icon="panel" label={tr.phone.panel} active={props.active === 'panel'} onClick={props.onPanel} />
       </>
     );
   } else if (state === 'sec') {
     actions = (
       <>
         <BarButton
+          vertical={vertical}
           label={tr.phone.value}
           tone={props.canEditValue ? 'accent' : 'ink'}
           disabled={!props.canEditValue}
@@ -120,24 +129,24 @@ export function PhoneBar(props: PhoneBarProps) {
           top={<span className="max-w-full truncate px-1 font-mono text-[15px] leading-5 font-semibold">{props.valueText}</span>}
           onClick={props.onValue}
         />
-        <BarButton icon="rotate" label={tr.phone.rotate} disabled={!props.canRotate} onClick={props.onRotate} />
-        <BarButton icon="flip" label={tr.phone.flip} disabled={!props.canFlip} onClick={props.onFlip} />
-        <BarButton icon="trash" label={tr.phone.remove} tone="danger" onClick={props.onDelete} />
+        <BarButton vertical={vertical} icon="rotate" label={tr.phone.rotate} disabled={!props.canRotate} onClick={props.onRotate} />
+        <BarButton vertical={vertical} icon="flip" label={tr.phone.flip} disabled={!props.canFlip} onClick={props.onFlip} />
+        <BarButton vertical={vertical} icon="trash" label={tr.phone.remove} tone="danger" onClick={props.onDelete} />
       </>
     );
   } else if (state === 'bagla') {
     actions = (
       <>
-        <div role="status" className="flex min-w-0 flex-col pl-2" style={{ flexGrow: 2.1, flexBasis: 0 }}>
+        <div role="status" className={vertical ? 'sr-only' : 'flex min-w-0 flex-col pl-2'} style={vertical ? undefined : { flexGrow: 2.1, flexBasis: 0 }}>
           <span className="text-sm font-semibold text-accent-ink">{props.connectMessage}</span>
           <span className="truncate text-label text-ink-2">{props.connectDetail}</span>
         </div>
-        <BarButton icon="undo" label={tr.phone.undo} disabled={!props.canUndo} onClick={props.onUndo} />
+        <BarButton vertical={vertical} icon="undo" label={tr.phone.undo} disabled={!props.canUndo} onClick={props.onUndo} />
         <button
           type="button"
           onClick={props.onDone}
-          style={{ flexGrow: 1, flexBasis: 0 }}
-          className="h-12 min-w-0 rounded-xl bg-ink text-sm font-semibold text-white active:brightness-125"
+          style={vertical ? undefined : { flexGrow: 1, flexBasis: 0 }}
+          className={`h-12 min-w-0 shrink-0 rounded-xl bg-ink text-sm font-semibold text-white active:brightness-125 ${vertical ? 'w-16' : ''}`}
         >
           {tr.phone.done}
         </button>
@@ -146,8 +155,9 @@ export function PhoneBar(props: PhoneBarProps) {
   } else {
     actions = (
       <>
-        <BarButton icon="measure" label={tr.phone.measurements} active={props.active === 'measure'} onClick={props.onMeasure} />
+        <BarButton vertical={vertical} icon="measure" label={tr.phone.measurements} active={props.active === 'measure'} onClick={props.onMeasure} />
         <BarButton
+          vertical={vertical}
           icon="devices"
           label={tr.phone.devices}
           active={props.active === 'devices'}
@@ -155,18 +165,46 @@ export function PhoneBar(props: PhoneBarProps) {
           onClick={props.onDevices}
         />
         <BarButton
+          vertical={vertical}
           label={tr.phone.speed}
           ariaLabel={tr.phone.speedButton(props.speed)}
           top={<span className="font-mono text-sm leading-5 font-semibold">{props.speed}</span>}
           onClick={props.onSpeed}
         />
-        <BarButton icon="stop" label={tr.phone.stop} onClick={props.onStop} />
+        <BarButton vertical={vertical} icon="stop" label={tr.phone.stop} onClick={props.onStop} />
       </>
     );
   }
 
   const running = state === 'olc';
   const playLabel = running ? tr.phone.pause : state === 'pause' ? tr.phone.resume : tr.phone.play;
+  const play = (
+      <button
+        type="button"
+        onClick={running ? props.onPause : props.onPlay}
+        disabled={state === 'bagla'}
+        aria-label={playLabel}
+        title={playLabel}
+        className={`flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full text-white ${vertical ? '' : 'ml-1'} shadow-[0_4px_12px_rgba(29,39,51,0.22)] ${
+          running ? 'bg-ink' : state === 'bagla' ? 'bg-line-2' : 'bg-ok active:brightness-110'
+        }`}
+      >
+        <Icon name={running ? 'pause' : 'play'} className="h-6 w-6" />
+      </button>
+  );
+  if (vertical) {
+    return (
+      <nav
+        aria-label={tr.phone.bar}
+        className={`flex w-[76px] shrink-0 flex-col items-center gap-0.5 overflow-y-auto border-l-[1.5px] pt-1.5 ${line} ${state === 'bagla' ? 'bg-accent-soft/50' : 'bg-panel'}`}
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        {actions}
+        <span className="flex-1" />
+        {play}
+      </nav>
+    );
+  }
   return (
     <nav
       aria-label={tr.phone.bar}
@@ -174,18 +212,7 @@ export function PhoneBar(props: PhoneBarProps) {
       style={{ height: 'calc(70px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className={`flex min-w-0 flex-1 items-center ${state === 'bagla' ? 'gap-1' : 'gap-0.5'}`}>{actions}</div>
-      <button
-        type="button"
-        onClick={running ? props.onPause : props.onPlay}
-        disabled={state === 'bagla'}
-        aria-label={playLabel}
-        title={playLabel}
-        className={`ml-1 flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full text-white shadow-[0_4px_12px_rgba(29,39,51,0.22)] ${
-          running ? 'bg-ink' : state === 'bagla' ? 'bg-line-2' : 'bg-ok active:brightness-110'
-        }`}
-      >
-        <Icon name={running ? 'pause' : 'play'} className="h-6 w-6" />
-      </button>
+      {play}
     </nav>
   );
 }

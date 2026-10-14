@@ -42,7 +42,7 @@ import { PhoneBar, type PhoneBarActive, type PhoneBarState } from './PhoneBar';
 import { PhoneDevicesBody } from './PhoneDevices';
 import { FileSheet, MoreSheet, StopToEditDialog } from './PhoneModals';
 import { BlockedNotice, MeasureSheetBody, PartSheetBody, PartsSheetBody, SheetTabs, type SheetTab } from './PhoneSheets';
-import { PhoneTopStrip, type PhoneMode } from './PhoneTopStrip';
+import { PhoneSideHeader, PhoneTopStrip, type PhoneMode } from './PhoneTopStrip';
 import { chainPlacement, firstFreePin } from './phoneTools';
 import { useRecentParts } from './recentParts';
 import { autoSettings } from './scopeView';
@@ -887,32 +887,43 @@ export default function Simulator() {
   );
 
   if (phone) {
+    const landscape = layout.landscape;
     const blocked = sim.notice?.kind === 'error';
-    const sheetCommon = {
-      areaHeight: phoneAreaHeight,
-      onHeight: setSheetHeight,
-      onSize: (size: SheetSize) => setSheet((s) => (s ? { ...s, size } : s)),
-      onClose: () => setSheet(null),
-    };
-    let sheetView: ReactNode = null;
-    if (sheet?.kind === 'parts') {
-      sheetView = (
-        <BottomSheet {...sheetCommon} size="half" sizes={['half']} role="dialog" label={tr.phone.addTitle} dimmed={partDragging}>
-          <SheetHeader title={tr.phone.addTitle} onClose={() => setSheet(null)} />
-          <PartsSheetBody
-            settings={settings}
-            recent={recentParts}
-            chainTo={chainTo}
-            onChainOff={() => setChainOff(true)}
-            onAdd={addFromSheet}
-            onDrop={(type, x, y) => canvasRef.current?.placeAtClient(type, x, y)}
-            onDragging={setPartDragging}
-          />
-        </BottomSheet>
-      );
-    } else if (sheet?.kind === 'part' && singlePart) {
-      sheetView = (
-        <BottomSheet {...sheetCommon} size={sheet.size} sizes={['peek', 'half']} label={tr.properties.title(singlePart.label)}>
+    // Yatay telefonda yan panel hep açık: sayfa yoksa panel (Örnek / Devre ya da Ölçümler / Mesajlar).
+    const shown = sheet ?? (landscape ? { kind: 'panel' as const, size: 'half' as const } : null);
+    /** Alt sayfanın (yatayda yan panelin) içeriği ve özellikleri. */
+    let spec: {
+      sizes: readonly SheetSize[];
+      label: string;
+      role?: 'region' | 'dialog' | 'alertdialog';
+      tone?: 'panel' | 'rack';
+      content: ReactNode;
+    } | null = null;
+    if (shown?.kind === 'parts') {
+      spec = {
+        sizes: ['half'],
+        label: tr.phone.addTitle,
+        role: 'dialog',
+        content: (
+          <>
+            <SheetHeader title={tr.phone.addTitle} onClose={() => setSheet(null)} />
+            <PartsSheetBody
+              settings={settings}
+              recent={recentParts}
+              chainTo={chainTo}
+              onChainOff={() => setChainOff(true)}
+              onAdd={addFromSheet}
+              onDrop={(type, x, y) => canvasRef.current?.placeAtClient(type, x, y)}
+              onDragging={setPartDragging}
+            />
+          </>
+        ),
+      };
+    } else if (shown?.kind === 'part' && singlePart) {
+      spec = {
+        sizes: ['peek', 'half'],
+        label: tr.properties.title(singlePart.label),
+        content: (
           <PartSheetBody
             key={singlePart.id}
             part={singlePart}
@@ -927,21 +938,19 @@ export default function Simulator() {
             onUpdatePart={updatePartFromPanel}
             onOpenDevices={openDevices}
           />
-        </BottomSheet>
-      );
-    } else if (sheet?.kind === 'panel') {
+        ),
+      };
+    } else if (shown?.kind === 'panel') {
       const measuring = sim.status !== 'stopped';
-      sheetView = (
-        <BottomSheet
-          {...sheetCommon}
-          size={sheet.size}
-          sizes={['peek', 'half']}
-          role={blocked && shownTab === 'messages' ? 'alertdialog' : 'region'}
-          label={blocked && shownTab === 'messages' ? tr.phone.blockedTitle : panelTabs.find((t) => t.id === shownTab)?.label ?? tr.phone.panel}
-        >
+      // Küçük sayfada yalnızca içerik (P05, P10); sekmeler yarım boyda ve yan panelde.
+      const tabsShown = panelTabs.length > 1 && (landscape || shown.size !== 'peek');
+      spec = {
+        sizes: ['peek', 'half'],
+        role: blocked && shownTab === 'messages' ? 'alertdialog' : 'region',
+        label: blocked && shownTab === 'messages' ? tr.phone.blockedTitle : (panelTabs.find((t) => t.id === shownTab)?.label ?? tr.phone.panel),
+        content: (
           <TouchUi.Provider value>
-            {/* Küçük sayfada yalnızca içerik (P05, P10); sekmeler yarım boyda. */}
-            {panelTabs.length > 1 && sheet.size !== 'peek' && <SheetTabs tabs={panelTabs} value={shownTab} onChange={setPanelTab} />}
+            {tabsShown && <SheetTabs tabs={panelTabs} value={shownTab} onChange={setPanelTab} />}
             {shownTab === 'example' && <ExampleTab {...exampleProps} />}
             {shownTab === 'circuit' &&
               (measuring && singlePart ? (
@@ -983,127 +992,113 @@ export default function Simulator() {
               />
             )}
           </TouchUi.Provider>
-        </BottomSheet>
-      );
-    } else if (sheet?.kind === 'devices' && instruments.length > 0) {
-      sheetView = (
-        <BottomSheet {...sheetCommon} size={sheet.size} sizes={['half', 'full']} label={tr.phone.devicesTitle} tone="rack">
-          <PhoneDevicesBody
-            devices={instruments}
-            activeId={rackActive ?? instruments[0]!.id}
-            onActive={setRackActive}
-            onClose={() => setSheet(null)}
-            scopeView={(id) => sim.frame?.scopes.get(id) ?? null}
-            status={(id) => sim.frame?.statuses.get(id) ?? {}}
-            outputVoltage={(id) => sim.frame?.measurements.get(id)?.voltage ?? null}
-            running={sim.status !== 'stopped'}
-            pinConnected={(id, pin) => !connectivity.unconnectedPins.has(pinKey(id, pin))}
-            onChange={changeInstrument}
-            onAuto={(id) => {
-              const target = doc.parts.find((p) => p.id === id);
-              if (target) autoScopeFor(target);
-            }}
-            onJack={(id, pin) => {
-              // Uç tuvalde görünsün diye sayfa yarıya iner.
-              setSheet({ kind: 'devices', size: 'half' });
-              flashPin(id, pin);
-            }}
-          />
-        </BottomSheet>
-      );
-    } else if (sheet?.kind === 'speed') {
-      sheetView = (
-        <BottomSheet {...sheetCommon} size="half" sizes={['half']} label={tr.sim.speedDialog}>
-          <SheetHeader title={tr.sim.speedDialog} onClose={() => setSheet(null)} />
-          <SheetBody>
-            <SpeedOptions speed={sim.speed} scopeSpeed={scopeSpeed} onSpeed={sim.setSpeed} touch />
-          </SheetBody>
-        </BottomSheet>
-      );
+        ),
+      };
+    } else if (shown?.kind === 'speed') {
+      spec = {
+        sizes: ['half'],
+        label: tr.sim.speedDialog,
+        content: (
+          <>
+            <SheetHeader title={tr.sim.speedDialog} onClose={() => setSheet(null)} />
+            <SheetBody>
+              <SpeedOptions speed={sim.speed} scopeSpeed={scopeSpeed} onSpeed={sim.setSpeed} touch />
+            </SheetBody>
+          </>
+        ),
+      };
     }
-    const sheetOpen = sheetView !== null;
-    // Tam boy (Cihazlar): üstte kalan devre şeridine dokunmak sayfayı yarıya indirir.
-    const fullStrip = sheet?.size === 'full' && sheetOpen;
+    const devicesOpen = shown?.kind === 'devices' && instruments.length > 0;
+    const devicesBody = devicesOpen && (
+      <PhoneDevicesBody
+        devices={instruments}
+        activeId={rackActive ?? instruments[0]!.id}
+        onActive={setRackActive}
+        onClose={() => setSheet(null)}
+        scopeView={(id) => sim.frame?.scopes.get(id) ?? null}
+        status={(id) => sim.frame?.statuses.get(id) ?? {}}
+        outputVoltage={(id) => sim.frame?.measurements.get(id)?.voltage ?? null}
+        running={sim.status !== 'stopped'}
+        pinConnected={(id, pin) => !connectivity.unconnectedPins.has(pinKey(id, pin))}
+        onChange={changeInstrument}
+        onAuto={(id) => {
+          const target = doc.parts.find((p) => p.id === id);
+          if (target) autoScopeFor(target);
+        }}
+        onJack={(id, pin) => {
+          // Uç tuvalde görünsün: dikeyde sayfa yarıya iner, yatayda devreye dönülür.
+          setSheet(landscape ? null : { kind: 'devices', size: 'half' });
+          flashPin(id, pin);
+        }}
+        landscape={landscape}
+      />
+    );
+    if (devicesOpen && !landscape && shown) {
+      spec = { sizes: ['half', 'full'], label: tr.phone.devicesTitle, tone: 'rack', content: devicesBody };
+    }
 
-    return (
-      <div className="app-root flex flex-col overflow-hidden bg-panel">
-        <PhoneTopStrip
-          title={circuitTitle}
-          saveState={saveState}
-          mode={phoneMode}
-          time={sim.frame?.time ?? 0}
-          errors={errorCount}
-          warnings={warningCount}
-          showIssues={showIssues}
-          moreOpen={modal === 'more'}
-          onFile={() => setModal('file')}
-          onIssues={() => openPanel('messages', 'half')}
-          onMore={() => setModal('more')}
-        />
-        {fileInput}
-        <div ref={phoneAreaRef} className="relative min-h-0 flex-1 bg-paper">
-          <main
-            className="absolute inset-x-0 top-0"
-            style={{ bottom: sheetOpen ? sheetHeight : 0, boxShadow: canvasMode === 'olc' ? 'inset 0 3px 0 var(--color-ok)' : undefined }}
-          >
-            {canvas}
-            {fullStrip && (
-              <button
-                type="button"
-                onClick={() => setSheet((s) => (s ? { ...s, size: 'half' } : s))}
-                className="absolute inset-0 z-10 flex items-end justify-end p-2"
-              >
-                <span className="rounded-md bg-panel/90 px-1.5 py-0.5 text-label text-muted">{tr.phone.backToCircuit}</span>
-              </button>
-            )}
-          </main>
-          {sheetView}
-        </div>
-        <PhoneBar
-          state={barState}
-          active={barActive}
-          canUndo={state.past.length > 0}
-          onParts={() => setSheet((s) => (s?.kind === 'parts' ? null : { kind: 'parts', size: 'half' }))}
-          onConnect={() => {
-            dispatch({ type: 'select', selection: EMPTY_SELECTION });
-            setSheet(null);
-            setConnect({ start: null });
-          }}
-          onUndo={() => dispatch({ type: 'undo' })}
-          onPanel={() => togglePanel(activeExample ? 'example' : panelTab, 'half')}
-          valueText={
-            singlePart
-              ? (partViewValue(singlePart) ?? tr.devices.names[singlePart.type])
-              : selection.parts.length === 0 && selection.wires.length === 1
-                ? tr.phone.wire
-                : tr.phone.items(selection.parts.length + selection.wires.length)
-          }
-          canEditValue={singlePart !== null}
-          canRotate={selection.parts.length > 0}
-          canFlip={canFlip}
-          onValue={() => singlePart && openProperties(singlePart.id)}
-          onRotate={() => rotateSelection(selection.parts)}
-          onFlip={() => flipSelection(selectedParts.filter((p) => CATALOG[p.type].polarized).map((p) => p.id))}
-          onDelete={deleteSelection}
-          connectMessage={connect?.start ? tr.phone.connectSecond : tr.phone.connectFirst}
-          connectDetail={
-            connect?.start
-              ? connectStartPart && connect.start.pin !== null
-                ? tr.phone.connectFrom(connectStartPart.label, tr.devices.pinShort[connectStartPart.type][connect.start.pin] ?? '')
-                : tr.phone.connectFromWire
-              : tr.phone.connectEnlarged
-          }
-          onDone={() => setConnect(null)}
-          speed={speedLabel(sim.speed)}
-          hasDevices={instruments.length > 0}
-          onMeasure={() => togglePanel('circuit', 'peek')}
-          onDevices={() => (sheet?.kind === 'devices' ? setSheet(null) : openDevices())}
-          onSpeed={() => setSheet((s) => (s?.kind === 'speed' ? null : { kind: 'speed', size: 'half' }))}
-          onStop={sim.stop}
-          onPlay={sim.play}
-          onPause={sim.pause}
-        />
-
+    const stripProps = {
+      title: circuitTitle,
+      saveState,
+      mode: phoneMode,
+      time: sim.frame?.time ?? 0,
+      errors: errorCount,
+      warnings: warningCount,
+      showIssues,
+      moreOpen: modal === 'more',
+      onFile: () => setModal('file'),
+      onIssues: () => openPanel('messages', 'half'),
+      onMore: () => setModal('more'),
+    };
+    const bar = (
+      <PhoneBar
+        vertical={landscape}
+        state={barState}
+        active={landscape && !sheet && sim.status !== 'stopped' ? 'measure' : barActive}
+        canUndo={state.past.length > 0}
+        onParts={() => setSheet((s) => (s?.kind === 'parts' ? null : { kind: 'parts', size: 'half' }))}
+        onConnect={() => {
+          dispatch({ type: 'select', selection: EMPTY_SELECTION });
+          setSheet(null);
+          setConnect({ start: null });
+        }}
+        onUndo={() => dispatch({ type: 'undo' })}
+        onPanel={() => (landscape ? openPanel(activeExample ? 'example' : 'circuit', 'half') : togglePanel(activeExample ? 'example' : panelTab, 'half'))}
+        valueText={
+          singlePart
+            ? (partViewValue(singlePart) ?? tr.devices.names[singlePart.type])
+            : selection.parts.length === 0 && selection.wires.length === 1
+              ? tr.phone.wire
+              : tr.phone.items(selection.parts.length + selection.wires.length)
+        }
+        canEditValue={singlePart !== null}
+        canRotate={selection.parts.length > 0}
+        canFlip={canFlip}
+        onValue={() => singlePart && openProperties(singlePart.id)}
+        onRotate={() => rotateSelection(selection.parts)}
+        onFlip={() => flipSelection(selectedParts.filter((p) => CATALOG[p.type].polarized).map((p) => p.id))}
+        onDelete={deleteSelection}
+        connectMessage={connect?.start ? tr.phone.connectSecond : tr.phone.connectFirst}
+        connectDetail={
+          connect?.start
+            ? connectStartPart && connect.start.pin !== null
+              ? tr.phone.connectFrom(connectStartPart.label, tr.devices.pinShort[connectStartPart.type][connect.start.pin] ?? '')
+              : tr.phone.connectFromWire
+            : tr.phone.connectEnlarged
+        }
+        onDone={() => setConnect(null)}
+        speed={speedLabel(sim.speed)}
+        hasDevices={instruments.length > 0}
+        onMeasure={() => (landscape ? openPanel('circuit', 'half') : togglePanel('circuit', 'peek'))}
+        onDevices={() => (sheet?.kind === 'devices' ? setSheet(null) : openDevices())}
+        onSpeed={() => setSheet((s) => (s?.kind === 'speed' ? null : { kind: 'speed', size: 'half' }))}
+        onStop={sim.stop}
+        onPlay={sim.play}
+        onPause={sim.pause}
+      />
+    );
+    const modals = (
+      <>
         {(modal === 'file' || modal === 'share') && (
           <FileSheet
             title={circuitTitle}
@@ -1151,6 +1146,89 @@ export default function Simulator() {
           />
         )}
         {examplesDialog}
+      </>
+    );
+    const canvasShadow = canvasMode === 'olc' ? 'inset 0 3px 0 var(--color-ok)' : undefined;
+
+    if (landscape) {
+      // Yatay telefon (L01, L02): solda tuval, sağda 280 px yan panel ve 76 px dikey çubuk. Cihazlar
+      // tuvalin ve yan panelin yerini alır; "Devre" ile geri dönülür.
+      return (
+        <div
+          className="app-root flex overflow-hidden bg-panel"
+          style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}
+        >
+          {fileInput}
+          <main className={`relative min-w-0 flex-1 bg-paper ${devicesOpen ? 'hidden' : ''}`} style={{ boxShadow: canvasShadow }}>
+            {canvas}
+          </main>
+          {devicesOpen ? (
+            <section role="region" aria-label={tr.phone.devicesTitle} className="flex min-w-0 flex-1 flex-col bg-rack">
+              {devicesBody}
+            </section>
+          ) : (
+            <aside className="flex w-[280px] shrink-0 flex-col border-l border-line bg-panel">
+              <PhoneSideHeader {...stripProps} />
+              {spec && (
+                <section
+                  role={spec.role ?? 'region'}
+                  aria-label={spec.label}
+                  className={`flex min-h-0 flex-1 flex-col pt-2 ${partDragging ? 'opacity-25' : ''}`}
+                  style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+                >
+                  {spec.content}
+                </section>
+              )}
+            </aside>
+          )}
+          {bar}
+          {modals}
+          <Toast toast={toast} offset={24} />
+        </div>
+      );
+    }
+
+    const sheetOpen = spec !== null;
+    // Tam boy (Cihazlar): üstte kalan devre şeridine dokunmak sayfayı yarıya indirir.
+    const fullStrip = sheet?.size === 'full' && sheetOpen;
+
+    return (
+      <div className="app-root flex flex-col overflow-hidden bg-panel">
+        <PhoneTopStrip {...stripProps} />
+        {fileInput}
+        <div ref={phoneAreaRef} className="relative min-h-0 flex-1 bg-paper">
+          <main className="absolute inset-x-0 top-0" style={{ bottom: sheetOpen ? sheetHeight : 0, boxShadow: canvasShadow }}>
+            {canvas}
+            {fullStrip && (
+              <button
+                type="button"
+                onClick={() => setSheet((s) => (s ? { ...s, size: 'half' } : s))}
+                className="absolute inset-0 z-10 flex items-end justify-end p-2"
+              >
+                <span className="rounded-md bg-panel/90 px-1.5 py-0.5 text-label text-muted">{tr.phone.backToCircuit}</span>
+              </button>
+            )}
+          </main>
+          {spec && shown && (
+            <BottomSheet
+              key={shown.kind}
+              size={shown.size}
+              sizes={spec.sizes}
+              role={spec.role}
+              label={spec.label}
+              tone={spec.tone}
+              dimmed={partDragging}
+              areaHeight={phoneAreaHeight}
+              onHeight={setSheetHeight}
+              onSize={(size) => setSheet((s) => (s ? { ...s, size } : s))}
+              onClose={() => setSheet(null)}
+            >
+              {spec.content}
+            </BottomSheet>
+          )}
+        </div>
+        {bar}
+        {modals}
         <Toast toast={toast} offset={PHONE_BAR_HEIGHT + (sheetOpen ? sheetHeight : 0) + 12} />
       </div>
     );

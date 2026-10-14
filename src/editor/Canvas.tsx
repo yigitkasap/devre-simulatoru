@@ -420,9 +420,13 @@ export function Canvas({
       setView((v) => ({ ...v, x: size.width / 2, y: size.height / 2 }));
       return;
     }
-    // Telefonda üstteki bilgi kartı (Bağla) ya da kilit bilgisi (Ölç) devrenin üstüne binmesin.
-    const top = phone && (phone.mode === 'bagla' || phone.lockChip) ? Math.min(phone.mode === 'bagla' ? 84 : 48, size.height / 4) : 0;
-    const fitted = fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top));
+    // Telefonda üstteki bilgi kartı (Bağla) ya da kilit bilgisi (Ölç) devrenin üstüne binmesin; kısa
+    // tuvalde kenar payı da küçük.
+    const top =
+      phone && (phone.mode === 'bagla' || (phone.mode === 'olc' && phone.lockChip))
+        ? Math.min(phone.mode === 'bagla' ? 84 : 48, size.height / 4)
+        : 0;
+    const fitted = fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top), phone ? 20 : 48);
     setView({ ...fitted, y: fitted.y + top });
   };
 

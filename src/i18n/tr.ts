@@ -1140,6 +1140,8 @@ export const tr = {
     devicesTitle: 'Cihazlar',
     devicesClose: 'Cihazları kapat',
     backToCircuit: 'Devreye dönmek için dokun',
+    backToCircuitLabel: 'Devreye dön',
+    circuit: 'Devre',
     deviceShort: { oscilloscope: 'Osiloskop', funcgen: 'Üreteç', dcsupply: 'Güç kaynağı' } as Record<string, string>,
     deviceTabs: 'Cihaz',
     waveform: 'Dalga biçimi',
