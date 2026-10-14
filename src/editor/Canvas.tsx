@@ -4,6 +4,7 @@
 
 import {
   useEffect,
+  useId,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -45,10 +46,14 @@ import {
   voltageGradient,
   type WireScale,
 } from './colors';
-import { BurnBalloon, ContextMenu, NoGroundBanner, ReadoutBox, type MenuItem } from './CanvasOverlays';
+import { BurnBalloon, ContextMenu, NoGroundBanner, type MenuItem } from './CanvasOverlays';
+import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, PartView, type PartTone } from './PartView';
-import { meterText, partReadout } from './readouts';
+import { routeAround } from './phoneTools';
+import { meterText } from './readouts';
+import { HintText } from './HintStrip';
+import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
 import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from './state';
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
@@ -62,6 +67,39 @@ export interface CanvasHandle {
   reveal(partIds: readonly string[], wireIds: readonly string[]): void;
   /** Parçayı görünen alanın ortasındaki boş bir yere ekler ve seçer (dokunmatik ekran). */
   addPartAtCenter(type: DeviceType): void;
+  /** Parçayı ekranın verilen noktasına (tuvalin içindeyse) ekler; tuvalin dışındaysa false. */
+  placeAtClient(type: DeviceType, clientX: number, clientY: number): boolean;
+}
+
+/** Telefonda Bağla kipinde kablonun başlangıcı: bir uç ya da bir kablonun üzerindeki nokta (T). */
+export interface ConnectStart {
+  readonly point: Point;
+  readonly partId: string | null;
+  readonly pin: number | null;
+}
+
+/**
+ * Telefon kipleri (tasarım: P00, P03, P05, N01): Kur'da dokunmak seçer, parçayı 150 ms basılı tutup
+ * sürüklemek taşır, uca dokunmak Bağla kipini başlatır; Bağla'da uçlar büyük etiketli hedeflerdir ve iki
+ * dokunuş kablo çizer; Ölç'te yapı kilitlidir (dokun: incele, sürükle: kaydır, anahtara dokun: aç/kapat).
+ */
+export interface PhoneCanvas {
+  readonly mode: 'kur' | 'bagla' | 'olc';
+  readonly connectStart: ConnectStart | null;
+  readonly onConnectStart: (start: ConnectStart | null) => void;
+  /** Kur kipinde bir uca dokunuldu: Bağla kipi o uçtan başlar. */
+  readonly onStartConnect: (start: ConnectStart) => void;
+  /** Bağla kipinden çık (boşluğa çift dokunuş). */
+  readonly onExitConnect: () => void;
+  /** Ölç kipinde bir parçaya dokunuldu (ölçümleri göster). */
+  readonly onInspect: (partId: string) => void;
+  /** Ölç kipinde parçayı basılı tutmak: "Düzenlemek için durdurulsun mu?" */
+  readonly onEditAttempt: () => void;
+  /** "Devre kilitli · dokun: incele" bilgisi gösterilsin mi. */
+  readonly lockChip: boolean;
+  readonly onLockChipClose: () => void;
+  /** Tuval, tam boy alt sayfanın üstünde ince bir şerit: bilgi katmanları gizlenir. */
+  readonly strip?: boolean;
 }
 
 /** Tuvalin altındaki ipucu şeridinin gösterdiği durum. */
@@ -119,12 +157,10 @@ export interface CanvasProps {
   readonly onFlip: (partIds: readonly string[]) => void;
   /** Bu sayı değişince görünüm devreye sığdırılır (örnek ya da dosya yüklenince). */
   readonly fitRequest: number;
-  /** Sol üstteki örnek kartı: sığdırırken kartın kapladığı alan boş bırakılır. */
-  readonly reserveCard: 'none' | 'collapsed' | 'open';
-  /** Osiloskop paneli: sığdırırken panelin kapladığı alan (sağda ya da altta) boş bırakılır. */
-  readonly reserveScope: 'none' | 'collapsed' | 'open';
-  /** Dokunmatik ekran (birincil işaretçi parmak): seçili parçanın V/I/P bilgisi kalıcı gösterilir. */
-  readonly touch: boolean;
+  /** Tuval küçülünce (alt sayfa açılınca) görünür tutulacak parçalar (seçili parça). */
+  readonly keepVisible?: readonly string[];
+  /** Telefon düzeni; masaüstünde ve tablette null. */
+  readonly phone?: PhoneCanvas | null;
   /** Tuvalin üstünde kaydırılabilir bir katman açık (çekmece, pencere): tuval dokunmayı tutmasın. */
   readonly overlayOpen: boolean;
   /** İpucu ya da yakınlık değişince çağrılır. */
@@ -139,8 +175,9 @@ export interface CanvasProps {
   readonly issuePins?: readonly Point[];
   /** Toprak tuzağında topraklı cihazların COM uçları: aralarında şebeke toprağı çizgisi (M06b). */
   readonly earthLine?: readonly Point[] | null;
-  /** "Devrede toprak yok": afiş ve önerilen toprak yeri (M07b). */
+  /** "Devrede toprak yok": afiş ve önerilen toprak yeri (M07b). Telefonda afiş yerine alt sayfa. */
   readonly noGround?: {
+    readonly banner: boolean;
     readonly point: Point | null;
     readonly text: string;
     readonly fixLabel: string | null;
@@ -149,11 +186,6 @@ export interface CanvasProps {
   } | null;
   /** Yanan LED balonundaki "Neden?": Mesajlar sekmesinde açıklama. */
   readonly onExplain?: (partId: string) => void;
-  /**
-   * Parçanın yanında V/I/P kutusu (fareyle üzerine gelince ya da dokunmatikte seçiliyken). Masaüstünde
-   * bu bilgiler İnceleme panelinde olduğu için kapalıdır.
-   */
-  readonly readoutBoxes?: boolean;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -166,6 +198,16 @@ type Interaction =
   | { readonly kind: 'idle' }
   | { readonly kind: 'pan'; readonly pointerId: number; readonly sx: number; readonly sy: number; readonly view: View }
   | { readonly kind: 'pinch' }
+  | {
+      /** Telefon: parmak indi, henüz dokunuş mu sürükleme mi belli değil. */
+      readonly kind: 'press';
+      readonly pointerId: number;
+      readonly sx: number;
+      readonly sy: number;
+      readonly view: View;
+      readonly hit: Hit | null;
+      readonly g: Point;
+    }
   | {
       readonly kind: 'drag-parts';
       readonly pointerId: number;
@@ -201,20 +243,11 @@ type Interaction =
       readonly downClient: { readonly x: number; readonly y: number };
     };
 
-/** Örnek kartının (ExampleCard) kapladığı alan; sığdırırken boş bırakılır. */
-const CARD_RESERVE_WIDTH = 368;
-const CARD_RESERVE_HEIGHT = 300;
-/** Küçültülmüş kart yalnızca başlık satırıdır. */
-const CARD_RESERVE_COLLAPSED = 52;
-/**
- * Osiloskop panelinin (ScopePanel) kapladığı alan: geniş ekranda sağ altta (genişlik ya da
- * yükseklik ayrılır), telefonda tuvalin altında.
- */
-const SCOPE_RESERVE_WIDTH = 396;
-const SCOPE_RESERVE_TALL = 450;
-const SCOPE_RESERVE_HEIGHT = 300;
-/** Küçültülmüş panel yalnızca başlık satırıdır. */
-const SCOPE_RESERVE_COLLAPSED = 56;
+/** Telefonda seçicideki seçenekler (tasarım: P15). */
+type PickOption =
+  | { readonly kind: 'part'; readonly partId: string }
+  | { readonly kind: 'pin'; readonly partId: string; readonly index: number; readonly pos: Point }
+  | { readonly kind: 'wire'; readonly wireId: string };
 
 /** Ekran pikseli cinsinden isabet toleransları (parmakla dokunurken daha geniş). */
 const PIN_TOLERANCE_PX = 8;
@@ -230,6 +263,14 @@ const DRAG_THRESHOLD_PX = 5;
 const LONG_PRESS_MS = 550;
 /** Dokunmatik: iki dokunuş arasındaki bu süre çift dokunuş sayılır (iOS'ta dblclick güvenilir değil). */
 const DOUBLE_TAP_MS = 350;
+/** Telefon: parça bu kadar basılı tutulunca sürüklenir; daha önce kayarsa tuval kaydırılır (N01). */
+const PHONE_HOLD_MS = 150;
+/** Telefon, Bağla kipi: uç hedeflerinin yarıçapı (44 pt hedef) ve bağlı uçlarınki. */
+const CONNECT_TARGET_PX = 22;
+const CONNECT_TARGET_SMALL_PX = 15;
+/** Telefon: büyüteç çapı ve büyütmesi. */
+const MAGNIFIER_PX = 140;
+const MAGNIFY = 2.6;
 
 const ZOOM_STEP = 1.25;
 
@@ -251,14 +292,12 @@ export function Canvas({
   onRotate,
   onFlip,
   fitRequest,
-  reserveCard,
-  reserveScope,
-  touch,
+  keepVisible,
+  phone = null,
   overlayOpen,
   onStatusChange,
   onPartPlaced,
   onExamples,
-  readoutBoxes = true,
   issues,
   issuePins,
   earthLine,
@@ -267,6 +306,7 @@ export function Canvas({
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const sceneId = `scene-${useId().replace(/:/g, '')}`;
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1.5 });
   const [cursor, setCursor] = useState<Point | null>(null);
@@ -281,6 +321,17 @@ export function Canvas({
     setInteractionState(next);
   };
   const [menu, setMenu] = useState<{ partId: string; x: number; y: number } | null>(null);
+  /** Telefon: kalabalık bir noktaya dokununca "Burada N öğe var" seçicisi; büyüteç (basılı tutunca da). */
+  const [picker, setPicker] = useState<{ x: number; y: number; options: readonly PickOption[] } | null>(null);
+  const [magnifier, setMagnifier] = useState<{ x: number; y: number; g: Point } | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
+  const phoneTimers = useRef({ hold: 0, long: 0 });
+  const phoneLongFired = useRef(false);
+  const lastEmptyTap = useRef(0);
+  const clearPhoneTimers = () => {
+    window.clearTimeout(phoneTimers.current.hold);
+    window.clearTimeout(phoneTimers.current.long);
+  };
   /** Kullanıcının kapattığı LED balonları (parça + yanma akımı). */
   const [dismissedBalloons, setDismissedBalloons] = useState<ReadonlySet<string>>(new Set());
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -349,13 +400,15 @@ export function Canvas({
       fit();
       return;
     }
-    setView((v) => ({ ...v, x: v.x + (size.width - previous.width) / 2, y: v.y + (size.height - previous.height) / 2 }));
+    // Merkez korunur; seçili parça (alt sayfanın arkasında kalmasın diye) görünür alana alınır.
+    let keep: Box | null = null;
+    for (const part of doc.parts) if (keepVisible?.includes(part.id)) keep = unionBox(keep, partBounds(part));
+    setView((v) => keepInside({ ...v, x: v.x + (size.width - previous.width) / 2, y: v.y + (size.height - previous.height) / 2 }, keep, size));
   }, [size]);
 
   useEffect(() => {
     if (viewInitialized.current || size.width === 0) return;
     viewInitialized.current = true;
-    // Açılışta da (kayıtlı ya da paylaşılan devre) örnek kartının ve osiloskop panelinin yeri ayrılır.
     if (docBounds(doc)) fit();
     else setView({ x: size.width / 2, y: size.height / 2, scale: size.width < 640 ? 1.1 : 1.5 });
   }, [size, doc]);
@@ -367,31 +420,10 @@ export function Canvas({
       setView((v) => ({ ...v, x: size.width / 2, y: size.height / 2 }));
       return;
     }
-    // Örnek kartı açıksa devre kartın yanındaki (geniş ekran) ya da altındaki (telefon) alana sığdırılır.
-    // Osiloskop paneli açıksa onun yeri de ayrılır: telefonda altta; geniş ekranda panel sağ altta
-    // durduğu için sağdaki şerit ya da alttaki şerit, hangisi devreyi daha büyük gösteriyorsa.
-    const wide = size.width >= 760;
-    const left = reserveCard === 'open' && wide ? CARD_RESERVE_WIDTH : 0;
-    const top =
-      reserveCard === 'none' || (wide && reserveCard === 'open')
-        ? 0
-        : Math.min(reserveCard === 'open' ? CARD_RESERVE_HEIGHT : CARD_RESERVE_COLLAPSED, size.height / 2);
-    const scopeHeight =
-      reserveScope === 'collapsed' ? SCOPE_RESERVE_COLLAPSED : wide ? SCOPE_RESERVE_TALL : SCOPE_RESERVE_HEIGHT;
-    // Panelin altında en az 120 piksellik bir şerit devreye kalsın.
-    const bottomOption = { right: 0, bottom: Math.max(0, Math.min(scopeHeight, size.height - top - 120)) };
-    const options: Array<{ right: number; bottom: number }> =
-      reserveScope === 'none'
-        ? [{ right: 0, bottom: 0 }]
-        : wide
-          ? [{ right: SCOPE_RESERVE_WIDTH, bottom: 0 }, bottomOption]
-          : [bottomOption];
-    let best: View | null = null;
-    for (const { right, bottom } of options) {
-      const fitted = fitView(bounds, Math.max(1, size.width - left - right), Math.max(1, size.height - top - bottom));
-      if (!best || fitted.scale > best.scale) best = { ...fitted, x: fitted.x + left, y: fitted.y + top };
-    }
-    if (best) setView(best);
+    // Telefonda üstteki bilgi kartı (Bağla) ya da kilit bilgisi (Ölç) devrenin üstüne binmesin.
+    const top = phone && (phone.mode === 'bagla' || phone.lockChip) ? Math.min(phone.mode === 'bagla' ? 84 : 48, size.height / 4) : 0;
+    const fitted = fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top));
+    setView({ ...fitted, y: fitted.y + top });
   };
 
   const reveal = (partIds: readonly string[], wireIds: readonly string[]) => {
@@ -425,6 +457,12 @@ export function Canvas({
     // Yalnızca yeni bir sığdırma isteğinde çalışır.
   }, [fitRequest]);
 
+  // Yeni seçilen parça (eklenen, listeden seçilen) ekranın dışındaysa görünüm ona kayar.
+  const keepKey = keepVisible?.join(',') ?? '';
+  useEffect(() => {
+    if (keepVisible && keepVisible.length > 0 && size.width > 0) reveal(keepVisible, []);
+  }, [keepKey]);
+
   const addPartAtCenter = (type: DeviceType) => {
     const center = snap(screenToGrid(view, size.width / 2, size.height / 2));
     const occupied = doc.parts.map((p) => partBounds(p));
@@ -445,6 +483,13 @@ export function Canvas({
     placePart(type, at, 0);
   };
 
+  const placeAtClient = (type: DeviceType, clientX: number, clientY: number): boolean => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect || clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return false;
+    placePart(type, snap(screenToGrid(view, clientX - rect.left, clientY - rect.top)), 0);
+    return true;
+  };
+
   useImperativeHandle(ref, () => ({
     zoomIn: () => {
       fittedRef.current = false;
@@ -457,6 +502,7 @@ export function Canvas({
     fit,
     reveal,
     addPartAtCenter,
+    placeAtClient,
   }));
 
   // --- Fare tekerleği ile yakınlaştırma (pasif olmayan dinleyici gerekir) ---------------
@@ -596,6 +642,208 @@ export function Canvas({
     onPartPlaced?.(type);
   };
 
+  // --- Telefon: dokunuşlar ------------------------------------------------------------
+  /** Bağla kipinde dokunulan hedef: en yakın uç (44 pt), yoksa kablonun üzerindeki nokta (T). */
+  const connectTarget = (local: { x: number; y: number }, g: Point): ConnectStart | null => {
+    let best: ConnectStart | null = null;
+    let bestDist = CONNECT_TARGET_PX;
+    for (const part of doc.parts) {
+      pinPositions(part).forEach((pos, index) => {
+        const d = Math.hypot(pos.x * GRID * view.scale + view.x - local.x, pos.y * GRID * view.scale + view.y - local.y);
+        if (d <= bestDist) {
+          bestDist = d;
+          best = { point: pos, partId: part.id, pin: index };
+        }
+      });
+    }
+    if (best) return best;
+    const hit = hitTest(g, { pins: false, parts: false });
+    if (hit?.kind !== 'wire') return null;
+    const wire = doc.wires.find((w) => w.id === hit.wireId)!;
+    return { point: snapToSegment(g, wire.points[hit.segment]!, wire.points[hit.segment + 1]!), partId: null, pin: null };
+  };
+
+  /**
+   * Kalabalık nokta: parmağın altında birden çok "sahip" (parça ya da bir parçaya bağlı olmayan kablo)
+   * varsa seçici açılır. Bir uca bağlanan kablo o parçayla aynı sahip sayılır.
+   */
+  const crowdOptions = (g: Point): PickOption[] => {
+    if (!phone || phone.mode === 'bagla') return [];
+    const pad = pxToGrid(6);
+    const parts = doc.parts.filter((p) => {
+      const b = partBounds(p);
+      return boxContains({ x: b.x - pad, y: b.y - pad, w: b.w + 2 * pad, h: b.h + 2 * pad }, g);
+    });
+    // Her parçanın yalnızca parmağa en yakın ucu seçenek olur.
+    const pins: PickOption[] = [];
+    if (phone.mode === 'kur') {
+      for (const part of doc.parts) {
+        let best: { index: number; pos: Point; d: number } | null = null;
+        pinPositions(part).forEach((pos, index) => {
+          const d = Math.hypot(pos.x - g.x, pos.y - g.y);
+          if (d <= pxToGrid(14) && (!best || d < best.d)) best = { index, pos, d };
+        });
+        const found = best as { index: number; pos: Point; d: number } | null;
+        if (found) pins.push({ kind: 'pin', partId: part.id, index: found.index, pos: found.pos });
+      }
+    }
+    const owners = new Set<string>([...parts.map((p) => p.id), ...pins.map((p) => (p.kind === 'pin' ? p.partId : ''))]);
+    const ownerPins = doc.parts.filter((p) => owners.has(p.id)).flatMap((p) => pinPositions(p));
+    const wires: PickOption[] = [];
+    for (const wire of doc.wires) {
+      const near = wire.points.some((pt, i) => i > 0 && distanceToSegment(g, wire.points[i - 1]!, pt) <= pxToGrid(10));
+      if (!near) continue;
+      wires.push({ kind: 'wire', wireId: wire.id });
+      const ends = [wire.points[0]!, wire.points[wire.points.length - 1]!];
+      if (!ends.some((end) => ownerPins.some((pin) => samePoint(pin, end)))) owners.add(`w:${wire.id}`);
+    }
+    if (owners.size < 2) return [];
+    return [...parts.map((p): PickOption => ({ kind: 'part', partId: p.id })), ...pins, ...wires].slice(0, 5);
+  };
+
+  const choose = (option: PickOption) => {
+    setPicker(null);
+    if (!phone) return;
+    if (option.kind === 'pin') {
+      phone.onStartConnect({ point: option.pos, partId: option.partId, pin: option.index });
+    } else if (option.kind === 'part') {
+      dispatch({ type: 'select', selection: { parts: [option.partId], wires: [] } });
+      if (phone.mode === 'olc') phone.onInspect(option.partId);
+    } else {
+      dispatch({ type: 'select', selection: { parts: [], wires: [option.wireId] } });
+    }
+  };
+
+  const phoneTap = (hit: Hit | null, g: Point, local: { x: number; y: number }) => {
+    if (!phone) return;
+    if (phone.mode === 'bagla') {
+      const target = connectTarget(local, g);
+      if (!target) {
+        // Boşluğa çift dokunuş: Bağla kipinden çık.
+        const now = performance.now();
+        if (now - lastEmptyTap.current < DOUBLE_TAP_MS) {
+          lastEmptyTap.current = 0;
+          phone.onExitConnect();
+        } else {
+          lastEmptyTap.current = now;
+        }
+        return;
+      }
+      const start = phone.connectStart;
+      if (!start) {
+        phone.onConnectStart(target);
+        return;
+      }
+      if (samePoint(start.point, target.point)) {
+        phone.onConnectStart(null);
+        return;
+      }
+      const result = addWire(doc, [start.point, ...routeAround(doc, start.point, target.point)]);
+      if (result.id) commit(result.doc, EMPTY_SELECTION);
+      phone.onConnectStart(null);
+      return;
+    }
+    const crowd = crowdOptions(g);
+    if (crowd.length > 1) {
+      setPicker({ x: local.x, y: local.y, options: crowd });
+      setMagnifier({ x: local.x, y: local.y, g });
+      return;
+    }
+    if (hit?.kind === 'part') {
+      const part = doc.parts.find((p) => p.id === hit.partId);
+      if (phone.mode === 'olc' && part?.type === 'switch') {
+        commit(updatePart(doc, part.id, { props: { ...part.props, closed: !boolProp(part.props, 'closed', false) } }));
+        return;
+      }
+      if (!selection.parts.includes(hit.partId) || selection.parts.length > 1 || selection.wires.length > 0) {
+        dispatch({ type: 'select', selection: { parts: [hit.partId], wires: [] } });
+      }
+      if (phone.mode === 'olc') {
+        phone.onInspect(hit.partId);
+        return;
+      }
+      // Kur: çift dokunuş değer sayfasını yarım açar.
+      const now = performance.now();
+      const previous = lastTap.current;
+      if (previous && previous.partId === hit.partId && now - previous.time < DOUBLE_TAP_MS) {
+        lastTap.current = null;
+        onOpenProperties(hit.partId);
+      } else {
+        lastTap.current = { partId: hit.partId, time: now };
+      }
+      return;
+    }
+    if (hit?.kind === 'pin' && phone.mode === 'kur') {
+      phone.onStartConnect({ point: hit.pos, partId: hit.partId, pin: hit.index });
+      return;
+    }
+    if (hit?.kind === 'wire') {
+      dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+      return;
+    }
+    setMenu(null);
+    if (selection.parts.length > 0 || selection.wires.length > 0) dispatch({ type: 'select', selection: EMPTY_SELECTION });
+  };
+
+  const phonePointerDown = (e: ReactPointerEvent<SVGSVGElement>, mode: PhoneCanvas['mode']) => {
+    const g = toGrid(e.clientX, e.clientY);
+    const local = localPoint(e.clientX, e.clientY);
+    setPicker(null);
+    setMagnifier(null);
+    if (menu) setMenu(null);
+    phoneLongFired.current = false;
+    clearPhoneTimers();
+    const hit = mode === 'bagla' ? null : hitTest(g, mode === 'olc' ? { pins: false } : undefined);
+    capture(e.pointerId);
+    const pointerId = e.pointerId;
+    setInteraction({ kind: 'press', pointerId, sx: local.x, sy: local.y, view, hit, g });
+    if (mode === 'kur' && (hit?.kind === 'part' || hit?.kind === 'wire')) {
+      // 150 ms kıpırdamadan basılı tutulursa sürükleme başlar (öncesinde kayarsa tuval kayar).
+      phoneTimers.current.hold = window.setTimeout(() => {
+        const state = interactionRef.current;
+        if (state.kind !== 'press' || state.pointerId !== pointerId) return;
+        navigator.vibrate?.(10);
+        if (hit.kind === 'part') {
+          const sel = selection.parts.includes(hit.partId) ? selection : { parts: [hit.partId], wires: [] };
+          if (sel !== selection) dispatch({ type: 'select', selection: sel });
+          setInteraction({
+            kind: 'drag-parts',
+            pointerId,
+            tapPartId: hit.partId,
+            start: g,
+            before: doc,
+            parts: new Set(sel.parts),
+            wires: new Set(sel.wires),
+            delta: { x: 0, y: 0 },
+          });
+        } else {
+          dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+          setInteraction({ kind: 'drag-segment', pointerId, start: g, before: doc, wireId: hit.wireId, segment: hit.segment, delta: { x: 0, y: 0 } });
+        }
+      }, PHONE_HOLD_MS);
+    }
+    if (hit?.kind === 'part' && mode !== 'bagla') {
+      phoneTimers.current.long = window.setTimeout(() => {
+        const state = interactionRef.current;
+        const still =
+          (state.kind === 'press' && state.pointerId === pointerId) ||
+          (state.kind === 'drag-parts' && state.pointerId === pointerId && state.delta.x === 0 && state.delta.y === 0);
+        if (!still) return;
+        phoneLongFired.current = true;
+        if (mode === 'olc') {
+          setInteraction({ kind: 'idle' });
+          phone?.onEditAttempt();
+          return;
+        }
+        // Kur: bağlam menüsü ve büyüteç (parmak kıpırdarsa menü kapanır, sürükleme sürer).
+        if (!selection.parts.includes(hit.partId)) dispatch({ type: 'select', selection: { parts: [hit.partId], wires: [] } });
+        menuFromLongPress.current = true;
+        setMenu({ partId: hit.partId, x: local.x, y: local.y });
+        setMagnifier({ x: local.x, y: local.y, g });
+      }, LONG_PRESS_MS);
+    }
+  };
+
   // --- İşaretçi olayları ---------------------------------------------------------------
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     pointerType.current = e.pointerType;
@@ -607,7 +855,7 @@ export function Canvas({
       if (stale.kind === 'drag-parts' || stale.kind === 'drag-segment') {
         dispatch({ type: 'end-preview', before: stale.before });
         setInteraction({ kind: 'idle' });
-      } else if (stale.kind === 'pinch' || stale.kind === 'pan' || stale.kind === 'rubber') {
+      } else if (stale.kind === 'pinch' || stale.kind === 'pan' || stale.kind === 'rubber' || stale.kind === 'press') {
         pinchRef.current = null;
         setInteraction({ kind: 'idle' });
       }
@@ -618,6 +866,7 @@ export function Canvas({
     // İki parmak: kıstırarak yakınlaştırma
     if (pointers.current.size === 2) {
       cancelLongPress();
+      clearPhoneTimers();
       const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
       if (current.kind === 'drag-parts' || current.kind === 'drag-segment') dispatch({ type: 'end-preview', before: current.before });
       const center = localPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
@@ -626,6 +875,11 @@ export function Canvas({
       return;
     }
     if (pointers.current.size > 2) return;
+
+    if (phone && e.button === 0) {
+      phonePointerDown(e, phone.mode);
+      return;
+    }
 
     const g = toGrid(e.clientX, e.clientY);
     const local = localPoint(e.clientX, e.clientY);
@@ -781,6 +1035,17 @@ export function Canvas({
     const g = toGrid(e.clientX, e.clientY);
     setCursor(g);
 
+    if (current.kind === 'press' && current.pointerId === e.pointerId) {
+      // Telefon: parmak kaydı (dokunuş değil): tuval kaydırılır.
+      const local = localPoint(e.clientX, e.clientY);
+      if (Math.hypot(local.x - current.sx, local.y - current.sy) <= DRAG_THRESHOLD_PX * 1.6) return;
+      clearPhoneTimers();
+      fittedRef.current = false;
+      setInteraction({ kind: 'pan', pointerId: e.pointerId, sx: current.sx, sy: current.sy, view: current.view });
+      setView({ ...current.view, x: current.view.x + local.x - current.sx, y: current.view.y + local.y - current.sy });
+      return;
+    }
+
     switch (current.kind) {
       case 'pan': {
         const local = localPoint(e.clientX, e.clientY);
@@ -794,6 +1059,7 @@ export function Canvas({
         if (menuFromLongPress.current) {
           menuFromLongPress.current = false;
           setMenu(null);
+          setMagnifier(null);
         }
         setInteraction({ ...current, delta });
         dispatch({ type: 'preview', doc: moveSelection(current.before, current.parts, current.wires, delta.x, delta.y) });
@@ -817,7 +1083,7 @@ export function Canvas({
       default:
         break;
     }
-    if (current.kind === 'wiring' || tool.kind !== 'place') {
+    if (!phone && (current.kind === 'wiring' || tool.kind !== 'place')) {
       const hit = hitTest(g, current.kind === 'wiring' ? { parts: false } : undefined);
       setHover(hit);
     }
@@ -828,6 +1094,28 @@ export function Canvas({
     const current = interactionRef.current;
     const longPressFired = longPress.current?.fired ?? false;
     cancelLongPress();
+    if (phone && e.type === 'pointerup') {
+      // Telefon: kıpırdamadan kalkan parmak bir dokunuştur (150 ms'den sonra da, taşınmadıysa).
+      const tap =
+        (current.kind === 'press' && current.pointerId === e.pointerId) ||
+        ((current.kind === 'drag-parts' || current.kind === 'drag-segment') && current.pointerId === e.pointerId && current.delta.x === 0 && current.delta.y === 0);
+      if (tap) {
+        clearPhoneTimers();
+        setInteraction({ kind: 'idle' });
+        menuFromLongPress.current = false;
+        if (phoneLongFired.current) return;
+        const local = localPoint(e.clientX, e.clientY);
+        const g = toGrid(e.clientX, e.clientY);
+        phoneTap(current.kind === 'press' ? current.hit : hitTest(g), g, local);
+        return;
+      }
+      clearPhoneTimers();
+      if (current.kind === 'drag-parts') menuFromLongPress.current = false;
+    } else if (phone && current.kind === 'press') {
+      clearPhoneTimers();
+      setInteraction({ kind: 'idle' });
+      return;
+    }
     if (current.kind === 'pinch') {
       if (pointers.current.size < 2) {
         pinchRef.current = null;
@@ -916,6 +1204,7 @@ export function Canvas({
       finishWire(current.points);
       return;
     }
+    if (phone) return;
     const hit = hitTest(toGrid(e.clientX, e.clientY), { pins: false, wires: false });
     if (hit?.kind === 'part') onOpenProperties(hit.partId);
   };
@@ -1040,6 +1329,9 @@ export function Canvas({
               : 'cursor-default';
 
   const selectedCount = selection.parts.length + selection.wires.length;
+  // Telefonda uzaklaşınca (%100'ün altında) değerler ve uç halkaları gizlenir; seçili parçada görünür.
+  const lod = phone !== null && view.scale < 1;
+  const bagla = phone?.mode === 'bagla';
   const hint: CanvasHint =
     simActive && tool.kind === 'select' && interaction.kind === 'idle'
       ? { kind: 'simulating' }
@@ -1108,7 +1400,7 @@ export function Canvas({
         // tuvalin üstündeki çekmece ya da pencere parmakla kaydırılamıyor. Katman açıkken kapatılır.
         style={overlayOpen ? { touchAction: 'auto' } : undefined}
         role="img"
-        aria-label={tr.canvas.label}
+        aria-label={phone?.mode === 'bagla' ? tr.phone.connectCanvas : phone?.mode === 'olc' ? tr.phone.olcCanvas : tr.canvas.label}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -1134,6 +1426,7 @@ export function Canvas({
         {/* Çizimin hiçbir parçası olay almaz; hedef her zaman SVG'nin kendisidir. Dokunmatikte işaretçi
             dokunulan öğeye örtük olarak yakalandığı için, yeniden çizilen bir alt öğe sürüklemeyi koparabilirdi. */}
         <g transform={`translate(${view.x} ${view.y}) scale(${view.scale})`} pointerEvents="none">
+          <g id={sceneId}>
           {view.scale >= 0.6 && <rect x={visible.x} y={visible.y} width={visible.w} height={visible.h} fill="url(#grid-minor)" />}
           <rect x={visible.x} y={visible.y} width={visible.w} height={visible.h} fill="url(#grid-major)" />
 
@@ -1242,6 +1535,8 @@ export function Canvas({
               </text>
             </g>
           )}
+          {/* Bağla kipinde parçalar soluklaşır, uçlar öne çıkar (P03). */}
+          <g opacity={bagla ? 0.38 : 1}>
           {doc.parts.map((part) => {
             const live = frame?.live.get(part.id);
             const measurement = frame?.measurements.get(part.id);
@@ -1254,16 +1549,18 @@ export function Canvas({
                 meterText={measurement ? meterText(part, measurement, frame?.statuses.get(part.id)) : null}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
+                hideValue={lod && !selectedParts.has(part.id)}
                 {...(live ? { live } : {})}
               />
             );
           })}
+          </g>
 
           {frame && <CurrentDots doc={doc} graph={flowGraph} frame={frame} />}
 
           {doc.parts.map((part) =>
             pinPositions(part).map((pos, i) =>
-              connectivity.unconnectedPins.has(pinKey(part.id, i)) ? (
+              connectivity.unconnectedPins.has(pinKey(part.id, i)) && !bagla && (!lod || selectedParts.has(part.id)) ? (
                 <circle
                   key={`u${part.id}-${i}`}
                   cx={pos.x * GRID}
@@ -1373,8 +1670,11 @@ export function Canvas({
           {interaction.kind === 'rubber' && (
             <RubberBand box={boxFromPoints(interaction.start, interaction.current)} scale={view.scale} />
           )}
+          </g>
         </g>
       </svg>
+
+      {bagla && phone && <ConnectTargets doc={doc} connectivity={connectivity} view={view} size={size} start={phone.connectStart} />}
 
       {doc.parts.length === 0 && doc.wires.length === 0 && tool.kind === 'select' && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-muted">
@@ -1389,14 +1689,13 @@ export function Canvas({
             />
           </svg>
           <p className="max-w-xs text-[15px]">
-            <span className="hidden desk:inline">{tr.canvas.empty}</span>
-            <span className="desk:hidden">{tr.canvas.emptyMobile}</span>
+            {phone ? <HintText text={tr.canvas.emptyMobile} /> : tr.canvas.empty}
           </p>
           {onExamples && (
             <button
               type="button"
               onClick={onExamples}
-              className="pointer-events-auto h-9 rounded-md border border-line-2 bg-panel px-3.5 text-sm font-medium text-ink hover:bg-panel-2"
+              className={`pointer-events-auto rounded-md border border-line-2 bg-panel px-3.5 text-sm font-medium text-ink hover:bg-panel-2 ${phone ? 'h-11' : 'h-9'}`}
             >
               {tr.canvas.emptyAction}
             </button>
@@ -1404,13 +1703,67 @@ export function Canvas({
         </div>
       )}
 
-      {frame && (
-        <VoltageLegend
-          vmax={frame.vmax}
-          scale={settings.wireScale}
-          electronFlow={settings.electronFlow}
-          rms={doc.parts.some((p) => p.type === 'acsource' || p.type === 'funcgen')}
-        />
+      {frame &&
+        !phone?.strip &&
+        (phone && !legendOpen ? (
+          <button
+            type="button"
+            onClick={() => setLegendOpen(true)}
+            aria-label={tr.phone.legendButton}
+            aria-expanded={false}
+            className="absolute bottom-3 left-3 flex h-11 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 text-[13px] font-medium shadow-sm"
+          >
+            <i className="block h-2 w-14 rounded-full" style={{ background: voltageGradient(settings.wireScale) }} aria-hidden="true" />
+            <span className="font-mono text-label">±{formatSI(frame.vmax, 'V', { trim: true })}</span>
+          </button>
+        ) : (
+          <VoltageLegend
+            vmax={frame.vmax}
+            scale={settings.wireScale}
+            electronFlow={settings.electronFlow}
+            rms={doc.parts.some((p) => p.type === 'acsource' || p.type === 'funcgen')}
+            onClose={phone ? () => setLegendOpen(false) : undefined}
+          />
+        ))}
+
+      {phone?.mode === 'olc' && phone.lockChip && !phone.strip && (
+        <div role="status" className="absolute top-3.5 left-3 flex items-center gap-2 rounded-full border border-ok-line bg-panel py-1 pr-1 pl-2.5 text-[13px] text-ok-ink shadow-sm">
+          <Icon name="lock" className="h-4 w-4" />
+          <span>{tr.phone.lock}</span>
+          <button
+            type="button"
+            onClick={phone.onLockChipClose}
+            aria-label={tr.phone.lockClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-ok-soft text-ok-ink"
+          >
+            <Icon name="close" className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {bagla && phone && (
+        <>
+          <div role="status" className="absolute inset-x-3 top-3 flex items-start gap-2.5 rounded-xl border border-accent-line bg-panel px-3 py-2.5 text-[13.5px] leading-[1.45] shadow-sm">
+            <Icon name="wire" className="mt-px h-5 w-5 shrink-0 text-accent-ink" />
+            <span>
+              <HintText text={connectCardText(phone.connectStart, doc)} />
+            </span>
+          </div>
+          <div className="pointer-events-none absolute bottom-3 left-3 flex gap-3 rounded-[10px] border border-line bg-panel/90 px-2.5 py-1.5 text-label text-ink-2" aria-hidden="true">
+            <span className="flex items-center gap-1.5">
+              <i className="block h-3 w-3 rounded-full bg-accent" />
+              {tr.phone.legendStart}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="block h-3 w-3 rounded-full border-2 border-accent" />
+              {tr.phone.legendFree}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <i className="block h-3 w-3 rounded-full border-2 border-[#9fb8e6]" />
+              {tr.phone.legendConnected}
+            </span>
+          </div>
+        </>
       )}
 
       {interaction.kind === 'wiring' && (
@@ -1426,25 +1779,8 @@ export function Canvas({
         </div>
       )}
 
-      {readoutBoxes && touch && frame && !menu && interaction.kind === 'idle' && selection.parts.length === 1 && selection.wires.length === 0 && (() => {
-        // Dokunmatikte üzerine gelme yok: seçili parçanın V/I/P bilgisi parçanın yanında gösterilir.
-        const part = doc.parts.find((p) => p.id === selection.parts[0]);
-        const m = part && frame.measurements.get(part.id);
-        const readout = part && m ? partReadout(part, m, frame.statuses.get(part.id)) : null;
-        if (!part || !readout) return null;
-        const box = partBounds(part);
-        const g = GRID * view.scale;
-        return (
-          <ReadoutBox
-            readout={readout}
-            x={(box.x + box.w) * g + view.x}
-            y={(box.y + box.h) * g + view.y}
-            area={size}
-          />
-        );
-      })()}
-
       {frame &&
+        !phone?.strip &&
         frame.runtime
           .filter((d) => d.code === 'led-burned')
           .map((d) => {
@@ -1483,27 +1819,12 @@ export function Canvas({
             );
           })}
 
-      {readoutBoxes && frame && hover?.kind === 'part' && cursor && !menu && interaction.kind === 'idle' && (() => {
-        const part = doc.parts.find((p) => p.id === hover.partId);
-        const m = part && frame.measurements.get(part.id);
-        const readout = part && m ? partReadout(part, m, frame.statuses.get(part.id)) : null;
-        if (!readout) return null;
-        return (
-          <ReadoutBox
-            readout={readout}
-            x={cursor.x * GRID * view.scale + view.x}
-            y={cursor.y * GRID * view.scale + view.y}
-            area={size}
-          />
-        );
-      })()}
-
       {menu && (() => {
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
         const burned = part.type === 'led' && frame?.statuses.get(part.id)?.burned === true;
         const items: MenuItem[] = [
-          { label: tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
+          { label: phone ? tr.phone.value : tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
           { label: tr.contextMenu.rotate, shortcut: 'R', onSelect: () => onRotate([part.id]) },
           ...(CATALOG[part.type].polarized ? [{ label: tr.contextMenu.flip, shortcut: 'F', onSelect: () => onFlip([part.id]) }] : []),
           ...(burned ? [{ label: tr.contextMenu.repair, onSelect: () => onRepair(part.id), tone: 'accent' as const, separatorBefore: true }] : []),
@@ -1522,20 +1843,282 @@ export function Canvas({
             items={items}
             area={size}
             label={tr.contextMenu.menu(part.label)}
-            onClose={() => setMenu(null)}
+            onClose={() => {
+              setMenu(null);
+              setMagnifier(null);
+            }}
           />
         );
       })()}
 
-      {noGround && (
+      {noGround?.banner && (
         <NoGroundBanner text={noGround.text} fixLabel={noGround.fixLabel} onFix={noGround.onFix} onDismiss={noGround.onDismiss} />
       )}
 
-      {/* Telefonda yakınlık tuvalin köşesinde; masaüstünde üst çubukta. */}
-      <p className="pointer-events-none absolute right-2 bottom-2 rounded bg-panel/85 px-2 py-1 text-xs text-muted shadow-sm tabular desk:hidden">
-        {tr.status.zoom} %{Math.round(view.scale * 100)}
-      </p>
+      {/* Telefon: uzaklaşınca değerler gizlenir; masaüstünde yakınlık üst çubukta. */}
+      {lod && !bagla && !phone?.strip && (
+        <p
+          className={`pointer-events-none absolute right-2.5 rounded-md bg-panel/90 px-1.5 py-0.5 font-mono text-label font-medium text-muted tabular ${
+            phone?.mode === 'olc' && phone.lockChip ? 'top-[64px]' : 'top-2.5'
+          }`}
+        >
+          {tr.phone.lod(Math.round(view.scale * 100))}
+        </p>
+      )}
+
+      {magnifier && (
+        <Magnifier sceneId={sceneId} at={magnifier} view={view} size={size} below={picker !== null && pickerAbove(picker, size)} />
+      )}
+      {picker && (
+        <Picker
+          picker={picker}
+          doc={doc}
+          size={size}
+          resistorStyle={settings.resistorStyle}
+          onChoose={choose}
+          onClose={() => {
+            setPicker(null);
+            setMagnifier(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/** Görünümü, verilen kutu (seçili parça) görünür alanın içinde kalacak kadar kaydırır. */
+function keepInside(view: View, box: Box | null, size: { width: number; height: number }): View {
+  if (!box) return view;
+  const g = GRID * view.scale;
+  const margin = 16;
+  const left = box.x * g + view.x;
+  const right = (box.x + box.w) * g + view.x;
+  const top = box.y * g + view.y;
+  const bottom = (box.y + box.h) * g + view.y;
+  let dx = 0;
+  let dy = 0;
+  if (right - left < size.width - 2 * margin) {
+    if (left < margin) dx = margin - left;
+    else if (right > size.width - margin) dx = size.width - margin - right;
+  }
+  if (bottom - top < size.height - 2 * margin) {
+    if (top < margin) dy = margin - top;
+    else if (bottom > size.height - margin) dy = size.height - margin - bottom;
+  }
+  return dx === 0 && dy === 0 ? view : { ...view, x: view.x + dx, y: view.y + dy };
+}
+
+/** Bağla kipindeki bilgi kartının metni. */
+function connectCardText(start: ConnectStart | null, doc: CircuitDoc): string {
+  if (!start) return tr.phone.connectCardIdle;
+  const part = start.partId ? doc.parts.find((p) => p.id === start.partId) : undefined;
+  if (!part || start.pin === null) return tr.phone.connectCardWire;
+  return tr.phone.connectCardStart(tr.phone.pinOf(part.label, tr.devices.pins[part.type][start.pin] ?? ''));
+}
+
+/**
+ * Bağla kipinde uç hedefleri (ekran pikselinde, yakınlıktan bağımsız): boş uç beyaz daire ve mavi
+ * halka (44 pt), bağlı uç küçük ve soluk, başlangıç dolu mavi ve haleli. Hepsinde uç etiketi.
+ */
+function ConnectTargets({
+  doc,
+  connectivity,
+  view,
+  size,
+  start,
+}: {
+  doc: CircuitDoc;
+  connectivity: Connectivity;
+  view: View;
+  size: { width: number; height: number };
+  start: ConnectStart | null;
+}) {
+  const targets: Array<{ key: string; x: number; y: number; tag: string; connected: boolean; isStart: boolean }> = [];
+  for (const part of doc.parts) {
+    pinPositions(part).forEach((pos, i) => {
+      const x = pos.x * GRID * view.scale + view.x;
+      const y = pos.y * GRID * view.scale + view.y;
+      if (x < -30 || y < -30 || x > size.width + 30 || y > size.height + 30) return;
+      targets.push({
+        key: `${part.id}-${i}`,
+        x,
+        y,
+        tag: tr.devices.pinTags[part.type][i] ?? '',
+        connected: !connectivity.unconnectedPins.has(pinKey(part.id, i)),
+        isStart: start?.partId === part.id && start.pin === i,
+      });
+    });
+  }
+  // Önce bağlı uçlar, sonra boşlar, en üstte başlangıç.
+  targets.sort((a, b) => Number(a.isStart) - Number(b.isStart) || Number(b.connected) - Number(a.connected));
+  const font = (tag: string, big: number) => (tag.length > 2 ? big - 4 : tag.length > 1 ? big - 2 : big);
+  const tStart = start && start.partId === null ? { x: start.point.x * GRID * view.scale + view.x, y: start.point.y * GRID * view.scale + view.y } : null;
+  return (
+    <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+      {targets.map((t) =>
+        t.isStart ? (
+          <g key={t.key}>
+            <circle cx={t.x} cy={t.y} r={30} fill="none" stroke="var(--color-accent)" strokeWidth={2} strokeOpacity={0.35} />
+            <circle cx={t.x} cy={t.y} r={24} fill="var(--color-accent)" />
+            <text x={t.x} y={t.y + 5} textAnchor="middle" fontSize={font(t.tag, 15)} fontWeight={700} fill="#fff">
+              {t.tag}
+            </text>
+          </g>
+        ) : t.connected ? (
+          <g key={t.key}>
+            <circle cx={t.x} cy={t.y} r={CONNECT_TARGET_SMALL_PX} fill="#fff" stroke="#9fb8e6" strokeWidth={2} />
+            <text x={t.x} y={t.y + 4.5} textAnchor="middle" fontSize={font(t.tag, 13)} fontWeight={600} fill="#5f7fb8">
+              {t.tag}
+            </text>
+          </g>
+        ) : (
+          <g key={t.key}>
+            <circle cx={t.x} cy={t.y} r={CONNECT_TARGET_PX} fill="#fff" stroke="var(--color-accent)" strokeWidth={2.5} />
+            <text x={t.x} y={t.y + 5} textAnchor="middle" fontSize={font(t.tag, 14)} fontWeight={600} fill="var(--color-accent-ink)">
+              {t.tag}
+            </text>
+          </g>
+        ),
+      )}
+      {tStart && (
+        <g>
+          <circle cx={tStart.x} cy={tStart.y} r={18} fill="none" stroke="var(--color-accent)" strokeWidth={2} strokeOpacity={0.35} />
+          <circle cx={tStart.x} cy={tStart.y} r={11} fill="var(--color-accent)" />
+        </g>
+      )}
+    </svg>
+  );
+}
+
+/** Seçici kartının yüksekliği (başlık + 52 px'lik seçenekler). */
+const pickerHeight = (n: number) => 40 + n * 52;
+/** Kart parmağın altına sığmıyorsa üstte durur (büyüteç o zaman parmağın altına iner). */
+function pickerAbove(picker: { y: number; options: readonly PickOption[] }, size: { height: number }): boolean {
+  return picker.y + 36 + pickerHeight(picker.options.length) > size.height - 8;
+}
+
+/**
+ * Büyüteç: sahnenin 2,6 kat büyütülmüş kopyası (tasarım: P15). Parmağın üstünde; seçici kartı üstte
+ * duruyorsa parmağın altında.
+ */
+function Magnifier({
+  sceneId,
+  at,
+  view,
+  size,
+  below = false,
+}: {
+  sceneId: string;
+  at: { x: number; y: number; g: Point };
+  view: View;
+  size: { width: number; height: number };
+  below?: boolean;
+}) {
+  const r = MAGNIFIER_PX / 2;
+  const left = Math.max(8, Math.min(size.width - MAGNIFIER_PX - 8, at.x - r));
+  const top = below ? Math.min(size.height - MAGNIFIER_PX - 8, at.y + 40) : Math.max(8, at.y - MAGNIFIER_PX - 40);
+  const scale = view.scale * MAGNIFY;
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute overflow-hidden rounded-full border-[3px] border-white bg-paper shadow-[0_6px_20px_rgba(29,39,51,0.3)]"
+      style={{ left, top, width: MAGNIFIER_PX, height: MAGNIFIER_PX }}
+    >
+      <svg width={MAGNIFIER_PX} height={MAGNIFIER_PX}>
+        <g transform={`translate(${r} ${r}) scale(${scale}) translate(${-at.g.x * GRID} ${-at.g.y * GRID})`}>
+          <use href={`#${sceneId}`} />
+        </g>
+        <circle cx={r} cy={r} r={5} fill="none" stroke="var(--color-accent)" strokeWidth={1.5} />
+      </svg>
+    </div>
+  );
+}
+
+/** "Burada N öğe var" seçicisi (listbox): parça, uç ya da kablo (tasarım: P15). */
+function Picker({
+  picker,
+  doc,
+  size,
+  resistorStyle,
+  onChoose,
+  onClose,
+}: {
+  picker: { x: number; y: number; options: readonly PickOption[] };
+  doc: CircuitDoc;
+  size: { width: number; height: number };
+  resistorStyle: Settings['resistorStyle'];
+  onChoose: (option: PickOption) => void;
+  onClose: () => void;
+}) {
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>('[role=option]')?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const n = picker.options.length;
+  const top = pickerAbove(picker, size) ? 8 : picker.y + 36;
+  const label = (option: PickOption): { title: string; note: string; part?: CircuitDoc['parts'][number] } => {
+    if (option.kind === 'wire') {
+      const wire = doc.wires.find((w) => w.id === option.wireId);
+      const ends = wire ? [wire.points[0]!, wire.points[wire.points.length - 1]!] : [];
+      const names = ends
+        .map((end) => {
+          for (const part of doc.parts) {
+            const i = pinPositions(part).findIndex((p) => samePoint(p, end));
+            if (i >= 0) return `${part.label} ${tr.devices.pinTags[part.type][i] ?? ''}`.trim();
+          }
+          return null;
+        })
+        .filter((s): s is string => s !== null);
+      return { title: tr.phone.wire, note: tr.phone.pickWire(names.join(' → ')) };
+    }
+    const part = doc.parts.find((p) => p.id === option.partId);
+    if (!part) return { title: '', note: '' };
+    if (option.kind === 'pin') return { title: `${part.label} · ${tr.devices.pins[part.type][option.index] ?? ''}`, note: tr.phone.pickPin, part };
+    return { title: part.label, note: tr.phone.pickPart(tr.devices.names[part.type]), part };
+  };
+  return (
+    <>
+      <div className="absolute inset-0" onPointerDown={onClose} aria-hidden="true" />
+      <div
+        ref={listRef}
+        role="listbox"
+        aria-label={tr.phone.pickerLabel(n)}
+        className="absolute inset-x-6 overflow-hidden rounded-[14px] border border-line bg-panel shadow-[0_10px_30px_rgba(29,39,51,0.22)]"
+        style={{ top }}
+      >
+        <div className="px-3.5 pt-2.5 pb-1.5 text-[13px] font-semibold text-muted">{tr.phone.pickerTitle(n)}</div>
+        {picker.options.map((option, i) => {
+          const text = label(option);
+          return (
+            <button
+              key={`${option.kind}-${'partId' in option ? option.partId : option.wireId}-${option.kind === 'pin' ? option.index : ''}`}
+              type="button"
+              role="option"
+              aria-selected={false}
+              onClick={() => onChoose(option)}
+              className={`flex min-h-[52px] w-full items-center gap-3 px-3.5 text-left active:bg-accent-soft ${i < n - 1 ? 'border-b border-app' : ''}`}
+            >
+              <span className="flex h-7 w-9 shrink-0 items-center justify-center text-ink">
+                {option.kind === 'wire' ? (
+                  <Icon name="wire" />
+                ) : option.kind === 'pin' ? (
+                  <i className="block h-4 w-4 rounded-full border-[2.5px] border-accent bg-panel" />
+                ) : text.part ? (
+                  <SymbolIcon type={text.part.type} resistorStyle={resistorStyle} className="max-h-6 w-9" />
+                ) : null}
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-[15px] font-semibold">{text.title}</span>
+                <small className="truncate text-[12.5px] text-muted">{text.note}</small>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -1601,28 +2184,32 @@ function VoltageLegend({
   scale,
   electronFlow,
   rms,
+  onClose,
 }: {
   vmax: number;
   scale: WireScale;
   electronFlow: boolean;
   /** AC devrede renkler etkin değerden (kare ortalamasından) çizilir. */
   rms: boolean;
+  /** Telefon: dokununca küçük düğmeye döner. */
+  onClose?: () => void;
 }) {
   const label = formatSI(vmax, 'V', { trim: true });
   return (
     <div
       role="note"
       aria-label={tr.sim.legendTitle}
-      className="pointer-events-none absolute bottom-3 left-3 flex flex-col gap-1.5 rounded-[10px] border border-line bg-panel/95 px-3 py-2.5 shadow-sm max-desk:bottom-10 max-desk:left-2 max-desk:gap-1 max-desk:px-2.5 max-desk:py-2"
+      onClick={onClose}
+      className={`absolute bottom-3 left-3 flex flex-col gap-1.5 rounded-[10px] border border-line bg-panel/95 px-3 py-2.5 shadow-sm ${onClose ? '' : 'pointer-events-none'}`}
     >
       <span className="text-label font-semibold text-muted">{rms ? tr.sim.legendRms : tr.sim.legend}</span>
-      <div className="h-2.5 w-44 rounded-[5px] max-desk:h-2 max-desk:w-36" style={{ background: voltageGradient(scale) }} />
-      <div className="flex w-44 justify-between font-mono text-[11.5px] text-ink-2 tabular max-desk:w-36 max-desk:text-[11px]">
+      <div className="h-2.5 w-44 rounded-[5px]" style={{ background: voltageGradient(scale) }} />
+      <div className="flex w-44 justify-between font-mono text-[11.5px] text-ink-2 tabular">
         <span>−{label}</span>
         <span>0 V</span>
         <span>+{label}</span>
       </div>
-      <div className="flex items-center gap-2 pt-0.5 text-label text-ink-2 max-desk:hidden">
+      <div className="flex items-center gap-2 pt-0.5 text-label text-ink-2">
         <svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true">
           {[5, 17, 29].map((cx) => (
             <circle key={cx} cx={cx} cy={5} r={3.4} fill={CURRENT_DOT_COLOR} stroke={CURRENT_DOT_EDGE} />

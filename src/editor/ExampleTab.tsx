@@ -6,6 +6,7 @@ import { EXAMPLE_GROUPS, EXAMPLE_IDS, type ExampleId } from '../examples';
 import { tr } from '../i18n/tr';
 import { Icon } from './icons';
 import { Rich } from './Rich';
+import { useTouchUi } from './touchUi';
 
 export interface ExampleTabProps {
   readonly id: ExampleId | null;
@@ -26,6 +27,9 @@ function groupOf(id: ExampleId): string {
 
 export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onOpen, onClose, onBrowse }: ExampleTabProps) {
   const inputId = useId();
+  // Telefonda dokunma hedefleri 44 px, yazı alanı 16 px.
+  const touch = useTouchUi();
+  const h9 = touch ? 'h-11' : 'h-9';
   if (!id) {
     return (
       <div className="flex flex-col items-start gap-3 px-5 pt-5">
@@ -34,7 +38,7 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
         <button
           type="button"
           onClick={onBrowse}
-          className="flex h-9 items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 text-sm font-medium hover:bg-panel-2"
+          className={`flex ${h9} items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 text-sm font-medium hover:bg-panel-2`}
         >
           <Icon name="book" />
           {tr.examples.browse}
@@ -50,7 +54,7 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
   const guess = prediction.trim();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain px-5 pt-4 pb-5">
+    <div className={`flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain pb-5 ${touch ? 'px-4 pt-2' : 'px-5 pt-4'}`}>
       <div className="flex flex-col gap-1.5">
         <span className="self-start rounded-xs bg-accent-soft px-2 py-0.5 text-label font-semibold text-accent-ink">
           {tr.examples.tabBadge(groupOf(id))}
@@ -89,7 +93,7 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
               value={prediction}
               onChange={(e) => onPrediction(e.target.value)}
               autoComplete="off"
-              className="h-10 rounded-md border border-warn-line bg-panel px-2.5 font-mono text-[15px] font-medium outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft"
+              className={`rounded-md border border-warn-line bg-panel px-2.5 font-mono font-medium ${touch ? 'h-12 text-base' : 'h-10 text-[15px]'} outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft`}
             />
           </>
         )}
@@ -119,7 +123,7 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
           <button
             type="button"
             onClick={onPlay}
-            className="flex h-9 items-center gap-1.5 rounded-md bg-ok px-3.5 text-sm font-semibold text-white hover:brightness-110"
+            className={`flex ${h9} items-center gap-1.5 rounded-md bg-ok px-3.5 text-sm font-semibold text-white hover:brightness-110`}
           >
             <Icon name="play" />
             {tr.sim.play}
@@ -133,11 +137,11 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
           disabled={!previous}
           onClick={() => previous && onOpen(previous)}
           aria-label={tr.examples.previousLabel}
-          className="h-9 rounded-md px-2.5 text-small font-medium text-ink enabled:hover:bg-panel-2 disabled:text-stopped"
+          className={`${h9} rounded-md px-2.5 text-small font-medium text-ink enabled:hover:bg-panel-2 disabled:text-stopped`}
         >
           {tr.examples.previous}
         </button>
-        <button type="button" onClick={onClose} className="h-9 rounded-md px-2.5 text-small font-medium text-muted hover:bg-panel-2">
+        <button type="button" onClick={onClose} className={`${h9} rounded-md px-2.5 text-small font-medium text-muted hover:bg-panel-2`}>
           {tr.examples.closeExample}
         </button>
         <button
@@ -145,7 +149,7 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
           disabled={!next}
           onClick={() => next && onOpen(next)}
           aria-label={tr.examples.nextLabel}
-          className="h-9 rounded-md px-2.5 text-small font-medium text-ink enabled:hover:bg-panel-2 disabled:text-stopped"
+          className={`${h9} rounded-md px-2.5 text-small font-medium text-ink enabled:hover:bg-panel-2 disabled:text-stopped`}
         >
           {tr.examples.next}
         </button>

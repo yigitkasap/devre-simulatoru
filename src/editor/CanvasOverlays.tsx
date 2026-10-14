@@ -1,9 +1,8 @@
-// Tuvalin üzerinde duran HTML katmanları: V/I/P bilgi kutusu, sağ tık menüsü, yanmış LED balonu ve
+// Tuvalin üzerinde duran HTML katmanları: sağ tık menüsü, yanmış LED balonu ve
 // "devrede toprak yok" afişi (tasarım: M07a, M07b).
 
 import { useEffect, useRef } from 'react';
 import { tr } from '../i18n/tr';
-import type { Readout } from './readouts';
 import { Rich } from './Rich';
 
 /** Kutunun kapsayıcıdan taşmaması için konumu ayarlar (imlecin sağına, sığmazsa soluna). */
@@ -13,46 +12,6 @@ function place(x: number, y: number, width: number, height: number, area: { widt
   let top = y + gap;
   if (top + height > area.height - 4) top = Math.max(4, area.height - height - 4);
   return { left, top };
-}
-
-export function ReadoutBox({
-  readout,
-  x,
-  y,
-  area,
-}: {
-  readout: Readout;
-  x: number;
-  y: number;
-  area: { width: number; height: number };
-}) {
-  const width = 248;
-  const height = 40 + readout.rows.length * 18 + (readout.note ? 40 : 0);
-  const pos = place(x, y, width, height, area);
-  return (
-    <div
-      className="pointer-events-none absolute z-20 rounded-lg border border-line bg-panel/95 px-3 py-2 text-xs shadow-lg"
-      style={{ left: pos.left, top: pos.top, width }}
-      role="tooltip"
-    >
-      <p className="mb-1 font-semibold">{readout.title}</p>
-      <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5">
-        {readout.rows.map((row) => (
-          <div key={row.label} className="contents">
-            <dt className="text-muted">
-              <Rich text={row.label} />
-            </dt>
-            <dd className="text-right font-medium tabular">{row.value}</dd>
-          </div>
-        ))}
-      </dl>
-      {readout.note && (
-        <p className="mt-1.5 border-t border-line pt-1.5 leading-snug text-ink/85 tabular">
-          <Rich text={readout.note} />
-        </p>
-      )}
-    </div>
-  );
 }
 
 export interface MenuItem {

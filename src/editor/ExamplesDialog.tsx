@@ -1,21 +1,26 @@
 // Örnek devreler penceresi: üst çubuktaki "Örnekler" düğmesiyle açılır. Örnekler konularına göre
-// gruplanır; birine tıklayınca devre yüklenir ve pencere kapanır.
+// gruplanır; birine tıklayınca devre yüklenir ve pencere kapanır. Telefonda tam ekran, aramalı ve
+// açılır kapanır gruplu liste (tasarım: P12).
 
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { EXAMPLE_GROUPS, type ExampleId } from '../examples';
 import { tr } from '../i18n/tr';
 import { Icon } from './icons';
 import { Rich } from './Rich';
 
 export interface ExamplesDialogProps {
-  /** Telefon düzeni: örneğin açıklaması tuvalin köşesindeki kartta çıkar (masaüstünde Örnek sekmesinde). */
+  /** Telefon düzeni: tam ekran liste (P12). */
   readonly phone: boolean;
   readonly activeExample: ExampleId | null;
   readonly onLoad: (id: ExampleId) => void;
   readonly onClose: () => void;
 }
 
-export function ExamplesDialog({ phone, activeExample, onLoad, onClose }: ExamplesDialogProps) {
+export function ExamplesDialog(props: ExamplesDialogProps) {
+  return props.phone ? <PhoneExamples {...props} /> : <DesktopExamples {...props} />;
+}
+
+function DesktopExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -46,7 +51,7 @@ export function ExamplesDialog({ phone, activeExample, onLoad, onClose }: Exampl
             <h2 id={titleId} className="font-semibold">
               {tr.examples.dialogTitle}
             </h2>
-            <p className="text-xs text-muted">{phone ? tr.examples.dialogHintPhone : tr.examples.dialogHint}</p>
+            <p className="text-xs text-muted">{tr.examples.dialogHint}</p>
           </div>
           <button
             ref={closeRef}
@@ -98,6 +103,142 @@ export function ExamplesDialog({ phone, activeExample, onLoad, onClose }: Exampl
             </section>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Türkçe karakterleri sadeleştirerek arar. */
+function normalize(text: string): string {
+  return text
+    .toLocaleLowerCase('tr-TR')
+    .replace(/ç/g, 'c')
+    .replace(/ğ/g, 'g')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ş/g, 's')
+    .replace(/ü/g, 'u');
+}
+
+function PhoneExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps) {
+  const titleId = useId();
+  const [query, setQuery] = useState('');
+  const activeGroup = EXAMPLE_GROUPS.find((g) => (g.ids as readonly ExampleId[]).includes(activeExample as ExampleId))?.id;
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set([activeGroup ?? EXAMPLE_GROUPS[0]!.id]));
+  const total = EXAMPLE_GROUPS.reduce((n, g) => n + g.ids.length, 0);
+  const numbers = useMemo(() => {
+    const map = new Map<ExampleId, number>();
+    let n = 0;
+    for (const g of EXAMPLE_GROUPS) for (const id of g.ids) map.set(id as ExampleId, ++n);
+    return map;
+  }, []);
+  const q = normalize(query.trim());
+  const groups = EXAMPLE_GROUPS.map((g) => ({
+    ...g,
+    ids: (g.ids as readonly ExampleId[]).filter((id) => {
+      if (!q) return true;
+      const t = tr.examples.texts[id];
+      return normalize(t.title).includes(q) || normalize(t.description).includes(q) || normalize(tr.examples.groups[g.id]).includes(q);
+    }),
+  })).filter((g) => g.ids.length > 0);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      className="fixed inset-0 z-50 flex flex-col bg-panel"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      <div className="flex h-14 shrink-0 items-center gap-1 px-2">
+        <button type="button" onClick={onClose} aria-label={tr.examples.dialogClose} className="flex h-11 w-11 items-center justify-center rounded-[10px] active:bg-app">
+          <Icon name="close" />
+        </button>
+        <h2 id={titleId} className="text-[19px] font-semibold">
+          {tr.examples.dialogTitle}
+        </h2>
+        <span className="ml-auto pr-2 font-mono text-[13px] text-muted">{total}</span>
+      </div>
+      <div className="shrink-0 px-4 pb-2">
+        <label className="flex h-11 items-center gap-2 rounded-[10px] border border-line-2 px-3 text-muted focus-within:border-accent">
+          <Icon name="search" className="h-[18px] w-[18px] shrink-0" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label={tr.phone.examplesSearchLabel}
+            placeholder={tr.phone.examplesSearch}
+            className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
+          />
+        </label>
+        <span className="mt-2 block text-[13px] text-muted">{tr.phone.examplesHint}</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
+        {groups.length === 0 && <p className="py-3 text-sm text-muted">{tr.phone.examplesNone}</p>}
+        {groups.map((group) => {
+          const expanded = q !== '' || open.has(group.id);
+          return (
+            <section key={group.id} className="border-b border-app">
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() =>
+                  setOpen((s) => {
+                    const next = new Set(s);
+                    if (next.has(group.id)) next.delete(group.id);
+                    else next.add(group.id);
+                    return next;
+                  })
+                }
+                className="flex min-h-[52px] w-full items-center gap-2.5 text-left text-[15px] font-semibold"
+              >
+                <Icon name={expanded ? 'chevronDown' : 'chevron'} className="h-[18px] w-[18px] shrink-0 text-muted" />
+                <span className="min-w-0 flex-1">{tr.examples.groups[group.id]}</span>
+                <span className="font-mono text-[13px] font-medium text-muted">{group.ids.length}</span>
+              </button>
+              {expanded && (
+                <ul className="flex flex-col gap-2 pb-3">
+                  {group.ids.map((id) => {
+                    const texts = tr.examples.texts[id];
+                    const active = activeExample === id;
+                    return (
+                      <li key={id}>
+                        <button
+                          type="button"
+                          onClick={() => onLoad(id)}
+                          aria-current={active || undefined}
+                          aria-label={texts.title}
+                          className={`flex w-full items-start gap-3 rounded-xl text-left ${active ? 'border-2 border-accent bg-accent-soft/50 p-[11px]' : 'border border-line p-3 active:bg-app'}`}
+                        >
+                          <span className={`w-5 shrink-0 pt-px text-right font-mono text-[13px] font-semibold ${active ? 'text-accent-ink' : 'text-muted'}`} aria-hidden="true">
+                            {numbers.get(id)}
+                          </span>
+                          <span className="min-w-0">
+                            <b className="block text-[15px] font-semibold">
+                              {texts.title}
+                              {active && (
+                                <span className="ml-1.5 rounded-xs bg-accent px-1.5 py-px align-[2px] text-[11px] font-semibold text-white">{tr.phone.exampleOpen}</span>
+                              )}
+                            </b>
+                            <span className="mt-0.5 line-clamp-2 block text-[13.5px] leading-snug text-muted">
+                              <Rich text={texts.description} />
+                            </span>
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+          );
+        })}
       </div>
     </div>
   );

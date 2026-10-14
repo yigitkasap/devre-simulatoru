@@ -1,7 +1,7 @@
 // Parça kütüphanesi (tasarım: C-Kutuphane). Biçimleri:
 //   full    masaüstünde solda sabit panel (232/256 px): arama, kategoriler, altta seçili parçanın bilgisi
 //   rail    56 px şerit: kütüphaneyi aç, ara ve son kullanılan parçalar
-//   drawer  telefonda soldan açılan çekmece (6. aşamada alt sayfaya dönüşecek); bilgi alanı yok
+// Telefonda kütüphane yerine alttaki Parça sayfası kullanılır (PhoneSheets).
 // Sıkışık masaüstünde (900–1279 px) şeritteki "aç" düğmesi tam paneli tuvalin üstünde açılır kart
 // olarak gösterir (LibraryFlyout); kart tuval alanının içinde durur, alttaki çubukları kapatmaz.
 // Örnekler üst çubuktaki "Örnekler" penceresindedir.
@@ -29,7 +29,7 @@ function normalize(text: string): string {
 
 const CATEGORY_OF = new Map<DeviceType, Category>(CATEGORIES.flatMap((c) => c.types.map((t) => [t, c.id] as const)));
 
-export type LibraryMode = 'full' | 'rail' | 'drawer';
+export type LibraryMode = 'full' | 'rail';
 
 export interface LibraryProps {
   readonly mode: LibraryMode;
@@ -39,9 +39,7 @@ export interface LibraryProps {
   readonly settings: Settings;
   readonly dispatch: Dispatch<EditorAction>;
   readonly onDragTypeChange: (type: DeviceType | null) => void;
-  /** Telefonda çekmece açık mı? */
-  readonly drawerOpen: boolean;
-  /** Çekmeceyi ya da açılır kartı kapatır. */
+  /** Açılır kartı kapatır. */
   readonly onClose: () => void;
   /** Tam paneli şeride daraltır. */
   readonly onCollapse: () => void;
@@ -67,20 +65,6 @@ const TOGGLE_ATTR = 'data-library-toggle';
 
 export function Library(props: LibraryProps) {
   const { mode } = props;
-
-  if (mode === 'drawer') {
-    return (
-      <aside
-        className={`absolute inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-line bg-panel shadow-xl transition-transform ${
-          props.drawerOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-        aria-label={tr.library.title}
-      >
-        <LibraryPanel {...props} />
-      </aside>
-    );
-  }
-
   if (mode === 'rail') return <Rail {...props} />;
   return (
     <aside
@@ -169,10 +153,9 @@ function LibraryPanel({
     } else {
       dispatch({ type: 'set-tool', tool: { kind: 'place', type, rotation: 0 } });
     }
-    if (mode === 'drawer' || mode === 'flyout') onClose();
+    if (mode === 'flyout') onClose();
   };
 
-  const drawer = mode === 'drawer';
   const category = CATEGORY_OF.get(infoType);
 
   return (
@@ -182,11 +165,11 @@ function LibraryPanel({
         <button
           type="button"
           className="flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-app max-desk:h-10 max-desk:w-10"
-          onClick={drawer || mode === 'flyout' ? onClose : onCollapse}
-          aria-label={drawer ? tr.library.close : tr.library.collapse}
-          title={drawer ? tr.library.close : tr.library.collapse}
+          onClick={mode === 'flyout' ? onClose : onCollapse}
+          aria-label={mode === 'flyout' ? tr.library.close : tr.library.collapse}
+          title={mode === 'flyout' ? tr.library.close : tr.library.collapse}
         >
-          <Icon name={drawer ? 'close' : 'collapseLeft'} />
+          <Icon name={mode === 'flyout' ? 'close' : 'collapseLeft'} />
         </button>
       </div>
       <div className="px-3 pb-2">
@@ -236,16 +219,14 @@ function LibraryPanel({
         ))}
       </nav>
 
-      {!drawer && (
-        <div aria-live="polite" className="flex flex-col gap-1.5 border-t border-line bg-panel-2 px-3.5 pt-3 pb-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <b className="text-sm font-semibold">{tr.devices.names[infoType]}</b>
-            {category && <span className="text-[11px] text-muted">{tr.library.categories[category]}</span>}
-          </div>
-          <p className="text-small leading-[1.45] text-ink-2">{tr.devices.descriptions[infoType]}</p>
-          <span className="text-label text-muted">{tr.library.hint}</span>
+      <div aria-live="polite" className="flex flex-col gap-1.5 border-t border-line bg-panel-2 px-3.5 pt-3 pb-3.5">
+        <div className="flex items-center justify-between gap-2">
+          <b className="text-sm font-semibold">{tr.devices.names[infoType]}</b>
+          {category && <span className="text-[11px] text-muted">{tr.library.categories[category]}</span>}
         </div>
-      )}
+        <p className="text-small leading-[1.45] text-ink-2">{tr.devices.descriptions[infoType]}</p>
+        <span className="text-label text-muted">{tr.library.hint}</span>
+      </div>
     </>
   );
 }

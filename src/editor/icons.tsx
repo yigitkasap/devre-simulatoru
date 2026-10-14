@@ -38,7 +38,12 @@ export type IconName =
   | 'saved'
   | 'speed'
   | 'info'
-  | 'chat';
+  | 'chat'
+  | 'more'
+  | 'panel'
+  | 'measure'
+  | 'devices'
+  | 'lock';
 
 const PATHS: Record<IconName, ReactNode> = {
   menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
@@ -158,6 +163,38 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   chat: <path d="M4 4h12v9H8l-4 3z" />,
+  more: (
+    <>
+      <circle cx="4.5" cy="10" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="10" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="10" r="1.5" fill="currentColor" stroke="none" />
+    </>
+  ),
+  panel: (
+    <>
+      <rect x="3" y="3" width="14" height="14" rx="2.5" />
+      <path d="M3 11h14M8 14h4" />
+    </>
+  ),
+  measure: (
+    <>
+      <rect x="3" y="4" width="14" height="12" rx="2" />
+      <path d="M6 12.5l2.5-3 2.5 2 3-4" />
+    </>
+  ),
+  devices: (
+    <>
+      <rect x="2" y="3.5" width="16" height="13" rx="2" />
+      <path d="M5 13V6.5h6.5V13z" />
+      <path d="M5.5 10.5c1-2 2-2 3 0s2 2 2.5 0M14.5 7.5v.01M14.5 10.5v.01M14.5 13v.01" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="4.5" y="9" width="11" height="8" rx="1.5" />
+      <path d="M7 9V6.5a3 3 0 0 1 6 0V9" />
+    </>
+  ),
 };
 
 export function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {

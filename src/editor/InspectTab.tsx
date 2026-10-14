@@ -18,6 +18,7 @@ import { Rich } from './Rich';
 import type { Settings } from './settings';
 import type { Selection } from './state';
 import { SymbolIcon } from './symbols';
+import { useTouchUi } from './touchUi';
 import type { SimFrame, SimStatus } from './useSimulation';
 
 export interface PartPatch {
@@ -48,6 +49,7 @@ const RACK_DEVICES: ReadonlySet<string> = new Set(['oscilloscope', 'funcgen', 'd
 
 export function InspectTab(props: InspectTabProps) {
   const { doc, selection, frame } = props;
+  const touch = useTouchUi();
   const parts = doc.parts.filter((p) => selection.parts.includes(p.id));
   const count = selection.parts.length + selection.wires.length;
 
@@ -68,7 +70,7 @@ export function InspectTab(props: InspectTabProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {frame && <MeterStrip {...props} />}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 pt-3.5 pb-5">{body}</div>
+      <div className={`flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-5 ${touch ? 'px-4 pt-3' : 'px-5 pt-3.5'}`}>{body}</div>
     </div>
   );
 }
@@ -102,6 +104,7 @@ function EmptyCircuit() {
 
 /** Seçim yokken: devredeki parçaların listesi (tuvalin metin karşılığı; tıklayınca seçer). */
 function NoSelection({ doc, settings, onSelectPart }: InspectTabProps) {
+  const touch = useTouchUi();
   return (
     <>
       <div className="flex flex-col gap-1 pt-1.5">
@@ -116,7 +119,7 @@ function NoSelection({ doc, settings, onSelectPart }: InspectTabProps) {
               <button
                 type="button"
                 onClick={() => onSelectPart(part.id)}
-                className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-panel-2"
+                className={`flex w-full items-center gap-2.5 rounded-md px-1.5 text-left hover:bg-panel-2 ${touch ? 'min-h-11 py-2' : 'py-1.5'}`}
               >
                 <span className="flex h-5 w-8 shrink-0 items-center justify-center">
                   <SymbolIcon type={part.type} resistorStyle={settings.resistorStyle} className="max-h-5 w-8" />
@@ -137,6 +140,7 @@ function NoSelection({ doc, settings, onSelectPart }: InspectTabProps) {
 
 /** Simülasyon çalışırken ölçü aletlerinin göstergeleri (tıklayınca o aleti seçer). */
 function MeterStrip({ doc, frame, onSelectPart }: InspectTabProps) {
+  const touch = useTouchUi();
   const meters = doc.parts.filter((p) => p.type === 'voltmeter' || p.type === 'ammeter');
   if (!frame || meters.length === 0) return null;
   return (
@@ -151,7 +155,7 @@ function MeterStrip({ doc, frame, onSelectPart }: InspectTabProps) {
             key={part.id}
             type="button"
             onClick={() => onSelectPart(part.id)}
-            className="flex items-center gap-2 rounded-md text-small font-medium hover:underline"
+            className={`flex items-center gap-2 rounded-md text-small font-medium hover:underline ${touch ? 'min-h-11' : ''}`}
             aria-label={`${tr.inspector.meters}: ${part.label} ${text}`}
           >
             <span>{part.label}</span>
@@ -304,12 +308,12 @@ function PartDetails({
   );
 }
 
-function SectionTitle({ children }: { children: ReactNode }) {
+export function SectionTitle({ children }: { children: ReactNode }) {
   return <span className="text-label font-semibold text-muted">{children}</span>;
 }
 
 /** "3,180 V" → ["3,180", "V"]; birimsiz değerlerde ikinci parça boş. */
-function splitUnit(value: string): [string, string] {
+export function splitUnit(value: string): [string, string] {
   const m = /^([−+-]?[\d.,]+)\s+(\S+)$/.exec(value);
   return m ? [m[1]!, m[2]!] : [value, ''];
 }
@@ -406,11 +410,11 @@ function BigValue({ value, size }: { value: string; size: 'lg' | 'md' }) {
 
 const FIELD_BOX = 'flex h-10 items-center overflow-hidden rounded-md border bg-panel transition-shadow';
 /** Çerçeve: hatalıyken kırmızı (odakta da), değilse odakta mavi. */
-function fieldTone(error: boolean): string {
+export function fieldTone(error: boolean): string {
   return error ? 'border-danger ring-3 ring-danger-soft' : 'border-line-2 focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft';
 }
 
-function FieldError({ id, error, kept }: { id: string; error: string; kept?: string }) {
+export function FieldError({ id, error, kept }: { id: string; error: string; kept?: string }) {
   return (
     <>
       <span id={id} role="alert" className="flex gap-1.5 text-small text-danger">
@@ -423,7 +427,7 @@ function FieldError({ id, error, kept }: { id: string; error: string; kept?: str
 }
 
 /** Metni Enter'da ya da odak çıkınca doğrulayıp uygulayan alanların ortak davranışı. */
-function useCommitField<T>(
+export function useCommitField<T>(
   external: string,
   validate: (text: string) => { value: T } | { error: string },
   apply: (value: T) => string | null,
@@ -675,6 +679,8 @@ function NumberField({
 // --- Kablo ve çoklu seçim -------------------------------------------------------------------
 
 function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: string }) {
+  // Telefonda silme alt çubukta (Ölç kipinde yapı kilitli).
+  const touch = useTouchUi();
   const voltage = frame?.wireVoltages.get(wireId);
   return (
     <>
@@ -683,6 +689,7 @@ function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: st
           <Icon name="wire" className="h-6 w-6" />
         </span>
         <h2 className="flex-1 text-title font-semibold">{tr.inspector.wire}</h2>
+        {!touch && (
         <button
           type="button"
           onClick={onDelete}
@@ -692,6 +699,7 @@ function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: st
           <Icon name="trash" />
           {tr.toolbar.remove}
         </button>
+        )}
       </header>
       <section className="flex flex-col gap-2" aria-live="polite">
         <SectionTitle>{tr.inspector.live}</SectionTitle>
@@ -710,6 +718,8 @@ function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: st
 }
 
 function MultiSelection({ count, parts, onRotate, onFlip, onDelete }: InspectTabProps & { count: number; parts: readonly Part[] }) {
+  // Telefonda eylemler alt çubukta.
+  const touch = useTouchUi();
   const canFlip = parts.some((p) => CATALOG[p.type].polarized);
   const ids = parts.map((p) => p.id);
   return (
@@ -718,7 +728,7 @@ function MultiSelection({ count, parts, onRotate, onFlip, onDelete }: InspectTab
         <h2 className="text-title font-semibold">{tr.inspector.selectedItems(count)}</h2>
         <span className="text-small text-muted">{tr.inspector.selectedHint}</span>
       </div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className={`flex flex-wrap gap-1.5 ${touch ? 'hidden' : ''}`}>
         {ids.length > 0 && (
           <button
             type="button"

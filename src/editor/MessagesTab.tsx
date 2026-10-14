@@ -2,9 +2,11 @@
 // hata/uyarıları. Hata ve uyarı renkle birlikte biçim ve simgeyle de ayrılır (dolu daire / üçgen).
 // Bir mesaja tıklayınca ilgili parçalar ve kablolar tuvalde vurgulanır.
 
+import type { ReactNode } from 'react';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import type { MessageItem, MessageSeverity } from './messages';
 import { Rich } from './Rich';
+import { useTouchUi } from './touchUi';
 
 /** Seçili mesajın altındaki düzeltme düğmesi (Onar, "R1'i 360 Ω yap"). */
 export interface MessageAction {
@@ -20,6 +22,8 @@ export interface MessagesTabProps {
   readonly context: DiagnosticContext;
   /** Bir mesajın düzeltme düğmeleri (seçiliyken gösterilir). */
   readonly actions: (item: MessageItem) => readonly MessageAction[];
+  /** Listenin üstünde (telefon: "Simülasyon başlamadı" kutusu). */
+  readonly header?: ReactNode;
 }
 
 export function SeverityMark({ severity, size = 20 }: { severity: MessageSeverity; size?: number }) {
@@ -38,13 +42,15 @@ export function SeverityMark({ severity, size = 20 }: { severity: MessageSeverit
   );
 }
 
-export function MessagesTab({ items, selectedKey, onSelect, context, actions }: MessagesTabProps) {
+export function MessagesTab({ items, selectedKey, onSelect, context, actions, header }: MessagesTabProps) {
+  const touch = useTouchUi();
   const errors = items.filter((i) => i.severity === 'error').length;
   const warnings = items.length - errors;
 
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-start gap-2 px-5 pt-5">
+        {header}
         <span className="flex items-center gap-2 text-heading font-semibold">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--color-ok)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="10" cy="10" r="7.5" />
@@ -59,6 +65,7 @@ export function MessagesTab({ items, selectedKey, onSelect, context, actions }: 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3">
+      {header}
       <p className="px-1 text-small font-semibold">{tr.messages.counts(errors, warnings)}</p>
       <ul className="flex flex-col gap-2">
         {items.map((item) => {
@@ -102,7 +109,7 @@ export function MessagesTab({ items, selectedKey, onSelect, context, actions }: 
                       key={action.label}
                       type="button"
                       onClick={action.run}
-                      className={`h-9 rounded-[7px] px-3 text-small ${
+                      className={`rounded-[7px] px-3 ${touch ? 'h-11 text-sm' : 'h-9 text-small'} ${
                         action.primary ? 'bg-ink font-semibold text-white hover:brightness-125' : 'border border-line-2 bg-panel font-medium hover:bg-panel-2'
                       }`}
                     >

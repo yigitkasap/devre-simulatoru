@@ -1,6 +1,6 @@
 // Üst çubuk (tasarım: C-UstCubuk): Dosya, Örnekler, araç seçici (Seç / Kablo), seçili parça eylemleri,
-// geri al / yinele, kayıt durumu, görünüm (yakınlık) ve Ayarlar. Telefonda (6. aşamaya kadar) aynı
-// çubuk sıkışık hâliyle kullanılır: kütüphane düğmesi, yalnızca simgeler, yatay kaydırılan araçlar.
+// geri al / yinele, kayıt durumu, görünüm (yakınlık) ve Ayarlar. Yalnızca masaüstünde ve tablette;
+// telefonda üst şerit (PhoneTopStrip) ve alt çubuk (PhoneBar) kullanılır.
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { tr } from '../i18n/tr';
@@ -48,8 +48,6 @@ function Separator() {
 }
 
 export interface TopBarProps {
-  /** Telefon düzeni (< 900 px). */
-  readonly phone: boolean;
   readonly toolKind: 'select' | 'wire' | 'place';
   readonly canUndo: boolean;
   readonly canRedo: boolean;
@@ -61,7 +59,6 @@ export interface TopBarProps {
   readonly saveState: SaveState;
   readonly settings: Settings;
   readonly onSettings: (patch: Partial<Settings>) => void;
-  readonly onToggleLibrary: () => void;
   readonly onSelectTool: () => void;
   readonly onWireTool: () => void;
   readonly onRotate: () => void;
@@ -96,7 +93,6 @@ function Logo() {
 }
 
 export function TopBar(props: TopBarProps) {
-  const { phone } = props;
   const tools = (
     <>
       <div role="group" aria-label={tr.toolbar.tools} className="flex shrink-0 gap-0.5 rounded-[10px] bg-app p-0.5">
@@ -106,7 +102,6 @@ export function TopBar(props: TopBarProps) {
           title={tr.toolbar.selectTitle}
           active={props.toolKind === 'select'}
           onClick={props.onSelectTool}
-          compact={phone}
         />
         <ToolSegment
           icon="wire"
@@ -115,7 +110,6 @@ export function TopBar(props: TopBarProps) {
           active={props.toolKind === 'wire'}
           onClick={props.onWireTool}
           shortcut="W"
-          compact={phone}
         />
       </div>
       <Separator />
@@ -126,10 +120,7 @@ export function TopBar(props: TopBarProps) {
         onClick={props.onRotate}
         disabled={!props.hasSelection && props.toolKind !== 'place'}
       />
-      {/* Telefonda ters çevirme basılı tutunca açılan menüde. */}
-      {!phone && (
-        <ToolButton icon="flip" label={tr.toolbar.flip} title={tr.toolbar.flipTitle} onClick={props.onFlip} disabled={!props.canFlip} />
-      )}
+      <ToolButton icon="flip" label={tr.toolbar.flip} title={tr.toolbar.flipTitle} onClick={props.onFlip} disabled={!props.canFlip} />
       <ToolButton icon="trash" label={tr.toolbar.remove} title={tr.toolbar.removeTitle} onClick={props.onDelete} disabled={!props.hasSelection} />
       <Separator />
       <ToolButton icon="undo" label={tr.toolbar.undo} title={tr.toolbar.undoTitle} onClick={props.onUndo} disabled={!props.canUndo} />
@@ -138,24 +129,13 @@ export function TopBar(props: TopBarProps) {
   );
 
   return (
-    <header className="flex h-[52px] shrink-0 items-center gap-1.5 border-b border-line bg-panel pr-2.5 pl-3 max-desk:h-12 max-desk:gap-1 max-desk:px-2">
-      {phone && (
-        <button
-          type="button"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-app"
-          onClick={props.onToggleLibrary}
-          aria-label={tr.toolbar.library}
-          title={tr.toolbar.library}
-        >
-          <Icon name="menu" />
-        </button>
-      )}
+    <header className="flex h-[52px] shrink-0 items-center gap-1.5 border-b border-line bg-panel pr-2.5 pl-3">
       <div className="flex shrink-0 items-center gap-2.5 pr-1.5 max-desk:gap-2 max-desk:pr-0.5">
         <Logo />
         <h1 className="text-[15px] font-semibold whitespace-nowrap max-wide:sr-only">{tr.site.name}</h1>
       </div>
 
-      <FileMenu phone={phone} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
+      <FileMenu onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
       <button
         type="button"
         onClick={props.onExamples}
@@ -168,28 +148,21 @@ export function TopBar(props: TopBarProps) {
       </button>
       <Separator />
 
-      {phone ? (
-        // Telefonda araçlar sığmazsa yatay kaydırılır.
-        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">{tools}</div>
-      ) : (
-        <>
-          {tools}
-          <div className="flex-1" />
-          <SaveStatus state={props.saveState} />
-          <div role="group" aria-label={tr.toolbar.view} className="flex h-9 shrink-0 items-center rounded-[9px] border border-line">
-            <ViewButton icon="minus" label={tr.toolbar.zoomOut} onClick={props.onZoomOut} />
-            <span
-              className="min-w-12 text-center font-mono text-small font-medium tabular"
-              aria-label={`${tr.toolbar.zoom} %${Math.round(props.zoom * 100)}`}
-            >
-              %{Math.round(props.zoom * 100)}
-            </span>
-            <ViewButton icon="plus" label={tr.toolbar.zoomIn} onClick={props.onZoomIn} />
-            <span className="h-5 w-px bg-line" aria-hidden="true" />
-            <ViewButton icon="fit" label={tr.toolbar.fit} onClick={props.onFit} />
-          </div>
-        </>
-      )}
+      {tools}
+      <div className="flex-1" />
+      <SaveStatus state={props.saveState} />
+      <div role="group" aria-label={tr.toolbar.view} className="flex h-9 shrink-0 items-center rounded-[9px] border border-line">
+        <ViewButton icon="minus" label={tr.toolbar.zoomOut} onClick={props.onZoomOut} />
+        <span
+          className="min-w-12 text-center font-mono text-small font-medium tabular"
+          aria-label={`${tr.toolbar.zoom} %${Math.round(props.zoom * 100)}`}
+        >
+          %{Math.round(props.zoom * 100)}
+        </span>
+        <ViewButton icon="plus" label={tr.toolbar.zoomIn} onClick={props.onZoomIn} />
+        <span className="h-5 w-px bg-line" aria-hidden="true" />
+        <ViewButton icon="fit" label={tr.toolbar.fit} onClick={props.onFit} />
+      </div>
 
       <SettingsMenu settings={props.settings} onChange={props.onSettings} />
     </header>
@@ -204,7 +177,6 @@ function ToolSegment({
   active,
   onClick,
   shortcut,
-  compact,
 }: {
   icon: IconName;
   label: string;
@@ -212,22 +184,20 @@ function ToolSegment({
   active: boolean;
   onClick: () => void;
   shortcut?: string;
-  compact: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      aria-label={compact ? label : undefined}
       aria-pressed={active}
-      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-md text-sm font-medium transition-colors max-desk:h-9 max-desk:w-9 max-desk:justify-center ${
+      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-md text-sm font-medium transition-colors ${
         shortcut ? 'pr-2 pl-2.5' : 'px-2.5'
-      } max-desk:px-0 ${active ? 'bg-panel text-accent-ink shadow-sm' : 'text-ink hover:bg-panel/60'}`}
+      } ${active ? 'bg-panel text-accent-ink shadow-sm' : 'text-ink hover:bg-panel/60'}`}
     >
       <Icon name={icon} />
-      {!compact && label}
-      {!compact && shortcut && (
+      {label}
+      {shortcut && (
         <span className="max-wide:hidden">
           <Kbd size="sm">{shortcut}</Kbd>
         </span>
@@ -300,13 +270,11 @@ function menuKeys(e: ReactKeyboardEvent<HTMLElement>) {
 }
 
 function FileMenu({
-  phone,
   onNew,
   onExport,
   onImport,
   onShare,
 }: {
-  phone: boolean;
   onNew: () => void;
   onExport: () => void;
   onImport: () => void;
@@ -332,19 +300,12 @@ function FileMenu({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={phone ? tr.file.menu : undefined}
-        className={`flex h-10 items-center gap-1 rounded-md pr-2 pl-2.5 text-sm font-medium max-desk:w-10 max-desk:justify-center max-desk:px-0 desk:h-9 ${
+        className={`flex h-9 items-center gap-1 rounded-md pr-2 pl-2.5 text-sm font-medium ${
           open ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-app'
         }`}
       >
-        {phone ? (
-          <Icon name="file" />
-        ) : (
-          <>
-            {tr.file.menu}
-            <Icon name="chevronDown" className="h-4 w-4" />
-          </>
-        )}
+        {tr.file.menu}
+        <Icon name="chevronDown" className="h-4 w-4" />
       </button>
       {open && (
         <div
@@ -393,7 +354,19 @@ function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (p
       <ToolButton icon="settings" label={tr.toolbar.settings} title={tr.toolbar.settings} onClick={() => setOpen((o) => !o)} active={open} />
       {open && (
         <div className="absolute top-11 right-0 z-40 w-60 rounded-lg border border-line bg-panel p-3 shadow-lg" role="dialog" aria-label={tr.settings.title}>
-          <p className="text-xs font-semibold text-muted">{tr.settings.resistorStyle}</p>
+          <SettingsFields settings={settings} onChange={onChange} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Ayar alanları: direnç sembolü ve kablo gerilimi renkleri (masaüstünde Ayarlar menüsü, telefonda ⋯ sayfası). */
+export function SettingsFields({ settings, onChange, touch = false }: { settings: Settings; onChange: (patch: Partial<Settings>) => void; touch?: boolean }) {
+  const option = touch ? 'min-h-14 text-sm' : 'text-xs';
+  return (
+    <>
+          <p className={`font-semibold text-muted ${touch ? 'text-label' : 'text-xs'}`}>{tr.settings.resistorStyle}</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {(['zigzag', 'iec'] as const).map((style) => (
               <button
@@ -401,7 +374,7 @@ function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (p
                 type="button"
                 onClick={() => onChange({ resistorStyle: style })}
                 aria-pressed={settings.resistorStyle === style}
-                className={`rounded-md border px-2 py-2 text-xs ${
+                className={`rounded-md border px-2 py-2 ${option} ${
                   settings.resistorStyle === style ? 'border-accent bg-accent-soft text-accent' : 'border-line hover:bg-app'
                 }`}
               >
@@ -425,7 +398,7 @@ function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (p
               </button>
             ))}
           </div>
-          <p className="mt-3 text-xs font-semibold text-muted">{tr.settings.wireScale}</p>
+          <p className={`mt-3 font-semibold text-muted ${touch ? 'text-label' : 'text-xs'}`}>{tr.settings.wireScale}</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {(['classic', 'colorblind'] as const).map((scale) => (
               <button
@@ -433,7 +406,7 @@ function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (p
                 type="button"
                 onClick={() => onChange({ wireScale: scale })}
                 aria-pressed={settings.wireScale === scale}
-                className={`rounded-md border px-2 py-2 text-xs ${
+                className={`rounded-md border px-2 py-2 ${option} ${
                   settings.wireScale === scale ? 'border-accent bg-accent-soft text-accent' : 'border-line hover:bg-app'
                 }`}
               >
@@ -442,8 +415,6 @@ function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (p
               </button>
             ))}
           </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }

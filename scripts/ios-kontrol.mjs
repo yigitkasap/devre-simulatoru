@@ -1,4 +1,4 @@
-// iOS / dokunmatik kontrol listesi. Tuvale, çekmeceye ya da olay işleyicilerine dokunan her
+// iOS / dokunmatik kontrol listesi. Tuvale, alt sayfalara ya da olay işleyicilerine dokunan her
 // değişiklikten sonra çalıştırılır (README → "Dokunmatik ekran ve iOS Safari").
 //
 //   npm run dev                          (ayrı bir terminalde)
@@ -58,11 +58,16 @@ const screen = (page, gx, gy) => page.evaluate(([x, y]) => {
 }, [gx, gy]);
 const doc = async (page) => { await page.waitForTimeout(500); return page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre'))); };
 const part = async (page, label) => (await doc(page)).parts.find((p) => p.label === label);
-/** Üst çubuktaki "Örnekler" penceresinden bir örneği dokunarak açar. */
+/** Telefonda üst şeritteki ad → Dosya → Örnekler; arayıp örneğe dokunarak açar. */
 async function openExample(page, name) {
+  await page.getByRole('button', { name: /^Dosya ve örnekler/ }).tap(); await page.waitForTimeout(400);
   await page.getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
+  await page.getByRole('searchbox', { name: 'Örnek ara' }).fill(name); await page.waitForTimeout(200);
   await page.getByRole('button', { name, exact: true }).tap(); await page.waitForTimeout(600);
 }
+/** Üst şeritteki kip rozeti (Kur, Bağla, Ölç, Duraklatıldı). */
+const mode = async (page) => (await page.locator('header [role=status]').first().textContent()) ?? '';
+const selectedCount = (page) => page.locator('svg.schematic rect[stroke-dasharray="4 3"]').count();
 /** Bir nesneye doğrudan bağlı olay dinleyicileri (CDP). */
 async function listeners(cdp, expression) {
   const { result } = await cdp.send('Runtime.evaluate', { expression });
@@ -74,8 +79,8 @@ try {
   // --- iOS kuralları (öykünmenin yakalayamadığı hatalara karşı) ------------------------
   {
     const { page, cdp } = await phone();
-    await page.getByRole('button', { name: 'Parça kütüphanesi' }).tap(); await page.waitForTimeout(400);
-    await page.getByRole('button', { name: 'Direnç', exact: true }).tap(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Parça', exact: true }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('button', { name: 'Direnç ekle' }).tap(); await page.waitForTimeout(500);
     // React dinleyicileri display: contents ada öğesinde durur; iOS o alanı dokunma alanı saymaz.
     const onDoc = await listeners(cdp, 'document');
     const passiveTypes = ['touchstart', 'touchmove', 'touchend', 'pointerdown', 'pointermove', 'pointerup'];
@@ -85,157 +90,269 @@ try {
     const onSvg = await listeners(cdp, "document.querySelector('svg.schematic')");
     const blocking = ['touchstart', 'touchmove'].filter((t) => onSvg.some((l) => l.type === t && !l.passive));
     check('tuvalde varsayılanı engelleyen touchstart/touchmove dinleyicileri var', blocking.length === 2, blocking.join(', '));
+    // WebKit touch-action: none bölgesini üstüne binen katmana da uygulayabiliyor: alt sayfa tuvalin
+    // üstüne binmemeli (tuval sayfanın üst kenarında biter).
+    const sheet = await page.getByRole('dialog', { name: 'Parça ekle' }).boundingBox();
+    const svgBox = await page.locator('svg.schematic').boundingBox();
+    check('alt sayfa tuvalin üstüne binmiyor', sheet !== null && svgBox.y + svgBox.height <= sheet.y + 1, sheet ? `tuval altı ${Math.round(svgBox.y + svgBox.height)} · sayfa ${Math.round(sheet.y)}` : 'sayfa yok');
     const ta = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
-    check('çekmece kapalıyken tuvalin touch-action değeri none', ta === 'none', ta);
+    check('tuvalin touch-action değeri none', ta === 'none', ta);
     // Çizimin hiçbir parçası olay almaz; hedef her zaman SVG (örtük yakalama sürüklemeyi koparmasın).
     const r1 = await part(page, 'R1');
-    const s = await screen(page, r1.x, r1.y);
-    const target = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.getAttribute('class') ?? '', [s.x, s.y]);
+    const at = await screen(page, r1.x, r1.y);
+    const target = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.getAttribute('class') ?? '', [at.x, at.y]);
     check('parçanın üstündeki dokunma hedefi SVG’nin kendisi', target.split(' ').includes('schematic'), target);
+    // Zincirle ekle: seçili parçanın boştaki ucuna bağlanır.
+    const banner = (await page.getByRole('dialog', { name: 'Parça ekle' }).textContent()) ?? '';
+    await page.getByRole('button', { name: 'LED ekle' }).tap(); await page.waitForTimeout(400);
+    const chained = await doc(page);
+    check('Parça sayfasında "Zincirle ekle" yeni parçayı kabloyla bağlıyor', banner.includes('R1’in 1. ucuna bağlanır') && chained.wires.length === 1 && chained.parts.length === 2, banner.slice(0, 60));
     await page.context().close();
   }
 
-  // --- Çekmece -----------------------------------------------------------------------
+  // --- Parça sayfası: liste kayar, sayfa kaymaz, arama 16 px -------------------------
   for (const [w, h] of [[390, 844], [375, 667]]) {
     const { page, cdp } = await phone(w, h);
-    await page.getByRole('button', { name: 'Parça kütüphanesi' }).tap(); await page.waitForTimeout(400);
-    const nav = await page.locator('aside[aria-label="Parçalar"] nav').boundingBox();
-    await drag(page, cdp, { x: nav.x + nav.width / 2, y: nav.y + nav.height - 30 }, { x: nav.x + nav.width / 2, y: nav.y + 30 });
+    await page.getByRole('button', { name: 'Parça', exact: true }).tap(); await page.waitForTimeout(400);
+    const grid = page.getByRole('dialog', { name: 'Parça ekle' }).locator('.overflow-y-auto').first();
+    const box = await grid.boundingBox();
+    await drag(page, cdp, { x: box.x + box.width / 2, y: box.y + box.height - 12 }, { x: box.x + box.width / 2, y: box.y + 4 });
     await page.waitForTimeout(300);
-    const top = await page.evaluate(() => document.querySelector('aside nav').scrollTop);
-    const previewInDrawer = await page.locator('aside[aria-label="Parçalar"] >> text=Sürükleyip tuvale').count();
-    check(`çekmece kaydırılıyor (${w}x${h}, liste ${Math.round(nav.height)} px)`, top > 0, `scrollTop ${top}`);
-    check(`çekmecede bilgi kartı yok (${w}x${h})`, previewInDrawer === 0);
-    const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
-    check('çekmece açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
-    if (w === 390) await shot(page, 'ios-1-cekmece.png');
-    await page.getByRole('button', { name: 'P kanallı MOSFET', exact: true }).tap(); await page.waitForTimeout(500);
-    check(`çekmecenin sonundaki parçaya ulaşılıp ekleniyor (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'pmos'));
+    const top = await grid.evaluate((el) => el.scrollTop);
+    const pageTop = await page.evaluate(() => document.scrollingElement.scrollTop);
+    check(`parça listesi parmakla kayıyor, sayfa kaymıyor (${w}x${h}, liste ${Math.round(box.height)} px)`, top > 0 && pageTop === 0, `scrollTop ${top}`);
+    const fs = await page.getByRole('searchbox', { name: 'Parça ara' }).evaluate((el) => getComputedStyle(el).fontSize);
+    check(`parça arama alanı 16 px (${w}x${h})`, fs === '16px', fs);
+    if (w === 390) await shot(page, 'ios-1-parca.png');
+    await page.waitForTimeout(800);
+    const last = page.getByRole('button', { name: 'Ampermetre ekle' });
+    await last.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
+    await last.tap(); await page.waitForTimeout(500);
+    check(`listenin sonundaki parçaya ulaşılıp ekleniyor (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'ammeter'));
     await page.context().close();
   }
 
-  // --- Örnekler penceresi -------------------------------------------------------------
+  // --- Örnekler (tam ekran) -------------------------------------------------------------
   for (const [w, h] of [[390, 844], [375, 667]]) {
     const { page, cdp } = await phone(w, h);
+    await page.getByRole('button', { name: /^Dosya ve örnekler/ }).tap(); await page.waitForTimeout(400);
     await page.getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
-    const list = page.locator('[role=dialog] .overflow-y-auto');
+    const list = page.getByRole('dialog', { name: 'Örnek devreler' }).locator('.overflow-y-auto');
     const box = await list.boundingBox();
     await drag(page, cdp, { x: box.x + box.width / 2, y: box.y + box.height - 40 }, { x: box.x + box.width / 2, y: box.y + 40 });
     await page.waitForTimeout(300);
     const top = await list.evaluate((el) => el.scrollTop);
-    check(`örnekler penceresi parmakla kaydırılıyor (${w}x${h})`, top > 0, `scrollTop ${top}`);
+    check(`örnekler parmakla kaydırılıyor (${w}x${h})`, top > 0, `scrollTop ${top}`);
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
-    check('örnekler penceresi açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
-    // Parmakla kaydırmanın ardından liste bir süre kaymaya devam eder; durunca dokunulur.
+    check('örnekler açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
     await page.waitForTimeout(1000);
+    const group = page.getByRole('button', { name: /^Transistörlerin anahtar olarak kullanılması/ });
+    await group.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
+    await group.tap(); await page.waitForTimeout(300);
     const last = page.getByRole('button', { name: 'MOSFET’in anahtar olarak kullanılması', exact: true });
     await last.scrollIntoViewIfNeeded(); await page.waitForTimeout(300);
     await last.tap(); await page.waitForTimeout(600);
-    check(`penceredeki son örneğe ulaşılıp açılıyor (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'nmos'));
+    const example = (await page.getByRole('region', { name: 'Örnek' }).textContent().catch(() => '')) ?? '';
+    check(`son gruptaki son örneğe ulaşılıp açılıyor; tahmin sorusu alttaki sayfada (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'nmos') && example.includes('Tahmin et'));
     await page.context().close();
   }
 
-  // --- Parça ekleme ve taşıma -------------------------------------------------------
-  const { page, cdp } = await phone();
-  await page.getByRole('button', { name: 'Parça kütüphanesi' }).tap(); await page.waitForTimeout(400);
-  await page.getByRole('button', { name: 'Direnç', exact: true }).tap(); await page.waitForTimeout(500);
-  const r1 = await part(page, 'R1');
-  check('dokunarak parça eklendi', Boolean(r1));
-  let s = await screen(page, r1.x, r1.y);
-  await tap(page, cdp, s);
-  check('parçaya dokununca seçiliyor', (await page.locator('svg.schematic rect[stroke-dasharray="4 3"]').count()) > 0);
-  await drag(page, cdp, s, { x: s.x + 60, y: s.y + 90 });
-  const r1b = await part(page, 'R1');
-  check('parça hemen sürüklenerek taşınıyor', r1b.x !== r1.x || r1b.y !== r1.y, `(${r1.x},${r1.y}) → (${r1b.x},${r1b.y})`);
-  s = await screen(page, r1b.x, r1b.y);
-  await drag(page, cdp, s, { x: s.x - 70, y: s.y - 40 }, 750);
-  const r1c = await part(page, 'R1');
-  const menuOpen = await page.getByRole('menu').count();
-  check('basılı tutup sürükleyince parça yine taşınıyor ve menü kapanıyor', (r1c.x !== r1b.x || r1c.y !== r1b.y) && menuOpen === 0, `(${r1b.x},${r1b.y}) → (${r1c.x},${r1c.y}), menü ${menuOpen}`);
-  s = await screen(page, r1c.x, r1c.y);
-  await drag(page, cdp, { x: s.x, y: s.y - 14 }, { x: s.x + 40, y: s.y + 60 });
-  const r1d = await part(page, 'R1');
-  check('gövdenin hemen dışından da tutulup taşınıyor', r1d.x !== r1c.x || r1d.y !== r1c.y, `(${r1c.x},${r1c.y}) → (${r1d.x},${r1d.y})`);
-  await shot(page, 'ios-2-tasindi.png');
-  s = await screen(page, r1d.x, r1d.y);
-  await tap(page, cdp, s, 750);
-  check('kıpırdamadan uzun basınca menü açılıyor', (await page.getByRole('menu').count()) === 1);
-  const empty = await screen(page, r1d.x + 14, r1d.y - 18);
-  await tap(page, cdp, empty);
-  const selected = await page.locator('svg.schematic rect[stroke-dasharray="4 3"]').count();
-  check('boşluğa dokununca menü ve seçim kalkıyor', (await page.getByRole('menu').count()) === 0 && selected === 0, `seçim çerçevesi ${selected}`);
-  // Boşlukta tek parmakla kaydırma
-  const viewBefore = await screen(page, 0, 0);
-  await drag(page, cdp, empty, { x: empty.x + 50, y: empty.y + 70 });
-  const viewAfter = await screen(page, 0, 0);
-  check('boşlukta tek parmakla tuval kaydırılıyor', Math.abs(viewAfter.x - viewBefore.x - 50) < 2 && Math.abs(viewAfter.y - viewBefore.y - 70) < 2);
-  const pinScreen = await screen(page, r1d.x - 4, r1d.y);
-  await tap(page, cdp, { x: pinScreen.x - 6, y: pinScreen.y });
-  const cancelVisible = await page.getByRole('button', { name: 'İptal', exact: true }).isVisible().catch(() => false);
-  check('pine dokununca kablo çizimi başlıyor ve İptal düğmesi görünüyor', cancelVisible);
-  if (cancelVisible) await page.getByRole('button', { name: 'İptal', exact: true }).tap();
-  await page.waitForTimeout(200);
-  check('İptal ile kablo çizimi bitiyor', !(await page.getByRole('button', { name: 'İptal', exact: true }).isVisible().catch(() => false)) && (await doc(page)).wires.length === 0);
-  s = await screen(page, r1d.x, r1d.y);
-  await tap(page, cdp, s); await page.waitForTimeout(80); await tap(page, cdp, s); await page.waitForTimeout(300);
-  const fontSize = await page.evaluate(() => getComputedStyle(document.querySelector('[role=dialog] input')).fontSize);
-  check('çift dokunuşla özellik penceresi açılıyor; giriş yazısı 16 px (iOS yakınlaşmasın)', fontSize === '16px', fontSize);
-  await page.getByRole('button', { name: 'İptal' }).first().tap(); await page.waitForTimeout(200);
-  // Parmaklar parçanın iki yanında: yakınlaşma o noktanın çevresinde olur, parça ekranda kalır.
-  const c = await screen(page, r1d.x, r1d.y);
-  const cx = Math.min(Math.max(c.x, 110), 280);
-  const cy = Math.min(Math.max(c.y, 200), 600);
-  const scaleBefore = c.scale;
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx - 35, y: cy, id: 1 }, { x: cx + 35, y: cy, id: 2 }] });
-  for (let i = 1; i <= 8; i++) {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx - 35 - i * 8, y: cy, id: 1 }, { x: cx + 35 + i * 8, y: cy, id: 2 }] });
-    await page.waitForTimeout(16);
+  // --- Kur kipi: seç, taşı, menü, kaydır, Bağla, değer sayfası, yakınlaştırma -----------
+  {
+    const { page, cdp } = await phone();
+    await page.getByRole('button', { name: 'Parça', exact: true }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('button', { name: 'Direnç ekle' }).tap(); await page.waitForTimeout(500);
+    await page.getByRole('dialog', { name: 'Parça ekle' }).getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(400);
+    const r1 = await part(page, 'R1');
+    check('dokunarak parça eklendi', Boolean(r1));
+    let s = await screen(page, r1.x, r1.y);
+    await tap(page, cdp, { x: s.x + 30, y: s.y + 60 }); // boşluk: seçimi kaldır
+    await tap(page, cdp, s);
+    const sheetOpen = await page.getByRole('region', { name: 'R1 — özellikler' }).count();
+    const bar = (await page.getByRole('navigation', { name: 'Eylemler' }).textContent()) ?? '';
+    check('parçaya dokununca seçiliyor; alt çubuk ve parça sayfası açılıyor', (await selectedCount(page)) > 0 && sheetOpen === 1 && bar.includes('Döndür') && bar.includes('Sil'), bar.slice(0, 40));
+    s = await screen(page, r1.x, r1.y);
+    const v0 = await screen(page, 0, 0);
+    await drag(page, cdp, s, { x: s.x + 50, y: s.y + 30 }, 20);
+    const r1b = await part(page, 'R1');
+    const v1 = await screen(page, 0, 0);
+    check('parçanın üstünde hızlı kaydırma tuvali kaydırıyor, parça yerinde kalıyor', r1b.x === r1.x && r1b.y === r1.y && Math.abs(v1.x - v0.x - 50) < 3, `görünüm ${Math.round(v1.x - v0.x)} px`);
+    s = await screen(page, r1b.x, r1b.y);
+    await drag(page, cdp, s, { x: s.x + 60, y: s.y - 50 }, 250);
+    const r1c = await part(page, 'R1');
+    check('150 ms basılı tutunca parça sürüklenerek taşınıyor', r1c.x !== r1b.x || r1c.y !== r1b.y, `(${r1b.x},${r1b.y}) → (${r1c.x},${r1c.y})`);
+    s = await screen(page, r1c.x, r1c.y);
+    await drag(page, cdp, s, { x: s.x - 70, y: s.y + 30 }, 750);
+    const r1d = await part(page, 'R1');
+    const menuOpen = await page.getByRole('menu').count();
+    check('basılı tutup sürükleyince parça yine taşınıyor ve menü kapanıyor', (r1d.x !== r1c.x || r1d.y !== r1c.y) && menuOpen === 0, `(${r1c.x},${r1c.y}) → (${r1d.x},${r1d.y}), menü ${menuOpen}`);
+    await shot(page, 'ios-2-tasindi.png');
+    s = await screen(page, r1d.x, r1d.y);
+    await tap(page, cdp, s, 750);
+    const magnifier = await page.locator('use[href^="#scene-"]').count();
+    check('kıpırdamadan uzun basınca menü ve büyüteç açılıyor', (await page.getByRole('menu').count()) === 1 && magnifier === 1);
+    await shot(page, 'ios-3-menu.png');
+    // Boş nokta: tuvalin sol üst köşesine yakın (alt sayfa açıkken tuval kısalır).
+    const area = await page.locator('svg.schematic').boundingBox();
+    const empty = { x: area.x + 40, y: area.y + 40 };
+    const hitEmpty = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.getAttribute('class') ?? '', [empty.x, empty.y]);
+    await tap(page, cdp, empty);
+    const selected = await selectedCount(page);
+    check('boşluğa dokununca menü, büyüteç ve seçim kalkıyor', (await page.getByRole('menu').count()) === 0 && selected === 0 && (await page.locator('use[href^="#scene-"]').count()) === 0, `seçim çerçevesi ${selected}; dokunulan ${hitEmpty}`);
+    const viewBefore = await screen(page, 0, 0);
+    await drag(page, cdp, empty, { x: empty.x + 50, y: empty.y + 70 });
+    const viewAfter = await screen(page, 0, 0);
+    check('boşlukta tek parmakla tuval kaydırılıyor', Math.abs(viewAfter.x - viewBefore.x - 50) < 2 && Math.abs(viewAfter.y - viewBefore.y - 70) < 2);
+    // Uca dokununca Bağla kipi; ikinci uca dokununca kablo; Bitti ile Kur'a dönüş.
+    await tap(page, cdp, await screen(page, r1d.x - 4, r1d.y));
+    const connectBar = (await page.getByRole('navigation', { name: 'Eylemler' }).textContent()) ?? '';
+    check('uca dokununca Bağla kipi başlıyor (uçlar büyük, alt çubukta durum)', (await mode(page)).includes('Bağla') && connectBar.includes('İkinci uca dokun') && connectBar.includes('R1 · 1. uç'), connectBar.slice(0, 50));
+    await shot(page, 'ios-4-bagla.png');
+    await tap(page, cdp, await screen(page, r1d.x + 4, r1d.y));
+    const wired = await doc(page);
+    check('ikinci uca dokununca kablo çiziliyor', wired.wires.length === 1, `${wired.wires.length} kablo`);
+    await page.getByRole('button', { name: 'Bitti' }).tap(); await page.waitForTimeout(200);
+    check('Bitti ile Kur kipine dönülüyor', (await mode(page)).includes('Kur'));
+    await page.getByRole('button', { name: 'Geri al' }).tap(); await page.waitForTimeout(200);
+    check('Geri al son kabloyu siliyor', (await doc(page)).wires.length === 0);
+    s = await screen(page, r1d.x, r1d.y);
+    await tap(page, cdp, s); await page.waitForTimeout(80); await tap(page, cdp, s); await page.waitForTimeout(300);
+    const field = page.getByLabel('Direnç', { exact: true });
+    const fontSize = await field.evaluate((el) => getComputedStyle(el).fontSize).catch(() => '');
+    check('çift dokunuşla değer sayfası açılıyor; giriş yazısı en az 16 px (iOS yakınlaşmasın)', parseFloat(fontSize) >= 16, fontSize);
+    await page.getByRole('button', { name: 'Direnç: bir adım artır' }).tap(); await page.waitForTimeout(200);
+    check('− / + E12 dizisinde bir adım değiştiriyor (1 kΩ → 1,2 kΩ)', (await part(page, 'R1')).props.resistance === 1200);
+    // Parmaklar parçanın iki yanında: yakınlaşma o noktanın çevresinde olur, parça ekranda kalır.
+    const canvasBox = await page.locator('svg.schematic').boundingBox();
+    const c = await screen(page, r1d.x, r1d.y);
+    const cx = Math.min(Math.max(c.x, canvasBox.x + 110), canvasBox.x + canvasBox.width - 110);
+    const cy = Math.min(Math.max(c.y, canvasBox.y + 60), canvasBox.y + canvasBox.height - 60);
+    const scaleBefore = (await screen(page, 0, 0)).scale;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx - 35, y: cy, id: 1 }, { x: cx + 35, y: cy, id: 2 }] });
+    for (let i = 1; i <= 8; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx - 35 - i * 8, y: cy, id: 1 }, { x: cx + 35 + i * 8, y: cy, id: 2 }] });
+      await page.waitForTimeout(16);
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await page.waitForTimeout(200);
+    const scaleAfter = (await screen(page, 0, 0)).scale;
+    check('iki parmakla yakınlaştırma çalışıyor', scaleAfter > scaleBefore * 1.3, `${scaleBefore.toFixed(2)} → ${scaleAfter.toFixed(2)}`);
+    const r1e = await part(page, 'R1');
+    s = await screen(page, r1e.x, r1e.y);
+    await drag(page, cdp, s, { x: s.x + 80, y: s.y }, 250);
+    const r1f = await part(page, 'R1');
+    check('yakınlaştırmadan sonra parça yine tek parmakla taşınıyor', r1f.x !== r1e.x, `(${r1e.x},${r1e.y}) → (${r1f.x},${r1f.y})`);
+    await page.context().close();
   }
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await page.waitForTimeout(200);
-  const scaleAfter = (await screen(page, 0, 0)).scale;
-  check('iki parmakla yakınlaştırma çalışıyor', scaleAfter > scaleBefore * 1.3, `${scaleBefore.toFixed(2)} → ${scaleAfter.toFixed(2)}`);
-  // Yakınlaştırmadan sonra tek parmak yine çalışıyor mu (takılı işaretçi kaydı kalmamalı)
-  const r1e = await part(page, 'R1');
-  s = await screen(page, r1e.x, r1e.y);
-  await drag(page, cdp, s, { x: s.x + 80, y: s.y });
-  const r1f = await part(page, 'R1');
-  check('yakınlaştırmadan sonra parça yine tek parmakla taşınıyor', r1f.x !== r1e.x, `(${r1e.x},${r1e.y}) → (${r1f.x},${r1f.y}); dokunuş (${Math.round(s.x)},${Math.round(s.y)})`);
-  await openExample(page, 'Voltmetrenin yükleme etkisi');
-  await page.getByRole('button', { name: 'Örnek açıklamasını küçült' }).tap().catch(() => {});
-  await page.getByRole('button', { name: 'Oynat' }).tap(); await page.waitForTimeout(600);
-  const v1 = await part(page, 'V1');
-  s = await screen(page, v1.x, v1.y);
-  await tap(page, cdp, s); await page.waitForTimeout(300);
-  const tooltip = await page.getByRole('tooltip').textContent().catch(() => '');
-  check('telefonda seçili parçanın V/I/P kutusu görünüyor', /Gösterge/.test(tooltip ?? ''), (tooltip ?? '').slice(0, 40));
-  await shot(page, 'ios-3-vip.png');
-  await page.context().close();
 
-  // --- Osiloskop paneli (telefon) -----------------------------------------------------
+  // --- Kalabalıkta seçici ve büyüteç -----------------------------------------------------
+  {
+    const crowded = { version: 1, parts: [
+      { id: 'a', type: 'resistor', label: 'R1', x: 0, y: 0, rotation: 0, props: { resistance: 100 } },
+      { id: 'b', type: 'resistor', label: 'R2', x: 0, y: 3, rotation: 0, props: { resistance: 200 } },
+      { id: 'c', type: 'battery', label: 'B1', x: -40, y: 20, rotation: 0, props: { voltage: 9, internalResistance: 0 } },
+      { id: 'd', type: 'resistor', label: 'R3', x: 40, y: -20, rotation: 0, props: { resistance: 200 } },
+    ], wires: [] };
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, JSON.stringify(crowded));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const cdp = await ctx.newCDPSession(page);
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await tap(page, cdp, await screen(page, 0, 1.5));
+    const picker = page.getByRole('listbox', { name: /^Burada \d öğe var/ });
+    const options = await picker.getByRole('option').count();
+    check('kalabalık noktaya dokununca "Burada N öğe var" seçicisi ve büyüteç çıkıyor', options >= 2 && (await page.locator('use[href^="#scene-"]').count()) === 1, `${options} seçenek`);
+    await picker.getByRole('option', { name: /^R2 Direnç/ }).tap(); await page.waitForTimeout(300);
+    check('seçiciden parça seçiliyor', (await page.getByRole('region', { name: 'R2 — özellikler' }).count()) === 1);
+    await ctx.close();
+  }
+
+  // --- Ölç kipi: kilit, inceleme, anahtar, canlı değer, durdurma sorusu --------------------
+  {
+    const { page, cdp } = await phone();
+    await openExample(page, 'RC dolma');
+    await page.getByRole('button', { name: 'Oynat' }).last().tap(); await page.waitForTimeout(600);
+    check('Oynat’tan sonra Ölç kipi (üst şeritte rozet ve zaman)', /Ölç\s*[\d,]+/.test(await mode(page)), await mode(page));
+    const r1 = await part(page, 'R1');
+    let s = await screen(page, r1.x, r1.y);
+    await tap(page, cdp, s); await page.waitForTimeout(300);
+    const measure = (await page.getByRole('region', { name: 'Ölçümler' }).textContent().catch(() => '')) ?? '';
+    check('Ölç’te parçaya dokununca ölçümleri alttaki sayfada', measure.includes('R1') && measure.includes('canlı') && measure.includes('Gerilim'), measure.slice(0, 50));
+    await drag(page, cdp, s, { x: s.x + 50, y: s.y + 40 }, 250);
+    const r1b = await part(page, 'R1');
+    check('Ölç’te parça sürüklenince taşınmıyor (yapı kilitli)', r1b.x === r1.x && r1b.y === r1.y);
+    const s1 = await part(page, 'S1');
+    await tap(page, cdp, await screen(page, s1.x, s1.y)); await page.waitForTimeout(300);
+    check('Ölç’te anahtara dokununca açılıp kapanıyor', (await part(page, 'S1')).props.closed === true);
+    await tap(page, cdp, await screen(page, r1.x, r1.y)); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Direnç: bir adım artır' }).tap(); await page.waitForTimeout(300);
+    check('Ölç’te − / + değeri canlı değiştiriyor, simülasyon durmuyor', (await part(page, 'R1')).props.resistance === 1200 && (await mode(page)).includes('Ölç'));
+    await shot(page, 'ios-5-olc.png');
+    s = await screen(page, r1.x, r1.y);
+    await tap(page, cdp, s, 750);
+    const ask = page.getByRole('alertdialog', { name: 'Düzenlemek için durdurulsun mu?' });
+    check('Ölç’te basılı tutunca "Düzenlemek için durdurulsun mu?" soruluyor', (await ask.count()) === 1);
+    await ask.getByRole('button', { name: 'Durdur ve düzenle' }).tap(); await page.waitForTimeout(300);
+    check('"Durdur ve düzenle" Kur kipine döndürüyor', (await mode(page)).includes('Kur'));
+    await page.context().close();
+  }
+
+  // --- Cihazlar sayfası (osiloskop) -------------------------------------------------------
   {
     const { page: sp, cdp: scdp } = await phone();
     await openExample(sp, 'Yarım dalga doğrultmaç');
-    await sp.getByRole('button', { name: 'Örnek açıklamasını küçült' }).tap().catch(() => {});
-    const expand = sp.getByRole('button', { name: 'Osiloskop panelini aç' });
-    check('telefonda osiloskop paneli küçültülmüş başlıyor', await expand.isVisible().catch(() => false));
-    await sp.getByRole('button', { name: 'Oynat' }).tap(); await sp.waitForTimeout(300);
-    await expand.tap(); await sp.waitForTimeout(1200);
-    const strip = await sp.locator('section[aria-labelledby] .tabular').first().textContent().catch(() => '');
-    check('dokununca panel açılıyor; ekran ve ölçümler görünüyor', /Tepe-tepe 20,0 V/.test(strip ?? ''), (strip ?? '').slice(0, 50));
-    await sp.getByLabel('Kanal B Volt/bölme').selectOption('2'); await sp.waitForTimeout(200);
-    const scopePart = await part(sp, 'OSC1');
-    check('panelden ayar değişince parçaya kaydediliyor', scopePart.props.voltsPerDivB === 2, String(scopePart.props.voltsPerDivB));
+    await sp.getByRole('button', { name: 'Oynat' }).last().tap(); await sp.waitForTimeout(300);
+    await sp.getByRole('button', { name: 'Cihazlar' }).tap(); await sp.waitForTimeout(1200);
+    const devices = sp.getByRole('region', { name: 'Cihazlar' });
+    const text = (await devices.textContent().catch(() => '')) ?? '';
+    check('Cihazlar sayfası tam boy açılıyor; ekran ve ölçümler görünüyor', /Tepe-tepe 20,0 V/.test(text), text.slice(0, 50));
+    const before = (await part(sp, 'OSC1')).props.voltsPerDivB ?? 5;
+    await sp.getByRole('button', { name: 'B volt/bölme artır' }).tap(); await sp.waitForTimeout(200);
+    const after = (await part(sp, 'OSC1')).props.voltsPerDivB;
+    check('sayfadan ayar değişince parçaya kaydediliyor', after !== before, `${before} → ${after}`);
     await sp.getByRole('button', { name: 'Oto' }).tap(); await sp.waitForTimeout(200);
     const auto = (await part(sp, 'OSC1')).props;
     check('Oto ayar 5 ms/bölme ve 5 V/bölme seçiyor', auto.timePerDiv === 0.005 && auto.voltsPerDivA === 5, `${auto.timePerDiv} s, ${auto.voltsPerDivA} V`);
-    // Panel açıkken tuvaldeki bir parçaya dokunmak yine seçmeli.
-    const d1 = await part(sp, 'D1');
-    const p = await screen(sp, d1.x, d1.y);
-    await tap(sp, scdp, p); await sp.waitForTimeout(200);
-    const chosen = await sp.locator('svg.schematic rect[stroke-dasharray="4 3"]').count();
-    check('panel açıkken tuvalde parçaya dokununca seçiliyor', chosen > 0);
-    await shot(sp, 'ios-4-osiloskop.png');
+    const body = devices.locator('.overflow-y-auto').first();
+    const box = await body.boundingBox();
+    await drag(sp, scdp, { x: box.x + 30, y: box.y + box.height - 20 }, { x: box.x + 30, y: box.y + 20 });
+    await sp.waitForTimeout(300);
+    check('Cihazlar sayfası kendi içinde kayıyor', (await body.evaluate((el) => el.scrollTop)) > 0);
+    await shot(sp, 'ios-6-cihazlar.png');
+    await sp.waitForTimeout(800);
+    const jack = sp.getByRole('button', { name: 'OSC1 A ucunu tuvalde göster' });
+    await jack.scrollIntoViewIfNeeded(); await jack.tap(); await sp.waitForTimeout(300);
+    const height = (await devices.boundingBox())?.height ?? 0;
+    check('jaka dokununca sayfa yarıya iniyor ve uç tuvalde yanıp sönüyor', height < 844 * 0.55 && (await sp.locator('svg.schematic circle.alarm-blink').count()) > 0, `sayfa ${Math.round(height)} px`);
     await sp.context().close();
+  }
+
+  // --- Toprak yok (telefon) ----------------------------------------------------------------
+  {
+    const groundless = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
+      { id: 'p2', type: 'resistor', label: 'R1', x: 12, y: -6, rotation: 0, props: { resistance: 1000 } },
+      { id: 'p3', type: 'resistor', label: 'R2', x: 24, y: 0, rotation: 90, props: { resistance: 2000 } },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [8, -6]] },
+      { id: 'w2', points: [[16, -6], [24, -6], [24, -4]] },
+      { id: 'w3', points: [[24, 4], [24, 6], [0, 6], [0, 4]] },
+    ] };
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, JSON.stringify(groundless));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Oynat' }).last().tap(); await page.waitForTimeout(400);
+    const blocked = page.getByRole('alertdialog', { name: 'Simülasyon başlamadı' });
+    const fix = blocked.getByRole('button', { name: 'B1’in − ucuna toprak ekle ve oynat' });
+    check('telefonda toprak yokken Oynat’ta alt sayfada tek dokunuşla düzeltme', (await fix.count()) === 1);
+    await fix.tap(); await page.waitForTimeout(700);
+    check('toprak eklenince simülasyon başlıyor (Ölç)', (await doc(page)).parts.some((p) => p.type === 'ground') && (await mode(page)).includes('Ölç'), await mode(page));
+    await page.getByRole('button', { name: /^Dosya ve örnekler/ }).tap(); await page.waitForTimeout(300);
+    const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
+    check('Dosya sayfası açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
+    await ctx.close();
   }
 
   // --- Masaüstü kabuğu: kütüphane bilgi alanı, ipucu şeridi, hız penceresi ---------------

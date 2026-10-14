@@ -25,14 +25,14 @@ import { ChannelBadge, Face, Jack, PanelLabel, Segmented, Stepper } from './Rack
 import { SCREEN_DIV, SCREEN_H, SCREEN_W, type ChannelStats, type ScopeView } from './scopeView';
 
 /** Kanal renkleri (koyu ekranda iyi seçilen sarı ve camgöbeği; açık zeminde koyu tonları). */
-const SCOPE_COLORS = ['var(--color-ch-a)', 'var(--color-ch-b)'] as const;
+export const SCOPE_COLORS = ['var(--color-ch-a)', 'var(--color-ch-b)'] as const;
 const LIGHT_COLORS = ['#7a5c00', '#0e6b8a'] as const;
-const CHANNELS = ['A', 'B'] as const;
+export const CHANNELS = ['A', 'B'] as const;
 const POSITION_LIMIT = 4;
 const POSITION_STEP = 0.5;
 
-const voltsLabel = (v: number) => `${formatSI(v, 'V', { trim: true })}${tr.scope.perDiv}`;
-const timeLabel = (t: number) => `${formatSI(t, 's', { trim: true })}${tr.scope.perDiv}`;
+export const voltsLabel = (v: number) => `${formatSI(v, 'V', { trim: true })}${tr.scope.perDiv}`;
+export const timeLabel = (t: number) => `${formatSI(t, 's', { trim: true })}${tr.scope.perDiv}`;
 const positionLabel = (p: number) => `${p > 0 ? '+' : ''}${formatNumber(p, 1)} ${tr.rack.divShort}`;
 
 function statsText(stats: ChannelStats): string {
@@ -41,7 +41,7 @@ function statsText(stats: ChannelStats): string {
   return parts.join('\u2002 ');
 }
 
-function stepIn(steps: readonly number[], value: number, direction: 1 | -1): number {
+export function stepIn(steps: readonly number[], value: number, direction: 1 | -1): number {
   const index = steps.findIndex((s) => Math.abs(s - value) <= s * 1e-6);
   const i = index < 0 ? steps.findIndex((s) => s > value) : index;
   return steps[Math.min(steps.length - 1, Math.max(0, (i < 0 ? steps.length - 1 : i) + direction))]!;
@@ -252,7 +252,7 @@ function ChannelControls({
 }
 
 /** Ekranın altındaki ölçüm satırları (kanal harfi renginin yanında). */
-function StatsLines({ view, settings, connected }: { view: ScopeView | null; settings: ScopeSettings; connected: readonly [boolean, boolean] }) {
+export function StatsLines({ view, settings, connected }: { view: ScopeView | null; settings: ScopeSettings; connected: readonly [boolean, boolean] }) {
   if (!view) {
     return (
       <p className="font-mono text-[11.5px] text-muted">
@@ -295,7 +295,7 @@ function lastPoint(path: string): { x: number; y: number } | null {
  * Ekran: 10 × 8 bölmelik ızgara, kanalların harfli sıfır üçgenleri (sürüklenince konum değişir),
  * çizgiler ve iz sonunda kanal harfi.
  */
-function Screen({
+export function Screen({
   part,
   view,
   settings,
@@ -305,12 +305,13 @@ function Screen({
   part: Part;
   view: ScopeView | null;
   settings: ScopeSettings;
-  height: number;
+  /** Ekranın yüksekliği (px); "fill" verilirse genişliğin tamamını kaplar (telefon). */
+  height: number | 'fill';
   onChange: (patch: Record<string, PropValue>) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<{ channel: 0 | 1; axis: 'x' | 'y' } | null>(null);
-  const width = Math.round((height * SCREEN_W) / SCREEN_H);
+  const size = height === 'fill' ? { width: '100%', aspectRatio: `${SCREEN_W} / ${SCREEN_H}` } : { width: Math.round((height * SCREEN_W) / SCREEN_H), height };
   const grid: string[] = [];
   for (let i = 1; i < 10; i++) grid.push(`M${i * SCREEN_DIV},0 V${SCREEN_H}`);
   for (let i = 1; i < 8; i++) grid.push(`M0,${i * SCREEN_DIV} H${SCREEN_W}`);
@@ -367,8 +368,8 @@ function Screen({
 
   return (
     <div
-      className="relative overflow-hidden rounded-md bg-scope-bg shadow-[inset_0_2px_8px_rgba(0,0,0,0.5)]"
-      style={{ width, height }}
+      className="relative shrink-0 overflow-hidden rounded-md bg-scope-bg shadow-[inset_0_2px_8px_rgba(0,0,0,0.5)]"
+      style={size}
     >
       {!view && (
         <p className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-small text-scope-text">

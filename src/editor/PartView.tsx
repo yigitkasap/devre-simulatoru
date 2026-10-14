@@ -67,6 +67,8 @@ export interface PartViewProps {
   readonly alarm?: boolean;
   /** Ölçü aleti ekranı öbür tarafa açılsın (yanında başka bir parça varsa). */
   readonly displayFlip?: boolean;
+  /** Değer yazısı gizlensin (telefonda uzaklaşınca; tasarım: P04). */
+  readonly hideValue?: boolean;
 }
 
 const LABEL_STYLE = { fontFamily: 'var(--font-sans)', fontSize: 11 } as const;
@@ -79,6 +81,7 @@ export const PartView = memo(function PartView({
   meterText,
   alarm,
   displayFlip = false,
+  hideValue = false,
 }: PartViewProps) {
   const def = CATALOG[part.type];
   const box = rotatedBox(def.bounds, part.rotation, { x: 0, y: 0 });
@@ -172,7 +175,7 @@ export const PartView = memo(function PartView({
           {part.label}
         </text>
       )}
-      {value && !isMeter && (
+      {value && !isMeter && !hideValue && (
         <text x={nameX} y={valueY} textAnchor={anchor} style={LABEL_STYLE} fill="var(--color-muted)" className="tabular">
           {value}
         </text>

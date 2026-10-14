@@ -1,8 +1,9 @@
-// Simülatörün kök bileşeni: üst çubuk, parça kütüphanesi, tuval, ipucu şeridi, mesaj paneli,
-// simülasyon çubuğu, özellik ve paylaşım pencereleri. Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım
-// bağlantısı) ve döndürme gibi birden çok bileşenin kullandığı işlemler de buradadır.
+// Simülatörün kök bileşeni. Masaüstünde: üst çubuk, parça kütüphanesi, tuval, ipucu şeridi, cihaz rafı,
+// simülasyon çubuğu ve İnceleme paneli. Telefonda: üst şerit, tuval, tek alt sayfa ve alt çubuk (Kur,
+// Bağla ve Ölç kipleri). Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım bağlantısı) ve
+// döndürme gibi birden çok bileşenin kullandığı işlemler de buradadır.
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
@@ -16,12 +17,13 @@ import { compileNetlist, scopeSettings, type CompiledCircuit, type Diagnostic } 
 import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { loadSavedDoc, useAutosave } from './autosave';
-import { Canvas, type CanvasHandle, type CanvasStatus, type Highlight } from './Canvas';
+import { BottomSheet, SheetBody, SheetHeader, type SheetSize } from './BottomSheet';
+import { Canvas, type CanvasHandle, type CanvasStatus, type ConnectStart, type Highlight, type PhoneCanvas } from './Canvas';
 import { DeviceRack, type RackLayout } from './DeviceRack';
-import { ExampleCard } from './ExampleCard';
 import { ExamplesDialog } from './ExamplesDialog';
+import { ExampleTab } from './ExampleTab';
 import { Inspector, type InspectorTab } from './Inspector';
-import type { PartPatch } from './InspectTab';
+import { InspectTab, type PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { HintStrip, type StripHint } from './HintStrip';
 import { Library, LibraryFlyout, type LibraryMode } from './Library';
@@ -34,18 +36,23 @@ import {
   suggestedResistor,
   type MessageItem,
 } from './messages';
-import { MessagesPanel } from './MessagesPanel';
-import type { MessageAction } from './MessagesTab';
-import { PropertiesDialog } from './PropertiesDialog';
+import { MessagesTab, type MessageAction } from './MessagesTab';
+import { partValueText } from './PartView';
+import { PhoneBar, type PhoneBarActive, type PhoneBarState } from './PhoneBar';
+import { PhoneDevicesBody } from './PhoneDevices';
+import { FileSheet, MoreSheet, StopToEditDialog } from './PhoneModals';
+import { BlockedNotice, MeasureSheetBody, PartSheetBody, PartsSheetBody, SheetTabs, type SheetTab } from './PhoneSheets';
+import { PhoneTopStrip, type PhoneMode } from './PhoneTopStrip';
+import { chainPlacement, firstFreePin } from './phoneTools';
 import { useRecentParts } from './recentParts';
-import { ScopePanel } from './ScopePanel';
 import { autoSettings } from './scopeView';
 import { useSettings } from './settings';
 import { ShareDialog } from './ShareDialog';
-import { SimBar, speedLabel } from './SimBar';
+import { SimBar, SpeedOptions, speedLabel } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { Toast, useToast } from './Toast';
 import { TopBar } from './TopBar';
+import { TouchUi } from './touchUi';
 import { useCoarsePointer } from './useCoarsePointer';
 import { useLayout } from './useLayout';
 import { useSimulation } from './useSimulation';
@@ -99,13 +106,18 @@ function sweepSpeed(timePerDiv: number): number {
   return Math.min(1, Math.max(1e-6, 50 * timePerDiv));
 }
 
+/** Telefonda tek alt sayfanın içeriği (tasarım: P00 → "Tek alt sayfa"). */
+type PhoneSheetKind = 'parts' | 'part' | 'panel' | 'devices' | 'speed';
+type PanelTab = 'example' | 'circuit' | 'messages';
+/** Alt çubuğun yüksekliği (güvenli alan hariç). */
+const PHONE_BAR_HEIGHT = 70;
+
 export default function Simulator() {
   const [initial] = useState(initialDoc);
   const [state, dispatch] = useReducer(editorReducer, initial.doc, initialEditorState);
   const [settings, updateSettings] = useSettings();
   const layout = useLayout();
   const phone = layout.kind === 'phone';
-  const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryPref, setLibraryPref] = useState(loadLibraryPref);
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [focusSearch, setFocusSearch] = useState(0);
@@ -115,7 +127,7 @@ export default function Simulator() {
   const [lastInfoType, setLastInfoType] = useState<DeviceType>('battery');
   const [canvasStatus, setCanvasStatus] = useState<CanvasStatus>({ hint: { kind: 'select' }, scale: 1 });
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('inspect');
-  /** Artınca İncele sekmesindeki ilk değer alanına odaklanılır (çift tık). */
+  /** Artınca İncele sekmesindeki (telefonda parça sayfasındaki) ilk değer alanına odaklanılır. */
   const [focusRequest, setFocusRequest] = useState(0);
   /** Öğrencinin örneklere yazdığı tahminler (yalnızca bu oturumda). */
   const [predictions, setPredictions] = useState<Partial<Record<ExampleId, string>>>({});
@@ -130,19 +142,27 @@ export default function Simulator() {
   const columnRef = useRef<HTMLDivElement>(null);
   /** Rafta bir jaka tıklanınca o ucun kısa süre yanıp sönmesi. */
   const [flash, setFlash] = useState<Highlight | null>(null);
-  const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [fitRequest, setFitRequest] = useState(0);
   const [activeExample, setActiveExample] = useState<ExampleId | null>(null);
   const [answerRevealed, setAnswerRevealed] = useState(false);
-  const [exampleCollapsed, setExampleCollapsed] = useState(false);
   const [chosenScope, setChosenScope] = useState<string | null>(null);
-  // Telefonda ve kısa ekranda osiloskop paneli küçültülmüş başlar (devreye yer kalsın).
-  const [scopeCollapsed, setScopeCollapsed] = useState(() => window.innerWidth < 900 || window.innerHeight < 640);
+  // Telefon: tek alt sayfa, Bağla kipi ve karartmalı sayfalar.
+  const [sheet, setSheet] = useState<{ kind: PhoneSheetKind; size: SheetSize } | null>(null);
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const [phoneAreaHeight, setPhoneAreaHeight] = useState(0);
+  const phoneAreaRef = useRef<HTMLDivElement>(null);
+  const [panelTab, setPanelTab] = useState<PanelTab>('circuit');
+  const [partExpanded, setPartExpanded] = useState(false);
+  const [connect, setConnect] = useState<{ start: ConnectStart | null } | null>(null);
+  const [modal, setModal] = useState<'file' | 'share' | 'more' | null>(null);
+  const [stopAsk, setStopAsk] = useState(false);
+  const [lockChipClosed, setLockChipClosed] = useState(false);
+  const [chainOff, setChainOff] = useState(false);
+  const [partDragging, setPartDragging] = useState(false);
   const [toast, showToast] = useToast();
   const touch = useCoarsePointer();
-  const touchHintShown = useRef(false);
   const canvasRef = useRef<CanvasHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -154,16 +174,13 @@ export default function Simulator() {
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
   const canFlip = selectedParts.some((p) => CATALOG[p.type].polarized);
+  const singlePart = selectedParts.length === 1 && selection.wires.length === 0 ? selectedParts[0]! : null;
 
-  // --- Kütüphane ---------------------------------------------------------------------------
+  // --- Kütüphane (masaüstü) -----------------------------------------------------------------
   // Ölç düzeninde (açık bir örnek yoksa) kütüphane şeride, İnceleme paneli 48 px'e iner. Örnek açıkken
   // cevap Örnek sekmesinde göründüğü için paneller açık kalır, yalnızca raf büyür.
   const measureCollapse = measureLayout && !phone && activeExample === null;
-  const libraryMode: LibraryMode = phone
-    ? 'drawer'
-    : layout.kind === 'compact' || libraryPref === 'rail' || measureCollapse
-      ? 'rail'
-      : 'full';
+  const libraryMode: LibraryMode = layout.kind === 'compact' || libraryPref === 'rail' || measureCollapse ? 'rail' : 'full';
   const showFlyout = layout.kind === 'compact' && flyoutOpen && !measureCollapse;
   const setLibraryPrefSaved = (pref: 'open' | 'rail') => {
     setLibraryPref(pref);
@@ -171,8 +188,7 @@ export default function Simulator() {
   };
   // Bilgi alanındaki parça: üzerine gelinen, yerleştirilen, sürüklenen ya da seçili tek parça; hiçbiri
   // yoksa en son anlatılan.
-  const singleSelected = selectedParts.length === 1 && selection.wires.length === 0 ? selectedParts[0]!.type : null;
-  const currentInfo = hoveredType ?? (tool.kind === 'place' ? tool.type : null) ?? libraryDragType ?? singleSelected;
+  const currentInfo = hoveredType ?? (tool.kind === 'place' ? tool.type : null) ?? libraryDragType ?? singlePart?.type ?? null;
   useEffect(() => {
     if (currentInfo) setLastInfoType(currentInfo);
   }, [currentInfo]);
@@ -184,11 +200,19 @@ export default function Simulator() {
     dispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
     dispatch({ type: 'set-tool', tool: { kind: 'select' } });
     setActiveExample(example);
-    setExampleCollapsed(false);
     setAnswerRevealed(false);
-    if (example) setInspectorTab('example');
+    setConnect(null);
+    if (example) {
+      setInspectorTab('example');
+      // Telefonda örneğin açıklaması ve tahmin sorusu alttaki sayfada (P06).
+      setPanelTab('example');
+      setSheet({ kind: 'panel', size: 'half' });
+    } else {
+      setSheet(null);
+    }
     setFitRequest((n) => n + 1);
-    showToast(message);
+    // Telefonda klavye kısayolu anılmaz; Geri al alttaki çubukta.
+    showToast(phone ? message.replace(/ \(Ctrl\+Z\)/g, '') : message);
   };
 
   const loadExample = (id: ExampleId) => {
@@ -257,8 +281,10 @@ export default function Simulator() {
     if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
     else rotateSelection(selection.parts);
   };
+  const deleteSelection = () =>
+    dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION });
 
-  // --- Tanılama ve mesaj paneli ----------------------------------------------------------
+  // --- Tanılama ve mesajlar ---------------------------------------------------------------
   // Topoloji kontrolleri devre her değiştiğinde çalışır (simülasyon durdurulmuş olsa da).
   const compiled = useMemo<CompiledCircuit | null>(() => {
     try {
@@ -295,7 +321,6 @@ export default function Simulator() {
     return items.sort((a, b) => Number(b.severity === 'error') - Number(a.severity === 'error'));
   }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc]);
 
-  const [panelOpen, setPanelOpen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
 
   /** Bir mesajın vurgulayacağı parçalar ve kablolar. */
@@ -374,6 +399,7 @@ export default function Simulator() {
     const item = messages.find((m) => m.code === 'led-burned' && m.elementIds.includes(partId));
     setInspectorTab('messages');
     setMeasureLayout(false);
+    if (phone) openPanel('messages', 'half');
     if (item) setSelectedMessage(item.key);
   };
 
@@ -425,41 +451,68 @@ export default function Simulator() {
   const warningCount = messages.length - errorCount;
   const runtimeIssues = messages.some((m) => (m.diagnostic && (sim.frame?.runtime ?? []).includes(m.diagnostic)) || m.code === 'earth-trap');
 
-  // Simülasyon hatası ya da yeni bir çalışma uyarısı (kısa devre, yanan LED) gelince panel açılır;
-  // simülasyon başlatılamadıysa hata vurgulanır. Kurulum sırasındaki boşta uç uyarıları paneli açmaz.
+  /** Telefon: alt sayfayı panel olarak verilen sekmede açar. */
+  const openPanel = (tab: PanelTab, size: SheetSize) => {
+    setPanelTab(tab);
+    setSheet({ kind: 'panel', size });
+  };
+
+  // Simülasyon hatası ya da yeni bir çalışma uyarısı (kısa devre, yanan LED) gelince Mesajlar sekmesi öne
+  // gelir (odak alınmaz); telefonda alt sayfa küçük açılır (P10). Simülasyon başlatılamadıysa hata seçilir.
   const runtimeKeys = (sim.frame?.runtime ?? []).map(messageKey).join(';');
   const previousRuntime = useRef('');
+  const phoneRef = useRef(phone);
+  phoneRef.current = phone;
   useEffect(() => {
     const before = new Set(previousRuntime.current.split(';'));
     previousRuntime.current = runtimeKeys;
-    if (runtimeKeys && runtimeKeys.split(';').some((k) => !before.has(k))) {
-      setPanelOpen(true);
-      // Yeni hata/uyarıda Mesajlar sekmesi öne gelir (odak alınmaz).
+    const fresh = runtimeKeys ? runtimeKeys.split(';').filter((k) => !before.has(k)) : [];
+    if (fresh.length > 0) {
       setInspectorTab('messages');
+      if (phoneRef.current) {
+        // Telefonda mesaj seçili gelir: düzeltme düğmeleri (Onar, "R1'i … yap") hemen görünür (P10).
+        setSelectedMessage(fresh[0]!);
+        setSheet((s) => (s?.kind === 'devices' ? s : (setPanelTab('messages'), { kind: 'panel', size: 'half' })));
+      }
     }
   }, [runtimeKeys]);
   useEffect(() => {
     if (sim.notice?.kind === 'error') {
-      setPanelOpen(true);
       setInspectorTab('messages');
       setSelectedMessage(messageKey(sim.notice.diagnostic));
+      if (phoneRef.current) {
+        setPanelTab('messages');
+        setSheet({ kind: 'panel', size: 'half' });
+      }
     }
   }, [sim.notice]);
 
-  // Tuvalde bir şey seçilince İncele sekmesi açılır.
+  // Tuvalde bir şey seçilince İncele sekmesi açılır; telefonda Kur kipinde parçanın sayfası (P04).
   const selectionKey = [...selection.parts, '|', ...selection.wires].join(',');
   useEffect(() => {
     if (selection.parts.length + selection.wires.length > 0) setInspectorTab('inspect');
+    if (!phoneRef.current) return;
+    setPartExpanded(false);
+    setSheet((s) => {
+      // Parça eklerken (Parça sayfası açık) ya da Ölç kipinde sayfa değişmez.
+      if (s?.kind === 'parts' || s?.kind === 'devices' || s?.kind === 'speed') return s;
+      if (sim.status !== 'stopped') return s;
+      if (singlePart) return { kind: 'part', size: 'half' };
+      return s?.kind === 'part' ? null : s;
+    });
   }, [selectionKey]);
 
-  /** Çift tık: masaüstünde parçayı seçip İncele'deki ilk değer alanına odaklanır; telefonda pencere açar. */
+  /** Çift tık: masaüstünde parçayı seçip İncele'deki ilk değer alanına odaklanır; telefonda değer sayfası. */
   const openProperties = (partId: string) => {
-    if (phone) {
-      setPropertiesFor(partId);
-      return;
-    }
     dispatch({ type: 'select', selection: { parts: [partId], wires: [] } });
     setInspectorTab('inspect');
+    if (phone) {
+      if (sim.status === 'stopped') setSheet({ kind: 'part', size: 'half' });
+      else {
+        openPanel('circuit', 'half');
+        setPartExpanded(true);
+      }
+    }
     setFocusRequest((n) => n + 1);
   };
   const updatePartFromPanel = (partId: string, patch: PartPatch) => {
@@ -473,39 +526,30 @@ export default function Simulator() {
       : sim.status !== 'stopped' && runtimeIssues && idleHint
         ? { kind: 'issues', text: tr.messages.stripRuntime(summary), tone: errorCount > 0 ? 'error' : 'warn' }
         : measureLayout && idleHint
-      ? { kind: 'measure', example: activeExample !== null }
-      : activeExample && !answerRevealed && idleHint && canvasStatus.hint.kind !== 'simulating'
-        ? { kind: 'example' }
-        : canvasStatus.hint;
+          ? { kind: 'measure', example: activeExample !== null }
+          : activeExample && !answerRevealed && idleHint && canvasStatus.hint.kind !== 'simulating'
+            ? { kind: 'example' }
+            : canvasStatus.hint;
 
-  const editingPart = propertiesFor ? doc.parts.find((p) => p.id === propertiesFor) : undefined;
-
-  // --- Osiloskop paneli ------------------------------------------------------------------
-  // Gösterilen osiloskop: seçili osiloskop, yoksa paneldeki seçim, o da yoksa ilki.
+  // --- Osiloskop -------------------------------------------------------------------------
+  // "Osiloskoba göre" hızının osiloskobu: seçili osiloskop, yoksa son seçilen, o da yoksa ilki.
   const scopes = doc.parts.filter((p) => p.type === 'oscilloscope');
   const selectedScope = scopes.find((p) => selection.parts.includes(p.id));
   const scope = selectedScope ?? scopes.find((p) => p.id === chosenScope) ?? scopes[0];
   useEffect(() => {
     if (selectedScope) setChosenScope(selectedScope.id);
   }, [selectedScope]);
-  const scopeConnected = scope
-    ? ([0, 1].map((pin) => !connectivity.unconnectedPins.has(pinKey(scope.id, pin))) as [boolean, boolean])
-    : ([false, false] as const);
   const scopeSpeed = scope ? sweepSpeed(scopeSettings(scope.props).timePerDiv) : null;
   /** Cihazın ayarlarını değiştirir (geri alınabilir; simülasyonu durdurmaz). */
   const changeInstrument = (partId: string, patch: Record<string, PropValue>) => {
     const part = doc.parts.find((p) => p.id === partId);
     if (part) dispatch({ type: 'commit', doc: updatePart(doc, partId, { props: { ...part.props, ...patch } }) });
   };
-  const changeScope = (patch: Record<string, PropValue>) => {
-    if (scope) changeInstrument(scope.id, patch);
-  };
   /**
    * Oto ayar: kayıt varsa sinyalden, yoksa devredeki AC kaynakların frekansından ve kaynak
-   * gerilimlerinden; hız da bir tarama ≈ 0,2 s sürecek biçimde. Masaüstünde bir bildirim neyin
-   * değiştiğini söyler.
+   * gerilimlerinden; hız da bir tarama ≈ 0,2 s sürecek biçimde. Bir bildirim neyin değiştiğini söyler.
    */
-  const autoScopeFor = (target: (typeof doc.parts)[number], announce: boolean) => {
+  const autoScopeFor = (target: (typeof doc.parts)[number]) => {
     const connected = [0, 1].map((pin) => !connectivity.unconnectedPins.has(pinKey(target.id, pin))) as [boolean, boolean];
     let frequency: number | null = null;
     let peak: number | null = null;
@@ -527,26 +571,21 @@ export default function Simulator() {
     const timePerDiv = patch.timePerDiv ?? settings.timePerDiv;
     const speed = sweepSpeed(timePerDiv);
     sim.setSpeed(speed);
-    if (announce) {
-      const perDiv = tr.scope.perDiv;
-      const parts = [
-        `${formatSI(timePerDiv, 's', { trim: true })}${perDiv}`,
-        `A ${formatSI(patch.voltsPerDivA ?? settings.voltsPerDiv[0], 'V', { trim: true })}${perDiv}`,
-        `B ${formatSI(patch.voltsPerDivB ?? settings.voltsPerDiv[1], 'V', { trim: true })}${perDiv}`,
-        tr.rack.autoSpeed(speedLabel(speed)),
-      ];
-      showToast(tr.rack.autoDone(parts.join(' · ')));
-    }
-  };
-  const autoScope = () => {
-    if (scope) autoScopeFor(scope, false);
+    const perDiv = tr.scope.perDiv;
+    const parts = [
+      `${formatSI(timePerDiv, 's', { trim: true })}${perDiv}`,
+      `A ${formatSI(patch.voltsPerDivA ?? settings.voltsPerDiv[0], 'V', { trim: true })}${perDiv}`,
+      `B ${formatSI(patch.voltsPerDivB ?? settings.voltsPerDiv[1], 'V', { trim: true })}${perDiv}`,
+      tr.rack.autoSpeed(speedLabel(speed)),
+    ];
+    showToast(tr.rack.autoDone(parts.join(' · ')));
   };
 
-  // --- Cihaz rafı (masaüstü) ---------------------------------------------------------------
+  // --- Cihaz rafı ---------------------------------------------------------------------------
   const instruments = doc.parts.filter((p) => RACK_TYPES.has(p.type));
   const showRack = !phone && instruments.length > 0;
-  // Tuvalde bir cihaz seçilince raf onu gösterir.
-  const selectedInstrument = selectedParts.length === 1 && RACK_TYPES.has(selectedParts[0]!.type) ? selectedParts[0]!.id : null;
+  // Tuvalde bir cihaz seçilince raf (telefonda Cihazlar sayfası) onu gösterir.
+  const selectedInstrument = singlePart && RACK_TYPES.has(singlePart.type) ? singlePart.id : null;
   useEffect(() => {
     if (selectedInstrument) setRackActive(selectedInstrument);
   }, [selectedInstrument]);
@@ -568,6 +607,14 @@ export default function Simulator() {
     previousRunStatus.current = sim.status;
     if (sim.status === 'stopped') setMeasureLayout(false);
     else if (sim.status === 'running' && before === 'stopped' && showRack) setMeasureLayout(true);
+    if (!phoneRef.current) return;
+    // Telefon: Oynat'ta Kur'un sayfaları Ölç'ünkilere döner (parça sayfası → ölçümler); Durdur'da tersi.
+    if (sim.status !== 'stopped' && before === 'stopped') {
+      setConnect(null);
+      setSheet((s) => (s?.kind === 'part' ? (setPanelTab('circuit'), { kind: 'panel', size: 'peek' }) : s?.kind === 'parts' ? null : s));
+    } else if (sim.status === 'stopped' && before !== 'stopped') {
+      setSheet((s) => (s?.kind === 'devices' || s?.kind === 'speed' ? null : s));
+    }
   }, [sim.status, showRack]);
   useEffect(() => {
     if (tool.kind === 'place' || libraryDragType) setMeasureLayout(false);
@@ -597,18 +644,14 @@ export default function Simulator() {
     setRackCollapsed(false);
   };
 
-  const closeLibrary = useCallback(() => {
-    setLibraryOpen(false);
-    setFlyoutOpen(false);
-  }, []);
+  const closeFlyout = useCallback(() => setFlyoutOpen(false), []);
   const libraryProps = {
     width: layout.libraryWidth,
     tool,
     settings,
     dispatch,
     onDragTypeChange: setLibraryDragType,
-    drawerOpen: libraryOpen,
-    onClose: closeLibrary,
+    onClose: closeFlyout,
     onCollapse: () => setLibraryPrefSaved('rail'),
     onExpand: (search: boolean) => {
       // Ölç düzeninde şeritteki düğme Kur düzenine döndürür.
@@ -623,19 +666,499 @@ export default function Simulator() {
     infoType,
     recent: recentParts,
     flyoutOpen: showFlyout,
-    onAddPart: (type: DeviceType) => {
-      canvasRef.current?.addPartAtCenter(type);
-      if (phone && !touchHintShown.current) {
-        touchHintShown.current = true;
-        showToast(tr.hints.touchAdded);
-      }
-    },
+    onAddPart: (type: DeviceType) => canvasRef.current?.addPartAtCenter(type),
   };
+
+  // --- Telefon ------------------------------------------------------------------------------
+  // Kip: Bağla (kablo çekerken), Ölç (çalışıyor ya da duraklatılmış; yapı kilitli) ya da Kur.
+  const phoneMode: PhoneMode = connect ? 'bagla' : sim.status === 'running' ? 'olc' : sim.status === 'paused' ? 'pause' : 'kur';
+  const canvasMode: PhoneCanvas['mode'] = connect ? 'bagla' : sim.status !== 'stopped' ? 'olc' : 'kur';
+  const barState: PhoneBarState = connect
+    ? 'bagla'
+    : sim.status === 'running'
+      ? 'olc'
+      : sim.status === 'paused'
+        ? 'pause'
+        : sheet?.kind !== 'parts' && hasSelection
+          ? 'sec'
+          : 'kur';
+  const barActive: PhoneBarActive =
+    sheet?.kind === 'parts'
+      ? 'parts'
+      : sheet?.kind === 'devices'
+        ? 'devices'
+        : sheet?.kind === 'panel'
+          ? sim.status === 'stopped'
+            ? 'panel'
+            : 'measure'
+          : null;
+  // Tuvalin yüksekliği alt sayfanın üstünde kalan alan: sayfa açılıp kapanınca devre yeniden sığar.
+  useEffect(() => {
+    const el = phoneAreaRef.current;
+    if (!el) return undefined;
+    const observer = new ResizeObserver((entries) => setPhoneAreaHeight(entries[0]?.contentRect.height ?? 0));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [phone]);
+  useEffect(() => {
+    if (!sheet) setSheetHeight(0);
+  }, [sheet]);
+  // Telefondan masaüstüne geçince telefonun durumları kapanır.
+  useEffect(() => {
+    if (phone) return;
+    setSheet(null);
+    setConnect(null);
+    setModal(null);
+    setStopAsk(false);
+  }, [phone]);
+  // Parça sayfası her açılışta "Zincirle ekle" açık başlar.
+  useEffect(() => {
+    if (sheet?.kind === 'parts') setChainOff(false);
+  }, [sheet?.kind]);
+
+  const circuitTitle = activeExample
+    ? tr.examples.texts[activeExample].title
+    : doc.parts.length === 0 && doc.wires.length === 0
+      ? tr.phone.emptyName
+      : tr.phone.defaultName;
+  /** Zincirle ekle: Parça sayfası açıkken seçili parçanın boştaki ilk ucu. */
+  const chainPart = sheet?.kind === 'parts' && !chainOff ? singlePart : null;
+  const chainPin = chainPart ? firstFreePin(chainPart.id, connectivity.unconnectedPins, doc) : null;
+  const chainTo = chainPart && chainPin !== null ? tr.phone.pinOf(chainPart.label, tr.devices.pins[chainPart.type][chainPin] ?? '') : null;
+  const addFromSheet = (type: DeviceType) => {
+    if (chainPart && chainPin !== null) {
+      const place = chainPlacement(doc, type, { partId: chainPart.id, pin: chainPin });
+      if (place) {
+        const added = addPart(doc, type, place.at, place.rotation);
+        const wired = addWire(added.doc, place.wire);
+        dispatch({ type: 'commit', doc: wired.doc, selection: { parts: [added.id], wires: [] } });
+        rememberPart(type);
+        return;
+      }
+    }
+    canvasRef.current?.addPartAtCenter(type);
+  };
+  const connectStartPart = connect?.start?.partId ? doc.parts.find((p) => p.id === connect.start!.partId) : undefined;
+  const panelTabs: SheetTab<PanelTab>[] = [
+    ...(activeExample ? [{ id: 'example' as const, label: tr.phone.tabs.example }] : []),
+    { id: 'circuit', label: sim.status === 'stopped' ? tr.phone.tabs.circuit : tr.phone.tabs.measure },
+    ...(messages.length > 0
+      ? [{ id: 'messages' as const, label: tr.phone.tabs.messages, count: messages.length, tone: errorCount > 0 ? ('error' as const) : ('warn' as const) }]
+      : []),
+  ];
+  const shownTab: PanelTab = panelTabs.some((t) => t.id === panelTab) ? panelTab : 'circuit';
+  const togglePanel = (tab: PanelTab, size: SheetSize) => {
+    if (sheet?.kind === 'panel') setSheet(null);
+    else openPanel(tab, size);
+  };
+
+  const exampleProps = {
+    id: activeExample,
+    revealed: answerRevealed,
+    prediction: activeExample ? (predictions[activeExample] ?? '') : '',
+    onPrediction: (text: string) => {
+      if (activeExample) setPredictions((p) => ({ ...p, [activeExample]: text }));
+    },
+    onPlay: sim.play,
+    onOpen: loadExample,
+    onClose: () => setActiveExample(null),
+    onBrowse: () => setExamplesOpen(true),
+  };
+  const inspectProps = {
+    doc,
+    selection,
+    frame: sim.frame,
+    status: sim.status,
+    settings,
+    focusRequest,
+    onUpdatePart: updatePartFromPanel,
+    onRotate: rotateSelection,
+    onFlip: flipSelection,
+    onDelete: deleteSelection,
+    onRepair: sim.repair,
+    onSelectPart: (partId: string) => {
+      dispatch({ type: 'select', selection: { parts: [partId], wires: [] } });
+      if (phone && sim.status !== 'stopped') openPanel('circuit', sheet?.size ?? 'peek');
+    },
+    onShowInRack: showInRack,
+  };
+  const messagesProps = {
+    items: messages,
+    selectedKey: selectedItem ? selectedItem.key : null,
+    onSelect: selectMessage,
+    context: diagnosticContext,
+    actions: messageActions,
+  };
+  const openDevices = (partId?: string) => {
+    if (partId) setRackActive(partId);
+    setSheet({ kind: 'devices', size: 'full' });
+  };
+
+  const canvas = (
+    <Canvas
+      ref={canvasRef}
+      doc={doc}
+      selection={selection}
+      tool={tool}
+      settings={settings}
+      connectivity={connectivity}
+      dispatch={dispatch}
+      libraryDragType={libraryDragType}
+      onOpenProperties={openProperties}
+      keyboardEnabled={!shareLink && !examplesOpen && modal === null}
+      flowGraph={flowGraph}
+      simActive={sim.status !== 'stopped'}
+      frame={sim.frame}
+      highlight={flash ?? highlight}
+      onRepair={sim.repair}
+      onRotate={rotateSelection}
+      onFlip={flipSelection}
+      fitRequest={fitRequest}
+      keepVisible={selection.parts}
+      phone={
+        phone
+          ? {
+              mode: canvasMode,
+              connectStart: connect?.start ?? null,
+              onConnectStart: (start) => setConnect({ start }),
+              onStartConnect: (start) => {
+                dispatch({ type: 'select', selection: EMPTY_SELECTION });
+                setSheet(null);
+                setConnect({ start });
+              },
+              onExitConnect: () => setConnect(null),
+              onInspect: () => openPanel('circuit', sheet?.kind === 'panel' ? sheet.size : 'peek'),
+              onEditAttempt: () => setStopAsk(true),
+              lockChip: !lockChipClosed,
+              onLockChipClose: () => setLockChipClosed(true),
+              strip: sheet?.size === 'full',
+            }
+          : null
+      }
+      overlayOpen={showFlyout || Boolean(shareLink) || examplesOpen || modal !== null || stopAsk}
+      onStatusChange={setCanvasStatus}
+      onPartPlaced={rememberPart}
+      onExamples={() => setExamplesOpen(true)}
+      issues={issues}
+      issuePins={issuePins}
+      earthLine={earthTrap?.comPoints ?? null}
+      noGround={
+        noGroundNotice && !noGroundDismissed
+          ? {
+              banner: !phone,
+              point: groundSuggestion?.at ?? null,
+              text: `${tr.noGround.text}${groundSuggestion ? ` ${tr.noGround.where[groundSuggestion.part.type] ?? ''}` : ''}`,
+              fixLabel: groundSuggestion ? tr.noGround.fix(groundSuggestion.part.label) : null,
+              onFix: addSuggestedGround,
+              onDismiss: () => setNoGroundDismissed(true),
+            }
+          : null
+      }
+      onExplain={explain}
+    />
+  );
+
+  const fileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept=".json,application/json"
+      // display:none yerine görünmez: iOS Safari gizli dosya alanında seçiciyi açmayabiliyor.
+      className="sr-only"
+      tabIndex={-1}
+      aria-hidden="true"
+      onChange={(e) => {
+        void importFile(e.target.files?.[0]);
+        e.target.value = '';
+      }}
+    />
+  );
+
+  const examplesDialog = examplesOpen && (
+    <ExamplesDialog
+      phone={phone}
+      activeExample={activeExample}
+      onClose={() => setExamplesOpen(false)}
+      onLoad={(id) => {
+        setExamplesOpen(false);
+        loadExample(id);
+      }}
+    />
+  );
+
+  if (phone) {
+    const blocked = sim.notice?.kind === 'error';
+    const sheetCommon = {
+      areaHeight: phoneAreaHeight,
+      onHeight: setSheetHeight,
+      onSize: (size: SheetSize) => setSheet((s) => (s ? { ...s, size } : s)),
+      onClose: () => setSheet(null),
+    };
+    let sheetView: ReactNode = null;
+    if (sheet?.kind === 'parts') {
+      sheetView = (
+        <BottomSheet {...sheetCommon} size="half" sizes={['half']} role="dialog" label={tr.phone.addTitle} dimmed={partDragging}>
+          <SheetHeader title={tr.phone.addTitle} onClose={() => setSheet(null)} />
+          <PartsSheetBody
+            settings={settings}
+            recent={recentParts}
+            chainTo={chainTo}
+            onChainOff={() => setChainOff(true)}
+            onAdd={addFromSheet}
+            onDrop={(type, x, y) => canvasRef.current?.placeAtClient(type, x, y)}
+            onDragging={setPartDragging}
+          />
+        </BottomSheet>
+      );
+    } else if (sheet?.kind === 'part' && singlePart) {
+      sheetView = (
+        <BottomSheet {...sheetCommon} size={sheet.size} sizes={['peek', 'half']} label={tr.properties.title(singlePart.label)}>
+          <PartSheetBody
+            key={singlePart.id}
+            part={singlePart}
+            doc={doc}
+            settings={settings}
+            expanded={partExpanded}
+            onExpand={(expanded) => {
+              setPartExpanded(expanded);
+              if (expanded) setSheet({ kind: 'part', size: 'half' });
+            }}
+            focusRequest={focusRequest}
+            onUpdatePart={updatePartFromPanel}
+            onOpenDevices={openDevices}
+          />
+        </BottomSheet>
+      );
+    } else if (sheet?.kind === 'panel') {
+      const measuring = sim.status !== 'stopped';
+      sheetView = (
+        <BottomSheet
+          {...sheetCommon}
+          size={sheet.size}
+          sizes={['peek', 'half']}
+          role={blocked && shownTab === 'messages' ? 'alertdialog' : 'region'}
+          label={blocked && shownTab === 'messages' ? tr.phone.blockedTitle : panelTabs.find((t) => t.id === shownTab)?.label ?? tr.phone.panel}
+        >
+          <TouchUi.Provider value>
+            {/* Küçük sayfada yalnızca içerik (P05, P10); sekmeler yarım boyda. */}
+            {panelTabs.length > 1 && sheet.size !== 'peek' && <SheetTabs tabs={panelTabs} value={shownTab} onChange={setPanelTab} />}
+            {shownTab === 'example' && <ExampleTab {...exampleProps} />}
+            {shownTab === 'circuit' &&
+              (measuring && singlePart ? (
+                <MeasureSheetBody
+                  key={singlePart.id}
+                  part={singlePart}
+                  doc={doc}
+                  frame={sim.frame}
+                  status={sim.status}
+                  settings={settings}
+                  expanded={partExpanded}
+                  onExpand={(expanded) => {
+                    setPartExpanded(expanded);
+                    setSheet({ kind: 'panel', size: expanded ? 'half' : 'peek' });
+                  }}
+                  onUpdatePart={updatePartFromPanel}
+                  onOpenDevices={openDevices}
+                />
+              ) : (
+                <InspectTab {...inspectProps} />
+              ))}
+            {shownTab === 'messages' && (
+              <MessagesTab
+                {...messagesProps}
+                header={
+                  blocked && sim.notice?.kind === 'error' ? (
+                    noGroundNotice ? (
+                      <BlockedNotice
+                        lead={tr.phone.noGroundLead}
+                        text={tr.phone.noGroundText}
+                        fixLabel={groundSuggestion ? tr.phone.fixAndPlay(groundSuggestion.part.label) : null}
+                        onFix={addSuggestedGround}
+                      />
+                    ) : (
+                      <BlockedNotice lead={tr.diagnostics.describe(sim.notice.diagnostic, diagnosticContext).title} text="" fixLabel={null} onFix={() => {}} />
+                    )
+                  ) : undefined
+                }
+              />
+            )}
+          </TouchUi.Provider>
+        </BottomSheet>
+      );
+    } else if (sheet?.kind === 'devices' && instruments.length > 0) {
+      sheetView = (
+        <BottomSheet {...sheetCommon} size={sheet.size} sizes={['half', 'full']} label={tr.phone.devicesTitle} tone="rack">
+          <PhoneDevicesBody
+            devices={instruments}
+            activeId={rackActive ?? instruments[0]!.id}
+            onActive={setRackActive}
+            onClose={() => setSheet(null)}
+            scopeView={(id) => sim.frame?.scopes.get(id) ?? null}
+            status={(id) => sim.frame?.statuses.get(id) ?? {}}
+            outputVoltage={(id) => sim.frame?.measurements.get(id)?.voltage ?? null}
+            running={sim.status !== 'stopped'}
+            pinConnected={(id, pin) => !connectivity.unconnectedPins.has(pinKey(id, pin))}
+            onChange={changeInstrument}
+            onAuto={(id) => {
+              const target = doc.parts.find((p) => p.id === id);
+              if (target) autoScopeFor(target);
+            }}
+            onJack={(id, pin) => {
+              // Uç tuvalde görünsün diye sayfa yarıya iner.
+              setSheet({ kind: 'devices', size: 'half' });
+              flashPin(id, pin);
+            }}
+          />
+        </BottomSheet>
+      );
+    } else if (sheet?.kind === 'speed') {
+      sheetView = (
+        <BottomSheet {...sheetCommon} size="half" sizes={['half']} label={tr.sim.speedDialog}>
+          <SheetHeader title={tr.sim.speedDialog} onClose={() => setSheet(null)} />
+          <SheetBody>
+            <SpeedOptions speed={sim.speed} scopeSpeed={scopeSpeed} onSpeed={sim.setSpeed} touch />
+          </SheetBody>
+        </BottomSheet>
+      );
+    }
+    const sheetOpen = sheetView !== null;
+    // Tam boy (Cihazlar): üstte kalan devre şeridine dokunmak sayfayı yarıya indirir.
+    const fullStrip = sheet?.size === 'full' && sheetOpen;
+
+    return (
+      <div className="app-root flex flex-col overflow-hidden bg-panel">
+        <PhoneTopStrip
+          title={circuitTitle}
+          saveState={saveState}
+          mode={phoneMode}
+          time={sim.frame?.time ?? 0}
+          errors={errorCount}
+          warnings={warningCount}
+          showIssues={showIssues}
+          moreOpen={modal === 'more'}
+          onFile={() => setModal('file')}
+          onIssues={() => openPanel('messages', 'half')}
+          onMore={() => setModal('more')}
+        />
+        {fileInput}
+        <div ref={phoneAreaRef} className="relative min-h-0 flex-1 bg-paper">
+          <main
+            className="absolute inset-x-0 top-0"
+            style={{ bottom: sheetOpen ? sheetHeight : 0, boxShadow: canvasMode === 'olc' ? 'inset 0 3px 0 var(--color-ok)' : undefined }}
+          >
+            {canvas}
+            {fullStrip && (
+              <button
+                type="button"
+                onClick={() => setSheet((s) => (s ? { ...s, size: 'half' } : s))}
+                className="absolute inset-0 z-10 flex items-end justify-end p-2"
+              >
+                <span className="rounded-md bg-panel/90 px-1.5 py-0.5 text-label text-muted">{tr.phone.backToCircuit}</span>
+              </button>
+            )}
+          </main>
+          {sheetView}
+        </div>
+        <PhoneBar
+          state={barState}
+          active={barActive}
+          canUndo={state.past.length > 0}
+          onParts={() => setSheet((s) => (s?.kind === 'parts' ? null : { kind: 'parts', size: 'half' }))}
+          onConnect={() => {
+            dispatch({ type: 'select', selection: EMPTY_SELECTION });
+            setSheet(null);
+            setConnect({ start: null });
+          }}
+          onUndo={() => dispatch({ type: 'undo' })}
+          onPanel={() => togglePanel(activeExample ? 'example' : panelTab, 'half')}
+          valueText={
+            singlePart
+              ? (partViewValue(singlePart) ?? tr.devices.names[singlePart.type])
+              : selection.parts.length === 0 && selection.wires.length === 1
+                ? tr.phone.wire
+                : tr.phone.items(selection.parts.length + selection.wires.length)
+          }
+          canEditValue={singlePart !== null}
+          canRotate={selection.parts.length > 0}
+          canFlip={canFlip}
+          onValue={() => singlePart && openProperties(singlePart.id)}
+          onRotate={() => rotateSelection(selection.parts)}
+          onFlip={() => flipSelection(selectedParts.filter((p) => CATALOG[p.type].polarized).map((p) => p.id))}
+          onDelete={deleteSelection}
+          connectMessage={connect?.start ? tr.phone.connectSecond : tr.phone.connectFirst}
+          connectDetail={
+            connect?.start
+              ? connectStartPart && connect.start.pin !== null
+                ? tr.phone.connectFrom(connectStartPart.label, tr.devices.pinShort[connectStartPart.type][connect.start.pin] ?? '')
+                : tr.phone.connectFromWire
+              : tr.phone.connectEnlarged
+          }
+          onDone={() => setConnect(null)}
+          speed={speedLabel(sim.speed)}
+          hasDevices={instruments.length > 0}
+          onMeasure={() => togglePanel('circuit', 'peek')}
+          onDevices={() => (sheet?.kind === 'devices' ? setSheet(null) : openDevices())}
+          onSpeed={() => setSheet((s) => (s?.kind === 'speed' ? null : { kind: 'speed', size: 'half' }))}
+          onStop={sim.stop}
+          onPlay={sim.play}
+          onPause={sim.pause}
+        />
+
+        {(modal === 'file' || modal === 'share') && (
+          <FileSheet
+            title={circuitTitle}
+            saveState={saveState}
+            shareOpen={modal === 'share'}
+            shareLink={() => shareUrl(doc, window.location.href)}
+            onClose={() => setModal(null)}
+            onExamples={() => {
+              setModal(null);
+              setExamplesOpen(true);
+            }}
+            onNew={() => {
+              setModal(null);
+              loadDoc(emptyDoc(), tr.file.newDone);
+            }}
+            onExport={() => {
+              setModal(null);
+              downloadDoc(doc);
+            }}
+            onImport={() => {
+              setModal(null);
+              fileInputRef.current?.click();
+            }}
+          />
+        )}
+        {modal === 'more' && (
+          <MoreSheet
+            settings={settings}
+            onSettings={updateSettings}
+            onClose={() => setModal(null)}
+            onFit={() => {
+              setModal(null);
+              canvasRef.current?.fit();
+            }}
+            onShare={() => setModal('share')}
+          />
+        )}
+        {stopAsk && (
+          <StopToEditDialog
+            onStop={() => {
+              setStopAsk(false);
+              sim.stop();
+            }}
+            onCancel={() => setStopAsk(false)}
+          />
+        )}
+        {examplesDialog}
+        <Toast toast={toast} offset={PHONE_BAR_HEIGHT + (sheetOpen ? sheetHeight : 0) + 12} />
+      </div>
+    );
+  }
 
   return (
     <div className="app-root flex flex-col overflow-hidden">
       <TopBar
-        phone={phone}
         toolKind={tool.kind}
         canUndo={state.past.length > 0}
         canRedo={state.future.length > 0}
@@ -645,14 +1168,11 @@ export default function Simulator() {
         saveState={saveState}
         settings={settings}
         onSettings={updateSettings}
-        onToggleLibrary={() => setLibraryOpen((o) => !o)}
         onSelectTool={() => dispatch({ type: 'set-tool', tool: { kind: 'select' } })}
         onWireTool={() => dispatch({ type: 'set-tool', tool: tool.kind === 'wire' ? { kind: 'select' } : { kind: 'wire' } })}
         onRotate={rotate}
         onFlip={() => flipSelection(selection.parts)}
-        onDelete={() =>
-          dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION })
-        }
+        onDelete={deleteSelection}
         onUndo={() => dispatch({ type: 'undo' })}
         onRedo={() => dispatch({ type: 'redo' })}
         onZoomIn={() => canvasRef.current?.zoomIn()}
@@ -664,103 +1184,16 @@ export default function Simulator() {
         onShare={() => setShareLink(shareUrl(doc, window.location.href))}
         onExamples={() => setExamplesOpen(true)}
       />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json,application/json"
-        // display:none yerine görünmez: iOS Safari gizli dosya alanında seçiciyi açmayabiliyor.
-        className="sr-only"
-        tabIndex={-1}
-        aria-hidden="true"
-        onChange={(e) => {
-          void importFile(e.target.files?.[0]);
-          e.target.value = '';
-        }}
-      />
+      {fileInput}
 
       <div className="relative flex min-h-0 flex-1">
         <Library mode={libraryMode} {...libraryProps} />
-        {phone && libraryOpen && (
-          <div className="absolute inset-0 z-20 bg-ink/20" onClick={() => setLibraryOpen(false)} aria-hidden="true" />
-        )}
         <div ref={columnRef} className="flex min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 flex-1">
             {showFlyout && <LibraryFlyout {...libraryProps} />}
-            <Canvas
-              ref={canvasRef}
-              doc={doc}
-              selection={selection}
-              tool={tool}
-              settings={settings}
-              connectivity={connectivity}
-              dispatch={dispatch}
-              libraryDragType={libraryDragType}
-              onOpenProperties={openProperties}
-              keyboardEnabled={!editingPart && !shareLink && !examplesOpen}
-              flowGraph={flowGraph}
-              simActive={sim.status !== 'stopped'}
-              frame={sim.frame}
-              highlight={flash ?? highlight}
-              onRepair={sim.repair}
-              onRotate={rotateSelection}
-              onFlip={flipSelection}
-              fitRequest={fitRequest}
-              reserveCard={!phone || activeExample === null ? 'none' : exampleCollapsed ? 'collapsed' : 'open'}
-              reserveScope={!phone || !scope ? 'none' : scopeCollapsed ? 'collapsed' : 'open'}
-              touch={touch}
-              overlayOpen={libraryOpen || showFlyout || Boolean(editingPart) || Boolean(shareLink) || examplesOpen}
-              onStatusChange={setCanvasStatus}
-              onPartPlaced={rememberPart}
-              onExamples={() => setExamplesOpen(true)}
-              readoutBoxes={phone}
-              issues={issues}
-              issuePins={issuePins}
-              earthLine={earthTrap?.comPoints ?? null}
-              noGround={
-                noGroundNotice && !noGroundDismissed
-                  ? {
-                      point: groundSuggestion?.at ?? null,
-                      text: `${tr.noGround.text}${groundSuggestion ? ` ${tr.noGround.where[groundSuggestion.part.type] ?? ''}` : ''}`,
-                      fixLabel: groundSuggestion ? tr.noGround.fix(groundSuggestion.part.label) : null,
-                      onFix: addSuggestedGround,
-                      onDismiss: () => setNoGroundDismissed(true),
-                    }
-                  : null
-              }
-              onExplain={explain}
-            />
-            {phone && scope && (
-              <ScopePanel
-                scopes={scopes}
-                scope={scope}
-                onChoose={setChosenScope}
-                view={sim.frame?.scopes.get(scope.id) ?? null}
-                connected={scopeConnected}
-                collapsed={scopeCollapsed}
-                onCollapsed={(next) => {
-                  setScopeCollapsed(next);
-                  // Panel büyüyüp küçülünce devre kalan alana yeniden sığdırılır.
-                  setFitRequest((n) => n + 1);
-                }}
-                onChange={changeScope}
-                onAuto={autoScope}
-              />
-            )}
-            {phone && activeExample && (
-              <ExampleCard
-                key={activeExample}
-                id={activeExample}
-                revealed={answerRevealed}
-                collapsed={exampleCollapsed}
-                onCollapsed={(next) => {
-                  setExampleCollapsed(next);
-                  setFitRequest((n) => n + 1);
-                }}
-                onClose={() => setActiveExample(null)}
-              />
-            )}
+            {canvas}
           </main>
-          {!phone && <HintStrip hint={stripHint} />}
+          <HintStrip hint={stripHint} />
           {showRack && (
             <DeviceRack
               devices={instruments}
@@ -787,19 +1220,9 @@ export default function Simulator() {
               onChange={changeInstrument}
               onAuto={(id) => {
                 const target = doc.parts.find((p) => p.id === id);
-                if (target) autoScopeFor(target, true);
+                if (target) autoScopeFor(target);
               }}
               onJack={flashPin}
-            />
-          )}
-
-          {phone && (
-            <MessagesPanel
-              items={messages}
-              open={panelOpen}
-              onToggle={() => setPanelOpen((o) => !o)}
-              selectedKey={selectedItem ? selectedItem.key : null}
-              onSelect={selectMessage}
             />
           )}
 
@@ -819,79 +1242,29 @@ export default function Simulator() {
             onElectronFlow={(on) => updateSettings({ electronFlow: on })}
           />
         </div>
-        {!phone && (
-          <Inspector
-            width={layout.inspectorWidth}
-            collapsed={measureCollapse}
-            onExpand={(tab) => {
-              setMeasureLayout(false);
-              setInspectorTab(tab);
-            }}
-            tab={inspectorTab}
-            onTab={setInspectorTab}
-            inspect={{
-              doc,
-              selection,
-              frame: sim.frame,
-              status: sim.status,
-              settings,
-              focusRequest,
-              onUpdatePart: updatePartFromPanel,
-              onRotate: rotateSelection,
-              onFlip: flipSelection,
-              onDelete: () =>
-                dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION }),
-              onRepair: sim.repair,
-              onSelectPart: (partId) => dispatch({ type: 'select', selection: { parts: [partId], wires: [] } }),
-              onShowInRack: showInRack,
-            }}
-            example={{
-              id: activeExample,
-              revealed: answerRevealed,
-              prediction: activeExample ? (predictions[activeExample] ?? '') : '',
-              onPrediction: (text) => {
-                if (activeExample) setPredictions((p) => ({ ...p, [activeExample]: text }));
-              },
-              onPlay: sim.play,
-              onOpen: loadExample,
-              onClose: () => setActiveExample(null),
-              onBrowse: () => setExamplesOpen(true),
-            }}
-            messages={{
-              items: messages,
-              selectedKey: selectedItem ? selectedItem.key : null,
-              onSelect: selectMessage,
-              context: diagnosticContext,
-              actions: messageActions,
-            }}
-          />
-        )}
+        <Inspector
+          width={layout.inspectorWidth}
+          collapsed={measureCollapse}
+          onExpand={(tab) => {
+            setMeasureLayout(false);
+            setInspectorTab(tab);
+          }}
+          tab={inspectorTab}
+          onTab={setInspectorTab}
+          inspect={inspectProps}
+          example={exampleProps}
+          messages={messagesProps}
+        />
       </div>
 
-      {editingPart && (
-        <PropertiesDialog
-          part={editingPart}
-          otherLabels={new Set(doc.parts.filter((p) => p.id !== editingPart.id).map((p) => p.label))}
-          onCancel={() => setPropertiesFor(null)}
-          onSave={(patch) => {
-            dispatch({ type: 'commit', doc: updatePart(doc, editingPart.id, patch) });
-            setPropertiesFor(null);
-          }}
-        />
-      )}
       {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
-      {examplesOpen && (
-        <ExamplesDialog
-          phone={phone}
-          activeExample={activeExample}
-          onClose={() => setExamplesOpen(false)}
-          onLoad={(id) => {
-            setExamplesOpen(false);
-            loadExample(id);
-          }}
-        />
-      )}
+      {examplesDialog}
       <Toast toast={toast} />
     </div>
   );
+}
+
+/** Alt çubuktaki Değer düğmesinin metni (220 Ω); değeri olmayan parçalarda null. */
+function partViewValue(part: CircuitDoc['parts'][number]): string | null {
+  return partValueText(part) || null;
 }

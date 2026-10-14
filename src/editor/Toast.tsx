@@ -26,13 +26,15 @@ export function useToast(): [ToastMessage | null, (text: string, tone?: ToastMes
   return [toast, show];
 }
 
-export function Toast({ toast }: { toast: ToastMessage | null }) {
+/** `offset`: alttan uzaklık (px); telefonda alt çubuğun ve alt sayfanın üstünde. */
+export function Toast({ toast, offset = 112 }: { toast: ToastMessage | null; offset?: number }) {
   if (!toast) return null;
   return (
     <div
       key={toast.id}
       role={toast.tone === 'error' ? 'alert' : 'status'}
-      className={`pointer-events-none fixed bottom-28 left-1/2 z-50 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg px-4 py-2 text-sm shadow-lg ${
+      style={{ bottom: `calc(${Math.round(offset)}px + env(safe-area-inset-bottom))` }}
+      className={`pointer-events-none fixed left-1/2 z-50 max-w-[calc(100%-2rem)] -translate-x-1/2 rounded-lg px-4 py-2 text-sm shadow-lg ${
         toast.tone === 'error' ? 'bg-danger text-white' : 'bg-ink text-white'
       }`}
     >

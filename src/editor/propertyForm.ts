@@ -89,3 +89,50 @@ export function valuePresets(type: DeviceType, key: string): readonly number[] {
 export function currentProp(part: Part, key: string, defaults: Readonly<Record<string, PropValue>>): PropValue | undefined {
   return part.props[key] ?? defaults[key];
 }
+
+// --- − / + düğmelerinin adımı (telefon: P04, P05) ------------------------------------------
+
+const E12 = [1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2];
+const SERIES_125 = [1, 2, 5];
+
+export type StepKind = 'e12' | 'linear' | 'step125';
+
+/** Direnç ve sığa E12 dizisinde, gerilim ve yüzde doğrusal, diğerleri (frekans, akım, β) 1-2-5 dizisinde. */
+export function stepKind(def: NumberPropDef): StepKind {
+  if (def.unit === 'Ω' || def.unit === 'F') return 'e12';
+  if (def.unit === 'V' || def.unit === '%') return 'linear';
+  return 'step125';
+}
+
+/** Değerden büyük (ya da küçük) ilk dizi elemanı. */
+function stepSeries(mantissas: readonly number[], value: number, direction: 1 | -1): number {
+  if (!(value > 0)) return 1;
+  const exp = Math.floor(Math.log10(value) + 1e-9);
+  const candidates: number[] = [];
+  for (let e = exp - 1; e <= exp + 1; e++) for (const m of mantissas) candidates.push(Number((m * 10 ** e).toPrecision(6)));
+  candidates.sort((a, b) => a - b);
+  const found =
+    direction > 0
+      ? candidates.find((c) => c > value * (1 + 1e-9))
+      : [...candidates].reverse().find((c) => c < value * (1 - 1e-9));
+  return found ?? value;
+}
+
+/** Bir adım sonraki değer; sınırın ötesine geçiyorsa ya da değişmiyorsa null. */
+export function stepValue(def: NumberPropDef, value: number, direction: 1 | -1): number | null {
+  let next: number;
+  const kind = stepKind(def);
+  if (kind === 'e12') {
+    next = value <= 0 ? (direction > 0 ? 1 : value) : stepSeries(E12, value, direction);
+  } else if (kind === 'step125') {
+    next = value <= 0 ? (direction > 0 ? 1 : value) : stepSeries(SERIES_125, value, direction);
+  } else {
+    const step = def.unit === '%' ? 5 : Math.abs(value + direction * 0.05) >= 2 ? 0.5 : 0.1;
+    next = Number((Math.round((value + direction * step) / step) * step).toFixed(6));
+  }
+  if (def.min) {
+    if (def.min.exclusive ? next <= def.min.value : next < def.min.value) return null;
+  }
+  if (def.max !== undefined && next > def.max) next = def.max;
+  return Math.abs(next - value) <= Math.abs(value) * 1e-12 ? null : next;
+}

@@ -2,8 +2,8 @@
 //
 // Yazım notları:
 //   - Fizik terimleri: "gerilim" (voltaj değil), "akım", "iç direnç", "toprak", "kısa devre", "ön direnç".
-//   - Bileşen adlarına (R1, B1...) ek getirilmez; okunuşa göre değişen ekler yerine
-//     "R1 direncinin", "B1 pilinin" gibi yapılar kullanılır.
+//   - Bileşen adlarına (R1, B1...) ek, okunuşa göre i18n/ek.ts ile getirilir (R1’in, R2’nin, R6’yı);
+//     uzun cümlelerde "R1 direncinin", "B1 pilinin" gibi yapılar da kullanılır.
 //   - Sayılar src/sim/units.ts ile Türkçe biçimde (4,7 kΩ) yazılır.
 //   - Formüllerdeki alt simgeler `_{...}` ile işaretlenir (R_{iç}); ekranda editor/Rich.tsx
 //     bunları gerçek alt simge (<sub>) olarak çizer.
@@ -13,6 +13,7 @@ import type { Diagnostic } from '../sim/diagnostics';
 import type { ExampleGroupId, ExampleId } from '../examples';
 import type { DeviceType } from '../sim/netlist';
 import { formatSI } from '../sim/units';
+import { ek, toDative } from './ek';
 
 export interface DiagnosticContext {
   /** Bileşenin tuvaldeki adı (R1, B2...). */
@@ -89,6 +90,54 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   voltmeter: ['+ ucu', '− ucu'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
+};
+
+/** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
+const PIN_TAGS: Record<DeviceType, readonly string[]> = {
+  battery: ['+', '−'],
+  acsource: ['+', '−'],
+  funcgen: ['OUT', 'TTL', 'COM'],
+  dcsupply: ['1+', '1−', '2+', '2−'],
+  ground: ['⏚'],
+  resistor: ['1', '2'],
+  capacitor: ['+', '−'],
+  diode: ['A', 'K'],
+  zener: ['A', 'K'],
+  led: ['A', 'K'],
+  npn: ['C', 'B', 'E'],
+  pnp: ['C', 'B', 'E'],
+  njfet: ['D', 'G', 'S'],
+  pjfet: ['D', 'G', 'S'],
+  nmos: ['D', 'G', 'S'],
+  pmos: ['D', 'G', 'S'],
+  switch: ['1', '2'],
+  voltmeter: ['+', '−'],
+  ammeter: ['+', '−'],
+  oscilloscope: ['A', 'B', 'COM'],
+};
+
+/** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
+const PIN_SHORT: Record<DeviceType, readonly string[]> = {
+  battery: ['+ uç', '− uç'],
+  acsource: ['+ uç', '− uç'],
+  funcgen: ['OUT', 'TTL', 'COM'],
+  dcsupply: ['1+', '1−', '2+', '2−'],
+  ground: ['uç'],
+  resistor: ['1. uç', '2. uç'],
+  capacitor: ['+ uç', '− uç'],
+  diode: ['anot', 'katot'],
+  zener: ['anot', 'katot'],
+  led: ['anot', 'katot'],
+  npn: ['kollektör', 'baz', 'emetör'],
+  pnp: ['kollektör', 'baz', 'emetör'],
+  njfet: ['drain', 'gate', 'source'],
+  pjfet: ['drain', 'gate', 'source'],
+  nmos: ['drain', 'gate', 'source'],
+  pmos: ['drain', 'gate', 'source'],
+  switch: ['1. uç', '2. uç'],
+  voltmeter: ['+ uç', '− uç'],
+  ammeter: ['+ uç', '− uç'],
+  oscilloscope: ['A girişi', 'B girişi', 'COM'],
 };
 
 function list(labels: readonly string[]): string {
@@ -478,6 +527,8 @@ export const tr = {
   devices: {
     names: DEVICE_NAMES,
     pins: PIN_NAMES,
+    pinTags: PIN_TAGS,
+    pinShort: PIN_SHORT,
     descriptions: DEVICE_DESCRIPTIONS,
     ledColors: OPTION_LABELS.color!,
     waveforms: OPTION_LABELS.waveform!,
@@ -545,7 +596,7 @@ export const tr = {
     label: 'Devre şeması',
     empty: 'Başlamak için soldaki kütüphaneden bir parça sürükle.',
     emptyAction: 'Örneklerden başla',
-    emptyMobile: 'Parça eklemek için sol üstteki kütüphane düğmesine dokun.',
+    emptyMobile: 'Parça eklemek için alttaki **Parça** düğmesine dokun.',
     wiringActive: 'Kablo çiziliyor: bir pine ya da kabloya dokun',
     cancelWire: 'İptal',
   },
@@ -679,7 +730,6 @@ export const tr = {
   },
   scope: {
     title: 'Osiloskop',
-    choose: 'Gösterilen osiloskop',
     collapse: 'Osiloskop panelini küçült',
     expand: 'Osiloskop panelini aç',
     screen: 'Osiloskop ekranı',
@@ -711,7 +761,6 @@ export const tr = {
     button: 'Örnekler',
     dialogTitle: 'Örnek devreler',
     dialogHint: 'Bir örneğe tıkla: devre açılır; açıklaması ve tahmin sorusu sağdaki Örnek sekmesinde çıkar.',
-    dialogHintPhone: 'Bir örneğe tıkla: devre açılır; açıklaması ve tahmin sorusu tuvalin köşesinde çıkar.',
     dialogClose: 'Örnekler penceresini kapat',
     groups: {
       temel: 'Temel devreler',
@@ -731,9 +780,6 @@ export const tr = {
     predict: 'Tahmin et',
     answer: 'Cevap',
     answerHidden: 'Cevabı görmek için Oynat’a bas.',
-    close: 'Örnek açıklamasını kapat',
-    collapse: 'Örnek açıklamasını küçült',
-    expand: 'Örnek açıklamasını aç',
     loaded: 'Örnek yüklendi. Önceki devrene dönmek için Geri al (Ctrl+Z).',
     tabBadge: (group: string) => `Örnek · ${group}`,
     predictionLabel: 'Tahminin (isteğe bağlı)',
@@ -875,8 +921,6 @@ export const tr = {
     errors: (n: number) => `${n} hata`,
     warnings: (n: number) => `${n} uyarı`,
     none: 'Sorun yok',
-    show: 'Mesajları göster',
-    hide: 'Mesajları gizle',
     hint: 'Bir mesaja tıklayınca ilgili parça tuvalde vurgulanır.',
     counts: (errors: number, warnings: number) => `${errors} hata · ${warnings} uyarı`,
     /** "2 hata", "1 hata, 1 uyarı", "3 uyarı". */
@@ -892,7 +936,7 @@ export const tr = {
     earthTrapGeneric: (instruments: string, shorted: string) =>
       `${instruments} şebeke toprağıyla birleşiyor; ${shorted} kısa devre oldu. Toprağa bağlı uçları aynı noktaya bağla ya da cihazın şebeke toprağı bağlantısını kaldır.`,
     repair: 'Onar',
-    setResistor: (label: string, value: string) => `${label}’i ${value} yap`,
+    setResistor: (label: string, value: string) => `${ek(label, 'i')} ${value} yap`,
     severity: { error: 'Hata', warning: 'Uyarı' },
     circuitTarget: 'devre',
     noneDetail: 'Devrede şu an hata ya da uyarı yok.',
@@ -920,7 +964,7 @@ export const tr = {
       acsource: 'AC kaynağın − ucu iyi bir yer.',
       dcsupply: 'Güç kaynağının − ucu iyi bir yer.',
     } as Record<string, string>,
-    fix: (label: string) => `${label}’in − ucuna toprak ekle`,
+    fix: (label: string) => `${ek(label, 'in')} − ucuna toprak ekle`,
     fixGeneric: 'Önerilen yere toprak ekle',
     myself: 'Kendim eklerim',
     close: 'Kapat',
@@ -928,8 +972,6 @@ export const tr = {
   },
   earthLine: 'şebeke toprağı (cihazlarda)',
   hints: {
-    touchAdded:
-      'Parça eklendi. Sürükle: taşı · pin ucuna dokun: kablo · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil)',
     // Tuvalin altındaki ipucu şeridi: **kalın**, [[tuş]].
     simulating:
       '**Simülasyon sırasında:** anahtarı açıp kapatmak için üzerine tıkla · değeri sağdaki panelden değiştir · parça eklemek ya da taşımak simülasyonu durdurur',
@@ -999,6 +1041,141 @@ export const tr = {
       labelEmpty: 'Bir ad yaz.',
       labelTaken: 'Bu ad başka bir parçada kullanılıyor.',
     },
+  },
+  phone: {
+    defaultName: 'Devrem',
+    emptyName: 'Yeni devre',
+    fileButton: (title: string) => `Dosya ve örnekler: ${title}`,
+    more: 'Daha fazla: görünüm, ayarlar, paylaş',
+    modes: { kur: 'Kur', bagla: 'Bağla', olc: 'Ölç', pause: 'Duraklatıldı' },
+    modeLabel: (mode: string) => `Kip: ${mode}`,
+    issues: (n: number) => `Mesajlar: ${n} sorun`,
+    bar: 'Eylemler',
+    parts: 'Parça',
+    connect: 'Bağla',
+    undo: 'Geri al',
+    panel: 'Panel',
+    value: 'Değer',
+    valueButton: (value: string) => `Değer: ${value}. Değiştirmek için dokun`,
+    items: (n: number) => `${n} öğe`,
+    wire: 'Kablo',
+    rotate: 'Döndür',
+    flip: 'Çevir',
+    remove: 'Sil',
+    measurements: 'Ölçümler',
+    devices: 'Cihazlar',
+    speed: 'Hız',
+    speedButton: (speed: string) => `Hız ${speed}`,
+    stop: 'Durdur',
+    play: 'Oynat',
+    pause: 'Duraklat',
+    resume: 'Devam et',
+    done: 'Bitti',
+    // Bağla kipi (P03)
+    connectFirst: 'İlk uca dokun',
+    connectSecond: 'İkinci uca dokun',
+    connectEnlarged: 'Uçlar büyütüldü',
+    connectFrom: (label: string, pin: string) => `Başlangıç: ${label} · ${pin}`,
+    connectFromWire: 'Başlangıç: kablo üzerinde',
+    connectCardIdle:
+      'Uçlar büyütüldü. Kablonun başlayacağı uca dokun, sonra bağlanacağı uca. Bir kablonun ortasına dokunursan T bağlantısı olur.',
+    connectCardStart: (who: string) =>
+      `Uçlar büyütüldü. **${who}** seçili; şimdi bağlanacağı uca dokun. Bir kablonun ortasına dokunursan T bağlantısı olur.`,
+    connectCardWire: 'Kablo üzerindeki nokta seçili; şimdi bağlanacağı uca dokun.',
+    pinOf: (label: string, pin: string) => `${ek(label, 'in')} ${pin}`,
+    legendStart: 'başlangıç',
+    legendFree: 'boş uç',
+    legendConnected: 'bağlı uç',
+    pinTarget: (label: string, pin: string, connected: boolean) => `${label} · ${pin}${connected ? ' (bağlı)' : ''}`,
+    connectCanvas: 'Devre şeması, Bağla kipi',
+    // Alt sayfa
+    sheetHandle: 'Sayfanın boyunu değiştir',
+    sheetSizes: { peek: 'küçük', half: 'yarım', full: 'tam' } as Record<string, string>,
+    close: 'Kapat',
+    // Parça ekle (P02)
+    addTitle: 'Parça ekle',
+    favorites: 'Sık kullanılan',
+    chain: (pinOf: string) => `**Zincirle ekle:** ${toDative(pinOf)} bağlanır`,
+    chainOff: 'Zincirle eklemeyi kapat',
+    addFooter: 'Dokun: ekle · Basılı tutup sürükle: istediğin yere bırak',
+    added: (name: string) => `${name} eklendi`,
+    // Parça sayfası (P04)
+    showAll: 'Tümü ▴',
+    showAllLabel: 'Tüm özellikler',
+    showLess: 'Daha az ▾',
+    showLessLabel: 'Yalnızca değer',
+    stepDown: 'Bir alt değer',
+    stepUp: 'Bir üst değer',
+    stepDownOf: (name: string) => `${name}: bir adım azalt`,
+    stepUpOf: (name: string) => `${name}: bir adım artır`,
+    editValue: (name: string, value: string) => `${name} ${value}, düzenle`,
+    e12Hint: '− / + E12 dizisinde bir adım değiştirir.',
+    stepHint: '− / + bir adım değiştirir.',
+    instrumentHint: 'Bu cihazın bütün ayarları Cihazlar sayfasında.',
+    openDevices: 'Cihaz panelini aç',
+    // Ölç kipi (P05)
+    live: 'canlı',
+    paused: 'duraklatıldı',
+    liveApplied: 'Canlı uygulanır',
+    tapPart: 'Bir parçaya dokun: ölçümleri burada görünür.',
+    lock: 'Devre kilitli · dokun: incele',
+    lockClose: 'Bilgiyi kapat',
+    olcCanvas: 'Devre şeması, Ölç kipi, yapı kilitli',
+    stopToEdit: 'Düzenlemek için durdurulsun mu?',
+    stopToEditText: 'Ölç kipinde devrenin yapısı kilitli. Durdurunca Kur kipine dönersin.',
+    stopAndEdit: 'Durdur ve düzenle',
+    cancel: 'Vazgeç',
+    lod: (percent: number) => `%${percent} · değerler gizli`,
+    legendButton: 'Gösterim: kablo gerilimi ölçeği',
+    // Panel sekmeleri
+    tabs: { example: 'Örnek', circuit: 'Devre', measure: 'Ölçümler', messages: 'Mesajlar' },
+    tabsLabel: 'Sayfa',
+    // Simülasyon başlamadı (P11)
+    blockedTitle: 'Simülasyon başlamadı',
+    noGroundLead: 'Devrede toprak yok.',
+    noGroundText: 'Gerilimler bir referansa göre ölçülür; bir toprak ekle.',
+    fixAndPlay: (label: string) => `${ek(label, 'in')} − ucuna toprak ekle ve oynat`,
+    notBlocking: 'Başlamaya engel değil.',
+    // Cihazlar (P08, P09)
+    devicesTitle: 'Cihazlar',
+    devicesClose: 'Cihazları kapat',
+    backToCircuit: 'Devreye dönmek için dokun',
+    deviceShort: { oscilloscope: 'Osiloskop', funcgen: 'Üreteç', dcsupply: 'Güç kaynağı' } as Record<string, string>,
+    deviceTabs: 'Cihaz',
+    waveform: 'Dalga biçimi',
+    freqRange: '0,2 Hz – 2 MHz',
+    freqDiv10: 'Frekansı 10’a böl',
+    freqTimes10: 'Frekansı 10 ile çarp',
+    amplitudeNote: 'tepe-tepe, açık devre',
+    attenuator: '−20 dB zayıflatıcı',
+    attenuatorNote: '(çıkış 10’da 1)',
+    earthedNote: 'Gerçek cihazdaki gibi; kapatırsan çıkış yalıtılır',
+    output: (v: string) => `Çıkış (OUT − COM) **${v}** · çıkış direnci 50 Ω: yük akımı arttıkça çıkış gerilimi düşer.`,
+    outputStopped: 'Çıkış direnci 50 Ω: yük akımı arttıkça çıkış gerilimi düşer.',
+    jacks: 'Uçlar (dokun: tuvalde göster)',
+    // Dosya (P13) ve ⋯ (P14)
+    fileTitle: 'Dosya',
+    autosaved: 'Bu tarayıcıda kendiliğinden kaydedildi',
+    notSaved: 'Bu tarayıcı devreyi saklamıyor; dışa aktar ya da bağlantı paylaş.',
+    newNote: 'Öncekine Geri al ile dönebilirsin',
+    shareLink: 'Paylaşım bağlantısı',
+    shareSystem: 'Paylaş…',
+    moreTitle: 'Daha fazla',
+    fit: 'Ekrana sığdır',
+    share: 'Paylaş',
+    // Seçici (P15)
+    pickerTitle: (n: number) => `Burada ${n} öğe var`,
+    pickerLabel: (n: number) => `Burada ${n} öğe var, birini seç`,
+    pickPart: (name: string) => `${name} · parçayı seç`,
+    pickPin: 'Buradan kablo başlat',
+    pickWire: (ends: string) => (ends ? `${ends} · kabloyu seç` : 'kabloyu seç'),
+    pickerClose: 'Seçiciyi kapat',
+    // Örnekler (P12)
+    examplesSearch: 'Örnek ara…',
+    examplesSearchLabel: 'Örnek ara',
+    examplesHint: 'Bir örneğe dokun: devre açılır, tahmin sorusu alttaki sayfada çıkar.',
+    exampleOpen: 'Açık',
+    examplesNone: 'Bu aramayla eşleşen örnek yok.',
   },
   diagnostics: {
     describe: describeDiagnostic,

@@ -292,6 +292,36 @@ button {
   }
 }
 
+/* Telefonda alt sayfa aşağıdan kayarak açılır (280 ms); modal sayfaların arkasında karartma. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+.sheet-in {
+  animation: sheet-in 280ms var(--ease-sheet);
+}
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.scrim-in {
+  animation: scrim-in 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in,
+  .scrim-in {
+    animation: none;
+  }
+}
+
 /* Uygulama ekranı: 100dvh desteklenmiyorsa (eski iOS) 100vh. */
 .app-root {
   height: 100vh;

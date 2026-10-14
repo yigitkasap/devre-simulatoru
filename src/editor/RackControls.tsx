@@ -32,6 +32,8 @@ export function Stepper({
   upGlyph = '+',
   editText,
   onType,
+  touch = false,
+  outer,
 }: {
   /** Erişilebilir ad (ör. "A volt/bölme"). */
   label: string;
@@ -48,6 +50,13 @@ export function Stepper({
   editText?: string;
   /** Yazılan metni uygular; geçersizse false döner. */
   onType?: (text: string) => boolean;
+  /** Telefon: 44 px düğmeler. */
+  touch?: boolean;
+  /** Dış uçlarda ek düğmeler (frekansta ÷10 ve ×10). */
+  outer?: {
+    readonly down: { readonly glyph: string; readonly label: string; readonly disabled?: boolean; readonly onClick: () => void };
+    readonly up: { readonly glyph: string; readonly label: string; readonly disabled?: boolean; readonly onClick: () => void };
+  };
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
@@ -105,18 +114,39 @@ export function Stepper({
       disabled={disabled || (direction > 0 ? !canUp : !canDown)}
       onClick={() => onStep(direction)}
       aria-label={direction > 0 ? (upLabel ?? tr.rack.increase(label)) : (downLabel ?? tr.rack.decrease(label))}
-      className="flex h-full w-[34px] shrink-0 items-center justify-center bg-step text-base font-semibold text-ink enabled:hover:bg-panel-2 disabled:text-stopped"
+      className={`flex h-full shrink-0 items-center justify-center bg-step font-semibold text-ink enabled:hover:bg-panel-2 disabled:text-stopped ${
+        touch ? 'w-11 text-lg' : 'w-[34px] text-base'
+      }`}
     >
       {direction > 0 ? upGlyph : downGlyph}
     </button>
   );
+  const outerButton = (side: 'down' | 'up') => {
+    const o = outer?.[side];
+    if (!o) return null;
+    return (
+      <button
+        type="button"
+        tabIndex={-1}
+        disabled={disabled || o.disabled}
+        onClick={o.onClick}
+        aria-label={o.label}
+        className={`flex h-full w-11 shrink-0 items-center justify-center bg-face-head font-mono text-small font-semibold text-ink disabled:text-stopped ${
+          side === 'down' ? 'border-r border-line' : 'border-l border-line'
+        }`}
+      >
+        {o.glyph}
+      </button>
+    );
+  };
 
   return (
     <div
-      className={`flex h-9 items-stretch overflow-hidden rounded-md border bg-panel ${
+      className={`flex items-stretch overflow-hidden border bg-panel ${touch ? 'h-11 rounded-[10px]' : 'h-9 rounded-md'} ${
         invalid ? 'border-danger' : 'border-rack-line'
       } ${disabled ? 'opacity-50' : ''}`}
     >
+      {outerButton('down')}
       {button(-1)}
       {editing !== null ? (
         <input
@@ -140,7 +170,7 @@ export function Stepper({
               setInvalid(false);
             }
           }}
-          className="min-w-0 flex-1 border-x border-line text-center font-mono text-small font-semibold outline-none"
+          className={`min-w-0 flex-1 border-x border-line text-center font-mono font-semibold outline-none ${touch ? 'text-base' : 'text-small'}`}
         />
       ) : (
         <span
@@ -153,7 +183,7 @@ export function Stepper({
           onKeyDown={onKeyDown}
           onClick={() => onType && !disabled && setEditing(editText ?? text)}
           title={onType ? tr.rack.typeHint : undefined}
-          className={`flex min-w-0 flex-1 items-center justify-center border-x border-line px-1 font-mono text-small font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${
+          className={`flex min-w-0 flex-1 items-center justify-center border-x border-line px-1 font-mono font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${touch ? 'text-sm' : 'text-small'} ${
             onType && !disabled ? 'cursor-text' : ''
           }`}
         >
@@ -161,6 +191,7 @@ export function Stepper({
         </span>
       )}
       {button(1)}
+      {outerButton('up')}
     </div>
   );
 }
@@ -173,6 +204,7 @@ export function Segmented<T extends string>({
   onChange,
   disabled = false,
   className = '',
+  touch = false,
 }: {
   label: string;
   options: ReadonlyArray<{ value: T; text: string }>;
@@ -180,6 +212,8 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
   disabled?: boolean;
   className?: string;
+  /** Telefon: 44 px yüksek seçenekler. */
+  touch?: boolean;
 }) {
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
@@ -196,7 +230,7 @@ export function Segmented<T extends string>({
       aria-label={label}
       aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
-      className={`flex gap-0.5 rounded-md bg-seg p-0.5 ${disabled ? 'opacity-50' : ''} ${className}`}
+      className={`flex gap-0.5 bg-seg p-0.5 ${touch ? 'rounded-[10px]' : 'rounded-md'} ${disabled ? 'opacity-50' : ''} ${className}`}
     >
       {options.map((option) => {
         const checked = option.value === value;
@@ -209,7 +243,7 @@ export function Segmented<T extends string>({
             tabIndex={checked ? 0 : -1}
             disabled={disabled}
             onClick={() => !checked && onChange(option.value)}
-            className={`h-8 min-w-0 flex-1 rounded-[6px] px-1.5 text-label font-semibold whitespace-nowrap ${
+            className={`min-w-0 flex-1 px-1.5 font-semibold whitespace-nowrap ${touch ? 'h-11 rounded-lg text-[13px]' : 'h-8 rounded-[6px] text-label'} ${
               checked ? 'bg-panel text-ink shadow-sm' : 'text-seg-ink hover:bg-panel/40'
             }`}
           >
