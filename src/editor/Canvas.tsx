@@ -79,11 +79,16 @@ export interface CanvasStatus {
   readonly scale: number;
 }
 
-/** Mesaj panelinde seçilen hata/uyarının tuvaldeki vurgusu. */
+/**
+ * Tuvaldeki vurgu: mesaj panelinde seçilen hata/uyarı (parçalar ve kablolar) ya da cihaz rafındaki bir
+ * jaka tıklanınca o ucun ve kablolarının kısa süre yanıp sönmesi ('info').
+ */
 export interface Highlight {
   readonly parts: ReadonlySet<string>;
   readonly wires: ReadonlySet<string>;
-  readonly severity: 'error' | 'warning';
+  readonly severity: 'error' | 'warning' | 'info';
+  /** Yanıp sönen uçlar (ızgara koordinatı). */
+  readonly pins?: readonly Point[];
 }
 
 export interface CanvasProps {
@@ -308,6 +313,23 @@ export function Canvas({
     return () => observer.disconnect();
   }, []);
 
+  // Görünüm devreye sığdırıldıktan sonra kullanıcı yakınlaştırmadı ya da kaydırmadı mı? Tuvalin boyutu
+  // değişince (raf, panel, pencere) böyleyse devre kalan alana yeniden sığdırılır; değilse yalnızca
+  // görünümün merkezi korunur (N02 → yeniden sığdırma kuralları).
+  const fittedRef = useRef(true);
+  const previousSize = useRef(size);
+  useEffect(() => {
+    const previous = previousSize.current;
+    previousSize.current = size;
+    if (!viewInitialized.current || previous.width === 0 || size.width === 0) return;
+    if (previous.width === size.width && previous.height === size.height) return;
+    if (fittedRef.current && docBounds(doc)) {
+      fit();
+      return;
+    }
+    setView((v) => ({ ...v, x: v.x + (size.width - previous.width) / 2, y: v.y + (size.height - previous.height) / 2 }));
+  }, [size]);
+
   useEffect(() => {
     if (viewInitialized.current || size.width === 0) return;
     viewInitialized.current = true;
@@ -317,6 +339,7 @@ export function Canvas({
   }, [size, doc]);
 
   const fit = () => {
+    fittedRef.current = true;
     const bounds = docBounds(doc);
     if (!bounds) {
       setView((v) => ({ ...v, x: size.width / 2, y: size.height / 2 }));
@@ -364,6 +387,7 @@ export function Canvas({
       (box.x + box.w) * g + view.x <= size.width &&
       (box.y + box.h) * g + view.y <= size.height;
     if (inside) return;
+    fittedRef.current = false;
     const fits = box.w * g < size.width - 80 && box.h * g < size.height - 80;
     if (fits) {
       const cx = (box.x + box.w / 2) * GRID;
@@ -400,8 +424,14 @@ export function Canvas({
   };
 
   useImperativeHandle(ref, () => ({
-    zoomIn: () => setView((v) => zoomAt(v, size.width / 2, size.height / 2, ZOOM_STEP)),
-    zoomOut: () => setView((v) => zoomAt(v, size.width / 2, size.height / 2, 1 / ZOOM_STEP)),
+    zoomIn: () => {
+      fittedRef.current = false;
+      setView((v) => zoomAt(v, size.width / 2, size.height / 2, ZOOM_STEP));
+    },
+    zoomOut: () => {
+      fittedRef.current = false;
+      setView((v) => zoomAt(v, size.width / 2, size.height / 2, 1 / ZOOM_STEP));
+    },
     fit,
     reveal,
     addPartAtCenter,
@@ -415,6 +445,7 @@ export function Canvas({
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const factor = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015));
+      fittedRef.current = false;
       setView((v) => zoomAt(v, e.clientX - rect.left, e.clientY - rect.top, factor));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -716,6 +747,7 @@ export function Canvas({
       const center = localPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
       const scale = clampScale(start.view.scale * (Math.hypot(a.x - b.x, a.y - b.y) / start.distance));
       const k = scale / start.view.scale;
+      fittedRef.current = false;
       setView({
         scale,
         x: center.x - (start.cx - start.view.x) * k,
@@ -730,6 +762,7 @@ export function Canvas({
     switch (current.kind) {
       case 'pan': {
         const local = localPoint(e.clientX, e.clientY);
+        fittedRef.current = false;
         setView({ ...current.view, x: current.view.x + local.x - current.sx, y: current.view.y + local.y - current.sy });
         return;
       }
@@ -1019,7 +1052,7 @@ export function Canvas({
   }
 
   const toneOf = (id: string): PartTone =>
-    highlight?.parts.has(id)
+    highlight && highlight.severity !== 'info' && highlight.parts.has(id)
       ? highlight.severity
       : selectedParts.has(id)
         ? 'selected'
@@ -1073,13 +1106,33 @@ export function Canvas({
                   key={`hl-${wire.id}`}
                   points={wire.points.map((p) => `${p.x * GRID},${p.y * GRID}`).join(' ')}
                   fill="none"
-                  stroke={highlight.severity === 'error' ? 'var(--color-danger)' : '#e8a317'}
+                  stroke={
+                    highlight.severity === 'error'
+                      ? 'var(--color-danger)'
+                      : highlight.severity === 'info'
+                        ? 'var(--color-accent)'
+                        : '#e8a317'
+                  }
+                  className={highlight.severity === 'info' ? 'alarm-blink' : undefined}
                   strokeOpacity={0.35}
                   strokeWidth={10}
                   strokeLinejoin="round"
                   strokeLinecap="round"
                 />
               ))}
+          {highlight?.pins?.map((p) => (
+            <circle
+              key={`hp${p.x},${p.y}`}
+              cx={p.x * GRID}
+              cy={p.y * GRID}
+              r={9}
+              fill="var(--color-accent)"
+              fillOpacity={0.35}
+              stroke="var(--color-accent)"
+              strokeWidth={2}
+              className="alarm-blink"
+            />
+          ))}
           {doc.wires.map((wire) => {
             const selected = selectedWires.has(wire.id);
             const hovered = hover?.kind === 'wire' && hover.wireId === wire.id;

@@ -41,7 +41,7 @@ const TONES: Record<Tone, string> = {
 };
 
 /** Şeridin gösterdiği durum: tuvalin ipucu ya da açık bir örneğin yönlendirmesi. */
-export type StripHint = CanvasHint | { readonly kind: 'example' };
+export type StripHint = CanvasHint | { readonly kind: 'example' } | { readonly kind: 'measure'; readonly example: boolean };
 
 function hintText(hint: StripHint): { text: string; tone: Tone; right?: string } {
   switch (hint.kind) {
@@ -59,6 +59,8 @@ function hintText(hint: StripHint): { text: string; tone: Tone; right?: string }
       return { text: tr.hints.empty, tone: 'neutral' };
     case 'example':
       return { text: tr.hints.example, tone: 'neutral', right: tr.hints.exampleUndo };
+    case 'measure':
+      return { text: hint.example ? tr.rack.measureHintExample : tr.rack.measureHint, tone: 'neutral' };
     default:
       return { text: tr.hints.select, tone: 'neutral' };
   }

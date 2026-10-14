@@ -4,22 +4,24 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
-import type { PartPatch } from './InspectTab';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
 import { flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
-import { nextRotation } from '../model/geometry';
+import { nextRotation, pinPositions } from '../model/geometry';
 import { docFromHash, shareUrl } from '../model/share';
 import { CATALOG } from '../model/catalog';
 import { emptyDoc, type CircuitDoc } from '../model/types';
 import { compileNetlist, scopeSettings, type CompiledCircuit, type Diagnostic } from '../sim';
 import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
+import { formatSI } from '../sim/units';
 import { loadSavedDoc, useAutosave } from './autosave';
 import { Canvas, type CanvasHandle, type CanvasStatus, type Highlight } from './Canvas';
+import { DeviceRack, type RackLayout } from './DeviceRack';
 import { ExampleCard } from './ExampleCard';
 import { ExamplesDialog } from './ExamplesDialog';
 import { Inspector, type InspectorTab } from './Inspector';
+import type { PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { HintStrip, type StripHint } from './HintStrip';
 import { Library, LibraryFlyout, type LibraryMode } from './Library';
@@ -30,7 +32,7 @@ import { ScopePanel } from './ScopePanel';
 import { autoSettings } from './scopeView';
 import { useSettings } from './settings';
 import { ShareDialog } from './ShareDialog';
-import { SimBar } from './SimBar';
+import { SimBar, speedLabel } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { Toast, useToast } from './Toast';
 import { TopBar } from './TopBar';
@@ -63,6 +65,25 @@ function saveLibraryPref(pref: 'open' | 'rail'): void {
   }
 }
 
+/** Ayarları cihaz rafındaki ön panelinde olan parçalar. */
+const RACK_TYPES: ReadonlySet<DeviceType> = new Set<DeviceType>(['oscilloscope', 'funcgen', 'dcsupply']);
+
+/** Rafın düzeni (yan yana / tek tek) tarayıcıda hatırlanır. */
+const RACK_KEY = 'devre-simulatoru:raf';
+function loadRackLayout(): RackLayout {
+  try {
+    return window.localStorage.getItem(RACK_KEY) === 'side' ? 'side' : 'single';
+  } catch {
+    return 'single';
+  }
+}
+
+/** Kur düzeninde rafın yüksekliği (px; M05a). Ölç düzeninde kolonun %60'ı (M06a). */
+const RACK_KUR_HEIGHT = 300;
+const RACK_MIN_HEIGHT = 140;
+/** Raf büyürken tuvale (ve ipucu şeridine) en az bu kadar yer kalır. */
+const CANVAS_MIN_HEIGHT = 200;
+
 /** Osiloskop ekranının bir taraması ≈ 0,2 s sürecek simülasyon hızı (en fazla ×1). */
 function sweepSpeed(timePerDiv: number): number {
   return Math.min(1, Math.max(1e-6, 50 * timePerDiv));
@@ -88,6 +109,17 @@ export default function Simulator() {
   const [focusRequest, setFocusRequest] = useState(0);
   /** Öğrencinin örneklere yazdığı tahminler (yalnızca bu oturumda). */
   const [predictions, setPredictions] = useState<Partial<Record<ExampleId, string>>>({});
+  // Cihaz rafı ve Ölç düzeni (N01).
+  const [rackLayout, setRackLayout] = useState<RackLayout>(loadRackLayout);
+  const [rackActive, setRackActive] = useState<string | null>(null);
+  const [rackCollapsed, setRackCollapsed] = useState(false);
+  const [rackHeights, setRackHeights] = useState<{ kur: number; olc: number | null }>({ kur: RACK_KUR_HEIGHT, olc: null });
+  /** Ölç düzeni: Oynat'tan sonra rafta cihaz varsa kütüphane ve İnceleme paneli şeride iner, raf büyür. */
+  const [measureLayout, setMeasureLayout] = useState(false);
+  const [columnHeight, setColumnHeight] = useState(0);
+  const columnRef = useRef<HTMLDivElement>(null);
+  /** Rafta bir jaka tıklanınca o ucun kısa süre yanıp sönmesi. */
+  const [flash, setFlash] = useState<Highlight | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<string | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
@@ -114,8 +146,15 @@ export default function Simulator() {
   const canFlip = selectedParts.some((p) => CATALOG[p.type].polarized);
 
   // --- Kütüphane ---------------------------------------------------------------------------
-  const libraryMode: LibraryMode = phone ? 'drawer' : layout.kind === 'compact' || libraryPref === 'rail' ? 'rail' : 'full';
-  const showFlyout = layout.kind === 'compact' && flyoutOpen;
+  // Ölç düzeninde (açık bir örnek yoksa) kütüphane şeride, İnceleme paneli 48 px'e iner. Örnek açıkken
+  // cevap Örnek sekmesinde göründüğü için paneller açık kalır, yalnızca raf büyür.
+  const measureCollapse = measureLayout && !phone && activeExample === null;
+  const libraryMode: LibraryMode = phone
+    ? 'drawer'
+    : layout.kind === 'compact' || libraryPref === 'rail' || measureCollapse
+      ? 'rail'
+      : 'full';
+  const showFlyout = layout.kind === 'compact' && flyoutOpen && !measureCollapse;
   const setLibraryPrefSaved = (pref: 'open' | 'rail') => {
     setLibraryPref(pref);
     saveLibraryPref(pref);
@@ -301,10 +340,13 @@ export default function Simulator() {
   const updatePartFromPanel = (partId: string, patch: PartPatch) => {
     dispatch({ type: 'commit', doc: updatePart(doc, partId, patch) });
   };
+  const idleHint = canvasStatus.hint.kind === 'select' || canvasStatus.hint.kind === 'empty' || canvasStatus.hint.kind === 'simulating';
   const stripHint: StripHint =
-    activeExample && !answerRevealed && (canvasStatus.hint.kind === 'select' || canvasStatus.hint.kind === 'empty')
-      ? { kind: 'example' }
-      : canvasStatus.hint;
+    measureLayout && idleHint
+      ? { kind: 'measure', example: activeExample !== null }
+      : activeExample && !answerRevealed && idleHint && canvasStatus.hint.kind !== 'simulating'
+        ? { kind: 'example' }
+        : canvasStatus.hint;
 
   const editingPart = propertiesFor ? doc.parts.find((p) => p.id === propertiesFor) : undefined;
 
@@ -320,12 +362,21 @@ export default function Simulator() {
     ? ([0, 1].map((pin) => !connectivity.unconnectedPins.has(pinKey(scope.id, pin))) as [boolean, boolean])
     : ([false, false] as const);
   const scopeSpeed = scope ? sweepSpeed(scopeSettings(scope.props).timePerDiv) : null;
-  const changeScope = (patch: Record<string, PropValue>) => {
-    if (scope) dispatch({ type: 'commit', doc: updatePart(doc, scope.id, { props: { ...scope.props, ...patch } }) });
+  /** Cihazın ayarlarını değiştirir (geri alınabilir; simülasyonu durdurmaz). */
+  const changeInstrument = (partId: string, patch: Record<string, PropValue>) => {
+    const part = doc.parts.find((p) => p.id === partId);
+    if (part) dispatch({ type: 'commit', doc: updatePart(doc, partId, { props: { ...part.props, ...patch } }) });
   };
-  /** Oto ayar: kayıt varsa sinyalden, yoksa devredeki AC kaynakların frekansından ve kaynak gerilimlerinden. */
-  const autoScope = () => {
-    if (!scope) return;
+  const changeScope = (patch: Record<string, PropValue>) => {
+    if (scope) changeInstrument(scope.id, patch);
+  };
+  /**
+   * Oto ayar: kayıt varsa sinyalden, yoksa devredeki AC kaynakların frekansından ve kaynak
+   * gerilimlerinden; hız da bir tarama ≈ 0,2 s sürecek biçimde. Masaüstünde bir bildirim neyin
+   * değiştiğini söyler.
+   */
+  const autoScopeFor = (target: (typeof doc.parts)[number], announce: boolean) => {
+    const connected = [0, 1].map((pin) => !connectivity.unconnectedPins.has(pinKey(target.id, pin))) as [boolean, boolean];
     let frequency: number | null = null;
     let peak: number | null = null;
     for (const part of doc.parts) {
@@ -339,11 +390,81 @@ export default function Simulator() {
         peak = Math.max(peak ?? 0, Math.abs(numProp(part.props, 'voltage', 0)));
       }
     }
-    const settings = scopeSettings(scope.props);
-    const patch = autoSettings(sim.scopeRecorder(scope.id), settings, scopeConnected, { frequency, peak });
-    changeScope(patch);
+    const settings = scopeSettings(target.props);
+    const patch = autoSettings(sim.scopeRecorder(target.id), settings, connected, { frequency, peak });
+    changeInstrument(target.id, patch);
     // Hız: bir ekran taraması ≈ 0,2 s sürsün (yüksek frekansta simülasyon yavaşlatılır, en fazla ×1).
-    sim.setSpeed(sweepSpeed(patch.timePerDiv ?? settings.timePerDiv));
+    const timePerDiv = patch.timePerDiv ?? settings.timePerDiv;
+    const speed = sweepSpeed(timePerDiv);
+    sim.setSpeed(speed);
+    if (announce) {
+      const perDiv = tr.scope.perDiv;
+      const parts = [
+        `${formatSI(timePerDiv, 's', { trim: true })}${perDiv}`,
+        `A ${formatSI(patch.voltsPerDivA ?? settings.voltsPerDiv[0], 'V', { trim: true })}${perDiv}`,
+        `B ${formatSI(patch.voltsPerDivB ?? settings.voltsPerDiv[1], 'V', { trim: true })}${perDiv}`,
+        tr.rack.autoSpeed(speedLabel(speed)),
+      ];
+      showToast(tr.rack.autoDone(parts.join(' · ')));
+    }
+  };
+  const autoScope = () => {
+    if (scope) autoScopeFor(scope, false);
+  };
+
+  // --- Cihaz rafı (masaüstü) ---------------------------------------------------------------
+  const instruments = doc.parts.filter((p) => RACK_TYPES.has(p.type));
+  const showRack = !phone && instruments.length > 0;
+  // Tuvalde bir cihaz seçilince raf onu gösterir.
+  const selectedInstrument = selectedParts.length === 1 && RACK_TYPES.has(selectedParts[0]!.type) ? selectedParts[0]!.id : null;
+  useEffect(() => {
+    if (selectedInstrument) setRackActive(selectedInstrument);
+  }, [selectedInstrument]);
+  // Kolonun yüksekliği (rafın en büyük yüksekliği bundan hesaplanır).
+  useEffect(() => {
+    const el = columnRef.current;
+    if (!el) return undefined;
+    const observer = new ResizeObserver((entries) => setColumnHeight(entries[0]?.contentRect.height ?? 0));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [phone]);
+  const rackMax = Math.max(RACK_MIN_HEIGHT, Math.min(columnHeight * 0.6, columnHeight - CANVAS_MIN_HEIGHT - 28 - 52));
+  const clampRack = (h: number) => Math.round(Math.max(RACK_MIN_HEIGHT, Math.min(rackMax, h)));
+  const rackHeight = clampRack(measureLayout ? (rackHeights.olc ?? rackMax) : rackHeights.kur);
+  // Ölç düzenine giriş (Oynat) ve çıkış (Durdur, parça sürükleme, şeritteki düğmeler).
+  const previousRunStatus = useRef(sim.status);
+  useEffect(() => {
+    const before = previousRunStatus.current;
+    previousRunStatus.current = sim.status;
+    if (sim.status === 'stopped') setMeasureLayout(false);
+    else if (sim.status === 'running' && before === 'stopped' && showRack) setMeasureLayout(true);
+  }, [sim.status, showRack]);
+  useEffect(() => {
+    if (tool.kind === 'place' || libraryDragType) setMeasureLayout(false);
+  }, [tool.kind, libraryDragType]);
+  /** Raftaki jak: o ucun ve kablolarının kısa süre yanıp sönmesi. */
+  const flashTimer = useRef(0);
+  const flashPin = (partId: string, pin: number) => {
+    const part = doc.parts.find((p) => p.id === partId);
+    const at = part ? pinPositions(part)[pin] : undefined;
+    if (!part || !at) return;
+    const wires = new Set<string>();
+    const key = pinKey(partId, pin);
+    if (compiled?.wiring.has(key)) {
+      const root = compiled.wiring.findKey(key);
+      for (const wire of doc.wires) {
+        const wk = wireKey(wire.id);
+        if (compiled.wiring.has(wk) && compiled.wiring.findKey(wk) === root) wires.add(wire.id);
+      }
+    }
+    window.clearTimeout(flashTimer.current);
+    setFlash({ parts: new Set(), wires, severity: 'info', pins: [at] });
+    canvasRef.current?.reveal([partId], [...wires]);
+    flashTimer.current = window.setTimeout(() => setFlash(null), 1800);
+  };
+  const showInRack = (partId: string) => {
+    setRackActive(partId);
+    setRackCollapsed(false);
   };
 
   const closeLibrary = useCallback(() => {
@@ -360,8 +481,10 @@ export default function Simulator() {
     onClose: closeLibrary,
     onCollapse: () => setLibraryPrefSaved('rail'),
     onExpand: (search: boolean) => {
+      // Ölç düzeninde şeritteki düğme Kur düzenine döndürür.
+      if (measureCollapse) setMeasureLayout(false);
       if (layout.kind === 'compact') setFlyoutOpen(true);
-      else setLibraryPrefSaved('open');
+      else if (!measureCollapse) setLibraryPrefSaved('open');
       if (search) setFocusSearch((n) => n + 1);
     },
     focusSearch,
@@ -438,7 +561,7 @@ export default function Simulator() {
         {phone && libraryOpen && (
           <div className="absolute inset-0 z-20 bg-ink/20" onClick={() => setLibraryOpen(false)} aria-hidden="true" />
         )}
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div ref={columnRef} className="flex min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 flex-1">
             {showFlyout && <LibraryFlyout {...libraryProps} />}
             <Canvas
@@ -455,13 +578,13 @@ export default function Simulator() {
               flowGraph={flowGraph}
               simActive={sim.status !== 'stopped'}
               frame={sim.frame}
-              highlight={highlight}
+              highlight={flash ?? highlight}
               onRepair={sim.repair}
               onRotate={rotateSelection}
               onFlip={flipSelection}
               fitRequest={fitRequest}
               reserveCard={!phone || activeExample === null ? 'none' : exampleCollapsed ? 'collapsed' : 'open'}
-              reserveScope={!scope ? 'none' : scopeCollapsed ? 'collapsed' : 'open'}
+              reserveScope={!phone || !scope ? 'none' : scopeCollapsed ? 'collapsed' : 'open'}
               touch={touch}
               overlayOpen={libraryOpen || showFlyout || Boolean(editingPart) || Boolean(shareLink) || examplesOpen}
               onStatusChange={setCanvasStatus}
@@ -469,7 +592,7 @@ export default function Simulator() {
               onExamples={() => setExamplesOpen(true)}
               readoutBoxes={phone}
             />
-            {scope && (
+            {phone && scope && (
               <ScopePanel
                 scopes={scopes}
                 scope={scope}
@@ -501,6 +624,37 @@ export default function Simulator() {
             )}
           </main>
           {!phone && <HintStrip hint={stripHint} />}
+          {showRack && (
+            <DeviceRack
+              devices={instruments}
+              layout={rackLayout}
+              onLayout={(next) => {
+                setRackLayout(next);
+                try {
+                  window.localStorage.setItem(RACK_KEY, next);
+                } catch {
+                  // Depolama kapalı: tercih yalnızca bu oturumda geçerli.
+                }
+              }}
+              activeId={rackActive ?? instruments[0]!.id}
+              onActive={setRackActive}
+              collapsed={rackCollapsed}
+              onCollapsed={setRackCollapsed}
+              height={rackHeight}
+              onResize={(h) => setRackHeights((hs) => (measureLayout ? { ...hs, olc: clampRack(h) } : { ...hs, kur: clampRack(h) }))}
+              onResizeEnd={() => {}}
+              scopeView={(id) => sim.frame?.scopes.get(id) ?? null}
+              status={(id) => sim.frame?.statuses.get(id) ?? {}}
+              running={sim.status !== 'stopped'}
+              pinConnected={(id, pin) => !connectivity.unconnectedPins.has(pinKey(id, pin))}
+              onChange={changeInstrument}
+              onAuto={(id) => {
+                const target = doc.parts.find((p) => p.id === id);
+                if (target) autoScopeFor(target, true);
+              }}
+              onJack={flashPin}
+            />
+          )}
 
           {phone && (
             <MessagesPanel
@@ -532,6 +686,11 @@ export default function Simulator() {
         {!phone && (
           <Inspector
             width={layout.inspectorWidth}
+            collapsed={measureCollapse}
+            onExpand={(tab) => {
+              setMeasureLayout(false);
+              setInspectorTab(tab);
+            }}
             tab={inspectorTab}
             onTab={setInspectorTab}
             inspect={{
@@ -548,6 +707,7 @@ export default function Simulator() {
                 dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION }),
               onRepair: sim.repair,
               onSelectPart: (partId) => dispatch({ type: 'select', selection: { parts: [partId], wires: [] } }),
+              onShowInRack: showInRack,
             }}
             example={{
               id: activeExample,

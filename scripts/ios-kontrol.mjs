@@ -292,6 +292,42 @@ try {
   check('masaüstü: Oynat’tan sonra Örnek sekmesinde cevap açık', answer.includes('Cevap'), answer.slice(0, 30));
   await desk.close();
 
+  // --- Masaüstü: cihaz rafı ve Ölç düzeni ------------------------------------------------
+  const rackCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+  const rp = await rackCtx.newPage();
+  rp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  await rp.goto(URL0, { waitUntil: 'networkidle' });
+  await rp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await rp.waitForTimeout(200);
+  await rp.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }).click(); await rp.waitForTimeout(500);
+  const rack = rp.getByRole('region', { name: 'Cihaz rafı' });
+  const rackBox = await rack.boundingBox();
+  const rackCanvas = await rp.locator('svg.schematic').boundingBox();
+  check('masaüstü: devrede cihaz varken raf tuvalin altında', rackBox !== null && rackBox.y >= rackCanvas.y + rackCanvas.height - 1, rackBox ? `y ${Math.round(rackBox.y)}` : 'yok');
+  if ((await rp.getByRole('tab', { name: /OSC1/ }).count()) > 0) { await rp.getByRole('tab', { name: /OSC1/ }).click(); await rp.waitForTimeout(150); }
+  const voltsBefore = (await part(rp, 'OSC1')).props.voltsPerDivA ?? 2;
+  await rp.getByRole('button', { name: 'A volt/bölme artır' }).click();
+  const voltsAfter = (await part(rp, 'OSC1')).props.voltsPerDivA;
+  check('masaüstü: osiloskop ön panelinde kademeli ayar çalışıyor', voltsAfter > voltsBefore, `${voltsBefore} → ${voltsAfter}`);
+  if ((await rp.getByRole('tab', { name: /FG1/ }).count()) > 0) { await rp.getByRole('tab', { name: /FG1/ }).click(); await rp.waitForTimeout(150); }
+  await rp.getByRole('spinbutton', { name: 'Frekans' }).click(); await rp.waitForTimeout(100);
+  await rp.keyboard.press('Control+A'); await rp.keyboard.type('2k'); await rp.keyboard.press('Enter'); await rp.waitForTimeout(150);
+  check('masaüstü: üretecin frekansı değere tıklayıp yazılarak değişiyor', (await part(rp, 'FG1')).props.frequency === 2000);
+  await rp.getByRole('button', { name: 'FG1 OUT ucunu tuvalde göster' }).click(); await rp.waitForTimeout(150);
+  check('masaüstü: jaka tıklayınca tuvalde uç yanıp sönüyor', (await rp.locator('svg.schematic circle.alarm-blink').count()) > 0);
+  await rp.getByRole('button', { name: 'Örneği kapat' }).click(); await rp.waitForTimeout(150);
+  await rp.getByRole('button', { name: 'Oynat' }).first().click(); await rp.waitForTimeout(700);
+  const panelStrip = await rp.getByRole('navigation', { name: 'İnceleme paneli (daraltılmış)' }).count();
+  const railOpen = await rp.getByRole('button', { name: 'Parça kütüphanesini aç' }).count();
+  const measureBox = await rack.boundingBox();
+  check('masaüstü: Oynat’tan sonra Ölç düzeni (paneller şeritte, raf büyük)', panelStrip === 1 && railOpen === 1 && measureBox.height > rackBox.height + 40, `raf ${Math.round(rackBox.height)} → ${Math.round(measureBox.height)}`);
+  if ((await rp.getByRole('tab', { name: /OSC1/ }).count()) > 0) { await rp.getByRole('tab', { name: /OSC1/ }).click(); await rp.waitForTimeout(150); }
+  await rp.getByRole('button', { name: 'Oto' }).click(); await rp.waitForTimeout(300);
+  const autoToast = (await rp.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
+  check('masaüstü: Oto neyin değiştiğini bildiriyor', autoToast);
+  await rp.getByRole('button', { name: 'Durdur', exact: true }).click(); await rp.waitForTimeout(300);
+  check('masaüstü: Durdur’la Kur düzenine dönülüyor', (await rp.getByRole('tablist', { name: 'İnceleme paneli' }).count()) === 1 && (await rp.getByRole('navigation', { name: 'İnceleme paneli (daraltılmış)' }).count()) === 0);
+  await rackCtx.close();
+
   // --- Sıkışık masaüstü (1100 px): kütüphane şerit, açılır kart --------------------------
   const compact = await browser.newContext({ viewport: { width: 1100, height: 760 }, locale: 'tr-TR' });
   const cp = await compact.newPage();

@@ -128,6 +128,20 @@
   --color-ch-xy: #9be37a;
   --color-lamp-cc: #e5484d;
 
+  /* Cihaz rafı ve ön paneller (DS-Cihaz, M06a) */
+  --color-rack: #d3d8de;
+  --color-rack-line: #b9c0c9;
+  --color-face: #e4e8ec;
+  --color-face-head: #dde2e7;
+  --color-seg: #c9cfd6;
+  --color-seg-ink: #2c3846;
+  --color-step: #f3f5f7;
+  --color-key: #f7f8fa;
+  --color-lamp-on: #3fd27a;
+  --color-lamp-off: #cfd4da;
+  --color-lcd-dim: #7fbf95;
+  --color-scope-text: #9fb5a6;
+
   /* Gerilim ölçeği durakları: −1 … +1 (src/editor/colors.ts aynı formülle hesaplar) */
   --color-v-n100: #194cb3;
   --color-v-n50: #148f8f;

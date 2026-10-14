@@ -39,7 +39,12 @@ export interface InspectTabProps {
   readonly onDelete: () => void;
   readonly onRepair: (partId: string) => void;
   readonly onSelectPart: (partId: string) => void;
+  /** Cihazın ön panelini rafta öne getirir (osiloskop, fonksiyon üreteci, DC güç kaynağı). */
+  readonly onShowInRack: (partId: string) => void;
 }
+
+/** Ayarları cihaz rafındaki ön panelinde olan parçalar. */
+const RACK_DEVICES: ReadonlySet<string> = new Set(['oscilloscope', 'funcgen', 'dcsupply']);
 
 export function InspectTab(props: InspectTabProps) {
   const { doc, selection, frame } = props;
@@ -173,6 +178,7 @@ function PartDetails({
   onFlip,
   onDelete,
   onRepair,
+  onShowInRack,
 }: InspectTabProps & { part: Part }) {
   const def = CATALOG[part.type];
   const running = status === 'running';
@@ -199,8 +205,10 @@ function PartDetails({
     const value = currentProp(part, prop.key, def.defaultProps);
     if (value !== undefined) values[prop.key] = value;
   }
-  const note = partNote(part.type, values);
-  const firstNumber = def.propDefs.find((p): p is NumberPropDef => p.kind === 'number');
+  // Cihazların bütün ayarları rafta; burada yalnızca adı ve rafa yönlendirme.
+  const inRack = RACK_DEVICES.has(part.type);
+  const note = inRack ? undefined : partNote(part.type, values);
+  const firstNumber = inRack ? undefined : def.propDefs.find((p): p is NumberPropDef => p.kind === 'number');
 
   const labelField = (
     <LabelField
@@ -211,7 +219,7 @@ function PartDetails({
       onCommit={(label) => onUpdatePart(part.id, { label })}
     />
   );
-  const propFields = def.propDefs.map((prop) => (
+  const propFields = (inRack ? [] : def.propDefs).map((prop) => (
     <PropField
       key={prop.key}
       part={part}
@@ -260,6 +268,18 @@ function PartDetails({
         <SectionTitle>{tr.inspector.properties}</SectionTitle>
         {/* Çalışırken önce değerler (değiştirmek için), durmuşken önce ad (M03, M04). */}
         {active ? [...propFields, labelField] : [labelField, ...propFields]}
+        {inRack && (
+          <div className="flex flex-col items-start gap-2 rounded-md bg-panel-2 px-3 py-2.5">
+            <span className="text-small text-ink-2">{tr.rack.settingsInRack}</span>
+            <button
+              type="button"
+              onClick={() => onShowInRack(part.id)}
+              className="h-9 rounded-md border border-line-2 bg-panel px-3 text-small font-medium hover:bg-panel-2"
+            >
+              {tr.rack.showInRack}
+            </button>
+          </div>
+        )}
         {firstNumber && <span className="text-label leading-[1.45] text-muted">{tr.properties.unitHint}</span>}
         {note && (
           <p className="rounded-md bg-panel-2 px-3 py-2 text-label leading-relaxed text-ink-2">

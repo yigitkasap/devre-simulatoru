@@ -5,6 +5,7 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { tr } from '../i18n/tr';
 import { ExampleTab, type ExampleTabProps } from './ExampleTab';
+import { Icon, type IconName } from './icons';
 import { InspectTab, type InspectTabProps } from './InspectTab';
 import { MessagesTab, type MessagesTabProps } from './MessagesTab';
 
@@ -14,6 +15,10 @@ const TABS: readonly InspectorTab[] = ['inspect', 'example', 'messages'];
 
 export interface InspectorProps {
   readonly width: number;
+  /** Ölç düzeninde 48 px'lik şeride iner (N01). */
+  readonly collapsed: boolean;
+  /** Şeritten bir sekmeyi açar (panel genişler). */
+  readonly onExpand: (tab: InspectorTab) => void;
   readonly tab: InspectorTab;
   readonly onTab: (tab: InspectorTab) => void;
   readonly inspect: InspectTabProps;
@@ -21,9 +26,51 @@ export interface InspectorProps {
   readonly messages: MessagesTabProps;
 }
 
-export function Inspector({ width, tab, onTab, inspect, example, messages }: InspectorProps) {
+const TAB_ICONS: Record<InspectorTab, IconName> = { inspect: 'search', example: 'book', messages: 'chat' };
+
+export function Inspector({ width, collapsed, onExpand, tab, onTab, inspect, example, messages }: InspectorProps) {
   const errors = messages.items.filter((i) => i.diagnostic.severity === 'error').length;
   const count = messages.items.length;
+
+  if (collapsed) {
+    return (
+      <nav aria-label={tr.inspector.collapsedLabel} className="flex w-12 shrink-0 flex-col items-center gap-1 border-l border-line bg-panel pt-2">
+        <button
+          type="button"
+          onClick={() => onExpand(tab)}
+          aria-label={tr.inspector.open}
+          title={tr.inspector.open}
+          className="flex h-11 w-11 items-center justify-center rounded-[10px] text-ink hover:bg-app"
+        >
+          <Icon name="collapseLeft" />
+        </button>
+        {TABS.map((t) => {
+          const label =
+            t === 'messages' && count > 0
+              ? `${tr.inspector.tabs.messages}: ${tr.messages.counts(errors, count - errors)}`
+              : tr.inspector.tabs[t];
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onExpand(t)}
+              aria-label={label}
+              title={label}
+              className="relative flex h-11 w-11 items-center justify-center rounded-[10px] text-ink hover:bg-app"
+            >
+              <Icon name={TAB_ICONS[t]} />
+              {t === 'messages' && count > 0 && (
+                <span
+                  className={`absolute top-1.5 right-1.5 h-[9px] w-[9px] rounded-full border-[1.5px] border-panel ${errors > 0 ? 'bg-danger' : 'bg-paused'}`}
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+    );
+  }
 
   // Sekmeler arasında ok tuşlarıyla (N02).
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {

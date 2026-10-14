@@ -37,7 +37,8 @@ export type IconName =
   | 'book'
   | 'saved'
   | 'speed'
-  | 'info';
+  | 'info'
+  | 'chat';
 
 const PATHS: Record<IconName, ReactNode> = {
   menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
@@ -156,6 +157,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <circle cx="10" cy="6.3" r=".5" fill="currentColor" />
     </>
   ),
+  chat: <path d="M4 4h12v9H8l-4 3z" />,
 };
 
 export function Icon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
