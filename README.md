@@ -17,14 +17,24 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 - **Laboratuvar cihazları:** fonksiyon üreteci (GFG-8015G benzeri: 0,2 Hz – 2 MHz, 50 Ω, offset,
   simetri, −20 dB, TTL çıkışı), iki çıkışlı akım sınırlamalı DC güç kaynağı (CV/CC), iki kanallı
   osiloskop. Üretecin ve osiloskobun COM ucu laboratuvardaki gibi şebeke toprağına bağlıdır.
-- **Şematik editör:** ızgaralı tuval, sürükle-bırak ya da seç-tıkla yerleştirme, pinden pine kablo,
-  T bağlantısı, taşıma (kablolar esner), döndürme, seçim kutusu, geri alma/yineleme, özellik
-  penceresi (SI önekli değer girişi), zigzag ya da kutu (IEC) direnç sembolü.
+- **Şematik editör:** ızgaralı tuval, sürükle-bırak ya da seç-tıkla yerleştirme, uçtan uca kablo,
+  T bağlantısı, taşıma (kablolar esner), döndürme, seçim kutusu, geri alma/yineleme, sağda İnceleme
+  paneli (canlı ölçüm, "Neden bu değer?" notu, SI önekli değer girişi), zigzag ya da kutu (IEC)
+  direnç sembolü.
+- **Arayüz:** masaüstü (kütüphane, tuval, cihaz rafı, İnceleme paneli), tablet (araç şeridi,
+  dokunmatik panel) ve telefon (Kur / Bağla / Ölç kipleri, alt çubuk ve tek alt sayfa; yatayda yan
+  panel). Yazı tipi IBM Plex Sans ve Mono (projeyle birlikte gelir, OFL).
+- **İlk açılış ve yardım:** hoş geldin penceresi, 4 adımlı kısa tur, Yardım penceresi (klavye
+  kısayolları, fare ve dokunma, simgeler ve renkler, laboratuvar ipuçları).
 - **Simülasyon:** Oynat / Duraklat / Durdur, ×10⁻⁶ … ×1 hız (MHz'lik sinyaller için), çalışırken
   değer değiştirme ve anahtara tıklama.
 - **Eğitsel görünüm:** akım noktaları (geleneksel akım ya da elektron akışı), gerilime göre kablo
-  rengi, LED parlaklığı ve yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, V/I/P bilgi
-  kutusu (Ohm yasası kontrolü), kısa devre uyarısı, mesaj paneli.
+  rengi (klasik ya da renk körlüğüne uygun ölçek), düğüm gerilimi etiketleri, LED parlaklığı ve
+  yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, İnceleme panelinde canlı V/I/P ve Ohm
+  yasası notu, hata ve uyarı rozetleri, "devrede toprak yok" için tek tıkla düzeltme, toprak
+  tuzağı uyarısı, yanan LED için önerilen ön direnç.
+- **Klavye ve erişilebilirlik:** "Tuvale atla" bağlantısı, tuvalde oklarla parçadan parçaya geçiş,
+  kısayollar, görünür odak, ekran okuyucu için parça listesi ve seyreltilmiş canlı duyurular.
 - **Osiloskop:** iki kanal (A, B) ortak uca göre; DC/AC/GND kuplaj, A ve B, ADD (A + B; INV ile
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
@@ -93,23 +103,30 @@ altına çıkart. Sayfadaki tüm yollar ve paylaşım bağlantıları `base`'e g
 
 ## Kullanım
 
-| İşlem | Nasıl |
+Tam liste uygulamada **Yardım** penceresinde (`?`).
+
+| İşlem | Masaüstü |
 |---|---|
-| Parça ekle | Kütüphaneden sürükleyip bırak ya da seçip tuvale tıkla (Shift + tıkla: art arda) |
-| Kablo çek | Bir pinin ucuna tıkla, ara tıklamalar köşe olur, bir pine ya da kabloya tıklayarak bitir; çift tık: boşta bitir |
+| Parça ekle | Kütüphaneden sürükleyip bırak ya da seçip tuvale tıkla (Shift + tıkla: art arda); klavyede listede oklar, Enter: tuvalin ortasına |
+| Kablo çek | Bir parçanın ucuna tıkla, ara tıklamalar köşe olur, bir uca ya da kabloya tıklayarak bitir; çift tık: boşta bitir |
 | Kablo aracı | W (boş noktadan ya da bir kablonun üzerinden başlatmak için) |
-| Döndür | R: 90° döndürür, bağlı kablolar pinleri izler (yerleştirirken de çalışır) |
-| Ters çevir | F: yönlü parçanın (diyot, LED, pil, voltmetre, ampermetre) uçlarını yer değiştirir, kablolar yerinde kalır; sağ tık → Ters çevir |
+| Döndür / ters çevir | R: 90° döndürür, kablolar uçları izler · F: yönlü parçanın uçlarını yer değiştirir |
 | Sil | Delete / Backspace |
-| Geri al / yinele | Ctrl+Z / Ctrl+Y (ya da Ctrl+Shift+Z) |
-| Tümünü seç | Ctrl+A |
-| İptal | Esc |
-| Özellikler | Parçaya çift tıkla ya da sağ tıkla → Özellikler |
-| Yakınlaştır / kaydır | Fare tekerleği / boşluk tuşu + sürükle ya da orta tuş; telefonda iki parmak |
-| Simülasyon | Alttaki Oynat / Duraklat / Durdur; çalışırken anahtara tıklayınca açılır/kapanır |
-| Örnekler | Üst çubuktaki "Örnekler" düğmesi: gruplanmış örnek devreler penceresi |
-| Yanmış LED | Sağ tıkla → Onar ya da Durdur |
-| Telefon / tablet | Kütüphanede parçaya dokun: parça görünen alanın ortasına eklenir · sürükle: taşı · pin ucuna dokun: kablo (üstteki İptal ile vazgeç) · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil, Onar) · boşluğa dokun: seçimi kaldır · iki parmak: yakınlaştır · simülasyonda seçili parçanın V/I/P bilgisi yanında görünür |
+| Geri al / yinele | Ctrl+Z / Ctrl+Y (ya da Ctrl+Shift+Z); örnek, yeni devre, içe aktarma ve silme bildirimlerinde Geri al düğmesi |
+| Özellikler | Parçayı seç: sağdaki İncele sekmesi; çift tık ya da Enter: ilk değer alanı |
+| Tuvalde gezinme | "Tuvale atla" (ilk Tab), oklar: en yakın parça, Shift + ok: kaydır, Esc: panelden tuvale dön |
+| Görünüm | Tekerlek ya da + / −, Shift+1: sığdır, Boşluk + sürükle ya da orta tuş: kaydır |
+| Simülasyon | Oynat / Duraklat / Durdur (P: oynat/duraklat); çalışırken anahtara tıklayınca açılır/kapanır |
+| Panel | Alt+1 … 3: İncele, Örnek, Mesajlar |
+| Örnekler | Üst çubuktaki "Örnekler" düğmesi |
+
+| Telefon | |
+|---|---|
+| Kur kipi | Alttaki **Parça** ile ekle (seçili parçanın boş ucuna "zincirle ekle"); parçaya dokun: seç, alt çubuk Değer / Döndür / Çevir / Sil olur; parçayı 150 ms basılı tutup sürükle: taşı; basılı tut: menü ve büyüteç |
+| Bağla kipi | **Bağla** ya da bir uca dokun; uçlar 44 pt etiketli hedeflere dönüşür; iki uca dokun: kablo; kablonun ortası: T bağlantısı; Bitti ya da boşluğa çift dokunuş: çık |
+| Ölç kipi | Oynat'tan sonra yapı kilitli: dokun: ölçümler alttaki sayfada, sürükle: kaydır, anahtara dokun: aç/kapat, −/+ ile değer canlı değişir; Cihazlar: osiloskop, üreteç, güç kaynağı |
+| Kalabalık yer | "Burada N öğe var" seçicisi ve büyüteç |
+| Tablet | Soldaki şeritte Parça (tuvalin üstünde kart) ve Bağla; tuvalde telefonla aynı kipler; cihazlar İnceleme panelinin Cihazlar sekmesinde |
 
 ## Dosya biçimi ve paylaşım bağlantısı
 
@@ -157,13 +174,22 @@ src/
     serialize.ts     JSON biçimi ve doğrulaması
     share.ts         paylaşım bağlantısı (lz-string)
   editor/            React arayüzü
-    Simulator.tsx    kök bileşen: durum, yükleme, döndürme, mesajlar
-    Canvas.tsx       SVG tuval ve tüm fare/dokunma etkileşimleri
+    Simulator.tsx    kök bileşen: durum, yükleme, düzenler (masaüstü, tablet, telefon)
+    Canvas.tsx       SVG tuval; fare, klavye ve dokunma (Kur / Bağla / Ölç) etkileşimleri
     useSimulation.ts simülasyon döngüsü (requestAnimationFrame)
-    readouts.ts      V/I/P bilgi kutusu ve ölçü aleti ekranı metinleri
-    ...              kütüphane, özellik penceresi, mesaj paneli, örnek kartı, simgeler
+    useLayout.ts     düzen seçimi (kırılma noktaları, yatay telefon, tablet)
+    TopBar, Library, SimBar, HintStrip, Inspector (+ InspectTab, ExampleTab, MessagesTab)
+                     masaüstü kabuğu ve İnceleme paneli
+    DeviceRack, ScopeFace, InstrumentFaces, RackControls   cihaz rafı ve ön paneller
+    Phone*.tsx, BottomSheet.tsx, phoneTools.ts             telefon: üst şerit, alt çubuk, alt sayfa,
+                     cihazlar, dosya/⋯ sayfaları, zincirle ekleme ve kablo yolu
+    TabletChrome.tsx tablet araç şeridi, alt çubuk, parça kartı
+    HelpDialog.tsx, Welcome.tsx   Yardım, hoş geldin ve kısa tur
+    messages.ts      Mesajlar: tanılamalar, toprak tuzağı, önerilen ön direnç
+    readouts.ts      canlı ölçüm satırları ve ölçü aleti ekranı metinleri
+  assets/fonts/      IBM Plex Sans ve Mono (woff2; lisans public/fonts/OFL.txt)
   examples/          hazır örneklerin JSON dosyaları
-  i18n/tr.ts         arayüzdeki tüm metinler (Türkçe)
+  i18n/tr.ts         arayüzdeki tüm metinler (Türkçe); i18n/ek.ts: R1’in, R2’nin gibi ekler
   layouts/, pages/   Astro sayfaları; simülatör tek bir React adası: <Simulator client:only="react" />
 tests/               Vitest testleri
 ```
@@ -189,7 +215,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 178 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 194 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -197,7 +223,10 @@ osiloskop kaydı ve ekranı (tetikleme, X-Y, ölçümler, Oto ayar), zener ve tr
 hesabıyla bilinen çalışma noktaları (`tests/transistor.test.ts`), laboratuvar cihazları
 (50 Ω çıkış, offset, simetri, TTL, CV/CC, 1 MΩ giriş, AC kuplaj, toprak tuzağı ve ADD ile doğru
 ölçüm; `tests/instruments.test.ts`), bütün hazır örneklerin
-cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`) ve paylaşım bağlantısı. Dokunmatik/iOS kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır.
+cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım bağlantısı, mesajlar
+(toprak tuzağı, ön direnç önerisi), renk ölçekleri ve telefon yardımcıları (ekler, zincirle ekleme,
+kablo yolu; `tests/phone.test.ts`). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
+(aşağıya bak).
 
 ## Kararlar
 
@@ -276,50 +305,47 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
 - **Otomatik kayıt (kullanıcı isteğiyle Aşama 3'e alındı):** Devre her değişiklikten 0,4 s
   sonra ve sayfa kapanırken `localStorage` içine (`devre-simulatoru:devre`) yazılır; açılışta
   okunur. Bozuk ya da tanınmayan veri sessizce yok sayılır. Ayarlar ayrı anahtarda tutulur.
-- **Dokunmatik ekran ve iOS Safari:** Birincil işaretçi parmaksa (`pointer: coarse`):
-  - Kütüphanede parçaya dokunmak onu görünen alanın ortasındaki boş bir yere ekler; imleci izleyen
-    önizleme olmadığı için masaüstündeki "seç, sonra tuvale tıkla" akışı ve HTML sürükle-bırak
-    kullanılmaz. Kütüphane önizlemesi yalnızca gerçek fareyle değişir (iOS, dokunuşun ürettiği
-    "üzerine gelme" olayı sayfayı değiştirirse ilk dokunuşta tıklamayı göndermez).
-  - Parçanın gövdesi her yöne 12 px geniş sayılır ve gövdenin içindeyken pin ancak 12 px
-    yakınsa seçilir; böylece küçük parçalar da parmakla tutulup taşınabilir.
-  - iOS'ta çift tıklama ve sağ tık olayları güvenilir gelmediği için çift dokunuş (özellikler) ve
-    uzun basış (0,55 s, menü) ayrıca algılanır. Uzun basıştan sonra parmak kıpırdarsa menü kapanır
-    ve parça taşınır; yani "basılı tutup sürükleme" de çalışır.
-  - Boşluğa dokunmak seçimi kaldırır; kablo çizerken üstte bir "İptal" düğmesi çıkar (Esc yok).
-    Simülasyon sırasında seçili parçanın V/I/P bilgisi yanında gösterilir (üzerine gelme yok).
+- **Dokunmatik ekran ve iOS Safari:**
+  - Telefonda (< 900 px) ve tablette (dokunmatik, ≥ 900 px) tuvalde üç kip vardır: **Kur** (dokun:
+    seç; parçayı 150 ms basılı tutup sürükle: taşı, daha önce kayarsa tuval kayar; uca dokun: Bağla;
+    basılı tut: menü ve büyüteç), **Bağla** (uçlar 44 pt etiketli hedefler; iki dokunuş kablo; yol,
+    iki L seçeneğinden parçaların gövdesinden daha az geçenidir) ve **Ölç** (yapı kilitli).
+    Kalabalık bir noktada parmağın altında birden çok "sahip" varsa (bir uca bağlanan kablo o
+    parçayla aynı sahip sayılır) "Burada N öğe var" seçicisi açılır.
+  - Telefonda tek alt sayfa vardır (peek / yarım / tam). Sayfa tuvalin üstüne binmez: tuval sayfanın
+    üst kenarında biter ve devre kalan alana yeniden sığar (kullanıcı yakınlaştırdıysa yalnızca
+    seçili parça görünür tutulur). Karartmalı sayfalar (Dosya, ⋯, Örnekler) açıkken tuvalin
+    `touch-action` değeri kaldırılır; WebKit, `touch-action: none` bölgesini üstüne binen katmanlara
+    da uygulayabiliyor.
   - Tuvalin tüm çizimi olay almaz (`pointer-events: none`); hedef her zaman SVG'dir. Dokunmatikte
     işaretçi dokunulan öğeye örtük olarak yakalandığı için, yeniden çizilen bir alt öğe sürüklemeyi
     koparabilirdi.
-  - WebKit, `touch-action: none` verilmiş tuvalin dokunma bölgesini üstüne binen katmanlara da
-    uygulayabiliyor; bu yüzden kütüphane çekmecesi ya da bir pencere açıkken tuvalin
-    `touch-action` değeri kaldırılır (aksi halde çekmece parmakla kaydırılamıyordu).
   - iOS Safari dokunuşları sayfaya yalnızca o olay türünü dinleyen bir öğenin alanında iletir.
     React dinleyicilerini Astro'nun kutusuz (`display: contents`) `astro-island` öğesine bağladığı
-    için bu alan boş kalabiliyor ve tuvale hiçbir işaretçi olayı gelmiyordu (düğmeler tıklama
-    olayıyla ayrı yoldan çalışıyordu). Bu yüzden belgeye boş ve pasif dokunma/işaretçi dinleyicileri
-    bağlanır; SVG'ye de doğrudan, varsayılanı engelleyen `touchstart`/`touchmove` dinleyicileri
-    bağlanır (Safari'nin kendi kaydırma/yakınlaştırma hareketi işaretçi akışını kesmesin diye).
+    için bu alan boş kalabiliyor ve tuvale hiçbir işaretçi olayı gelmiyordu. Bu yüzden belgeye boş ve
+    pasif dokunma/işaretçi dinleyicileri bağlanır; SVG'ye de doğrudan, varsayılanı engelleyen
+    `touchstart`/`touchmove` dinleyicileri bağlanır. Parça sayfasında basılı tutup sürüklerken
+    listenin `touchmove`'u da etkin bir dinleyiciyle engellenir.
   - Birincil işaretçi her basıldığında eski işaretçi kayıtları silinir; kaçırılmış bir `pointerup`
     yüzünden tek parmağın iki parmak sanılıp tuvalin kıstırma kipinde takılması önlenir.
-  - **Kontrol listesi:** Tuvale, çekmeceye, pencerelere ya da olay işleyicilerine dokunan her
-    değişiklikten sonra `npm run dev` açıkken `npm run ios-kontrol` çalıştırılır
-    (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için adresi ver:
-    `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un iPhone
-    öykünmesiyle 28 madde dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma
-    alanı hatasını göremiyordu (bütün davranış maddeleri yine geçiyordu); bu yüzden listenin ilk
-    bölümü bu kuralların yerinde durduğunu doğrudan denetler. `playwright-core` bu projeye kurulu
-    değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir. Dokunmatik davranışı değiştiren
-    işler ayrıca gerçek bir iPhone'da denenmelidir.
-  - Giriş alanlarının yazısı dokunmatikte 16 px'tir (iOS daha küçük yazılı alana odaklanınca
-    sayfayı yakınlaştırıp öyle bırakır). Arayüzde çift dokunuşla sayfa yakınlaşmaz
-    (`touch-action: manipulation`), sayfa esneyip kaymaz (`overscroll-behavior: none`).
-- **Parça bilgi kartı:** Kütüphanede fareyle üzerine gelinen (ya da yerleştirilmekte olan) parçanın
-  sembolü ve açıklaması masaüstünde tuvalin sağ altında gösterilir; telefonda gösterilmez
-  (kullanıcı isteği; kütüphanede yer kaplıyordu).
+  - Dokunma hedefleri en az 44 px, giriş alanlarının yazısı 16 px'tir (iOS daha küçük yazılı alana
+    odaklanınca sayfayı yakınlaştırır). Arayüzde çift dokunuşla sayfa yakınlaşmaz
+    (`touch-action: manipulation`), sayfa esneyip kaymaz (`overscroll-behavior: none`); güvenli
+    alanlar (`viewport-fit=cover`, `env(safe-area-inset-*)`) gözetilir.
+  - **Kontrol listesi:** Tuvale, alt sayfalara, pencerelere ya da olay işleyicilerine dokunan her
+    değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
+    `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
+    adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 109 madde
+    dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
+    göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
+    `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
+    Dokunmatik davranışı değiştiren işler ayrıca gerçek bir iPhone'da denenmelidir.
+- **Kütüphanenin bilgi alanı:** Masaüstünde kütüphanenin altında, fareyle üzerine gelinen (ya da
+  yerleştirilmekte olan, seçili) parçanın açıklaması gösterilir; telefonda yoktur.
 - **Yükleme:** Örnek açmak, JSON içe aktarmak, paylaşım bağlantısı açmak ve "Yeni devre"
-  mevcut devrenin yerine geçer ama geri alma geçmişine girer; Ctrl+Z ile önceki devreye dönülür.
-  Bu yüzden onay sorulmaz, kısa bir bildirim gösterilir.
+  mevcut devrenin yerine geçer ama geri alma geçmişine girer. Bu yüzden onay sorulmaz; bildirimde
+  5 saniye Geri al düğmesi durur (Ctrl+Z ve alt çubuktaki Geri al da çalışır).
 
 ### Simülasyon ve animasyon
 
@@ -340,7 +366,9 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   voltmetrenin çektiği µA düzeyindeki akım gösterilir (kullanıcı kararı). Nokta hızı
   simülasyon hızı ayarından bağımsızdır; yalnızca akımın büyüklüğünü gösterir (kullanıcı kararı).
 - **Kablo rengi:** Ton (hue) üzerinden mavi (−Vmax) → yeşil (0 V) → sarı/turuncu → kırmızı
-  (+Vmax). Vmax, devredeki en büyük pil gerilimidir. Devreye bağlı olmayan kablolar gri.
+  (+Vmax). Vmax, devredeki en büyük pil gerilimidir. Gerilimi belirsiz (toprağa bağlı olmayan)
+  kablolar gri ve kesiklidir. Ayarlardan renk körlüğüne uygun ölçek (mavi – gri – turuncu)
+  seçilebilir.
 - **Kondansatör çubuğu:** |V| / Vmax oranında dolar; kırmızı: + ucu yüksek, mavi: ters
   yönde dolu. Dikey kondansatörde aşağıdan yukarı dolar.
 
@@ -350,15 +378,16 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   bir basamak eklerse (9,9999 → 10,00) basamak sayısı korunur. Voltmetre v(+) − v(−),
   ampermetre + uçtan giren akımı gösterir; ters bağlanırsa değer eksi çıkar. Ekran yatay
   alette üstte, dikey alette sağdadır; o tarafta başka bir parça varsa karşı tarafa açılır.
-- **V/I/P kutusu:** Simülasyon çalışırken ya da duraklatılmışken parçanın üzerine gelince
-  çıkar. Pasif bileşenlerde gerilim ve akım büyüklük olarak (yönü noktalar gösterir), pilde
+- **Canlı ölçüm (İnceleme paneli, telefonda alt sayfa):** Simülasyon çalışırken ya da
+  duraklatılmışken seçili parçanın değerleri gösterilir. Pasif bileşenlerde gerilim ve akım büyüklük olarak (yönü noktalar gösterir), pilde
   ve ölçü aletlerinde işaretiyle yazılır. Dirençte Ohm yasası, iç dirençli pilde
   V = E − I·Riç kontrolü, kondansatörde depolanan enerji, ölçü aletlerinde iç direncin
   etkisi gösterilir.
-- **Mesaj paneli:** Topoloji kontrolleri devre her değiştiğinde (simülasyon durdurulmuşken
-  de) çalışır. Panel, kurulum sırasında sık çıkan "boşta uç" uyarılarıyla kendiliğinden
-  açılmaz; simülasyon hatası ya da yeni bir çalışma uyarısı (kısa devre, yanan LED) gelince
-  açılır. Simülasyon başlatılamazsa hatanın parçaları vurgulanır. Vurgulanan parça ekran
+- **Mesajlar sekmesi:** Topoloji kontrolleri devre her değiştiğinde (simülasyon durdurulmuşken
+  de) çalışır. Sekme, kurulum sırasında sık çıkan "boşta uç" uyarılarıyla kendiliğinden öne
+  gelmez; simülasyon hatası ya da yeni bir çalışma uyarısı (kısa devre, yanan LED) gelince öne
+  gelir (odak alınmaz). Tuvaldeki rozetler yalnızca simülasyon çalışırken ya da başlayamayınca
+  çıkar. Simülasyon başlatılamazsa hatanın parçaları vurgulanır. Vurgulanan parça ekran
   dışındaysa görünüm ona kaydırılır.
 - **Yanmış LED:** Yanında açıklama balonu çıkar (Kapat / Onar). Sağ tık menüsünde "Onar"
   vardır; Durdur da onarır. Devre değişmediyse onarılan LED yeniden yanar.
@@ -399,10 +428,10 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   kesim yoksa ekran kayar. Frekans, kayıttaki ardışık kesimlerden ölçülür.
 - **Oto ayar:** Ekranda ≈ 2,5 periyot görünecek zaman/bölme ve sinyalin ±3,5 bölmeye sığacağı
   volt/bölme (1-2-5 dizisi); kayıt yoksa devredeki AC kaynağın frekansı ve kaynak gerilimleri.
-- **Panelin yeri:** Masaüstünde tuvalin sağ altında (380 px); telefonda tuvalin altında ve
-  küçültülmüş başlar. Ayarlar parçanın özelliklerinde saklanır (kaydedilir, paylaşılır, geri
-  alınabilir; simülasyonu durdurmaz). Devre sığdırılırken panelin ve örnek kartının o anki
-  (açık/küçük) yeri boş bırakılır; panel ya da kart açılıp kapanınca devre yeniden sığdırılır.
+- **Ön panelin yeri:** Masaüstünde tuvalin altındaki cihaz rafında (yan yana ya da tek tek,
+  tutamaçtan büyütülür), tablette İnceleme panelinin Cihazlar sekmesinde, telefonda Cihazlar alt
+  sayfasında. Ayarlar parçanın özelliklerinde saklanır (kaydedilir, paylaşılır, geri alınabilir;
+  simülasyonu durdurmaz). Raf ya da sayfa açılıp kapanınca devre kalan alana yeniden sığdırılır.
 
 ### Laboratuvar cihazları (föy için 1. aşama)
 
@@ -463,10 +492,36 @@ doğrulanır.
   ([`sim/devices/threeTerminal.ts`](src/sim/devices/threeTerminal.ts)). FET'lerde V_GS adımı 1 V,
   V_DS adımı 5 V ile sınırlanır. Kablo akımları için her bileşen uçlarına giren akımları verir.
 
+### Yeniden tasarım (2026-10)
+
+Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı; hesap ve veri mantığı
+(`src/sim`, `src/model`), otomatik kayıt, paylaşım bağlantısı ve JSON sürüm 1 değişmedi.
+
+- **Düzenler:** < 900 px telefon (yükseklik < 500 px ise yatay telefon: yan panel ve dikey çubuk),
+  ≥ 900 px dokunmatik tablet, fareyle 900–1279 px sıkışık masaüstü (kütüphane şerit), ≥ 1280 px
+  masaüstü. Dokunmatik ve kısa (< 500 px) ekranda genişlik 900 px'i aşsa da telefon düzeni.
+- **Devrenin adı:** açık örneğin adı, yoksa "Devrem" (boş devrede "Yeni devre"); yalnızca arayüzde,
+  JSON'a ve bağlantıya girmez.
+- **Ölç düzeni (masaüstü):** Oynat'tan sonra rafta cihaz varsa kütüphane ve İnceleme paneli şeride
+  iner, raf büyür; örnek açıkken paneller açık kalır.
+- **Osiloskop kipleri:** modeldeki üç kip (A ve B, A + B, X-Y); tasarımdaki tek kanal kipleri yok.
+- **Hatalar:** yanan LED ve kısa devre arayüzde hata olarak gösterilir; "R1'i … yap" önerisi
+  yalnızca LED'e tek direnç seri bağlıysa (arada ampermetre olabilir) çıkar. Önerilen değer
+  (V − V_f) / 20 mA'nın bir üst E24 değeridir.
+- **Telefon:** panel sekmeleri (Örnek / Devre ya da Ölçümler / Mesajlar) yarım boyda görünür;
+  zincirle ekleme saat yönünde döner (pil → direnç → LED); −/+ direnç ve sığada E12, gerilimde
+  0,5 V (2 V'un altında 0,1 V), diğerlerinde 1-2-5 adımıdır.
+- **Tablet:** cihazlar İnceleme panelinin Cihazlar sekmesindedir; tuvaldeki "Cihaz rafı" düğmesi
+  o sekmeyi açar.
+- **Ayarlar:** düğüm gerilimleri, akım noktaları, elektron akışı, renk ölçeği, direnç sembolü.
+  Koyu tema ve projeksiyon kipi sonraki işlere bırakıldı.
+
 ### Örnekler
 
 - **Örnekler penceresi (kullanıcı isteği):** Örnekler sol panelden kaldırıldı; üst çubuktaki
-  "Örnekler" düğmesi gruplanmış bir pencere açar. Gruplar ve sıraları
+  "Örnekler" düğmesi gruplanmış bir pencere açar (telefonda tam ekran, aramalı ve açılır gruplu
+  liste). Açılan örneğin açıklaması, tahmin sorusu ve cevabı İnceleme panelinin Örnek sekmesinde
+  (telefonda alt sayfada). Gruplar ve sıraları
   [`src/examples/index.ts`](src/examples/index.ts) içindedir; iOS kuralı gereği pencere açıkken
   tuvalin `touch-action` değeri kaldırılır (pencere parmakla kaydırılabilsin).
 - **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC");

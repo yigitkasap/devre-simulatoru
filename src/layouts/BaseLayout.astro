@@ -3,6 +3,9 @@
 // formüller) da bu düzeni kullanır.
 import '../styles/global.css';
 import { SITE_DESCRIPTION, SITE_NAME } from '../config';
+// Yazı tipleri src/assets/fonts'ta: Vite hem geliştirmede hem derlemede doğru yolu (base dahil) verir.
+// Lisans (OFL) public/fonts/OFL.txt olarak siteyle birlikte yayımlanır.
+import plexSans from '../assets/fonts/plex-sans-var-latin.woff2?url';
 
 interface Props {
   /** Sayfa başlığı; verilmezse yalnızca site adı kullanılır. */
@@ -24,7 +27,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <meta name="description" content={description} />
     <meta name="theme-color" content="#eef0f3" />
     <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
-    <link rel="preload" href={`${base}/fonts/plex-sans-var-latin.woff2`} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={plexSans} as="font" type="font/woff2" crossorigin />
     <title>{fullTitle}</title>
   </head>
   <body>
