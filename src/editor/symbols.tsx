@@ -285,7 +285,7 @@ function Oscilloscope({ rotation, earthed }: { rotation: Rotation; earthed: bool
       {pinLabel('A', -20)}
       {pinLabel('B', 0)}
       {/* Ortak uç: küçük toprak işareti (şebeke toprağına bağlıysa yeşil) */}
-      <g stroke={earthed ? '#1f8a4c' : 'currentColor'} strokeWidth={1.4} strokeLinecap="round" transform={upright(-23, 20)}>
+      <g stroke={earthed ? 'var(--color-earth)' : 'currentColor'} strokeWidth={1.4} strokeLinecap="round" transform={upright(-23, 20)}>
         <line x1={-23} y1={15} x2={-23} y2={19} />
         <line x1={-28} y1={19} x2={-18} y2={19} />
         <line x1={-26} y1={22} x2={-20} y2={22} />
@@ -431,7 +431,7 @@ function DeviceText({
 function EarthGlyph({ x, y, rotation, earthed }: { x: number; y: number; rotation: Rotation; earthed: boolean }) {
   return (
     <g
-      stroke={earthed ? '#1f8a4c' : 'currentColor'}
+      stroke={earthed ? 'var(--color-earth)' : 'currentColor'}
       strokeWidth={1.4}
       strokeLinecap="round"
       transform={rotation ? `rotate(${-rotation} ${x} ${y})` : undefined}

@@ -36,7 +36,15 @@ import { GRID, type CircuitDoc, type Point, type Rotation } from '../model/types
 import { moveSegment, routeL } from '../model/wires';
 import { boolProp, type DeviceType } from '../sim/netlist';
 import { formatSI } from '../sim/units';
-import { CURRENT_DOT_COLOR, UNKNOWN_WIRE_COLOR, VOLTAGE_GRADIENT, voltageColor } from './colors';
+import {
+  CURRENT_DOT_COLOR,
+  CURRENT_DOT_EDGE,
+  UNKNOWN_WIRE_COLOR,
+  UNKNOWN_WIRE_DASH,
+  voltageColor,
+  voltageGradient,
+  type WireScale,
+} from './colors';
 import { BurnBalloon, ContextMenu, ReadoutBox, type MenuItem } from './CanvasOverlays';
 import { meterDisplayRect, PartView, type PartTone } from './PartView';
 import { meterText, partReadout } from './readouts';
@@ -1035,9 +1043,11 @@ export function Canvas({
             const selected = selectedWires.has(wire.id);
             const hovered = hover?.kind === 'wire' && hover.wireId === wire.id;
             let stroke = selected ? 'var(--color-select)' : hovered ? '#3d63b8' : 'var(--color-symbol)';
+            let dash: string | undefined;
             if (frame && !selected) {
               const v = frame.wireVoltages.get(wire.id);
-              stroke = v === undefined ? UNKNOWN_WIRE_COLOR : voltageColor(v / frame.vmax);
+              stroke = v === undefined ? UNKNOWN_WIRE_COLOR : voltageColor(v / frame.vmax, settings.wireScale);
+              if (v === undefined) dash = UNKNOWN_WIRE_DASH;
             }
             return (
               <polyline
@@ -1046,6 +1056,7 @@ export function Canvas({
                 fill="none"
                 stroke={stroke}
                 strokeWidth={selected || frame ? 3 : 2}
+                strokeDasharray={dash}
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
@@ -1149,7 +1160,7 @@ export function Canvas({
         </div>
       )}
 
-      {frame && <VoltageLegend vmax={frame.vmax} />}
+      {frame && <VoltageLegend vmax={frame.vmax} scale={settings.wireScale} />}
 
       {interaction.kind === 'wiring' && (
         <div className="absolute top-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-panel/95 py-1 pr-1 pl-3 text-xs shadow-md">
@@ -1267,7 +1278,11 @@ export function Canvas({
 /** Akım noktaları aralığı (dünya pikseli). */
 const DOT_SPACING = 16;
 
-function dotLine(key: string, a: Point, b: Point, phase: number, width: number) {
+/**
+ * Bir doğru parçası boyunca noktalar: uzunluğu 0 olan, yuvarlak uçlu çizgi desenleri. Koyu kenar
+ * için aynı desen bir alt katmanda 2 px daha kalın çizilir.
+ */
+function dotLine(key: string, a: Point, b: Point, phase: number, width: number, edge = false) {
   return (
     <line
       key={key}
@@ -1275,8 +1290,8 @@ function dotLine(key: string, a: Point, b: Point, phase: number, width: number) 
       y1={a.y * GRID}
       x2={b.x * GRID}
       y2={b.y * GRID}
-      stroke={CURRENT_DOT_COLOR}
-      strokeWidth={width}
+      stroke={edge ? CURRENT_DOT_EDGE : CURRENT_DOT_COLOR}
+      strokeWidth={edge ? width + 2 : width}
       strokeLinecap="round"
       strokeDasharray={`0 ${DOT_SPACING}`}
       // Desen, kaydırma arttıkça başa doğru gider; ileri hareket için kaydırma negatif.
@@ -1287,34 +1302,40 @@ function dotLine(key: string, a: Point, b: Point, phase: number, width: number) 
 
 /** Kablolarda ve iki uçlu bileşenlerde akımın yönünü ve büyüklüğünü gösteren hareketli noktalar. */
 function CurrentDots({ doc, graph, frame }: { doc: CircuitDoc; graph: FlowGraph; frame: SimFrame }) {
+  const edges = [];
   const lines = [];
   for (let i = 0; i < graph.segments.length; i++) {
     const current = frame.segmentFlows[i] ?? 0;
     if (Math.abs(current) < MIN_ANIMATED_CURRENT) continue;
     const segment = graph.segments[i]!;
-    lines.push(dotLine(segment.key, segment.a, segment.b, frame.segmentPhases[i] ?? 0, 4));
+    const phase = frame.segmentPhases[i] ?? 0;
+    edges.push(dotLine(`e-${segment.key}`, segment.a, segment.b, phase, 4, true));
+    lines.push(dotLine(segment.key, segment.a, segment.b, phase, 4));
   }
   for (const part of doc.parts) {
     const flow = frame.partFlows.get(part.id);
     if (!flow || Math.abs(flow.current) < MIN_ANIMATED_CURRENT) continue;
     const axis = partAxis(part);
-    if (axis) lines.push(dotLine(`part-${part.id}`, axis[0], axis[1], flow.phase, 3.4));
+    if (!axis) continue;
+    edges.push(dotLine(`e-part-${part.id}`, axis[0], axis[1], flow.phase, 3.4, true));
+    lines.push(dotLine(`part-${part.id}`, axis[0], axis[1], flow.phase, 3.4));
   }
   return (
-    <g pointerEvents="none" opacity={0.95}>
+    <g pointerEvents="none">
+      {edges}
       {lines}
     </g>
   );
 }
 
 /** Kablo renklerinin açıklaması (köşede). */
-function VoltageLegend({ vmax }: { vmax: number }) {
+function VoltageLegend({ vmax, scale }: { vmax: number; scale: WireScale }) {
   const label = formatSI(vmax, 'V', { trim: true });
   return (
     // Telefonda örnek kartı üst kenarı kapladığı için açıklama sol altta durur.
     <div className="pointer-events-none absolute bottom-10 left-2 rounded-md border border-line bg-panel/90 px-2.5 py-1.5 text-[11px] shadow-sm md:top-2 md:right-2 md:bottom-auto md:left-auto">
       <p className="mb-1 font-medium text-muted">{tr.sim.legend}</p>
-      <div className="h-2 w-36 rounded-full" style={{ background: VOLTAGE_GRADIENT }} />
+      <div className="h-2 w-36 rounded-full" style={{ background: voltageGradient(scale) }} />
       <div className="mt-0.5 flex w-36 justify-between tabular text-muted">
         <span>−{label}</span>
         <span>0 V</span>

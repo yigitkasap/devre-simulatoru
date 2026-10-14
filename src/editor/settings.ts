@@ -1,6 +1,7 @@
 // Kullanıcı ayarları; tarayıcıda saklanır. Depolamaya erişilemezse varsayılanlarla sessizce devam edilir.
 
 import { useCallback, useState } from 'react';
+import type { WireScale } from './colors';
 
 export type ResistorStyle = 'zigzag' | 'iec';
 
@@ -8,11 +9,14 @@ export interface Settings {
   readonly resistorStyle: ResistorStyle;
   /** Akım noktaları elektronların hareket yönünde (geleneksel akımın tersine) gitsin. */
   readonly electronFlow: boolean;
+  /** Kablo gerilimi renk ölçeği: klasik ya da renk körlüğüne uygun (mavi – gri – turuncu). */
+  readonly wireScale: WireScale;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   resistorStyle: 'zigzag',
   electronFlow: false,
+  wireScale: 'classic',
 };
 
 const STORAGE_KEY = 'devre-simulatoru:ayarlar';
@@ -27,6 +31,7 @@ function loadSettings(): Settings {
     return {
       resistorStyle: record.resistorStyle === 'iec' ? 'iec' : 'zigzag',
       electronFlow: record.electronFlow === true,
+      wireScale: record.wireScale === 'colorblind' ? 'colorblind' : 'classic',
     };
   } catch {
     return DEFAULT_SETTINGS;

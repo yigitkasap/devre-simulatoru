@@ -523,6 +523,9 @@ export const tr = {
     resistorStyle: 'Direnç sembolü',
     zigzag: 'Zigzag',
     iec: 'Kutu (IEC)',
+    wireScale: 'Kablo gerilimi renkleri',
+    classic: 'Klasik',
+    colorblind: 'Renk körlüğüne uygun',
   },
   canvas: {
     label: 'Devre şeması',

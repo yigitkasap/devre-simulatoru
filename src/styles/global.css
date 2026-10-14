@@ -1,27 +1,180 @@
 @import 'tailwindcss';
 
-@theme {
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, 'Liberation Mono', monospace;
+/* IBM Plex (SIL OFL 1.1, bkz. public/fonts/OFL.txt): yalnızca latin ve latin-ext alt kümeleri.
+   Yüklenemezse ya da bir karakter bu alt kümelerde yoksa (Ω, β gibi Yunanca harfler) sistem yazı
+   tipine düşülür. Sans değişken yazı tipidir (tek dosya, 100–700); Mono her kalınlık için ayrı. */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('/fonts/plex-sans-var-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('/fonts/plex-sans-var-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex-mono-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex-mono-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-mono-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex-mono-500-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/plex-mono-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/plex-mono-600-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
-  /* Arayüz renkleri */
+/* Tasarım belirteçleri (docs/tasarim/tokens.css; kaynak: DS-Token, DS-Renk, DS-Tipo). */
+@theme {
+  /* Yazı tipleri (IBM Plex yüklenemezse sistem yazı tipine düşer) */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', 'Segoe UI Mono', Consolas, 'Liberation Mono', monospace;
+
+  /* Arayüz */
   --color-app: #eef0f3;
   --color-panel: #ffffff;
+  --color-panel-2: #f6f7f9;
   --color-line: #dde1e6;
+  --color-line-2: #c4cad2;
   --color-ink: #1d2733;
   --color-muted: #5f6b7a;
   --color-accent: #1f6feb;
+  --color-accent-ink: #1557c0;
   --color-accent-soft: #e6effd;
-  --color-danger: #d92d20;
+  --color-ok: #1b7d44;
+  --color-ok-soft: #e8f5ed;
   --color-warn: #b54708;
   --color-warn-soft: #fef6e7;
+  --color-danger: #d92d20;
+  --color-danger-soft: #fdecea;
+  --color-paused: #e8a317;
+  --color-stopped: #9aa3ad;
 
-  /* Şema renkleri */
+  /* Şema */
   --color-paper: #fbfbf9;
   --color-grid: #d3d7dc;
+  --color-grid-major: #b3bac3;
   --color-symbol: #1d2733;
   --color-select: #1f6feb;
   --color-pin: #f05a28;
+  --color-dot: #ffd43b;
+  --color-dot-edge: #7a5c00;
+  --color-wire-off: #9aa3ad;
+  --color-earth: #1b7d44;
+
+  /* Cihaz ekranları */
+  --color-lcd-bg: #1e2a25;
+  --color-lcd-fg: #a6f4bd;
+  --color-scope-bg: #0f1713;
+  --color-scope-grid: #2b3b32;
+  --color-ch-a: #f2c94c;
+  --color-ch-b: #56ccf2;
+  --color-ch-xy: #9be37a;
+  --color-lamp-cc: #e5484d;
+
+  /* Gerilim ölçeği durakları: −1 … +1 (src/editor/colors.ts aynı formülle hesaplar) */
+  --color-v-n100: #194cb3;
+  --color-v-n50: #148f8f;
+  --color-v-0: #148f3d;
+  --color-v-p25: #338f14;
+  --color-v-p50: #7a8f14;
+  --color-v-p75: #b37319;
+  --color-v-p100: #b31919;
+
+  /* Ölçü */
+  --spacing: 4px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow-sm: 0 1px 2px rgb(29 39 51 / 0.1);
+  --shadow-md: 0 4px 12px rgb(29 39 51 / 0.12), 0 1px 3px rgb(29 39 51 / 0.08);
+  --shadow-lg: 0 16px 40px rgb(29 39 51 / 0.18), 0 2px 6px rgb(29 39 51 / 0.08);
+  --text-display: 28px;
+  --text-display--line-height: 34px;
+  --text-title: 20px;
+  --text-title--line-height: 28px;
+  --text-heading: 16px;
+  --text-heading--line-height: 24px;
+  --text-body: 14px;
+  --text-body--line-height: 20px;
+  --text-small: 13px;
+  --text-small--line-height: 18px;
+  --text-label: 12px;
+  --text-label--line-height: 16px;
+  --text-readout: 28px;
+  --text-readout--line-height: 32px;
+  --ease-sheet: cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+/* Koyu tema (isteğe bağlı; henüz bir ayarla açılmıyor) */
+[data-theme='dark'] {
+  --color-app: #0f141a;
+  --color-panel: #161d25;
+  --color-panel-2: #1b232c;
+  --color-line: #26313d;
+  --color-line-2: #34414f;
+  --color-ink: #e6ebf1;
+  --color-muted: #9aa7b5;
+  --color-accent: #5b9dff;
+  --color-accent-ink: #8db9ff;
+  --color-accent-soft: #1b2a44;
+  --color-paper: #12181f;
+  --color-grid: #27313b;
+  --color-grid-major: #3a4652;
+  --color-symbol: #d9e0e7;
+  --color-v-n100: #5a87e2;
+  --color-v-n50: #5ae2e2;
+  --color-v-0: #5ae287;
+  --color-v-p25: #7ce25a;
+  --color-v-p50: #cbe25a;
+  --color-v-p75: #e2a95a;
+  --color-v-p100: #e25a5a;
 }
 
 html,

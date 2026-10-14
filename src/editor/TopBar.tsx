@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { tr } from '../i18n/tr';
+import { voltageGradient } from './colors';
 import { Icon, type IconName } from './icons';
 import type { Settings } from './settings';
 
@@ -260,6 +261,23 @@ function SettingsMenu({ settings, onChange }: { settings: Settings; onChange: (p
                   )}
                 </svg>
                 {style === 'zigzag' ? tr.settings.zigzag : tr.settings.iec}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs font-semibold text-muted">{tr.settings.wireScale}</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {(['classic', 'colorblind'] as const).map((scale) => (
+              <button
+                key={scale}
+                type="button"
+                onClick={() => onChange({ wireScale: scale })}
+                aria-pressed={settings.wireScale === scale}
+                className={`rounded-md border px-2 py-2 text-xs ${
+                  settings.wireScale === scale ? 'border-accent bg-accent-soft text-accent' : 'border-line hover:bg-app'
+                }`}
+              >
+                <span className="mx-auto mb-1.5 block h-2 w-16 rounded-full" style={{ background: voltageGradient(scale) }} aria-hidden="true" />
+                {scale === 'classic' ? tr.settings.classic : tr.settings.colorblind}
               </button>
             ))}
           </div>

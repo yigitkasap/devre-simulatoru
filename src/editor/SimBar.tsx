@@ -61,7 +61,7 @@ function SimButton({
       disabled={disabled}
       title={title ?? label}
       className={`flex h-8 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors disabled:opacity-35 ${
-        tone === 'play' && !disabled ? 'bg-[#1f8a4c] text-white hover:brightness-110' : 'text-ink hover:bg-app'
+        tone === 'play' && !disabled ? 'bg-ok text-white hover:brightness-110' : 'text-ink hover:bg-app'
       }`}
     >
       <Icon name={icon} className="h-4 w-4" />
@@ -71,9 +71,9 @@ function SimButton({
 }
 
 const STATUS_DOT: Record<SimStatus, string> = {
-  running: 'bg-[#1f8a4c]',
-  paused: 'bg-[#e8a317]',
-  stopped: 'bg-[#9aa3ad]',
+  running: 'bg-ok',
+  paused: 'bg-paused',
+  stopped: 'bg-stopped',
 };
 
 export function SimBar(props: SimBarProps) {
