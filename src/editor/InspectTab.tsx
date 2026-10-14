@@ -14,10 +14,11 @@ import { Icon, type IconName } from './icons';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, validateLabel, validateNumber, valuePresets } from './propertyForm';
 import { meterText, partReadout, type ReadoutRow } from './readouts';
-import { Rich } from './Rich';
+import { plainText, Rich } from './Rich';
 import type { Settings } from './settings';
 import type { Selection } from './state';
 import { SymbolIcon } from './symbols';
+import { useThrottledText } from './a11y';
 import { useTouchUi } from './touchUi';
 import type { SimFrame, SimStatus } from './useSimulation';
 
@@ -329,6 +330,8 @@ const ZERO_MEASUREMENT = { voltage: 0, current: 0, power: 0 };
 function LiveSection({ part, frame, status }: { part: Part; frame: SimFrame | null; status: SimStatus }) {
   const m = frame?.measurements.get(part.id);
   const readout = m && frame ? partReadout(part, m, frame.statuses.get(part.id)) : partReadout(part, ZERO_MEASUREMENT);
+  // Ekran okuyucu canlı değerleri en çok saniyede bir duyar (N02).
+  const spoken = useThrottledText(m && readout ? readout.rows.map((r) => `${plainText(r.label)} ${r.value}`).join(', ') : '');
   if (!readout) return null;
 
   if (!m) {
@@ -355,7 +358,10 @@ function LiveSection({ part, frame, status }: { part: Part; frame: SimFrame | nu
   const [first, second, ...rest] = readout.rows;
   const formula = readout.note?.includes('→') ?? false;
   return (
-    <section className="flex flex-col gap-2.5" aria-label={tr.inspector.live} aria-live="polite">
+    <section className="flex flex-col gap-2.5" aria-label={tr.inspector.live}>
+      <p className="sr-only" aria-live="polite">
+        {spoken}
+      </p>
       <div className="flex items-center justify-between">
         <SectionTitle>{tr.inspector.live}</SectionTitle>
         <span className={`flex items-center gap-1.5 text-label font-semibold ${status === 'running' ? 'text-ok' : 'text-muted'}`}>
@@ -682,6 +688,7 @@ function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: st
   // Telefonda silme alt çubukta (Ölç kipinde yapı kilitli).
   const touch = useTouchUi();
   const voltage = frame?.wireVoltages.get(wireId);
+  const spoken = useThrottledText(voltage === undefined ? '' : `${tr.inspector.wireVoltage} ${formatSI(voltage, 'V')}`);
   return (
     <>
       <header className="flex items-center gap-2.5">
@@ -701,7 +708,10 @@ function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: st
         </button>
         )}
       </header>
-      <section className="flex flex-col gap-2" aria-live="polite">
+      <section className="flex flex-col gap-2">
+        <p className="sr-only" aria-live="polite">
+          {spoken}
+        </p>
         <SectionTitle>{tr.inspector.live}</SectionTitle>
         <div className="flex flex-col gap-0.5 rounded-[10px] border border-line px-3 py-2.5">
           <span className="text-label text-muted">{tr.inspector.wireVoltage}</span>

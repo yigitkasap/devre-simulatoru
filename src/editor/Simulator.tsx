@@ -4,7 +4,7 @@
 // dokunmatik İnceleme paneli (cihazlar panelin bir sekmesinde). Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım bağlantısı) ve
 // döndürme gibi birden çok bileşenin kullandığı işlemler de buradadır.
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
@@ -655,6 +655,8 @@ export default function Simulator() {
     previousRunStatus.current = sim.status;
     if (sim.status === 'stopped') setMeasureLayout(false);
     else if (sim.status === 'running' && before === 'stopped' && showRack) setMeasureLayout(true);
+    // Kilit bilgisi yalnızca ilk Ölç'te; sonra kip rozeti yeter (N02).
+    if (sim.status === 'stopped' && before !== 'stopped') setLockChipClosed(true);
     // Oynat'ta Bağla kipi ve parça ekleme kapanır (Ölç'te yapı kilitli).
     if (sim.status !== 'stopped' && before === 'stopped') {
       setConnect(null);
@@ -859,7 +861,7 @@ export default function Simulator() {
       dispatch={dispatch}
       libraryDragType={libraryDragType}
       onOpenProperties={openProperties}
-      keyboardEnabled={!shareLink && !examplesOpen && modal === null}
+      keyboardEnabled={!shareLink && !examplesOpen && modal === null && !helpOpen && !welcomeOpen}
       flowGraph={flowGraph}
       simActive={sim.status !== 'stopped'}
       frame={sim.frame}
@@ -930,6 +932,72 @@ export default function Simulator() {
         e.target.value = '';
       }}
     />
+  );
+
+  // Klavye kısayolları (onaylı liste, M12): + / − yakınlaştır, Shift+1 sığdır, P oynat/duraklat,
+  // Alt+1…3 panel sekmeleri, ? yardım. Yazı alanlarında ve açık pencerelerde çalışmaz. Tuşlar e.key ve
+  // e.code ile okunur; Türkçe Q klavyede de aynı.
+  const dialogOpen = Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || helpOpen || welcomeOpen;
+  const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  shortcutRef.current = (e: KeyboardEvent) => {
+    if (dialogOpen || e.defaultPrevented) return;
+    const target = e.target as HTMLElement | null;
+    if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+    if (e.ctrlKey || e.metaKey) return;
+    const inspectorTabs: InspectorTab[] = tablet && instruments.length > 0 ? ['inspect', 'example', 'devices', 'messages'] : ['inspect', 'example', 'messages'];
+    if (e.altKey) {
+      const n = /^Digit([1-4])$/.exec(e.code)?.[1];
+      const next = n ? inspectorTabs[Number(n) - 1] : undefined;
+      if (next && !phone) {
+        e.preventDefault();
+        setMeasureLayout(false);
+        setInspectorTab(next);
+        window.setTimeout(() => document.getElementById(`inspector-tab-${next}`)?.focus(), 0);
+      }
+      return;
+    }
+    if (e.key === '?') {
+      e.preventDefault();
+      if (phone) setModal('more');
+      else setHelpOpen(true);
+    } else if (e.shiftKey && e.code === 'Digit1') {
+      e.preventDefault();
+      canvasRef.current?.fit();
+    } else if (e.key === '+' || e.code === 'NumpadAdd') {
+      e.preventDefault();
+      canvasRef.current?.zoomIn();
+    } else if (e.key === '-' || e.key === '−' || e.code === 'NumpadSubtract') {
+      e.preventDefault();
+      canvasRef.current?.zoomOut();
+    } else if ((e.key === 'p' || e.key === 'P') && !e.altKey) {
+      e.preventDefault();
+      if (sim.status === 'running') sim.pause();
+      else sim.play();
+    }
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => shortcutRef.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  /** Panelden Esc: odak tuvale döner (N02). */
+  const backToCanvas = (e: ReactKeyboardEvent) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    const role = (e.target as HTMLElement).getAttribute('role');
+    if (role === 'menu' || role === 'menuitem' || role === 'dialog') return;
+    document.getElementById('tuval')?.focus();
+  };
+  const skipLink = (
+    <a
+      href="#tuval"
+      onClick={(e) => {
+        e.preventDefault();
+        document.getElementById('tuval')?.focus();
+      }}
+      className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+    >
+      {tr.a11y.skip}
+    </a>
   );
 
   // Kısa tur: her adım gerçek eylemle ilerler (parça eklendi, kablo çekildi, Oynat, parça incelendi).
@@ -1073,6 +1141,8 @@ export default function Simulator() {
     const rackDevice = instruments.find((p) => p.id === rackActive) ?? instruments[0];
     return (
       <div className="app-root flex flex-col overflow-hidden">
+
+        {skipLink}
         <TabletTopBar
           title={circuitTitle}
           mode={phoneMode}
@@ -1179,6 +1249,7 @@ export default function Simulator() {
             touch
             devices={devicesBody}
             inspectBody={inspectBody}
+            onKeyDown={backToCanvas}
           />
         </div>
         {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
@@ -1475,6 +1546,8 @@ export default function Simulator() {
           className="app-root flex overflow-hidden bg-panel"
           style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}
         >
+
+          {skipLink}
           {fileInput}
           <main className={`relative min-w-0 flex-1 bg-paper ${devicesOpen ? 'hidden' : ''}`} style={{ boxShadow: canvasShadow }}>
             {canvas}
@@ -1512,6 +1585,8 @@ export default function Simulator() {
 
     return (
       <div className="app-root flex flex-col overflow-hidden bg-panel">
+
+        {skipLink}
         <PhoneTopStrip {...stripProps} />
         {fileInput}
         <div ref={phoneAreaRef} className="relative min-h-0 flex-1 bg-paper">
@@ -1555,6 +1630,8 @@ export default function Simulator() {
 
   return (
     <div className="app-root flex flex-col overflow-hidden">
+
+      {skipLink}
       <TopBar
         toolKind={tool.kind}
         canUndo={state.past.length > 0}
@@ -1654,6 +1731,7 @@ export default function Simulator() {
           inspect={inspectProps}
           example={exampleProps}
           messages={messagesProps}
+          onKeyDown={backToCanvas}
         />
       </div>
 

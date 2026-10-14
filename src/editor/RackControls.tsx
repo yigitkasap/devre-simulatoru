@@ -142,7 +142,7 @@ export function Stepper({
 
   return (
     <div
-      className={`flex items-stretch overflow-hidden border bg-panel ${touch ? 'h-11 rounded-[10px]' : 'h-9 rounded-md'} ${
+      className={`flex items-stretch overflow-hidden border bg-panel ${touch ? 'h-[46px] rounded-[10px]' : 'h-9 rounded-md'} ${
         invalid ? 'border-danger' : 'border-rack-line'
       } ${disabled ? 'opacity-50' : ''}`}
     >

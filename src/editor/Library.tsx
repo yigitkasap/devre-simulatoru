@@ -6,7 +6,7 @@
 // olarak gösterir (LibraryFlyout); kart tuval alanının içinde durur, alttaki çubukları kapatmaz.
 // Örnekler üst çubuktaki "Örnekler" penceresindedir.
 
-import { useEffect, useMemo, useRef, useState, type Dispatch } from 'react';
+import { useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { tr } from '../i18n/tr';
 import { CATEGORIES, type Category } from '../model/catalog';
 import type { DeviceType } from '../sim/netlist';
@@ -146,7 +146,26 @@ function LibraryPanel({
     })).filter((cat) => cat.types.length > 0);
   }, [query]);
 
-  const choose = (type: DeviceType) => {
+  // Liste tek odak durağıdır: oklar, Home ve End ile gezilir; Enter parçayı tuvalin ortasına ekler (N02).
+  const [focusIndex, setFocusIndex] = useState(0);
+  const onListKeys = (e: ReactKeyboardEvent<HTMLElement>) => {
+    const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[data-lib-item]')];
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    if (index < 0) return;
+    const next =
+      e.key === 'ArrowDown' ? index + 1 : e.key === 'ArrowUp' ? index - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    const target = items[Math.max(0, Math.min(items.length - 1, next))];
+    target?.focus();
+  };
+
+  const choose = (type: DeviceType, keyboard = false) => {
+    if (keyboard) {
+      onAddPart(type);
+      if (mode === 'flyout') onClose();
+      return;
+    }
     if (touch) {
       // Dokunmatikte imleci izleyen önizleme olmadığı için "seç, sonra tuvale dokun" belirsizdir:
       // parça doğrudan görünen alanın ortasına eklenir.
@@ -189,18 +208,24 @@ function LibraryPanel({
       </div>
 
       <nav
+        aria-label={tr.library.listLabel}
         className="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto overscroll-contain px-2 pb-2"
         onPointerLeave={(e) => e.pointerType === 'mouse' && onPreview(null)}
+        onKeyDown={onListKeys}
       >
         {groups.length === 0 && <p className="px-2 py-3 text-sm text-muted">{tr.library.noResults}</p>}
-        {groups.map((cat, i) => (
+        {groups.map((cat, i) => {
+          const total = groups.reduce((n, g) => n + g.types.length, 0);
+          const before = groups.slice(0, i).reduce((n, g) => n + g.types.length, 0);
+          return (
           <section key={cat.id}>
             <h3 className={`px-2 pb-1 text-label font-semibold text-muted ${i === 0 ? 'pt-2' : 'pt-2.5'}`}>
               {tr.library.categories[cat.id]}
             </h3>
             <ul className="flex flex-col gap-px">
-              {cat.types.map((type) => {
+              {cat.types.map((type, j) => {
                 const active = tool.kind === 'place' && tool.type === type;
+                const index = before + j;
                 return (
                   <li key={type}>
                     <PartButton
@@ -211,13 +236,16 @@ function LibraryPanel({
                       onChoose={choose}
                       onPreview={onPreview}
                       onDragTypeChange={onDragTypeChange}
+                      tabIndex={index === Math.min(focusIndex, total - 1) ? 0 : -1}
+                      onFocus={() => setFocusIndex(index)}
                     />
                   </li>
                 );
               })}
             </ul>
           </section>
-        ))}
+          );
+        })}
       </nav>
 
       <div aria-live="polite" className="flex flex-col gap-1.5 border-t border-line bg-panel-2 px-3.5 pt-3 pb-3.5">
@@ -241,15 +269,20 @@ function PartButton({
   onPreview,
   onDragTypeChange,
   rail = false,
+  tabIndex,
+  onFocus,
 }: {
   type: DeviceType;
   active: boolean;
   touch: boolean;
   settings: Settings;
-  onChoose: (type: DeviceType) => void;
+  /** `keyboard`: Enter / Boşluk ile seçildi (tuvalin ortasına eklenir). */
+  onChoose: (type: DeviceType, keyboard?: boolean) => void;
   onPreview: (type: DeviceType | null) => void;
   onDragTypeChange: (type: DeviceType | null) => void;
   rail?: boolean;
+  tabIndex?: number;
+  onFocus?: () => void;
 }) {
   return (
     <button
@@ -261,7 +294,11 @@ function PartButton({
         onDragTypeChange(type);
       }}
       onDragEnd={() => onDragTypeChange(null)}
-      onClick={() => onChoose(type)}
+      // Klavyeyle (detail 0) seçilince parça doğrudan eklenir; fareyle yerleştirme aracı başlar.
+      onClick={(e) => onChoose(type, e.detail === 0)}
+      data-lib-item=""
+      tabIndex={tabIndex}
+      onFocus={onFocus}
       // Önizleme yalnızca gerçek farede değişir: iOS Safari'de dokunuşun ürettiği "üzerine gelme"
       // olayı sayfayı değiştirirse ilk dokunuşta tıklama gönderilmez.
       onPointerEnter={(e) => e.pointerType === 'mouse' && onPreview(type)}
@@ -285,8 +322,8 @@ function PartButton({
 
 /** 56 px şerit: kütüphaneyi aç, ara ve son kullanılan parçalar. */
 function Rail({ tool, settings, dispatch, onDragTypeChange, onExpand, onClose, touch, onAddPart, onPreview, recent, flyoutOpen }: LibraryProps) {
-  const choose = (type: DeviceType) => {
-    if (touch) onAddPart(type);
+  const choose = (type: DeviceType, keyboard = false) => {
+    if (touch || keyboard) onAddPart(type);
     else dispatch({ type: 'set-tool', tool: { kind: 'place', type, rotation: 0 } });
   };
   const open = flyoutOpen === true;

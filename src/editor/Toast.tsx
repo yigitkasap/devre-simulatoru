@@ -43,8 +43,8 @@ export function Toast({ toast, offset = 112, onDone }: { toast: ToastMessage | n
       key={toast.id}
       role={toast.tone === 'error' ? 'alert' : 'status'}
       style={{ bottom: `calc(${Math.round(offset)}px + env(safe-area-inset-bottom))` }}
-      className={`fixed left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg py-2 pl-4 text-sm shadow-lg ${
-        toast.action ? 'pr-1.5' : 'pointer-events-none pr-4'
+      className={`fixed left-1/2 z-50 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg pl-4 text-sm shadow-lg ${
+        toast.action ? 'py-0.5 pr-1' : 'pointer-events-none py-2 pr-4'
       } ${toast.tone === 'error' ? 'bg-danger text-white' : 'bg-ink text-white'}`}
     >
       <span>{toast.text}</span>
@@ -55,7 +55,7 @@ export function Toast({ toast, offset = 112, onDone }: { toast: ToastMessage | n
             toast.action?.run();
             onDone?.();
           }}
-          className="h-9 shrink-0 rounded-md px-3 font-semibold text-[#9cc3ff] hover:bg-white/10"
+          className="h-11 shrink-0 rounded-md px-3 font-semibold text-[#9cc3ff] hover:bg-white/10"
         >
           {toast.action.label}
         </button>

@@ -16,7 +16,8 @@ import { Icon } from './icons';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, stepKind, stepValue, validateLabel, validateNumber, valuePresets } from './propertyForm';
 import { partReadout } from './readouts';
-import { Rich } from './Rich';
+import { useThrottledText } from './a11y';
+import { plainText, Rich } from './Rich';
 import type { Settings } from './settings';
 import { SymbolIcon } from './symbols';
 import type { SimFrame, SimStatus } from './useSimulation';
@@ -725,6 +726,7 @@ export function MeasureSheetBody({ part, doc, frame, status, settings, expanded:
   const down = primary && primaryValue !== null ? stepValue(primary, primaryValue, -1) : null;
   const up = primary && primaryValue !== null ? stepValue(primary, primaryValue, 1) : null;
   const primaryLabel = primary ? tr.properties.fieldLabel(part.type, primary.key) : '';
+  const spoken = useThrottledText(m ? rows.map((r) => `${plainText(r.label)} ${r.value}`).join(', ') : '');
 
   return (
     <>
@@ -739,7 +741,10 @@ export function MeasureSheetBody({ part, doc, frame, status, settings, expanded:
       />
       {/* Dar yan panelde (yatay telefon, L01) ölçümler satır satır; genişte üç kutu yan yana. */}
       <div className="@container flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4 pb-4">
-        <div aria-live="polite" className="grid grid-cols-1 @[330px]:grid-cols-3 @[330px]:gap-2.5">
+        <p className="sr-only" aria-live="polite">
+          {spoken}
+        </p>
+        <div className="grid grid-cols-1 @[330px]:grid-cols-3 @[330px]:gap-2.5">
           {(expanded ? rows : rows.slice(0, 3)).map((row) => {
             const [number, unit] = splitUnit(m ? row.value : '');
             return (

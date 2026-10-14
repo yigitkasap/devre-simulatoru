@@ -32,11 +32,13 @@ export interface InspectorProps {
   readonly devices?: ReactNode;
   /** Tablet: İncele sekmesinde seçili parçanın dokunmatik sayfası (yoksa İncele sekmesi). */
   readonly inspectBody?: ReactNode;
+  /** Panelde basılan tuşlar (Esc: tuvale dön). */
+  readonly onKeyDown?: (e: ReactKeyboardEvent) => void;
 }
 
 const TAB_ICONS: Record<InspectorTab, IconName> = { inspect: 'search', example: 'book', devices: 'devices', messages: 'chat' };
 
-export function Inspector({ width, collapsed, onExpand, tab: requested, onTab, inspect, example, messages, touch = false, devices, inspectBody }: InspectorProps) {
+export function Inspector({ width, collapsed, onExpand, tab: requested, onTab, inspect, example, messages, touch = false, devices, inspectBody, onKeyDown: onPanelKey }: InspectorProps) {
   const TABS: readonly InspectorTab[] = devices ? ['inspect', 'example', 'devices', 'messages'] : DESK_TABS;
   const tab = TABS.includes(requested) ? requested : 'inspect';
   const errors = messages.items.filter((i) => i.severity === 'error').length;
@@ -95,6 +97,7 @@ export function Inspector({ width, collapsed, onExpand, tab: requested, onTab, i
   return (
     <aside
       data-tour="inspect"
+      onKeyDown={onPanelKey}
       aria-label={tr.inspector.label}
       className="flex min-h-0 shrink-0 flex-col border-l border-line bg-panel"
       style={{ width }}

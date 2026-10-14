@@ -11,9 +11,9 @@ export type SheetSize = 'peek' | 'half' | 'full';
 
 /** Tam boyda sayfanın üstünde kalan devre şeridi (px). */
 export const SHEET_FULL_TOP = 112;
-export const PEEK_HEIGHT = 200;
+export const PEEK_HEIGHT = 214;
 /** Kısa ekranda (375×667; S01) küçük sayfa. */
-const PEEK_HEIGHT_SMALL = 150;
+const PEEK_HEIGHT_SMALL = 164;
 const DRAG_PX = 28;
 
 export interface BottomSheetProps {
@@ -101,7 +101,7 @@ export function BottomSheet({ size, sizes, onSize, onClose, label, role = 'regio
           dragged.current = true;
           step(dy < 0 ? 1 : -1);
         }}
-        className="flex h-[30px] w-full shrink-0 touch-none items-center justify-center rounded-t-xl"
+        className="flex h-11 w-full shrink-0 touch-none items-center justify-center rounded-t-xl"
       >
         <i className={`block h-[5px] w-9 rounded-[3px] ${tone === 'rack' ? 'bg-muted' : 'bg-line-2'}`} aria-hidden="true" />
       </button>

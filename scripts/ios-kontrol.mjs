@@ -409,7 +409,7 @@ try {
     await tap(page, cdp, await screen(page, r1.x, r1.y)); await page.waitForTimeout(300);
     const sheet = await page.getByRole('region', { name: 'Ölçümler' }).boundingBox();
     const svgBox = await page.locator('svg.schematic').boundingBox();
-    check('375×667: Ölç’te parçanın küçük sayfası 150 px; tuval sayfanın üstünde bitiyor', sheet !== null && Math.round(sheet.height) === 150 && svgBox.y + svgBox.height <= sheet.y + 1, sheet ? `sayfa ${Math.round(sheet.height)} px` : 'yok');
+    check('375×667: Ölç’te parçanın küçük sayfası 164 px; tuval sayfanın üstünde bitiyor', sheet !== null && Math.round(sheet.height) === 164 && svgBox.y + svgBox.height <= sheet.y + 1, sheet ? `sayfa ${Math.round(sheet.height)} px` : 'yok');
     await shot(page, 'ios-9-kucuk.png');
     await page.context().close();
   }
@@ -520,6 +520,69 @@ try {
     await page.getByRole('button', { name: /Daha fazla/ }).tap(); await page.waitForTimeout(300);
     const more = (await page.getByRole('dialog', { name: 'Daha fazla' }).textContent()) ?? '';
     check('telefonda ⋯: Yardım sekmesinde dokunma hareketleri (P14)', more.includes('Uca dokun') && more.includes('Düğüm gerilimleri'), more.slice(0, 40));
+    await ctx.close();
+  }
+
+  // --- 9. aşama: klavye, odak sırası ve kısayollar (N02, M12) --------------------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const active = () => page.evaluate(() => ({ id: document.activeElement?.id ?? '', tag: document.activeElement?.tagName ?? '', text: (document.activeElement?.textContent ?? '').trim().slice(0, 30) }));
+    await page.keyboard.press('Tab');
+    const first = await active();
+    await page.keyboard.press('Enter');
+    const afterSkip = await active();
+    check('ilk Tab durağı "Tuvale atla"; Enter tuvale götürüyor', first.text === 'Tuvale atla' && afterSkip.id === 'tuval', `${first.text} → ${afterSkip.id}`);
+    // Kütüphane tek durak: oklarla gez, Enter tuvalin ortasına ekler.
+    await page.getByRole('button', { name: 'Pil', exact: true }).focus();
+    await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
+    const libFocus = await active();
+    await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    const tabStops = await page.locator('[data-lib-item][tabindex="0"]').count();
+    check('kütüphane listesi tek durak; oklarla geziliyor, Enter tuvale ekliyor', libFocus.text === 'Toprak' && tabStops === 1 && (await doc(page)).parts.some((p) => p.type === 'ground'), libFocus.text);
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).focus();
+    await page.keyboard.press('Space'); await page.waitForTimeout(300);
+    const examplesOpen = (await page.getByRole('dialog', { name: 'Örnek devreler' }).count()) === 1;
+    check('odak bir düğmedeyken Boşluk düğmeyi çalıştırıyor (tuval kaydırmayı yutmuyor)', examplesOpen);
+    if (examplesOpen) await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click();
+    await page.waitForTimeout(500);
+    await page.locator('#tuval').focus();
+    await page.keyboard.press('ArrowRight'); await page.waitForTimeout(150);
+    const announced = (await page.locator('#tuval ~ p[aria-live]').first().textContent().catch(() => '')) ?? '';
+    const selected = (await page.evaluate(() => JSON.stringify(document.activeElement?.id))) === '"tuval"';
+    check('tuvalde oklar en yakın parçayı seçiyor ve seçim duyuruluyor', selected && announced.includes('seçili'), announced);
+    const before = await doc(page);
+    const selectedLabel = announced.split(',')[0] ?? '';
+    const partBefore = before.parts.find((p) => p.label === selectedLabel);
+    await page.keyboard.press('Shift+ArrowRight'); await page.waitForTimeout(150);
+    const partAfter = (await doc(page)).parts.find((p) => p.label === selectedLabel);
+    check('Shift + ok seçili parçayı 1 birim kaydırıyor', partBefore && partAfter && partAfter.x === partBefore.x + 1, `${partBefore?.x} → ${partAfter?.x}`);
+    await page.keyboard.press('Enter'); await page.waitForTimeout(200);
+    const inField = await active();
+    await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+    const back = await active();
+    check('Enter değer alanına, panelden Esc tuvale götürüyor', inField.tag === 'INPUT' && back.id === 'tuval', `${inField.tag} → ${back.id}`);
+    const scale0 = (await screen(page, 0, 0)).scale;
+    await page.keyboard.press('+'); await page.waitForTimeout(100);
+    const scale1 = (await screen(page, 0, 0)).scale;
+    await page.keyboard.press('Shift+Digit1'); await page.waitForTimeout(100);
+    const scale2 = (await screen(page, 0, 0)).scale;
+    check('+ yakınlaştırıyor, Shift+1 devreyi sığdırıyor', scale1 > scale0 && Math.abs(scale2 - scale0) < 0.01, `${scale0.toFixed(2)} → ${scale1.toFixed(2)} → ${scale2.toFixed(2)}`);
+    await page.keyboard.press('p'); await page.waitForTimeout(400);
+    const running = (await page.getByRole('region', { name: 'Simülasyon' }).getByRole('status').first().textContent()) ?? '';
+    await page.keyboard.press('p'); await page.waitForTimeout(200);
+    const paused = (await page.getByRole('region', { name: 'Simülasyon' }).getByRole('status').first().textContent()) ?? '';
+    check('P oynatıp duraklatıyor', running.includes('Çalışıyor') && paused.includes('Duraklatıldı'), `${running} / ${paused}`);
+    await page.keyboard.press('Alt+Digit3'); await page.waitForTimeout(150);
+    const messagesTab = await page.getByRole('tab', { name: /Mesajlar/ }).getAttribute('aria-selected');
+    check('Alt+3 Mesajlar sekmesine geçiyor', messagesTab === 'true');
+    await page.locator('#tuval').focus();
+    await page.keyboard.press('?'); await page.waitForTimeout(200);
+    const helpOpen = (await page.getByRole('dialog', { name: 'Yardım' }).count()) === 1;
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    check('? Yardım’ı açıyor, Esc kapatıyor', helpOpen && (await page.getByRole('dialog', { name: 'Yardım' }).count()) === 0);
     await ctx.close();
   }
 

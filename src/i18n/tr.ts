@@ -553,6 +553,7 @@ export const tr = {
     open: 'Parça kütüphanesini aç',
     recent: 'Son',
     recentLabel: 'Son kullanılan parçalar',
+    listLabel: 'Parça listesi (oklarla gez, Enter: tuvalin ortasına ekle)',
     add: (name: string) => `${name} ekle`,
   },
   toolbar: {
@@ -1374,6 +1375,15 @@ export const tr = {
     undo: 'Geri al',
     deleted: (what: string) => `${what} silindi.`,
     adjustSpeed: 'Hızı ayarla',
+  },
+  a11y: {
+    skip: 'Tuvale atla',
+    canvasKeys:
+      'Ok tuşları: en yakın parçaya geç. Shift ve ok: seçili parçayı kaydır. Enter: değer alanı. R döndür, F ters çevir, Delete sil, Esc seçimi kaldır.',
+    selected: (what: string) => `${what} seçili`,
+    partList: 'Devredeki parçalar',
+    pinList: 'Uçlar (Bağla kipi)',
+    pin: (label: string, pin: string, connected: boolean) => `${label}, ${pin}${connected ? ', bağlı' : ''}`,
   },
   tablet: {
     tools: 'Araçlar',

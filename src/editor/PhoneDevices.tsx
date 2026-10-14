@@ -264,7 +264,7 @@ function PhoneScope({
             </div>
             <Segmented<ScopeCoupling>
               touch
-              className="w-[132px] shrink-0"
+              className="w-[140px] shrink-0"
               label={`${name} ${tr.scope.coupling.toLocaleLowerCase('tr-TR')}`}
               options={(['ac', 'gnd', 'dc'] as const)
                 .filter((c) => SCOPE_COUPLINGS.includes(c))

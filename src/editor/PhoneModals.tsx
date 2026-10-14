@@ -38,7 +38,7 @@ function ModalSheet({ label, top, onClose, children }: { label: string; top: num
         className="sheet-in absolute inset-x-0 bottom-0 flex flex-col rounded-t-xl bg-panel shadow-[0_-4px_18px_rgba(29,39,51,0.2)]"
         style={{ top: `calc(${top}px + env(safe-area-inset-top))` }}
       >
-        <button type="button" onClick={onClose} aria-label={tr.phone.close} className="flex h-[30px] w-full shrink-0 items-center justify-center rounded-t-xl" tabIndex={-1}>
+        <button type="button" onClick={onClose} aria-label={tr.phone.close} className="flex h-11 w-full shrink-0 items-center justify-center rounded-t-xl" tabIndex={-1}>
           <i className="block h-[5px] w-9 rounded-[3px] bg-line-2" aria-hidden="true" />
         </button>
         {children}

@@ -49,7 +49,7 @@ import {
 import { BurnBalloon, ContextMenu, NoGroundBanner, type MenuItem } from './CanvasOverlays';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
-import { meterDisplayRect, PartView, type PartTone } from './PartView';
+import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
 import { routeAround } from './phoneTools';
 import { meterText } from './readouts';
 import { HintText } from './HintStrip';
@@ -395,6 +395,11 @@ export function Canvas({
   // değişince (raf, panel, pencere) böyleyse devre kalan alana yeniden sığdırılır; değilse yalnızca
   // görünümün merkezi korunur (N02 → yeniden sığdırma kuralları).
   const fittedRef = useRef(true);
+  const [isFitted, setIsFitted] = useState(true);
+  const markUnfitted = () => {
+    fittedRef.current = false;
+    setIsFitted(false);
+  };
   const previousSize = useRef(size);
   useEffect(() => {
     const previous = previousSize.current;
@@ -420,6 +425,7 @@ export function Canvas({
 
   const fit = () => {
     fittedRef.current = true;
+    setIsFitted(true);
     const bounds = docBounds(doc);
     if (!bounds) {
       setView((v) => ({ ...v, x: size.width / 2, y: size.height / 2 }));
@@ -450,7 +456,7 @@ export function Canvas({
       (box.x + box.w) * g + view.x <= size.width &&
       (box.y + box.h) * g + view.y <= size.height;
     if (inside) return;
-    fittedRef.current = false;
+    markUnfitted();
     const fits = box.w * g < size.width - 80 && box.h * g < size.height - 80;
     if (fits) {
       const cx = (box.x + box.w / 2) * GRID;
@@ -501,11 +507,11 @@ export function Canvas({
 
   useImperativeHandle(ref, () => ({
     zoomIn: () => {
-      fittedRef.current = false;
+      markUnfitted();
       setView((v) => zoomAt(v, size.width / 2, size.height / 2, ZOOM_STEP));
     },
     zoomOut: () => {
-      fittedRef.current = false;
+      markUnfitted();
       setView((v) => zoomAt(v, size.width / 2, size.height / 2, 1 / ZOOM_STEP));
     },
     fit,
@@ -522,7 +528,7 @@ export function Canvas({
       e.preventDefault();
       const rect = el.getBoundingClientRect();
       const factor = Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015));
-      fittedRef.current = false;
+      markUnfitted();
       setView((v) => zoomAt(v, e.clientX - rect.left, e.clientY - rect.top, factor));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -723,6 +729,23 @@ export function Canvas({
     }
   };
 
+  /** Bağla kipinde bir uca (ya da kablo üzerindeki noktaya) dokunuş: başlangıç ya da bitiş. */
+  const connectTo = (target: ConnectStart) => {
+    if (!phone) return;
+    const start = phone.connectStart;
+    if (!start) {
+      phone.onConnectStart(target);
+      return;
+    }
+    if (samePoint(start.point, target.point)) {
+      phone.onConnectStart(null);
+      return;
+    }
+    const result = addWire(doc, [start.point, ...routeAround(doc, start.point, target.point)]);
+    if (result.id) commit(result.doc, EMPTY_SELECTION);
+    phone.onConnectStart(null);
+  };
+
   const phoneTap = (hit: Hit | null, g: Point, local: { x: number; y: number }) => {
     if (!phone) return;
     if (phone.mode === 'bagla') {
@@ -738,18 +761,7 @@ export function Canvas({
         }
         return;
       }
-      const start = phone.connectStart;
-      if (!start) {
-        phone.onConnectStart(target);
-        return;
-      }
-      if (samePoint(start.point, target.point)) {
-        phone.onConnectStart(null);
-        return;
-      }
-      const result = addWire(doc, [start.point, ...routeAround(doc, start.point, target.point)]);
-      if (result.id) commit(result.doc, EMPTY_SELECTION);
-      phone.onConnectStart(null);
+      connectTo(target);
       return;
     }
     const crowd = crowdOptions(g);
@@ -1032,7 +1044,7 @@ export function Canvas({
       const center = localPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
       const scale = clampScale(start.view.scale * (Math.hypot(a.x - b.x, a.y - b.y) / start.distance));
       const k = scale / start.view.scale;
-      fittedRef.current = false;
+      markUnfitted();
       setView({
         scale,
         x: center.x - (start.cx - start.view.x) * k,
@@ -1049,7 +1061,7 @@ export function Canvas({
       const local = localPoint(e.clientX, e.clientY);
       if (Math.hypot(local.x - current.sx, local.y - current.sy) <= DRAG_THRESHOLD_PX * 1.6) return;
       clearPhoneTimers();
-      fittedRef.current = false;
+      markUnfitted();
       setInteraction({ kind: 'pan', pointerId: e.pointerId, sx: current.sx, sy: current.sy, view: current.view });
       setView({ ...current.view, x: current.view.x + local.x - current.sx, y: current.view.y + local.y - current.sy });
       return;
@@ -1058,7 +1070,7 @@ export function Canvas({
     switch (current.kind) {
       case 'pan': {
         const local = localPoint(e.clientX, e.clientY);
-        fittedRef.current = false;
+        markUnfitted();
         setView({ ...current.view, x: current.view.x + local.x - current.sx, y: current.view.y + local.y - current.sy });
         return;
       }
@@ -1241,12 +1253,17 @@ export function Canvas({
     if (!keyboardEnabled) return;
     const target = e.target as HTMLElement | null;
     if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+    // Boşluk, oklar ve Enter yalnızca odak tuvaldeyken (ya da hiçbir yerde değilken): düğmelerin ve
+    // seçicilerin kendi tuşları bozulmasın (N02).
+    const onCanvas = !target || target === document.body || (e.target as Node) === svgRef.current;
     if (e.code === 'Space') {
+      if (!onCanvas) return;
       e.preventDefault();
       setSpaceDown(down);
       return;
     }
     if (!down) return;
+    if (onCanvas && keyboardNav(e)) return;
     const key = e.key.toLowerCase();
     const ctrl = e.ctrlKey || e.metaKey;
     const current = interactionRef.current;
@@ -1284,6 +1301,58 @@ export function Canvas({
       dispatch({ type: 'set-tool', tool: tool.kind === 'wire' ? { kind: 'select' } : { kind: 'wire' } });
     }
   };
+  /** Ok tuşları: en yakın parçaya geç; Shift + ok: seçili parçaları 1 birim kaydır; Enter: değer alanı. */
+  const keyboardNav = (e: KeyboardEvent): boolean => {
+    const dir =
+      e.key === 'ArrowRight' ? { x: 1, y: 0 } : e.key === 'ArrowLeft' ? { x: -1, y: 0 } : e.key === 'ArrowDown' ? { x: 0, y: 1 } : e.key === 'ArrowUp' ? { x: 0, y: -1 } : null;
+    if (e.key === 'Enter') {
+      if (selection.parts.length !== 1) return false;
+      e.preventDefault();
+      onOpenProperties(selection.parts[0]!);
+      return true;
+    }
+    if (!dir || e.ctrlKey || e.metaKey || e.altKey) return false;
+    e.preventDefault();
+    if (e.shiftKey) {
+      if (selection.parts.length === 0 && selection.wires.length === 0) return true;
+      if (simActive && phone) return true;
+      commit(moveSelection(doc, new Set(selection.parts), new Set(selection.wires), dir.x, dir.y));
+      return true;
+    }
+    if (doc.parts.length === 0) return true;
+    const centerOf = (part: CircuitDoc['parts'][number]) => {
+      const b = partBounds(part);
+      return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    };
+    const current = selection.parts.length === 1 ? doc.parts.find((p) => p.id === selection.parts[0]) : undefined;
+    let next: CircuitDoc['parts'][number] | undefined;
+    if (!current) {
+      // Seçim yoksa görünür alanın ortasına en yakın parça.
+      const c = screenToGrid(view, size.width / 2, size.height / 2);
+      next = [...doc.parts].sort((a, b) => Math.hypot(centerOf(a).x - c.x, centerOf(a).y - c.y) - Math.hypot(centerOf(b).x - c.x, centerOf(b).y - c.y))[0];
+    } else {
+      const from = centerOf(current);
+      let best = Infinity;
+      for (const part of doc.parts) {
+        if (part.id === current.id) continue;
+        const c = centerOf(part);
+        const along = (c.x - from.x) * dir.x + (c.y - from.y) * dir.y;
+        if (along <= 0.5) continue;
+        const across = Math.abs((c.x - from.x) * dir.y) + Math.abs((c.y - from.y) * dir.x);
+        const score = along + 2 * across;
+        if (score < best) {
+          best = score;
+          next = part;
+        }
+      }
+    }
+    if (next) {
+      dispatch({ type: 'select', selection: { parts: [next.id], wires: [] } });
+      reveal([next.id], []);
+    }
+    return true;
+  };
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => keyHandlerRef.current(e, true);
     const up = (e: KeyboardEvent) => keyHandlerRef.current(e, false);
@@ -1408,8 +1477,11 @@ export function Canvas({
         // iOS/WebKit, touch-action: none bölgesini üstüne binen katmanlara da uygulayabiliyor; o zaman
         // tuvalin üstündeki çekmece ya da pencere parmakla kaydırılamıyor. Katman açıkken kapatılır.
         style={overlayOpen ? { touchAction: 'auto' } : undefined}
-        role="img"
+        id="tuval"
+        tabIndex={0}
+        role="application"
         aria-label={phone?.mode === 'bagla' ? tr.phone.connectCanvas : phone?.mode === 'olc' ? tr.phone.olcCanvas : tr.canvas.label}
+        aria-describedby={`${sceneId}-keys`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -1704,6 +1776,44 @@ export function Canvas({
 
       {bagla && phone && <ConnectTargets doc={doc} connectivity={connectivity} view={view} size={size} start={phone.connectStart} />}
 
+      {/* Ekran okuyucu: tuvalin klavye ipucu, seçimin duyurusu ve (dokunmatikte) parça ya da uç listesi. */}
+      <p id={`${sceneId}-keys`} className="sr-only">
+        {tr.a11y.canvasKeys}
+      </p>
+      <p className="sr-only" aria-live="polite">
+        {selectionAnnouncement(doc, selection)}
+      </p>
+      {phone && (
+        <nav className="sr-only" aria-label={bagla ? tr.a11y.pinList : tr.a11y.partList}>
+          <ul>
+            {bagla
+              ? doc.parts.flatMap((part) =>
+                  pinPositions(part).map((pos, i) => (
+                    <li key={`${part.id}-${i}`}>
+                      <button type="button" tabIndex={-1} onClick={() => connectTo({ point: pos, partId: part.id, pin: i })}>
+                        {tr.a11y.pin(part.label, tr.devices.pinShort[part.type][i] ?? '', !connectivity.unconnectedPins.has(pinKey(part.id, i)))}
+                      </button>
+                    </li>
+                  )),
+                )
+              : doc.parts.map((part) => (
+                  <li key={part.id}>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => {
+                        dispatch({ type: 'select', selection: { parts: [part.id], wires: [] } });
+                        if (phone.mode === 'olc') phone.onInspect(part.id);
+                      }}
+                    >
+                      {[part.label, tr.devices.names[part.type], partValueText(part)].filter(Boolean).join(', ')}
+                    </button>
+                  </li>
+                ))}
+          </ul>
+        </nav>
+      )}
+
       {doc.parts.length === 0 && doc.wires.length === 0 && tool.kind === 'select' && (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-muted">
           <svg width="64" height="40" viewBox="0 0 64 40" aria-hidden="true">
@@ -1883,6 +1993,19 @@ export function Canvas({
         <NoGroundBanner text={noGround.text} fixLabel={noGround.fixLabel} onFix={noGround.onFix} onDismiss={noGround.onDismiss} />
       )}
 
+      {phone && !isFitted && !bagla && !phone.strip && doc.parts.length > 0 && (
+        <button
+          type="button"
+          onClick={fit}
+          aria-label={tr.toolbar.fit}
+          title={tr.toolbar.fit}
+          className={`absolute right-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-panel/95 text-ink shadow-sm ${
+            phone.mode === 'olc' && phone.lockChip ? 'top-[100px]' : 'top-11'
+          }`}
+        >
+          <Icon name="fit" />
+        </button>
+      )}
       {/* Telefon: uzaklaşınca değerler gizlenir; masaüstünde yakınlık üst çubukta. */}
       {lod && !bagla && !phone?.strip && (
         <p
@@ -2279,4 +2402,15 @@ function docBounds(doc: CircuitDoc): Box | null {
   if (!box) return null;
   // Etiketler ve ölçü aleti ekranları için pay
   return { x: box.x - 2, y: box.y - 4, w: box.w + 4, h: box.h + 6 };
+}
+
+/** Seçimin ekran okuyucu duyurusu: "R1, Direnç, 220 Ω seçili" ya da "3 öğe seçili". */
+function selectionAnnouncement(doc: CircuitDoc, selection: Selection): string {
+  const count = selection.parts.length + selection.wires.length;
+  if (count === 0) return '';
+  if (count === 1 && selection.parts.length === 1) {
+    const part = doc.parts.find((p) => p.id === selection.parts[0]);
+    if (part) return tr.a11y.selected([part.label, tr.devices.names[part.type], partValueText(part)].filter(Boolean).join(', '));
+  }
+  return tr.inspector.selectedItems(count);
 }
