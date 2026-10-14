@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Etkileşim notları</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.5}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.k{display:inline-flex;font:500 12px 'IBM Plex Mono',monospace;line-height:19px;padding:0 6px;border:1px solid #c4cad2;border-bottom-width:2px;border-radius:4px;background:#fff}
+.cd{border:1px solid #dde1e6;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;background:#fff}
+.cd h3{margin:0;font-size:15px;font-weight:600;display:flex;gap:8px;align-items:baseline}
+.cd h3 span{font:500 12px 'IBM Plex Mono',monospace;color:#5f6b7a}
+.cd ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:3px;font-size:13.5px;color:#3d4957}
+.col{display:flex;flex-direction:column;gap:12px}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:1600px;box-sizing:border-box;background:#f6f7f9;padding:48px 64px;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <h1 style="margin:0;font-size:28px;font-weight:600">Etkileşim notları</h1>
+    <span style="font-size:13px;color:#5f6b7a">Her ekran için: hareketler, kısayollar, panellerin açılıp kapanması, tuvalin yeniden sığdırılması.</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px">
+    <div class="col">
+      <h2 style="margin:0;font-size:19px;font-weight:600">Masaüstü ve tablet</h2>
+      <div class="cd"><h3>Genel <span>tüm ekranlar</span></h3><ul>
+        <li>Tuval: tekerlek yakınlaştırır (imleç merkezli), <span class="k">Boşluk</span>+sürükle ve orta tuş kaydırır.</li>
+        <li>İnceleme paneli 320–336 px; <span class="k">Alt</span>+<span class="k">1</span>…<span class="k">3</span> ile sekme değişir. Panel daraltılınca 48 px şerit kalır.</li>
+        <li>Cihaz rafı yalnızca devrede cihaz varken görünür; tutamaçtan sürüklenir (0–60 % yükseklik). Raf açılıp kapanınca devre kalan alana sığdırılır, kullanıcı yakınlaştırdıysa yalnızca merkez korunur.</li>
+        <li>Ölç düzeni: Oynat’tan sonra rafta cihaz varsa kütüphane şeride iner; bir parça sürüklenince ya da Durdur’a basılınca Kur düzenine döner.</li>
+      </ul></div>
+      <div class="cd"><h3>1 · İlk açılış <span>M01</span></h3><ul>
+        <li>Hoş geldin penceresi yalnızca ilk ziyarette; odak “Örnekle başla”da. <span class="k">Esc</span> = Atla.</li>
+        <li>Tur 4 adım: Parça ekle → Kablo çek → Oynat → İncele. Her adım gerçek eylemle ilerler; “İleri” ile atlanabilir.</li>
+      </ul></div>
+      <div class="cd"><h3>2 · Parça ve kablo <span>M02, M02b</span></h3><ul>
+        <li>Sürükle-bırak ya da tıkla-yerleştir; hayalet ızgaraya yapışır. <span class="k">R</span>, <span class="k">F</span> yerleştirirken çalışır; <span class="k">Shift</span>+tıkla art arda.</li>
+        <li>Kablo: uca tıkla → köşeler → uç/kablo. Hedef uç 14 px yarıçapında mavi halkayla yakalanır. <span class="k">Esc</span> iptal, çift tık boşta bitir.</li>
+        <li>İpucu satırı tuvalin altında, tuvalin üstüne binmez.</li>
+      </ul></div>
+      <div class="cd"><h3>3 · Seçili parça <span>M03, M04</span></h3><ul>
+        <li>Tek tık seçer ve İncele sekmesini açar; çift tık ilk değer alanına odaklar (<span class="k">Enter</span> de aynı).</li>
+        <li>Alanlar Enter’da ya da odak çıkınca uygulanır; geçersizse uygulanmaz, hata alanın altında kalır. Her değişiklik geri alınabilir.</li>
+        <li>Çalışırken değer değişimi simülasyonu durdurmaz; panelde “canlı” rozeti görünür.</li>
+      </ul></div>
+      <div class="cd"><h3>5 · Örnek <span>M05a, M05b</span></h3><ul>
+        <li>Örnek yüklenince Örnek sekmesi açılır, devre kalan alana sığar; önceki devre Geri al ile döner.</li>
+        <li>Cevap kutusu Oynat’a kadar kilitli; açılınca ekran okuyucuya duyurulur (role=status).</li>
+      </ul></div>
+      <div class="cd"><h3>6 · Cihaz rafı <span>M06a–c</span></h3><ul>
+        <li>Kademeli ayarlarda −/+, tekerlek ve <span class="k">↑</span><span class="k">↓</span>; değere tıklayınca yazılabilir alan olur.</li>
+        <li>Sıfır üçgenleri sürüklenerek konum değişir. Oto zaman/bölme, volt/bölme ve hızı birlikte ayarlar; bir bildirim neyin değiştiğini söyler.</li>
+        <li>Toprak tuzağı algılanınca şebeke toprağı çizgisi kendiliğinden görünür ve Mesajlar’a uyarı düşer.</li>
+      </ul></div>
+      <div class="cd"><h3>7 · Hatalar <span>M07a, M07b</span></h3><ul>
+        <li>Yeni hata gelince Mesajlar sekmesi kendiliğinden öne gelir ama odak alınmaz; sekmede sayı rozeti.</li>
+        <li>Mesaja tıklayınca parça vurgulanır, ekran dışındaysa görünüm 300 ms’de oraya kayar.</li>
+        <li>Toprak yokken Oynat başlamaz; tuvalde öneri afişi ve tek tıkla düzeltme.</li>
+      </ul></div>
+      <div class="cd"><h3>8–10 · Pencereler <span>M08–M12</span></h3><ul>
+        <li>Örnekler, Paylaşım, Yardım modal: odak içeride döner, <span class="k">Esc</span> kapatır, odak açan düğmeye döner.</li>
+        <li>Dosya ve Ayarlar açılır menü: ok tuşlarıyla gezilir, dışarı tıklamak kapatır.</li>
+      </ul></div>
+    </div>
+    <div class="col">
+      <h2 style="margin:0;font-size:19px;font-weight:600">Telefon</h2>
+      <div class="cd"><h3>Genel <span>tüm ekranlar</span></h3><ul>
+        <li>Tek kontrol bölgesi: alt çubuk + tek alt sayfa. Üst şerit yalnızca ad, kip, sorun sayısı ve ⋯.</li>
+        <li>Alt sayfa konumları: kapalı · peek (≈ 140–190) · yarım (en çok %50) · tam (yalnızca Cihazlar, Örnekler, Yardım). Tutamaca dokunmak bir sonraki konuma geçirir.</li>
+        <li>Sayfa her konum değiştirdiğinde devre kalan alana 280 ms’de yeniden sığar; seçili parça görünür tutulur.</li>
+        <li>Sayfa içeriği kendi içinde kayar (overscroll-behavior: contain); sayfa kayarken tuval kaymaz.</li>
+        <li>Güvenli alan: üst 47, alt 34 (dikey); yatayda sol/sağ 47, alt 21; 375×667’de üst 20, alt 0.</li>
+      </ul></div>
+      <div class="cd"><h3>Kur kipi <span>P01–P04, P15</span></h3><ul>
+        <li>Dokun: seç → çubuk bağlam eylemlerine döner. Boşluğa dokun: seçim kalkar, çubuk geri gelir.</li>
+        <li>Parçayı sürükle: taşı (150 ms bekleme, titreşim). Boşlukta sürükle: kaydır. İki parmak: yakınlaştır.</li>
+        <li>Basılı tut: bağlam menüsü + büyüteç. Kalabalık noktada “Burada N öğe var” seçicisi.</li>
+        <li>Parça: sayfa açılır; bir uç seçiliyse “Zincirle ekle” açık gelir.</li>
+      </ul></div>
+      <div class="cd"><h3>Bağla kipi <span>P03</span></h3><ul>
+        <li>Uçlar 44 pt hedef ve etiket (+, −, 1, 2, A, K, B, C, E, G, D, S). Parçalar %38 soluk.</li>
+        <li>İlk dokunuş başlangıç, ikinci bitiş; L yolu çakışmayan biçimde kendiliğinden. Kablonun ortası T bağlantısı.</li>
+        <li>Bitti ya da boşluğa iki kez dokun: Kur kipine dön. Geri al son kabloyu siler.</li>
+      </ul></div>
+      <div class="cd"><h3>Ölç kipi <span>P05–P11, L01, L02, S01</span></h3><ul>
+        <li>Yapı kilitli: dokun = incele, sürükle = kaydır. Anahtara dokun = aç/kapat.</li>
+        <li>Parça ekleme ya da taşıma girişimi: “Düzenlemek için durdurulsun mu?” sorusu.</li>
+        <li>Cihazlar tam sayfa; üstte 112–120 px devre şeridi kalır; şeride dokunmak sayfayı yarıma indirir.</li>
+        <li>Hız düğmesi hazır seçenek sayfası açar (Gerçek zaman, Yavaş, Çok yavaş, Ağır çekim, Osiloskoba göre).</li>
+      </ul></div>
+      <div class="cd"><h3>Yatay telefon <span>L01, L02</span></h3><ul>
+        <li>Alt sayfa sağ yan panele (280 px), alt çubuk sağ kenarda dikey şeride döner; Oynat sağ altta.</li>
+        <li>Osiloskop yatayda tam genişlik: ekran solda, ayarlar sağda; “Devre” ile geri dönülür.</li>
+      </ul></div>
+      <div class="cd"><h3>Bildirimler <span>tüm cihazlar</span></h3><ul>
+        <li>Toast altta, telefonda alt sayfanın üstünde; 5 s, Geri al düğmeli. Ekran okuyucuya role=status ile duyurulur.</li>
+      </ul></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1600}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

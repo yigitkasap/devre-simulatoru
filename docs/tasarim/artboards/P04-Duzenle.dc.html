@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: seçili parça</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:11px 11px;background-position:5px 5px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 18px rgba(29,39,51,.14);display:flex;flex-direction:column}
+.hd{height:22px;display:flex;align-items:center;justify-content:center}
+.hd i{display:block;width:36px;height:5px;border-radius:3px;background:#c4cad2}
+.s{fill:none;stroke:#1d2733;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.lb{font:600 19px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 17px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+.chip{height:40px;min-width:52px;padding:0 10px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 15px 'IBM Plex Mono',monospace;color:#1d2733;flex:none}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="LED ve ön direnç" mode="kur" hint-size="390px,52px"></dc-import>
+  <div style="flex:1;position:relative;min-height:0">
+    <div class="paper" role="application" aria-label="Devre şeması" style="position:absolute;left:0;right:0;top:0;height:301px;overflow:hidden">
+      <svg width="390" height="301" viewBox="0 0 390 301" aria-hidden="true" style="position:absolute;inset:0">
+        <g transform="translate(-46,-26) scale(0.72)">
+          <rect x="228" y="92" width="144" height="80" rx="6" fill="#e6effd" fill-opacity=".6" stroke="#1f6feb" stroke-width="2.5" stroke-dasharray="8 6"/>
+          <path class="s" d="M180 150H240M360 150H480M480 270V330H420M300 330H180V270M180 330V360M166 360H194M171 367H189M176 374H184"/>
+          <circle cx="180" cy="330" r="5" fill="#1d2733"/>
+          <path class="s" d="M180 150V204M180 216V270M159 204H201"/>
+          <path d="M169 216H191" fill="none" stroke="#1d2733" stroke-width="6.5"/>
+          <text class="lb" x="146" y="210" text-anchor="end">B1</text><text class="lv" x="146" y="232" text-anchor="end">5 V</text>
+          <path class="s" d="M240 150H270L275 139.5L285 160.5L295 139.5L305 160.5L315 139.5L325 160.5L330 150H360"/>
+          <text class="lb" x="300" y="118" text-anchor="middle" style="fill:#1557c0">R1</text>
+          <path class="s" d="M480 150V192M480 222V270M458 222H502"/>
+          <path d="M458 192H502L480 222Z" fill="#1d2733"/>
+          <path class="s" style="stroke-width:2.4" d="M505 186l13-13M512 173h6v6M510 202l13-13M517 189h6v6"/>
+          <text class="lb" x="530" y="216">D1</text>
+          <path class="s" d="M300 330H339M381 330H420"/>
+          <circle class="s" cx="360" cy="330" r="21"/>
+          <text x="360" y="337" text-anchor="middle" style="font:600 20px 'IBM Plex Sans',sans-serif;fill:#1d2733">A</text>
+          <text class="lb" x="360" y="296" text-anchor="middle">A1</text>
+        </g>
+      </svg>
+      <span style="position:absolute;right:10px;top:10px;font:500 12px 'IBM Plex Mono',monospace;color:#5f6b7a;background:rgba(255,255,255,.9);padding:2px 6px;border-radius:6px">%72 · değerler gizli</span>
+    </div>
+    <div class="sheet" role="region" aria-label="R1 özellikleri" style="height:340px">
+      <div class="hd"><i></i></div>
+      <div style="padding:0 8px 8px 16px;display:flex;align-items:center;gap:10px">
+        <svg width="36" height="22" viewBox="0 0 32 20" fill="none" stroke="#1d2733" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10H8L9.5 6.5L12.5 13.5L15.5 6.5L18.5 13.5L21.5 6.5L23 10H30"/></svg>
+        <div style="flex:1;display:flex;flex-direction:column;line-height:1.2"><b style="font-size:18px">R1</b><span style="font-size:13px;color:#5f6b7a">Direnç</span></div>
+        <button aria-label="Yukarı çek: tüm özellikler" style="height:44px;padding:0 10px;border:0;background:transparent;font:500 14px 'IBM Plex Sans',sans-serif;color:#1557c0">Tümü ▴</button>
+      </div>
+      <div style="padding:0 16px;display:flex;flex-direction:column;gap:10px;overflow:auto">
+        <label for="pr" style="font-size:14px;font-weight:500">Direnç</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button aria-label="Bir alt değer" style="width:48px;height:48px;border-radius:10px;border:1px solid #c4cad2;background:#f6f7f9;font:600 20px 'IBM Plex Sans',sans-serif;color:#1d2733;flex:none">−</button>
+          <div style="flex:1;display:flex;align-items:center;height:48px;border:1.5px solid #1f6feb;border-radius:10px;background:#fff;box-sizing:border-box;overflow:hidden;box-shadow:0 0 0 3px #e6effd"><input id="pr" value="220" inputmode="decimal" style="flex:1;min-width:0;border:0;outline:0;background:transparent;padding:0 12px;font:500 18px 'IBM Plex Mono',monospace;color:#1d2733"><span style="padding:0 14px;height:100%;display:flex;align-items:center;border-left:1px solid #dde1e6;background:#f6f7f9;font:500 16px 'IBM Plex Mono',monospace;color:#5f6b7a">Ω</span></div>
+          <button aria-label="Bir üst değer" style="width:48px;height:48px;border-radius:10px;border:1px solid #c4cad2;background:#f6f7f9;font:600 20px 'IBM Plex Sans',sans-serif;color:#1d2733;flex:none">+</button>
+        </div>
+        <div style="display:flex;gap:6px;overflow:hidden;margin-right:-16px" aria-label="Sık kullanılan değerler">
+          <button class="chip">100</button><button class="chip" style="background:#1d2733;color:#fff;border-color:#1d2733">220</button><button class="chip">330</button><button class="chip">470</button><button class="chip">1k</button><button class="chip">4,7k</button>
+        </div>
+        <span style="font-size:12.5px;line-height:1.45;color:#5f6b7a">− / + E12 dizisinde bir adım değiştirir. SI önekleri: p, n, µ (ya da u), m, k, M, G. Büyük M mega, küçük m mili.</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eef0f3;padding-top:10px"><span style="font-size:14px">Ad</span><span class="mono" style="font-size:15px">R1 ›</span></div>
+      </div>
+    </div>
+  </div>
+  <dc-import name="C-TelAlt" bar="sec" value="220 Ω" hint-size="390px,104px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

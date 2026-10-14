@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: yardım ve ayarlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:12px 12px}
+.sg{display:flex;background:#eef0f3;border-radius:10px;padding:2px;gap:2px}
+.sg button{flex:1;height:40px;border:0;border-radius:8px;background:transparent;font:500 14.5px 'IBM Plex Sans',sans-serif;color:#3d4957}
+.sg .on{background:#fff;color:#1d2733;font-weight:600;box-shadow:0 1px 2px rgba(29,39,51,.18)}
+.qa{flex:1;height:64px;border-radius:12px;border:1px solid #dde1e6;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:500 12.5px 'IBM Plex Sans',sans-serif;color:#1d2733}
+.hr{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #eef0f3;font-size:14.5px;line-height:1.4}
+.hr .g{width:96px;flex:none;font-weight:600;font-size:13.5px}
+.kp{display:inline-flex;font:600 11px 'IBM Plex Mono',monospace;padding:2px 7px;border-radius:4px}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden;position:relative">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="Gerilim bölücü" mode="kur" more="{{ true }}" hint-size="390px,52px"></dc-import>
+  <div class="paper" style="flex:1"></div>
+  <dc-import name="C-TelAlt" bar="kur" hint-size="390px,104px"></dc-import>
+  <div style="position:absolute;inset:0;background:rgba(29,39,51,.4)"></div>
+  <div role="dialog" aria-modal="true" aria-label="Daha fazla" style="position:absolute;left:0;right:0;bottom:0;top:118px;background:#fff;border-radius:16px 16px 0 0;display:flex;flex-direction:column">
+    <div style="height:22px;display:flex;align-items:center;justify-content:center"><i style="display:block;width:36px;height:5px;border-radius:3px;background:#c4cad2"></i></div>
+    <div style="padding:0 16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px">
+        <button class="qa"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"/></svg>Ekrana sığdır</button>
+        <button class="qa"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="14" height="7" rx="3.5"/><path d="M7 10.5h6"/></svg>Düğüm gerilimleri</button>
+        <button class="qa"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a3 3 0 0 0 4 4L11 13M13 11l1.5-1.5a3 3 0 0 0-4-4L9 7"/></svg>Paylaş</button>
+      </div>
+      <div class="sg" role="tablist"><button class="on" role="tab" aria-selected="true">Yardım</button><button role="tab" aria-selected="false">Ayarlar</button></div>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:6px 16px 34px">
+      <div style="font-size:13px;font-weight:600;color:#5f6b7a;padding:8px 0 2px;display:flex;align-items:center;gap:8px"><span class="kp" style="background:#eef0f3;color:#3d4957">KUR</span>Devre kurarken</div>
+      <div class="hr"><span class="g">Parçaya dokun</span><span>Seçer; alttaki çubuk o parçanın eylemlerine döner.</span></div>
+      <div class="hr"><span class="g">Parçayı sürükle</span><span>Taşır; bağlı kablolar esner.</span></div>
+      <div class="hr"><span class="g">Uca dokun</span><span>Bağla kipini o uçtan başlatır.</span></div>
+      <div class="hr"><span class="g">Basılı tut</span><span>Menü ve büyüteç: Döndür, Ters çevir, Sil.</span></div>
+      <div style="font-size:13px;font-weight:600;color:#5f6b7a;padding:12px 0 2px;display:flex;align-items:center;gap:8px"><span class="kp" style="background:#e6effd;color:#1557c0">BAĞLA</span>Kablo çekerken</div>
+      <div class="hr"><span class="g">İki uca dokun</span><span>Kablo kendiliğinden çizilir. Kablonun ortası: T bağlantısı.</span></div>
+      <div style="font-size:13px;font-weight:600;color:#5f6b7a;padding:12px 0 2px;display:flex;align-items:center;gap:8px"><span class="kp" style="background:#e8f5ed;color:#1b7d44">ÖLÇ</span>Simülasyon çalışırken</div>
+      <div class="hr"><span class="g">Parçaya dokun</span><span>Ölçümleri gösterir; değeri −/+ ile değiştirebilirsin.</span></div>
+      <div class="hr"><span class="g">Anahtara dokun</span><span>Açar ya da kapatır.</span></div>
+      <div class="hr" style="border-bottom:0"><span class="g">Her yerde</span><span>Tek parmak kaydırır, iki parmak yakınlaştırır.</span></div>
+      <button style="width:100%;height:48px;margin-top:8px;border-radius:12px;border:1px solid #c4cad2;background:#fff;font:500 15px 'IBM Plex Sans',sans-serif;color:#1d2733">Kısa turu yeniden başlat</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Devrede toprak yok</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#b3bac3 1.3px,transparent 1.6px),radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:70px 70px,14px 14px;background-position:6px 6px,6px 6px}
+.tab{height:44px;padding:0 12px;border:0;background:transparent;font:500 14px 'IBM Plex Sans',sans-serif;color:#5f6b7a;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.tsel{color:#1d2733;border-bottom-color:#1d2733}
+.s{fill:none;stroke:#1d2733;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.p{fill:#fff;stroke:#f05a28;stroke-width:1.5}
+.lb{font:600 11px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden">
+  <dc-import name="C-UstCubuk" tool="sec" zoom="%140" hint-size="1440px,52px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="width:256px;flex:none"><dc-import name="C-Kutuphane" info="toprak" hint-size="256px,848px"></dc-import></div>
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div class="paper" role="application" aria-label="Devre şeması, simülasyon başlamadı" style="flex:1;position:relative;overflow:hidden">
+        <svg width="848" height="768" viewBox="0 0 848 768" style="position:absolute;left:0;top:0" aria-hidden="true">
+          <g transform="translate(102,200) scale(1.4)">
+            <path class="s" d="M100 40V76M100 84V120M100 40H260V60M260 100V140M260 120H340M340 174V200H260M260 200H100V120M260 40H300"/>
+            <circle cx="260" cy="40" r="3.2" fill="#1d2733"/><circle cx="260" cy="120" r="3.2" fill="#1d2733"/><circle cx="260" cy="200" r="3.2" fill="#1d2733"/>
+            <path class="s" d="M86 76H114"/><path d="M93 84H107" stroke="#1d2733" stroke-width="4.5"/><path class="s" style="stroke-width:1.4" d="M80 68h6M83 65v6"/>
+            <text class="lb" x="76" y="84" text-anchor="end">B1</text><text class="lv" x="76" y="96" text-anchor="end">9 V</text>
+            <path class="s" d="M260 60L253 63.3L267 70L253 76.7L267 83.3L253 90L267 96.7L260 100"/>
+            <text class="lb" x="274" y="78">R1</text><text class="lv" x="274" y="90">1 kΩ</text>
+            <path class="s" d="M260 140L253 143.3L267 150L253 156.7L267 163.3L253 170L267 176.7L260 180M260 180V200"/>
+            <text class="lb" x="234" y="158" text-anchor="end">R2</text><text class="lv" x="234" y="170" text-anchor="end">2 kΩ</text>
+            <circle class="s" cx="340" cy="160" r="14"/><text x="340" y="165" text-anchor="middle" style="font:600 13px 'IBM Plex Sans',sans-serif;fill:#1d2733">V</text>
+            <path class="s" d="M340 120V146M340 174V180"/>
+            <text class="lb" x="360" y="158">V1</text>
+            <rect x="314" y="208" width="52" height="16" rx="3" fill="#1e2a25"/><text x="340" y="219.5" text-anchor="middle" style="font:600 9.5px 'IBM Plex Mono',monospace;fill:#5d8a6c">– – – V</text>
+            <rect x="290" y="22" width="108" height="36" rx="4" fill="#fef6e7" fill-opacity=".6" stroke="#b54708" stroke-width="1.5" stroke-dasharray="4 3"/>
+            <path class="s" d="M300 40H310L313.3 33L320 47L326.7 33L333.3 47L340 33L346.7 47L350 40H380"/>
+            <text class="lb" x="340" y="16" text-anchor="middle">R3</text>
+            <circle cx="380" cy="40" r="7" fill="#fff" stroke="#f05a28" stroke-width="2.5"/>
+            <path d="M398 4l9 15H389z" fill="#e8a317" stroke="#b54708" stroke-width="1" stroke-linejoin="round"/><path d="M398 9v4.5" stroke="#1d2733" stroke-width="1.6" stroke-linecap="round"/><circle cx="398" cy="16" r="1" fill="#1d2733"/>
+            <g opacity=".8"><path d="M100 200V218M88 218H112M92 224H108M97 230H103" fill="none" stroke="#1f6feb" stroke-width="2" stroke-dasharray="3 3" stroke-linecap="round"/></g>
+            <rect x="114" y="212" width="58" height="14" rx="7" fill="#e6effd"/><text x="143" y="222" text-anchor="middle" style="font:500 8.5px 'IBM Plex Sans',sans-serif;fill:#1557c0">önerilen toprak</text>
+          </g>
+        </svg>
+        <div role="alert" style="position:absolute;left:50%;top:16px;transform:translateX(-50%);width:560px;background:#fff;border:1px solid #f5c2bd;border-left-width:1px;border-radius:12px;box-shadow:0 4px 12px rgba(29,39,51,.14);padding:12px 14px;display:flex;gap:12px;align-items:flex-start">
+          <svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="10" cy="10" r="9" fill="#d92d20"/><path d="M10 5.5v5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.2" r="1.2" fill="#fff"/></svg>
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+            <b style="font-size:15px">Simülasyon başlamadı: devrede toprak yok</b>
+            <span style="font-size:13px;line-height:1.5;color:#3d4957">Gerilimler bir referansa göre ölçülür. Toprak sembolü ekle; pilin − ucu iyi bir yer.</span>
+            <div style="display:flex;gap:8px"><button style="height:36px;padding:0 14px;border-radius:8px;border:0;background:#1f6feb;color:#fff;font:600 13px 'IBM Plex Sans',sans-serif">B1’in − ucuna toprak ekle</button><button style="height:36px;padding:0 12px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">Kendim eklerim</button></div>
+          </div>
+          <button aria-label="Kapat" style="width:32px;height:32px;border-radius:8px;border:0;background:transparent;color:#5f6b7a"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+        </div>
+      </div>
+      <div style="height:28px;flex:none;display:flex;align-items:center;padding:0 12px;background:#fdecea;border-top:1px solid #f5c2bd;font-size:13px;color:#a3241a">
+        <span><b>1 hata, 1 uyarı.</b> Hata düzelmeden simülasyon başlamaz; uyarılar başlamasına engel değildir.</span>
+      </div>
+      <dc-import name="C-SimCubugu" state="stop" time="0,000 s" err="{{ true }}" msg="Simülasyon çalışamıyor: devrede toprak yok." hint-size="848px,52px"></dc-import>
+    </main>
+    <aside aria-label="İnceleme paneli" style="width:336px;flex:none;background:#fff;border-left:1px solid #dde1e6;display:flex;flex-direction:column;min-height:0">
+      <div role="tablist" style="display:flex;padding:0 8px;border-bottom:1px solid #dde1e6">
+        <button class="tab" role="tab" aria-selected="false">İncele</button>
+        <button class="tab" role="tab" aria-selected="false">Örnek</button>
+        <button class="tab tsel" role="tab" aria-selected="true">Mesajlar <span class="mono" style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;background:#d92d20;color:#fff">2</span></button>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px"><span style="font-size:13px;font-weight:600">1 hata · 1 uyarı</span></div>
+        <button style="display:flex;gap:10px;padding:12px;border-radius:10px;background:#fdecea;border:1.5px solid #d92d20;text-align:left;font:inherit;color:inherit">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none"><circle cx="10" cy="10" r="9" fill="#d92d20"/><path d="M10 5.5v5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.2" r="1.2" fill="#fff"/></svg>
+          <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;font-weight:600;color:#a3241a">Hata · devre</span><b>Devrede toprak yok</b><span style="font-size:13px;line-height:1.5;color:#3d4957">Her devrede en az bir toprak (0 V referansı) olmalı. Laboratuvar cihazlarının COM ucu şebeke toprağına bağlıysa o da sayılır.</span></span>
+        </button>
+        <button style="display:flex;gap:10px;padding:12px;border-radius:10px;background:#fff;border:1px solid #dde1e6;text-align:left;font:inherit;color:inherit">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none"><path d="M10 1.5l9 16H1z" fill="#e8a317" stroke="#b54708" stroke-width="1" stroke-linejoin="round"/><path d="M10 7v4.5" stroke="#1d2733" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="14.3" r="1.1" fill="#1d2733"/></svg>
+          <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;font-weight:600;color:#b54708">Uyarı · R3</span><b>Boşta uç</b><span style="font-size:13px;line-height:1.5;color:#3d4957">R3 direncinin 2. ucu hiçbir yere bağlı değil. Üzerinden akım geçmez.</span></span>
+        </button>
+        <span style="font-size:12px;color:#5f6b7a;padding:4px">Bir mesaja tıklayınca ilgili parça tuvalde vurgulanır.</span>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

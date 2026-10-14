@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Bileşenler</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root{--app:#eef0f3;--panel:#fff;--panel-2:#f6f7f9;--line:#dde1e6;--line-2:#c4cad2;--ink:#1d2733;--muted:#5f6b7a;--accent:#1f6feb;--accent-ink:#1557c0;--accent-soft:#e6effd;--ok:#1b7d44;--ok-soft:#e8f5ed;--warn:#b54708;--warn-soft:#fef6e7;--danger:#d92d20;--danger-soft:#fdecea;--paused:#e8a317;--stopped:#9aa3ad;--sans:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+.ui{font-family:var(--sans);color:var(--ink);font-size:14px;line-height:1.45}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.ic{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;width:20px;height:20px;flex:none}
+.b{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--line-2);background:#fff;color:var(--ink);font:500 14px var(--sans);white-space:nowrap;cursor:pointer;box-sizing:border-box}
+.g{border-color:transparent;background:transparent}
+.on{background:var(--accent-soft);color:var(--accent-ink);border-color:transparent}
+.go{background:var(--ok);border-color:var(--ok);color:#fff}
+.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.dz{color:var(--danger)}
+.i{width:36px;padding:0}
+.fo{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--accent)}
+.k{font-family:var(--mono);font-size:11.5px;line-height:18px;padding:0 5px;border:1px solid var(--line-2);border-bottom-width:2px;border-radius:4px;background:#fff;color:var(--ink)}
+.lab{font-size:12px;font-weight:600;color:var(--muted)}
+.fld{display:flex;align-items:center;height:40px;border:1px solid var(--line-2);border-radius:8px;background:#fff;overflow:hidden;box-sizing:border-box}
+.fld input{flex:1;min-width:0;border:0;outline:0;background:transparent;padding:0 10px;font:500 15px var(--mono);color:var(--ink);height:100%}
+.fld .u{padding:0 10px;color:var(--muted);font:500 14px var(--mono);border-left:1px solid var(--line);height:100%;display:flex;align-items:center;background:var(--panel-2)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--line-2);background:#fff;font:500 13px var(--sans);color:var(--ink);cursor:pointer}
+.sel{background:var(--ink);border-color:var(--ink);color:#fff}
+.tab{height:40px;padding:0 12px;border:0;background:transparent;font:500 14px var(--sans);color:var(--muted);border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.tsel{color:var(--ink);border-bottom-color:var(--ink)}
+.cnt{font:600 11px var(--mono);padding:1px 6px;border-radius:10px;background:var(--danger);color:#fff}
+.lcd{font:600 13px var(--mono);background:#1e2a25;color:#a6f4bd;border-radius:4px;padding:2px 6px}
+.sub{color:var(--muted);font-size:13px}
+.h2{margin:0 0 12px;font-size:18px;font-weight:600}
+.cell{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.cap{font-size:12px;color:var(--muted)}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:1760px;box-sizing:border-box;background:var(--app);padding:48px 64px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <h1 style="margin:0;font-size:28px;font-weight:600">Bileşenler ve durumları</h1>
+    <span class="sub">Odak halkası: 2 px beyaz + 2 px accent, her öğede yalnızca klavye odağında (:focus-visible).</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px">
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px">
+      <h2 class="h2">Düğme</h2>
+      <div style="display:grid;grid-template-columns:110px repeat(4,minmax(0,1fr));gap:12px 12px;align-items:center">
+        <span></span><span class="cap">Normal</span><span class="cap">Odak</span><span class="cap">Basılı</span><span class="cap">Devre dışı</span>
+        <span class="cap">Ana (Oynat)</span>
+        <button class="b go"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>Oynat</button>
+        <button class="b go fo"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>Oynat</button>
+        <button class="b go" style="background:#14613a"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>Oynat</button>
+        <button class="b" style="background:#e3e7ec;border-color:#e3e7ec;color:#8a94a1" disabled><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"/></svg>Oynat</button>
+        <span class="cap">Vurgulu</span>
+        <button class="b pri">Tamam</button><button class="b pri fo">Tamam</button><button class="b pri" style="background:#1557c0">Tamam</button><button class="b" style="background:#e3e7ec;border-color:#e3e7ec;color:#8a94a1" disabled>Tamam</button>
+        <span class="cap">İkincil</span>
+        <button class="b">Kapat</button><button class="b fo">Kapat</button><button class="b" style="background:#eef0f3">Kapat</button><button class="b" style="color:#8a94a1;border-color:#dde1e6" disabled>Kapat</button>
+        <span class="cap">Hayalet</span>
+        <button class="b g">İptal</button><button class="b g fo">İptal</button><button class="b g" style="background:#e3e7ec">İptal</button><button class="b g" style="color:#8a94a1" disabled>İptal</button>
+        <span class="cap">Tehlikeli</span>
+        <button class="b dz"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg>Sil</button><button class="b dz fo"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg>Sil</button><button class="b dz" style="background:var(--danger-soft)"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg>Sil</button><button class="b" style="color:#8a94a1;border-color:#dde1e6" disabled><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg>Sil</button>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:18px">
+      <div>
+        <h2 class="h2">İkon düğme ve araç düğmesi</h2>
+        <div style="display:flex;gap:28px;align-items:flex-end;flex-wrap:wrap">
+          <div class="cell"><div style="display:flex;gap:4px"><button class="b g i" aria-label="Geri al (Ctrl+Z)"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5L4 9l4 4M4 9h8a4 4 0 0 1 0 8H9"/></svg></button><button class="b g i fo" aria-label="Yinele (Ctrl+Y)"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 5l4 4-4 4M16 9H8a4 4 0 0 0 0 8h3"/></svg></button><button class="b g i" style="color:#9aa3ad" aria-label="Yinele" disabled><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M12 5l4 4-4 4M16 9H8a4 4 0 0 0 0 8h3"/></svg></button></div><span class="cap">36×36 · masaüstü · aria-label zorunlu</span></div>
+          <div class="cell"><div style="display:flex;gap:4px"><button class="b g" style="width:44px;height:44px;padding:0" aria-label="Geri al"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true" style="width:22px;height:22px"><path d="M8 5L4 9l4 4M4 9h8a4 4 0 0 1 0 8H9"/></svg></button><button class="b g" style="width:44px;height:44px;padding:0;background:#e3e7ec" aria-label="Daha fazla"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true" style="width:22px;height:22px"><circle cx="4.5" cy="10" r="1.2" fill="currentColor"/><circle cx="10" cy="10" r="1.2" fill="currentColor"/><circle cx="15.5" cy="10" r="1.2" fill="currentColor"/></svg></button></div><span class="cap">44×44 · telefon</span></div>
+          <div class="cell">
+            <div style="display:flex;padding:2px;background:var(--app);border-radius:10px;gap:2px">
+              <button class="b on" aria-pressed="true"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3l10 6-4.5 1.2L13 15l-2 1-2.4-4.6L5 14z"/></svg>Seç</button>
+              <button class="b g" aria-pressed="false"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15h5V5h9"/><circle cx="3" cy="15" r="1.6"/><circle cx="17" cy="5" r="1.6"/></svg>Kablo <span class="k">W</span></button>
+            </div>
+            <span class="cap">Araç seçici · aria-pressed · kısayol rozeti masaüstünde görünür</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h2 class="h2">Araç ipucu (hover değil, odak + uzun basma)</h2>
+        <div style="display:flex;gap:16px;align-items:center">
+          <button class="b g i fo" aria-label="Döndür (R)"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 8.5A6 6 0 1 0 16 13"/><path d="M16 3.5v5h-5"/></svg></button>
+          <div style="background:#1d2733;color:#fff;font-size:13px;border-radius:6px;padding:6px 10px;display:flex;gap:8px;align-items:center">Döndür <span class="k" style="background:#2c3846;color:#fff;border-color:#475466">R</span></div>
+          <span class="sub" style="max-width:300px">İpucunun söylediği her şey menüde, yardım panelinde ya da görünür etikette de var; ipucu yalnızca kısayol hatırlatır.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px">
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px">
+      <h2 class="h2">Sayı alanı (birimli)</h2>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="cell" style="align-items:stretch"><label class="lab" for="f1">Direnç</label><div class="fld"><input id="f1" value="4,7k"><span class="u">Ω</span></div><span class="cap">Normal · SI önekli yazılır: 4,7k · 100µ · 2,2M · 4k7</span></div>
+        <div class="cell" style="align-items:stretch"><label class="lab" for="f2">Kapasite</label><div class="fld" style="border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)"><input id="f2" value="100µ"><span class="u">F</span></div><span class="cap">Odak · Enter ya da odak çıkınca uygulanır; Esc eski değere döner</span></div>
+        <div class="cell" style="align-items:stretch"><label class="lab" for="f3">Frekans</label><div class="fld" style="border-color:var(--danger);box-shadow:0 0 0 3px var(--danger-soft)"><input id="f3" value="4,7x" aria-invalid="true" aria-describedby="e3"><span class="u">Hz</span></div><span id="e3" style="font-size:13px;color:var(--danger);display:flex;gap:6px;align-items:flex-start"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true" style="width:16px;height:16px;margin-top:2px"><circle cx="10" cy="10" r="7.5"/><path d="M10 6v5"/><circle cx="10" cy="13.8" r=".6" fill="currentColor"/></svg>Bu bir sayı değil. Örnekler: 4,7k · 100µ · 2,2M · 0,5</span></div>
+        <div class="cell" style="align-items:stretch"><label class="lab" for="f4">Direnç · çalışırken</label><div class="fld"><input id="f4" value="330"><span class="u">Ω</span></div><span style="font-size:12px;color:var(--ok);display:flex;align-items:center;gap:6px"><i style="display:block;width:8px;height:8px;border-radius:4px;background:var(--ok)"></i>Canlı uygulandı · simülasyon sürüyor</span></div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:18px">
+      <div>
+        <h2 class="h2">Çip seçici</h2>
+        <div role="radiogroup" aria-label="Dalga biçimi" style="display:flex;gap:6px">
+          <button class="chip sel" role="radio" aria-checked="true"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true" style="width:16px;height:16px"><path d="M2 10c2-7 4-7 6 0s4 7 6 0 3-5 4-4"/></svg>Sinüs</button>
+          <button class="chip" role="radio" aria-checked="false"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true" style="width:16px;height:16px"><path d="M2 14V6h5v8h5V6h6"/></svg>Kare</button>
+          <button class="chip" role="radio" aria-checked="false"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true" style="width:16px;height:16px"><path d="M2 14l4-8 4 8 4-8 4 8"/></svg>Üçgen</button>
+        </div>
+        <div role="radiogroup" aria-label="LED rengi" style="display:flex;gap:6px;margin-top:10px">
+          <button class="chip sel" role="radio" aria-checked="true"><i style="width:10px;height:10px;border-radius:5px;background:#ff4d4d;display:block;box-shadow:0 0 0 1.5px #fff"></i>Kırmızı</button>
+          <button class="chip" role="radio" aria-checked="false"><i style="width:10px;height:10px;border-radius:5px;background:#22b455;display:block"></i>Yeşil</button>
+          <button class="chip" role="radio" aria-checked="false"><i style="width:10px;height:10px;border-radius:5px;background:#3b7bff;display:block"></i>Mavi</button>
+        </div>
+      </div>
+      <div>
+        <h2 class="h2">Onay kutusu ve anahtar</h2>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <label style="display:flex;align-items:center;gap:10px"><span style="width:20px;height:20px;border-radius:5px;background:var(--accent);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M4 10l4 4 8-8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>B ters (INV)</label>
+          <label style="display:flex;align-items:center;gap:10px"><span style="width:20px;height:20px;border-radius:5px;border:1.5px solid var(--line-2);box-sizing:border-box;background:#fff"></span>Elektron akışını göster</label>
+          <label style="display:flex;align-items:center;gap:10px"><span class="fo" style="width:20px;height:20px;border-radius:5px;border:1.5px solid var(--line-2);box-sizing:border-box;background:#fff"></span>İdeal voltmetre (iç direnç ∞) <span class="cap">· odak</span></label>
+          <label style="display:flex;align-items:center;gap:10px"><span style="width:36px;height:20px;border-radius:10px;background:var(--ok);position:relative;display:block"><i style="position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:8px;background:#fff;display:block"></i></span>Anahtar kapalı (akım geçirir)</label>
+        </div>
+      </div>
+      <div>
+        <h2 class="h2">Seçme kutusu</h2>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <button class="b" style="justify-content:space-between;width:180px">OSC1 · Osiloskop<svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></button>
+          <div style="width:180px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 12px rgba(29,39,51,.12);padding:4px">
+            <div style="padding:8px 10px;border-radius:6px;background:var(--accent-soft);color:var(--accent-ink);font-weight:500">OSC1 · Osiloskop</div>
+            <div style="padding:8px 10px">OSC2 · Osiloskop</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+      <h2 class="h2" style="margin:0">Hız denetimi</h2>
+      <button class="b" style="justify-content:space-between;width:100%"><span style="display:flex;gap:8px;align-items:center"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="11" r="7"/><path d="M10 11l4-3M10 4V2"/></svg>Hız <span class="mono" style="font-weight:600">×0,001</span></span><span class="sub">1 s’de 1 ms ▾</span></button>
+      <div style="border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 12px rgba(29,39,51,.12);padding:6px">
+        <div role="radiogroup" aria-label="Simülasyon hızı" style="display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:8px"><span>Gerçek zaman</span><span class="mono sub">1 s’de 1 s</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:8px"><span>Yavaş</span><span class="mono sub">1 s’de 100 ms</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent-ink);font-weight:500"><span>Çok yavaş</span><span class="mono">1 s’de 1 ms</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:8px"><span>Ağır çekim</span><span class="mono sub">1 s’de 1 µs</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:8px"><span>Osiloskoba göre</span><span class="sub">tarama ≈ 0,2 s</span></div>
+        </div>
+        <div style="border-top:1px solid var(--line);margin-top:6px;padding:12px 10px 6px;display:flex;flex-direction:column;gap:8px">
+          <span class="lab">İnce ayar</span>
+          <div style="position:relative;height:24px">
+            <div style="position:absolute;left:0;right:0;top:10px;height:4px;border-radius:2px;background:#dde1e6"></div>
+            <div style="position:absolute;left:50%;right:0;top:10px;height:4px;border-radius:2px;background:var(--accent)"></div>
+            <div style="position:absolute;left:calc(50% - 10px);top:2px;width:20px;height:20px;border-radius:10px;background:#fff;border:2px solid var(--accent);box-sizing:border-box"></div>
+          </div>
+          <div class="mono" style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>10⁻⁶</span><span>10⁻⁴</span><span>10⁻³</span><span>0,01</span><span>×1</span></div>
+          <span style="font-size:13px">Gerçek 1 saniyede simülasyonda <b class="mono">1 ms</b> geçer.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px">
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:16px">
+      <h2 class="h2" style="margin:0">Sekme ve rozet</h2>
+      <div role="tablist" style="display:flex;border-bottom:1px solid var(--line)">
+        <button class="tab tsel" role="tab" aria-selected="true">İncele</button>
+        <button class="tab" role="tab" aria-selected="false">Örnek</button>
+        <button class="tab" role="tab" aria-selected="false">Mesajlar <span class="cnt">2</span></button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--accent-soft);color:var(--accent-ink)">Örnek</span>
+        <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--danger-soft);color:#a3241a">Hata</span>
+        <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--warn-soft);color:var(--warn)">Uyarı</span>
+        <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:#eef0f3;color:var(--muted)">Kesim</span>
+        <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:var(--ok-soft);color:var(--ok)">Aktif</span>
+        <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:#efe7fb;color:#5b3aa8">Doyum</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="display:inline-flex;align-items:center;gap:8px;font-weight:500"><i style="width:10px;height:10px;border-radius:5px;background:var(--ok);display:block"></i>Çalışıyor <span class="mono sub">1,594 s</span></span>
+        <span style="display:inline-flex;align-items:center;gap:8px;font-weight:500"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1" y="0" width="3" height="10" fill="#e8a317"/><rect x="6" y="0" width="3" height="10" fill="#e8a317"/></svg>Duraklatıldı</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;font-weight:500"><i style="width:10px;height:10px;background:var(--stopped);display:block"></i>Durduruldu</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center"><span class="lcd">4,500 V</span><span class="lcd">7,071 V~</span><span class="lcd" style="color:#5d8a6c">– – – V</span><span class="cap">LCD</span></div>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+      <h2 class="h2" style="margin:0">Mesaj satırı</h2>
+      <div style="display:flex;gap:10px;padding:10px 12px;border-radius:8px;background:var(--danger-soft);border:1px solid #f5c2bd">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none"><circle cx="10" cy="10" r="9" fill="#d92d20"/><path d="M10 5.5v5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.2" r="1.2" fill="#fff"/></svg>
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;font-weight:600;color:#a3241a">Hata · seçili</span><b>LED yandı</b><span style="font-size:13px;color:#4a5562">D1 üzerinden 149 mA geçti; en fazla 30 mA. Ön direnç: R = (V<sub>kaynak</sub> − V<sub>f</sub>) / I</span></div>
+      </div>
+      <div style="display:flex;gap:10px;padding:10px 12px;border-radius:8px">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none"><path d="M10 1.5l9 16H1z" fill="#e8a317" stroke="#b54708" stroke-width="1" stroke-linejoin="round"/><path d="M10 7v4.5" stroke="#1d2733" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="14.3" r="1.1" fill="#1d2733"/></svg>
+        <div style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;font-weight:600;color:var(--warn)">Uyarı</span><b>Boşta uç</b><span style="font-size:13px;color:#4a5562">R1 direncinin 2. ucu hiçbir yere bağlı değil.</span></div>
+      </div>
+      <span class="cap">Satıra tıkla/dokun: ilgili parça tuvalde vurgulanır, gerekirse görünüm oraya kayar. Satır bir &lt;button&gt;’dur.</span>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+      <h2 class="h2" style="margin:0">Toast</h2>
+      <div style="display:flex;align-items:center;gap:12px;background:#1d2733;color:#fff;border-radius:10px;padding:10px 10px 10px 14px;box-shadow:0 16px 40px rgba(29,39,51,.18)">
+        <span style="font-size:14px;flex:1">Örnek yüklendi. Önceki devrene dönebilirsin.</span>
+        <button class="b" style="background:#2c3846;border-color:#2c3846;color:#fff;height:32px">Geri al</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #f5c2bd;border-radius:10px;padding:10px 14px;box-shadow:0 4px 12px rgba(29,39,51,.12)">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none"><circle cx="10" cy="10" r="9" fill="#d92d20"/><path d="M10 5.5v5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.2" r="1.2" fill="#fff"/></svg>
+        <span style="font-size:14px">Bu dosya geçerli bir devre dosyası değil (sürüm 1 JSON bekleniyor).</span>
+      </div>
+      <span class="cap">Altta ortada; telefonda alt sayfanın üstünde. 5 s, odakta durur; role="status".</span>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px">
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+      <h2 class="h2" style="margin:0">Alt sayfa (telefon)</h2>
+      <div style="display:flex;gap:14px;align-items:flex-end">
+        <div style="width:120px;height:72px;background:#fff;border:1px solid var(--line-2);border-radius:16px 16px 0 0;display:flex;flex-direction:column;align-items:center;padding-top:6px;box-shadow:0 -2px 10px rgba(29,39,51,.08)"><i style="width:36px;height:5px;border-radius:3px;background:#c4cad2;display:block"></i><span class="cap" style="margin-top:14px">Peek 72</span></div>
+        <div style="width:120px;height:150px;background:#fff;border:1px solid var(--line-2);border-radius:16px 16px 0 0;display:flex;flex-direction:column;align-items:center;padding-top:6px"><i style="width:36px;height:5px;border-radius:3px;background:#c4cad2;display:block"></i><span class="cap" style="margin-top:14px">Yarım %50</span></div>
+        <div style="width:120px;height:220px;background:#fff;border:1px solid var(--line-2);border-radius:16px 16px 0 0;display:flex;flex-direction:column;align-items:center;padding-top:6px"><i style="width:36px;height:5px;border-radius:3px;background:#c4cad2;display:block"></i><span class="cap" style="margin-top:14px">Tam</span></div>
+      </div>
+      <span class="cap">Tutamaç 44×44 dokunma alanında; tutamaca dokunmak bir sonraki konuma geçirir. İçerik kendi içinde kayar (overscroll-behavior: contain). Tuval hareketi sayfa kenarına 12 px’ten yakın başlarsa sayfaya geçmez.</span>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+      <h2 class="h2" style="margin:0">Modal</h2>
+      <div style="background:rgba(29,39,51,.35);border-radius:10px;padding:20px;display:flex;justify-content:center">
+        <div style="width:300px;background:#fff;border-radius:16px;box-shadow:0 16px 40px rgba(29,39,51,.18);padding:18px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">Paylaşım bağlantısı</b><button class="b g i" aria-label="Kapat"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button></div>
+          <span class="sub">Odak pencerenin içinde döner; Esc ve arka plana dokunmak kapatır.</span>
+          <div style="display:flex;justify-content:flex-end;gap:8px"><button class="b">Kapat</button><button class="b pri">Kopyala</button></div>
+        </div>
+      </div>
+      <span class="cap">Modal yalnızca: Örnekler, Paylaşım, Yardım, ilk açılış. Özellikler artık modal değil.</span>
+    </div>
+
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:12px">
+      <h2 class="h2" style="margin:0">Örnek kartı (İnceleme › Örnek)</h2>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="background:var(--warn-soft);border:1px solid #f3d9a8;border-radius:10px;padding:10px 12px"><span style="font-size:12px;font-weight:600;color:var(--warn);display:flex;gap:6px;align-items:center"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true" style="width:16px;height:16px"><path d="M7 14h6M8 17h4M10 2a5 5 0 0 0-3 9c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a5 5 0 0 0-3-9z"/></svg>Tahmin et</span><div style="font-size:14px;margin-top:2px">Voltmetre kaç volt gösterir? Önce hesapla, sonra Oynat’a bas.</div></div>
+        <div style="background:#f6f7f9;border:1px dashed var(--line-2);border-radius:10px;padding:10px 12px;display:flex;gap:8px;align-items:center;color:var(--muted)"><svg class="ic" viewBox="0 0 20 20" aria-hidden="true" style="width:18px;height:18px"><rect x="4" y="9" width="12" height="8" rx="2"/><path d="M7 9V6a3 3 0 0 1 6 0v3"/></svg><span style="font-size:14px">Cevabı görmek için Oynat’a bas.</span></div>
+        <div style="background:var(--ok-soft);border:1px solid #b9dfc8;border-radius:10px;padding:10px 12px"><span style="font-size:12px;font-weight:600;color:var(--ok)">Cevap</span><div style="font-size:14px;margin-top:2px"><b>4,5 V:</b> V<sub>çıkış</sub> = V · R<sub>2</sub> / (R<sub>1</sub> + R<sub>2</sub>)</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

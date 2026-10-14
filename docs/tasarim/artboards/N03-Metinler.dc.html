@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Metin değişiklikleri</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.5}
+.r{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr);gap:16px;padding:10px 0;border-bottom:1px solid #e3e7ec;align-items:start}
+.r .n{font:600 12px 'IBM Plex Mono',monospace;color:#5f6b7a;padding-top:2px}
+.o{color:#6b7480;font-size:13.5px}
+.w{font-size:14px}
+.w b{font-weight:600}
+.w small{display:block;font-size:12px;color:#5f6b7a;margin-top:2px}
+.h{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr);gap:16px;padding:8px 0;border-bottom:2px solid #1d2733;font-size:12px;font-weight:600;color:#5f6b7a}
+.g{margin:18px 0 0;font-size:15px;font-weight:600}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:1600px;box-sizing:border-box;background:#fff;padding:48px 64px;display:flex;flex-direction:column">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+    <h1 style="margin:0;font-size:28px;font-weight:600">Metin değişiklikleri</h1>
+    <span style="font-size:13px;color:#5f6b7a">Anlam ve terimler korunur. Arayüzde “pin” yerine “uç” önerilir.</span>
+  </div>
+  <div class="h"><span>#</span><span>Eski</span><span>Yeni · neden</span></div>
+  <div class="g">İpuçları ve rehber</div>
+  <div class="r"><span class="n">1</span><span class="o">Kablo çekmek için bir pinin ucuna tıkla. Çift tık: özellikler · R: döndür · F: ters çevir · Delete: sil · Boşluk + sürükle: tuvali kaydır</span><span class="w"><b>Kablo çekmek için bir parçanın ucuna tıkla · seçince özellikler sağda açılır · R: döndür · F: ters çevir · Delete: sil · Boşluk + sürükle: kaydır</b><small>Özellikler artık seçimle açılıyor; “pin” yerine Türkçe “uç”.</small></span></div>
+  <div class="r"><span class="n">2</span><span class="o">Simülasyon sırasında: … değer değiştirmek için çift tıkla · parça eklemek ya da taşımak simülasyonu durdurur</span><span class="w"><b>Simülasyon sırasında: anahtarı açıp kapatmak için üzerine tıkla · değeri sağdaki panelden değiştir · parça eklemek ya da taşımak simülasyonu durdurur</b><small>Değer artık panelden, canlı.</small></span></div>
+  <div class="r"><span class="n">3</span><span class="o">Parça eklemek için sol üstteki kütüphane düğmesine dokun.</span><span class="w"><b>Parça eklemek için alttaki Parça düğmesine dokun.</b><small>Telefonda kütüphane alttan açılıyor.</small></span></div>
+  <div class="r"><span class="n">4</span><span class="o">Parça eklendi. Sürükle: taşı · pin ucuna dokun: kablo · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil)</span><span class="w"><b>R1 eklendi. Değeri, döndürme ve silme alttaki çubukta. Bağlamak için bir uca dokun.</b><small>Eylemler artık görünür; hareket listesine gerek yok.</small></span></div>
+  <div class="r"><span class="n">5</span><span class="o">Bir örneğe tıkla: devre açılır; açıklaması ve tahmin sorusu tuvalin köşesinde çıkar.</span><span class="w"><b>Bir örneğe tıkla: devre açılır; açıklaması ve tahmin sorusu sağdaki Örnek sekmesinde çıkar.</b><small>Telefonda: “…alttaki sayfada çıkar.”</small></span></div>
+  <div class="g">Bildirimler</div>
+  <div class="r"><span class="n">6</span><span class="o">Örnek yüklendi. Önceki devrene dönmek için Geri al (Ctrl+Z).</span><span class="w"><b>Örnek yüklendi.</b> + <b>[Geri al]</b> düğmesi<small>Telefonda Ctrl+Z yok; düğme her cihazda çalışır. Aynısı “Yeni devre açıldı.” ve “Devre içe aktarıldı.” için.</small></span></div>
+  <div class="r"><span class="n">7</span><span class="o">Paylaşım bağlantısındaki devre okunamadı; bağlantı eksik kopyalanmış olabilir.</span><span class="w"><b>Paylaşım bağlantısındaki devre okunamadı. Bağlantı eksik kopyalanmış olabilir; gönderenden yeniden iste.</b><small>Ne yapılacağını söyler.</small></span></div>
+  <div class="g">Simülasyon çubuğu ve hız</div>
+  <div class="r"><span class="n">8</span><span class="o">×2,5·10⁻⁵</span><span class="w"><b>1 s’de 25 µs</b> (ikincil: ×2,5·10⁻⁵)<small>Oran yerine gerçek zamanda ne kadar geçtiği.</small></span></div>
+  <div class="r"><span class="n">9</span><span class="o">Simülasyon hızı: simülasyon zamanının gerçek zamana oranı</span><span class="w"><b>Gerçek 1 saniyede simülasyonda ne kadar zaman geçer</b></span></div>
+  <div class="r"><span class="n">10</span><span class="o">Simülasyon çalışamıyor: {hata açıklaması}</span><span class="w"><b>Simülasyon başlamadı: {hata açıklaması}</b> + düzeltme düğmesi<small>“Çalışamıyor” kalıcı bir arıza gibi okunuyordu.</small></span></div>
+  <div class="r"><span class="n">11</span><span class="o">Bu hızda simülasyon gerçek zamana yetişemiyor (yüksek frekans). Hızı düşür ya da osiloskopta Oto’ya bas.</span><span class="w">Aynı metin + <b>[Hızı ayarla]</b> düğmesi</span></div>
+  <div class="g">Özellikler ve İnceleme</div>
+  <div class="r"><span class="n">12</span><span class="o">R1 — özellikler</span><span class="w"><b>R1 · Direnç</b><small>Panel başlığı; “özellikler” sekme adından anlaşılıyor.</small></span></div>
+  <div class="r"><span class="n">13</span><span class="o">İptal · Tamam (Enter)</span><span class="w"><b>Değişiklikler Enter’la ya da alandan çıkınca uygulanır. Geri almak için Ctrl+Z.</b><small>Modal kalktı.</small></span></div>
+  <div class="r"><span class="n">14</span><span class="o">(yok)</span><span class="w"><b>Geçersiz değer uygulanmaz; tuvalde {eski değer} kalır.</b><small>Hata metninin altında.</small></span></div>
+  <div class="r"><span class="n">15</span><span class="o">(yok)</span><span class="w"><b>Canlı uygulanır · simülasyon durmaz</b></span></div>
+  <div class="g">Mesajlar</div>
+  <div class="r"><span class="n">16</span><span class="o">Bir mesaja tıklayınca ilgili parça tuvalde vurgulanır.</span><span class="w"><b>Bir mesajı seçince ilgili parça tuvalde vurgulanır.</b><small>Tıklama ve dokunma için tek metin.</small></span></div>
+  <div class="r"><span class="n">17</span><span class="o">(yok)</span><span class="w"><b>Toprak tuzağı</b> · “{OSC} ve {FG} COM uçları şebeke toprağıyla birleşiyor; {D} kısa devre oldu. Prob toprağını {FG} COM ile aynı noktaya bağla.”<small>Yeni uyarı başlığı.</small></span></div>
+  <div class="g">Yeni metinler (telefon kipleri)</div>
+  <div class="r"><span class="n">18</span><span class="o">(yok)</span><span class="w"><b>Devre kilitli · dokun: incele</b> — Ölç kipi bilgisi</span></div>
+  <div class="r"><span class="n">19</span><span class="o">(yok)</span><span class="w"><b>Düzenlemek için durdurulsun mu?</b> “Parça eklemek ya da taşımak simülasyonu durdurur.” [Durdur ve düzenle] [Vazgeç]</span></div>
+  <div class="r"><span class="n">20</span><span class="o">Kablo çiziliyor: bir pine ya da kabloya dokun · İptal</span><span class="w"><b>İlk uca dokun</b> → <b>İkinci uca dokun</b> · alt satır “Başlangıç: R1 · 2. uç” · [Geri al] [Bitti]</span></div>
+  <div class="r"><span class="n">21</span><span class="o">(yok)</span><span class="w"><b>Burada {n} öğe var</b> — kalabalıkta seçici başlığı</span></div>
+  <div class="r"><span class="n">22</span><span class="o">(yok)</span><span class="w"><b>Zincirle ekle: {parça}’in {uç} ucuna bağlanır</b></span></div>
+  <div class="r"><span class="n">23</span><span class="o">(yok)</span><span class="w"><b>Tahminin (isteğe bağlı)</b> · cevapta “Tahminin {x} idi; …”</span></div>
+  <div class="r" style="border-bottom:0"><span class="n">24</span><span class="o">(Kaydet düğmesi yok, durum da görünmüyor)</span><span class="w"><b>Tarayıcıda kaydedildi</b><small>Üst çubukta sürekli, Dosya menüsünde açıklamasıyla.</small></span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1600}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

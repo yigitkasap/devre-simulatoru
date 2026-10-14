@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Deney föyü</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#b3bac3 1.2px,transparent 1.5px),radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:60px 60px,12px 12px;background-position:6px 6px,6px 6px}
+.s{fill:none;stroke:#1d2733;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lb{font:600 11px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+.th{font-size:12px;font-weight:600;color:#5f6b7a;text-align:left;padding:8px 12px;border-bottom:1px solid #dde1e6;background:#f6f7f9}
+.td{padding:0 12px;height:40px;border-bottom:1px solid #eef0f3;font:500 14px 'IBM Plex Mono',monospace}
+.stp{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #eef0f3}
+.sn{width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;font:600 12px 'IBM Plex Mono',monospace;flex:none}
+.fl{display:flex;align-items:center;height:40px;border:1px solid #c4cad2;border-radius:8px;background:#fff;box-sizing:border-box;overflow:hidden}
+.fl input{flex:1;min-width:0;border:0;outline:0;background:transparent;padding:0 10px;font:500 15px 'IBM Plex Mono',monospace;color:#1d2733}
+.fl span{padding:0 10px;height:100%;display:flex;align-items:center;border-left:1px solid #dde1e6;background:#f6f7f9;font:500 14px 'IBM Plex Mono',monospace;color:#5f6b7a}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden">
+  <dc-import name="C-UstCubuk" tool="sec" zoom="%120" hint-size="1440px,52px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="width:56px;flex:none;background:#fff"><dc-import name="C-Kutuphane" rail="{{ true }}" hint-size="56px,848px"></dc-import></div>
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div class="paper" role="application" aria-label="Devre şeması: JFET’li ortak kaynak yükselteci" style="flex:1;position:relative;overflow:hidden">
+        <svg width="1004" height="496" viewBox="0 0 1004 496" style="position:absolute;left:0;top:0" aria-hidden="true">
+          <g transform="translate(190,40) scale(1.25)">
+            <path class="s" d="M300 40H420V76M420 84V120V300M300 40V60M300 100V120H360M300 120V156H276M276 184H300V210M300 210V230M300 270V300M300 210H350V246M350 254V300M240 300H420M240 170H200M200 170V210M200 250V300M100 170H156M164 170H200M100 210V300H240M360 120H396M404 120H460"/>
+            <circle cx="300" cy="120" r="3" fill="#1d2733"/><circle cx="300" cy="210" r="3" fill="#1d2733"/><circle cx="200" cy="170" r="3" fill="#1d2733"/><circle cx="300" cy="300" r="3" fill="#1d2733"/><circle cx="240" cy="300" r="3" fill="#1d2733"/>
+            <path class="s" d="M406 76H434"/><path d="M413 84H427" stroke="#1d2733" stroke-width="4.5"/>
+            <text class="lb" x="440" y="82">V<tspan dy="2" font-size="8">DD</tspan></text><text class="lv" x="440" y="96">15 V</text>
+            <path class="s" d="M300 60L293 63.3L307 70L293 76.7L307 83.3L293 90L307 96.7L300 100"/>
+            <rect x="268" y="56" width="64" height="48" rx="5" fill="#e6effd" fill-opacity=".5" stroke="#1f6feb" stroke-width="1.5" stroke-dasharray="5 4"/>
+            <text class="lb" x="312" y="76" style="fill:#1557c0">R<tspan dy="2" font-size="8">D</tspan></text><text class="lv" x="312" y="90" style="fill:#1557c0">4,7 kΩ</text>
+            <path d="M240 170H262" class="s"/><path d="M270 170l-8-4v8z" fill="#1d2733"/>
+            <path d="M276 150V190" stroke="#1d2733" stroke-width="3"/>
+            <text class="lb" x="262" y="146" text-anchor="end">Q1</text>
+            <path class="s" d="M300 230L293 233.3L307 240L293 246.7L307 253.3L293 260L307 266.7L300 270"/>
+            <text class="lb" x="312" y="246">R<tspan dy="2" font-size="8">S</tspan></text><text class="lv" x="312" y="260">470 Ω</text>
+            <path class="s" d="M336 246H364M336 254H364"/>
+            <text class="lb" x="370" y="254">C<tspan dy="2" font-size="8">S</tspan></text>
+            <path class="s" d="M200 210L193 213.3L207 220L193 226.7L207 233.3L193 240L207 246.7L200 250"/>
+            <text class="lb" x="186" y="232" text-anchor="end">R<tspan dy="2" font-size="8">G</tspan></text><text class="lv" x="186" y="246" text-anchor="end">1 MΩ</text>
+            <path class="s" d="M156 160V180M164 160V180"/><text class="lb" x="160" y="152" text-anchor="middle">C1</text>
+            <path class="s" d="M396 110V130M404 110V130"/><text class="lb" x="400" y="104" text-anchor="middle">C2</text>
+            <path class="s" d="M240 300V310M231 310H249M234.5 314.5H245.5M238 319H242"/>
+            <rect x="20" y="150" width="80" height="80" rx="5" fill="#fff" stroke="#1d2733" stroke-width="2"/><text class="lb" x="28" y="222">FG1</text>
+            <rect x="28" y="158" width="58" height="16" rx="2" fill="#1e2a25"/><text x="57" y="170" text-anchor="middle" style="font:600 8.5px 'IBM Plex Mono',monospace;fill:#a6f4bd">1,000 kHz</text>
+            <rect x="460" y="100" width="62" height="40" rx="5" fill="#fff" stroke="#1d2733" stroke-width="2"/><text class="lb" x="470" y="124">OSC1 B</text>
+            <rect x="112" y="128" width="56" height="18" rx="9" fill="#fff" stroke="#c4cad2"/><text x="140" y="140.5" text-anchor="middle" style="font:500 8.5px 'IBM Plex Sans',sans-serif;fill:#3d4957">→ OSC1 A</text>
+          </g>
+        </svg>
+        <div style="position:absolute;left:12px;top:12px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:6px;background:#efe7fb;color:#5b3aa8">Deney 6 · föydeki devre</div>
+      </div>
+      <section aria-label="Ölçüm tablosu" style="height:300px;flex:none;background:#fff;border-top:1px solid #c4cad2;display:flex;flex-direction:column">
+        <div style="height:48px;display:flex;align-items:center;gap:10px;padding:0 12px 0 16px;border-bottom:1px solid #dde1e6">
+          <b style="font-size:15px">Ölçüm tablosu</b><span style="font-size:13px;color:#5f6b7a">Tablo 6.1 · R<sub>D</sub>’ye göre gerilim kazancı</span>
+          <span style="flex:1"></span>
+          <button style="height:36px;padding:0 12px;border-radius:8px;border:0;background:#1f6feb;color:#fff;font:600 13px 'IBM Plex Sans',sans-serif;display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M6 9l4 4 4-4M4 16h12"/></svg>Simülasyondan al</button>
+          <button style="height:36px;padding:0 12px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">Satır ekle</button>
+          <button style="height:36px;padding:0 12px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">CSV indir</button>
+        </div>
+        <div style="flex:1;min-height:0;display:flex">
+          <div style="flex:1;overflow:auto">
+            <table style="width:100%;border-collapse:collapse">
+              <thead><tr><th class="th" style="width:40px">#</th><th class="th">R<sub>D</sub></th><th class="th">V<sub>giriş</sub> (tepe-tepe)</th><th class="th">V<sub>çıkış</sub> (tepe-tepe)</th><th class="th">|A<sub>V</sub>| = V<sub>çıkış</sub> / V<sub>giriş</sub></th><th class="th">Not</th></tr></thead>
+              <tbody>
+                <tr><td class="td" style="color:#5f6b7a">1</td><td class="td">1,0 kΩ</td><td class="td">0,200 V</td><td class="td">0,402 V</td><td class="td">2,01</td><td class="td" style="font-family:'IBM Plex Sans',sans-serif;font-weight:400;color:#5f6b7a">simülasyondan</td></tr>
+                <tr><td class="td" style="color:#5f6b7a">2</td><td class="td">2,2 kΩ</td><td class="td">0,200 V</td><td class="td">0,881 V</td><td class="td">4,41</td><td class="td" style="font-family:'IBM Plex Sans',sans-serif;font-weight:400;color:#5f6b7a">simülasyondan</td></tr>
+                <tr style="background:#f3f7fe;box-shadow:inset 3px 0 0 #1f6feb"><td class="td" style="color:#1557c0">3</td><td class="td">4,7 kΩ</td><td class="td">0,200 V</td><td class="td" style="color:#1557c0">1,88 V <span style="font:400 11px 'IBM Plex Sans',sans-serif;color:#1557c0">canlı</span></td><td class="td" style="color:#1557c0">9,40</td><td class="td" style="font-family:'IBM Plex Sans',sans-serif;font-weight:400;color:#1557c0">“Simülasyondan al” ile kaydet</td></tr>
+                <tr><td class="td" style="color:#5f6b7a">4</td><td class="td" style="color:#9aa3ad">—</td><td class="td"></td><td class="td"></td><td class="td"></td><td class="td"></td></tr>
+              </tbody>
+            </table>
+            <div style="padding:8px 12px;font-size:12.5px;color:#5f6b7a">Hücreler elle de yazılabilir; elle yazılanlar “elle” notu alır. Tablo bu tarayıcıda saklanır, devreyle birlikte paylaşılır.</div>
+          </div>
+          <div style="width:300px;flex:none;border-left:1px solid #dde1e6;padding:12px 16px;display:flex;flex-direction:column;gap:6px">
+            <span style="font-size:12px;font-weight:600;color:#5f6b7a">|A<sub>V</sub>| – R<sub>D</sub></span>
+            <svg width="268" height="190" viewBox="0 0 268 190" role="img" aria-label="Kazanç R D ile doğrusal artıyor; 3 nokta">
+              <path d="M36 10V160H260" fill="none" stroke="#c4cad2" stroke-width="1"/>
+              <path d="M36 85H260" stroke="#b54708" stroke-width="1" stroke-dasharray="4 3"/><text x="258" y="80" text-anchor="end" style="font:500 10px 'IBM Plex Sans',sans-serif;fill:#b54708">hedef 10</text>
+              <path d="M36 160L70 130L118 94L210 19" fill="none" stroke="#1f6feb" stroke-width="1.2" stroke-dasharray="3 3"/>
+              <circle cx="70" cy="130" r="4" fill="#1f6feb"/><circle cx="118" cy="94" r="4" fill="#1f6feb"/><circle cx="210" cy="19" r="5" fill="#fff" stroke="#1f6feb" stroke-width="2"/>
+              <text x="30" y="164" text-anchor="end" style="font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a">0</text><text x="30" y="89" text-anchor="end" style="font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a">10</text>
+              <text x="70" y="176" text-anchor="middle" style="font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a">1k</text><text x="118" y="176" text-anchor="middle" style="font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a">2,2k</text><text x="210" y="176" text-anchor="middle" style="font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a">4,7k</text>
+            </svg>
+          </div>
+        </div>
+      </section>
+      <dc-import name="C-SimCubugu" state="run" time="0,0153 s" speed="×0,01" speed-note="1 s’de 10 ms" msg="Ölçüm tablosu açık: “Simülasyondan al” seçili satıra o anki değerleri yazar." hint-size="1004px,52px"></dc-import>
+    </main>
+    <aside aria-label="Deney paneli" style="width:380px;flex:none;background:#fff;border-left:1px solid #dde1e6;display:flex;flex-direction:column;min-height:0">
+      <div style="padding:16px 20px 10px;border-bottom:1px solid #dde1e6;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:#efe7fb;color:#5b3aa8">Deney 6 · FET yükselteci</span><span class="mono" style="font-size:12px;color:#5f6b7a">Adım 2 / 4</span></div>
+        <h2 style="margin:0;font-size:19px;font-weight:600;line-height:1.25">JFET’li yükselteç (ortak kaynak)</h2>
+        <div style="height:6px;border-radius:3px;background:#eef0f3;overflow:hidden"><i style="display:block;width:45%;height:100%;background:#5b3aa8"></i></div>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;padding:4px 20px 20px">
+        <div class="stp"><span class="sn" style="background:#e8f5ed;color:#1b7d44">✓</span><div><b>Amaç</b><div style="font-size:13px;color:#5f6b7a">Ortak kaynaklı yükseltecin kazancını ölçmek.</div></div></div>
+        <div class="stp" style="border-bottom:0"><span class="sn" style="background:#5b3aa8;color:#fff">2</span><div style="flex:1;display:flex;flex-direction:column;gap:10px">
+          <b>Tasarım görevi</b>
+          <span style="font-size:14px;line-height:1.5">Gerilim kazancı |A<sub>V</sub>| ≈ 10 olacak şekilde R<sub>D</sub>’yi seç. Diğer değerler föydeki gibi kalsın.</span>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600">R<sub>D</sub><div class="fl" style="border-color:#1f6feb;box-shadow:0 0 0 3px #e6effd"><input value="4,7k"><span>Ω</span></div></label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600">V<sub>DD</sub><div class="fl"><input value="15"><span>V</span></div></label>
+          </div>
+          <span style="font-size:12px;color:#5f6b7a">Bu alanlar devredeki R<sub>D</sub> ve V<sub>DD</sub>’ye bağlı; burada değiştirince tuvalde de değişir.</span>
+          <div style="border:1px solid #f3d9a8;background:#fef6e7;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:12px;font-weight:600;color:#b54708">Hedef kontrolü</span>
+            <span style="font-size:14px">Ölçülen |A<sub>V</sub>| = <b class="mono">9,40</b> · hedef 10 · fark %6</span>
+            <span style="font-size:12.5px;color:#3d4957">Biraz daha büyük bir R<sub>D</sub> dene.</span>
+          </div>
+        </div></div>
+        <div class="stp"><span class="sn" style="background:#eef0f3;color:#5f6b7a">3</span><div><b>Ölçüm tablosu</b><div style="font-size:13px;color:#5f6b7a">Tablo 6.1’i doldur: üç farklı R<sub>D</sub> için kazanç.</div></div></div>
+        <div class="stp"><span class="sn" style="background:#eef0f3;color:#5f6b7a">4</span><div><b>Sorular</b><div style="font-size:13px;color:#5f6b7a">C<sub>S</sub> çıkarılırsa kazanç neden düşer?</div></div></div>
+        <div style="display:flex;justify-content:space-between;padding-top:12px"><button style="height:36px;padding:0 12px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">← Önceki adım</button><button style="height:36px;padding:0 12px;border-radius:8px;border:0;background:#1d2733;color:#fff;font:600 13px 'IBM Plex Sans',sans-serif">Sonraki adım →</button></div>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

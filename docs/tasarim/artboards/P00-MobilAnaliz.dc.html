@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Mobil analiz</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.h2{margin:0;font-size:20px;font-weight:600}
+.sub{color:#5f6b7a;font-size:13.5px}
+.pr{display:grid;grid-template-columns:36px minmax(0,1fr) 28px minmax(0,1fr);gap:12px;align-items:start;padding:14px 0;border-bottom:1px solid #e3e7ec}
+.pr .n{font:600 13px 'IBM Plex Mono',monospace;color:#a3241a;padding-top:1px}
+.pr b{display:block;font-size:15px;margin-bottom:2px}
+.pr span{font-size:13.5px;color:#3d4957;line-height:1.5}
+.bar{width:312px;height:56px;border-radius:12px;background:#fff;border:1px solid #c4cad2;display:flex;align-items:center;gap:2px;padding:0 6px;box-sizing:border-box}
+.bi{flex:1;height:44px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10.5px;font-weight:500;color:#1d2733;line-height:1.1;text-align:center}
+.bp{width:46px;height:46px;border-radius:23px;flex:none;display:flex;align-items:center;justify-content:center;margin-left:4px}
+.st{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.st h4{margin:0;font-size:14px;font-weight:600;display:flex;gap:8px;align-items:center}
+.zn{position:absolute;left:0;right:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:1760px;box-sizing:border-box;background:#fff;padding:48px 64px;display:flex;flex-direction:column;gap:36px">
+  <div style="display:flex;flex-direction:column;gap:8px;max-width:1000px">
+    <span class="mono" style="font-size:13px;color:#1557c0">Telefon · analiz</span>
+    <h1 style="margin:0;font-size:32px;font-weight:600;line-height:1.2">Telefonda neden zorlanılıyor, nasıl sadeleşir?</h1>
+    <span style="font-size:16px;color:#3d4957;line-height:1.5">Sorun tek bir düğme değil, kontrollerin dağınıklığı ve her dokunuşun bir düzenleme sayılması. Yeni model: bütün kontroller altta tek yerde, Kur ve Ölç diye iki açık kip, bağlama göre değişen tek bir çubuk.</span>
+  </div>
+
+  <div style="display:flex;gap:56px;align-items:flex-start">
+    <div style="display:flex;gap:28px">
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+        <div style="position:relative;width:195px;height:422px;border-radius:22px;border:1.5px solid #c4cad2;overflow:hidden;background:#fbfbf9">
+          <div style="position:absolute;left:0;right:0;top:0;height:46px;background:#fdecea;border-bottom:1px solid #f5c2bd;display:flex;align-items:flex-end;justify-content:space-between;padding:0 6px 4px;gap:2px;box-sizing:border-box"><i style="width:12px;height:12px;border-radius:3px;background:#d92d20;display:block"></i><i style="width:12px;height:12px;border-radius:3px;background:#d92d20;display:block"></i><i style="width:12px;height:12px;border-radius:3px;background:#d92d20;display:block"></i><i style="width:12px;height:12px;border-radius:3px;background:#d92d20;display:block"></i><i style="width:12px;height:12px;border-radius:3px;background:#d92d20;display:block"></i><i style="width:12px;height:12px;border-radius:3px;background:#d92d20;display:block"></i><i style="width:12px;height:12px;border-radius:3px;background:#d92d20;display:block"></i><i style="width:12px;height:12px;border-radius:3px;background:#d92d20;display:block"></i></div>
+          <div style="position:absolute;left:0;right:0;top:46px;height:74px;background:#fef6e7;border-bottom:1px solid #f3d9a8" class="zn"><span style="color:#b54708">Örnek kartı</span></div>
+          <div style="position:absolute;left:0;top:46px;width:118px;bottom:0;background:rgba(31,111,235,.12);border-right:1.5px solid #1f6feb" class="zn"><span style="color:#1557c0;transform:rotate(-90deg);white-space:nowrap">Kütüphane çekmecesi</span></div>
+          <div style="position:absolute;left:0;right:0;bottom:84px;height:96px;background:#0f1713;opacity:.85" class="zn"><span style="color:#cfe3d6">Osiloskop paneli</span></div>
+          <div style="position:absolute;left:0;right:0;bottom:46px;height:38px;background:#eef0f3;border-top:1px solid #c4cad2" class="zn"><span style="color:#5f6b7a">Mesajlar</span></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;height:46px;background:#fdecea;border-top:1px solid #f5c2bd" class="zn"><span style="color:#a3241a">Sim. çubuğu · 2 satır</span></div>
+        </div>
+        <b style="font-size:15px">Bugün</b>
+        <span class="sub" style="text-align:center;max-width:200px">6 bölge, 20’den çok hedef; panel açıkken tuval görünür alanın %35’ine iner.</span>
+      </div>
+      <div style="display:flex;align-items:center;font-size:28px;color:#9aa3ad;padding-bottom:80px">→</div>
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+        <div style="position:relative;width:195px;height:422px;border-radius:22px;border:1.5px solid #c4cad2;overflow:hidden;background:#fbfbf9">
+          <div style="position:absolute;left:0;right:0;top:0;height:46px;background:#f6f7f9;border-bottom:1px solid #dde1e6;display:flex;align-items:flex-end;padding:0 8px 6px;box-sizing:border-box;gap:6px"><span style="font-size:10px;font-weight:600">Devre adı ▾</span><span style="flex:1"></span><span style="font-size:9px;color:#1b7d44;font-weight:600">● Ölç</span><span style="font-size:10px">⋯</span></div>
+          <div class="zn" style="top:46px;bottom:96px;color:#5f6b7a"><span>Tuval · %69</span></div>
+          <div style="position:absolute;left:0;right:0;bottom:49px;height:36px;background:#fff;border-top:1px solid #c4cad2;border-radius:10px 10px 0 0" class="zn"><span style="color:#3d4957">Tek alt sayfa (peek)</span></div>
+          <div style="position:absolute;left:0;right:0;bottom:0;height:49px;background:#e6effd;border-top:1.5px solid #1f6feb;display:flex;align-items:center;padding:0 8px;gap:6px;box-sizing:border-box"><i style="flex:1;height:22px;border-radius:6px;background:#fff;display:block"></i><i style="flex:1;height:22px;border-radius:6px;background:#fff;display:block"></i><i style="flex:1;height:22px;border-radius:6px;background:#fff;display:block"></i><i style="flex:1;height:22px;border-radius:6px;background:#fff;display:block"></i><i style="width:30px;height:30px;border-radius:15px;background:#1b7d44;display:block;flex:none"></i></div>
+        </div>
+        <b style="font-size:15px">Yeni</b>
+        <span class="sub" style="text-align:center;max-width:200px">1 kontrol bölgesi, aynı anda en fazla 4 hedef + Oynat; üst şerit yalnızca bilgi.</span>
+      </div>
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column">
+      <h2 class="h2" style="margin-bottom:4px">Sorunlar ve karşılıkları</h2>
+      <div class="pr"><span class="n">S1</span><span><b>Kontroller dört yere dağılmış</b>Soldan çekmece, üstte 9 ikon, altta 2 satırlık çubuk, ortada kartlar. Başparmak ve göz sürekli yer değiştiriyor.</span><span style="color:#1b7d44;font-size:18px">→</span><span><b>Tek kontrol bölgesi</b>Bütün eylemler alt çubukta ve tek bir alt sayfada. Üst şerit yalnızca ad, durum ve ⋯.</span></div>
+      <div class="pr"><span class="n">S2</span><span><b>Her dokunuş bir düzenleme</b>Çalışırken parçaya dokununca parça kayıyor, simülasyon duruyor; ölçerken korku yaratıyor.</span><span style="color:#1b7d44;font-size:18px">→</span><span><b>Kur ve Ölç kipleri</b>Oynat’a basınca devrenin yapısı kilitlenir: dokunmak inceler, sürüklemek tuvali kaydırır. Değer değiştirmek serbest.</span></div>
+      <div class="pr"><span class="n">S3</span><span><b>Hedefler parmaktan küçük</b>Uç halkası ≈ 6 px, kablo 2–3 px; pin, kablo ve parça aynı noktada üst üste.</span><span style="color:#1b7d44;font-size:18px">→</span><span><b>Bağla kipi + seçici</b>Uçlar 44 pt etiketli hedeflere dönüşür. Birden çok hedefin olduğu yere dokununca “hangisi?” listesi çıkar.</span></div>
+      <div class="pr"><span class="n">S4</span><span><b>Kablo çizmek el becerisi istiyor</b>Uçtan başlayıp köşe köşe dokunmak, küçük hedefte bitirmek gerekiyor.</span><span style="color:#1b7d44;font-size:18px">→</span><span><b>İki dokunuş</b>Birinci uç, ikinci uç; L yolu kendiliğinden çizilir. Köşe gerekirse kablo parçası sonradan sürüklenir.</span></div>
+      <div class="pr"><span class="n">S5</span><span><b>Parça ekledikçe karmaşa artıyor</b>Her parça ad, değer, halka ve ekran getiriyor; yeni parça rastgele bir boşluğa düşüyor.</span><span style="color:#1b7d44;font-size:18px">→</span><span><b>Zincirle ekle + yakınlığa göre ayrıntı</b>Bir uç seçiliyken eklenen parça o uca bağlanır. Uzaklaşınca değer ve halkalar gizlenir.</span></div>
+      <div class="pr"><span class="n">S6</span><span><b>Gizli hareketler keşfedilmiyor</b>Çift dokunma ve uzun basma tek erişim yolu.</span><span style="color:#1b7d44;font-size:18px">→</span><span><b>Her eylem görünür</b>Seçince alt çubuk o parçanın eylemlerine döner. Hareketler yalnızca kısayol.</span></div>
+      <div class="pr" style="border-bottom:0"><span class="n">S7</span><span><b>Panel açılınca devre kayboluyor</b>Örnek kartı ve osiloskop paneli tuvalin üstünü ve altını kapatıyor.</span><span style="color:#1b7d44;font-size:18px">→</span><span><b>Sayfa açılınca yeniden sığdır</b>Devre her zaman görünür kalan alana sığar; seçili parça görünür tutulur.</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <h2 class="h2">Etkileşim modeli: alt çubuğun dört hâli</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">
+      <div class="st">
+        <h4><span class="mono" style="font-size:11px;padding:2px 6px;border-radius:4px;background:#eef0f3">KUR</span>Boşta</h4>
+        <div class="bar"><div class="bi">＋<span>Parça</span></div><div class="bi">⤳<span>Bağla</span></div><div class="bi">↶<span>Geri al</span></div><div class="bi">▤<span>Panel</span></div><div class="bp" style="background:#1b7d44;color:#fff">▶</div></div>
+        <span class="sub">Tuvalde parçaya dokun: seçer. Boşlukta sürükle: kaydırır. Parçayı sürükle: taşır.</span>
+      </div>
+      <div class="st">
+        <h4><span class="mono" style="font-size:11px;padding:2px 6px;border-radius:4px;background:#eef0f3">KUR</span>Parça seçili</h4>
+        <div class="bar" style="border-color:#1f6feb"><div class="bi" style="background:#e6effd;color:#1557c0"><span class="mono" style="font-size:12px;font-weight:600">220 Ω</span><span>Değer</span></div><div class="bi">⟳<span>Döndür</span></div><div class="bi">⇋<span>Çevir</span></div><div class="bi" style="color:#d92d20"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg><span>Sil</span></div><div class="bp" style="background:#1b7d44;color:#fff">▶</div></div>
+        <span class="sub">Alt sayfa peek’te ad ve değer görünür; yukarı çekince bütün özellikler. Boşluğa dokun: seçim biter.</span>
+      </div>
+      <div class="st">
+        <h4><span class="mono" style="font-size:11px;padding:2px 6px;border-radius:4px;background:#e6effd;color:#1557c0">BAĞLA</span>Kablo kipi</h4>
+        <div class="bar" style="border-color:#1f6feb;background:#f3f7fe"><div style="flex:2.2;font-size:11.5px;font-weight:600;padding-left:6px;color:#1557c0">İkinci uca dokun<br><span style="font-weight:400;color:#3d4957">R1 · 2. uçtan</span></div><div class="bi">↶<span>Geri al</span></div><div class="bi" style="background:#1d2733;color:#fff">✓<span>Bitti</span></div><div class="bp" style="background:#c4cad2;color:#fff">▶</div></div>
+        <span class="sub">Uçlar büyür ve etiketlenir. Parçalar soluklaşır, kaydırma ve yakınlaştırma serbest.</span>
+      </div>
+      <div class="st">
+        <h4><span class="mono" style="font-size:11px;padding:2px 6px;border-radius:4px;background:#e8f5ed;color:#1b7d44">ÖLÇ</span>Çalışıyor</h4>
+        <div class="bar" style="border-color:#1b7d44"><div class="bi">◫<span>Ölçümler</span></div><div class="bi">∿<span>Cihazlar</span></div><div class="bi"><span class="mono" style="font-size:12px;font-weight:600">×1</span><span>Hız</span></div><div class="bi">■<span>Durdur</span></div><div class="bp" style="background:#1d2733;color:#fff">❚❚</div></div>
+        <span class="sub">Yapı kilitli. Parçaya dokun: ölçümler sayfası o parçayı gösterir. Anahtara dokun: açar/kapar.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:center;font-size:13.5px;color:#3d4957;padding:12px 16px;background:#f6f7f9;border-radius:12px">
+      <span class="mono" style="font-weight:600">KUR</span><span>— Oynat →</span><span class="mono" style="font-weight:600;color:#1b7d44">ÖLÇ</span><span>— Duraklat ↔ devam —</span><span>— Durdur →</span><span class="mono" style="font-weight:600">KUR</span>
+      <span style="flex:1"></span>
+      <span>Ölç’te “Parça” ya da bir parçayı taşımak istersen: “Düzenlemek için durdur?” sorusu, tek dokunuşla Kur’a döner.</span>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:48px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+      <div style="position:relative;width:195px;height:422px;border-radius:22px;border:1.5px solid #c4cad2;overflow:hidden;background:linear-gradient(180deg,#fdecea 0%,#fef6e7 30%,#eef6f0 55%,#d5eedf 100%)">
+        <div class="zn" style="top:14px;color:#a3241a">zor</div>
+        <div class="zn" style="top:160px;color:#b54708">orta</div>
+        <div class="zn" style="bottom:110px;color:#1b7d44">kolay</div>
+        <div style="position:absolute;right:12px;bottom:12px;width:34px;height:34px;border-radius:17px;background:#1b7d44;border:2px solid #fff"></div>
+        <div style="position:absolute;left:10px;bottom:16px;width:120px;height:26px;border-radius:7px;background:#fff;border:1px solid #c4cad2"></div>
+      </div>
+      <b style="font-size:14px">Başparmak bölgesi</b>
+      <span class="sub" style="text-align:center;max-width:210px">Oynat sağ altta, her ekranda aynı yerde. Sık eylemler altta; nadir eylemler ⋯ içinde.</span>
+    </div>
+    <div style="flex:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 40px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <h2 class="h2" style="font-size:17px">Telefon kuralları</h2>
+        <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5">
+          <li>Aynı anda en fazla 4 eylem ve Oynat.</li>
+          <li>Tek alt sayfa: içeriği bağlama göre değişir (Parça ekle, Ölçümler, Cihazlar, Örnek, Mesajlar). İki sayfa üst üste açılmaz.</li>
+          <li>Sayfa en çok ekranın yarısını kaplar; tam ekran yalnızca cihaz paneli ve örnekler listesinde.</li>
+          <li>Sayfa açılıp kapanınca devre kalan alana yeniden sığar.</li>
+          <li>Ölç kipinde tek parmak her yerde tuvali kaydırır; parça taşınmaz.</li>
+          <li>Yakınlık %100’ün altındayken değerler ve uç halkaları gizlenir; seçili parçada görünür.</li>
+          <li>Geri al hiçbir zaman bir dokunuştan uzak değil: Kur çubuğunda ve her silme bildiriminde.</li>
+        </ol>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <h2 class="h2" style="font-size:17px">Dokunma hareketleri</h2>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.5">
+          <span><b>Dokun</b> · Kur: seç · Ölç: incele · Bağla: uç seç</span>
+          <span><b>Parçayı sürükle</b> · yalnızca Kur’da taşır; Ölç’te tuvali kaydırır</span>
+          <span><b>Boşlukta sürükle</b> · tuvali kaydırır (her kipte)</span>
+          <span><b>İki parmak</b> · yakınlaştırır ve kaydırır (her kipte)</span>
+          <span><b>Basılı tut</b> · Kur’da bağlam menüsü (çubuktaki eylemlerin aynısı) + büyüteç</span>
+          <span><b>Çift dokun</b> · seçili parçanın özellik sayfasını yarım açar</span>
+          <span><b>Uca dokun (Kur)</b> · Bağla kipini o uçtan başlatır</span>
+        </div>
+      </div>
+      <div style="grid-column:span 2;display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid #f3d9a8;background:#fef6e7;border-radius:12px;font-size:13.5px;line-height:1.5">
+        <b style="white-space:nowrap">Varsayım</b>
+        <span>Telefondaki asıl kullanım “örneği aç → tahmin et → Oynat → ölç → değer değiştir”. Bu yol en az dokunuşla yapılır. Sıfırdan kurmak da mümkün; zincirle ekle ve Bağla kipi bunu parmakla yapılabilir kılar. Laboratuvar deneyleri için ölçüm tablosu telefonda tam ekran sayfadır.</span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1760}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

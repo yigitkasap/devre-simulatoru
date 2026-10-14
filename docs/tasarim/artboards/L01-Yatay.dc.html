@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Yatay telefon: Ölç</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:10px 10px}
+.s{fill:none;stroke:#1d2733;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.ri{width:64px;height:56px;border:0;border-radius:12px;background:transparent;color:#1d2733;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:500 11px 'IBM Plex Sans',sans-serif}
+.rd{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid #eef0f3;font-size:14px}
+.rd b{font:500 16px 'IBM Plex Mono',monospace}
+</style>
+</helmet>
+<div class="ui" style="width:844px;height:390px;display:flex;background:#fff;overflow:hidden">
+  <div style="width:47px;flex:none;background:#fbfbf9"></div>
+  <div class="paper" role="application" aria-label="Devre şeması, Ölç kipi" style="flex:1;position:relative;overflow:hidden;box-shadow:inset 0 3px 0 #1b7d44">
+    <svg width="394" height="390" viewBox="0 0 394 390" aria-hidden="true" style="position:absolute;inset:0">
+      <defs><radialGradient id="ly"><stop offset="0" stop-color="#ff4d4d" stop-opacity=".55"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/></radialGradient></defs>
+      <g transform="translate(-50,46) scale(0.72)">
+        <circle cx="480" cy="205" r="66" fill="url(#ly)"/>
+        <rect x="230" y="96" width="140" height="74" rx="6" fill="none" stroke="#1f6feb" stroke-width="3"/>
+        <path d="M180 204V150H270" fill="none" stroke="#b31919" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M270 150L275 139.5L285 160.5L295 139.5L305 160.5L315 139.5L325 160.5L330 150" fill="none" stroke="#8a4a16" stroke-width="4.4" stroke-linejoin="round"/>
+        <path d="M330 150H480V192" fill="none" stroke="#548f14" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M480 222V330H381M339 330H180V216M180 330V360M166 360H194M171 367H189M176 374H184" fill="none" stroke="#148f3d" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path class="s" d="M159 204H201"/><path d="M169 216H191" fill="none" stroke="#1d2733" stroke-width="7"/>
+        <path d="M458 192H502L480 222Z" fill="#ff4d4d" stroke="#1d2733" stroke-width="3" stroke-linejoin="round"/><path class="s" d="M458 222H502"/>
+        <circle cx="360" cy="330" r="21" fill="#fbfbf9" stroke="#1d2733" stroke-width="3.2"/>
+        <text x="360" y="338" text-anchor="middle" style="font:600 22px 'IBM Plex Sans',sans-serif;fill:#1d2733">A</text>
+        <rect x="300" y="362" width="120" height="34" rx="5" fill="#1e2a25"/><text x="360" y="386" text-anchor="middle" style="font:600 21px 'IBM Plex Mono',monospace;fill:#a6f4bd">14,45 mA</text>
+        <text x="300" y="122" text-anchor="middle" style="font:600 21px 'IBM Plex Sans',sans-serif;fill:#1557c0">R1</text>
+        <g fill="#ffd43b" stroke="#7a5c00" stroke-width="1.4"><circle cx="214" cy="150" r="5"/><circle cx="300" cy="150" r="5"/><circle cx="388" cy="150" r="5"/><circle cx="460" cy="150" r="5"/><circle cx="480" cy="270" r="5"/><circle cx="430" cy="330" r="5"/><circle cx="284" cy="330" r="5"/><circle cx="212" cy="330" r="5"/><circle cx="180" cy="270" r="5"/></g>
+      </g>
+    </svg>
+  </div>
+  <aside aria-label="Ölçümler" style="width:280px;flex:none;border-left:1px solid #dde1e6;background:#fff;display:flex;flex-direction:column">
+    <div style="height:52px;display:flex;align-items:center;gap:6px;padding:0 4px 0 12px;border-bottom:1px solid #dde1e6">
+      <button style="flex:1;min-width:0;height:44px;border:0;background:transparent;text-align:left;display:flex;flex-direction:column;justify-content:center;padding:0"><b style="font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">LED ve ön direnç ▾</b><span style="font-size:11.5px;color:#14613a;display:flex;align-items:center;gap:5px"><i style="display:block;width:7px;height:7px;border-radius:4px;background:#1b7d44"></i>Ölç · 1,594 s</span></button>
+      <button aria-label="Daha fazla" style="width:44px;height:44px;border:0;background:transparent;color:#1d2733"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15.5" cy="10" r="1.5" fill="currentColor"/></svg></button>
+    </div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:10px 14px 21px;display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;align-items:baseline;gap:8px"><b style="font-size:16px">R1</b><span style="font-size:13px;color:#5f6b7a">Direnç · canlı</span></div>
+      <div class="rd"><span>Gerilim</span><b>3,180 V</b></div>
+      <div class="rd"><span>Akım</span><b>14,45 mA</b></div>
+      <div class="rd"><span>Harcanan güç</span><b>45,95 mW</b></div>
+      <div style="display:flex;gap:6px;align-items:center;padding-top:8px">
+        <button aria-label="Azalt" style="width:44px;height:44px;border-radius:10px;border:1px solid #c4cad2;background:#f6f7f9;font:600 18px 'IBM Plex Sans',sans-serif">−</button>
+        <button style="flex:1;height:44px;border-radius:10px;border:1px solid #c4cad2;background:#fff;font:500 16px 'IBM Plex Mono',monospace;color:#1d2733">220 Ω</button>
+        <button aria-label="Artır" style="width:44px;height:44px;border-radius:10px;border:1px solid #c4cad2;background:#f6f7f9;font:600 18px 'IBM Plex Sans',sans-serif">+</button>
+      </div>
+    </div>
+  </aside>
+  <nav aria-label="Eylemler" style="width:76px;flex:none;border-left:1px solid #1b7d44;background:#fff;display:flex;flex-direction:column;align-items:center;padding:6px 0 21px;gap:2px">
+    <button class="ri" style="background:#e6effd;color:#1557c0"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6 12h3M6 8h8"/></svg>Ölçümler</button>
+    <button class="ri"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="13" rx="2"/><path d="M5 11c1.5-5 3-5 4.5 0s3 5 4.5 0"/></svg>Cihazlar</button>
+    <button class="ri"><span class="mono" style="font-size:13px;font-weight:600">×1</span>Hız</button>
+    <button class="ri"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1.5" fill="currentColor"/></svg>Durdur</button>
+    <span style="flex:1"></span>
+    <button aria-label="Duraklat" style="width:60px;height:60px;border-radius:30px;border:0;background:#1d2733;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(29,39,51,.22)"><svg width="24" height="24" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1" fill="currentColor"/><rect x="11.6" y="4" width="3.4" height="12" rx="1" fill="currentColor"/></svg></button>
+  </nav>
+  <div style="width:47px;flex:none;background:#fff"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":844,"height":390}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

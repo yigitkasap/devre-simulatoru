@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: ilk açılış</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:12px 12px;background-position:6px 6px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 18px rgba(29,39,51,.14);display:flex;flex-direction:column}
+.hd{height:22px;display:flex;align-items:center;justify-content:center}
+.hd i{display:block;width:36px;height:5px;border-radius:3px;background:#c4cad2}
+.opt{display:flex;gap:12px;align-items:center;width:100%;min-height:64px;padding:10px 14px;border-radius:12px;border:1px solid #c4cad2;background:#fff;text-align:left;font:inherit;color:inherit;box-sizing:border-box}
+.opt b{display:block;font-size:15.5px}
+.opt span{font-size:13px;color:#5f6b7a;line-height:1.35}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="Yeni devre" mode="kur" hint-size="390px,52px"></dc-import>
+  <div style="flex:1;position:relative;min-height:0">
+    <div class="paper" role="application" aria-label="Devre şeması, boş" style="position:absolute;inset:0;display:flex;justify-content:center;padding-top:96px">
+      <span style="font-size:14px;color:#5f6b7a;text-align:center;max-width:260px">Parça eklemek için alttaki <b style="color:#1d2733">Parça</b> düğmesine dokun.</span>
+    </div>
+    <div class="sheet" role="dialog" aria-label="Hoş geldin" style="height:440px">
+      <div class="hd"><i></i></div>
+      <div style="padding:2px 16px 16px;display:flex;flex-direction:column;gap:12px;overflow:auto">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <h2 style="margin:0;font-size:21px;font-weight:600">Devre Simülatörü’ne hoş geldin</h2>
+          <span style="font-size:14px;color:#3d4957">Şemayı çiz, Oynat’a bas, devrenin neden öyle davrandığını gör.</span>
+        </div>
+        <button class="opt" style="border:2px solid #1f6feb;background:#f3f7fe"><svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="#1557c0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M3 4h5a2 2 0 0 1 2 2v11a2 2 0 0 0-2-2H3zM17 4h-5a2 2 0 0 0-2 2v11a2 2 0 0 1 2-2h5z"/></svg><span><b style="color:#1557c0">Örnekle başla</b><span>Hazır devre aç, tahmin et, Oynat’la doğrula.</span></span></button>
+        <button class="opt"><svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="#1d2733" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M10 7v6M7 10h6"/></svg><span><b>Boş tuvalde kur</b><span>Parça ekle, iki dokunuşla bağla.</span></span></button>
+        <button class="opt"><svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="#1d2733" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><circle cx="10" cy="10" r="7.5"/><path d="M8.5 7l4 3-4 3z"/></svg><span><b>Kısa tur</b><span>4 adım, yaklaşık 1 dakika.</span></span></button>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:600;color:#5f6b7a">İlk deneme için</span>
+          <div style="display:flex;gap:6px;overflow:hidden">
+            <button style="height:40px;padding:0 12px;border-radius:20px;border:1px solid #c4cad2;background:#fff;font:500 14px 'IBM Plex Sans',sans-serif;color:#1d2733;white-space:nowrap">LED ve ön direnç</button>
+            <button style="height:40px;padding:0 12px;border-radius:20px;border:1px solid #c4cad2;background:#fff;font:500 14px 'IBM Plex Sans',sans-serif;color:#1d2733;white-space:nowrap">Gerilim bölücü</button>
+            <button style="height:40px;padding:0 12px;border-radius:20px;border:1px solid #c4cad2;background:#fff;font:500 14px 'IBM Plex Sans',sans-serif;color:#1d2733;white-space:nowrap">RC dolma</button>
+          </div>
+        </div>
+        <button style="align-self:center;height:44px;padding:0 16px;border:0;background:transparent;font:500 15px 'IBM Plex Sans',sans-serif;color:#5f6b7a">Atla</button>
+      </div>
+    </div>
+  </div>
+  <dc-import name="C-TelAlt" bar="kur" hint-size="390px,104px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

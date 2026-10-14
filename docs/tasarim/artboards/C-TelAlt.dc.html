@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon alt çubuk</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<nav aria-label="Eylemler" style="width:100%;height:{{h}}px;box-sizing:border-box;padding:0 8px {{safe}}px 6px;background:{{barBg}};border-top:1.5px solid {{barLine}};display:flex;align-items:center;gap:2px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733">
+
+  <sc-if value="{{isKur}}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;display:flex;gap:2px">
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:{{parcaBg}};color:{{parcaFg}};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>Parça</button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:transparent;color:#1d2733;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15h5V5h7"/><circle cx="4" cy="15" r="2"/><circle cx="16" cy="5" r="2"/></svg>Bağla</button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:transparent;color:#1d2733;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5L4 9l4 4M4 9h8a4 4 0 0 1 0 8H9"/></svg>Geri al</button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:{{panelBg}};color:{{panelFg}};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="2.5"/><path d="M3 12h14"/></svg>Panel</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isSec}}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;display:flex;gap:2px">
+      <button aria-label="Değer: {{value}}. Değiştirmek için dokun" style="flex:1.25;height:56px;border:0;border-radius:12px;background:#e6effd;color:#1557c0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer"><span style="font:600 15px 'IBM Plex Mono',monospace">{{value}}</span><span style="font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif">Değer</span></button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:transparent;color:#1d2733;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 8.5A6 6 0 1 0 16 13"/><path d="M16 3.5v5h-5"/></svg>Döndür</button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:transparent;color:{{flipFg}};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v14"/><path d="M7 6L3 10l4 4z"/><path d="M13 6l4 4-4 4z"/></svg>Çevir</button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:transparent;color:#d92d20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg>Sil</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isBagla}}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;display:flex;gap:4px;align-items:center">
+      <div role="status" style="flex:2.1;min-width:0;display:flex;flex-direction:column;padding-left:8px"><span style="font:600 14px 'IBM Plex Sans',system-ui,sans-serif;color:#1557c0">{{msg}}</span><span style="font:400 12px 'IBM Plex Sans',system-ui,sans-serif;color:#3d4957;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{msg2}}</span></div>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:transparent;color:#1d2733;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5L4 9l4 4M4 9h8a4 4 0 0 1 0 8H9"/></svg>Geri al</button>
+      <button style="flex:1;height:48px;border:0;border-radius:12px;background:#1d2733;color:#fff;display:flex;align-items:center;justify-content:center;gap:6px;font:600 14px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer">Bitti</button>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isOlc}}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;display:flex;gap:2px">
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:{{olcBg}};color:{{olcFg}};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6 12h3M6 8h8"/></svg>Ölçümler</button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:{{cihazBg}};color:{{cihazFg}};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="24" height="24" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="13" rx="2"/><path d="M5 11c1.5-5 3-5 4.5 0s3 5 4.5 0"/></svg>Cihazlar</button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:transparent;color:#1d2733;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer"><span style="font:600 14px 'IBM Plex Mono',monospace">{{speed}}</span><span style="font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif">Hız</span></button>
+      <button style="flex:1;height:56px;border:0;border-radius:12px;background:transparent;color:#1d2733;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:500 11.5px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1.5" fill="currentColor"/></svg>Durdur</button>
+    </div>
+  </sc-if>
+
+  <button aria-label="{{playLabel}}" style="width:60px;height:60px;flex:none;border:0;border-radius:30px;background:{{playBg}};color:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 12px rgba(29,39,51,.22);margin-left:4px">
+    <sc-if value="{{showPlay}}" hint-placeholder-val="{{ true }}"><svg width="28" height="28" viewBox="0 0 20 20" aria-hidden="true"><path d="M6.5 4l10 6-10 6z" fill="currentColor"/></svg></sc-if>
+    <sc-if value="{{showPause}}" hint-placeholder-val="{{ false }}"><svg width="26" height="26" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1" fill="currentColor"/><rect x="11.6" y="4" width="3.4" height="12" rx="1" fill="currentColor"/></svg></sc-if>
+  </button>
+</nav>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"bar":{"editor":"enum","options":["kur","sec","bagla","olc","pause"],"default":"kur"},"active":{"editor":"enum","options":["","parca","panel","olcum","cihaz"],"default":""},"value":{"editor":"text","default":"220 Ω"},"flippable":{"editor":"boolean","default":false},"msg":{"editor":"text","default":"İlk uca dokun"},"msg2":{"editor":"text","default":"Uçlar büyütüldü"},"speed":{"editor":"text","default":"×1"},"safe":{"editor":"int","default":34},"$preview":{"width":390,"height":98}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const b = this.props.bar ?? 'kur';
+    const a = this.props.active ?? '';
+    const safe = this.props.safe ?? 34;
+    const on = '#e6effd', onFg = '#1557c0';
+    const olc = b === 'olc' || b === 'pause';
+    return {
+      h: 70 + safe, safe,
+      isKur: b === 'kur', isSec: b === 'sec', isBagla: b === 'bagla', isOlc: olc,
+      barBg: b === 'bagla' ? '#f3f7fe' : '#ffffff',
+      barLine: b === 'bagla' || b === 'sec' ? '#1f6feb' : olc ? '#1b7d44' : '#dde1e6',
+      parcaBg: a === 'parca' ? on : 'transparent', parcaFg: a === 'parca' ? onFg : '#1d2733',
+      panelBg: a === 'panel' ? on : 'transparent', panelFg: a === 'panel' ? onFg : '#1d2733',
+      olcBg: a === 'olcum' ? on : 'transparent', olcFg: a === 'olcum' ? onFg : '#1d2733',
+      cihazBg: a === 'cihaz' ? on : 'transparent', cihazFg: a === 'cihaz' ? onFg : '#1d2733',
+      flipFg: this.props.flippable ? '#1d2733' : '#9aa3ad',
+      value: this.props.value ?? '220 Ω',
+      msg: this.props.msg ?? 'İlk uca dokun', msg2: this.props.msg2 ?? 'Uçlar büyütüldü',
+      speed: this.props.speed ?? '×1',
+      playBg: b === 'olc' ? '#1d2733' : b === 'bagla' ? '#c4cad2' : '#1b7d44',
+      playLabel: b === 'olc' ? 'Duraklat' : b === 'pause' ? 'Devam et' : 'Oynat',
+      showPlay: b !== 'olc', showPause: b === 'olc'
+    };
+  }
+}
+</script>
+</body>
+</html>

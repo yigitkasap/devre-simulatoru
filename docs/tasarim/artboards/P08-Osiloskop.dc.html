@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: osiloskop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:10px 10px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#e9ecef;border-radius:16px 16px 0 0;box-shadow:0 -4px 18px rgba(29,39,51,.16);display:flex;flex-direction:column}
+.hd{height:22px;display:flex;align-items:center;justify-content:center}
+.hd i{display:block;width:36px;height:5px;border-radius:3px;background:#9aa3ad}
+.st{display:flex;align-items:center;background:#fff;border:1px solid #b9c0c9;border-radius:10px;height:44px;overflow:hidden;flex:1}
+.st button{width:44px;height:44px;border:0;background:#f3f5f7;font:600 18px 'IBM Plex Sans',sans-serif;color:#1d2733;flex:none}
+.st span{flex:1;text-align:center;font:600 14px 'IBM Plex Mono',monospace;border-left:1px solid #dde1e6;border-right:1px solid #dde1e6;height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.sg{display:flex;background:#c9cfd6;border-radius:10px;padding:2px;gap:2px}
+.sg button{flex:1;height:40px;border:0;border-radius:8px;background:transparent;font:600 13px 'IBM Plex Sans',sans-serif;color:#2c3846;white-space:nowrap;padding:0 6px}
+.sg .on{background:#fff;color:#1d2733;box-shadow:0 1px 2px rgba(29,39,51,.2)}
+.ch{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font:700 13px 'IBM Plex Mono',monospace;flex:none}
+.lbl{font-size:12px;font-weight:600;color:#3d4957}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="Yarım dalga doğrultmaç" mode="olc" time="0,214 s" hint-size="390px,52px"></dc-import>
+  <div style="flex:1;position:relative;min-height:0">
+    <div class="paper" role="application" aria-label="Devre şeması, küçültülmüş" style="position:absolute;left:0;right:0;top:0;height:120px;overflow:hidden;box-shadow:inset 0 3px 0 #1b7d44">
+      <svg width="390" height="120" viewBox="0 0 390 120" aria-hidden="true" style="position:absolute;inset:0">
+        <g transform="translate(78,8) scale(0.5)">
+          <path d="M100 86V60H168M100 60V20H340V70H360" fill="none" stroke="#b38219" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M188 60H280V80M280 60H320V105H360" fill="none" stroke="#708f14" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M100 114V140H360M280 120V140M280 80V120" fill="none" stroke="#148f3d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="100" cy="100" r="14" fill="#fbfbf9" stroke="#1d2733" stroke-width="3.5"/>
+          <path d="M168 48V72L188 60Z" fill="#1d2733"/>
+          <rect x="360" y="40" width="112" height="120" rx="5" fill="#fff" stroke="#1f6feb" stroke-width="4"/>
+        </g>
+      </svg>
+      <span style="position:absolute;right:10px;bottom:8px;font-size:12px;color:#5f6b7a;background:rgba(255,255,255,.9);padding:2px 6px;border-radius:6px">Devreye dönmek için aşağı çek</span>
+    </div>
+    <div class="sheet" role="region" aria-label="Cihazlar: OSC1 osiloskop" style="top:112px">
+      <div class="hd"><i></i></div>
+      <div style="padding:0 12px;display:flex;align-items:center;gap:8px">
+        <div style="flex:1;display:flex;align-items:baseline;gap:8px;padding-left:4px"><b style="font-size:17px">Osiloskop</b><span class="mono" style="font-size:13px;color:#5f6b7a">OSC1</span><span style="font-size:12px;color:#5f6b7a">· birden çok cihazda burada sekme çıkar</span></div>
+        <button aria-label="Cihazları kapat" style="width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:#3d4957"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></button>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;padding:10px 16px 16px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px"><span style="display:flex;align-items:center;gap:6px"><i style="display:block;width:8px;height:8px;border-radius:4px;background:#1b7d44"></i>Tetikleniyor · A ↑</span><button style="height:36px;padding:0 14px;border-radius:9px;border:0;background:#1d2733;color:#fff;font:600 14px 'IBM Plex Sans',sans-serif">Oto</button></div>
+        <div style="width:358px;height:286px;border-radius:10px;background:#0f1713;position:relative;overflow:hidden;flex:none;box-shadow:inset 0 2px 8px rgba(0,0,0,.5)">
+          <svg width="358" height="286" viewBox="0 0 400 320" style="position:absolute;inset:0" role="img" aria-label="A kanalı 20 V tepe-tepe sinüs, B kanalı yarım dalga">
+            <path d="M40 0V320M80 0V320M120 0V320M160 0V320M240 0V320M280 0V320M320 0V320M360 0V320M0 40H400M0 80H400M0 120H400M0 200H400M0 240H400M0 280H400" stroke="#2b3b32" stroke-width="1" vector-effect="non-scaling-stroke"/>
+            <path d="M200 0V320M0 160H400" stroke="#3d5246" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+            <path d="M0 100 L14.7 56.4 L24 35.3 L33.3 22.7 L41.3 20.1 L50.7 26.9 L60 43.4 L73.3 79.3 L92 136.3 L102.7 162.2 L112 176.1 L120 180 L129.3 174.7 L138.7 159.5 L150.7 128.7 L170.7 67.5 L181.3 40.5 L190.7 25.3 L198.7 20.1 L206.7 22.7 L216 35.3 L226.7 60 L252 136.3 L262.7 162.2 L272 176.1 L280 180 L289.3 174.7 L298.7 159.5 L310.7 128.7 L330.7 67.5 L341.3 40.5 L350.7 25.3 L358.7 20.1 L366.7 22.7 L376 35.3 L386.7 60 L400 100" fill="none" stroke="#f2c94c" stroke-width="2.2" vector-effect="non-scaling-stroke"/>
+            <path d="M0 240 L2.7 237.2 L16 198.6 L25.3 178.5 L34.7 167.3 L42.7 166 L52 174.3 L61.3 192.1 L76 233.1 L78.7 240 L161.3 240 L176 198.6 L185.3 178.5 L194.7 167.3 L202.7 166 L212 174.3 L221.3 192.1 L236 233.1 L238.7 240 L321.3 240 L336 198.6 L345.3 178.5 L354.7 167.3 L362.7 166 L372 174.3 L381.3 192.1 L396 233.1 L398.7 240 L400 240" fill="none" stroke="#56ccf2" stroke-width="1.8" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <div aria-label="A sıfır seviyesi, sürükle" style="position:absolute;left:0;top:67px;width:30px;height:44px;display:flex;align-items:center"><svg width="16" height="18" viewBox="0 0 16 18" aria-hidden="true"><path d="M0 0l14 9-14 9z" fill="#f2c94c"/></svg><span class="mono" style="font-size:11px;font-weight:700;color:#f2c94c;margin-left:-11px;margin-top:-1px">A</span></div>
+          <div aria-label="B sıfır seviyesi, sürükle" style="position:absolute;left:0;top:192px;width:30px;height:44px;display:flex;align-items:center"><svg width="16" height="18" viewBox="0 0 16 18" aria-hidden="true"><path d="M0 0l14 9-14 9z" fill="#56ccf2"/></svg><span class="mono" style="font-size:11px;font-weight:700;color:#0f1713;margin-left:-11px;margin-top:-1px">B</span></div>
+        </div>
+        <div class="mono" style="font-size:12px;line-height:1.55"><b style="color:#7a5c00">A</b> Tepe-tepe 20,0 V · Etkin 7,07 V · f 50,0 Hz<br><b style="color:#0e6b8a">B</b> Tepe 9,30 V · Ortalama 2,84 V</div>
+        <div style="display:flex;gap:8px;align-items:center"><span class="ch" style="background:#f2c94c">A</span><div class="st"><button aria-label="A volt/bölme azalt">−</button><span>5 V/b</span><button aria-label="A volt/bölme artır">+</button></div><div class="sg" style="width:132px"><button>AC</button><button>GND</button><button class="on">DC</button></div></div>
+        <div style="display:flex;gap:8px;align-items:center"><span class="ch" style="background:#56ccf2">B</span><div class="st"><button aria-label="B volt/bölme azalt">−</button><span>5 V/b</span><button aria-label="B volt/bölme artır">+</button></div><div class="sg" style="width:132px"><button>AC</button><button>GND</button><button class="on">DC</button></div></div>
+        <div style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Zaman/bölme</span><div class="st"><button aria-label="Zaman/bölme azalt">−</button><span>5 ms/b</span><button aria-label="Zaman/bölme artır">+</button></div></div>
+        <div style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Kip</span><div class="sg"><button class="on">A ve B</button><button>A + B</button><button>X-Y</button></div></div>
+      </div>
+    </div>
+  </div>
+  <dc-import name="C-TelAlt" bar="olc" active="cihaz" speed="×0,25" hint-size="390px,104px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

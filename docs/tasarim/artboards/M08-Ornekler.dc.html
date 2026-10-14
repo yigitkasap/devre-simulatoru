@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Örnekler penceresi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:15px 15px}
+.nv{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:36px;padding:6px 10px;border:0;border-radius:8px;background:transparent;font:500 13.5px 'IBM Plex Sans',sans-serif;color:#1d2733;text-align:left;line-height:1.3}
+.nv span:last-child{font:500 12px 'IBM Plex Mono',monospace;color:#5f6b7a}
+.cd{display:flex;gap:12px;align-items:flex-start;text-align:left;padding:12px 14px;border-radius:12px;border:1px solid #dde1e6;background:#fff;font:inherit;color:inherit;cursor:pointer;min-height:84px;box-sizing:border-box}
+.cd .n{font:600 12px 'IBM Plex Mono',monospace;color:#5f6b7a;width:24px;flex:none;padding-top:2px}
+.cd b{display:block;font-size:14.5px;margin-bottom:2px}
+.cd .t{font-size:13px;line-height:1.45;color:#5f6b7a;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tg{display:inline-flex;font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:#eef0f3;color:#3d4957;margin-top:6px;margin-right:4px}
+.gh{display:flex;align-items:baseline;gap:10px;margin:6px 0 2px}
+.gh h3{margin:0;font-size:15px;font-weight:600}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden;position:relative">
+  <dc-import name="C-UstCubuk" tool="sec" menu="ornekler" hint-size="1440px,52px"></dc-import>
+  <div class="paper" style="flex:1"></div>
+  <div style="position:absolute;inset:0;background:rgba(29,39,51,.42);display:flex;align-items:center;justify-content:center">
+    <div role="dialog" aria-modal="true" aria-labelledby="ot" style="width:1080px;height:780px;background:#fff;border-radius:16px;box-shadow:0 16px 40px rgba(29,39,51,.2);display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:22px 24px 16px;display:flex;align-items:flex-start;gap:16px;border-bottom:1px solid #dde1e6">
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+          <h2 id="ot" style="margin:0;font-size:24px;font-weight:600">Örnek devreler</h2>
+          <span style="font-size:14px;color:#5f6b7a">Bir örneğe tıkla: devre açılır; açıklaması ve tahmin sorusu sağdaki Örnek sekmesinde çıkar.</span>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;height:40px;width:260px;padding:0 10px;border:1px solid #c4cad2;border-radius:8px;box-sizing:border-box;color:#5f6b7a">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/></svg>
+          <input aria-label="Örnek ara" placeholder="Örnek ara…" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font:400 15px 'IBM Plex Sans',sans-serif;color:#1d2733">
+        </label>
+        <button aria-label="Kapat" style="width:40px;height:40px;border-radius:8px;border:0;background:transparent;color:#5f6b7a"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+      </div>
+      <div style="flex:1;min-height:0;display:flex">
+        <nav aria-label="Örnek grupları" style="width:260px;flex:none;border-right:1px solid #dde1e6;padding:12px;overflow:auto;display:flex;flex-direction:column;gap:2px;background:#f6f7f9">
+          <button class="nv" style="background:#e6effd;color:#1557c0;font-weight:600"><span>Tümü</span><span style="color:#1557c0">23</span></button>
+          <div style="font-size:12px;font-weight:600;color:#5f6b7a;padding:10px 10px 4px">Gruplar</div>
+          <button class="nv"><span>Temel devreler</span><span>7</span></button>
+          <button class="nv"><span>Laboratuvar cihazları</span><span>1</span></button>
+          <button class="nv"><span>Diyot karakteristiklerinin incelenmesi</span><span>1</span></button>
+          <button class="nv"><span>Doğrultucu devreler</span><span>3</span></button>
+          <button class="nv"><span>Kenetleyici ve gerilim katlayıcı devreler</span><span>2</span></button>
+          <button class="nv"><span>Kırpıcı devreler</span><span>2</span></button>
+          <button class="nv"><span>FET karakteristiklerinin incelenmesi</span><span>2</span></button>
+          <button class="nv"><span>FET yükselteci</span><span>1</span></button>
+          <button class="nv"><span>BJT’li yükselteç</span><span>1</span></button>
+          <button class="nv"><span>MOSFET’li yükselteç devresi</span><span>1</span></button>
+          <button class="nv"><span>Transistörlerin anahtar olarak kullanılması</span><span>2</span></button>
+          <div style="margin-top:10px;padding:10px;border-radius:10px;border:1px dashed #c4cad2;font-size:12px;line-height:1.45;color:#5f6b7a">Laboratuvar föyündeki deneyler bu gruplara “Deney” rozetiyle eklenir.</div>
+        </nav>
+        <div style="flex:1;min-width:0;overflow:auto;padding:16px 24px 24px;display:flex;flex-direction:column;gap:10px">
+          <div class="gh"><h3>Temel devreler</h3><span style="font-size:12px;color:#5f6b7a">7 örnek</span></div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+            <button class="cd"><span class="n">1</span><span><b>LED ve ön direnç</b><span class="t">LED’in akımını seri bir dirençle sınırla; direnç küçülünce ne olduğunu gör.</span></span></button>
+            <button class="cd" aria-current="true" style="border:2px solid #1f6feb;background:#f3f7fe;padding:11px 13px"><span class="n" style="color:#1557c0">2</span><span><b>Gerilim bölücü <span style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:#1f6feb;color:#fff;margin-left:4px;vertical-align:2px">Açık</span></b><span class="t">İki eşit direnç ideal 9 V’luk bir pile seri bağlı. Voltmetre orta noktanın gerilimini ölçüyor.</span></span></button>
+            <button class="cd"><span class="n">3</span><span><b>Voltmetrenin yükleme etkisi</b><span class="t">İç direnci sonlu bir voltmetre ölçtüğü devreyi nasıl değiştirir?</span></span></button>
+            <button class="cd"><span class="n">4</span><span><b>Ampermetrenin etkisi</b><span class="t">Ampermetrenin iç direnci devre akımını ne kadar azaltır?</span></span></button>
+            <button class="cd"><span class="n">5</span><span><b>RC dolma</b><span class="t">Kondansatör bir direnç üzerinden dolarken gerilimi zamanla nasıl artar?</span></span></button>
+            <button class="cd"><span class="n">6</span><span><b>Kare dalga ile RC</b><span class="t">Kare dalga RC devresinde dolma ve boşalmayı osiloskopta göster.</span><span class="tg">Osiloskop</span><span class="tg">Fonksiyon üreteci</span></span></button>
+            <button class="cd"><span class="n">7</span><span><b>Diyot yönü</b><span class="t">Diyotu ters çevir: akım neden kesilir?</span></span></button>
+          </div>
+          <div class="gh" style="margin-top:10px"><h3>Laboratuvar cihazları</h3><span style="font-size:12px;color:#5f6b7a">1 örnek</span></div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+            <button class="cd"><span class="n">8</span><span><b>Toprak tuzağı: köprüde prob toprağı</b><span class="t">Prob toprağı yanlış yere takılınca köprü doğrultmaçta neden bir diyot kısa devre olur?</span><span class="tg">Osiloskop</span><span class="tg">Şebeke toprağı</span></span></button>
+          </div>
+          <div class="gh" style="margin-top:10px"><h3>Diyot karakteristiklerinin incelenmesi</h3><span style="font-size:12px;color:#5f6b7a">1 örnek</span><span style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:#efe7fb;color:#5b3aa8">Deney 1</span></div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+            <button class="cd"><span class="n">9</span><span><b>Diyot karakteristiği (akım-gerilim eğrisi)</b><span class="t">Üçgen dalgayla diyotu tara, X-Y kipinde akım-gerilim eğrisini çiz.</span><span class="tg">X-Y</span><span class="tg">Ölçüm tablosu</span></span></button>
+          </div>
+          <div class="gh" style="margin-top:10px"><h3>Doğrultucu devreler</h3><span style="font-size:12px;color:#5f6b7a">3 örnek</span></div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+            <button class="cd"><span class="n">10</span><span><b>Yarım dalga doğrultmaç</b><span class="t">Tek diyotla AC’yi doğrult; yükte yalnızca pozitif yarım periyotlar kalır.</span></span></button>
+            <button class="cd"><span class="n">11</span><span><b>Orta uçlu tam dalga doğrultmaç</b><span class="t">İki diyot ve orta uçlu kaynakla her iki yarım periyodu kullan.</span></span></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

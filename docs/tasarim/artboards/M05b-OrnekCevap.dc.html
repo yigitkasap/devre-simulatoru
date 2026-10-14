@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Örnek: cevap</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#b3bac3 1.3px,transparent 1.6px),radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:75px 75px,15px 15px;background-position:7px 7px,7px 7px}
+.tab{height:44px;padding:0 12px;border:0;background:transparent;font:500 14px 'IBM Plex Sans',sans-serif;color:#5f6b7a;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.tsel{color:#1d2733;border-bottom-color:#1d2733}
+.k{font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:18px;padding:0 5px;border:1px solid #c4cad2;border-bottom-width:2px;border-radius:4px;background:#fff;color:#1d2733}
+.s{fill:none;stroke:#1d2733;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.wa{fill:none;stroke:#b38219;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.wl{fill:none;stroke:#708f14;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.wg{fill:none;stroke:#148f3d;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.d{fill:#ffd43b;stroke:#7a5c00;stroke-width:.75}
+.lb{font:600 10.5px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+.rk{background:#e4e8ec;border-top:1px solid #c4cad2}
+.pl{font-size:11.5px;font-weight:600;color:#1d2733;display:flex;gap:6px;align-items:baseline}
+.pl small{font:500 10px 'IBM Plex Mono',monospace;color:#5f6b7a}
+.st{display:flex;align-items:center;background:#fff;border:1px solid #b9c0c9;border-radius:8px;height:36px;overflow:hidden}
+.st button{width:36px;height:36px;border:0;background:#f3f5f7;font:600 16px 'IBM Plex Sans',sans-serif;color:#1d2733}
+.st span{flex:1;text-align:center;font:600 13px 'IBM Plex Mono',monospace;border-left:1px solid #dde1e6;border-right:1px solid #dde1e6;height:100%;display:flex;align-items:center;justify-content:center}
+.sg{display:flex;background:#c9cfd6;border-radius:8px;padding:2px;gap:2px}
+.sg button{flex:1;height:32px;border:0;border-radius:6px;background:transparent;font:600 12px 'IBM Plex Sans',sans-serif;color:#2c3846}
+.sg .on{background:#fff;color:#1d2733;box-shadow:0 1px 2px rgba(29,39,51,.2)}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden">
+  <dc-import name="C-UstCubuk" tool="sec" hint-size="1440px,52px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="width:256px;flex:none"><dc-import name="C-Kutuphane" info="diyot" hint-size="256px,848px"></dc-import></div>
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div class="paper" role="application" aria-label="Devre şeması, simülasyon çalışıyor" style="flex:1;position:relative;overflow:hidden">
+        <svg width="848" height="428" viewBox="0 0 848 428" style="position:absolute;left:0;top:0" aria-hidden="true">
+          <defs><linearGradient id="gR5" gradientUnits="userSpaceOnUse" x1="0" y1="80" x2="0" y2="120"><stop offset="0" stop-color="#708f14"/><stop offset="1" stop-color="#148f3d"/></linearGradient></defs>
+          <g transform="translate(41,75) scale(1.5)">
+            <path class="wa" d="M100 86V60H168M100 60V20H340V70H360"/>
+            <path class="wl" d="M188 60H280V80M280 60H320V105H360"/>
+            <path class="wg" d="M100 114V140H360M280 120V140M190 140V150M181 150H199M184.5 154.5H195.5M188 159H192"/>
+            <path d="M280 80L273 83.3L287 90L273 96.7L287 103.3L273 110L287 116.7L280 120" fill="none" stroke="url(#gR5)" stroke-width="2.4" stroke-linejoin="round"/>
+            <circle cx="100" cy="60" r="3.2" fill="#b38219"/><circle cx="280" cy="60" r="3.2" fill="#708f14"/><circle cx="190" cy="140" r="3.2" fill="#148f3d"/><circle cx="280" cy="140" r="3.2" fill="#148f3d"/>
+            <circle cx="100" cy="100" r="14" fill="#fbfbf9" stroke="#1d2733" stroke-width="2"/><path class="s" d="M91 100c2.5-7 6-7 9 0s6.5 7 9 0"/>
+            <text class="lb" x="80" y="97" text-anchor="end">V1</text><text class="lv" x="80" y="110" text-anchor="end">10 V · 50 Hz</text>
+            <path d="M168 48V72L188 60Z" fill="#1d2733"/><path class="s" d="M188 48V72"/>
+            <text class="lb" x="178" y="40" text-anchor="middle">D1</text>
+            <text class="lb" x="296" y="96">R1</text><text class="lv" x="296" y="108">1 kΩ</text>
+            <g><circle class="d" cx="118" cy="60" r="2.4"/><circle class="d" cx="140" cy="60" r="2.4"/><circle class="d" cx="160" cy="60" r="2.4"/><circle class="d" cx="206" cy="60" r="2.4"/><circle class="d" cx="230" cy="60" r="2.4"/><circle class="d" cx="254" cy="60" r="2.4"/><circle class="d" cx="280" cy="72" r="2.4"/><circle class="d" cx="280" cy="100" r="2.4"/><circle class="d" cx="280" cy="130" r="2.4"/><circle class="d" cx="256" cy="140" r="2.4"/><circle class="d" cx="226" cy="140" r="2.4"/><circle class="d" cx="160" cy="140" r="2.4"/><circle class="d" cx="130" cy="140" r="2.4"/><circle class="d" cx="104" cy="140" r="2.4"/><circle class="d" cx="100" cy="124" r="2.4"/></g>
+            <rect x="360" y="40" width="112" height="120" rx="5" fill="#fff" stroke="#1d2733" stroke-width="2"/>
+            <rect x="378" y="50" width="84" height="56" rx="3" fill="#0f1713"/>
+            <path d="M378 70c5-26 10-26 15 0s10 26 15 0 10-26 15 0 10 26 15 0 10-26 15 0" fill="none" stroke="#f2c94c" stroke-width="1.2"/>
+            <path d="M378 98c5-12 10-12 15 0H408c5-12 10-12 15 0H438c5-12 10-12 15 0" fill="none" stroke="#56ccf2" stroke-width="1.2"/>
+            <text class="lb" x="378" y="122">OSC1</text>
+            <text class="lv" x="366" y="73" style="font-weight:600;fill:#1d2733">A</text><text class="lv" x="366" y="108" style="font-weight:600;fill:#1d2733">B</text>
+            <text class="lv" x="366" y="143" style="font-weight:600;fill:#1d2733">COM</text>
+            <path d="M412 136v5M406 141h12M408.5 144.5h7M410.5 148h3" fill="none" stroke="#1b7d44" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+        </svg>
+        <div aria-label="Gösterim" style="position:absolute;left:12px;bottom:12px;background:rgba(255,255,255,.94);border:1px solid #dde1e6;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:600;color:#5f6b7a">Kablo gerilimi · etkin değer</span>
+          <div style="width:176px;height:10px;border-radius:5px;background:linear-gradient(90deg,#194cb3,#148f8f,#148f3d,#338f14,#7a8f14,#b37319,#b31919)"></div>
+          <div class="mono" style="display:flex;justify-content:space-between;font-size:11.5px;color:#3d4957;width:176px"><span>−10 V</span><span>0 V</span><span>+10 V</span></div>
+        </div>
+      </div>
+      <div style="height:28px;flex:none;display:flex;align-items:center;padding:0 12px;background:#e8f5ed;border-top:1px solid #b9dfc8;font-size:13px;color:#14613a">
+        <span><b>Simülasyon sırasında:</b> osiloskop ayarlarını raftan değiştir · parçayı seçip değerini sağdaki panelden değiştir</span>
+      </div>
+      <section class="rk" aria-label="Cihaz rafı" style="height:340px;flex:none;display:flex;flex-direction:column">
+        <div style="height:40px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px;border-bottom:1px solid #c4cad2;background:#dde2e7">
+          <b style="font-size:13px">Cihaz rafı</b>
+          <span style="width:1px;height:20px;background:#c4cad2;margin:0 4px"></span>
+          <button style="height:30px;padding:0 10px;border-radius:7px;border:1px solid #9aa3ad;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733;display:flex;align-items:center;gap:6px"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="13" rx="2"/><path d="M5 11c1.5-5 3-5 4.5 0s3 5 4.5 0"/></svg>OSC1 · Osiloskop</button>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#1d2733;margin-left:6px"><i style="display:block;width:8px;height:8px;border-radius:4px;background:#1b7d44"></i>Tetikleniyor · A, yükselen kenar</span>
+          <span style="flex:1"></span>
+          <button aria-label="Rafı küçült" style="width:32px;height:32px;border-radius:7px;border:0;background:transparent;color:#1d2733"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></button>
+        </div>
+        <div style="flex:1;display:flex;gap:16px;padding:12px">
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="width:300px;height:240px;border-radius:8px;background:#0f1713;position:relative;overflow:hidden;box-shadow:inset 0 2px 8px rgba(0,0,0,.5)">
+              <svg width="300" height="240" viewBox="0 0 400 320" style="position:absolute;inset:0" role="img" aria-label="Osiloskop ekranı: A kanalında 20 V tepe-tepe sinüs, B kanalında yarım dalga">
+                <path d="M40 0V320M80 0V320M120 0V320M160 0V320M240 0V320M280 0V320M320 0V320M360 0V320M0 40H400M0 80H400M0 120H400M0 200H400M0 240H400M0 280H400" stroke="#2b3b32" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path d="M200 0V320M0 160H400" stroke="#3d5246" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+                <path d="M0 100 L14.7 56.4 L24 35.3 L33.3 22.7 L41.3 20.1 L50.7 26.9 L60 43.4 L73.3 79.3 L92 136.3 L102.7 162.2 L112 176.1 L120 180 L129.3 174.7 L138.7 159.5 L150.7 128.7 L170.7 67.5 L181.3 40.5 L190.7 25.3 L198.7 20.1 L206.7 22.7 L216 35.3 L226.7 60 L252 136.3 L262.7 162.2 L272 176.1 L280 180 L289.3 174.7 L298.7 159.5 L310.7 128.7 L330.7 67.5 L341.3 40.5 L350.7 25.3 L358.7 20.1 L366.7 22.7 L376 35.3 L386.7 60 L400 100" fill="none" stroke="#f2c94c" stroke-width="2" vector-effect="non-scaling-stroke"/>
+                <path d="M0 240 L2.7 237.2 L16 198.6 L25.3 178.5 L34.7 167.3 L42.7 166 L52 174.3 L61.3 192.1 L76 233.1 L78.7 240 L161.3 240 L176 198.6 L185.3 178.5 L194.7 167.3 L202.7 166 L212 174.3 L221.3 192.1 L236 233.1 L238.7 240 L321.3 240 L336 198.6 L345.3 178.5 L354.7 167.3 L362.7 166 L372 174.3 L381.3 192.1 L396 233.1 L398.7 240 L400 240" fill="none" stroke="#56ccf2" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+                <path d="M0 92l10 8-10 8z" fill="#f2c94c"/><path d="M0 232l10 8-10 8z" fill="#56ccf2"/>
+              </svg>
+              <span class="mono" style="position:absolute;left:12px;top:56px;font-size:11px;font-weight:700;color:#f2c94c">A</span>
+              <span class="mono" style="position:absolute;left:12px;top:161px;font-size:11px;font-weight:700;color:#56ccf2">B</span>
+            </div>
+            <div class="mono" style="font-size:11px;line-height:1.5;color:#1d2733"><b style="color:#7a5c00">A</b>  Tepe-tepe 20,0 V  Etkin 7,07 V  f 50,0 Hz<br><b style="color:#0e6b8a">B</b>  Tepe 9,30 V  Ortalama 2,84 V  f 50,0 Hz</div>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px"><span style="width:18px;height:18px;border-radius:4px;background:#f2c94c;display:flex;align-items:center;justify-content:center;font:700 11px 'IBM Plex Mono',monospace">A</span>Kanal A</span>
+              <span class="pl">Volt/bölme <small>VOLTS/DIV</small></span>
+              <div class="st"><button aria-label="A volt/bölme azalt">−</button><span>5 V/b</span><button aria-label="A volt/bölme artır">+</button></div>
+              <span class="pl">Kuplaj</span>
+              <div class="sg"><button>AC</button><button>GND</button><button class="on">DC</button></div>
+              <span class="pl">Konum <small>POSITION</small></span>
+              <div class="st"><button aria-label="A konum aşağı">▼</button><span>+1,5 b</span><button aria-label="A konum yukarı">▲</button></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px"><span style="width:18px;height:18px;border-radius:4px;background:#56ccf2;display:flex;align-items:center;justify-content:center;font:700 11px 'IBM Plex Mono',monospace">B</span>Kanal B</span>
+              <span class="pl">Volt/bölme <small>VOLTS/DIV</small></span>
+              <div class="st"><button aria-label="B volt/bölme azalt">−</button><span>5 V/b</span><button aria-label="B volt/bölme artır">+</button></div>
+              <span class="pl">Kuplaj</span>
+              <div class="sg"><button>AC</button><button>GND</button><button class="on">DC</button></div>
+              <span class="pl">Konum <small>POSITION</small></span>
+              <div class="st"><button aria-label="B konum aşağı">▼</button><span>−2,0 b</span><button aria-label="B konum yukarı">▲</button></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <span style="font-weight:600;font-size:13px;height:18px">Yatay ve tetik</span>
+              <span class="pl">Zaman/bölme <small>TIME/DIV</small></span>
+              <div class="st"><button aria-label="Zaman/bölme azalt">−</button><span>5 ms/b</span><button aria-label="Zaman/bölme artır">+</button></div>
+              <span class="pl">Kip <small>MODE</small></span>
+              <div class="sg"><button class="on">A ve B</button><button>A + B</button><button>X-Y</button></div>
+              <span class="pl">Tetik <small>TRIG</small></span>
+              <div style="display:flex;gap:6px;align-items:center"><div class="sg" style="flex:1"><button class="on">A</button><button>B</button></div><button style="height:36px;padding:0 12px;border-radius:8px;border:0;background:#1d2733;color:#fff;font:600 13px 'IBM Plex Sans',sans-serif">Oto</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <dc-import name="C-SimCubugu" state="run" time="0,214 s" speed="×0,25" speed-note="1 s’de 250 ms" msg="Hız osiloskoba göre ayarlandı: bir tarama ≈ 0,2 s." hint-size="848px,52px"></dc-import>
+    </main>
+    <aside aria-label="İnceleme paneli" style="width:336px;flex:none;background:#fff;border-left:1px solid #dde1e6;display:flex;flex-direction:column;min-height:0">
+      <div role="tablist" style="display:flex;padding:0 8px;border-bottom:1px solid #dde1e6">
+        <button class="tab" role="tab" aria-selected="false">İncele</button>
+        <button class="tab tsel" role="tab" aria-selected="true">Örnek</button>
+        <button class="tab" role="tab" aria-selected="false">Mesajlar</button>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="align-self:flex-start;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:#e6effd;color:#1557c0">Örnek · Doğrultucu devreler</span>
+          <h2 style="margin:0;font-size:20px;font-weight:600;line-height:1.25">Yarım dalga doğrultmaç</h2>
+        </div>
+        <div style="background:#fef6e7;border:1px solid #f3d9a8;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:600;color:#b54708">Tahmin et</span>
+          <span style="font-size:14px;line-height:1.5">Yükteki gerilimin tepe değeri yaklaşık kaç volt olur? Negatif yarım periyotlarda yükte ne görürsün?</span>
+          <span style="font-size:13px;color:#5f6b7a">Tahminin: <b class="mono" style="color:#1d2733">10 V</b></span>
+        </div>
+        <div role="status" style="background:#e8f5ed;border:1px solid #b9dfc8;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:12px;font-weight:600;color:#1b7d44;display:flex;gap:6px;align-items:center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10l4 4 8-8"/></svg>Cevap</span>
+          <span style="font-size:15px;line-height:1.55"><b>≈ 9,3 V.</b> Diyot iletimdeyken yaklaşık 0,7 V düşürür: V<sub>tepe,yük</sub> ≈ V<sub>tepe</sub> − V<sub>D</sub> = 10 V − 0,7 V. Negatif yarım periyotta diyot ters kutuplanır, yükteki gerilim ≈ 0 V olur.</span>
+          <span style="font-size:13px;line-height:1.5;color:#14613a;background:#d5eedf;border-radius:8px;padding:8px 10px">Tahminin 10 V’tu; aradaki ≈ 0,7 V diyotun ileri gerilimi. Osiloskopta B izinin tepesinin A’dan biraz aşağıda kaldığına bak.</span>
+        </div>
+        <div style="font-size:13px;line-height:1.5;color:#3d4957;display:flex;flex-direction:column;gap:6px">
+          <b style="font-size:13px">Dene</b>
+          <span>R1’i seçip 100 Ω yap: tepe gerilimi biraz daha düşer (diyot akımı artar).</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #eef0f3;padding-top:12px">
+          <button style="height:36px;padding:0 10px;border-radius:8px;border:0;background:transparent;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">← Önceki</button>
+          <button style="height:36px;padding:0 10px;border-radius:8px;border:0;background:transparent;font:500 13px 'IBM Plex Sans',sans-serif;color:#5f6b7a">Örneği kapat</button>
+          <button style="height:36px;padding:0 10px;border-radius:8px;border:0;background:transparent;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">Sonraki →</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: LED yandı</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:13px 13px;background-position:6px 6px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 18px rgba(29,39,51,.14);display:flex;flex-direction:column}
+.hd{height:22px;display:flex;align-items:center;justify-content:center}
+.hd i{display:block;width:36px;height:5px;border-radius:3px;background:#c4cad2}
+.s{fill:none;stroke:#1d2733;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.lb{font:600 12px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 11px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="LED ve ön direnç" mode="olc" time="0,082 s" issues="1" hint-size="390px,52px"></dc-import>
+  <div style="flex:1;position:relative;min-height:0">
+    <div class="paper" role="application" aria-label="Devre şeması, 1 hata" style="position:absolute;left:0;right:0;top:0;height:451px;overflow:hidden;box-shadow:inset 0 3px 0 #1b7d44">
+      <svg width="390" height="451" viewBox="0 0 390 451" aria-hidden="true" style="position:absolute;inset:0">
+        <g transform="translate(-6,40) scale(1.35)">
+          <rect x="194" y="52" width="52" height="52" rx="6" fill="#d92d20" fill-opacity=".07" stroke="#d92d20" stroke-width="2"/>
+          <path d="M60 76V40H100M180 40H220V68" fill="none" stroke="#b31919" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M100 40H110L113.3 33L120 47L126.7 33L133.3 47L140 33L146.7 47L150 40H180" fill="none" stroke="#b31919" stroke-width="2.4" stroke-linejoin="round"/>
+          <path d="M220 88V120H60V84M140 120V130M131 130H149M134.5 134.5H145.5M138 139H142" fill="none" stroke="#148f3d" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path class="s" d="M46 76H74"/><path d="M53 84H67" stroke="#1d2733" stroke-width="4.5"/>
+          <text class="lb" x="38" y="82" text-anchor="end">B1</text>
+          <text class="lb" x="140" y="26" text-anchor="middle">R1</text>
+          <path d="M208 68H232L220 88Z" fill="#3a3330" stroke="#1d2733" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M216 70l3 6-2 3 3 4" fill="none" stroke="#f0e6dc" stroke-width="1.1"/>
+          <path class="s" d="M208 88H232"/>
+          <path d="M236 60c4-4 0-8 4-12M243 64c4-4 0-8 4-12" fill="none" stroke="#8a8f96" stroke-width="1.8" stroke-linecap="round" opacity=".75"/>
+          <circle cx="246" cy="52" r="8" fill="#d92d20"/><path d="M246 48v4.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="246" cy="56" r="1" fill="#fff"/>
+          <text class="lb" x="200" y="114" text-anchor="end">D1</text>
+        </g>
+      </svg>
+      <div role="alertdialog" aria-label="D1 yandı" style="position:absolute;left:166px;top:240px;width:210px;background:#fff;border:1px solid #f5c2bd;border-radius:14px;box-shadow:0 4px 14px rgba(29,39,51,.16);padding:12px;display:flex;flex-direction:column;gap:8px">
+        <svg width="16" height="10" viewBox="0 0 16 10" aria-hidden="true" style="position:absolute;left:117px;top:-9px"><path d="M0 10l8-10 8 10z" fill="#fff" stroke="#f5c2bd"/></svg>
+        <b style="font-size:15px;color:#a3241a">D1 yandı</b>
+        <span style="font-size:13.5px;line-height:1.45">≈ 147 mA geçti; en fazla 30 mA’e dayanır.</span>
+        <div style="display:flex;gap:6px"><button style="flex:1;height:44px;border-radius:10px;border:0;background:#1d2733;color:#fff;font:600 14px 'IBM Plex Sans',sans-serif">Onar</button><button style="flex:1;height:44px;border-radius:10px;border:1px solid #c4cad2;background:#fff;font:500 14px 'IBM Plex Sans',sans-serif;color:#1d2733">Kapat</button></div>
+      </div>
+    </div>
+    <div class="sheet" role="region" aria-label="Mesajlar" style="height:190px">
+      <div class="hd"><i></i></div>
+      <div style="padding:0 16px 12px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">Mesajlar</b><span style="font-size:13px;color:#5f6b7a">1 hata</span></div>
+        <div style="display:flex;gap:10px;padding:10px 12px;border-radius:12px;background:#fdecea;border:1.5px solid #d92d20">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="10" cy="10" r="9" fill="#d92d20"/><path d="M10 5.5v5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.2" r="1.2" fill="#fff"/></svg>
+          <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+            <span style="font-size:14.5px"><b>LED yandı</b> · ön direnç gerekli: R = (V<sub>kaynak</sub> − V<sub>f</sub>) / I ≈ 360 Ω</span>
+            <button style="align-self:flex-start;height:40px;padding:0 12px;border-radius:9px;border:1px solid #c4cad2;background:#fff;font:500 14px 'IBM Plex Sans',sans-serif;color:#1d2733">R1’i 360 Ω yap</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <dc-import name="C-TelAlt" bar="olc" active="olcum" hint-size="390px,104px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

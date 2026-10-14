@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Simülasyon çalışıyor</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#b3bac3 1.3px,transparent 1.6px),radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:75px 75px,15px 15px;background-position:7px 7px,7px 7px}
+.tab{height:44px;padding:0 12px;border:0;background:transparent;font:500 14px 'IBM Plex Sans',sans-serif;color:#5f6b7a;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.tsel{color:#1d2733;border-bottom-color:#1d2733}
+.k{font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:18px;padding:0 5px;border:1px solid #c4cad2;border-bottom-width:2px;border-radius:4px;background:#fff;color:#1d2733}
+.s{fill:none;stroke:#1d2733;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.v5{fill:none;stroke:#b31919;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.v2{fill:none;stroke:#548f14;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.v0{fill:none;stroke:#148f3d;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.d{fill:#ffd43b;stroke:#7a5c00;stroke-width:1.1}
+.lb{font:600 16px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 15px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+.sec{font-size:12px;font-weight:600;color:#5f6b7a}
+.ab{height:36px;padding:0 10px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733;display:inline-flex;align-items:center;gap:6px}
+.chip{height:32px;padding:0 10px;border-radius:6px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Mono',monospace;color:#1d2733}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden">
+  <dc-import name="C-UstCubuk" tool="sec" has-sel="{{ true }}" hint-size="1440px,52px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="width:256px;flex:none"><dc-import name="C-Kutuphane" info="led" hint-size="256px,848px"></dc-import></div>
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div class="paper" role="application" aria-label="Devre şeması, simülasyon çalışıyor" style="flex:1;position:relative;overflow:hidden">
+        <svg width="848" height="768" viewBox="0 0 848 768" style="position:absolute;left:0;top:0" aria-hidden="true">
+          <defs>
+            <radialGradient id="led4"><stop offset="0" stop-color="#ff4d4d" stop-opacity=".6"/><stop offset=".55" stop-color="#ff4d4d" stop-opacity=".22"/><stop offset="1" stop-color="#ff4d4d" stop-opacity="0"/></radialGradient>
+            <linearGradient id="gR4" gradientUnits="userSpaceOnUse" x1="270" y1="0" x2="330" y2="0"><stop offset="0" stop-color="#b31919"/><stop offset="1" stop-color="#548f14"/></linearGradient>
+          </defs>
+          <g transform="translate(150,170)">
+            <circle cx="480" cy="205" r="62" fill="url(#led4)"/>
+            <rect x="228" y="96" width="144" height="76" rx="5" fill="#e6effd" fill-opacity=".45" stroke="#1f6feb" stroke-width="1.8" stroke-dasharray="7 5"/>
+            <path class="v5" d="M180 204V150H270"/>
+            <path d="M270 150L275 139.5L285 160.5L295 139.5L305 160.5L315 139.5L325 160.5L330 150" fill="none" stroke="url(#gR4)" stroke-width="3.5" stroke-linejoin="round"/>
+            <path class="v2" d="M330 150H480V192"/>
+            <path class="v0" d="M480 222V330H381M339 330H180V216M180 330V360"/>
+            <path class="v0" d="M166 360H194M171 367H189M176 374H184"/>
+            <circle cx="180" cy="330" r="5.5" fill="#148f3d"/>
+            <path class="s" d="M159 204H201"/>
+            <path d="M169 216H191" fill="none" stroke="#1d2733" stroke-width="6.5"/>
+            <path class="s" style="stroke-width:2" d="M152 186h9M156.5 181.5v9"/>
+            <text class="lb" x="140" y="208" text-anchor="end">B1</text><text class="lv" x="140" y="228" text-anchor="end">5 V</text>
+            <text class="lb" x="300" y="118" text-anchor="middle">R1</text><text class="lv" x="300" y="136" text-anchor="middle">220 Ω</text>
+            <path d="M458 192H502L480 222Z" fill="#ff4d4d" stroke="#1d2733" stroke-width="2.5" stroke-linejoin="round"/>
+            <path class="s" d="M458 222H502"/>
+            <path class="s" style="stroke-width:2.4;stroke:#d92d20" d="M505 186l13-13M512 173h6v6M510 202l13-13M517 189h6v6"/>
+            <text class="lb" x="534" y="214">D1</text><text class="lv" x="534" y="234">kırmızı</text>
+            <circle cx="360" cy="330" r="21" fill="#fbfbf9" stroke="#1d2733" stroke-width="3"/>
+            <text x="360" y="337" text-anchor="middle" style="font:600 20px 'IBM Plex Sans',sans-serif;fill:#1d2733">A</text>
+            <path class="s" style="stroke-width:2" d="M398 310h9M402.5 305.5v9"/>
+            <text class="lb" x="360" y="296" text-anchor="middle">A1</text>
+            <rect x="318" y="358" width="84" height="26" rx="4" fill="#1e2a25"/><text x="360" y="376" text-anchor="middle" style="font:600 15px 'IBM Plex Mono',monospace;fill:#a6f4bd">14,45 mA</text>
+            <g>
+              <circle class="d" cx="180" cy="180" r="3.6"/><circle class="d" cx="204" cy="150" r="3.6"/><circle class="d" cx="230" cy="150" r="3.6"/><circle class="d" cx="256" cy="150" r="3.6"/>
+              <circle class="d" cx="300" cy="150" r="3.6"/><circle class="d" cx="344" cy="150" r="3.6"/><circle class="d" cx="370" cy="150" r="3.6"/><circle class="d" cx="396" cy="150" r="3.6"/><circle class="d" cx="422" cy="150" r="3.6"/><circle class="d" cx="448" cy="150" r="3.6"/><circle class="d" cx="474" cy="150" r="3.6"/><circle class="d" cx="480" cy="176" r="3.6"/>
+              <circle class="d" cx="480" cy="240" r="3.6"/><circle class="d" cx="480" cy="266" r="3.6"/><circle class="d" cx="480" cy="292" r="3.6"/><circle class="d" cx="480" cy="318" r="3.6"/><circle class="d" cx="456" cy="330" r="3.6"/><circle class="d" cx="430" cy="330" r="3.6"/>
+              <circle class="d" cx="328" cy="330" r="3.6"/><circle class="d" cx="302" cy="330" r="3.6"/><circle class="d" cx="276" cy="330" r="3.6"/><circle class="d" cx="250" cy="330" r="3.6"/><circle class="d" cx="224" cy="330" r="3.6"/><circle class="d" cx="198" cy="330" r="3.6"/><circle class="d" cx="180" cy="308" r="3.6"/><circle class="d" cx="180" cy="282" r="3.6"/><circle class="d" cx="180" cy="242" r="3.6"/>
+            </g>
+          </g>
+        </svg>
+        <div aria-label="Gösterim" style="position:absolute;left:12px;bottom:12px;background:rgba(255,255,255,.94);border:1px solid #dde1e6;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 1px 2px rgba(29,39,51,.08)">
+          <span style="font-size:12px;font-weight:600;color:#5f6b7a">Kablo gerilimi</span>
+          <div style="width:176px;height:10px;border-radius:5px;background:linear-gradient(90deg,#194cb3,#148f8f,#148f3d,#338f14,#7a8f14,#b37319,#b31919)"></div>
+          <div class="mono" style="display:flex;justify-content:space-between;font-size:11.5px;color:#3d4957;width:176px"><span>−5 V</span><span>0 V</span><span>+5 V</span></div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:#3d4957;padding-top:2px"><svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true"><circle cx="5" cy="5" r="3.4" fill="#ffd43b" stroke="#7a5c00"/><circle cx="17" cy="5" r="3.4" fill="#ffd43b" stroke="#7a5c00"/><circle cx="29" cy="5" r="3.4" fill="#ffd43b" stroke="#7a5c00"/></svg>Akım · geleneksel yön</div>
+        </div>
+      </div>
+      <div style="height:28px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#e8f5ed;border-top:1px solid #b9dfc8;font-size:13px;color:#14613a">
+        <span><b>Simülasyon sırasında:</b> anahtarı açıp kapatmak için üzerine tıkla · değeri sağdaki panelden değiştir · parça eklemek ya da taşımak simülasyonu durdurur</span>
+      </div>
+      <dc-import name="C-SimCubugu" state="run" time="1,594 s" msg="Noktalar geleneksel akım yönünü gösterir: dış devrede + uçtan − uca." hint-size="848px,52px"></dc-import>
+    </main>
+    <aside aria-label="İnceleme paneli" style="width:336px;flex:none;background:#fff;border-left:1px solid #dde1e6;display:flex;flex-direction:column;min-height:0">
+      <div role="tablist" style="display:flex;padding:0 8px;border-bottom:1px solid #dde1e6">
+        <button class="tab tsel" role="tab" aria-selected="true">İncele</button>
+        <button class="tab" role="tab" aria-selected="false">Örnek</button>
+        <button class="tab" role="tab" aria-selected="false">Mesajlar</button>
+      </div>
+      <button aria-label="Göstergeler: A1 14,45 miliamper. A1’i seç" style="display:flex;align-items:center;gap:10px;margin:12px 16px 0;padding:8px 10px;border:1px solid #dde1e6;border-radius:10px;background:#f6f7f9;text-align:left;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">
+        <span style="font-size:12px;color:#5f6b7a;font-weight:600">Göstergeler</span>
+        <span style="flex:1"></span>
+        <span>A1</span><span class="mono" style="background:#1e2a25;color:#a6f4bd;border-radius:4px;padding:2px 8px;font-weight:600">14,45 mA</span>
+      </button>
+      <div style="flex:1;min-height:0;overflow:auto;padding:14px 20px 20px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="40" height="24" viewBox="0 0 32 20" fill="none" stroke="#1d2733" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10H8L9.5 6.5L12.5 13.5L15.5 6.5L18.5 13.5L21.5 6.5L23 10H30"/></svg>
+          <div style="display:flex;flex-direction:column;flex:1"><b style="font-size:20px;line-height:1.2">R1</b><span style="font-size:13px;color:#5f6b7a">Direnç</span></div>
+          <button class="ab" aria-label="Döndür"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 8.5A6 6 0 1 0 16 13"/><path d="M16 3.5v5h-5"/></svg></button>
+          <button class="ab" aria-label="Sil" style="color:#d92d20"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h12M8 6V4h4v2M6 6l1 11h6l1-11"/></svg></button>
+        </div>
+
+        <section aria-live="polite" style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span class="sec">Canlı ölçüm</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#1b7d44;font-weight:600"><i style="display:block;width:8px;height:8px;border-radius:4px;background:#1b7d44"></i>canlı</span></div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+            <div style="border:1px solid #dde1e6;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#5f6b7a">Gerilim</span><span class="mono" style="font-size:22px;font-weight:500">3,180 <span style="font-size:14px;color:#5f6b7a">V</span></span></div>
+            <div style="border:1px solid #dde1e6;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;color:#5f6b7a">Akım</span><span class="mono" style="font-size:22px;font-weight:500">14,45 <span style="font-size:14px;color:#5f6b7a">mA</span></span></div>
+            <div style="grid-column:span 2;border:1px solid #dde1e6;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:12px;color:#5f6b7a">Harcanan güç</span><span class="mono" style="font-size:18px;font-weight:500">45,95 <span style="font-size:13px;color:#5f6b7a">mW</span></span></div>
+          </div>
+          <div style="background:#eef3f8;border:1px solid #d6e2ee;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:12px;font-weight:600;color:#3d5a78">Neden bu değer?</span>
+            <span class="mono" style="font-size:13.5px;color:#1d2733">V = I · R → 3,18 V = 14,45 mA × 220 Ω</span>
+            <span style="font-size:12.5px;color:#3d4957">Kaynağın 5 V’unun 1,82 V’u LED’de, kalanı dirençte düşer.</span>
+          </div>
+        </section>
+
+        <section style="display:flex;flex-direction:column;gap:8px">
+          <span class="sec">Özellikler</span>
+          <label for="dr4" style="font-size:13px;font-weight:500">Direnç</label>
+          <div style="display:flex;align-items:center;height:40px;border:1px solid #1f6feb;border-radius:8px;background:#fff;box-sizing:border-box;overflow:hidden;box-shadow:0 0 0 3px #e6effd"><input id="dr4" value="220" style="flex:1;min-width:0;border:0;outline:0;background:transparent;padding:0 10px;font:500 15px 'IBM Plex Mono',monospace;color:#1d2733"><span style="padding:0 12px;height:100%;display:flex;align-items:center;border-left:1px solid #dde1e6;background:#f6f7f9;font:500 14px 'IBM Plex Mono',monospace;color:#5f6b7a">Ω</span></div>
+          <span style="font-size:12px;color:#1b7d44;display:flex;align-items:center;gap:6px"><i style="display:block;width:8px;height:8px;border-radius:4px;background:#1b7d44"></i>Canlı uygulanır · simülasyon durmaz</span>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <button class="chip">100</button><button class="chip" style="background:#1d2733;color:#fff;border-color:#1d2733">220</button><button class="chip">330</button><button class="chip">470</button><button class="chip">1k</button>
+          </div>
+          <label for="ad4" style="font-size:13px;font-weight:500;padding-top:4px">Ad</label>
+          <div style="display:flex;align-items:center;height:40px;border:1px solid #c4cad2;border-radius:8px;background:#fff;box-sizing:border-box"><input id="ad4" value="R1" style="flex:1;border:0;outline:0;background:transparent;padding:0 10px;font:500 15px 'IBM Plex Mono',monospace;color:#1d2733"></div>
+        </section>
+        <div style="font-size:12px;line-height:1.5;color:#5f6b7a;border-top:1px solid #eef0f3;padding-top:10px">Değer, ad ve anahtar değişiklikleri simülasyonu durdurmaz; kondansatör gerilimleri korunur. Parça eklemek, silmek, taşımak ya da döndürmek durdurur.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

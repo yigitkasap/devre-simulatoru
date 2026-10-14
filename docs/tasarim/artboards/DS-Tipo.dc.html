@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Tipografi ve ölçüler</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root{--line:#dde1e6;--line-2:#c4cad2;--ink:#1d2733;--muted:#5f6b7a;--accent-ink:#1557c0;--sans:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+.ui{font-family:var(--sans);color:var(--ink);font-size:14px;line-height:1.45}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.h2{margin:0;font-size:18px;font-weight:600}
+.sub{color:var(--muted);font-size:13px}
+.tr{display:grid;grid-template-columns:150px 170px minmax(0,1fr);align-items:baseline;gap:16px;padding:10px 0;border-bottom:1px solid var(--line)}
+.tr .mono{font-size:12px;color:var(--muted)}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:1040px;box-sizing:border-box;background:#fff;padding:48px 64px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <h1 style="margin:0;font-size:28px;font-weight:600">Tipografi · aralık · köşe · gölge</h1>
+    <span class="sub">Yazı tipi: IBM Plex Sans + IBM Plex Mono (Google Fonts, Türkçe karakterli, ~70 KB woff2). Yüklenmezse system-ui / ui-monospace’e düşer.</span>
+  </div>
+
+  <div style="display:flex;gap:56px">
+    <div style="flex:1;display:flex;flex-direction:column">
+      <h2 class="h2" style="margin-bottom:8px">Yazı ölçeği</h2>
+      <div class="tr"><b>display</b><span class="mono">28/34 · 600</span><span style="font-size:28px;font-weight:600;line-height:34px">Örnek devreler</span></div>
+      <div class="tr"><b>title</b><span class="mono">20/28 · 600</span><span style="font-size:20px;font-weight:600">R1 · Direnç</span></div>
+      <div class="tr"><b>heading</b><span class="mono">16/24 · 600</span><span style="font-size:16px;font-weight:600">Canlı ölçüm</span></div>
+      <div class="tr"><b>body</b><span class="mono">14/20 · 400 (telefon 16/22)</span><span>Üzerinden geçen akımla orantılı bir gerilim düşümü oluşturur.</span></div>
+      <div class="tr"><b>small</b><span class="mono">13/18 · 400</span><span style="font-size:13px;color:var(--muted)">SI önekleri: p, n, µ (ya da u), m, k, M, G.</span></div>
+      <div class="tr"><b>label</b><span class="mono">12/16 · 600</span><span style="font-size:12px;font-weight:600;color:var(--muted)">Kablo gerilimi</span></div>
+      <div class="tr"><b>readout</b><span class="mono">Mono 28/32 · 500</span><span class="mono" style="font-size:28px;font-weight:500">14,45 <span style="font-size:18px;color:var(--muted)">mA</span></span></div>
+      <div class="tr"><b>value</b><span class="mono">Mono 14/20 · 500</span><span class="mono" style="font-size:14px;font-weight:500">4,7 kΩ · 100 µF · 2,2 MΩ · 1,594 s</span></div>
+      <div class="tr"><b>lcd</b><span class="mono">Mono 13/16 · 600</span><span><span class="mono" style="display:inline-block;background:#1e2a25;color:#a6f4bd;font-size:13px;font-weight:600;padding:3px 8px;border-radius:4px">9,616 mA</span></span></div>
+      <div class="tr"><b>şema etiketi</b><span class="mono">12/14 · 600 (%100)</span><span style="font-size:12px;font-weight:600">R1 <span class="mono" style="font-weight:400;color:var(--muted)">4,7 kΩ</span> <span class="sub">· yakınlıkla büyür, ekranda en az 10 px</span></span></div>
+    </div>
+
+    <div style="width:520px;display:flex;flex-direction:column;gap:14px">
+      <h2 class="h2">Sayı ve birim kuralları</h2>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:14px">
+        <div style="display:flex;gap:12px"><span class="mono" style="width:150px;flex:none;font-weight:600">4,7 kΩ</span><span class="sub">Ondalık virgül; sayı ile birim arasında bölünmeyen boşluk (U+00A0); önek birime bitişik.</span></div>
+        <div style="display:flex;gap:12px"><span class="mono" style="width:150px;flex:none;font-weight:600">−2,50 V</span><span class="sub">Eksi işareti U+2212 (kısa çizgi değil); artı yalnızca farkın önemli olduğu yerde.</span></div>
+        <div style="display:flex;gap:12px"><span class="mono" style="width:150px;flex:none;font-weight:600">4,500 V</span><span class="sub">LCD ve İnceleme: 4 anlamlı basamak, sabit genişlik; osiloskop şeridi: 3.</span></div>
+        <div style="display:flex;gap:12px"><span class="mono" style="width:150px;flex:none;font-weight:600">7,071 V~</span><span class="sub">AC kipinde “~” eki; durmuşken “– – – V”.</span></div>
+        <div style="display:flex;gap:12px"><span class="mono" style="width:150px;flex:none;font-weight:600">mV · MΩ</span><span class="sub">Küçük m mili, büyük M mega; önek seçimi: mantis 1 ile 999 arasında.</span></div>
+        <div style="display:flex;gap:12px"><span style="width:150px;flex:none;font-weight:600">V<sub>CE</sub> · R<sub>iç</sub></span><span class="sub">Gerçek alt simge (&lt;sub&gt;, %75 boy, −0,25 em); alt çizgi yok.</span></div>
+        <div style="display:flex;gap:12px"><span class="mono" style="width:150px;flex:none;font-weight:600">tabular-nums</span><span class="sub">Değişen her sayıda eş genişlikli rakam; titreme olmaz.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:40px">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <h2 class="h2">Aralık (4 px tabanı)</h2>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:10px"><span class="mono" style="width:56px;font-size:12px">space-1</span><i style="display:block;width:4px;height:12px;background:#1f6feb"></i><span class="mono sub">4</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="mono" style="width:56px;font-size:12px">space-2</span><i style="display:block;width:8px;height:12px;background:#1f6feb"></i><span class="mono sub">8</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="mono" style="width:56px;font-size:12px">space-3</span><i style="display:block;width:12px;height:12px;background:#1f6feb"></i><span class="mono sub">12</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="mono" style="width:56px;font-size:12px">space-4</span><i style="display:block;width:16px;height:12px;background:#1f6feb"></i><span class="mono sub">16</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="mono" style="width:56px;font-size:12px">space-6</span><i style="display:block;width:24px;height:12px;background:#1f6feb"></i><span class="mono sub">24</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="mono" style="width:56px;font-size:12px">space-8</span><i style="display:block;width:32px;height:12px;background:#1f6feb"></i><span class="mono sub">32</span></div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="mono" style="width:56px;font-size:12px">space-12</span><i style="display:block;width:48px;height:12px;background:#1f6feb"></i><span class="mono sub">48</span></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <h2 class="h2">Köşe yarıçapı</h2>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><i style="display:block;width:48px;height:48px;border:2px solid #1d2733;border-radius:4px"></i><span class="mono" style="font-size:12px">xs 4</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><i style="display:block;width:48px;height:48px;border:2px solid #1d2733;border-radius:6px"></i><span class="mono" style="font-size:12px">sm 6</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><i style="display:block;width:48px;height:48px;border:2px solid #1d2733;border-radius:8px"></i><span class="mono" style="font-size:12px">md 8</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><i style="display:block;width:48px;height:48px;border:2px solid #1d2733;border-radius:12px"></i><span class="mono" style="font-size:12px">lg 12</span></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px"><i style="display:block;width:48px;height:48px;border:2px solid #1d2733;border-radius:16px"></i><span class="mono" style="font-size:12px">xl 16</span></div>
+      </div>
+      <span class="sub">xs: kısayol tuşu, rozet · sm: çip · md: düğme, alan · lg: kart, panel · xl: alt sayfa üst köşeleri, modal</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <h2 class="h2">Gölge ve katman</h2>
+      <div style="display:flex;gap:14px;padding:6px 0 10px">
+        <div style="width:72px;height:56px;background:#fff;border-radius:8px;box-shadow:0 1px 2px rgba(29,39,51,.10);border:1px solid #dde1e6"></div>
+        <div style="width:72px;height:56px;background:#fff;border-radius:8px;box-shadow:0 4px 12px rgba(29,39,51,.12),0 1px 3px rgba(29,39,51,.08)"></div>
+        <div style="width:72px;height:56px;background:#fff;border-radius:12px;box-shadow:0 16px 40px rgba(29,39,51,.18),0 2px 6px rgba(29,39,51,.08)"></div>
+      </div>
+      <div class="mono" style="font-size:12px;color:var(--muted);line-height:1.6">sm · md · lg<br>z: tuval 0 · lejant 10 · panel 20 · alt sayfa 30 · menü 40 · toast 50 · modal 60</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <h2 class="h2">Dokunma ve hareket</h2>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:13px">
+        <span><b>Masaüstü hedef</b> <span class="mono">36×36</span>, araç çubuğu 36 yükseklik</span>
+        <span><b>Telefon hedef</b> <span class="mono">44×44</span> pt, Oynat <span class="mono">56</span></span>
+        <span><b>Pin yakalama</b> masaüstü <span class="mono">r 8 px</span>, telefon <span class="mono">r 22 pt</span></span>
+        <span><b>Giriş yazısı</b> telefonda en az <span class="mono">16 px</span></span>
+        <span><b>Süre</b> basma <span class="mono">120 ms</span> · menü <span class="mono">180 ms</span> · alt sayfa <span class="mono">280 ms</span></span>
+        <span class="sub">prefers-reduced-motion: geçişler anında; akım noktaları Ayarlar’dan kapatılabilir.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <h2 class="h2">Kırılma noktaları</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;font-size:13px">
+      <div style="border:1px solid var(--line);border-radius:12px;padding:14px"><b class="mono">&lt; 640 · dikey telefon</b><div class="sub">Üst çubuk + tuval + alt sayfa + alt çubuk (Oynat ortada).</div></div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:14px"><b class="mono">yükseklik &lt; 500 · yatay telefon</b><div class="sub">Sol araç şeridi + tuval + sağ yan sayfa (300 px); Oynat sağ altta.</div></div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:14px"><b class="mono">1024–1279 · tablet</b><div class="sub">Kütüphane 56 px şerit; İnceleme 320 px; cihaz rafı altta.</div></div>
+      <div style="border:1px solid var(--line);border-radius:12px;padding:14px"><b class="mono">≥ 1280 · masaüstü</b><div class="sub">Kütüphane 232–256 px açık; İnceleme 320–336 px; raf altta.</div></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

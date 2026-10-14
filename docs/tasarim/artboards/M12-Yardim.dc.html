@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Yardım ve kısayollar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:15px 15px}
+.tab{height:44px;padding:0 14px;border:0;background:transparent;font:500 14.5px 'IBM Plex Sans',sans-serif;color:#5f6b7a;border-bottom:2px solid transparent}
+.tsel{color:#1d2733;border-bottom-color:#1d2733;font-weight:600}
+.k{display:inline-flex;align-items:center;font:500 12.5px 'IBM Plex Mono',monospace;line-height:22px;padding:0 7px;border:1px solid #c4cad2;border-bottom-width:2px;border-radius:5px;background:#fff;color:#1d2733}
+.r{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:40px;border-bottom:1px solid #eef0f3}
+.r .ks{display:flex;gap:4px;align-items:center;flex:none}
+.h3{margin:14px 0 4px;font-size:13px;font-weight:600;color:#5f6b7a}
+.nw{font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:4px;background:#efe7fb;color:#5b3aa8;margin-left:6px}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden;position:relative">
+  <dc-import name="C-UstCubuk" tool="sec" menu="yardim" hint-size="1440px,52px"></dc-import>
+  <div class="paper" style="flex:1"></div>
+  <div style="position:absolute;inset:0;background:rgba(29,39,51,.42);display:flex;align-items:center;justify-content:center">
+    <div role="dialog" aria-modal="true" aria-labelledby="yt" style="width:960px;height:700px;background:#fff;border-radius:16px;box-shadow:0 16px 40px rgba(29,39,51,.2);display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:20px 24px 0;display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:4px"><h2 id="yt" style="margin:0;font-size:24px;font-weight:600">Yardım</h2><span style="color:#5f6b7a;font-size:14px">Bu pencereyi her yerde <span class="k">?</span> ile açabilirsin.</span></div>
+        <div style="display:flex;gap:8px"><button style="height:36px;padding:0 12px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 14px 'IBM Plex Sans',sans-serif;color:#1d2733">Kısa turu başlat</button><button aria-label="Kapat" style="width:36px;height:36px;border-radius:8px;border:0;background:transparent;color:#5f6b7a"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button></div>
+      </div>
+      <div role="tablist" style="display:flex;padding:8px 16px 0;border-bottom:1px solid #dde1e6">
+        <button class="tab tsel" role="tab" aria-selected="true">Klavye kısayolları</button>
+        <button class="tab" role="tab" aria-selected="false">Fare ve dokunma</button>
+        <button class="tab" role="tab" aria-selected="false">Simgeler ve renkler</button>
+        <button class="tab" role="tab" aria-selected="false">Laboratuvar ipuçları</button>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;padding:4px 24px 24px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 48px;align-content:start">
+        <div>
+          <div class="h3">Araçlar</div>
+          <div class="r"><span>Seçme aracı</span><span class="ks"><span class="k">Esc</span></span></div>
+          <div class="r"><span>Kablo aracı</span><span class="ks"><span class="k">W</span></span></div>
+          <div class="r"><span>Tuvali kaydır</span><span class="ks"><span class="k">Boşluk</span>+ sürükle</span></div>
+          <div class="h3">Seçili öğe</div>
+          <div class="r"><span>Döndür (90°)</span><span class="ks"><span class="k">R</span></span></div>
+          <div class="r"><span>Ters çevir (yönlü parçalar)</span><span class="ks"><span class="k">F</span></span></div>
+          <div class="r"><span>Sil</span><span class="ks"><span class="k">Delete</span><span class="k">Backspace</span></span></div>
+          <div class="r"><span>Değer alanına git <span class="nw">yeni</span></span><span class="ks"><span class="k">Enter</span></span></div>
+          <div class="r"><span>Tümünü seç</span><span class="ks"><span class="k">Ctrl</span>+<span class="k">A</span></span></div>
+        </div>
+        <div>
+          <div class="h3">Düzen</div>
+          <div class="r"><span>Geri al</span><span class="ks"><span class="k">Ctrl</span>+<span class="k">Z</span></span></div>
+          <div class="r"><span>Yinele</span><span class="ks"><span class="k">Ctrl</span>+<span class="k">Y</span> ya da <span class="k">Ctrl</span>+<span class="k">Shift</span>+<span class="k">Z</span></span></div>
+          <div class="r"><span>İptal (yerleştirme, kablo)</span><span class="ks"><span class="k">Esc</span></span></div>
+          <div class="h3">Görünüm ve simülasyon</div>
+          <div class="r"><span>Yakınlaştır / uzaklaştır</span><span class="ks">tekerlek · <span class="k">+</span><span class="k">−</span> <span class="nw">yeni</span></span></div>
+          <div class="r"><span>Devreyi ekrana sığdır <span class="nw">yeni</span></span><span class="ks"><span class="k">Shift</span>+<span class="k">1</span></span></div>
+          <div class="r"><span>Oynat / Duraklat <span class="nw">yeni</span></span><span class="ks"><span class="k">P</span></span></div>
+          <div class="r"><span>Panel sekmesine geç <span class="nw">yeni</span></span><span class="ks"><span class="k">Alt</span>+<span class="k">1</span>…<span class="k">3</span></span></div>
+          <div class="r"><span>Yardım</span><span class="ks"><span class="k">?</span></span></div>
+        </div>
+        <div style="grid-column:span 2;margin-top:16px;padding:12px 14px;border-radius:10px;background:#f6f7f9;font-size:13px;color:#3d4957">Kısayollar yalnızca odak tuvaldeyken çalışır; bir alana yazarken harf tuşları yazıya gider. “Yeni” işaretliler öneridir.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

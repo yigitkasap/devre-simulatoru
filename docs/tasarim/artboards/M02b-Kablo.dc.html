@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Kablo çekme</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#b3bac3 1.3px,transparent 1.6px),radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:75px 75px,15px 15px;background-position:7px 7px,7px 7px}
+.tab{height:44px;padding:0 12px;border:0;background:transparent;font:500 14px 'IBM Plex Sans',sans-serif;color:#5f6b7a;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.tsel{color:#1d2733;border-bottom-color:#1d2733}
+.k{font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:18px;padding:0 5px;border:1px solid #c4cad2;border-bottom-width:2px;border-radius:4px;background:#fff;color:#1d2733}
+.s{fill:none;stroke:#1d2733;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.p{fill:#fff;stroke:#f05a28;stroke-width:2.2}
+.lb{font:600 16px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 15px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden">
+  <dc-import name="C-UstCubuk" tool="kablo" hint-size="1440px,52px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="width:256px;flex:none"><dc-import name="C-Kutuphane" info="amper" hint-size="256px,848px"></dc-import></div>
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div class="paper" role="application" aria-label="Devre şeması" style="flex:1;position:relative;overflow:hidden;cursor:crosshair">
+        <svg width="848" height="768" viewBox="0 0 848 768" style="position:absolute;left:0;top:0" aria-hidden="true">
+          <g transform="translate(150,170)">
+            <path class="s" d="M180 150H240M360 150H480"/>
+            <path class="s" d="M180 150V204M180 216V270M159 204H201"/>
+            <path d="M169 216H191" fill="none" stroke="#1d2733" stroke-width="6.5"/>
+            <path class="s" style="stroke-width:2" d="M152 186h9M156.5 181.5v9"/>
+            <text class="lb" x="140" y="208" text-anchor="end">B1</text><text class="lv" x="140" y="228" text-anchor="end">5 V</text>
+            <path class="s" d="M240 150H270L275 139.5L285 160.5L295 139.5L305 160.5L315 139.5L325 160.5L330 150H360"/>
+            <text class="lb" x="300" y="118" text-anchor="middle">R1</text><text class="lv" x="300" y="136" text-anchor="middle">220 Ω</text>
+            <path class="s" d="M480 150V192M480 222V270M458 222H502"/>
+            <path d="M458 192H502L480 222Z" fill="#1d2733"/>
+            <path class="s" style="stroke-width:2.4" d="M505 186l13-13M512 173h6v6M510 202l13-13M517 189h6v6"/>
+            <text class="lb" x="530" y="214">D1</text><text class="lv" x="530" y="234">kırmızı</text>
+            <path class="s" d="M300 330H339M381 330H420"/>
+            <circle class="s" cx="360" cy="330" r="21"/>
+            <text x="360" y="337" text-anchor="middle" style="font:600 20px 'IBM Plex Sans',sans-serif;fill:#1d2733">A</text>
+            <path class="s" style="stroke-width:2" d="M398 310h9M402.5 305.5v9"/>
+            <text class="lb" x="360" y="296" text-anchor="middle">A1</text>
+            <rect x="325" y="360" width="70" height="22" rx="4" fill="#1e2a25"/><text x="360" y="376" text-anchor="middle" style="font:600 13px 'IBM Plex Mono',monospace;fill:#5d8a6c">– – – A</text>
+            <circle class="p" cx="180" cy="270" r="4.5"/>
+            <circle class="p" cx="300" cy="330" r="4.5"/>
+            <path d="M480 270V330" fill="none" stroke="#1f6feb" stroke-width="3" stroke-linecap="round"/>
+            <path d="M480 330H436" fill="none" stroke="#1f6feb" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6"/>
+            <circle cx="480" cy="330" r="5" fill="#1f6feb"/>
+            <circle cx="480" cy="270" r="5" fill="#fff" stroke="#1f6feb" stroke-width="2.5"/>
+            <circle cx="420" cy="330" r="14" fill="#e6effd" stroke="#1f6feb" stroke-width="2"/>
+            <circle cx="420" cy="330" r="4.5" fill="#1f6feb"/>
+            <path d="M432 338l10 22 3.5-8.5 8.5-1.5z" fill="#1d2733" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+          </g>
+        </svg>
+        <div role="dialog" aria-label="Tur adımı 2 / 4" style="position:absolute;left:590px;top:566px;width:240px;background:#1d2733;color:#fff;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 16px 40px rgba(29,39,51,.25)">
+          <span class="mono" style="font-size:11px;opacity:.75">Tur · 2 / 4</span>
+          <b style="font-size:15px">Kablo çek</b>
+          <span style="font-size:13px;line-height:1.45;opacity:.9">Bir pinin ucuna tıkla. Köşe için boş yere, bitirmek için başka bir pine ya da kabloya tıkla.</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+            <button style="height:32px;padding:0 8px;border:0;background:transparent;color:#c9d2dc;font:500 13px 'IBM Plex Sans',sans-serif">Turu bitir</button>
+            <div style="display:flex;gap:6px"><button style="height:32px;padding:0 10px;border-radius:7px;border:1px solid #475466;background:transparent;color:#fff;font:500 13px 'IBM Plex Sans',sans-serif">Geri</button><button style="height:32px;padding:0 12px;border-radius:7px;border:0;background:#fff;color:#1d2733;font:600 13px 'IBM Plex Sans',sans-serif">İleri</button></div>
+          </div>
+          <svg width="16" height="10" viewBox="0 0 16 10" aria-hidden="true" style="position:absolute;left:32px;top:-9px"><path d="M0 10l8-10 8 10z" fill="#1d2733"/></svg>
+        </div>
+      </div>
+      <div style="height:28px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#e6effd;border-top:1px solid #c7dafb;font-size:13px;color:#1557c0">
+        <span><b>Kablo çiziliyor:</b> köşe için tıkla · bitirmek için bir pine ya da kabloya tıkla · çift tık: boşta bitir · <span class="k">Esc</span> iptal</span>
+        <span>Tüm kısayollar: <span class="k">?</span></span>
+      </div>
+      <dc-import name="C-SimCubugu" state="stop" time="0,000 s" msg="Noktalar geleneksel akım yönünü gösterir: dış devrede + uçtan − uca." hint-size="848px,52px"></dc-import>
+    </main>
+    <aside aria-label="İnceleme paneli" style="width:336px;flex:none;background:#fff;border-left:1px solid #dde1e6;display:flex;flex-direction:column">
+      <div role="tablist" style="display:flex;padding:0 8px;border-bottom:1px solid #dde1e6">
+        <button class="tab tsel" role="tab" aria-selected="true">İncele</button>
+        <button class="tab" role="tab" aria-selected="false">Örnek</button>
+        <button class="tab" role="tab" aria-selected="false">Mesajlar <span class="mono" style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;background:#fef6e7;color:#b54708">3</span></button>
+      </div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:16px">Kablo</b><span style="font-size:13px;color:#5f6b7a">D1 katot ucundan</span></div>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+          <div style="display:flex;gap:10px"><span class="mono" style="color:#1557c0;width:20px">1</span><span>Başlangıç: <b>D1 · katot</b></span></div>
+          <div style="display:flex;gap:10px"><span class="mono" style="color:#1557c0;width:20px">2</span><span>Köşe eklendi. Yatay ve dikey L yolu kendiliğinden çizilir.</span></div>
+          <div style="display:flex;gap:10px"><span class="mono" style="color:#1557c0;width:20px">3</span><span>Hedef: <b>A1 · + ucu</b> (mavi halka). Tıklayınca kablo biter.</span></div>
+        </div>
+        <div style="padding:12px;border-radius:10px;background:#f6f7f9;font-size:13px;color:#3d4957;display:flex;flex-direction:column;gap:6px">
+          <b style="font-size:13px">Bağlantı kuralları</b>
+          <span>Kablonun ucu başka bir kablonun ortasına değerse T bağlantısı olur. Kesişen kablolar bağlanmaz; köprü işareti çizilir.</span>
+        </div>
+        <button style="align-self:flex-start;height:36px;padding:0 12px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 14px 'IBM Plex Sans',sans-serif;color:#1d2733">Kabloyu iptal et <span class="k" style="margin-left:6px">Esc</span></button>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

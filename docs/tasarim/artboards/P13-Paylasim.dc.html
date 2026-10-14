@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: dosya ve paylaşım</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:12px 12px}
+.mi{display:flex;align-items:center;gap:14px;width:100%;min-height:52px;padding:0 4px;border:0;border-bottom:1px solid #eef0f3;background:transparent;font:500 16px 'IBM Plex Sans',sans-serif;color:#1d2733;text-align:left}
+.mi svg{flex:none}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden;position:relative">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="Gerilim bölücü" mode="kur" hint-size="390px,52px"></dc-import>
+  <div class="paper" style="flex:1"></div>
+  <dc-import name="C-TelAlt" bar="kur" hint-size="390px,104px"></dc-import>
+  <div style="position:absolute;inset:0;background:rgba(29,39,51,.4)"></div>
+  <div role="dialog" aria-modal="true" aria-label="Dosya" style="position:absolute;left:0;right:0;bottom:0;top:150px;background:#fff;border-radius:16px 16px 0 0;display:flex;flex-direction:column;box-shadow:0 -4px 18px rgba(29,39,51,.2)">
+    <div style="height:22px;display:flex;align-items:center;justify-content:center"><i style="display:block;width:36px;height:5px;border-radius:3px;background:#c4cad2"></i></div>
+    <div style="padding:0 8px 4px 16px;display:flex;align-items:center;justify-content:space-between"><div style="display:flex;flex-direction:column"><b style="font-size:18px">Gerilim bölücü</b><span style="font-size:12.5px;color:#1b7d44">Bu tarayıcıda kendiliğinden kaydedildi</span></div><button aria-label="Kapat" style="width:44px;height:44px;border:0;background:transparent;color:#5f6b7a"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button></div>
+    <div style="flex:1;min-height:0;overflow:auto;padding:0 16px 34px">
+      <button class="mi"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h5a2 2 0 0 1 2 2v11a2 2 0 0 0-2-2H3zM17 4h-5a2 2 0 0 0-2 2v11a2 2 0 0 1 2-2h5z"/></svg>Örnekler</button>
+      <button class="mi"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 2h7l4 4v12H5z"/><path d="M12 2v4h4M10.5 9v6M7.5 12h6"/></svg><span>Yeni devre<br><span style="font-size:13px;font-weight:400;color:#5f6b7a">Öncekine Geri al ile dönebilirsin</span></span></button>
+      <div style="border-bottom:1px solid #eef0f3;padding:6px 0 14px">
+        <button class="mi" aria-expanded="true" style="border-bottom:0;color:#1557c0"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a3 3 0 0 0 4 4L11 13M13 11l1.5-1.5a3 3 0 0 0-4-4L9 7"/></svg>Paylaşım bağlantısı</button>
+        <div style="display:flex;flex-direction:column;gap:8px;padding-left:36px">
+          <span style="font-size:13.5px;line-height:1.5;color:#3d4957">Devre bağlantının içine sıkıştırılarak yazıldı; bir sunucuya gönderilmedi. Bağlantıyı açan kişi aynı devreyi görür.</span>
+          <textarea readonly rows="3" aria-label="Paylaşım bağlantısı" style="resize:none;width:100%;box-sizing:border-box;border:1px solid #c4cad2;border-radius:10px;padding:8px 10px;font:400 16px/1.4 'IBM Plex Mono',monospace;color:#1d2733;background:#f6f7f9;word-break:break-all">https://[site-adresi]/#d=N4IgDgTg9gzgFgQwHYGMAuA…</textarea>
+          <span class="mono" style="font-size:12.5px;color:#5f6b7a">595 karakter</span>
+          <div style="display:flex;gap:8px"><button style="flex:1;height:48px;border-radius:12px;border:0;background:#1f6feb;color:#fff;font:600 15px 'IBM Plex Sans',sans-serif">Kopyala</button><button style="flex:1;height:48px;border-radius:12px;border:1px solid #c4cad2;background:#fff;font:500 15px 'IBM Plex Sans',sans-serif;color:#1d2733">Paylaş…</button></div>
+        </div>
+      </div>
+      <button class="mi"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v10M6 9l4 4 4-4M4 16h12"/></svg>JSON olarak dışa aktar</button>
+      <button class="mi"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13V3M6 7l4-4 4 4M4 16h12"/></svg>JSON dosyası içe aktar…</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

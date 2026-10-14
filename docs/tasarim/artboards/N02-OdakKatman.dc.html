@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Odak sırası ve katmanlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.5}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.z{position:absolute;box-sizing:border-box;border-radius:6px;font-size:12px;padding:6px 8px}
+.n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:12px;background:#1f6feb;color:#fff;font:600 12px 'IBM Plex Mono',monospace;flex:none}
+.li{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #eef0f3;font-size:13.5px}
+.cv{display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #eef0f3;font-size:13.5px}
+.cv b{white-space:nowrap}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:1400px;box-sizing:border-box;background:#fff;padding:48px 64px;display:flex;flex-direction:column;gap:28px">
+  <h1 style="margin:0;font-size:28px;font-weight:600">Odak sırası · paneller ve tuval</h1>
+  <div style="display:flex;gap:48px">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:600">Masaüstü klavye odağı</h2>
+      <div style="position:relative;width:640px;height:400px;border:1px solid #c4cad2;border-radius:10px;background:#f6f7f9;overflow:hidden">
+        <div class="z" style="left:0;top:0;width:640px;height:30px;border-radius:0;background:#1d2733;color:#fff;display:flex;align-items:center;gap:8px"><span class="n" style="width:20px;height:20px">1</span>Üst çubuk</div>
+        <div class="z" style="left:6px;top:36px;width:110px;height:358px;background:#fff;border:1px solid #dde1e6"><span class="n" style="width:20px;height:20px">2</span><br>Kütüphane</div>
+        <div class="z" style="left:122px;top:36px;width:360px;height:200px;background:#fbfbf9;border:1.5px dashed #1f6feb"><span class="n" style="width:20px;height:20px">3</span> Tuval<br><span style="color:#5f6b7a">tek durak · ok tuşları parçadan parçaya</span></div>
+        <div class="z" style="left:122px;top:242px;width:360px;height:110px;background:#0f1713;color:#d8e6dc"><span class="n" style="width:20px;height:20px">4</span> Cihaz rafı</div>
+        <div class="z" style="left:122px;top:358px;width:360px;height:36px;background:#fff;border:1px solid #dde1e6;display:flex;align-items:center;gap:8px"><span class="n" style="width:20px;height:20px">5</span>Simülasyon çubuğu</div>
+        <div class="z" style="left:488px;top:36px;width:146px;height:358px;background:#fff;border:1.5px solid #1f6feb"><span class="n" style="width:20px;height:20px">6</span><br>İnceleme paneli</div>
+        <div class="z" style="left:130px;top:46px;background:#1557c0;color:#fff;font-weight:600;display:none">0</div>
+      </div>
+      <div style="width:640px;display:flex;flex-direction:column">
+        <div class="li"><span class="n" style="background:#5f6b7a">0</span><span><b>“Tuvale atla”</b> bağlantısı: yalnızca odakla görünür, ilk Tab durağı.</span></div>
+        <div class="li"><span class="n">1</span><span>Üst çubuk soldan sağa; menüler ok tuşlarıyla.</span></div>
+        <div class="li"><span class="n">2</span><span>Kütüphane: arama → liste (tek durak; ok tuşları, Enter = tuvalin ortasına ekle).</span></div>
+        <div class="li"><span class="n">3</span><span>Tuval: tek durak. Ok tuşları seçimi en yakın parçaya taşır; <b>Shift</b>+ok parçayı 1 birim kaydırır; Enter → 6’daki ilk alan; Esc → seçim kalkar.</span></div>
+        <div class="li"><span class="n">4</span><span>Cihaz rafı: her ön panel bir grup; grup içinde Tab.</span></div>
+        <div class="li"><span class="n">5</span><span>Oynat · Duraklat · Durdur · Hız · Elektron akışı.</span></div>
+        <div class="li"><span class="n">6</span><span>İnceleme: sekmeler (ok tuşları) → içerik. Esc tuvaldeki seçili parçaya döndürür.</span></div>
+        <div class="li" style="border-bottom:0"><span class="n" style="background:#1b7d44">i</span><span>Ekran okuyucu: tuvalin metin karşılığı “Devre” listesidir (ad, değer, canlı ölçüm). Canlı ölçümler en çok saniyede bir, aria-live="polite" ile okunur.</span></div>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:600">Telefon: ekran okuyucu sırası</h2>
+      <div style="display:flex;gap:16px;align-items:flex-start">
+        <div style="position:relative;width:180px;height:390px;border:1px solid #c4cad2;border-radius:20px;background:#fbfbf9;overflow:hidden;flex:none">
+          <div class="z" style="left:0;right:0;top:20px;height:28px;border-radius:0;background:#fff;border-bottom:1px solid #dde1e6"><span class="n" style="width:18px;height:18px;font-size:10px">1</span></div>
+          <div class="z" style="left:8px;right:8px;top:60px;height:150px;border:1.5px dashed #1f6feb"><span class="n" style="width:18px;height:18px;font-size:10px">2</span> <span style="font-size:11px">Tuval</span></div>
+          <div class="z" style="left:0;right:0;bottom:46px;height:100px;border-radius:12px 12px 0 0;background:#fff;border:1px solid #c4cad2"><span class="n" style="width:18px;height:18px;font-size:10px">3</span> <span style="font-size:11px">Alt sayfa</span></div>
+          <div class="z" style="left:0;right:0;bottom:0;height:46px;border-radius:0;background:#fff;border-top:1px solid #dde1e6;display:flex;align-items:center;gap:6px"><span class="n" style="width:18px;height:18px;font-size:10px">4</span><span style="flex:1"></span><span class="n" style="width:26px;height:26px;background:#1b7d44;font-size:10px">5</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;font-size:13.5px">
+          <div class="li"><span class="n">1</span><span>Üst şerit: devre adı (Dosya), kip durumu, sorun sayısı, ⋯</span></div>
+          <div class="li"><span class="n">2</span><span>Tuval: parçalar rotor ile tek tek; çift dokunma seçer. Bağla kipinde uçlar “R1, 2. uç” diye okunur.</span></div>
+          <div class="li"><span class="n">3</span><span>Alt sayfa içeriği (açıksa)</span></div>
+          <div class="li"><span class="n">4</span><span>Alt çubuk eylemleri</span></div>
+          <div class="li" style="border-bottom:0"><span class="n" style="background:#1b7d44">5</span><span>Oynat / Duraklat</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:48px">
+    <div style="display:flex;flex-direction:column">
+      <h2 style="margin:0 0 6px;font-size:18px;font-weight:600">Telefonda hangi katman neyi kapatır?</h2>
+      <div class="cv"><b>Alt çubuk</b><span>Her zaman; 70 px + güvenli alan. Tuvalin altında, üstüne binmez.</span></div>
+      <div class="cv"><b>Alt sayfa · peek</b><span>Tuvalin alt 140–190 px’ini alır; devre yukarı sığar.</span></div>
+      <div class="cv"><b>Alt sayfa · yarım</b><span>En çok %50; devre üst yarıya sığar, seçili parça ortada.</span></div>
+      <div class="cv"><b>Cihazlar · tam</b><span>Tuvalden 112–120 px’lik şerit kalır; şeride dokununca yarıma iner.</span></div>
+      <div class="cv"><b>Örnekler, Dosya, Yardım</b><span>Tam ekran ya da örtülü sayfa; kapanınca önceki duruma dönülür.</span></div>
+      <div class="cv"><b>LED balonu</b><span>Parçanın yanında, parçayı ve kablolarını kapatmayacak yöne açılır.</span></div>
+      <div class="cv"><b>Seçici + büyüteç</b><span>Büyüteç parmağın üstünde, liste altında; parmak kaldırılınca kalır.</span></div>
+      <div class="cv"><b>Toast</b><span>Alt sayfanın hemen üstünde, 48 px; tuval hareketlerini engellemez.</span></div>
+      <div class="cv" style="border-bottom:0"><b>Kilit bilgisi (Ölç)</b><span>Sol üstte; ilk seferden sonra yalnızca üst şeritteki kip rozeti kalır.</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column">
+      <h2 style="margin:0 0 6px;font-size:18px;font-weight:600">Yeniden sığdırma kuralları</h2>
+      <div class="cv"><b>Örnek açılınca</b><span>Görünür alana tam sığdır (kenar boşluğu 24 px).</span></div>
+      <div class="cv"><b>Panel/sayfa açılıp kapanınca</b><span>Kullanıcı yakınlaştırmadıysa sığdır; yakınlaştırdıysa yalnızca seçili parçayı görünür tut.</span></div>
+      <div class="cv"><b>Parça eklenince</b><span>Yeni parça görünür alanda değilse görünüm kayar, ölçek değişmez.</span></div>
+      <div class="cv"><b>Mesaja tıklanınca</b><span>İlgili parçalar görünür alana kayar; gerekirse en çok %25 uzaklaşır.</span></div>
+      <div class="cv"><b>Telefon döndürülünce</b><span>Merkez ve ölçek korunur; devre taşarsa sığdırılır.</span></div>
+      <div class="cv" style="border-bottom:0"><b>Sığdır düğmesi</b><span>Masaüstünde üst çubukta; telefonda ⋯ içinde ve kullanıcı uzaklaştığında tuvalin sağ üstünde geçici olarak.</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

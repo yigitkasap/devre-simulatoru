@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon üst şerit</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<header style="width:100%;height:52px;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:0 4px 0 8px;background:#ffffff;border-bottom:1px solid #dde1e6;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733">
+  <button aria-haspopup="menu" aria-label="Dosya ve örnekler: {{title}}" style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:44px;padding:0 6px 0 2px;border:0;border-radius:10px;background:transparent;color:#1d2733;cursor:pointer;text-align:left">
+    <svg width="28" height="28" viewBox="0 0 44 44" aria-hidden="true" style="flex:none"><rect width="44" height="44" rx="9" fill="#1d2733"/><path d="M8 22c3.5-10 7-10 10.5 0s7 10 10.5 0 5-8 7-6" fill="none" stroke="#f05a28" stroke-width="3.6" stroke-linecap="round"/></svg>
+    <span style="display:flex;flex-direction:column;min-width:0">
+      <span style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{title}}</span>
+      <span style="font-size:11px;color:#5f6b7a;white-space:nowrap">Tarayıcıda kaydedildi</span>
+    </span>
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M5 8l5 5 5-5"/></svg>
+  </button>
+  <span role="status" style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;background:{{chipBg}};color:{{chipFg}};font:600 12px 'IBM Plex Sans',system-ui,sans-serif;white-space:nowrap">
+    <sc-if value="{{isRun}}" hint-placeholder-val="{{ false }}"><i style="display:block;width:8px;height:8px;border-radius:4px;background:#1b7d44"></i></sc-if>
+    <sc-if value="{{isPause}}" hint-placeholder-val="{{ false }}"><svg width="8" height="9" viewBox="0 0 8 9" aria-hidden="true"><rect x="0" y="0" width="3" height="9" fill="#e8a317"/><rect x="5" y="0" width="3" height="9" fill="#e8a317"/></svg></sc-if>
+    {{chipText}}<span style="font:500 12px 'IBM Plex Mono',monospace">{{time}}</span>
+  </span>
+  <sc-if value="{{hasIssues}}" hint-placeholder-val="{{ false }}">
+    <button aria-label="Mesajlar: {{issues}} sorun" style="height:44px;min-width:44px;padding:0 6px;border:0;border-radius:10px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 8px;border-radius:13px;background:{{issueBg}};color:#fff;font:600 12px 'IBM Plex Mono',monospace"><svg width="12" height="12" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v7" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="10" cy="15.5" r="1.8" fill="#fff"/></svg>{{issues}}</span></button>
+  </sc-if>
+  <button aria-label="Daha fazla: görünüm, ayarlar, yardım, paylaş" aria-haspopup="menu" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:0;border-radius:10px;background:{{moreBg}};color:#1d2733;cursor:pointer;padding:0;flex:none"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4.5" cy="10" r="1.5" fill="currentColor"/><circle cx="10" cy="10" r="1.5" fill="currentColor"/><circle cx="15.5" cy="10" r="1.5" fill="currentColor"/></svg></button>
+</header>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"title":{"editor":"text","default":"Yeni devre"},"mode":{"editor":"enum","options":["kur","bagla","olc","pause"],"default":"kur"},"time":{"editor":"text","default":""},"issues":{"editor":"text","default":""},"warnOnly":{"editor":"boolean","default":false},"more":{"editor":"boolean","default":false},"$preview":{"width":390,"height":52}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const m = this.props.mode ?? 'kur';
+    const iss = this.props.issues ?? '';
+    const chip = {
+      kur: ['#eef0f3', '#3d4957', 'Kur'],
+      bagla: ['#e6effd', '#1557c0', 'Bağla'],
+      olc: ['#e8f5ed', '#14613a', 'Ölç'],
+      pause: ['#fef6e7', '#b54708', 'Duraklatıldı']
+    }[m] || ['#eef0f3', '#3d4957', 'Kur'];
+    return {
+      title: this.props.title ?? 'Yeni devre',
+      chipBg: chip[0], chipFg: chip[1], chipText: chip[2],
+      isRun: m === 'olc', isPause: m === 'pause',
+      time: this.props.time ?? '',
+      hasIssues: iss !== '', issues: iss,
+      issueBg: this.props.warnOnly ? '#b54708' : '#d92d20',
+      moreBg: this.props.more ? '#e6effd' : 'transparent'
+    };
+  }
+}
+</script>
+</body>
+</html>

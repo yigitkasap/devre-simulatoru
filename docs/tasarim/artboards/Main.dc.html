@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Genel bakış</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+:root{--app:#eef0f3;--panel:#fff;--panel-2:#f6f7f9;--line:#dde1e6;--line-2:#c4cad2;--ink:#1d2733;--muted:#5f6b7a;--accent:#1f6feb;--accent-ink:#1557c0;--accent-soft:#e6effd;--danger:#d92d20;--warn:#b54708;--warn-soft:#fef6e7;--ok:#1b7d44;--ok-soft:#e8f5ed;--paper:#fbfbf9;--grid:#d3d7dc;--pin:#f05a28;--sans:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+.ui{font-family:var(--sans);color:var(--ink);font-size:14px;line-height:1.45}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.zone{position:absolute;box-sizing:border-box;border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.35}
+.zone b{display:block;font-size:13px}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;box-sizing:border-box;background:var(--app);padding:56px 64px;display:flex;flex-direction:column;gap:32px">
+  <div style="display:flex;align-items:center;gap:16px">
+    <svg width="44" height="44" viewBox="0 0 44 44" role="img" aria-label="Devre Simülatörü logosu"><rect width="44" height="44" rx="10" fill="#1d2733"/><path d="M8 22c3.5-10 7-10 10.5 0s7 10 10.5 0 5-8 7-6" fill="none" stroke="#f05a28" stroke-width="3" stroke-linecap="round"/></svg>
+    <div style="display:flex;flex-direction:column">
+      <h1 style="margin:0;font-size:32px;line-height:1.15;font-weight:600;letter-spacing:-0.01em">Devre Simülatörü · arayüz yeniden tasarımı</h1>
+      <div style="color:var(--muted);font-size:16px">Tezgâh düzeni: tuval ortada, ölçüm ve ayar tek bir İnceleme alanında, laboratuvar cihazları rafta.</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:48px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:13px;font-weight:600;color:var(--muted)">Masaüstü · 1440×900 düzen haritası</div>
+      <div style="position:relative;width:720px;height:450px;background:#fff;border:1px solid var(--line-2);border-radius:10px;overflow:hidden">
+        <div class="zone" style="left:0;top:0;width:720px;height:30px;border-radius:0;background:#1d2733;color:#fff;display:flex;align-items:center;gap:12px;padding:0 12px"><b style="display:inline;font-size:12px">Üst çubuk</b><span style="opacity:.8">Dosya · Örnekler · araçlar · geri al · kayıt durumu · görünüm · Yardım · Ayarlar</span></div>
+        <div class="zone" style="left:6px;top:36px;width:122px;height:382px;background:#f6f7f9;border:1px solid var(--line)"><b>Parça kütüphanesi</b>256 px · 56 px şeride daralır · arama · kategori · bilgi alanı</div>
+        <div class="zone" style="left:134px;top:36px;width:412px;height:218px;background:var(--paper);border:1.5px dashed var(--line-2);display:flex;flex-direction:column;justify-content:space-between"><div><b>Tuval</b>her zaman en büyük alan; üstünde yalnızca küçük gösterim lejantı ve ipucu satırı</div><div style="display:flex;justify-content:space-between;align-items:flex-end"><span style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:2px 6px;font-size:11px">Gösterim (gerilim ölçeği)</span></div></div>
+        <div class="zone" style="left:134px;top:258px;width:412px;height:16px;padding:0 8px;font-size:11px;background:#f6f7f9;color:var(--muted)">İpucu satırı · duruma göre değişir</div>
+        <div class="zone" style="left:134px;top:278px;width:412px;height:140px;background:#0f1713;color:#d8e6dc"><b style="color:#fff">Cihaz rafı</b>Devrede cihaz varsa açılır · ön paneller yan yana · yüksekliği sürüklenir (0–360 px)</div>
+        <div class="zone" style="left:552px;top:36px;width:162px;height:382px;background:#fff;border:1.5px solid var(--accent)"><b style="color:var(--accent-ink)">İnceleme paneli</b>336 px · sekmeler: İncele · Örnek · Mesajlar<br><br>Seçili parçanın canlı ölçümleri, formül notu ve özellikleri aynı yerde; değişiklik anında uygulanır.</div>
+        <div class="zone" style="left:0;top:424px;width:720px;height:26px;border-radius:0;background:#f6f7f9;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 12px"><b style="display:inline;font-size:12px;color:var(--ok)">Simülasyon çubuğu</b><span style="color:var(--muted)">Oynat · Duraklat · Durdur · durum · zaman · hız · elektron akışı · bilgi satırı</span></div>
+      </div>
+      <div style="display:flex;gap:24px;font-size:13px;color:var(--muted)">
+        <span><span class="mono" style="color:var(--ink)">1280</span> İnceleme 320 px, kütüphane 232 px</span>
+        <span><span class="mono" style="color:var(--ink)">1024</span> kütüphane şerit + açılır kart</span>
+        <span><span class="mono" style="color:var(--ink)">&lt;900</span> telefon düzeni</span>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:13px;font-weight:600;color:var(--muted)">Telefon · 390×844 · Kur ve Ölç kipleri, tek alt sayfa</div>
+      <div style="display:flex;gap:20px">
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <div style="position:relative;width:156px;height:338px;background:var(--paper);border:1px solid var(--line-2);border-radius:18px;overflow:hidden">
+            <div style="position:absolute;left:0;top:0;right:0;height:38px;background:#fff;border-bottom:1px solid var(--line)"></div>
+            <div style="position:absolute;left:0;right:0;bottom:39px;height:29px;background:#fff;border-top:1px solid var(--line);border-radius:10px 10px 0 0"></div>
+            <div style="position:absolute;left:0;right:0;bottom:0;height:39px;background:#fff;border-top:1px solid var(--line)"></div>
+            <div style="position:absolute;right:8px;bottom:6px;width:28px;height:28px;border-radius:14px;background:var(--ok)"></div>
+          </div>
+          <div style="font-size:12px;text-align:center;line-height:1.35"><b>Gözat</b><br><span style="color:var(--muted)">tuval %69</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <div style="position:relative;width:156px;height:338px;background:var(--paper);border:1px solid var(--line-2);border-radius:18px;overflow:hidden">
+            <div style="position:absolute;left:0;top:0;right:0;height:38px;background:#fff;border-bottom:1px solid var(--line)"></div>
+            <div style="position:absolute;left:0;right:0;bottom:39px;height:136px;background:#fff;border-top:1px solid var(--line-2);border-radius:10px 10px 0 0"></div>
+            <div style="position:absolute;left:0;right:0;bottom:0;height:39px;background:#fff;border-top:1px solid var(--line)"></div>
+            <div style="position:absolute;right:8px;bottom:6px;width:28px;height:28px;border-radius:14px;background:var(--ok)"></div>
+          </div>
+          <div style="font-size:12px;text-align:center;line-height:1.35"><b>Yarım</b><br><span style="color:var(--muted)">tuval %37, devre yeniden sığar</span></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <div style="position:relative;width:156px;height:338px;background:var(--paper);border:1px solid var(--line-2);border-radius:18px;overflow:hidden">
+            <div style="position:absolute;left:0;top:0;right:0;height:38px;background:#fff;border-bottom:1px solid var(--line)"></div>
+            <div style="position:absolute;left:0;right:0;top:78px;bottom:39px;background:#0f1713;border-radius:10px 10px 0 0"></div>
+            <div style="position:absolute;left:0;right:0;bottom:0;height:39px;background:#fff;border-top:1px solid var(--line)"></div>
+            <div style="position:absolute;right:8px;bottom:6px;width:28px;height:28px;border-radius:14px;background:var(--ok)"></div>
+          </div>
+          <div style="font-size:12px;text-align:center;line-height:1.35"><b>Tam</b><br><span style="color:var(--muted)">cihaz paneli; tuval şeridi kalır</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px">
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px"><span class="mono" style="color:var(--accent-ink);font-size:13px">01</span><b style="font-size:15px">Tuval başrolde</b><span style="color:var(--muted);font-size:13px">Telefonda paneller tuvalin en fazla yarısını kaplar; tam ekran yalnızca cihaz panelinde.</span></div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px"><span class="mono" style="color:var(--accent-ink);font-size:13px">02</span><b style="font-size:15px">Tek inceleme yeri</b><span style="color:var(--muted);font-size:13px">Özellik penceresi ve üzerine gelince açılan kutu tek panelde birleşir.</span></div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px"><span class="mono" style="color:var(--accent-ink);font-size:13px">03</span><b style="font-size:15px">Cihaz rafı</b><span style="color:var(--muted);font-size:13px">Osiloskop, fonksiyon üreteci ve güç kaynağının bütün ayarları kendi ön panelinde.</span></div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px"><span class="mono" style="color:var(--accent-ink);font-size:13px">04</span><b style="font-size:15px">Oynat başparmakta</b><span style="color:var(--muted);font-size:13px">Telefonda sağ altta, her ekranda aynı yerde; bütün kontroller altta.</span></div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:6px"><span class="mono" style="color:var(--accent-ink);font-size:13px">05</span><b style="font-size:15px">Renk tek başına değil</b><span style="color:var(--muted);font-size:13px">Gerilim rengi, ölçek ve dokununca açılan değerle; hata ve uyarı biçim ve simgeyle ayrılır.</span></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

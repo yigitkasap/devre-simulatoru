@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>CSS değişkenleri</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+pre{margin:0;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.6;white-space:pre;color:#1d2733}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:1500px;box-sizing:border-box;background:#fff;padding:48px 64px;display:flex;flex-direction:column;gap:24px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline">
+    <h1 style="margin:0;font-size:28px;font-weight:600">CSS değişkenleri · Tailwind CSS 4</h1>
+    <span style="color:#5f6b7a;font-size:13px">app.css içine; @theme ile bg-panel, text-muted, border-line, rounded-lg, shadow-md gibi sınıflar kendiliğinden oluşur.</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px">
+    <div style="background:#f6f7f9;border:1px solid #dde1e6;border-radius:12px;padding:20px 24px">
+<pre>@import "tailwindcss";
+
+@theme {
+  /* Yazı tipleri */
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Arayüz */
+  --color-app: #eef0f3;
+  --color-panel: #ffffff;
+  --color-panel-2: #f6f7f9;
+  --color-line: #dde1e6;
+  --color-line-2: #c4cad2;
+  --color-ink: #1d2733;
+  --color-muted: #5f6b7a;
+  --color-accent: #1f6feb;
+  --color-accent-ink: #1557c0;
+  --color-accent-soft: #e6effd;
+  --color-ok: #1b7d44;
+  --color-ok-soft: #e8f5ed;
+  --color-warn: #b54708;
+  --color-warn-soft: #fef6e7;
+  --color-danger: #d92d20;
+  --color-danger-soft: #fdecea;
+  --color-paused: #e8a317;
+  --color-stopped: #9aa3ad;
+
+  /* Şema */
+  --color-paper: #fbfbf9;
+  --color-grid: #d3d7dc;
+  --color-grid-major: #b3bac3;
+  --color-symbol: #1d2733;
+  --color-select: #1f6feb;
+  --color-pin: #f05a28;
+  --color-dot: #ffd43b;
+  --color-dot-edge: #7a5c00;
+  --color-wire-off: #9aa3ad;
+  --color-earth: #1b7d44;
+
+  /* Cihaz ekranları */
+  --color-lcd-bg: #1e2a25;
+  --color-lcd-fg: #a6f4bd;
+  --color-scope-bg: #0f1713;
+  --color-scope-grid: #2b3b32;
+  --color-ch-a: #f2c94c;
+  --color-ch-b: #56ccf2;
+  --color-ch-xy: #9be37a;
+  --color-lamp-cc: #e5484d;
+
+  /* Gerilim ölçeği durakları: −1 … +1 */
+  --color-v-n100: #194cb3;
+  --color-v-n50: #148f8f;
+  --color-v-0: #148f3d;
+  --color-v-p25: #338f14;
+  --color-v-p50: #7a8f14;
+  --color-v-p75: #b37319;
+  --color-v-p100: #b31919;
+}</pre>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <div style="background:#f6f7f9;border:1px solid #dde1e6;border-radius:12px;padding:20px 24px">
+<pre>@theme {
+  /* Ölçü */
+  --spacing: 4px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow-sm: 0 1px 2px rgb(29 39 51 / .10);
+  --shadow-md: 0 4px 12px rgb(29 39 51 / .12),
+               0 1px 3px rgb(29 39 51 / .08);
+  --shadow-lg: 0 16px 40px rgb(29 39 51 / .18),
+               0 2px 6px rgb(29 39 51 / .08);
+  --text-display: 28px; --text-display--line-height: 34px;
+  --text-title: 20px;   --text-title--line-height: 28px;
+  --text-heading: 16px; --text-heading--line-height: 24px;
+  --text-body: 14px;    --text-body--line-height: 20px;
+  --text-small: 13px;   --text-small--line-height: 18px;
+  --text-label: 12px;   --text-label--line-height: 16px;
+  --text-readout: 28px; --text-readout--line-height: 32px;
+  --ease-sheet: cubic-bezier(.2, .9, .3, 1);
+}
+
+/* Koyu tema (isteğe bağlı) */
+[data-theme="dark"] {
+  --color-app: #0f141a;   --color-panel: #161d25;
+  --color-panel-2: #1b232c; --color-line: #26313d;
+  --color-line-2: #34414f; --color-ink: #e6ebf1;
+  --color-muted: #9aa7b5; --color-accent: #5b9dff;
+  --color-accent-ink: #8db9ff; --color-accent-soft: #1b2a44;
+  --color-paper: #12181f; --color-grid: #27313b;
+  --color-grid-major: #3a4652; --color-symbol: #d9e0e7;
+  --color-v-n100: #5a87e2; --color-v-n50: #5ae2e2;
+  --color-v-0: #5ae287;   --color-v-p25: #7ce25a;
+  --color-v-p50: #cbe25a; --color-v-p75: #e2a95a;
+  --color-v-p100: #e25a5a;
+}
+
+/* Telefon girişleri iOS’ta yakınlaştırmasın */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: 16px; }
+}</pre>
+      </div>
+      <div style="background:#f6f7f9;border:1px solid #dde1e6;border-radius:12px;padding:20px 24px">
+<pre>/* Gerilim → renk (önerilen varsayılan) */
+function wireColor(v, vmax) {
+  const x = Math.max(-1, Math.min(1, v / vmax));
+  const hue = x &gt;= 0 ? 140 - 140 * x : 140 + 80 * -x;
+  const light = hue &gt; 45 &amp;&amp; hue &lt;= 200 ? 32 : 40;
+  return `hsl(${hue} 75% ${light}%)`;
+}</pre>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

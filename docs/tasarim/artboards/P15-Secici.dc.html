@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: kalabalıkta seçici</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:8px 8px}
+.s{fill:none;stroke:#1d2733;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ch{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:0 14px;border:0;border-bottom:1px solid #eef0f3;background:#fff;font:500 15.5px 'IBM Plex Sans',sans-serif;color:#1d2733;text-align:left}
+.ch small{display:block;font-size:12.5px;font-weight:400;color:#5f6b7a}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="Köprü doğrultmaç" mode="kur" hint-size="390px,52px"></dc-import>
+  <div style="flex:1;position:relative;min-height:0">
+    <div class="paper" role="application" aria-label="Devre şeması" style="position:absolute;inset:0;overflow:hidden">
+      <svg width="390" height="641" viewBox="0 0 390 641" aria-hidden="true" style="position:absolute;inset:0">
+        <g transform="translate(6,250) scale(0.62)">
+          <path class="s" d="M120 60H160V95H200M120 120H140V190H330V95H280M330 190H455V160H470M200 40H400V75M400 40H440V60H470M200 150H400V115M400 150H450V105H470M200 40V52M200 83V107M200 138V150M280 40V52M280 83V107M280 138V150"/>
+          <path d="M188 83H212L200 52Z" fill="#1d2733"/><path class="s" d="M188 52H212"/>
+          <path d="M188 138H212L200 107Z" fill="#1d2733"/><path class="s" d="M188 107H212"/>
+          <path d="M268 83H292L280 52Z" fill="#1d2733"/><path class="s" d="M268 52H292"/>
+          <path d="M268 138H292L280 107Z" fill="#1d2733"/><path class="s" d="M268 107H292"/>
+          <path d="M400 75L393 78.3L407 85L393 91.7L407 98.3L393 105L407 111.7L400 115" class="s"/>
+          <rect x="30" y="40" width="90" height="100" rx="5" fill="#fff" stroke="#1d2733" stroke-width="2"/>
+          <rect x="470" y="30" width="110" height="145" rx="5" fill="#fff" stroke="#1d2733" stroke-width="2"/>
+          <circle cx="200" cy="95" r="3.4" fill="#1d2733"/><circle cx="280" cy="95" r="3.4" fill="#1d2733"/><circle cx="400" cy="40" r="3.4" fill="#1d2733"/><circle cx="400" cy="150" r="3.4" fill="#1d2733"/>
+        </g>
+        <circle cx="130" cy="309" r="22" fill="#1f6feb" fill-opacity=".18" stroke="#1f6feb" stroke-width="1.5"/>
+      </svg>
+      <div aria-hidden="true" style="position:absolute;left:60px;top:130px;width:140px;height:140px;border-radius:70px;overflow:hidden;border:3px solid #fff;box-shadow:0 6px 20px rgba(29,39,51,.3);background:#fbfbf9">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <g transform="translate(-450,-177) scale(2.6)">
+            <path class="s" d="M200 40H400M200 40V52M200 83V107M280 40V52M280 83V107M120 60H160V95H200M280 95H330"/>
+            <path d="M188 83H212L200 52Z" fill="#1d2733"/><path class="s" d="M188 52H212"/>
+            <path d="M188 107H212M200 107V120" class="s"/>
+            <circle cx="200" cy="95" r="3.4" fill="#1d2733"/>
+          </g>
+          <circle cx="70" cy="70" r="5" fill="none" stroke="#1f6feb" stroke-width="2"/>
+        </svg>
+      </div>
+      <div role="listbox" aria-label="Burada 3 öğe var, birini seç" style="position:absolute;left:24px;right:24px;top:370px;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(29,39,51,.22);overflow:hidden;border:1px solid #dde1e6">
+        <div style="padding:10px 14px 6px;font-size:13px;font-weight:600;color:#5f6b7a">Burada 3 öğe var</div>
+        <button class="ch" role="option"><svg width="30" height="20" viewBox="0 0 32 20" fill="none" stroke="#1d2733" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 10H11M21 10H30M21 4V16"/><path d="M11 4V16L21 10Z" fill="#1d2733"/></svg><span>D1<small>Diyot · parçayı seç</small></span></button>
+        <button class="ch" role="option"><svg width="30" height="20" viewBox="0 0 30 20" aria-hidden="true"><circle cx="15" cy="10" r="6" fill="#fff" stroke="#1f6feb" stroke-width="2.5"/></svg><span>D1 · anot ucu<small>Buradan kablo başlat</small></span></button>
+        <button class="ch" role="option" style="border-bottom:0"><svg width="30" height="20" viewBox="0 0 30 20" aria-hidden="true"><path d="M2 10H28" stroke="#1d2733" stroke-width="2.5" stroke-linecap="round"/></svg><span>Kablo<small>FG1 OUT → D1, D4 · kabloyu seç</small></span></button>
+      </div>
+    </div>
+  </div>
+  <dc-import name="C-TelAlt" bar="kur" hint-size="390px,104px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

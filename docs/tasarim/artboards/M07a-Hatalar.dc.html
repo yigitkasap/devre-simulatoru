@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>LED yandı ve kısa devre</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#b3bac3 1.3px,transparent 1.6px),radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:65px 65px,13px 13px;background-position:6px 6px,6px 6px}
+.tab{height:44px;padding:0 12px;border:0;background:transparent;font:500 14px 'IBM Plex Sans',sans-serif;color:#5f6b7a;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.tsel{color:#1d2733;border-bottom-color:#1d2733}
+.s{fill:none;stroke:#1d2733;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.d{fill:#ffd43b;stroke:#7a5c00;stroke-width:.8}
+.lb{font:600 11px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+.mi{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;height:36px;padding:0 10px;border:0;border-radius:6px;background:transparent;font:400 14px 'IBM Plex Sans',sans-serif;color:#1d2733;text-align:left}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden">
+  <dc-import name="C-UstCubuk" tool="sec" has-sel="{{ true }}" zoom="%130" hint-size="1440px,52px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="width:256px;flex:none"><dc-import name="C-Kutuphane" info="led" hint-size="256px,848px"></dc-import></div>
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div class="paper" role="application" aria-label="Devre şeması, 2 hata" style="flex:1;position:relative;overflow:hidden">
+        <svg width="848" height="768" viewBox="0 0 848 768" style="position:absolute;left:0;top:0" aria-hidden="true">
+          <g transform="translate(30,200) scale(1.3)">
+            <rect x="194" y="52" width="52" height="52" rx="6" fill="#d92d20" fill-opacity=".07" stroke="#d92d20" stroke-width="2"/>
+            <path d="M60 76V40H100M180 40H220V68" fill="none" stroke="#b31919" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M100 40H110L113.3 33L120 47L126.7 33L133.3 47L140 33L146.7 47L150 40H180" fill="none" stroke="#b31919" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M220 88V120H60V84M140 120V130M131 130H149M134.5 134.5H145.5M138 139H142" fill="none" stroke="#148f3d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="140" cy="120" r="3.2" fill="#148f3d"/>
+            <path class="s" d="M46 76H74"/><path d="M53 84H67" stroke="#1d2733" stroke-width="4.5"/>
+            <text class="lb" x="38" y="80" text-anchor="end">B1</text><text class="lv" x="38" y="92" text-anchor="end">9 V</text>
+            <text class="lb" x="140" y="24" text-anchor="middle">R1</text><text class="lv" x="140" y="60" text-anchor="middle">47 Ω</text>
+            <path d="M208 68H232L220 88Z" fill="#3a3330" stroke="#1d2733" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M216 70l3 6-2 3 3 4" fill="none" stroke="#f0e6dc" stroke-width="1.1"/>
+            <path class="s" d="M208 88H232"/>
+            <path d="M236 60c4-4 0-8 4-12M243 64c4-4 0-8 4-12" fill="none" stroke="#8a8f96" stroke-width="1.8" stroke-linecap="round" opacity=".75"/>
+            <circle cx="246" cy="52" r="7" fill="#d92d20"/><path d="M246 48.5v4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="246" cy="55.6" r=".9" fill="#fff"/>
+            <text class="lb" x="200" y="112" text-anchor="end">D1</text>
+
+            <rect x="398" y="62" width="44" height="36" rx="4" fill="#fdecea" stroke="#d92d20" stroke-width="2.4"/>
+            <rect x="394" y="58" width="52" height="44" rx="6" fill="none" stroke="#d92d20" stroke-width="1.2" stroke-opacity=".45"/>
+            <path d="M420 76V40H480V120H420V84M450 120V130M441 130H459M444.5 134.5H455.5M448 139H452" fill="none" stroke="#148f3d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path class="s" d="M406 76H434"/><path d="M413 84H427" stroke="#1d2733" stroke-width="4.5"/>
+            <circle cx="442" cy="62" r="7" fill="#d92d20"/><path d="M442 58.5v4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="442" cy="65.6" r=".9" fill="#fff"/>
+            <text class="lb" x="392" y="80" text-anchor="end">B2</text><text class="lv" x="392" y="92" text-anchor="end">5 V</text>
+            <g><circle class="d" cx="420" cy="58" r="2.4"/><circle class="d" cx="440" cy="40" r="2.4"/><circle class="d" cx="460" cy="40" r="2.4"/><circle class="d" cx="480" cy="58" r="2.4"/><circle class="d" cx="480" cy="80" r="2.4"/><circle class="d" cx="480" cy="102" r="2.4"/><circle class="d" cx="462" cy="120" r="2.4"/><circle class="d" cx="438" cy="120" r="2.4"/><circle class="d" cx="420" cy="102" r="2.4"/></g>
+          </g>
+        </svg>
+        <div role="alertdialog" aria-labelledby="bt" style="position:absolute;left:350px;top:226px;width:268px;background:#fff;border:1px solid #f5c2bd;border-radius:12px;box-shadow:0 4px 12px rgba(29,39,51,.14);padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+          <b id="bt" style="font-size:14px;color:#a3241a">D1 yandı</b>
+          <span style="font-size:13px;line-height:1.45">Üzerinden ≈ 147 mA geçti; en fazla 30 mA’e dayanır.</span>
+          <div style="display:flex;gap:8px"><button style="height:36px;padding:0 14px;border-radius:8px;border:0;background:#1d2733;color:#fff;font:600 13px 'IBM Plex Sans',sans-serif">Onar</button><button style="height:36px;padding:0 12px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">Kapat</button><button style="height:36px;padding:0 8px;border-radius:8px;border:0;background:transparent;font:500 13px 'IBM Plex Sans',sans-serif;color:#1557c0">Neden?</button></div>
+          <svg width="14" height="10" viewBox="0 0 14 10" aria-hidden="true" style="position:absolute;left:-9px;top:52px;transform:rotate(-90deg)"><path d="M0 10l7-10 7 10z" fill="#fff" stroke="#f5c2bd"/></svg>
+        </div>
+        <div role="menu" aria-label="D1 menüsü" style="position:absolute;left:300px;top:352px;width:220px;background:#fff;border:1px solid #dde1e6;border-radius:10px;box-shadow:0 4px 12px rgba(29,39,51,.14);padding:4px">
+          <button class="mi" role="menuitem"><span>Özellikler…</span><span class="mono" style="font-size:12px;color:#5f6b7a">Enter</span></button>
+          <button class="mi" role="menuitem"><span>Döndür</span><span class="mono" style="font-size:12px;color:#5f6b7a">R</span></button>
+          <button class="mi" role="menuitem"><span>Ters çevir</span><span class="mono" style="font-size:12px;color:#5f6b7a">F</span></button>
+          <div style="height:1px;background:#dde1e6;margin:4px 6px"></div>
+          <button class="mi" role="menuitem" style="background:#e6effd;color:#1557c0;font-weight:600"><span>Onar</span><span></span></button>
+          <button class="mi" role="menuitem" style="color:#d92d20"><span>Sil</span><span class="mono" style="font-size:12px;color:#5f6b7a">Delete</span></button>
+        </div>
+      </div>
+      <div style="height:28px;flex:none;display:flex;align-items:center;padding:0 12px;background:#fdecea;border-top:1px solid #f5c2bd;font-size:13px;color:#a3241a">
+        <span><b>2 hata.</b> Sağdaki listeden bir hataya tıkla: ilgili parça vurgulanır ve görünüm oraya kayar.</span>
+      </div>
+      <dc-import name="C-SimCubugu" state="run" time="0,082 s" err="{{ true }}" msg="Kısa devre: B2’nin akımını yalnızca iç direnci sınırlıyor." hint-size="848px,52px"></dc-import>
+    </main>
+    <aside aria-label="İnceleme paneli" style="width:336px;flex:none;background:#fff;border-left:1px solid #dde1e6;display:flex;flex-direction:column;min-height:0">
+      <div role="tablist" style="display:flex;padding:0 8px;border-bottom:1px solid #dde1e6">
+        <button class="tab" role="tab" aria-selected="false">İncele</button>
+        <button class="tab" role="tab" aria-selected="false">Örnek</button>
+        <button class="tab tsel" role="tab" aria-selected="true">Mesajlar <span class="mono" style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;background:#d92d20;color:#fff">2</span></button>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0 4px"><span style="font-size:13px;font-weight:600">2 hata · 0 uyarı</span><span style="font-size:12px;color:#5f6b7a">En yeni üstte</span></div>
+        <div aria-current="true" style="display:flex;gap:10px;padding:12px;border-radius:10px;background:#fdecea;border:1.5px solid #d92d20">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none"><circle cx="10" cy="10" r="9" fill="#d92d20"/><path d="M10 5.5v5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.2" r="1.2" fill="#fff"/></svg>
+          <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;font-weight:600;color:#a3241a">Hata · D1</span><b>LED yandı</b><span style="font-size:13px;line-height:1.5;color:#3d4957">D1 üzerinden ≈ 147 mA geçti; en fazla 30 mA’e dayanır. Seri ön direnç: R = (V<sub>kaynak</sub> − V<sub>f</sub>) / I = (9 V − 1,85 V) / 20 mA ≈ 360 Ω.</span><span style="display:flex;gap:8px;padding-top:4px"><button style="height:36px;padding:0 12px;border-radius:7px;border:0;background:#1d2733;color:#fff;font:600 13px 'IBM Plex Sans',sans-serif">Onar</button><button style="height:36px;padding:0 12px;border-radius:7px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">R1’i 360 Ω yap</button></span></span>
+        </div>
+        <button style="display:flex;gap:10px;padding:12px;border-radius:10px;background:#fff;border:1px solid #dde1e6;text-align:left;font:inherit;color:inherit">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none"><circle cx="10" cy="10" r="9" fill="#d92d20"/><path d="M10 5.5v5.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14.2" r="1.2" fill="#fff"/></svg>
+          <span style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;font-weight:600;color:#a3241a">Hata · B2</span><b>Kısa devre</b><span style="font-size:13px;line-height:1.5;color:#3d4957">B2’nin uçları bir kabloyla doğrudan birleşiyor. Akımı yalnızca pilin iç direnci sınırlıyor: I = E / R<sub>iç</sub>.</span></span>
+        </button>
+        <span style="font-size:12px;color:#5f6b7a;padding:4px">Bir mesaja tıklayınca ilgili parça tuvalde vurgulanır.</span>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

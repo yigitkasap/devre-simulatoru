@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: örnek tahmin</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:12px 12px;background-position:6px 6px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -4px 18px rgba(29,39,51,.14);display:flex;flex-direction:column}
+.hd{height:22px;display:flex;align-items:center;justify-content:center}
+.hd i{display:block;width:36px;height:5px;border-radius:3px;background:#c4cad2}
+.s{fill:none;stroke:#1d2733;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.lb{font:600 15px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 13px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="Yarım dalga doğrultmaç" mode="kur" hint-size="390px,52px"></dc-import>
+  <div style="flex:1;position:relative;min-height:0">
+    <div class="paper" role="application" aria-label="Devre şeması" style="position:absolute;left:0;right:0;top:0;height:250px;overflow:hidden">
+      <svg width="390" height="250" viewBox="0 0 390 250" aria-hidden="true" style="position:absolute;inset:0">
+        <g transform="translate(-5,52) scale(0.78)">
+          <path class="s" d="M100 60V86M100 114V140H280M100 60H168M188 60H280V80M280 120V140M280 60H320V105H360M100 60V20H340V70H360M280 140H360M190 140V150M181 150H199M184.5 154.5H195.5M188 159H192"/>
+          <circle cx="100" cy="60" r="3.6" fill="#1d2733"/><circle cx="280" cy="60" r="3.6" fill="#1d2733"/><circle cx="190" cy="140" r="3.6" fill="#1d2733"/><circle cx="280" cy="140" r="3.6" fill="#1d2733"/>
+          <circle class="s" cx="100" cy="100" r="14"/><path class="s" d="M91 100c2.5-7 6-7 9 0s6.5 7 9 0"/>
+          <text class="lb" x="80" y="98" text-anchor="end">V1</text>
+          <path d="M168 48V72L188 60Z" fill="#1d2733"/><path class="s" d="M188 48V72"/>
+          <text class="lb" x="178" y="42" text-anchor="middle">D1</text>
+          <path class="s" d="M280 80L273 83.3L287 90L273 96.7L287 103.3L273 110L287 116.7L280 120"/>
+          <text class="lb" x="294" y="98">R1</text>
+          <rect x="360" y="40" width="112" height="120" rx="5" fill="#fff" stroke="#1d2733" stroke-width="2.4"/>
+          <rect x="378" y="50" width="84" height="56" rx="3" fill="#0f1713"/>
+          <text class="lb" x="378" y="128">OSC1</text>
+          <text class="lv" x="366" y="74" style="font-weight:600;fill:#1d2733">A</text><text class="lv" x="366" y="109" style="font-weight:600;fill:#1d2733">B</text>
+        </g>
+      </svg>
+      <span style="position:absolute;left:10px;top:10px;font-size:12px;font-weight:600;padding:3px 8px;border-radius:6px;background:#e6effd;color:#1557c0">Örnek açık</span>
+    </div>
+    <div class="sheet" role="region" aria-label="Örnek: Yarım dalga doğrultmaç" style="height:391px">
+      <div class="hd"><i></i></div>
+      <div style="padding:0 16px 12px;display:flex;flex-direction:column;gap:10px;overflow:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:#e6effd;color:#1557c0">Doğrultucu devreler · 10</span>
+          <button aria-label="Örneği kapat" style="width:44px;height:36px;border:0;background:transparent;color:#5f6b7a;font:500 13px 'IBM Plex Sans',sans-serif">Kapat</button>
+        </div>
+        <h2 style="margin:0;font-size:19px;font-weight:600;line-height:1.25">Yarım dalga doğrultmaç</h2>
+        <p style="margin:0;font-size:14.5px;line-height:1.5;color:#3d4957">10 V tepe değerli, 50 Hz’lik kaynak bir diyot üzerinden 1 kΩ’luk yükü besliyor. A kanalı kaynağı, B kanalı yükü ölçüyor.</p>
+        <div style="background:#fef6e7;border:1px solid #f3d9a8;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px">
+          <span style="font-size:12px;font-weight:600;color:#b54708">Tahmin et</span>
+          <span style="font-size:15px;line-height:1.5">Yükteki gerilimin tepe değeri yaklaşık kaç volt olur?</span>
+          <div style="display:flex;align-items:center;height:48px;border:1px solid #e3c48a;border-radius:10px;background:#fff;box-sizing:border-box;overflow:hidden"><input aria-label="Tahminin, volt" placeholder="Tahminin" inputmode="decimal" style="flex:1;min-width:0;border:0;outline:0;background:transparent;padding:0 12px;font:500 17px 'IBM Plex Mono',monospace;color:#1d2733"><span style="padding:0 14px;height:100%;display:flex;align-items:center;border-left:1px solid #f0dfbf;background:#fffaf0;font:500 16px 'IBM Plex Mono',monospace;color:#5f6b7a">V</span></div>
+        </div>
+        <div style="background:#f6f7f9;border:1px dashed #c4cad2;border-radius:12px;padding:12px;display:flex;align-items:center;gap:10px;color:#5f6b7a;font-size:14.5px">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><rect x="4" y="9" width="12" height="8" rx="2"/><path d="M7 9V6a3 3 0 0 1 6 0v3"/></svg>
+          <span style="flex:1">Cevabı görmek için Oynat’a bas.</span>
+          <svg width="40" height="28" viewBox="0 0 40 28" aria-hidden="true"><path d="M4 4c14 0 26 6 30 18" fill="none" stroke="#1b7d44" stroke-width="2" stroke-linecap="round"/><path d="M28 19l6 5 2-8" fill="none" stroke="#1b7d44" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+  <dc-import name="C-TelAlt" bar="kur" active="panel" hint-size="390px,104px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

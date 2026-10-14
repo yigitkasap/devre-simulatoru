@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>X-Y diyot karakteristiği</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#b3bac3 1.3px,transparent 1.6px),radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:65px 65px,13px 13px;background-position:6px 6px,6px 6px}
+.tab{height:44px;padding:0 12px;border:0;background:transparent;font:500 14px 'IBM Plex Sans',sans-serif;color:#5f6b7a;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.tsel{color:#1d2733;border-bottom-color:#1d2733}
+.s{fill:none;stroke:#1d2733;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lb{font:600 10.5px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 9.5px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+.face{background:#e4e8ec;border:1px solid #b9c0c9;border-radius:12px;display:flex;flex-direction:column;overflow:hidden}
+.fh{height:36px;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #c4cad2;background:#dde2e7;font-size:13px}
+.pl{font-size:11.5px;font-weight:600;color:#1d2733;display:flex;gap:6px;align-items:baseline}
+.pl small{font:500 10px 'IBM Plex Mono',monospace;color:#5f6b7a}
+.st{display:flex;align-items:center;background:#fff;border:1px solid #b9c0c9;border-radius:8px;height:36px;overflow:hidden}
+.st button{width:34px;height:36px;border:0;background:#f3f5f7;font:600 16px 'IBM Plex Sans',sans-serif;color:#1d2733}
+.st span{flex:1;text-align:center;font:600 13px 'IBM Plex Mono',monospace;border-left:1px solid #dde1e6;border-right:1px solid #dde1e6;height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.sg{display:flex;background:#c9cfd6;border-radius:8px;padding:2px;gap:2px}
+.sg button{flex:1;height:32px;border:0;border-radius:6px;background:transparent;font:600 12px 'IBM Plex Sans',sans-serif;color:#2c3846;white-space:nowrap}
+.sg .on{background:#fff;color:#1d2733;box-shadow:0 1px 2px rgba(29,39,51,.2)}
+</style>
+</helmet>
+<div class="ui" style="width:1440px;height:900px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden">
+  <dc-import name="C-UstCubuk" tool="sec" zoom="%130" hint-size="1440px,52px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="width:256px;flex:none"><dc-import name="C-Kutuphane" info="diyot" hint-size="256px,848px"></dc-import></div>
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div class="paper" role="application" aria-label="Devre şeması" style="height:408px;flex:none;position:relative;overflow:hidden">
+        <svg width="848" height="408" viewBox="0 0 848 408" style="position:absolute;left:0;top:0" aria-hidden="true">
+          <g transform="translate(60,54) scale(1.3)">
+            <path d="M120 60H240V72M240 60H380V60H420" fill="none" stroke="#8f8d14" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M240 128V140M240 140H300V155H420" fill="none" stroke="#148f3d" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M120 120H140V190H410V110H420M140 140H160" fill="none" stroke="#6a8f14" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M405 155a5 5 0 0 1 10 0" fill="#fbfbf9" stroke="#6a8f14" stroke-width="2.4"/>
+            <circle cx="240" cy="60" r="3.2" fill="#8f8d14"/><circle cx="240" cy="140" r="3.2" fill="#148f3d"/><circle cx="140" cy="140" r="3.2" fill="#6a8f14"/>
+            <path d="M228 78H252L240 108Z" fill="#1d2733"/><path class="s" d="M228 108H252M240 72V78M240 108V128"/>
+            <text class="lb" x="258" y="94">D1</text>
+            <path d="M160 140H180L183.3 133L190 147L196.7 133L203.3 147L210 133L216.7 147L220 140H240" fill="none" stroke="#1d2733" stroke-width="2" stroke-linejoin="round"/>
+            <text class="lb" x="200" y="125" text-anchor="middle">R1</text><text class="lv" x="200" y="164" text-anchor="middle">100 Ω</text>
+            <rect x="30" y="40" width="90" height="100" rx="5" fill="#fff" stroke="#1d2733" stroke-width="2"/>
+            <rect x="38" y="48" width="62" height="18" rx="2" fill="#1e2a25"/><text x="69" y="61" text-anchor="middle" style="font:600 9.5px 'IBM Plex Mono',monospace;fill:#a6f4bd">50,0 Hz</text>
+            <path d="M42 86l6-10 6 10 6-10 6 10" fill="none" stroke="#1d2733" stroke-width="1.4"/>
+            <text class="lb" x="38" y="132">FG1</text>
+            <text class="lv" x="114" y="63" text-anchor="end" style="font-weight:600;fill:#1d2733">OUT</text>
+            <text class="lv" x="114" y="116" text-anchor="end" style="font-weight:600;fill:#1d2733">COM</text>
+            <rect x="420" y="40" width="110" height="130" rx="5" fill="#fff" stroke="#1d2733" stroke-width="2"/>
+            <rect x="440" y="48" width="80" height="50" rx="3" fill="#0f1713"/>
+            <path d="M440 92H482L486 86L488 70L490 50" fill="none" stroke="#9be37a" stroke-width="1.4"/>
+            <text class="lb" x="440" y="116">OSC1</text>
+            <text class="lv" x="426" y="63" style="font-weight:600;fill:#1d2733">A</text><text class="lv" x="426" y="113" style="font-weight:600;fill:#1d2733">B</text><text class="lv" x="426" y="158" style="font-weight:600;fill:#1d2733">COM</text>
+            <path d="M480 152v4M475 156h10M477 159h6M479 162h2" fill="none" stroke="#1b7d44" stroke-width="1.4" stroke-linecap="round"/>
+          </g>
+        </svg>
+        <div style="position:absolute;left:12px;top:12px;max-width:290px;background:#fef6e7;border:1px solid #f3d9a8;border-radius:10px;padding:10px 12px;display:flex;gap:10px;font-size:13px;line-height:1.45">
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="10" cy="10" r="8" fill="none" stroke="#b54708" stroke-width="1.8"/><path d="M10 9v5" stroke="#b54708" stroke-width="1.8" stroke-linecap="round"/><circle cx="10" cy="6.4" r="1" fill="#b54708"/></svg>
+          <span>FG1’in COM’u şebeke toprağından <b>ayrılmış</b> (yalıtılmış çıkış). Bu yüzden osiloskop COM’u D1 ile R1’in arasına bağlanabiliyor.</span>
+        </div>
+      </div>
+      <div style="height:28px;flex:none;display:flex;align-items:center;padding:0 12px;background:#f6f7f9;border-top:1px solid #dde1e6;font-size:13px;color:#5f6b7a">
+        <span>X-Y kipinde zaman ekseni yoktur: yatay A, dikey B. B ters çevrildiği için yukarı = ileri yönde akım.</span>
+      </div>
+      <section aria-label="Cihaz rafı" style="flex:1;min-height:0;background:#d3d8de;border-top:1px solid #b9c0c9;display:flex;flex-direction:column">
+        <div style="height:40px;display:flex;align-items:center;gap:8px;padding:0 8px 0 12px">
+          <b style="font-size:13px">Cihaz rafı</b>
+          <button style="height:30px;padding:0 10px;border-radius:7px;border:1px solid #9aa3ad;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">OSC1 · Osiloskop</button>
+          <button style="height:30px;padding:0 10px;border-radius:7px;border:1px solid transparent;background:transparent;font:500 13px 'IBM Plex Sans',sans-serif;color:#3d4957">FG1 · Fonksiyon üreteci</button>
+        </div>
+        <div style="flex:1;min-height:0;padding:0 12px 12px;display:flex">
+          <div class="face" style="flex:1" role="group" aria-label="Osiloskop OSC1, X-Y kipi">
+            <div class="fh"><b>Osiloskop</b><span class="mono" style="color:#5f6b7a">OSC1</span><span style="flex:1"></span><span style="font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:#1d2733;color:#fff">X-Y · A yatay, B dikey</span></div>
+            <div style="flex:1;display:flex;gap:16px;padding:10px 12px">
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <div style="width:265px;height:212px;border-radius:8px;background:#0f1713;position:relative;overflow:hidden;box-shadow:inset 0 2px 8px rgba(0,0,0,.5)">
+                  <svg width="265" height="212" viewBox="0 0 400 320" style="position:absolute;inset:0" role="img" aria-label="Diyotun akım-gerilim eğrisi: yaklaşık 0,6 V’a kadar akım yok, sonra hızla artıyor">
+                    <path d="M40 0V320M80 0V320M160 0V320M200 0V320M240 0V320M280 0V320M320 0V320M360 0V320M0 40H400M0 80H400M0 120H400M0 160H400M0 200H400M0 280H400" stroke="#2b3b32" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                    <path d="M120 0V320M0 240H400" stroke="#4d6a58" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+                    <path d="M0 240 L216.8 239.3 L241.2 230.9 L252.4 209.8 L259.6 174.5 L264.8 125.6 L268.8 64.1 L271.6 2.4 L272 0" fill="none" stroke="#9be37a" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+                    <path d="M120 0h-6l6-8z" fill="none"/>
+                  </svg>
+                  <span class="mono" style="position:absolute;left:6px;top:4px;font-size:10.5px;color:#9be37a">I ↑</span>
+                  <span class="mono" style="position:absolute;right:6px;bottom:44px;font-size:10.5px;color:#9be37a">V<sub>D</sub> →</span>
+                  <span class="mono" style="position:absolute;left:84px;bottom:46px;font-size:10px;color:#9fb5a6">0</span>
+                </div>
+                <div class="mono" style="font-size:11px;line-height:1.5;color:#1d2733">X: A 0,2 V/b · Y: B ters 0,5 V/b = 5 mA/b<br>10 mA’de V<sub>D</sub> ≈ 0,71 V</div>
+              </div>
+              <div style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-content:start">
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <span style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px"><span style="width:18px;height:18px;border-radius:4px;background:#f2c94c;display:flex;align-items:center;justify-content:center;font:700 11px 'IBM Plex Mono',monospace">A</span>A · yatay (X)</span>
+                  <span class="pl">Volt/bölme</span><div class="st"><button aria-label="A volt/bölme azalt">−</button><span>0,2 V/b</span><button aria-label="A volt/bölme artır">+</button></div>
+                  <div class="sg"><button>AC</button><button>GND</button><button class="on">DC</button></div>
+                  <span class="pl">Konum</span><div class="st"><button aria-label="Sola">◀</button><span>−2,0 b</span><button aria-label="Sağa">▶</button></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <span style="display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px"><span style="width:18px;height:18px;border-radius:4px;background:#56ccf2;display:flex;align-items:center;justify-content:center;font:700 11px 'IBM Plex Mono',monospace">B</span>B · dikey (Y)</span>
+                  <span class="pl">Volt/bölme</span><div class="st"><button aria-label="B volt/bölme azalt">−</button><span>0,5 V/b</span><button aria-label="B volt/bölme artır">+</button></div>
+                  <div class="sg"><button>AC</button><button>GND</button><button class="on">DC</button></div>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;background:#fff;border:1.5px solid #1d2733;border-radius:8px;height:36px;padding:0 10px;box-sizing:border-box"><span style="width:18px;height:18px;border-radius:5px;background:#1d2733;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10l4 4 8-8" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>B ters <small class="mono" style="color:#5f6b7a;font-weight:500">INV</small></label>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <span style="font-weight:600;font-size:13px;height:18px">Kip</span>
+                  <span class="pl">Kip</span><div class="sg"><button>A ve B</button><button>A + B</button><button class="on">X-Y</button></div>
+                  <span class="pl" style="color:#9aa3ad">Zaman/bölme <small>X-Y’de kullanılmaz</small></span><div class="st" style="opacity:.5"><button aria-label="Azalt" disabled>−</button><span>5 ms/b</span><button aria-label="Artır" disabled>+</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <dc-import name="C-SimCubugu" state="run" time="0,412 s" speed="×0,25" speed-note="1 s’de 250 ms" msg="X-Y kipinde de hız osiloskoba göre ayarlanabilir." hint-size="848px,52px"></dc-import>
+    </main>
+    <aside aria-label="İnceleme paneli" style="width:336px;flex:none;background:#fff;border-left:1px solid #dde1e6;display:flex;flex-direction:column;min-height:0">
+      <div role="tablist" style="display:flex;padding:0 8px;border-bottom:1px solid #dde1e6">
+        <button class="tab" role="tab" aria-selected="false">İncele</button>
+        <button class="tab tsel" role="tab" aria-selected="true">Örnek</button>
+        <button class="tab" role="tab" aria-selected="false">Mesajlar</button>
+      </div>
+      <div style="flex:1;min-height:0;overflow:auto;padding:16px 20px 20px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span style="align-self:flex-start;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:#e6effd;color:#1557c0">Örnek · Diyot karakteristiklerinin incelenmesi</span>
+          <h2 style="margin:0;font-size:20px;font-weight:600;line-height:1.25">Diyot karakteristiği (akım-gerilim eğrisi)</h2>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.55;color:#3d4957">Üçgen dalga diyotu ileri ve ters yönde tarar. A diyotun gerilimini, ters çevrilmiş B ise 100 Ω üzerindeki gerilimi, yani akımı gösterir.</p>
+        <div style="background:#fef6e7;border:1px solid #f3d9a8;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:600;color:#b54708">Tahmin et</span>
+          <span style="font-size:14px;line-height:1.5">Akım hangi gerilimden sonra belirgin biçimde artmaya başlar?</span>
+        </div>
+        <div style="background:#e8f5ed;border:1px solid #b9dfc8;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:12px;font-weight:600;color:#1b7d44">Cevap</span>
+          <span style="font-size:14px;line-height:1.55"><b>≈ 0,6 V.</b> Bu dizin altında akım neredeyse sıfırdır; üstünde gerilim çok az artarken akım hızla büyür. Ters yönde eğri yataydır: yalnızca çok küçük bir sızıntı akımı geçer.</span>
+        </div>
+        <div style="border:1px solid #dde1e6;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px">
+          <b style="font-size:13px">Ölçüm tablosuna ekle</b>
+          <span style="font-size:13px;color:#5f6b7a">Ekrandaki imleçle bir noktayı seç: V<sub>D</sub> ve I tabloya yazılır.</span>
+          <button style="align-self:flex-start;height:36px;padding:0 12px;border-radius:8px;border:1px solid #c4cad2;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733">Ölçüm tablosunu aç</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

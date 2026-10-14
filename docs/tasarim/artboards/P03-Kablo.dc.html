@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: Bağla</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.paper{background-color:#f6f8fb;background-image:radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:16px 16px;background-position:8px 8px}
+.s{fill:none;stroke:#1d2733;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round}
+.tg{font:700 13px 'IBM Plex Mono',monospace;text-anchor:middle}
+</style>
+</helmet>
+<div class="ui" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden">
+  <div style="height:47px;flex:none"></div>
+  <dc-import name="C-TelUst" title="Yeni devre" mode="bagla" hint-size="390px,52px"></dc-import>
+  <div style="flex:1;position:relative;min-height:0">
+    <div class="paper" role="application" aria-label="Devre şeması, Bağla kipi" style="position:absolute;inset:0;overflow:hidden">
+      <svg width="390" height="641" viewBox="0 0 390 641" aria-hidden="true" style="position:absolute;inset:0">
+        <g opacity=".38">
+          <path class="s" d="M90 200V262M90 274V330M150 200H170L175 189L185 211L195 189L205 211L215 189L225 211L230 200H250M320 200V246M320 280V330M298 280H342"/>
+          <path d="M66 262H114" stroke="#1d2733" stroke-width="3.2" stroke-linecap="round"/><path d="M78 274H102" stroke="#1d2733" stroke-width="7"/>
+          <path d="M298 246H342L320 280Z" fill="#1d2733"/>
+          <circle cx="200" cy="420" r="26" fill="none" stroke="#1d2733" stroke-width="3.2"/>
+          <text x="200" y="428" text-anchor="middle" style="font:600 22px 'IBM Plex Sans',sans-serif;fill:#1d2733">A</text>
+          <path class="s" d="M120 420H174M226 420H280"/>
+        </g>
+        <path d="M90 200H150" fill="none" stroke="#1d2733" stroke-width="3.2" stroke-linecap="round"/>
+        <text x="58" y="272" text-anchor="end" style="font:600 15px 'IBM Plex Sans',sans-serif;fill:#3d4957">B1</text>
+        <text x="200" y="176" text-anchor="middle" style="font:600 15px 'IBM Plex Sans',sans-serif;fill:#3d4957">R1</text>
+        <text x="352" y="268" style="font:600 15px 'IBM Plex Sans',sans-serif;fill:#3d4957">D1</text>
+        <text x="200" y="380" text-anchor="middle" style="font:600 15px 'IBM Plex Sans',sans-serif;fill:#3d4957">A1</text>
+
+        <circle cx="90" cy="200" r="15" fill="#fff" stroke="#9fb8e6" stroke-width="2"/><text class="tg" x="90" y="205" style="fill:#5f7fb8">+</text>
+        <circle cx="150" cy="200" r="15" fill="#fff" stroke="#9fb8e6" stroke-width="2"/><text class="tg" x="150" y="205" style="fill:#5f7fb8">1</text>
+
+        <circle cx="250" cy="200" r="24" fill="#1f6feb"/><text class="tg" x="250" y="205" style="fill:#fff;font-size:15px">2</text>
+        <circle cx="250" cy="200" r="30" fill="none" stroke="#1f6feb" stroke-width="2" stroke-opacity=".35"/>
+
+        <circle cx="320" cy="200" r="22" fill="#fff" stroke="#1f6feb" stroke-width="2.5"/><text class="tg" x="320" y="205" style="fill:#1557c0;font-size:14px">A</text>
+        <circle cx="320" cy="330" r="22" fill="#fff" stroke="#1f6feb" stroke-width="2.5"/><text class="tg" x="320" y="335" style="fill:#1557c0;font-size:14px">K</text>
+        <circle cx="90" cy="330" r="22" fill="#fff" stroke="#1f6feb" stroke-width="2.5"/><text class="tg" x="90" y="335" style="fill:#1557c0;font-size:15px">−</text>
+        <circle cx="120" cy="420" r="22" fill="#fff" stroke="#1f6feb" stroke-width="2.5"/><text class="tg" x="120" y="425" style="fill:#1557c0;font-size:14px">−</text>
+        <circle cx="280" cy="420" r="22" fill="#fff" stroke="#1f6feb" stroke-width="2.5"/><text class="tg" x="280" y="425" style="fill:#1557c0;font-size:14px">+</text>
+        <path d="M250 200H298" stroke="#1f6feb" stroke-width="2.5" stroke-dasharray="5 5" stroke-linecap="round" opacity=".6"/>
+      </svg>
+      <div role="status" style="position:absolute;left:12px;right:12px;top:12px;display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #c7dafb;box-shadow:0 2px 6px rgba(29,39,51,.08);font-size:13.5px;line-height:1.45">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#1557c0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><path d="M4 15h5V5h7"/><circle cx="4" cy="15" r="2"/><circle cx="16" cy="5" r="2"/></svg>
+        <span>Uçlar büyütüldü. <b>R1’in 2. ucu</b> seçili; şimdi bağlanacağı uca dokun. Bir kablonun ortasına dokunursan T bağlantısı olur.</span>
+      </div>
+      <div style="position:absolute;left:12px;bottom:12px;display:flex;gap:12px;font-size:12px;color:#3d4957;background:rgba(255,255,255,.92);border-radius:10px;padding:6px 10px;border:1px solid #dde1e6">
+        <span style="display:flex;align-items:center;gap:5px"><i style="display:block;width:12px;height:12px;border-radius:6px;background:#1f6feb"></i>başlangıç</span>
+        <span style="display:flex;align-items:center;gap:5px"><i style="display:block;width:12px;height:12px;border-radius:6px;border:2px solid #1f6feb;box-sizing:border-box"></i>boş uç</span>
+        <span style="display:flex;align-items:center;gap:5px"><i style="display:block;width:12px;height:12px;border-radius:6px;border:2px solid #9fb8e6;box-sizing:border-box"></i>bağlı uç</span>
+      </div>
+    </div>
+  </div>
+  <dc-import name="C-TelAlt" bar="bagla" msg="İkinci uca dokun" msg2="Başlangıç: R1 · 2. uç" hint-size="390px,104px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

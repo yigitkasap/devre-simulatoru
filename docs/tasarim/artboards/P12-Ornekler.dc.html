@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Telefon: örnekler</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.gr{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:0 4px;border:0;border-bottom:1px solid #eef0f3;background:transparent;font:600 15.5px 'IBM Plex Sans',sans-serif;color:#1d2733;text-align:left}
+.gr .c{font:500 13px 'IBM Plex Mono',monospace;color:#5f6b7a;margin-left:auto}
+.cd{display:flex;gap:12px;align-items:flex-start;width:100%;padding:12px;border:1px solid #dde1e6;border-radius:12px;background:#fff;text-align:left;font:inherit;color:inherit;box-sizing:border-box}
+.cd .n{font:600 13px 'IBM Plex Mono',monospace;color:#5f6b7a;width:22px;flex:none;padding-top:2px}
+.cd b{display:block;font-size:15.5px}
+.cd .t{font-size:13.5px;line-height:1.4;color:#5f6b7a}
+</style>
+</helmet>
+<div class="ui" role="dialog" aria-modal="true" aria-labelledby="pot" style="width:390px;height:844px;display:flex;flex-direction:column;background:#fff;overflow:hidden">
+  <div style="height:47px;flex:none"></div>
+  <div style="height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 8px">
+    <button aria-label="Kapat" style="width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:#1d2733"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15"/></svg></button>
+    <h2 id="pot" style="margin:0;font-size:19px;font-weight:600">Örnek devreler</h2>
+    <span class="mono" style="margin-left:auto;font-size:13px;color:#5f6b7a;padding-right:8px">23</span>
+  </div>
+  <div style="padding:0 16px 8px;flex:none">
+    <label style="display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;border:1px solid #c4cad2;border-radius:10px;box-sizing:border-box;color:#5f6b7a">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="M13 13l4 4"/></svg>
+      <input aria-label="Örnek ara" placeholder="Örnek ara…" style="flex:1;min-width:0;border:0;outline:0;background:transparent;font:400 16px 'IBM Plex Sans',sans-serif;color:#1d2733">
+    </label>
+    <span style="display:block;font-size:13px;color:#5f6b7a;margin-top:8px">Bir örneğe dokun: devre açılır, tahmin sorusu alttaki sayfada çıkar.</span>
+  </div>
+  <div style="flex:1;min-height:0;overflow:auto;padding:0 16px 34px">
+    <button class="gr" aria-expanded="true"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg>Temel devreler<span class="c">7</span></button>
+    <div style="display:flex;flex-direction:column;gap:8px;padding:10px 0 12px">
+      <button class="cd"><span class="n">1</span><span><b>LED ve ön direnç</b><span class="t">LED’in akımını seri bir dirençle sınırla.</span></span></button>
+      <button class="cd" aria-current="true" style="border:2px solid #1f6feb;background:#f3f7fe;padding:11px"><span class="n" style="color:#1557c0">2</span><span><b>Gerilim bölücü <span style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:#1f6feb;color:#fff;vertical-align:2px">Açık</span></b><span class="t">Voltmetre orta noktanın gerilimini ölçüyor.</span></span></button>
+      <button class="cd"><span class="n">3</span><span><b>Voltmetrenin yükleme etkisi</b><span class="t">Sonlu iç direnç ölçümü nasıl değiştirir?</span></span></button>
+      <button class="cd"><span class="n">4</span><span><b>Ampermetrenin etkisi</b><span class="t">İç direnç devre akımını ne kadar azaltır?</span></span></button>
+      <button class="cd"><span class="n">5</span><span><b>RC dolma</b><span class="t">Kondansatör bir direnç üzerinden dolar.</span></span></button>
+    </div>
+    <button class="gr" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>Laboratuvar cihazları<span class="c">1</span></button>
+    <button class="gr" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>Diyot karakteristikleri<span style="font-size:11px;font-weight:600;padding:1px 6px;border-radius:4px;background:#efe7fb;color:#5b3aa8">Deney 1</span><span class="c">1</span></button>
+    <button class="gr" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>Doğrultucu devreler<span class="c">3</span></button>
+    <button class="gr" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>Kenetleyici ve katlayıcı<span class="c">2</span></button>
+    <button class="gr" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>Kırpıcı devreler<span class="c">2</span></button>
+    <button class="gr" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>FET karakteristikleri<span class="c">2</span></button>
+    <button class="gr" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>FET yükselteci<span class="c">1</span></button>
+    <button class="gr" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5l5 5-5 5"/></svg>BJT’li yükselteç<span class="c">1</span></button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

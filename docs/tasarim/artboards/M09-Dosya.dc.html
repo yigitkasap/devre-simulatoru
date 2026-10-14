@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Dosya menüsü</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.paper{background-color:#fbfbf9;background-image:radial-gradient(circle,#b3bac3 1.3px,transparent 1.6px),radial-gradient(circle,#d3d7dc 1px,transparent 1.3px);background-size:75px 75px,15px 15px;background-position:7px 7px,7px 7px}
+.tab{height:44px;padding:0 12px;border:0;background:transparent;font:500 14px 'IBM Plex Sans',sans-serif;color:#5f6b7a;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:6px}
+.tsel{color:#1d2733;border-bottom-color:#1d2733}
+.s{fill:none;stroke:#1d2733;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lb{font:600 11px 'IBM Plex Sans',sans-serif;fill:#1d2733}
+.lv{font:400 10px 'IBM Plex Mono',monospace;fill:#5f6b7a}
+.mi{display:flex;align-items:flex-start;gap:12px;width:100%;padding:10px 12px;border:0;border-radius:8px;background:transparent;font:400 14px 'IBM Plex Sans',sans-serif;color:#1d2733;text-align:left}
+.mi b{display:block;font-weight:500}
+.mi small{display:block;font-size:12.5px;color:#5f6b7a;line-height:1.35;margin-top:1px}
+</style>
+</helmet>
+<div class="ui" style="width:1280px;height:800px;display:flex;flex-direction:column;background:#eef0f3;overflow:hidden;position:relative">
+  <dc-import name="C-UstCubuk" tool="sec" menu="dosya" hint-size="1280px,52px"></dc-import>
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="width:232px;flex:none"><dc-import name="C-Kutuphane" info="volt" hint-size="232px,748px"></dc-import></div>
+    <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <div class="paper" role="application" aria-label="Devre şeması" style="flex:1;position:relative;overflow:hidden">
+        <svg width="728" height="668" viewBox="0 0 728 668" style="position:absolute;left:0;top:0" aria-hidden="true">
+          <g transform="translate(74,170) scale(1.5)">
+            <path class="s" d="M100 40V76M100 84V120M100 40H260V60M260 100V140M260 120H340M340 174V200H260M260 180V200M260 200H100V120M180 200V210M171 210H189M174.5 214.5H185.5M178 219H182M340 120V146"/>
+            <circle cx="260" cy="120" r="3.2" fill="#1d2733"/><circle cx="260" cy="200" r="3.2" fill="#1d2733"/><circle cx="180" cy="200" r="3.2" fill="#1d2733"/>
+            <path class="s" d="M86 76H114"/><path d="M93 84H107" stroke="#1d2733" stroke-width="4.5"/><path class="s" style="stroke-width:1.4" d="M80 68h6M83 65v6"/>
+            <text class="lb" x="76" y="84" text-anchor="end">B1</text><text class="lv" x="76" y="96" text-anchor="end">9 V</text>
+            <path class="s" d="M260 60L253 63.3L267 70L253 76.7L267 83.3L253 90L267 96.7L260 100"/>
+            <text class="lb" x="274" y="78">R1</text><text class="lv" x="274" y="90">1 kΩ</text>
+            <path class="s" d="M260 140L253 143.3L267 150L253 156.7L267 163.3L253 170L267 176.7L260 180"/>
+            <text class="lb" x="234" y="158" text-anchor="end">R2</text><text class="lv" x="234" y="170" text-anchor="end">1 kΩ</text>
+            <circle class="s" cx="340" cy="160" r="14"/><text x="340" y="165" text-anchor="middle" style="font:600 13px 'IBM Plex Sans',sans-serif;fill:#1d2733">V</text>
+            <text class="lb" x="360" y="158">V1</text>
+            <rect x="358" y="166" width="52" height="16" rx="3" fill="#1e2a25"/><text x="384" y="177.5" text-anchor="middle" style="font:600 9.5px 'IBM Plex Mono',monospace;fill:#5d8a6c">– – – V</text>
+          </g>
+        </svg>
+      </div>
+      <div style="height:28px;flex:none;display:flex;align-items:center;padding:0 12px;background:#f6f7f9;border-top:1px solid #dde1e6;font-size:13px;color:#5f6b7a">Kablo çekmek için bir pinin ucuna tıkla · çift tık: özellikler · R: döndür</div>
+      <dc-import name="C-SimCubugu" state="stop" time="0,000 s" msg="Noktalar geleneksel akım yönünü gösterir." hint-size="728px,52px"></dc-import>
+    </main>
+    <aside aria-label="İnceleme paneli" style="width:320px;flex:none;background:#fff;border-left:1px solid #dde1e6;display:flex;flex-direction:column">
+      <div role="tablist" style="display:flex;padding:0 8px;border-bottom:1px solid #dde1e6"><button class="tab" role="tab">İncele</button><button class="tab tsel" role="tab" aria-selected="true">Örnek</button><button class="tab" role="tab">Mesajlar</button></div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+        <span style="align-self:flex-start;font-size:12px;font-weight:600;padding:2px 8px;border-radius:4px;background:#e6effd;color:#1557c0">Örnek · Temel devreler</span>
+        <h2 style="margin:0;font-size:20px;font-weight:600">Gerilim bölücü</h2>
+        <p style="margin:0;font-size:14px;line-height:1.55;color:#3d4957">İki eşit direnç (1 kΩ + 1 kΩ) ideal 9 V’luk bir pile seri bağlı. Voltmetre, dirençlerin birleştiği orta noktanın gerilimini ölçüyor.</p>
+      </div>
+    </aside>
+  </div>
+
+  <div role="menu" aria-label="Dosya" style="position:absolute;left:196px;top:50px;width:320px;background:#fff;border:1px solid #dde1e6;border-radius:12px;box-shadow:0 16px 40px rgba(29,39,51,.18);padding:6px">
+    <button class="mi" role="menuitem"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><path d="M5 2h7l4 4v12H5z"/><path d="M12 2v4h4M10.5 9v6M7.5 12h6"/></svg><span><b>Yeni devre</b><small>Önceki devrene Geri al (Ctrl+Z) ile dönebilirsin.</small></span></button>
+    <div style="height:1px;background:#dde1e6;margin:4px 8px"></div>
+    <button class="mi" role="menuitem" style="background:#e6effd"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><path d="M10 3v10M6 9l4 4 4-4M4 16h12"/></svg><span><b>JSON olarak dışa aktar</b><small>Devreyi .json dosyası olarak indir.</small></span></button>
+    <button class="mi" role="menuitem"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><path d="M10 13V3M6 7l4-4 4 4M4 16h12"/></svg><span><b>JSON dosyası içe aktar…</b><small>Bilgisayarındaki bir devre dosyasını aç.</small></span></button>
+    <button class="mi" role="menuitem"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none;margin-top:1px"><path d="M8.5 11.5l3-3M7 9L5.5 10.5a3 3 0 0 0 4 4L11 13M13 11l1.5-1.5a3 3 0 0 0-4-4L9 7"/></svg><span><b>Paylaşım bağlantısı…</b><small>Devreyi bağlantının içine yaz, kopyala.</small></span></button>
+    <div style="margin:6px 4px 2px;padding:10px 12px;border-radius:8px;background:#f6f7f9;display:flex;gap:10px;align-items:flex-start;font-size:12.5px;line-height:1.45;color:#3d4957">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#1b7d44" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><circle cx="10" cy="10" r="7.5"/><path d="M6.5 10l2.5 2.5 4.5-5"/></svg>
+      <span>Devren her değişiklikten sonra bu tarayıcıya kendiliğinden kaydedilir. Kaydet düğmesi gerekmez; başka bilgisayara taşımak için dışa aktar ya da bağlantı paylaş.</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

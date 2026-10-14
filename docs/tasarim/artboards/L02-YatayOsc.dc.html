@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Yatay telefon: osiloskop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ui{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#1d2733;font-size:15px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.st{display:flex;align-items:center;background:#fff;border:1px solid #b9c0c9;border-radius:10px;height:44px;overflow:hidden;flex:1}
+.st button{width:42px;height:44px;border:0;background:#f3f5f7;font:600 17px 'IBM Plex Sans',sans-serif;color:#1d2733;flex:none}
+.st span{flex:1;text-align:center;font:600 13.5px 'IBM Plex Mono',monospace;border-left:1px solid #dde1e6;border-right:1px solid #dde1e6;height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.sg{display:flex;background:#c9cfd6;border-radius:10px;padding:2px;gap:2px}
+.sg button{flex:1;height:40px;border:0;border-radius:8px;background:transparent;font:600 12.5px 'IBM Plex Sans',sans-serif;color:#2c3846;white-space:nowrap}
+.sg .on{background:#fff;color:#1d2733;box-shadow:0 1px 2px rgba(29,39,51,.2)}
+.ch{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font:700 12px 'IBM Plex Mono',monospace;flex:none}
+.ri{width:64px;height:56px;border:0;border-radius:12px;background:transparent;color:#1d2733;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font:500 11px 'IBM Plex Sans',sans-serif}
+</style>
+</helmet>
+<div class="ui" style="width:844px;height:390px;display:flex;background:#e9ecef;overflow:hidden">
+  <div style="width:47px;flex:none"></div>
+  <section aria-label="Osiloskop OSC1" style="flex:1;display:flex;gap:12px;padding:8px 12px 21px 4px;min-width:0">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="height:36px;display:flex;align-items:center;gap:8px">
+        <button aria-label="Devreye dön" style="height:36px;padding:0 10px 0 6px;border-radius:9px;border:1px solid #b9c0c9;background:#fff;font:500 13px 'IBM Plex Sans',sans-serif;color:#1d2733;display:flex;align-items:center;gap:4px"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5l-5 5 5 5"/></svg>Devre</button>
+        <b style="font-size:14px">Osiloskop</b><span class="mono" style="font-size:12px;color:#5f6b7a">OSC1</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:12px;margin-left:auto"><i style="display:block;width:7px;height:7px;border-radius:4px;background:#1b7d44"></i>Tetikleniyor</span>
+      </div>
+      <div style="width:350px;height:280px;border-radius:10px;background:#0f1713;position:relative;overflow:hidden;box-shadow:inset 0 2px 8px rgba(0,0,0,.5)">
+        <svg width="350" height="280" viewBox="0 0 400 320" style="position:absolute;inset:0" role="img" aria-label="A eksi B tam dalga doğrultulmuş">
+          <path d="M40 0V320M80 0V320M120 0V320M160 0V320M240 0V320M280 0V320M320 0V320M360 0V320M0 40H400M0 80H400M0 120H400M0 200H400M0 240H400M0 280H400" stroke="#2b3b32" stroke-width="1" vector-effect="non-scaling-stroke"/>
+          <path d="M200 0V320M0 160H400" stroke="#3d5246" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+          <path d="M0 280 L2.7 280 L4 276.7 L13.3 208 L20 166.6 L26.7 134.8 L32 117.8 L37.3 109.1 L42.7 109.1 L48 117.8 L53.3 134.8 L60 166.6 L66.7 208 L76 276.7 L82.7 280 L84 276.7 L93.3 208 L100 166.6 L106.7 134.8 L112 117.8 L117.3 109.1 L122.7 109.1 L128 117.8 L133.3 134.8 L140 166.6 L146.7 208 L156 276.7 L162.7 280 L164 276.7 L173.3 208 L180 166.6 L186.7 134.8 L192 117.8 L197.3 109.1 L202.7 109.1 L208 117.8 L213.3 134.8 L220 166.6 L226.7 208 L236 276.7 L242.7 280 L244 276.7 L253.3 208 L260 166.6 L266.7 134.8 L272 117.8 L277.3 109.1 L282.7 109.1 L288 117.8 L293.3 134.8 L300 166.6 L306.7 208 L316 276.7 L322.7 280 L324 276.7 L333.3 208 L340 166.6 L346.7 134.8 L352 117.8 L357.3 109.1 L362.7 109.1 L368 117.8 L373.3 134.8 L380 166.6 L386.7 208 L396 276.7 L400 280" fill="none" stroke="#f2c94c" stroke-width="2.2" vector-effect="non-scaling-stroke"/>
+          <path d="M0 271l12 9-12 9z" fill="#f2c94c"/>
+        </svg>
+        <span class="mono" style="position:absolute;left:8px;bottom:6px;font-size:11px;color:#e6ebf1;background:rgba(15,23,19,.75);padding:1px 4px;border-radius:3px">A−B · Tepe 8,60 V · Ort. 5,03 V · f 100 Hz</span>
+      </div>
+    </div>
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto;padding-top:2px">
+      <div style="display:flex;gap:6px;align-items:center"><span class="ch" style="background:#f2c94c">A</span><div class="st"><button aria-label="A volt/bölme azalt">−</button><span>2 V/b</span><button aria-label="A volt/bölme artır">+</button></div></div>
+      <div style="display:flex;gap:6px;align-items:center"><span class="ch" style="background:#56ccf2">B</span><div class="st"><button aria-label="B volt/bölme azalt">−</button><span>2 V/b</span><button aria-label="B volt/bölme artır">+</button></div></div>
+      <div class="sg"><button>A ve B</button><button class="on">A + B</button><button>X-Y</button></div>
+      <label style="display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 10px;border-radius:10px;background:#fff;border:1.5px solid #1d2733;font:600 13.5px 'IBM Plex Sans',sans-serif">B ters (INV)<span style="width:40px;height:24px;border-radius:12px;background:#1b7d44;position:relative;display:block"><i style="position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:9px;background:#fff;display:block"></i></span></label>
+      <div style="display:flex;gap:6px"><div class="st"><button aria-label="Zaman/bölme azalt">−</button><span>5 ms/b</span><button aria-label="Zaman/bölme artır">+</button></div><button style="height:44px;padding:0 12px;border-radius:10px;border:0;background:#1d2733;color:#fff;font:600 13.5px 'IBM Plex Sans',sans-serif">Oto</button></div>
+    </div>
+  </section>
+  <nav aria-label="Eylemler" style="width:76px;flex:none;border-left:1px solid #1b7d44;background:#fff;display:flex;flex-direction:column;align-items:center;padding:6px 0 21px;gap:2px">
+    <button class="ri"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="2"/><path d="M6 12h3M6 8h8"/></svg>Ölçümler</button>
+    <button class="ri" style="background:#e6effd;color:#1557c0"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="16" height="13" rx="2"/><path d="M5 11c1.5-5 3-5 4.5 0s3 5 4.5 0"/></svg>Cihazlar</button>
+    <button class="ri"><span class="mono" style="font-size:13px;font-weight:600">×0,25</span>Hız</button>
+    <button class="ri"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="1.5" fill="currentColor"/></svg>Durdur</button>
+    <span style="flex:1"></span>
+    <button aria-label="Duraklat" style="width:60px;height:60px;border-radius:30px;border:0;background:#1d2733;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(29,39,51,.22)"><svg width="24" height="24" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.4" height="12" rx="1" fill="currentColor"/><rect x="11.6" y="4" width="3.4" height="12" rx="1" fill="currentColor"/></svg></button>
+  </nav>
+  <div style="width:47px;flex:none;background:#fff"></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":844,"height":390}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
