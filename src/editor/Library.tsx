@@ -68,6 +68,7 @@ export function Library(props: LibraryProps) {
   if (mode === 'rail') return <Rail {...props} />;
   return (
     <aside
+      data-tour="parts"
       className="flex h-full shrink-0 flex-col border-r border-line bg-panel"
       style={{ width: props.width }}
       aria-label={tr.library.title}
@@ -291,6 +292,7 @@ function Rail({ tool, settings, dispatch, onDragTypeChange, onExpand, onClose, t
   const open = flyoutOpen === true;
   return (
     <nav
+      data-tour="parts"
       aria-label={tr.toolbar.library}
       className="flex h-full w-14 shrink-0 flex-col items-center gap-1 border-r border-line bg-panel py-2"
     >

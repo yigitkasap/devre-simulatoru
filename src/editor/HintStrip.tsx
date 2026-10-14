@@ -63,7 +63,7 @@ function hintText(hint: StripHint): { text: string; tone: Tone; right?: string }
     case 'selected':
       return { text: tr.hints.selected(hint.count), tone: 'neutral' };
     case 'empty':
-      return { text: tr.hints.empty, tone: 'neutral' };
+      return { text: tr.hints.empty, tone: 'neutral', right: tr.hints.allShortcuts };
     case 'example':
       return { text: tr.hints.example, tone: 'neutral', right: tr.hints.exampleUndo };
     case 'issues':
@@ -71,7 +71,7 @@ function hintText(hint: StripHint): { text: string; tone: Tone; right?: string }
     case 'measure':
       return { text: hint.example ? tr.rack.measureHintExample : tr.rack.measureHint, tone: 'neutral' };
     default:
-      return { text: tr.hints.select, tone: 'neutral' };
+      return { text: tr.hints.select, tone: 'neutral', right: tr.hints.allShortcuts };
   }
 }
 

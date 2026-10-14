@@ -23,6 +23,8 @@ import { Canvas, type CanvasHandle, type CanvasStatus, type ConnectStart, type H
 import { DeviceRack, type RackLayout } from './DeviceRack';
 import { ExamplesDialog } from './ExamplesDialog';
 import { ExampleTab } from './ExampleTab';
+import { HelpDialog } from './HelpDialog';
+import { markWelcomeSeen, Tour, welcomeSeen, WelcomeDialog, type TourStep } from './Welcome';
 import { Inspector, type InspectorTab } from './Inspector';
 import { InspectTab, type PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
@@ -168,7 +170,11 @@ export default function Simulator() {
   const [lockChipClosed, setLockChipClosed] = useState(false);
   const [chainOff, setChainOff] = useState(false);
   const [partDragging, setPartDragging] = useState(false);
-  const [toast, showToast] = useToast();
+  const [toast, showToast, hideToast] = useToast();
+  // İlk açılış (M01): hoş geldin yalnızca ilk ziyarette (kayıtlı devre ya da paylaşım bağlantısı yoksa).
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !welcomeSeen() && initialIsFresh());
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [tour, setTour] = useState<{ step: TourStep; parts: number; wires: number } | null>(null);
   const touch = useCoarsePointer();
   const canvasRef = useRef<CanvasHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -218,8 +224,15 @@ export default function Simulator() {
       setSheet(null);
     }
     setFitRequest((n) => n + 1);
-    // Telefonda klavye kısayolu anılmaz; Geri al alttaki çubukta.
-    showToast(touchUi ? message.replace(/ \(Ctrl\+Z\)/g, '') : message);
+    // Bildirimde Geri al: önceki devre ve (varsa) önceki örnek geri gelir (N03).
+    const previousExample = activeExample;
+    showToast(message, 'info', {
+      label: tr.toast.undo,
+      run: () => {
+        dispatch({ type: 'undo' });
+        setActiveExample(previousExample);
+      },
+    });
   };
 
   const loadExample = (id: ExampleId) => {
@@ -288,8 +301,14 @@ export default function Simulator() {
     if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
     else rotateSelection(selection.parts);
   };
-  const deleteSelection = () =>
+  /** Seçili öğeleri siler; bildirimde Geri al (P00: "Geri al her silme bildiriminde"). */
+  const deleteSelection = () => {
+    const count = selection.parts.length + selection.wires.length;
+    if (count === 0) return;
+    const what = count === 1 && singlePart ? singlePart.label : tr.phone.items(count);
     dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION });
+    showToast(tr.toast.deleted(what), 'info', { label: tr.toast.undo, run: () => dispatch({ type: 'undo' }) });
+  };
 
   // --- Tanılama ve mesajlar ---------------------------------------------------------------
   // Topoloji kontrolleri devre her değiştiğinde çalışır (simülasyon durdurulmuş olsa da).
@@ -329,6 +348,27 @@ export default function Simulator() {
   }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc]);
 
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+
+  /** Ayarlar → "Düğüm gerilimlerini yaz": her düğümün en uzun kablo parçasının ortasında gerilim. */
+  const nodeLabels = useMemo(() => {
+    if (!settings.nodeVoltages || !sim.frame || !compiled) return undefined;
+    const best = new Map<string, { at: { x: number; y: number }; length: number; voltage: number }>();
+    for (const wire of doc.wires) {
+      const key = wireKey(wire.id);
+      const voltage = sim.frame.wireVoltages.get(wire.id);
+      if (voltage === undefined || !compiled.nets.has(key)) continue;
+      const net = compiled.nets.findKey(key);
+      for (let i = 1; i < wire.points.length; i++) {
+        const a = wire.points[i - 1]!;
+        const b = wire.points[i]!;
+        const length = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        if (length < (best.get(net)?.length ?? 0)) continue;
+        const at = { x: Math.round((a.x + b.x) / 2), y: Math.round((a.y + b.y) / 2) };
+        best.set(net, { at, length, voltage });
+      }
+    }
+    return [...best.values()].map((n) => ({ at: n.at, text: formatSI(n.voltage, 'V', { digits: 3 }) }));
+  }, [settings.nodeVoltages, sim.frame, compiled, doc.wires]);
 
   /** Bir mesajın vurgulayacağı parçalar ve kablolar. */
   const highlightOf = (d: MessageItem): Highlight => {
@@ -859,6 +899,7 @@ export default function Simulator() {
       issues={issues}
       issuePins={issuePins}
       earthLine={earthTrap?.comPoints ?? null}
+      nodeLabels={nodeLabels}
       noGround={
         noGroundNotice && !noGroundDismissed
           ? {
@@ -889,6 +930,61 @@ export default function Simulator() {
         e.target.value = '';
       }}
     />
+  );
+
+  // Kısa tur: her adım gerçek eylemle ilerler (parça eklendi, kablo çekildi, Oynat, parça incelendi).
+  useEffect(() => {
+    if (!tour) return;
+    const advance = () => setTour((t) => (t ? { ...t, step: (t.step + 1) as TourStep, parts: doc.parts.length, wires: doc.wires.length } : t));
+    if (tour.step === 0 && doc.parts.length > tour.parts) advance();
+    else if (tour.step === 1 && doc.wires.length > tour.wires) advance();
+    else if (tour.step === 2 && sim.status === 'running') advance();
+    else if (tour.step === 3 && sim.status !== 'stopped' && singlePart) finishTour();
+  }, [tour, doc.parts.length, doc.wires.length, sim.status, singlePart?.id]);
+
+  const variant = phone ? 'phone' : tablet ? 'tablet' : 'desktop';
+  const closeWelcome = () => {
+    markWelcomeSeen();
+    setWelcomeOpen(false);
+  };
+  const startTour = () => {
+    closeWelcome();
+    setHelpOpen(false);
+    setModal(null);
+    setTour({ step: 0, parts: doc.parts.length, wires: doc.wires.length });
+  };
+  const finishTour = () => {
+    setTour(null);
+    showToast(tr.tour.done);
+  };
+  const overlays = (
+    <>
+      {welcomeOpen && (
+        <WelcomeDialog
+          variant={variant}
+          onExamples={() => {
+            closeWelcome();
+            setExamplesOpen(true);
+          }}
+          onBlank={closeWelcome}
+          onTour={startTour}
+          onExample={(id) => {
+            closeWelcome();
+            loadExample(id);
+          }}
+          onClose={closeWelcome}
+        />
+      )}
+      {helpOpen && <HelpDialog scale={settings.wireScale} onTour={startTour} onClose={() => setHelpOpen(false)} />}
+      {tour && !welcomeOpen && (
+        <Tour
+          step={tour.step}
+          variant={variant}
+          onNext={() => setTour((t) => (t && t.step < 3 ? { ...t, step: (t.step + 1) as TourStep, parts: doc.parts.length, wires: doc.wires.length } : t))}
+          onClose={finishTour}
+        />
+      )}
+    </>
   );
 
   const examplesDialog = examplesOpen && (
@@ -994,6 +1090,8 @@ export default function Simulator() {
           onImport={() => fileInputRef.current?.click()}
           onShare={() => setShareLink(shareUrl(doc, window.location.href))}
           onExamples={() => setExamplesOpen(true)}
+          onHelp={() => setHelpOpen(true)}
+          onWelcome={() => setWelcomeOpen(true)}
         />
         {fileInput}
         <div className="relative flex min-h-0 flex-1">
@@ -1094,7 +1192,8 @@ export default function Simulator() {
           />
         )}
         {examplesDialog}
-        <Toast toast={toast} offset={84} />
+        {overlays}
+        <Toast toast={toast} offset={84} onDone={hideToast} />
       </div>
     );
   }
@@ -1135,7 +1234,7 @@ export default function Simulator() {
     } else if (shown?.kind === 'part' && singlePart) {
       spec = {
         sizes: ['peek', 'half'],
-        label: tr.properties.title(singlePart.label),
+        label: tr.properties.title(singlePart.label, tr.devices.names[singlePart.type]),
         content: (
           <PartSheetBody
             key={singlePart.id}
@@ -1347,6 +1446,11 @@ export default function Simulator() {
               canvasRef.current?.fit();
             }}
             onShare={() => setModal('share')}
+            onTour={startTour}
+            onWelcome={() => {
+              setModal(null);
+              setWelcomeOpen(true);
+            }}
           />
         )}
         {stopAsk && (
@@ -1396,7 +1500,8 @@ export default function Simulator() {
           )}
           {bar}
           {modals}
-          <Toast toast={toast} offset={24} />
+          {overlays}
+          <Toast toast={toast} offset={24} onDone={hideToast} />
         </div>
       );
     }
@@ -1442,7 +1547,8 @@ export default function Simulator() {
         </div>
         {bar}
         {modals}
-        <Toast toast={toast} offset={PHONE_BAR_HEIGHT + (sheetOpen ? sheetHeight : 0) + 12} />
+        {overlays}
+        <Toast toast={toast} offset={PHONE_BAR_HEIGHT + (sheetOpen ? sheetHeight : 0) + 12} onDone={hideToast} />
       </div>
     );
   }
@@ -1474,6 +1580,8 @@ export default function Simulator() {
         onImport={() => fileInputRef.current?.click()}
         onShare={() => setShareLink(shareUrl(doc, window.location.href))}
         onExamples={() => setExamplesOpen(true)}
+        onHelp={() => setHelpOpen(true)}
+        onWelcome={() => setWelcomeOpen(true)}
       />
       {fileInput}
 
@@ -1531,6 +1639,7 @@ export default function Simulator() {
             onStop={sim.stop}
             onSpeed={sim.setSpeed}
             onElectronFlow={(on) => updateSettings({ electronFlow: on })}
+            fix={noGroundNotice && groundSuggestion ? { label: tr.noGround.fix(groundSuggestion.part.label), run: addSuggestedGround } : null}
           />
         </div>
         <Inspector
@@ -1550,9 +1659,16 @@ export default function Simulator() {
 
       {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
       {examplesDialog}
-      <Toast toast={toast} />
+      {overlays}
+      <Toast toast={toast} onDone={hideToast} />
     </div>
   );
+}
+
+/** Açılışta paylaşım bağlantısı ya da kayıtlı devre yoksa (gerçekten ilk ziyaret). */
+function initialIsFresh(): boolean {
+  if (window.location.hash.includes('d=')) return false;
+  return loadSavedDoc() === null;
 }
 
 /** Alt çubuktaki Değer düğmesinin metni (220 Ω); değeri olmayan parçalarda null. */

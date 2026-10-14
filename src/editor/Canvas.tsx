@@ -177,6 +177,8 @@ export interface CanvasProps {
   readonly issuePins?: readonly Point[];
   /** Toprak tuzağında topraklı cihazların COM uçları: aralarında şebeke toprağı çizgisi (M06b). */
   readonly earthLine?: readonly Point[] | null;
+  /** Ayarlar → "Düğüm gerilimlerini yaz": her düğümün yanında gerilim etiketi (ızgara noktası, metin). */
+  readonly nodeLabels?: readonly { readonly at: Point; readonly text: string }[];
   /** "Devrede toprak yok": afiş ve önerilen toprak yeri (M07b). Telefonda afiş yerine alt sayfa. */
   readonly noGround?: {
     readonly banner: boolean;
@@ -303,6 +305,7 @@ export function Canvas({
   issues,
   issuePins,
   earthLine,
+  nodeLabels,
   noGround,
   onExplain,
   ref,
@@ -1562,7 +1565,26 @@ export function Canvas({
           })}
           </g>
 
-          {frame && <CurrentDots doc={doc} graph={flowGraph} frame={frame} />}
+          {frame && settings.currentDots && <CurrentDots doc={doc} graph={flowGraph} frame={frame} />}
+
+          {nodeLabels?.map((label) => (
+            <g key={`n${label.at.x},${label.at.y}`} pointerEvents="none" aria-hidden="true">
+              <rect
+                x={label.at.x * GRID - (label.text.length * 5.4 + 8) / 2}
+                y={label.at.y * GRID - 17}
+                width={label.text.length * 5.4 + 8}
+                height={12}
+                rx={6}
+                fill="var(--color-panel)"
+                fillOpacity={0.92}
+                stroke="var(--color-line-2)"
+                strokeWidth={0.75}
+              />
+              <text x={label.at.x * GRID} y={label.at.y * GRID - 8} textAnchor="middle" fontSize={8.5} fontFamily="var(--font-mono)" fill="var(--color-ink)">
+                {label.text}
+              </text>
+            </g>
+          ))}
 
           {doc.parts.map((part) =>
             pinPositions(part).map((pos, i) =>

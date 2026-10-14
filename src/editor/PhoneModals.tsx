@@ -7,6 +7,7 @@ import { tr } from '../i18n/tr';
 import type { SaveState } from './autosave';
 import { Icon, type IconName } from './icons';
 import type { Settings } from './settings';
+import { PhoneHelp } from './HelpDialog';
 import { SettingsFields } from './TopBar';
 
 function ModalSheet({ label, top, onClose, children }: { label: string; top: number; onClose: () => void; children: ReactNode }) {
@@ -169,43 +170,59 @@ export interface MoreSheetProps {
   readonly onClose: () => void;
   readonly onFit: () => void;
   readonly onShare: () => void;
+  readonly onTour: () => void;
+  readonly onWelcome: () => void;
 }
 
-export function MoreSheet({ settings, onSettings, onClose, onFit, onShare }: MoreSheetProps) {
-  const quick: Array<{ icon: IconName; label: string; run: () => void }> = [
+export function MoreSheet({ settings, onSettings, onClose, onFit, onShare, onTour, onWelcome }: MoreSheetProps) {
+  const [tab, setTab] = useState<'help' | 'settings'>('help');
+  const quick: Array<{ icon: IconName; label: string; run: () => void; pressed?: boolean }> = [
     { icon: 'fit', label: tr.phone.fit, run: onFit },
+    { icon: 'measure', label: tr.phone.nodeVoltages, run: () => onSettings({ nodeVoltages: !settings.nodeVoltages }), pressed: settings.nodeVoltages },
     { icon: 'share', label: tr.phone.share, run: onShare },
   ];
   return (
     <ModalSheet label={tr.phone.moreTitle} top={118} onClose={onClose}>
-      <div className="flex shrink-0 gap-2 px-4">
-        {quick.map((q) => (
-          <button
-            key={q.label}
-            type="button"
-            onClick={q.run}
-            className="flex h-[72px] min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border border-line bg-panel-2 text-[13px] font-medium active:bg-app"
-          >
-            <Icon name={q.icon} className="h-[22px] w-[22px]" />
-            {q.label}
-          </button>
-        ))}
+      <div className="flex shrink-0 flex-col gap-3 px-4">
+        <div className="flex gap-2">
+          {quick.map((q) => (
+            <button
+              key={q.label}
+              type="button"
+              onClick={q.run}
+              aria-pressed={q.pressed}
+              className={`flex h-[72px] min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border px-1 text-[13px] font-medium ${
+                q.pressed ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-panel-2 active:bg-app'
+              }`}
+            >
+              <Icon name={q.icon} className="h-[22px] w-[22px]" />
+              <span className="max-w-full truncate">{q.label}</span>
+            </button>
+          ))}
+        </div>
+        <div role="tablist" aria-label={tr.phone.moreTitle} className="flex gap-0.5 rounded-[10px] bg-app p-0.5">
+          {(['help', 'settings'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`h-11 flex-1 rounded-lg text-sm font-semibold ${tab === t ? 'bg-panel text-ink shadow-sm' : 'text-ink-2'}`}
+            >
+              {t === 'help' ? tr.help.title : tr.settings.title}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
-        <h2 className="mb-2 text-[15px] font-semibold">{tr.settings.title}</h2>
-        <SettingsFields settings={settings} onChange={onSettings} touch />
-        <label className="mt-3 flex min-h-11 cursor-pointer items-center justify-between gap-3 text-[15px]">
-          <span>
-            {tr.sim.electronFlow}
-            <span className="block text-[12.5px] text-muted">{settings.electronFlow ? tr.sim.electronNote : tr.sim.conventionalNote}</span>
-          </span>
-          <input
-            type="checkbox"
-            checked={settings.electronFlow}
-            onChange={(e) => onSettings({ electronFlow: e.target.checked })}
-            className="h-6 w-6 shrink-0 accent-accent"
-          />
-        </label>
+      <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
+        {tab === 'help' ? (
+          <PhoneHelp onTour={onTour} />
+        ) : (
+          <div className="pt-3">
+            <SettingsFields settings={settings} onChange={onSettings} touch onWelcome={onWelcome} />
+          </div>
+        )}
       </div>
     </ModalSheet>
   );

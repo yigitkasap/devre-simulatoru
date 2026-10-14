@@ -44,7 +44,7 @@ export function Inspector({ width, collapsed, onExpand, tab: requested, onTab, i
 
   if (collapsed) {
     return (
-      <nav aria-label={tr.inspector.collapsedLabel} className="flex w-12 shrink-0 flex-col items-center gap-1 border-l border-line bg-panel pt-2">
+      <nav data-tour="inspect" aria-label={tr.inspector.collapsedLabel} className="flex w-12 shrink-0 flex-col items-center gap-1 border-l border-line bg-panel pt-2">
         <button
           type="button"
           onClick={() => onExpand(tab)}
@@ -94,6 +94,7 @@ export function Inspector({ width, collapsed, onExpand, tab: requested, onTab, i
 
   return (
     <aside
+      data-tour="inspect"
       aria-label={tr.inspector.label}
       className="flex min-h-0 shrink-0 flex-col border-l border-line bg-panel"
       style={{ width }}

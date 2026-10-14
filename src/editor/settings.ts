@@ -11,12 +11,18 @@ export interface Settings {
   readonly electronFlow: boolean;
   /** Kablo gerilimi renk ölçeği: klasik ya da renk körlüğüne uygun (mavi – gri – turuncu). */
   readonly wireScale: WireScale;
+  /** Simülasyon çalışırken her düğümün yanında gerilim etiketi (M11). */
+  readonly nodeVoltages: boolean;
+  /** Akım noktaları gösterilsin (M11). */
+  readonly currentDots: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   resistorStyle: 'zigzag',
   electronFlow: false,
   wireScale: 'classic',
+  nodeVoltages: false,
+  currentDots: true,
 };
 
 const STORAGE_KEY = 'devre-simulatoru:ayarlar';
@@ -32,6 +38,8 @@ function loadSettings(): Settings {
       resistorStyle: record.resistorStyle === 'iec' ? 'iec' : 'zigzag',
       electronFlow: record.electronFlow === true,
       wireScale: record.wireScale === 'colorblind' ? 'colorblind' : 'classic',
+      nodeVoltages: record.nodeVoltages === true,
+      currentDots: record.currentDots !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;

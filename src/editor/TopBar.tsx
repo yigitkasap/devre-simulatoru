@@ -3,7 +3,7 @@
 // boyutlu hâli: devrenin adı ▾ (Dosya), Örnekler, Geri al / Yinele, kip rozeti, sığdır ve Ayarlar.
 // Telefonda üst şerit (PhoneTopStrip) ve alt çubuk (PhoneBar) kullanılır.
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { tr } from '../i18n/tr';
 import { formatSI } from '../sim/units';
 import type { SaveState } from './autosave';
@@ -76,6 +76,8 @@ export interface TopBarProps {
   readonly onImport: () => void;
   readonly onShare: () => void;
   readonly onExamples: () => void;
+  readonly onHelp: () => void;
+  readonly onWelcome: () => void;
 }
 
 /** Sitenin simgesi: koyu kare üzerinde turuncu dalga. */
@@ -166,7 +168,8 @@ export function TopBar(props: TopBarProps) {
         <ViewButton icon="fit" label={tr.toolbar.fit} onClick={props.onFit} />
       </div>
 
-      <SettingsMenu settings={props.settings} onChange={props.onSettings} />
+      <ToolButton icon="help" label={tr.help.open} title={tr.help.openTitle} onClick={props.onHelp} />
+      <SettingsMenu settings={props.settings} onChange={props.onSettings} onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
     </header>
   );
 }
@@ -270,8 +273,8 @@ export interface TabletTopBarProps {
   readonly onImport: () => void;
   readonly onShare: () => void;
   readonly onExamples: () => void;
-  /** Yardım düğmesi (8. aşamadan sonra). */
-  readonly extra?: ReactNode;
+  readonly onHelp: () => void;
+  readonly onWelcome: () => void;
 }
 
 const MODE_CHIP: Record<TabletTopBarProps['mode'], string> = {
@@ -311,8 +314,8 @@ export function TabletTopBar(props: TabletTopBarProps) {
       </span>
       <SaveStatus state={props.saveState} />
       <TouchIconButton icon="fit" label={tr.toolbar.fit} onClick={props.onFit} />
-      {props.extra}
-      <SettingsMenu settings={props.settings} onChange={props.onSettings} touch />
+      <TouchIconButton icon="help" label={tr.help.open} onClick={props.onHelp} />
+      <SettingsMenu settings={props.settings} onChange={props.onSettings} touch onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
     </header>
   );
 }
@@ -446,7 +449,19 @@ function FileMenu({
   );
 }
 
-function SettingsMenu({ settings, onChange, touch = false }: { settings: Settings; onChange: (patch: Partial<Settings>) => void; touch?: boolean }) {
+function SettingsMenu({
+  settings,
+  onChange,
+  touch = false,
+  onWelcome,
+  onShortcuts,
+}: {
+  settings: Settings;
+  onChange: (patch: Partial<Settings>) => void;
+  touch?: boolean;
+  onWelcome: () => void;
+  onShortcuts: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useDismiss(open, setOpen);
 
@@ -459,71 +474,171 @@ function SettingsMenu({ settings, onChange, touch = false }: { settings: Setting
       )}
       {open && (
         <div
-          className={`absolute right-0 z-40 rounded-lg border border-line bg-panel p-3 shadow-lg ${touch ? 'top-12 w-72' : 'top-11 w-60'}`}
+          className={`absolute right-0 z-40 flex flex-col gap-4 rounded-[14px] border border-line bg-panel px-[18px] py-4 shadow-[0_16px_40px_rgba(29,39,51,0.18)] ${touch ? 'top-12 w-[380px]' : 'top-11 w-[380px]'}`}
           role="dialog"
           aria-label={tr.settings.title}
         >
-          <SettingsFields settings={settings} onChange={onChange} touch={touch} />
+          <div className="flex items-center justify-between">
+            <b className="text-base font-semibold">{tr.settings.title}</b>
+            <span className="text-label text-muted">{tr.settings.stored}</span>
+          </div>
+          <SettingsFields
+            settings={settings}
+            onChange={onChange}
+            touch={touch}
+            onWelcome={() => {
+              setOpen(false);
+              onWelcome();
+            }}
+            onShortcuts={() => {
+              setOpen(false);
+              onShortcuts();
+            }}
+          />
         </div>
       )}
     </div>
   );
 }
 
-/** Ayar alanları: direnç sembolü ve kablo gerilimi renkleri (masaüstünde Ayarlar menüsü, telefonda ⋯ sayfası). */
-export function SettingsFields({ settings, onChange, touch = false }: { settings: Settings; onChange: (patch: Partial<Settings>) => void; touch?: boolean }) {
-  const option = touch ? 'min-h-14 text-sm' : 'text-xs';
+/** Açma/kapama satırı (anahtar görünümünde; role="switch"). */
+export function SwitchRow({
+  label,
+  note,
+  checked,
+  onChange,
+  touch = false,
+}: {
+  label: string;
+  note?: string;
+  checked: boolean;
+  onChange: (on: boolean) => void;
+  touch?: boolean;
+}) {
   return (
-    <>
-          <p className={`font-semibold text-muted ${touch ? 'text-label' : 'text-xs'}`}>{tr.settings.resistorStyle}</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {(['zigzag', 'iec'] as const).map((style) => (
-              <button
-                key={style}
-                type="button"
-                onClick={() => onChange({ resistorStyle: style })}
-                aria-pressed={settings.resistorStyle === style}
-                className={`rounded-md border px-2 py-2 ${option} ${
-                  settings.resistorStyle === style ? 'border-accent bg-accent-soft text-accent' : 'border-line hover:bg-app'
-                }`}
-              >
-                <svg viewBox="-44 -12 88 24" className="mx-auto mb-1 h-5 w-16" aria-hidden="true">
-                  {style === 'zigzag' ? (
-                    <polyline
-                      points="-40,0 -24,0 -21,-7 -15,7 -9,-7 -3,7 3,-7 9,7 15,-7 21,7 24,0 40,0"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinejoin="round"
-                    />
-                  ) : (
-                    <g stroke="currentColor" strokeWidth={2} fill="none">
-                      <path d="M-40,0 H-22 M22,0 H40" />
-                      <rect x={-22} y={-7} width={44} height={14} />
-                    </g>
-                  )}
-                </svg>
-                {style === 'zigzag' ? tr.settings.zigzag : tr.settings.iec}
-              </button>
-            ))}
-          </div>
-          <p className={`mt-3 font-semibold text-muted ${touch ? 'text-label' : 'text-xs'}`}>{tr.settings.wireScale}</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {(['classic', 'colorblind'] as const).map((scale) => (
-              <button
-                key={scale}
-                type="button"
-                onClick={() => onChange({ wireScale: scale })}
-                aria-pressed={settings.wireScale === scale}
-                className={`rounded-md border px-2 py-2 ${option} ${
-                  settings.wireScale === scale ? 'border-accent bg-accent-soft text-accent' : 'border-line hover:bg-app'
-                }`}
-              >
-                <span className="mx-auto mb-1.5 block h-2 w-16 rounded-full" style={{ background: voltageGradient(scale) }} aria-hidden="true" />
-                {scale === 'classic' ? tr.settings.classic : tr.settings.colorblind}
-              </button>
-            ))}
-          </div>
-    </>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`flex w-full items-center justify-between gap-3 rounded-md text-left ${touch ? 'min-h-11 text-[15px]' : 'min-h-9 text-sm hover:bg-panel-2'}`}
+    >
+      <span>
+        {label}
+        {note && <span className={`block text-muted ${touch ? 'text-[12.5px]' : 'text-label'}`}>{note}</span>}
+      </span>
+      <span className={`relative shrink-0 rounded-full transition-colors ${checked ? 'bg-ok' : 'bg-line-2'} ${touch ? 'h-[30px] w-[50px]' : 'h-6 w-10'}`} aria-hidden="true">
+        <i
+          className={`absolute block rounded-full bg-white shadow transition-[left] ${touch ? 'top-[3px] h-6 w-6' : 'top-[3px] h-[18px] w-[18px]'} ${
+            checked ? (touch ? 'left-[23px]' : 'left-[19px]') : 'left-[3px]'
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Ayar alanları (tasarım: M11): direnç sembolü, kablo gerilimi renkleri, düğüm gerilimleri, akım
+ * noktaları ve elektron akışı; altta ilk açılış turu ve kısayollar. Masaüstünde Ayarlar menüsü,
+ * tablette aynı menü dokunmatik boyutta, telefonda ⋯ sayfası.
+ */
+export function SettingsFields({
+  settings,
+  onChange,
+  touch = false,
+  onWelcome,
+  onShortcuts,
+}: {
+  settings: Settings;
+  onChange: (patch: Partial<Settings>) => void;
+  touch?: boolean;
+  /** "İlk açılış turunu göster". */
+  onWelcome?: () => void;
+  /** "Kısayollar (?)": Yardım penceresi. */
+  onShortcuts?: () => void;
+}) {
+  const section = `font-semibold text-muted ${touch ? 'text-label' : 'text-xs'}`;
+  const segment = (selected: boolean) =>
+    `flex flex-1 items-center justify-center gap-2 rounded-[7px] px-2 font-semibold ${touch ? 'h-11 text-sm' : 'h-9 text-small'} ${
+      selected ? 'bg-panel text-ink shadow-sm' : 'text-seg-ink hover:bg-panel/40'
+    }`;
+  return (
+    <div className="flex flex-col gap-4">
+      <section className="flex flex-col gap-2">
+        <span className={section}>{tr.settings.resistorStyle}</span>
+        <div role="radiogroup" aria-label={tr.settings.resistorStyle} className="flex gap-0.5 rounded-[9px] bg-seg p-0.5">
+          {(['zigzag', 'iec'] as const).map((style) => (
+            <button key={style} type="button" role="radio" aria-checked={settings.resistorStyle === style} onClick={() => onChange({ resistorStyle: style })} className={segment(settings.resistorStyle === style)}>
+              <svg viewBox="-44 -12 88 24" className="h-4 w-11" aria-hidden="true">
+                {style === 'zigzag' ? (
+                  <polyline points="-40,0 -24,0 -21,-7 -15,7 -9,-7 -3,7 3,-7 9,7 15,-7 21,7 24,0 40,0" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinejoin="round" />
+                ) : (
+                  <g stroke="currentColor" strokeWidth={2.4} fill="none">
+                    <path d="M-40,0 H-22 M22,0 H40" />
+                    <rect x={-22} y={-7} width={44} height={14} />
+                  </g>
+                )}
+              </svg>
+              {style === 'zigzag' ? tr.settings.zigzag : tr.settings.iec}
+            </button>
+          ))}
+        </div>
+      </section>
+      <section className="flex flex-col gap-2">
+        <span className={section}>{tr.settings.wireScale}</span>
+        <div role="radiogroup" aria-label={tr.settings.wireScale} className="flex flex-col gap-0.5 rounded-[9px] bg-seg p-0.5">
+          {(['classic', 'colorblind'] as const).map((scale) => (
+            <button
+              key={scale}
+              type="button"
+              role="radio"
+              aria-checked={settings.wireScale === scale}
+              onClick={() => onChange({ wireScale: scale })}
+              className={`${segment(settings.wireScale === scale)} justify-between! px-2.5`}
+            >
+              <span>{scale === 'classic' ? tr.settings.classic : tr.settings.colorblind}</span>
+              <i className="block h-2 w-[110px] shrink-0 rounded-full" style={{ background: voltageGradient(scale) }} aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+        <SwitchRow
+          touch={touch}
+          label={tr.settings.nodeVoltages}
+          note={tr.settings.nodeVoltagesNote}
+          checked={settings.nodeVoltages}
+          onChange={(on) => onChange({ nodeVoltages: on })}
+        />
+      </section>
+      <section className="flex flex-col gap-0.5">
+        <span className={`${section} mb-1`}>{tr.settings.currentSection}</span>
+        <SwitchRow touch={touch} label={tr.settings.currentDots} checked={settings.currentDots} onChange={(on) => onChange({ currentDots: on })} />
+        <SwitchRow
+          touch={touch}
+          label={tr.sim.electronFlow}
+          note={settings.electronFlow ? tr.sim.electronNote : undefined}
+          checked={settings.electronFlow}
+          onChange={(on) => onChange({ electronFlow: on })}
+        />
+      </section>
+      {(onWelcome || onShortcuts) && (
+        <div className="flex flex-wrap gap-2 border-t border-app pt-3">
+          {onWelcome && (
+            <button
+              type="button"
+              onClick={onWelcome}
+              className={`rounded-lg border border-line-2 bg-panel px-3 font-medium hover:bg-panel-2 ${touch ? 'h-11 text-sm' : 'h-9 text-small'}`}
+            >
+              {tr.settings.welcome}
+            </button>
+          )}
+          {onShortcuts && (
+            <button type="button" onClick={onShortcuts} className={`rounded-lg px-3 font-medium text-accent-ink hover:bg-accent-soft ${touch ? 'h-11 text-sm' : 'h-9 text-small'}`}>
+              {tr.settings.shortcuts}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

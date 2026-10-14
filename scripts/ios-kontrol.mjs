@@ -19,6 +19,14 @@ const OUT = process.argv[3];
 const shot = (page, name) => (OUT ? page.screenshot({ path: path.join(OUT, name) }) : Promise.resolve());
 
 const browser = await chromium.launch({ channel: 'msedge' });
+// Hoş geldin penceresi yalnızca ilk ziyarette açılır; denetimler onu kapatılmış sayar ({ welcome: true }
+// verilen bağlam hariç).
+const rawNewContext = browser.newContext.bind(browser);
+browser.newContext = async ({ welcome = false, ...options } = {}) => {
+  const ctx = await rawNewContext(options);
+  if (!welcome) await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+  return ctx;
+};
 const results = [];
 let failed = 0;
 const check = (name, ok, extra = '') => {
@@ -168,7 +176,7 @@ try {
     let s = await screen(page, r1.x, r1.y);
     await tap(page, cdp, { x: s.x + 30, y: s.y + 60 }); // boşluk: seçimi kaldır
     await tap(page, cdp, s);
-    const sheetOpen = await page.getByRole('region', { name: 'R1 — özellikler' }).count();
+    const sheetOpen = await page.getByRole('region', { name: 'R1 · Direnç' }).count();
     const bar = (await page.getByRole('navigation', { name: 'Eylemler' }).textContent()) ?? '';
     check('parçaya dokununca seçiliyor; alt çubuk ve parça sayfası açılıyor', (await selectedCount(page)) > 0 && sheetOpen === 1 && bar.includes('Döndür') && bar.includes('Sil'), bar.slice(0, 40));
     s = await screen(page, r1.x, r1.y);
@@ -263,7 +271,7 @@ try {
     const options = await picker.getByRole('option').count();
     check('kalabalık noktaya dokununca "Burada N öğe var" seçicisi ve büyüteç çıkıyor', options >= 2 && (await page.locator('use[href^="#scene-"]').count()) === 1, `${options} seçenek`);
     await picker.getByRole('option', { name: /^R2 Direnç/ }).tap(); await page.waitForTimeout(300);
-    check('seçiciden parça seçiliyor', (await page.getByRole('region', { name: 'R2 — özellikler' }).count()) === 1);
+    check('seçiciden parça seçiliyor', (await page.getByRole('region', { name: 'R2 · Direnç' }).count()) === 1);
     await ctx.close();
   }
 
@@ -455,6 +463,63 @@ try {
     const devicesTab = await page.getByRole('tab', { name: 'Cihazlar' }).getAttribute('aria-selected');
     const panel = (await page.getByRole('tabpanel').textContent()) ?? '';
     check('tablette örnek Örnek sekmesinde; cihaz düğmesi Cihazlar sekmesini açıyor', exampleTab === 'true' && devicesTab === 'true' && panel.includes('Osiloskop'), panel.slice(0, 30));
+    await ctx.close();
+  }
+
+  // --- 8. aşama: hoş geldin, yardım, ayarlar, Geri al'lı bildirim -----------------------------
+  {
+    const ctx = await browser.newContext({ welcome: true, viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const welcome = page.getByRole('dialog', { name: /hoş geldin/ });
+    const focused = await page.evaluate(() => document.activeElement?.textContent ?? '');
+    check('ilk ziyarette hoş geldin penceresi; odak "Örnekle başla"da', (await welcome.count()) === 1 && focused.includes('Örnekle başla'), focused.slice(0, 30));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    await page.reload({ waitUntil: 'networkidle' });
+    check('hoş geldin Esc ile kapanıyor ve bir daha açılmıyor', (await page.getByRole('dialog', { name: /hoş geldin/ }).count()) === 0);
+    await page.getByRole('button', { name: 'Yardım', exact: true }).click(); await page.waitForTimeout(200);
+    const help = page.getByRole('dialog', { name: 'Yardım' });
+    const tabs = await help.getByRole('tab').count();
+    await help.getByRole('tab', { name: 'Simgeler ve renkler' }).click();
+    const symbols = (await help.getByRole('tabpanel').textContent()) ?? '';
+    check('Yardım penceresi dört sekmeli; simgeler sekmesi açılıyor', tabs === 4 && symbols.includes('Kablo gerilimi'), `${tabs} sekme`);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(500);
+    const undo = page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).getByRole('button', { name: 'Geri al' });
+    const hadUndo = (await undo.count()) === 1;
+    if (hadUndo) await undo.click();
+    await page.waitForTimeout(300);
+    check('örnek yüklenince bildirimde Geri al; dokununca önceki devre geri geliyor', hadUndo && (await doc(page)).parts.length === 0);
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(400);
+    await page.getByRole('button', { name: 'Ayarlar', exact: true }).click(); await page.waitForTimeout(150);
+    await page.getByRole('switch', { name: /Düğüm gerilimlerini yaz/ }).click(); await page.waitForTimeout(100);
+    await page.keyboard.press('Escape');
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(600);
+    const labels = await page.locator('svg.schematic text', { hasText: /^4,50 V$/ }).count();
+    check('Ayarlar → Düğüm gerilimlerini yaz: düğümlerin yanında gerilim etiketi', labels >= 1, `${labels} etiket`);
+    await ctx.close();
+  }
+  {
+    const ctx = await browser.newContext({ welcome: true, viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const welcome = page.getByRole('dialog', { name: /hoş geldin/ });
+    check('telefonda hoş geldin alt sayfa olarak açılıyor (P01)', (await welcome.count()) === 1);
+    await welcome.getByRole('button', { name: /Kısa tur/ }).tap(); await page.waitForTimeout(300);
+    const tour = page.getByRole('dialog', { name: 'Kısa tur' });
+    const step1 = (await tour.textContent()) ?? '';
+    await page.getByRole('button', { name: 'Parça', exact: true }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Direnç ekle' }).tap(); await page.waitForTimeout(400);
+    const step2 = (await tour.textContent()) ?? '';
+    check('kısa tur gerçek eylemle ilerliyor (parça eklenince 2. adım)', step1.includes('Adım 1 / 4') && step2.includes('Adım 2 / 4'), step2.slice(0, 20));
+    await tour.getByRole('button', { name: 'Turu bitir' }).tap(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: /Daha fazla/ }).tap(); await page.waitForTimeout(300);
+    const more = (await page.getByRole('dialog', { name: 'Daha fazla' }).textContent()) ?? '';
+    check('telefonda ⋯: Yardım sekmesinde dokunma hareketleri (P14)', more.includes('Uca dokun') && more.includes('Düğüm gerilimleri'), more.slice(0, 40));
     await ctx.close();
   }
 

@@ -59,6 +59,7 @@ function BarButton({
   ariaLabel,
   grow = 1,
   vertical = false,
+  tour,
 }: {
   icon?: IconName;
   label: string;
@@ -71,6 +72,8 @@ function BarButton({
   ariaLabel?: string;
   grow?: number;
   vertical?: boolean;
+  /** Kısa turun hedefi (data-tour). */
+  tour?: string;
 }) {
   const color = disabled
     ? 'text-stopped'
@@ -86,6 +89,7 @@ function BarButton({
       disabled={disabled}
       aria-pressed={active || undefined}
       aria-label={ariaLabel}
+      data-tour={tour}
       style={vertical ? undefined : { flexGrow: grow, flexBasis: 0 }}
       className={`flex h-14 min-w-0 shrink-0 flex-col items-center justify-center gap-[3px] rounded-xl leading-4 font-medium ${
         vertical ? 'w-16 text-[11px]' : 'text-[11.5px]'
@@ -110,7 +114,7 @@ export function PhoneBar(props: PhoneBarProps) {
   if (state === 'kur') {
     actions = (
       <>
-        <BarButton vertical={vertical} icon="plus" label={tr.phone.parts} active={props.active === 'parts'} onClick={props.onParts} />
+        <BarButton vertical={vertical} tour="parts" icon="plus" label={tr.phone.parts} active={props.active === 'parts'} onClick={props.onParts} />
         <BarButton vertical={vertical} icon="wire" label={tr.phone.connect} onClick={props.onConnect} />
         <BarButton vertical={vertical} icon="undo" label={tr.phone.undo} disabled={!props.canUndo} onClick={props.onUndo} />
         <BarButton vertical={vertical} icon="panel" label={tr.phone.panel} active={props.active === 'panel'} onClick={props.onPanel} />
@@ -155,7 +159,7 @@ export function PhoneBar(props: PhoneBarProps) {
   } else {
     actions = (
       <>
-        <BarButton vertical={vertical} icon="measure" label={tr.phone.measurements} active={props.active === 'measure'} onClick={props.onMeasure} />
+        <BarButton vertical={vertical} tour="inspect" icon="measure" label={tr.phone.measurements} active={props.active === 'measure'} onClick={props.onMeasure} />
         <BarButton
           vertical={vertical}
           icon="devices"
@@ -181,6 +185,7 @@ export function PhoneBar(props: PhoneBarProps) {
   const play = (
       <button
         type="button"
+        data-tour="play"
         onClick={running ? props.onPause : props.onPlay}
         disabled={state === 'bagla'}
         aria-label={playLabel}

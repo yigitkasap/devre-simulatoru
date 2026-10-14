@@ -26,6 +26,7 @@ export function TabletRail({
   const item = (icon: IconName, label: string, active: boolean, onClick: () => void, expanded?: boolean) => (
     <button
       type="button"
+      data-tour={icon === 'plus' ? 'parts' : undefined}
       onClick={onClick}
       disabled={locked}
       aria-pressed={expanded === undefined ? active : undefined}
@@ -204,6 +205,7 @@ export function TabletBar(props: TabletBarProps) {
       )}
       <button
         type="button"
+        data-tour="play"
         onClick={running ? props.onPause : props.onPlay}
         disabled={state === 'bagla'}
         aria-label={playLabel}

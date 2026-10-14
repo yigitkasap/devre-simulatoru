@@ -25,6 +25,8 @@ export interface SimBarProps {
   readonly onStop: () => void;
   readonly onSpeed: (speed: number) => void;
   readonly onElectronFlow: (on: boolean) => void;
+  /** "Simülasyon başlamadı" yanında tek tıkla düzeltme (toprak yok → toprak ekle). */
+  readonly fix?: { readonly label: string; readonly run: () => void } | null;
 }
 
 /**
@@ -59,17 +61,18 @@ const near = (a: number, b: number) => Math.abs(Math.log10(a / b)) < 0.013;
 
 export function SimBar(props: SimBarProps) {
   const { status, notice } = props;
+  const [speedOpen, setSpeedOpen] = useState(false);
   const active = status !== 'stopped';
   const running = status === 'running';
 
-  let message: { text: string; tone: 'error' | 'info' } | null = null;
+  let message: { text: string; tone: 'error' | 'info'; action?: { label: string; run: () => void } } | null = null;
   if (notice?.kind === 'error') {
     const { detail } = tr.diagnostics.describe(notice.diagnostic, props.diagnosticContext);
-    message = { text: `${tr.sim.cannotRun} ${detail}`, tone: 'error' };
+    message = { text: `${tr.sim.cannotRun} ${detail}`, tone: 'error', ...(props.fix ? { action: props.fix } : {}) };
   } else if (notice?.kind === 'stopped-by-edit') {
     message = { text: tr.sim.stoppedByEdit, tone: 'info' };
   } else if (active && props.lagging) {
-    message = { text: tr.sim.lagging, tone: 'error' };
+    message = { text: tr.sim.lagging, tone: 'error', action: { label: tr.toast.adjustSpeed, run: () => setSpeedOpen(true) } };
   } else if (active) {
     message = { text: props.electronFlow ? tr.sim.electronNote : tr.sim.conventionalNote, tone: 'info' };
   }
@@ -82,6 +85,7 @@ export function SimBar(props: SimBarProps) {
         <div className="flex items-center gap-2.5 @max-[640px]:gap-1.5">
           <button
             type="button"
+            data-tour="play"
             onClick={running ? undefined : props.onPlay}
             aria-pressed={running}
             className={`flex h-9 items-center gap-1.5 rounded-md border pr-3.5 pl-3 font-semibold text-white ${
@@ -105,7 +109,7 @@ export function SimBar(props: SimBarProps) {
           <span className="font-mono font-semibold text-ink tabular">{formatSI(active ? props.time : 0, 's', { digits: 4 })}</span>
         </span>
 
-        <SpeedControl speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} />
+        <SpeedControl speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} open={speedOpen} setOpen={setSpeedOpen} />
 
         <label className="flex cursor-pointer items-center gap-2 px-1 text-small whitespace-nowrap">
           <input
@@ -129,6 +133,15 @@ export function SimBar(props: SimBarProps) {
             <span className="truncate whitespace-nowrap @max-[640px]:whitespace-normal">
               <Rich text={message.text} />
             </span>
+            {message.action && (
+              <button
+                type="button"
+                onClick={message.action.run}
+                className="h-8 shrink-0 rounded-md border border-danger-line bg-panel px-2.5 font-medium text-ink hover:bg-panel-2"
+              >
+                {message.action.label}
+              </button>
+            )}
           </p>
         )}
       </div>
@@ -181,12 +194,15 @@ function SpeedControl({
   speed,
   scopeSpeed,
   onSpeed,
+  open,
+  setOpen,
 }: {
   speed: number;
   scopeSpeed: number | null;
   onSpeed: (speed: number) => void;
+  open: boolean;
+  setOpen: (open: boolean | ((open: boolean) => boolean)) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
 
