@@ -272,6 +272,26 @@ button {
   }
 }
 
+/* Mesajdan vurgu: çerçeve 3 s parlar, sonra söner (PartView'un çerçevesi kalır). */
+@keyframes hl-glow {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.hl-glow {
+  animation: hl-glow 3s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hl-glow {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* Uygulama ekranı: 100dvh desteklenmiyorsa (eski iOS) 100vh. */
 .app-root {
   height: 100vh;

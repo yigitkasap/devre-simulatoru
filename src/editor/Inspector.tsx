@@ -29,7 +29,7 @@ export interface InspectorProps {
 const TAB_ICONS: Record<InspectorTab, IconName> = { inspect: 'search', example: 'book', messages: 'chat' };
 
 export function Inspector({ width, collapsed, onExpand, tab, onTab, inspect, example, messages }: InspectorProps) {
-  const errors = messages.items.filter((i) => i.diagnostic.severity === 'error').length;
+  const errors = messages.items.filter((i) => i.severity === 'error').length;
   const count = messages.items.length;
 
   if (collapsed) {

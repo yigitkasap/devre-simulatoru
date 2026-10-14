@@ -45,7 +45,8 @@ import {
   voltageGradient,
   type WireScale,
 } from './colors';
-import { BurnBalloon, ContextMenu, ReadoutBox, type MenuItem } from './CanvasOverlays';
+import { BurnBalloon, ContextMenu, NoGroundBanner, ReadoutBox, type MenuItem } from './CanvasOverlays';
+import type { MessageSeverity } from './messages';
 import { meterDisplayRect, PartView, type PartTone } from './PartView';
 import { meterText, partReadout } from './readouts';
 import type { Settings } from './settings';
@@ -132,6 +133,22 @@ export interface CanvasProps {
   readonly onPartPlaced?: (type: DeviceType) => void;
   /** Boş tuvaldeki "Örneklerden başla" düğmesi. */
   readonly onExamples?: () => void;
+  /** Hata ya da uyarısı olan parçalar: çerçeve ve köşede rozet (M07a, M07b). */
+  readonly issues?: ReadonlyMap<string, MessageSeverity>;
+  /** Uyarısı olan uçlar (boşta uç): büyütülmüş halka. */
+  readonly issuePins?: readonly Point[];
+  /** Toprak tuzağında topraklı cihazların COM uçları: aralarında şebeke toprağı çizgisi (M06b). */
+  readonly earthLine?: readonly Point[] | null;
+  /** "Devrede toprak yok": afiş ve önerilen toprak yeri (M07b). */
+  readonly noGround?: {
+    readonly point: Point | null;
+    readonly text: string;
+    readonly fixLabel: string | null;
+    readonly onFix: () => void;
+    readonly onDismiss: () => void;
+  } | null;
+  /** Yanan LED balonundaki "Neden?": Mesajlar sekmesinde açıklama. */
+  readonly onExplain?: (partId: string) => void;
   /**
    * Parçanın yanında V/I/P kutusu (fareyle üzerine gelince ya da dokunmatikte seçiliyken). Masaüstünde
    * bu bilgiler İnceleme panelinde olduğu için kapalıdır.
@@ -242,6 +259,11 @@ export function Canvas({
   onPartPlaced,
   onExamples,
   readoutBoxes = true,
+  issues,
+  issuePins,
+  earthLine,
+  noGround,
+  onExplain,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1058,7 +1080,24 @@ export function Canvas({
         ? 'selected'
         : hover?.kind === 'part' && hover.partId === id
           ? 'hover'
-          : 'normal';
+          : (issues?.get(id) ?? 'normal');
+
+  // Şebeke toprağı çizgisi: COM uçlarından devrenin altına inip birleşen kesikli yeşil çizgi.
+  const earthPath = (() => {
+    if (!earthLine || earthLine.length < 2) return null;
+    let bottom = -Infinity;
+    for (const part of doc.parts) {
+      const b = partBounds(part);
+      bottom = Math.max(bottom, b.y + b.h);
+    }
+    for (const p of earthLine) bottom = Math.max(bottom, p.y);
+    const yb = (bottom + 3) * GRID;
+    const xs = earthLine.map((p) => p.x * GRID);
+    const left = Math.min(...xs);
+    const right = Math.max(...xs);
+    const d = [...earthLine.map((p) => `M${p.x * GRID} ${p.y * GRID}V${yb}`), `M${left} ${yb}H${right}`].join('');
+    return { d, yb, mid: (left + right) / 2 };
+  })();
 
   return (
     <div className="absolute inset-0 overflow-hidden bg-paper">
@@ -1171,6 +1210,38 @@ export function Canvas({
             />
           ))}
 
+          {earthPath && (
+            <g pointerEvents="none" aria-hidden="true">
+              <path d={earthPath.d} fill="none" stroke="var(--color-earth)" strokeWidth={1.5} strokeDasharray="4 3" />
+              <path
+                d={`M${earthPath.mid} ${earthPath.yb}v4M${earthPath.mid - 6} ${earthPath.yb + 4}h12M${earthPath.mid - 3.5} ${earthPath.yb + 7.5}h7M${earthPath.mid - 1.5} ${earthPath.yb + 11}h3`}
+                fill="none"
+                stroke="var(--color-earth)"
+                strokeWidth={1.6}
+                strokeLinecap="round"
+              />
+              <rect x={earthPath.mid + 14} y={earthPath.yb - 7} width={118} height={14} rx={7} fill="var(--color-ok-soft)" />
+              <text x={earthPath.mid + 73} y={earthPath.yb + 3.5} textAnchor="middle" fontSize={8.5} fontWeight={500} fill="var(--color-ok-ink)">
+                {tr.earthLine}
+              </text>
+            </g>
+          )}
+          {noGround?.point && (
+            <g pointerEvents="none" aria-hidden="true" opacity={0.85}>
+              <path
+                d={`M${noGround.point.x * GRID} ${noGround.point.y * GRID}v18m-12 0h24m-20 6h16m-11 6h6`}
+                fill="none"
+                stroke="var(--color-accent)"
+                strokeWidth={2}
+                strokeDasharray="3 3"
+                strokeLinecap="round"
+              />
+              <rect x={noGround.point.x * GRID + 14} y={noGround.point.y * GRID + 12} width={58} height={14} rx={7} fill="var(--color-accent-soft)" />
+              <text x={noGround.point.x * GRID + 43} y={noGround.point.y * GRID + 22} textAnchor="middle" fontSize={8.5} fontWeight={500} fill="var(--color-accent-ink)">
+                {tr.noGround.suggested}
+              </text>
+            </g>
+          )}
           {doc.parts.map((part) => {
             const live = frame?.live.get(part.id);
             const measurement = frame?.measurements.get(part.id);
@@ -1204,6 +1275,66 @@ export function Canvas({
                 />
               ) : null,
             ),
+          )}
+
+          {issuePins?.map((p) => (
+            <circle
+              key={`ip${p.x},${p.y}`}
+              cx={p.x * GRID}
+              cy={p.y * GRID}
+              r={7}
+              fill="var(--color-panel)"
+              stroke="var(--color-pin)"
+              strokeWidth={2.5}
+              pointerEvents="none"
+            />
+          ))}
+          {/* Hata ve uyarı rozetleri: renk + biçim (dolu daire / üçgen). */}
+          {issues &&
+            doc.parts.map((part) => {
+              const severity = issues.get(part.id);
+              if (!severity) return null;
+              const b = partBounds(part);
+              const x = (b.x + b.w) * GRID + 4;
+              const y = b.y * GRID - 4;
+              return severity === 'error' ? (
+                <g key={`ib${part.id}`} pointerEvents="none" aria-hidden="true">
+                  <circle cx={x} cy={y} r={7} fill="var(--color-danger)" />
+                  <path d={`M${x} ${y - 3.5}v4`} stroke="white" strokeWidth={1.8} strokeLinecap="round" />
+                  <circle cx={x} cy={y + 3.6} r={0.9} fill="white" />
+                </g>
+              ) : (
+                <g key={`ib${part.id}`} pointerEvents="none" aria-hidden="true">
+                  <path d={`M${x} ${y - 8}l9 15H${x - 9}z`} fill="var(--color-paused)" stroke="var(--color-warn)" strokeWidth={1} strokeLinejoin="round" />
+                  <path d={`M${x} ${y - 3}v4.5`} stroke="var(--color-ink)" strokeWidth={1.6} strokeLinecap="round" />
+                  <circle cx={x} cy={y + 4} r={1} fill="var(--color-ink)" />
+                </g>
+              );
+            })}
+          {/* Mesajdan vurgu: 3 s parlayan çerçeve, sonra PartView'un çerçevesi kalır. */}
+          {highlight && highlight.severity !== 'info' && (
+            <g key={`glow-${[...highlight.parts].join(',')}`} className="hl-glow" pointerEvents="none" aria-hidden="true">
+              {doc.parts
+                .filter((p) => highlight.parts.has(p.id))
+                .map((p) => {
+                  const b = partBounds(p);
+                  return (
+                    <rect
+                      key={p.id}
+                      x={b.x * GRID - 9}
+                      y={b.y * GRID - 9}
+                      width={b.w * GRID + 18}
+                      height={b.h * GRID + 18}
+                      rx={6}
+                      fill={highlight.severity === 'error' ? 'var(--color-danger)' : 'var(--color-warn)'}
+                      fillOpacity={0.08}
+                      stroke={highlight.severity === 'error' ? 'var(--color-danger)' : 'var(--color-warn)'}
+                      strokeWidth={3}
+                      strokeOpacity={0.35}
+                    />
+                  );
+                })}
+            </g>
           )}
 
           {hoverPin && (
@@ -1331,15 +1462,18 @@ export function Canvas({
             const besideLabel = part.rotation % 180 === 0 ? 0 : 62 * view.scale;
             const labelSpace = right + besideLabel + BALLOON <= size.width ? besideLabel : 0;
             const flip = right + labelSpace + BALLOON > size.width;
-            const { title, detail } = tr.diagnostics.describe(d, {
-              label: (pid) => doc.parts.find((p) => p.id === pid)?.label ?? pid,
-              type: (pid) => doc.parts.find((p) => p.id === pid)?.type,
-            });
+            const title = tr.balloon.burnTitle(part.label);
+            const detail = tr.balloon.burnDetail(
+              formatSI(d.params?.current ?? 0, 'A', { digits: 3 }),
+              formatSI(d.params?.maxCurrent ?? 0, 'A', { trim: true }),
+            );
             return (
               <BurnBalloon
                 key={dismissKey}
+                id={id}
                 title={title}
                 detail={detail}
+                onWhy={onExplain ? () => onExplain(id) : undefined}
                 x={flip ? left - 10 : right + labelSpace + 10}
                 y={box.y * g + view.y - 6}
                 flip={flip}
@@ -1367,22 +1501,35 @@ export function Canvas({
       {menu && (() => {
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
-        const items: MenuItem[] = [];
-        if (part.type === 'led' && frame?.statuses.get(part.id)?.burned) {
-          items.push({ label: tr.contextMenu.repair, onSelect: () => onRepair(part.id), tone: 'accent' });
-        }
-        items.push(
+        const burned = part.type === 'led' && frame?.statuses.get(part.id)?.burned === true;
+        const items: MenuItem[] = [
           { label: tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
-          { label: tr.contextMenu.rotate, onSelect: () => onRotate([part.id]) },
-          ...(CATALOG[part.type].polarized ? [{ label: tr.contextMenu.flip, onSelect: () => onFlip([part.id]) }] : []),
+          { label: tr.contextMenu.rotate, shortcut: 'R', onSelect: () => onRotate([part.id]) },
+          ...(CATALOG[part.type].polarized ? [{ label: tr.contextMenu.flip, shortcut: 'F', onSelect: () => onFlip([part.id]) }] : []),
+          ...(burned ? [{ label: tr.contextMenu.repair, onSelect: () => onRepair(part.id), tone: 'accent' as const, separatorBefore: true }] : []),
           {
             label: tr.contextMenu.remove,
+            shortcut: 'Delete',
             onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
             tone: 'danger',
+            separatorBefore: !burned,
           },
+        ];
+        return (
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            items={items}
+            area={size}
+            label={tr.contextMenu.menu(part.label)}
+            onClose={() => setMenu(null)}
+          />
         );
-        return <ContextMenu x={menu.x} y={menu.y} items={items} area={size} onClose={() => setMenu(null)} />;
       })()}
+
+      {noGround && (
+        <NoGroundBanner text={noGround.text} fixLabel={noGround.fixLabel} onFix={noGround.onFix} onDismiss={noGround.onDismiss} />
+      )}
 
       {/* Telefonda yakınlık tuvalin köşesinde; masaüstünde üst çubukta. */}
       <p className="pointer-events-none absolute right-2 bottom-2 rounded bg-panel/85 px-2 py-1 text-xs text-muted shadow-sm tabular desk:hidden">

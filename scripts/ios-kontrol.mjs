@@ -328,6 +328,63 @@ try {
   check('masaüstü: Durdur’la Kur düzenine dönülüyor', (await rp.getByRole('tablist', { name: 'İnceleme paneli' }).count()) === 1 && (await rp.getByRole('navigation', { name: 'İnceleme paneli (daraltılmış)' }).count()) === 0);
   await rackCtx.close();
 
+  // --- Masaüstü: hatalar ve uyarılar (rozet, LED balonu, düzeltmeler, toprak yok, tuzak) ------
+  const errCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+  const ep = await errCtx.newPage();
+  ep.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  await ep.goto(URL0, { waitUntil: 'networkidle' });
+  await ep.getByRole('button', { name: 'Örnekler', exact: true }).click(); await ep.waitForTimeout(200);
+  await ep.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await ep.waitForTimeout(400);
+  await ep.getByRole('button', { name: 'Oynat' }).first().click(); await ep.waitForTimeout(400);
+  await ep.getByRole('tab', { name: 'İncele' }).click();
+  await ep.getByRole('button', { name: /^R1/ }).first().click();
+  const r1Field = ep.getByLabel('Direnç', { exact: true });
+  await r1Field.fill('10'); await r1Field.press('Enter'); await ep.waitForTimeout(900);
+  const balloon = ep.getByRole('alertdialog', { name: /LED1 yandı/ });
+  check('masaüstü: LED yanınca balon ve Mesajlar sekmesi öne geliyor', (await balloon.count()) === 1 && (await ep.getByRole('tab', { name: /Mesajlar/ }).getAttribute('aria-selected')) === 'true');
+  await balloon.getByRole('button', { name: 'Neden?' }).click(); await ep.waitForTimeout(200);
+  const fix = ep.getByRole('tabpanel').getByRole('button', { name: /^R1’i .* yap$/ });
+  const fixLabel = (await fix.textContent().catch(() => '')) ?? '';
+  check('masaüstü: "Neden?" mesajı seçiyor; seri direnç önerisi var', fixLabel.includes('160'), fixLabel);
+  await fix.click(); await ep.waitForTimeout(700);
+  check('masaüstü: önerilen ön direnç uygulanınca LED onarılıyor', (await part(ep, 'R1')).props.resistance === 160 && (await ep.getByRole('alertdialog').count()) === 0);
+  await errCtx.close();
+
+  const groundless = { version: 1, parts: [
+    { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
+    { id: 'p2', type: 'resistor', label: 'R1', x: 12, y: -6, rotation: 0, props: { resistance: 1000 } },
+    { id: 'p3', type: 'resistor', label: 'R2', x: 24, y: 0, rotation: 90, props: { resistance: 2000 } },
+  ], wires: [
+    { id: 'w1', points: [[0, -4], [0, -6], [8, -6]] },
+    { id: 'w2', points: [[16, -6], [24, -6], [24, -4]] },
+    { id: 'w3', points: [[24, 4], [24, 6], [0, 6], [0, 4]] },
+  ] };
+  const ngCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+  await ngCtx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, JSON.stringify(groundless));
+  const gp = await ngCtx.newPage();
+  gp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  await gp.goto(URL0, { waitUntil: 'networkidle' });
+  await gp.getByRole('button', { name: 'Oynat' }).first().click(); await gp.waitForTimeout(400);
+  const banner = gp.getByRole('alert').filter({ hasText: 'devrede toprak yok' });
+  check('masaüstü: toprak yokken Oynat’ta afiş ve tek tıkla düzeltme çıkıyor', (await banner.count()) === 1 && (await banner.getByRole('button', { name: 'B1’in − ucuna toprak ekle' }).count()) === 1);
+  await banner.getByRole('button', { name: 'B1’in − ucuna toprak ekle' }).click(); await gp.waitForTimeout(700);
+  const fixedDoc = await doc(gp);
+  const runningText = (await gp.getByRole('region', { name: 'Simülasyon' }).getByRole('status').textContent()) ?? '';
+  check('masaüstü: toprak eklenince simülasyon başlıyor', fixedDoc.parts.some((p) => p.type === 'ground') && runningText.includes('Çalışıyor'), runningText);
+  await ngCtx.close();
+
+  const trapCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+  const tp = await trapCtx.newPage();
+  tp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+  await tp.goto(URL0, { waitUntil: 'networkidle' });
+  await tp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await tp.waitForTimeout(200);
+  await tp.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }).click(); await tp.waitForTimeout(400);
+  const earthLabel = await tp.locator('svg.schematic text', { hasText: 'şebeke toprağı' }).count();
+  await tp.getByRole('tab', { name: /Mesajlar/ }).click(); await tp.waitForTimeout(150);
+  const trapText = (await tp.getByRole('tabpanel').textContent()) ?? '';
+  check('masaüstü: toprak tuzağında uyarı ve şebeke toprağı çizgisi', earthLabel === 1 && trapText.includes('Toprak tuzağı') && trapText.includes('D4 kısa devre oldu'), trapText.slice(0, 50));
+  await trapCtx.close();
+
   // --- Sıkışık masaüstü (1100 px): kütüphane şerit, açılır kart --------------------------
   const compact = await browser.newContext({ viewport: { width: 1100, height: 760 }, locale: 'tr-TR' });
   const cp = await compact.newPage();

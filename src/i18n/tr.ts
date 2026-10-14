@@ -879,21 +879,54 @@ export const tr = {
     hide: 'Mesajları gizle',
     hint: 'Bir mesaja tıklayınca ilgili parça tuvalde vurgulanır.',
     counts: (errors: number, warnings: number) => `${errors} hata · ${warnings} uyarı`,
+    /** "2 hata", "1 hata, 1 uyarı", "3 uyarı". */
+    summary: (errors: number, warnings: number) =>
+      [errors > 0 ? `${errors} hata` : '', warnings > 0 ? `${warnings} uyarı` : ''].filter(Boolean).join(', '),
+    stripBlocked: (summary: string) =>
+      `**${summary}.** Hata düzelmeden simülasyon başlamaz; uyarılar başlamasına engel değildir.`,
+    stripRuntime: (summary: string) =>
+      `**${summary}.** Sağdaki listeden bir mesaja tıkla: ilgili parça vurgulanır ve görünüm oraya kayar.`,
+    earthTrapTitle: 'Toprak tuzağı',
+    earthTrap: (scope: string, generator: string, shorted: string) =>
+      `${scope} ve ${generator} COM uçları şebeke toprağıyla birleşiyor; ${shorted} kısa devre oldu. Prob toprağını ${generator} COM ile aynı noktaya bağla.`,
+    earthTrapGeneric: (instruments: string, shorted: string) =>
+      `${instruments} şebeke toprağıyla birleşiyor; ${shorted} kısa devre oldu. Toprağa bağlı uçları aynı noktaya bağla ya da cihazın şebeke toprağı bağlantısını kaldır.`,
+    repair: 'Onar',
+    setResistor: (label: string, value: string) => `${label}’i ${value} yap`,
     severity: { error: 'Hata', warning: 'Uyarı' },
     circuitTarget: 'devre',
     noneDetail: 'Devrede şu an hata ya da uyarı yok.',
   },
   contextMenu: {
     properties: 'Özellikler…',
-    rotate: 'Döndür (R)',
-    flip: 'Ters çevir (F)',
+    rotate: 'Döndür',
+    flip: 'Ters çevir',
     remove: 'Sil',
     repair: 'Onar',
+    menu: (label: string) => `${label} menüsü`,
   },
   balloon: {
     repair: 'Onar',
     close: 'Kapat',
+    why: 'Neden?',
+    burnTitle: (label: string) => `${label} yandı`,
+    burnDetail: (current: string, max: string) => `Üzerinden ≈ ${current} geçti; en fazla ${max}’e dayanır.`,
   },
+  noGround: {
+    title: 'Simülasyon başlamadı: devrede toprak yok',
+    text: 'Gerilimler bir referansa göre ölçülür. Toprak sembolü ekle.',
+    where: {
+      battery: 'Pilin − ucu iyi bir yer.',
+      acsource: 'AC kaynağın − ucu iyi bir yer.',
+      dcsupply: 'Güç kaynağının − ucu iyi bir yer.',
+    } as Record<string, string>,
+    fix: (label: string) => `${label}’in − ucuna toprak ekle`,
+    fixGeneric: 'Önerilen yere toprak ekle',
+    myself: 'Kendim eklerim',
+    close: 'Kapat',
+    suggested: 'önerilen toprak',
+  },
+  earthLine: 'şebeke toprağı (cihazlarda)',
   hints: {
     touchAdded:
       'Parça eklendi. Sürükle: taşı · pin ucuna dokun: kablo · çift dokun: özellikler · basılı tut: menü (Döndür, Ters çevir, Sil)',

@@ -32,16 +32,23 @@ export function HintText({ text }: { text: string }) {
   );
 }
 
-type Tone = 'neutral' | 'ok' | 'accent';
+type Tone = 'neutral' | 'ok' | 'accent' | 'error' | 'warn';
 
 const TONES: Record<Tone, string> = {
   neutral: 'border-line bg-panel-2 text-muted [&_b]:text-ink',
   ok: 'border-ok-line bg-ok-soft text-ok-ink',
   accent: 'border-accent-line bg-accent-soft text-accent-ink',
+  error: 'border-danger-line bg-danger-soft text-danger-ink',
+  warn: 'border-warn-line bg-warn-soft text-warn',
 };
 
 /** Şeridin gösterdiği durum: tuvalin ipucu ya da açık bir örneğin yönlendirmesi. */
-export type StripHint = CanvasHint | { readonly kind: 'example' } | { readonly kind: 'measure'; readonly example: boolean };
+export type StripHint =
+  | CanvasHint
+  | { readonly kind: 'example' }
+  | { readonly kind: 'measure'; readonly example: boolean }
+  /** Hata/uyarı özeti (M07a, M07b). */
+  | { readonly kind: 'issues'; readonly text: string; readonly tone: 'error' | 'warn' };
 
 function hintText(hint: StripHint): { text: string; tone: Tone; right?: string } {
   switch (hint.kind) {
@@ -59,6 +66,8 @@ function hintText(hint: StripHint): { text: string; tone: Tone; right?: string }
       return { text: tr.hints.empty, tone: 'neutral' };
     case 'example':
       return { text: tr.hints.example, tone: 'neutral', right: tr.hints.exampleUndo };
+    case 'issues':
+      return { text: hint.text, tone: hint.tone };
     case 'measure':
       return { text: hint.example ? tr.rack.measureHintExample : tr.rack.measureHint, tone: 'neutral' };
     default:

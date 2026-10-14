@@ -130,11 +130,12 @@ export const PartView = memo(function PartView({
           width={right - left + 8}
           height={bottom - top + 8}
           rx={3}
-          fill={tone === 'selected' ? 'var(--color-accent-soft)' : tone === 'error' ? '#fde8e6' : 'var(--color-warn-soft)'}
-          fillOpacity={tone === 'selected' ? 0.55 : 0.9}
+          // Hata: kesintisiz kırmızı çerçeve; uyarı: kesikli amber çerçeve (renk tek başına değil).
+          fill={tone === 'selected' ? 'var(--color-accent-soft)' : tone === 'error' ? 'var(--color-danger-soft)' : 'var(--color-warn-soft)'}
+          fillOpacity={tone === 'selected' ? 0.55 : tone === 'error' ? 0.75 : 0.6}
           stroke={color}
-          strokeWidth={tone === 'selected' ? 1 : 1.6}
-          strokeDasharray={tone === 'selected' ? '4 3' : undefined}
+          strokeWidth={tone === 'selected' ? 1 : tone === 'error' ? 2 : 1.5}
+          strokeDasharray={tone === 'selected' || tone === 'warning' ? '4 3' : undefined}
         />
       )}
       {alarm && (

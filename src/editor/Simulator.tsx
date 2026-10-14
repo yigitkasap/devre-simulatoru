@@ -6,9 +6,9 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
-import { flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
+import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
-import { nextRotation, pinPositions } from '../model/geometry';
+import { boxesIntersect, nextRotation, partBounds, pinPositions } from '../model/geometry';
 import { docFromHash, shareUrl } from '../model/share';
 import { CATALOG } from '../model/catalog';
 import { emptyDoc, type CircuitDoc } from '../model/types';
@@ -25,7 +25,17 @@ import type { PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { HintStrip, type StripHint } from './HintStrip';
 import { Library, LibraryFlyout, type LibraryMode } from './Library';
-import { MessagesPanel, messageKey, type MessageItem } from './MessagesPanel';
+import {
+  earthTrapItem,
+  findEarthTrap,
+  itemFromDiagnostic,
+  messageKey,
+  seriesResistor,
+  suggestedResistor,
+  type MessageItem,
+} from './messages';
+import { MessagesPanel } from './MessagesPanel';
+import type { MessageAction } from './MessagesTab';
 import { PropertiesDialog } from './PropertiesDialog';
 import { useRecentParts } from './recentParts';
 import { ScopePanel } from './ScopePanel';
@@ -258,6 +268,17 @@ export default function Simulator() {
     }
   }, [connectivity]);
 
+  const diagnosticContext = useMemo<DiagnosticContext>(() => {
+    const byId = new Map(doc.parts.map((p) => [p.id, p]));
+    return {
+      label: (id) => byId.get(id)?.label ?? id,
+      type: (id) => byId.get(id)?.type,
+    };
+  }, [doc]);
+
+  /** Toprak tuzağı: topraklı cihazların COM'ları şebeke toprağıyla birleşip bir parçayı kısa devre ediyor. */
+  const earthTrap = useMemo(() => (compiled ? findEarthTrap(doc, compiled) : null), [doc, compiled]);
+
   const messages = useMemo<MessageItem[]>(() => {
     const list: Diagnostic[] = [...(compiled?.diagnostics ?? []), ...(sim.frame?.runtime ?? [])];
     if (sim.notice?.kind === 'error') list.push(sim.notice.diagnostic);
@@ -267,17 +288,18 @@ export default function Simulator() {
       const key = messageKey(d);
       if (seen.has(key)) continue;
       seen.add(key);
-      items.push({ key, diagnostic: d });
+      items.push(itemFromDiagnostic(d, diagnosticContext));
     }
+    if (earthTrap) items.push(earthTrapItem(earthTrap, doc));
     // Önce hatalar, sonra uyarılar (kendi içlerinde sıra korunur).
-    return items.sort((a, b) => Number(b.diagnostic.severity === 'error') - Number(a.diagnostic.severity === 'error'));
-  }, [compiled, sim.frame?.runtime, sim.notice]);
+    return items.sort((a, b) => Number(b.severity === 'error') - Number(a.severity === 'error'));
+  }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc]);
 
   const [panelOpen, setPanelOpen] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
 
-  /** Bir tanılamanın vurgulayacağı parçalar ve kablolar. */
-  const highlightOf = (d: Diagnostic): Highlight => {
+  /** Bir mesajın vurgulayacağı parçalar ve kablolar. */
+  const highlightOf = (d: MessageItem): Highlight => {
     const nets = new Set(d.netKeys);
     const wires = new Set<string>();
     if (compiled && nets.size > 0) {
@@ -290,15 +312,118 @@ export default function Simulator() {
     return { parts: new Set(d.elementIds), wires, severity: d.severity };
   };
   const selectedItem = messages.find((m) => m.key === selectedMessage);
-  const highlight = selectedItem ? highlightOf(selectedItem.diagnostic) : null;
+  const highlight = selectedItem ? highlightOf(selectedItem) : null;
 
   const selectMessage = (item: MessageItem | null) => {
     setSelectedMessage(item?.key ?? null);
     if (item) {
-      const h = highlightOf(item.diagnostic);
+      const h = highlightOf(item);
       canvasRef.current?.reveal([...h.parts], [...h.wires]);
     }
   };
+
+  // --- Tuvalde hata ve uyarı işaretleri ----------------------------------------------------
+  // Kurulum sırasında (boşta uçlar vb.) tuval sakin kalır; rozetler simülasyon çalışırken ya da
+  // Oynat'a basılıp başlayamadığında çıkar (M07a, M07b).
+  const showIssues = sim.status !== 'stopped' || sim.notice?.kind === 'error';
+  const issues = useMemo(() => {
+    const map = new Map<string, 'error' | 'warning'>();
+    if (!showIssues) return map;
+    for (const item of messages) {
+      for (const id of item.badgeIds ?? item.elementIds) {
+        if (map.get(id) !== 'error') map.set(id, item.severity);
+      }
+    }
+    return map;
+  }, [messages, showIssues]);
+  const issuePins = useMemo(() => {
+    if (!showIssues) return [];
+    const points = [];
+    for (const item of messages) {
+      const d = item.diagnostic;
+      if (d?.code !== 'floating-pin' || d.pin === undefined) continue;
+      const part = doc.parts.find((p) => p.id === d.elementIds[0]);
+      const at = part ? pinPositions(part)[d.pin] : undefined;
+      if (at) points.push(at);
+    }
+    return points;
+  }, [messages, showIssues, doc]);
+
+  /** Mesajın düzeltme düğmeleri: yanan LED için Onar ve (tek seri direnç varsa) önerilen ön direnç. */
+  const messageActions = (item: MessageItem): MessageAction[] => {
+    const d = item.diagnostic;
+    if (d?.code !== 'led-burned') return [];
+    const ledId = d.elementIds[0]!;
+    const actions: MessageAction[] = [{ label: tr.messages.repair, primary: true, run: () => sim.repair(ledId) }];
+    const resistorId = compiled ? seriesResistor(ledId, compiled) : null;
+    const resistor = resistorId ? doc.parts.find((p) => p.id === resistorId) : undefined;
+    const value = suggestedResistor(sim.frame?.vmax ?? 0, d.params?.forwardVoltage ?? 2);
+    if (resistor && value !== null) {
+      actions.push({
+        label: tr.messages.setResistor(resistor.label, formatSI(value, 'Ω', { trim: true })),
+        run: () => {
+          dispatch({ type: 'commit', doc: updatePart(doc, resistor.id, { props: { ...resistor.props, resistance: value } }) });
+          sim.repair(ledId);
+        },
+      });
+    }
+    return actions;
+  };
+  /** LED balonundaki "Neden?": Mesajlar sekmesinde o mesaj seçili açılır. */
+  const explain = (partId: string) => {
+    const item = messages.find((m) => m.code === 'led-burned' && m.elementIds.includes(partId));
+    setInspectorTab('messages');
+    setMeasureLayout(false);
+    if (item) setSelectedMessage(item.key);
+  };
+
+  // --- "Devrede toprak yok" afişi ve tek tıkla düzeltme --------------------------------------
+  const [noGroundDismissed, setNoGroundDismissed] = useState(false);
+  const noGroundNotice = sim.notice?.kind === 'error' && sim.notice.diagnostic.code === 'no-ground';
+  useEffect(() => setNoGroundDismissed(false), [sim.notice]);
+  /** Önerilen toprak yeri: pilin, AC kaynağın ya da güç kaynağının − ucu. */
+  const groundSuggestion = useMemo(() => {
+    if (!noGroundNotice) return null;
+    for (const type of ['battery', 'acsource', 'dcsupply'] as const) {
+      const part = doc.parts.find((p) => p.type === type);
+      const at = part ? pinPositions(part)[1] : undefined;
+      if (part && at) return { part, at };
+    }
+    return null;
+  }, [noGroundNotice, doc]);
+  const [playAfterFix, setPlayAfterFix] = useState(false);
+  useEffect(() => {
+    if (!playAfterFix) return;
+    setPlayAfterFix(false);
+    sim.play();
+  }, [playAfterFix, doc]);
+  const addSuggestedGround = () => {
+    if (!groundSuggestion) return;
+    const p = groundSuggestion.at;
+    const occupied = doc.parts.map((part) => partBounds(part));
+    const candidates = [
+      { x: p.x, y: p.y + 3 },
+      { x: p.x, y: p.y + 5 },
+      { x: p.x - 4, y: p.y + 3 },
+      { x: p.x + 4, y: p.y + 3 },
+    ];
+    const at =
+      candidates.find((c) => {
+        const b = partBounds({ type: 'ground', x: c.x, y: c.y, rotation: 0 });
+        return !occupied.some((o) => boxesIntersect(o, b));
+      }) ?? candidates[0]!;
+    const placed = addPart(doc, 'ground', at, 0);
+    const route = at.x === p.x ? [p, at] : [p, { x: p.x, y: at.y - 0 }, at];
+    const wired = addWire(placed.doc, route);
+    dispatch({ type: 'commit', doc: wired.doc, selection: EMPTY_SELECTION });
+    setNoGroundDismissed(true);
+    setPlayAfterFix(true);
+  };
+
+  // --- İpucu şeridinde hata/uyarı özeti ---------------------------------------------------
+  const errorCount = messages.filter((m) => m.severity === 'error').length;
+  const warningCount = messages.length - errorCount;
+  const runtimeIssues = messages.some((m) => (m.diagnostic && (sim.frame?.runtime ?? []).includes(m.diagnostic)) || m.code === 'earth-trap');
 
   // Simülasyon hatası ya da yeni bir çalışma uyarısı (kısa devre, yanan LED) gelince panel açılır;
   // simülasyon başlatılamadıysa hata vurgulanır. Kurulum sırasındaki boşta uç uyarıları paneli açmaz.
@@ -341,8 +466,13 @@ export default function Simulator() {
     dispatch({ type: 'commit', doc: updatePart(doc, partId, patch) });
   };
   const idleHint = canvasStatus.hint.kind === 'select' || canvasStatus.hint.kind === 'empty' || canvasStatus.hint.kind === 'simulating';
+  const summary = tr.messages.summary(errorCount, warningCount);
   const stripHint: StripHint =
-    measureLayout && idleHint
+    sim.notice?.kind === 'error' && idleHint
+      ? { kind: 'issues', text: tr.messages.stripBlocked(summary), tone: 'error' }
+      : sim.status !== 'stopped' && runtimeIssues && idleHint
+        ? { kind: 'issues', text: tr.messages.stripRuntime(summary), tone: errorCount > 0 ? 'error' : 'warn' }
+        : measureLayout && idleHint
       ? { kind: 'measure', example: activeExample !== null }
       : activeExample && !answerRevealed && idleHint && canvasStatus.hint.kind !== 'simulating'
         ? { kind: 'example' }
@@ -502,14 +632,6 @@ export default function Simulator() {
     },
   };
 
-  const diagnosticContext = useMemo<DiagnosticContext>(() => {
-    const byId = new Map(doc.parts.map((p) => [p.id, p]));
-    return {
-      label: (id) => byId.get(id)?.label ?? id,
-      type: (id) => byId.get(id)?.type,
-    };
-  }, [doc]);
-
   return (
     <div className="app-root flex flex-col overflow-hidden">
       <TopBar
@@ -591,6 +713,21 @@ export default function Simulator() {
               onPartPlaced={rememberPart}
               onExamples={() => setExamplesOpen(true)}
               readoutBoxes={phone}
+              issues={issues}
+              issuePins={issuePins}
+              earthLine={earthTrap?.comPoints ?? null}
+              noGround={
+                noGroundNotice && !noGroundDismissed
+                  ? {
+                      point: groundSuggestion?.at ?? null,
+                      text: `${tr.noGround.text}${groundSuggestion ? ` ${tr.noGround.where[groundSuggestion.part.type] ?? ''}` : ''}`,
+                      fixLabel: groundSuggestion ? tr.noGround.fix(groundSuggestion.part.label) : null,
+                      onFix: addSuggestedGround,
+                      onDismiss: () => setNoGroundDismissed(true),
+                    }
+                  : null
+              }
+              onExplain={explain}
             />
             {phone && scope && (
               <ScopePanel
@@ -663,7 +800,6 @@ export default function Simulator() {
               onToggle={() => setPanelOpen((o) => !o)}
               selectedKey={selectedItem ? selectedItem.key : null}
               onSelect={selectMessage}
-              context={diagnosticContext}
             />
           )}
 
@@ -726,6 +862,7 @@ export default function Simulator() {
               selectedKey: selectedItem ? selectedItem.key : null,
               onSelect: selectMessage,
               context: diagnosticContext,
+              actions: messageActions,
             }}
           />
         )}

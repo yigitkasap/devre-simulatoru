@@ -1,18 +1,9 @@
 // Mesaj paneli: topoloji kontrollerinin ve simülasyonun hata/uyarıları (simülasyon günlüğü).
 // Bir mesaja tıklayınca ilgili parçalar ve kablolar tuvalde vurgulanır.
 
-import { tr, type DiagnosticContext } from '../i18n/tr';
-import type { Diagnostic } from '../sim/diagnostics';
+import { tr } from '../i18n/tr';
+import type { MessageItem, MessageSeverity } from './messages';
 import { Rich } from './Rich';
-
-export interface MessageItem {
-  readonly key: string;
-  readonly diagnostic: Diagnostic;
-}
-
-export function messageKey(d: Diagnostic): string {
-  return `${d.code}|${d.elementIds.join(',')}|${d.pin ?? ''}`;
-}
 
 export interface MessagesPanelProps {
   readonly items: readonly MessageItem[];
@@ -20,10 +11,9 @@ export interface MessagesPanelProps {
   readonly onToggle: () => void;
   readonly selectedKey: string | null;
   readonly onSelect: (item: MessageItem | null) => void;
-  readonly context: DiagnosticContext;
 }
 
-function SeverityIcon({ severity }: { severity: Diagnostic['severity'] }) {
+function SeverityIcon({ severity }: { severity: MessageSeverity }) {
   return severity === 'error' ? (
     <svg viewBox="0 0 16 16" className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden="true">
       <circle cx="8" cy="8" r="7" fill="currentColor" />
@@ -38,8 +28,8 @@ function SeverityIcon({ severity }: { severity: Diagnostic['severity'] }) {
   );
 }
 
-export function MessagesPanel({ items, open, onToggle, selectedKey, onSelect, context }: MessagesPanelProps) {
-  const errors = items.filter((i) => i.diagnostic.severity === 'error').length;
+export function MessagesPanel({ items, open, onToggle, selectedKey, onSelect }: MessagesPanelProps) {
+  const errors = items.filter((i) => i.severity === 'error').length;
   const warnings = items.length - errors;
 
   return (
@@ -66,7 +56,7 @@ export function MessagesPanel({ items, open, onToggle, selectedKey, onSelect, co
       {open && items.length > 0 && (
         <ul className="max-h-40 overflow-y-auto border-t border-line">
           {items.map((item) => {
-            const { title, detail } = tr.diagnostics.describe(item.diagnostic, context);
+            const { title, detail } = item;
             const selected = item.key === selectedKey;
             return (
               <li key={item.key}>
@@ -78,7 +68,7 @@ export function MessagesPanel({ items, open, onToggle, selectedKey, onSelect, co
                     selected ? 'bg-accent-soft' : 'hover:bg-app'
                   }`}
                 >
-                  <SeverityIcon severity={item.diagnostic.severity} />
+                  <SeverityIcon severity={item.severity} />
                   <span>
                     <span className="font-semibold">{title}.</span> <span className="text-ink/85">
                       <Rich text={detail} />

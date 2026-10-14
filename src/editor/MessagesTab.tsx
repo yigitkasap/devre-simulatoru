@@ -3,18 +3,26 @@
 // Bir mesaja tıklayınca ilgili parçalar ve kablolar tuvalde vurgulanır.
 
 import { tr, type DiagnosticContext } from '../i18n/tr';
-import type { Diagnostic } from '../sim/diagnostics';
-import type { MessageItem } from './MessagesPanel';
+import type { MessageItem, MessageSeverity } from './messages';
 import { Rich } from './Rich';
+
+/** Seçili mesajın altındaki düzeltme düğmesi (Onar, "R1'i 360 Ω yap"). */
+export interface MessageAction {
+  readonly label: string;
+  readonly primary?: boolean;
+  readonly run: () => void;
+}
 
 export interface MessagesTabProps {
   readonly items: readonly MessageItem[];
   readonly selectedKey: string | null;
   readonly onSelect: (item: MessageItem | null) => void;
   readonly context: DiagnosticContext;
+  /** Bir mesajın düzeltme düğmeleri (seçiliyken gösterilir). */
+  readonly actions: (item: MessageItem) => readonly MessageAction[];
 }
 
-export function SeverityMark({ severity, size = 20 }: { severity: Diagnostic['severity']; size?: number }) {
+export function SeverityMark({ severity, size = 20 }: { severity: MessageSeverity; size?: number }) {
   return severity === 'error' ? (
     <svg width={size} height={size} viewBox="0 0 20 20" className="shrink-0" aria-hidden="true">
       <circle cx="10" cy="10" r="9" fill="var(--color-danger)" />
@@ -30,8 +38,8 @@ export function SeverityMark({ severity, size = 20 }: { severity: Diagnostic['se
   );
 }
 
-export function MessagesTab({ items, selectedKey, onSelect, context }: MessagesTabProps) {
-  const errors = items.filter((i) => i.diagnostic.severity === 'error').length;
+export function MessagesTab({ items, selectedKey, onSelect, context, actions }: MessagesTabProps) {
+  const errors = items.filter((i) => i.severity === 'error').length;
   const warnings = items.length - errors;
 
   if (items.length === 0) {
@@ -54,24 +62,27 @@ export function MessagesTab({ items, selectedKey, onSelect, context }: MessagesT
       <p className="px-1 text-small font-semibold">{tr.messages.counts(errors, warnings)}</p>
       <ul className="flex flex-col gap-2">
         {items.map((item) => {
-          const { severity, elementIds } = item.diagnostic;
-          const { title, detail } = tr.diagnostics.describe(item.diagnostic, context);
+          const { severity, elementIds, title, detail } = item;
           const selected = item.key === selectedKey;
-          const target = elementIds.length > 0 ? elementIds.map((id) => context.label(id)).join(', ') : tr.messages.circuitTarget;
+          const target = elementIds.length > 0 ? context.label(elementIds[0]!) : tr.messages.circuitTarget;
           const error = severity === 'error';
+          const buttons = selected ? actions(item) : [];
           return (
-            <li key={item.key}>
+            <li
+              key={item.key}
+              className={`rounded-[10px] ${
+                selected
+                  ? error
+                    ? 'border-[1.5px] border-danger bg-danger-soft'
+                    : 'border-[1.5px] border-warn bg-warn-soft'
+                  : 'border border-line bg-panel hover:bg-panel-2'
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => onSelect(selected ? null : item)}
                 aria-pressed={selected}
-                className={`flex w-full gap-2.5 rounded-[10px] p-3 text-left ${
-                  selected
-                    ? error
-                      ? 'border-[1.5px] border-danger bg-danger-soft'
-                      : 'border-[1.5px] border-warn bg-warn-soft'
-                    : 'border border-line bg-panel hover:bg-panel-2'
-                }`}
+                className="flex w-full gap-2.5 p-3 text-left"
               >
                 <SeverityMark severity={severity} />
                 <span className="flex min-w-0 flex-col gap-1">
@@ -84,6 +95,22 @@ export function MessagesTab({ items, selectedKey, onSelect, context }: MessagesT
                   </span>
                 </span>
               </button>
+              {buttons.length > 0 && (
+                <div className="flex flex-wrap gap-2 pr-3 pb-3 pl-[42px]">
+                  {buttons.map((action) => (
+                    <button
+                      key={action.label}
+                      type="button"
+                      onClick={action.run}
+                      className={`h-9 rounded-[7px] px-3 text-small ${
+                        action.primary ? 'bg-ink font-semibold text-white hover:brightness-125' : 'border border-line-2 bg-panel font-medium hover:bg-panel-2'
+                      }`}
+                    >
+                      {action.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </li>
           );
         })}
