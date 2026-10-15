@@ -165,6 +165,29 @@ try {
     await page.context().close();
   }
 
+  // --- Parça ekle sayfası: daha açık başlar, başlıktan çekilerek tam boy olur, aşağı çekince kapanır --
+  {
+    const { page, cdp } = await phone();
+    await page.getByRole('button', { name: 'Parça', exact: true }).tap(); await page.waitForTimeout(500);
+    const sheet = page.getByRole('dialog', { name: 'Parça ekle' });
+    const half = await sheet.boundingBox();
+    check('Parça ekle sayfası pencerenin ≈ %60’ı kadar açılıyor', half !== null && half.height > 844 * 0.55 && half.height < 844 * 0.65, `${Math.round(half?.height ?? 0)} px`);
+    const chips = sheet.getByRole('tablist');
+    const hidden = await chips.evaluate((el) => getComputedStyle(el).scrollbarWidth === 'none');
+    check('kategori çiplerinin kaydırma çubuğu gizli (düğmelerle çakışmıyor)', hidden);
+    const title = await sheet.getByRole('heading', { name: 'Parça ekle' }).boundingBox();
+    await drag(page, cdp, { x: title.x + 20, y: title.y + title.height / 2 }, { x: title.x + 20, y: title.y - 250 });
+    await page.waitForTimeout(300);
+    const full = await sheet.boundingBox();
+    const canvas = await page.locator('svg.schematic').boundingBox();
+    check('başlıktan yukarı çekince sayfa tam boy; tuvalde devre şeridi kalıyor', full !== null && half !== null && full.height > half.height + 60 && canvas !== null && canvas.height >= 100, `${Math.round(full?.height ?? 0)} px, tuval ${Math.round(canvas?.height ?? 0)} px`);
+    const handle = await sheet.getByRole('button', { name: /^Sayfanın boyunu değiştir/ }).boundingBox();
+    await drag(page, cdp, { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }, { x: handle.x + handle.width / 2, y: handle.y + 420 });
+    await page.waitForTimeout(300);
+    check('tutamaçtan aşağı çekince sayfa kapanıyor', (await sheet.count()) === 0);
+    await page.context().close();
+  }
+
   // --- Kur kipi: seç, taşı, menü, kaydır, Bağla, değer sayfası, yakınlaştırma -----------
   {
     const { page, cdp } = await phone();

@@ -213,7 +213,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
         />
       </label>
       {!query.trim() && !grouped && (
-        <div role="tablist" aria-label={tr.library.title} className="-mr-4 flex shrink-0 gap-1.5 overflow-x-auto overscroll-contain pr-4 pb-0.5">
+        <div role="tablist" aria-label={tr.library.title} className="no-scrollbar fade-right -mr-4 flex shrink-0 gap-1.5 overflow-x-auto overscroll-contain pr-4">
           {categories.map((c) => {
             const selected = c.id === category;
             return (

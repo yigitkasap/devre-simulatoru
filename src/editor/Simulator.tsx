@@ -1277,6 +1277,8 @@ export default function Simulator() {
     /** Alt sayfanın (yatayda yan panelin) içeriği ve özellikleri. */
     let spec: {
       sizes: readonly SheetSize[];
+      /** Yarım konumda pencerenin en çok bu kadarı (yoksa yarısı). */
+      halfRatio?: number;
       label: string;
       role?: 'region' | 'dialog' | 'alertdialog';
       tone?: 'panel' | 'rack';
@@ -1284,7 +1286,9 @@ export default function Simulator() {
     } | null = null;
     if (shown?.kind === 'parts') {
       spec = {
-        sizes: ['half'],
+        // Biraz daha açık başlar; tutamaçtan ya da başlıktan yukarı çekilince tam boy olur.
+        sizes: ['half', 'full'],
+        halfRatio: 0.6,
         label: tr.phone.addTitle,
         role: 'dialog',
         content: (
@@ -1610,6 +1614,7 @@ export default function Simulator() {
               role={spec.role}
               label={spec.label}
               tone={spec.tone}
+              {...(spec.halfRatio !== undefined ? { halfRatio: spec.halfRatio } : {})}
               dimmed={partDragging}
               areaHeight={phoneAreaHeight}
               onHeight={setSheetHeight}

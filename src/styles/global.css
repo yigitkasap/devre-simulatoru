@@ -250,6 +250,18 @@ body {
 }
 
 /* Dokunmatikte basılı tutunca metin seçimi ve sistem menüsü çıkmasın. */
+/* Yatay kayan çip satırları: kaydırma çubuğu düğmelerin üstüne binmesin; sağ kenar solarak
+   devamı olduğunu gösterir. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.fade-right {
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+
 .no-callout {
   user-select: none;
   -webkit-user-select: none;
