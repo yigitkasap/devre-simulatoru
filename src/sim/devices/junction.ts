@@ -35,12 +35,84 @@ export function limitJunction(vnew: number, vold: number, nvt: number, vcrit: nu
   return { v: vnew, limited: false };
 }
 
+// ---------------------------------------------------------------------------
+// Yük depolama (SPICE'taki gibi): boşluk (depletion) kapasitesi ve difüzyon yükü.
+//
+//   V < FC·VJ:  Q = CJ0·VJ/(1 − M)·(1 − (1 − V/VJ)^(1−M)),   C = CJ0·(1 − V/VJ)^(−M)
+//   V ≥ FC·VJ:  C, V'ye göre doğrusal uzatılır (FC = 0,5); Q bunun integralidir.
+//   Difüzyon yükü Q_d = τ_T·I_D (ileri yönde depolanan azınlık taşıyıcıları; ters toparlanma).
+// Zaman adımında geri Euler ile i = (Q(v) − Q_önceki)/h, iletkenliği C(v)/h olur. Doğru akım
+// çözümünde (h = 0) yük akımı yoktur: kondansatörsüz devreler eskisi gibi tek çözümle kalır.
+
+const DEPLETION_FC = 0.5;
+
+export interface DepletionParams {
+  /** Sıfır gerilimdeki kapasite (F). */
+  readonly cj0: number;
+  /** Eklem potansiyeli (V). */
+  readonly vj: number;
+  /** Derecelenme katsayısı. */
+  readonly m: number;
+}
+
+/** Boşluk yükü ve kapasitesi; v, eklemin ileri yöndeki gerilimidir (ters kutuplanmada negatif). */
+export function depletionCharge(v: number, p: DepletionParams): { q: number; c: number } {
+  if (p.cj0 <= 0) return { q: 0, c: 0 };
+  const vf = DEPLETION_FC * p.vj;
+  if (v < vf) {
+    const arg = 1 - v / p.vj;
+    const s = arg ** -p.m;
+    return { q: (p.cj0 * p.vj * (1 - arg * s)) / (1 - p.m), c: p.cj0 * s };
+  }
+  const f1 = (p.vj * (1 - (1 - DEPLETION_FC) ** (1 - p.m))) / (1 - p.m);
+  const f2 = (1 - DEPLETION_FC) ** (1 + p.m);
+  const f3 = 1 - DEPLETION_FC * (1 + p.m);
+  return {
+    q: p.cj0 * f1 + (p.cj0 / f2) * (f3 * (v - vf) + (p.m / (2 * p.vj)) * (v * v - vf * vf)),
+    c: (p.cj0 / f2) * (f3 + (p.m * v) / p.vj),
+  };
+}
+
+/** Bir eklemin yük modeli: boşluk kapasitesi ve difüzyon (geçiş) süresi τ_T. */
+export interface ChargeParams extends DepletionParams {
+  /** Geçiş süresi τ_T (s): ileri akımla depolanan yük Q = τ_T·I. */
+  readonly tt: number;
+}
+
+/**
+ * Yük depolayan bir dalın geri Euler durumu: son kabul edilen adımdaki yük ve akım.
+ * companion(), (q, c) noktasında doğrusallaştırılmış akımı ve iletkenliği verir.
+ */
+export class ChargeState {
+  /** Son kabul edilen adımdaki yük (C). */
+  q0 = 0;
+  /** Son kabul edilen adımdaki yük akımı dQ/dt (A). */
+  current = 0;
+
+  companion(q: number, c: number, h: number): { i: number; g: number } {
+    return h > 0 ? { i: (q - this.q0) / h, g: c / h } : { i: 0, g: 0 };
+  }
+
+  accept(q: number, h: number): void {
+    this.current = h > 0 ? (q - this.q0) / h : 0;
+    this.q0 = q;
+  }
+
+  copyFrom(other: ChargeState): void {
+    this.q0 = other.q0;
+    this.current = other.current;
+  }
+}
+
 export class Junction {
   readonly saturationCurrent: number;
   /** N·VT */
   readonly nvt: number;
   /** Vcrit = N·VT·ln(N·VT/(√2·Is)): bunun üstünde gerilim adımı sınırlanır. */
   readonly vcrit: number;
+  /** Yük modeli (yoksa eklem anlık davranır: eski genel modeller). */
+  readonly charge: ChargeParams | null;
+  readonly chargeState = new ChargeState();
 
   /** NR'nin bu iterasyonda kullandığı doğrusallaştırma noktası. */
   vd = 0;
@@ -50,10 +122,28 @@ export class Junction {
   private linCurrent = 0;
   private linConductance = 0;
 
-  constructor(saturationCurrent: number, emissionCoefficient: number) {
+  constructor(saturationCurrent: number, emissionCoefficient: number, charge: ChargeParams | null = null) {
     this.saturationCurrent = saturationCurrent;
     this.nvt = emissionCoefficient * THERMAL_VOLTAGE;
     this.vcrit = criticalVoltage(this.nvt, saturationCurrent);
+    this.charge = charge;
+  }
+
+  /** Eklemde depolanan yük ve küçük sinyal kapasitesi (boşluk + difüzyon). */
+  chargeAt(vd: number): { q: number; c: number } {
+    if (!this.charge) return { q: 0, c: 0 };
+    const dep = depletionCharge(vd, this.charge);
+    const tt = this.charge.tt;
+    const e = safeExp(vd / this.nvt);
+    return {
+      q: dep.q + tt * this.saturationCurrent * (e - 1),
+      c: dep.c + (tt * this.saturationCurrent * e) / this.nvt,
+    };
+  }
+
+  /** Son kabul edilen adımdaki yük akımı (kapasitif ve ters toparlanma akımı). */
+  get chargeCurrent(): number {
+    return this.chargeState.current;
   }
 
   /** Eklem akımı (paralel gmin dahil). */
@@ -72,13 +162,20 @@ export class Junction {
    *   gd  = (Is/(N·VT))·exp(vd/(N·VT)) + gmin
    *   Ieq = Id − gd·vd
    * Böylece eklem, a–c arasında bir gd iletkenliği ve ona paralel, a'dan c'ye akan
-   * Ieq akım kaynağı olur.
+   * Ieq akım kaynağı olur. Zaman adımında (h > 0) yük modeli varsa yük akımı da aynı biçimde
+   * eklenir: i = (Q(vd) − Q_önceki)/h, iletkenlik C(vd)/h.
    */
-  stamp(sys: MnaSystem, anode: number, cathode: number): void {
-    const gd = this.conductance(this.vd);
-    const id = this.current(this.vd);
+  stamp(sys: MnaSystem, anode: number, cathode: number, h = 0): void {
+    let gd = this.conductance(this.vd);
+    let id = this.current(this.vd);
     this.linConductance = gd;
     this.linCurrent = id;
+    if (this.charge && h > 0) {
+      const { q, c } = this.chargeAt(this.vd);
+      const { i, g } = this.chargeState.companion(q, c, h);
+      gd += g;
+      id += i;
+    }
     sys.conductance(anode, cathode, gd);
     sys.currentSource(anode, cathode, id - gd * this.vd);
   }
@@ -99,8 +196,10 @@ export class Junction {
     return !limited && Math.abs(actual - predicted) <= tolerance;
   }
 
-  accept(): void {
+  /** Adım kabul edildi; h, adımın süresidir (doğru akım çözümünde 0). */
+  accept(h = 0): void {
     this.vdAccepted = this.vd;
+    if (this.charge) this.chargeState.accept(this.chargeAt(this.vd).q, h);
   }
 
   restore(): void {
@@ -110,6 +209,7 @@ export class Junction {
   copyStateFrom(other: Junction): void {
     this.vd = other.vd;
     this.vdAccepted = other.vdAccepted;
+    this.chargeState.copyFrom(other.chargeState);
   }
 }
 

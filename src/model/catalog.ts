@@ -9,12 +9,24 @@ import {
   BATTERY_DEFAULTS,
   BJT_DEFAULTS,
   DCSUPPLY_DEFAULTS,
+  DIODE_DEFAULTS,
+  DIODE_LEGACY_MODEL,
+  DIODE_MODELS,
+  NJFET_DEFAULTS,
+  NJFET_LEGACY_MODEL,
+  NJFET_MODELS,
+  NJFET_PRESETS,
+  NMOS_DEFAULTS,
+  NMOS_LEGACY_MODEL,
+  NMOS_MODELS,
+  NMOS_PRESETS,
+  NPN_DEFAULTS,
+  NPN_LEGACY_MODEL,
+  NPN_MODELS,
   DCSUPPLY_MAX_VOLTAGE,
   FUNCGEN_DEFAULTS,
   FUNCGEN_LIMITS,
   SCOPE_INPUTS,
-  JFET_DEFAULTS,
-  MOSFET_DEFAULTS,
   PJFET_DEFAULTS,
   PMOSFET_DEFAULTS,
   ZENER_DEFAULTS,
@@ -84,6 +96,13 @@ export interface PartDef {
   readonly polarized: boolean;
   /** Ad ve değer yazısı parçanın sağında (üç uçlu transistörlerde üst ve alt uçlar kablolu olur). */
   readonly labelRight?: boolean;
+  /**
+   * Belgede bulunmayan özelliklerin eski anlamı: bu özellik eklenmeden önce kaydedilmiş devreler
+   * (ör. "model" seçimi olmayan diyot genel modeldir). Yeni parçalar defaultProps'u alır.
+   */
+  readonly legacyProps?: Readonly<Record<string, PropValue>>;
+  /** Model seçilince değişen özellikler (ör. BF245A seçilince I_DSS ve V_P). */
+  readonly modelPresets?: Readonly<Record<string, Readonly<Record<string, PropValue>>>>;
 }
 
 const TWO_PINS: readonly Point[] = [
@@ -102,7 +121,13 @@ const TRANSISTOR_PINS: readonly Point[] = [
 ];
 const TRANSISTOR_BOUNDS: Box = { x: -4, y: -4, w: 7, h: 8 };
 
-function transistor(type: DeviceType, labelPrefix: string, defaultProps: Readonly<Record<string, PropValue>>, propDefs: readonly PropDef[]): PartDef {
+function transistor(
+  type: DeviceType,
+  labelPrefix: string,
+  defaultProps: Readonly<Record<string, PropValue>>,
+  propDefs: readonly PropDef[],
+  models?: Pick<PartDef, 'legacyProps' | 'modelPresets'>,
+): PartDef {
   return {
     type,
     category: 'transistors',
@@ -114,6 +139,7 @@ function transistor(type: DeviceType, labelPrefix: string, defaultProps: Readonl
     showLabel: true,
     polarized: false,
     labelRight: true,
+    ...models,
   };
 }
 
@@ -246,10 +272,11 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     labelPrefix: 'D',
     pins: TWO_PINS,
     bounds: { x: -4, y: -1.2, w: 8, h: 2.4 },
-    defaultProps: {},
-    propDefs: [],
+    defaultProps: { ...DIODE_DEFAULTS },
+    propDefs: [{ kind: 'select', key: 'model', options: DIODE_MODELS }],
     showLabel: true,
     polarized: true,
+    legacyProps: { model: DIODE_LEGACY_MODEL },
   },
   zener: {
     type: 'zener',
@@ -262,24 +289,45 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: true,
   },
-  npn: transistor('npn', 'Q', { ...BJT_DEFAULTS }, [
-    { kind: 'number', key: 'beta', unit: '', min: { value: 1, exclusive: false }, max: 2000 },
-  ]),
+  npn: transistor(
+    'npn',
+    'Q',
+    { ...NPN_DEFAULTS },
+    [
+      { kind: 'select', key: 'model', options: NPN_MODELS },
+      { kind: 'number', key: 'beta', unit: '', min: { value: 1, exclusive: false }, max: 2000 },
+    ],
+    { legacyProps: { model: NPN_LEGACY_MODEL } },
+  ),
   pnp: transistor('pnp', 'Q', { ...BJT_DEFAULTS }, [
     { kind: 'number', key: 'beta', unit: '', min: { value: 1, exclusive: false }, max: 2000 },
   ]),
-  njfet: transistor('njfet', 'J', { ...JFET_DEFAULTS }, [
-    { kind: 'number', key: 'idss', unit: 'A', min: { value: 0, exclusive: true } },
-    { kind: 'number', key: 'pinchOff', unit: 'V', max: -0.1 },
-  ]),
+  njfet: transistor(
+    'njfet',
+    'J',
+    { ...NJFET_DEFAULTS },
+    [
+      { kind: 'select', key: 'model', options: NJFET_MODELS },
+      { kind: 'number', key: 'idss', unit: 'A', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'pinchOff', unit: 'V', max: -0.1 },
+    ],
+    { legacyProps: { model: NJFET_LEGACY_MODEL }, modelPresets: NJFET_PRESETS },
+  ),
   pjfet: transistor('pjfet', 'J', { ...PJFET_DEFAULTS }, [
     { kind: 'number', key: 'idss', unit: 'A', min: { value: 0, exclusive: true } },
     { kind: 'number', key: 'pinchOff', unit: 'V', min: { value: 0.1, exclusive: false } },
   ]),
-  nmos: transistor('nmos', 'M', { ...MOSFET_DEFAULTS }, [
-    { kind: 'number', key: 'threshold', unit: 'V', min: { value: 0, exclusive: true } },
-    { kind: 'number', key: 'k', unit: 'A/V²', min: { value: 0, exclusive: true } },
-  ]),
+  nmos: transistor(
+    'nmos',
+    'M',
+    { ...NMOS_DEFAULTS },
+    [
+      { kind: 'select', key: 'model', options: NMOS_MODELS },
+      { kind: 'number', key: 'threshold', unit: 'V', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'k', unit: 'A/V²', min: { value: 0, exclusive: true } },
+    ],
+    { legacyProps: { model: NMOS_LEGACY_MODEL }, modelPresets: NMOS_PRESETS },
+  ),
   pmos: transistor('pmos', 'M', { ...PMOSFET_DEFAULTS }, [
     { kind: 'number', key: 'threshold', unit: 'V', max: -0.01 },
     { kind: 'number', key: 'k', unit: 'A/V²', min: { value: 0, exclusive: true } },
@@ -369,6 +417,26 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'meters', types: ['voltmeter', 'ammeter'] },
   { id: 'instruments', types: ['funcgen', 'dcsupply', 'oscilloscope'] },
 ];
+
+/**
+ * Parçanın bir özelliğinin şu anki değeri: belgedeki değer; yoksa (eski kayıt) eski anlamı,
+ * o da yoksa varsayılan.
+ */
+export function partProp(type: DeviceType, props: Readonly<Record<string, PropValue>>, key: string): PropValue | undefined {
+  const def = CATALOG[type];
+  return props[key] ?? def.legacyProps?.[key] ?? def.defaultProps[key];
+}
+
+/** Bir özelliği değiştirir; model seçimi değiştiyse o modelin ön ayarlarını da uygular. */
+export function withProp(
+  type: DeviceType,
+  props: Readonly<Record<string, PropValue>>,
+  key: string,
+  value: PropValue,
+): Record<string, PropValue> {
+  const preset = key === 'model' && typeof value === 'string' ? CATALOG[type].modelPresets?.[value] : undefined;
+  return { ...props, ...preset, [key]: value };
+}
 
 export function isDeviceType(value: unknown): value is DeviceType {
   return typeof value === 'string' && Object.prototype.hasOwnProperty.call(CATALOG, value);

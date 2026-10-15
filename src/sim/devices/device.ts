@@ -4,7 +4,8 @@
 //   1. stampStatic   — adım boyunca değişmeyen katkılar (dirençler, kaynaklar, kondansatörün C/h'si).
 //                      Doğrusal devrelerde bu matris aynı h için bir kez LU ayrıştırılır.
 //   2. stampStep     — her adımda değişen sağ taraf katkıları (kondansatörün Ieq'su).
-//   3. stampNonlinear — Newton-Raphson iterasyonuna bağlı katkılar (diyot, LED).
+//   3. stampNonlinear — Newton-Raphson iterasyonuna bağlı katkılar (diyot, LED, transistörler;
+//                      yük depolayan modellerde eklem kapasitelerinin geri Euler katkısı da).
 //   4. updateIterate — NR çözümünden sonra eklem gerilimlerini sınırla/güncelle.
 //   5. accept        — adım kabul edilince durumu kaydet (kondansatör gerilimi vb.).
 //   6. observe       — adım kabul edildikten sonra ölçüm kaydı (osiloskop). Kondansatörsüz ve AC
@@ -114,7 +115,8 @@ export abstract class Device {
 
   stampStatic(_sys: MnaSystem, _ctx: StepContext): void {}
   stampStep(_sys: MnaSystem, _ctx: StepContext): void {}
-  stampNonlinear(_sys: MnaSystem): void {}
+  /** NR iterasyonu katkısı; yük depolayan eklemler (diyot, transistör kapasiteleri) ctx.h'yi kullanır. */
+  stampNonlinear(_sys: MnaSystem, _ctx: StepContext): void {}
 
   /** NR çözümünden sonra çağrılır. Bu bileşen yakınsadıysa true döner. */
   updateIterate(_x: Float64Array): boolean {

@@ -4,7 +4,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from 'react';
 import { tr } from '../i18n/tr';
-import { CATALOG, type NumberPropDef, type PropDef } from '../model/catalog';
+import { CATALOG, withProp, type NumberPropDef, type PropDef } from '../model/catalog';
 import type { CircuitDoc, Part } from '../model/types';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { PropValue } from '../sim/netlist';
@@ -207,7 +207,7 @@ function PartDetails({
   const otherLabels = new Set(doc.parts.filter((p) => p.id !== part.id).map((p) => p.label));
   const values: Record<string, PropValue> = {};
   for (const prop of def.propDefs) {
-    const value = currentProp(part, prop.key, def.defaultProps);
+    const value = currentProp(part, prop.key);
     if (value !== undefined) values[prop.key] = value;
   }
   // Cihazların bütün ayarları rafta; burada yalnızca adı ve rafa yönlendirme.
@@ -232,7 +232,7 @@ function PartDetails({
       values={values}
       live={active && prop === firstNumber}
       inputRef={prop === firstNumber ? firstFieldRef : undefined}
-      onCommit={(value) => onUpdatePart(part.id, { props: { ...part.props, [prop.key]: value } })}
+      onCommit={(value) => onUpdatePart(part.id, { props: withProp(part.type, part.props, prop.key, value) })}
     />
   ));
 

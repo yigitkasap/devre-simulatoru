@@ -69,20 +69,39 @@ export {
 } from './funcgen';
 export { AmmeterDevice, AMMETER_DEFAULTS } from './ammeter';
 export { BatteryDevice, BATTERY_DEFAULTS } from './battery';
-export { BjtDevice, BJT_DEFAULTS, BJT_PARAMS, evaluateBjt } from './bjt';
+export { BjtDevice, BJT_DEFAULTS, BJT_PARAMS, NPN_DEFAULTS, NPN_LEGACY_MODEL, NPN_MODELS, evaluateBjt, type NpnModelName } from './bjt';
 export {
   FET_LAMBDA,
   JFET_DEFAULTS,
   JfetDevice,
   MOSFET_DEFAULTS,
   MosfetDevice,
+  NJFET_DEFAULTS,
+  NJFET_LEGACY_MODEL,
+  NJFET_MODELS,
+  NJFET_PRESETS,
+  NMOS_DEFAULTS,
+  NMOS_LEGACY_MODEL,
+  NMOS_MODELS,
+  NMOS_PRESETS,
   PJFET_DEFAULTS,
   PMOSFET_DEFAULTS,
   channelCurrent,
+  type NjfetModelName,
+  type NmosModelName,
 } from './fet';
 export { ZENER_DEFAULTS, ZENER_TEST_CURRENT, ZenerDevice } from './zener';
 export { CapacitorDevice, CAPACITOR_DEFAULTS } from './capacitor';
-export { DiodeDevice, DIODE_EMISSION, DIODE_SATURATION } from './diode';
+export {
+  DiodeDevice,
+  DIODE_DEFAULTS,
+  DIODE_EMISSION,
+  DIODE_LEGACY_MODEL,
+  DIODE_MODELS,
+  DIODE_MODEL_PARAMS,
+  DIODE_SATURATION,
+  type DiodeModelName,
+} from './diode';
 export { GroundDevice } from './ground';
 export {
   LedDevice,

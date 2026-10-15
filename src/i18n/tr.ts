@@ -246,14 +246,14 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   ground: 'Devrenin 0 V referans noktası; her devrede en az bir tane olmalı.',
   resistor: 'Üzerinden geçen akımla orantılı bir gerilim düşümü oluşturur: V = I · R.',
   capacitor: 'Yük depolar; bir direnç üzerinden zamanla dolar ya da boşalır.',
-  diode: 'Akımı yalnızca bir yönde, anottan katoda geçirir; ileri yönde yaklaşık 0,6-0,7 V düşürür.',
+  diode: 'Akımı yalnızca bir yönde, anottan katoda geçirir; ileri yönde yaklaşık 0,6 V düşürür. Föydeki 1N4001 olarak gelir.',
   zener: 'Ters yönde, kırılma (zener) geriliminde iletime geçen diyot; gerilimi sınırlamak ve kırpmak için kullanılır.',
   led: 'Işık yayan diyot; fazla akım geçerse yanar, bu yüzden seri bir ön direnç gerekir.',
-  npn: 'Küçük bir baz akımıyla büyük kollektör akımını kontrol eder (IC = β · IB); yükselteç ve anahtar olarak kullanılır.',
+  npn: 'Küçük bir baz akımıyla büyük kollektör akımını kontrol eder (IC = β · IB); yükselteç ve anahtar olarak kullanılır. Föydeki BC107 olarak gelir.',
   pnp: 'NPN’in ters kutuplusu: akım emetörden girer, kollektörden çıkar; baz emetörden düşük gerilimde olunca iletir.',
-  njfet: 'Drain akımını kapı-kaynak gerilimi (VGS) kontrol eder; kapı neredeyse akım çekmez. VGS = 0’da en büyük akım (IDSS) akar.',
+  njfet: 'Drain akımını kapı-kaynak gerilimi (VGS) kontrol eder; kapı neredeyse akım çekmez. VGS = 0’da en büyük akım (IDSS) akar. Föydeki BF245A olarak gelir.',
   pjfet: 'N kanallı JFET’in ters kutuplusu: kapıya pozitif gerilim verildikçe akım azalır.',
-  nmos: 'Kapısı yalıtılmış alan etkili transistör; VGS eşik gerilimini (VT) aşınca iletime geçer. Anahtar ve yükselteç olarak kullanılır.',
+  nmos: 'Kapısı yalıtılmış alan etkili transistör; VGS eşik gerilimini (VT) aşınca iletime geçer. Anahtar ve yükselteç olarak kullanılır. Föydeki IRF510 olarak gelir.',
   pmos: 'P kanallı MOSFET: kapı kaynaktan yeterince düşük olunca (VGS < VT < 0) iletime geçer.',
   switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
@@ -270,6 +270,7 @@ function fieldLabel(type: DeviceType, key: string): string {
   if (type === 'funcgen' && key === 'amplitude') return 'Genlik (tepe-tepe, açık devre)';
   if (type === 'funcgen' && key === 'offset') return 'DC offset (açık devre)';
   const labels: Record<string, string> = {
+    model: 'Model',
     mode: 'Ölçüm kipi',
     duty: 'Simetri (DUTY)',
     attenuate: '−20 dB zayıflatıcı (çıkış 10’da 1)',
@@ -306,6 +307,12 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
   mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)' },
   input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
+  model: {
+    genel: 'Genel (basit)',
+    BC547B: 'BC547B (basit)',
+    '2N5457': '2N5457 (basit)',
+    '2N7000': '2N7000 (basit)',
+  },
 };
 
 function optionLabel(key: string, option: string): string {
@@ -1035,6 +1042,24 @@ export const tr = {
       pmos:
         'N kanallı MOSFET ile aynı denklemler; V_{T} negatiftir, gerilim ve akımların yönü terstir.',
     } as Partial<Record<DeviceType, string>>,
+    /** Parça modelinin notu (genel modellerde türün notu kullanılır). */
+    modelNotes: {
+      '1N4001':
+        '1N4001: 1 A, 50 V doğrultucu diyot. İleri gerilim 10 mA’de ≈ 0,60 V, 100 mA’de ≈ 0,72 V (Vishay veri sayfası). Eklem kapasitesi (0 V’ta ≈ 30 pF) ve ters toparlanma (τ_{T} ≈ 5,8 µs) de hesaplanır: frekans arttıkça diyot ters yönde de bir süre akım geçirir; 1 MHz’te neredeyse doğrultmaz.',
+      genel: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer; kapasitesi yoktur, her frekansta anında iletir ya da keser.',
+      BC107:
+        'BC107: 2 mA’de h_{FE} 110–450 (modelde β; ölçtüğün değeri yazabilirsin), V_{BE} ≈ 0,65 V, f_{T} ≈ 300 MHz. Eklem kapasiteleri (C_{je} ≈ 14 pF, C_{jc} ≈ 3,7 pF) hesaplanır: yükseltecin kazancı yüksek frekansta düşer. BC547 ile aynı yonga ailesidir.',
+      BC547B:
+        'BC547B benzeri basit model: I_{S} ≈ 2,4·10⁻¹⁴ A (1 mA’de V_{BE} ≈ 0,63 V), Early gerilimi ≈ 63 V, kapasitesiz. Aktif bölgede I_{C} ≈ β · I_{B}; doyumda V_{CE} ≈ 0,1–0,2 V.',
+      BF245A:
+        'BF245A (NXP modeli): I_{DSS} ≈ 3,5 mA, V_{P} ≈ −1,74 V (veri sayfası: I_{DSS} 2–6,5 mA; kendi ölçtüğün değerleri yazabilirsin). Doyumda I_{D} = I_{DSS} · (1 − V_{GS} / V_{P})² · (1 + λV_{DS}), λ = 0,018 V⁻¹. Kapı kapasiteleri ≈ 2,2 pF.',
+      '2N5457':
+        '2N5457 benzeri basit model (veri sayfası: I_{DSS} 1–5 mA, V_{P} −0,5…−6 V), kapasitesiz. Doyumda I_{D} = I_{DSS} · (1 − V_{GS} / V_{P})²; λ = 0,01 V⁻¹.',
+      IRF510:
+        'IRF510: 100 V, 5,6 A güç MOSFET’i. V_{GS(th)} 2–4 V (modelde V_{T} = 3,83 V), k = 1,24 A/V²: birkaç mA’de V_{GS} eşiğin yalnızca birkaç on mV üstündedir. Kapasiteleri büyüktür (25 V’ta C_{iss} ≈ 180 pF, C_{oss} ≈ 81 pF, C_{rss} ≈ 15 pF); drain direnci büyükse kazanç birkaç yüz kHz’te düşmeye başlar.',
+      '2N7000':
+        '2N7000 benzeri basit model (V_{GS(th)} tipik 2,1 V), kapasitesiz. Doyumda I_{D} = k · (V_{GS} − V_{T})², omik bölgede I_{D} = k · (2(V_{GS} − V_{T})V_{DS} − V_{DS}²); λ = 0,01 V⁻¹.',
+    } as Record<string, string>,
     meterModeNote:
       'AC kaynaklı devrede DC kipi bir periyottaki ortalamayı, AC kipi etkin değeri (√(ortalama v²)) gösterir; gösterge her periyotta bir güncellenir.',
     acSpec: (rms: string, period: string) =>

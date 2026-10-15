@@ -2,7 +2,7 @@
 // ve sık kullanılan değerler. İnceleme paneli ve (telefonda) özellik penceresi bunları kullanır.
 
 import { tr } from '../i18n/tr';
-import type { NumberPropDef } from '../model/catalog';
+import { partProp, type NumberPropDef } from '../model/catalog';
 import type { Part } from '../model/types';
 import { acRms, WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
@@ -65,6 +65,7 @@ export function acNote(values: Readonly<Record<string, PropValue>>): string | un
 
 /** Parçaya özel bilgi notu (özellik alanlarının altında). */
 export function partNote(type: DeviceType, values: Readonly<Record<string, PropValue>>): string | undefined {
+  if (typeof values.model === 'string' && tr.properties.modelNotes[values.model]) return tr.properties.modelNotes[values.model];
   if (type === 'led') return ledNote(values.color);
   if (type === 'acsource') return acNote(values);
   if (type === 'voltmeter' || type === 'ammeter') return `${tr.properties.notes[type] ?? ''} ${tr.properties.meterModeNote}`;
@@ -85,9 +86,9 @@ export function valuePresets(type: DeviceType, key: string): readonly number[] {
   return PRESETS[type]?.[key] ?? [];
 }
 
-/** Formdaki bir alanın şu anki değeri: parçadaki değer, yoksa kataloğun varsayılanı. */
-export function currentProp(part: Part, key: string, defaults: Readonly<Record<string, PropValue>>): PropValue | undefined {
-  return part.props[key] ?? defaults[key];
+/** Formdaki bir alanın şu anki değeri: parçadaki değer, yoksa eski kayıtlardaki anlamı ya da varsayılan. */
+export function currentProp(part: Part, key: string): PropValue | undefined {
+  return partProp(part.type, part.props, key);
 }
 
 // --- − / + düğmelerinin adımı (telefon: P04, P05) ------------------------------------------

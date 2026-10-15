@@ -215,12 +215,14 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 194 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 206 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
 osiloskop kaydı ve ekranı (tetikleme, X-Y, ölçümler, Oto ayar), zener ve transistörlerin el
-hesabıyla bilinen çalışma noktaları (`tests/transistor.test.ts`), laboratuvar cihazları
+hesabıyla bilinen çalışma noktaları (`tests/transistor.test.ts`), föy parça modelleri (1N4001,
+BC107, BF245A, IRF510: veri sayfası noktaları, ters toparlanma, frekansla kazanç düşmesi;
+`tests/models.test.ts`), laboratuvar cihazları
 (50 Ω çıkış, offset, simetri, TTL, CV/CC, 1 MΩ giriş, AC kuplaj, toprak tuzağı ve ADD ile doğru
 ölçüm; `tests/instruments.test.ts`), bütün hazır örneklerin
 cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım bağlantısı, mesajlar
@@ -491,6 +493,38 @@ doğrulanır.
   (V_BE, V_BC ya da V_GS, V_DS) fonksiyonu olarak verir ve bunların Jacobian'ıyla doğrusallaştırılır
   ([`sim/devices/threeTerminal.ts`](src/sim/devices/threeTerminal.ts)). FET'lerde V_GS adımı 1 V,
   V_DS adımı 5 V ile sınırlanır. Kablo akımları için her bileşen uçlarına giren akımları verir.
+
+### Föy parça modelleri (föy için 2. aşama)
+
+Diyot, NPN, N kanallı JFET ve N kanallı MOSFET'te İnceleme panelinde bir **Model** seçimi var.
+Yeni yerleştirilen parça föydeki modelle gelir; `model` özelliği olmayan (bu aşamadan önce
+kaydedilmiş) devreler yukarıdaki genel modellerle aynen çalışır (`PartDef.legacyProps`). Model
+değişince o modelin parametreleri de gelir (`modelPresets`; ör. BF245A'da I_DSS ve V_P);
+parametreler sonra yine değiştirilebilir (öğrencinin ölçtüğü β ya da I_DSS).
+
+| Model | Kaynak | Doğru akım | Yük depolama |
+|---|---|---|---|
+| 1N4001 | Vishay 1N4001 veri sayfası (tipik eğriler); τ_T LTspice'ın 1N4001 kartı | 10 mA'de 0,60 V, 100 mA'de 0,72 V (N ≈ 2,0, Is ≈ 1·10⁻⁷ A) | C_j0 = 30 pF, V_J = 0,4 V, M = 0,33; τ_T = 5,76 µs |
+| BC107 | Central BC107 veri sayfası; kapasiteler NXP BC547B kartı (aynı yonga ailesi) | V_BE(2 mA) ≈ 0,65 V, β = 200 (110–450) | C_je = 13,6 pF, C_jc = 3,7 pF, τ_F = 0,44 ns (f_T ≈ 300 MHz) |
+| BF245A | NXP SPICE kartı | I_DSS = 3,52 mA, V_P = −1,74 V, λ = 0,0177 | C_GS = C_GD = 2,2 pF, PB = 0,78 V |
+| IRF510 | Yaygın MODPEX kartı (V_T, k); Vishay veri sayfası (kapasiteler, 25 V) | V_T = 3,83 V, k = 1,24 A/V², λ = 0,003 (varsayım) | C_GS = 165 pF; C_GD 25 V'ta 15 pF, C_DS 25 V'ta 66 pF (eklem biçiminde) |
+
+- **Yük depolama:** SPICE'taki gibi boşluk yükü Q = C_j0·V_J/(1 − M)·(1 − (1 − V/V_J)^(1−M))
+  (V > V_J/2'de doğrusal uzatma) ve difüzyon yükü Q = τ·I. Zaman adımında geri Euler ile
+  i = (Q(v) − Q_önceki)/h, iletkenliği C(v)/h; bu katkı `stampNonlinear(sys, ctx)` içinde
+  Newton-Raphson'a girer ([`junction.ts`](src/sim/devices/junction.ts) → `ChargeState`).
+  Doğru akım çözümünde (h = 0) yük akımı yoktur: kondansatörsüz devreler eskisi gibi tek
+  çözümle kalır. Ölçülen akımlar son adımın yük akımlarını da içerir.
+- **Sonuçları (testler: `tests/models.test.ts`):** 1N4001'de ±5 V kare dalga ters dönünce
+  ≈ 3 µs boyunca ≈ −5,4 mA ters akım akar (genel modelde hiç akmaz); 1 MHz'te diyot doğrultmaz.
+  BC107'li ortak emetörlü yükselteçte (10 kΩ'dan sürülen baz) kazanç 1 kHz'te eski modelle
+  aynı, 100 kHz'te ≈ %25, 1 MHz'te ≈ %90 düşer (Miller etkisi). IRF510'lu kaynak dirençli
+  yükselteçte (R_D = 10 kΩ, R_S = 1 kΩ) kazanç 1 kHz'te ≈ 9,8; C_GD yüzünden kutup ≈ 420 kHz
+  (R_S transistörü akım kaynağı gibi yaptığından C_DS'in etkisi neredeyse yoktur).
+- **İhmal edilenler:** 1N4001'in seri direnci (≈ 0,05 Ω; föy devrelerinde akım 10 mA'i
+  geçmez) ve ters kırılması (50 V); BF245A kartının 9 Ω'luk drain/source dirençleri; IRF510'un
+  iç dirençleri (≈ 0,5 Ω) ve gövde diyodunun doğru akım davranışı. Bunlar için parçaya iç düğüm
+  eklemek gerekir; föydeki akımlarda fark ölçüm belirsizliğinin çok altında.
 
 ### Yeniden tasarım (2026-10)
 

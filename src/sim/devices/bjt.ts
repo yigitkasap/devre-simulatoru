@@ -1,8 +1,16 @@
 import { GMIN, NR_ABSTOL, NR_RELTOL, THERMAL_VOLTAGE } from '../constants';
 import type { MnaSystem } from '../mna';
-import { numProp } from '../netlist';
-import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type TransistorRegion } from './device';
-import { criticalVoltage, limitJunction, safeExp } from './junction';
+import { numProp, strProp } from '../netlist';
+import {
+  Device,
+  type DeviceInit,
+  type DeviceModel,
+  type DeviceStatus,
+  type Measurement,
+  type StepContext,
+  type TransistorRegion,
+} from './device';
+import { ChargeState, criticalVoltage, depletionCharge, limitJunction, safeExp, type ChargeParams } from './junction';
 import { stampThreeTerminal, type TerminalLinearization } from './threeTerminal';
 
 /**
@@ -13,6 +21,34 @@ import { stampThreeTerminal, type TerminalLinearization } from './threeTerminal'
  */
 export const BJT_PARAMS = { saturationCurrent: 2.39e-14, reverseBeta: 7.9, earlyVoltage: 63.2 };
 export const BJT_DEFAULTS = { beta: 200 };
+
+/**
+ * NPN modelleri. BC107 föydeki transistördür; BC547 ile aynı yonga ailesidir (BC547, BC107'nin
+ * plastik kılıflı karşılığı). Doğru akım parametreleri yukarıdakilerle aynıdır ve BC107 veri
+ * sayfasıyla (Central Semiconductor) tutar: 2 mA'de V_BE 0,55–0,7 V (modelde 0,65 V), h_FE 110–450.
+ * BC107'de eklem yükleri de vardır (NXP BC547B SPICE kartından):
+ *   B-E: C_je = 13,6 pF, V_je = 0,65 V, M_je = 0,33;  τ_F = 0,44 ns  (f_T ≈ 300 MHz; veri sayfası ≥ 150 MHz)
+ *   B-C: C_jc = 3,7 pF,  V_jc = 0,40 V, M_jc = 0,30  (10 V'ta ≈ 1,4 pF; veri sayfası C_ob ≤ 4,5 pF)
+ * Bu kapasiteler yükseltecin kazancını yüksek frekansta düşürür (Miller etkisi).
+ * "BC547B" seçeneği eski (yüksüz) modeldir; "model" özelliği olmayan kayıtlar onu kullanır.
+ */
+export const NPN_MODELS = ['BC107', 'BC547B'] as const;
+export type NpnModelName = (typeof NPN_MODELS)[number];
+export const NPN_DEFAULTS = { model: 'BC107' as NpnModelName, beta: 200 };
+export const NPN_LEGACY_MODEL: NpnModelName = 'BC547B';
+
+interface BjtCharges {
+  readonly be: ChargeParams;
+  readonly bc: ChargeParams;
+}
+
+const NPN_CHARGES: Readonly<Record<NpnModelName, BjtCharges | null>> = {
+  BC107: {
+    be: { cj0: 13.58e-12, vj: 0.65, m: 0.3279, tt: 0.4391e-9 },
+    bc: { cj0: 3.728e-12, vj: 0.3997, m: 0.2955, tt: 0 },
+  },
+  BC547B: null,
+};
 
 const VT = THERMAL_VOLTAGE;
 const VCRIT = criticalVoltage(VT, BJT_PARAMS.saturationCurrent);
@@ -60,11 +96,29 @@ export function evaluateBjt(vbe: number, vbc: number, beta: number): BjtEvaluati
   };
 }
 
+/**
+ * Eklem yükü (boşluk + difüzyon): Q = Q_boşluk(v) + τ·Is·(e^{v/VT} − 1). Taşıma akımındaki
+ * Early çarpanı ihmal edilir (SPICE'ın τ_F·I_F'si gibi).
+ */
+function junctionCharge(v: number, p: ChargeParams): { q: number; c: number } {
+  const dep = depletionCharge(v, p);
+  if (p.tt <= 0) return dep;
+  const is = BJT_PARAMS.saturationCurrent;
+  const e = safeExp(v / VT);
+  return { q: dep.q + p.tt * is * (e - 1), c: dep.c + (p.tt * is * e) / VT };
+}
+
 /** Bipolar transistör. Pinler: [0] = kollektör (C), [1] = baz (B), [2] = emetör (E). */
 export class BjtDevice extends Device {
   readonly type: 'npn' | 'pnp';
   readonly sign: 1 | -1;
   readonly beta: number;
+  /** NPN modeli (PNP'de yalnızca eski model vardır). */
+  readonly model: NpnModelName | null;
+  private readonly charges: BjtCharges | null;
+  /** B-E ve B-C eklem yüklerinin geri Euler durumu. */
+  private readonly chargeBe = new ChargeState();
+  private readonly chargeBc = new ChargeState();
   /** Newton-Raphson'un doğrusallaştırma noktası (model gerilimleri V_BE, V_BC). */
   private vbe = 0;
   private vbc = 0;
@@ -76,6 +130,8 @@ export class BjtDevice extends Device {
     this.type = type;
     this.sign = type === 'npn' ? 1 : -1;
     this.beta = Math.max(1, numProp(init.props, 'beta', BJT_DEFAULTS.beta));
+    this.model = type === 'npn' ? strProp(init.props, 'model', NPN_MODELS, NPN_LEGACY_MODEL) : null;
+    this.charges = this.model ? NPN_CHARGES[this.model] : null;
   }
 
   override get nonlinear(): boolean {
@@ -90,15 +146,26 @@ export class BjtDevice extends Device {
     return { vbe: this.sign * (vb - ve), vbc: this.sign * (vb - vc) };
   }
 
-  override stampNonlinear(sys: MnaSystem): void {
+  override stampNonlinear(sys: MnaSystem, ctx: StepContext): void {
     const e = evaluateBjt(this.vbe, this.vbc, this.beta);
     this.linear = e;
+    let collector = e.collector;
+    let base = e.base;
+    if (this.charges && ctx.h > 0) {
+      // Eklem yüklerinin akımları: B-E yükü bazdan emetöre, B-C yükü bazdan kollektöre akar.
+      const be = junctionCharge(this.vbe, this.charges.be);
+      const bc = junctionCharge(this.vbc, this.charges.bc);
+      const ibe = this.chargeBe.companion(be.q, be.c, ctx.h);
+      const ibc = this.chargeBc.companion(bc.q, bc.c, ctx.h);
+      collector = { current: collector.current - ibc.i, du: collector.du, dw: collector.dw - ibc.g };
+      base = { current: base.current + ibe.i + ibc.i, du: base.du + ibe.g, dw: base.dw + ibc.g };
+    }
     const emitter: TerminalLinearization = {
-      current: -(e.collector.current + e.base.current),
-      du: -(e.collector.du + e.base.du),
-      dw: -(e.collector.dw + e.base.dw),
+      current: -(collector.current + base.current),
+      du: -(collector.du + base.du),
+      dw: -(collector.dw + base.dw),
     };
-    stampThreeTerminal(sys, this.nodes, this.sign, CU, CW, [e.collector, e.base, emitter], this.vbe, this.vbc);
+    stampThreeTerminal(sys, this.nodes, this.sign, CU, CW, [collector, base, emitter], this.vbe, this.vbc);
   }
 
   override updateIterate(x: Float64Array): boolean {
@@ -128,16 +195,26 @@ export class BjtDevice extends Device {
     this.vbc = this.accepted.vbc;
   }
 
-  override accept(): void {
+  override accept(_x: Float64Array, ctx: StepContext): void {
     this.accepted = { vbe: this.vbe, vbc: this.vbc };
+    if (this.charges) {
+      this.chargeBe.accept(junctionCharge(this.vbe, this.charges.be).q, ctx.h);
+      this.chargeBc.accept(junctionCharge(this.vbc, this.charges.bc).q, ctx.h);
+    }
   }
 
-  /** Kollektöre, baza ve emetöre giren gerçek akımlar. */
+  /** Kollektöre, baza ve emetöre giren gerçek akımlar (yük modelinde son adımın yük akımları dahil). */
   override pinCurrents(x: Float64Array): number[] {
     const { vbe, vbc } = this.controls(x);
     const e = evaluateBjt(vbe, vbc, this.beta);
-    const ic = this.sign * e.collector.current;
-    const ib = this.sign * e.base.current;
+    let ic = e.collector.current;
+    let ib = e.base.current;
+    if (this.charges) {
+      ic -= this.chargeBc.current;
+      ib += this.chargeBe.current + this.chargeBc.current;
+    }
+    ic *= this.sign;
+    ib *= this.sign;
     return [ic, ib, -(ic + ib)];
   }
 
@@ -166,6 +243,10 @@ export class BjtDevice extends Device {
       this.vbe = prev.vbe;
       this.vbc = prev.vbc;
       this.accepted = prev.accepted;
+      if (prev.model === this.model) {
+        this.chargeBe.copyFrom(prev.chargeBe);
+        this.chargeBc.copyFrom(prev.chargeBc);
+      }
     }
   }
 }

@@ -11,6 +11,13 @@ import { formatNumber, formatSI } from '../sim/units';
 import type { ResistorStyle } from './settings';
 import { PartSymbol, type LiveVisual } from './symbols';
 
+/** Seçilen parça modelinin adı (ör. "1N4001"); eski genel modelde boş (tuvalde eskisi gibi). */
+function modelName(part: Part): string {
+  const model = part.props.model;
+  const def = CATALOG[part.type];
+  return typeof model === 'string' && model !== def.legacyProps?.model ? model : '';
+}
+
 /** Parçanın tuvalde adının altında görünen değeri (ör. "4,7 kΩ"). */
 export function partValueText(part: Part): string {
   const p = part.props;
@@ -33,7 +40,15 @@ export function partValueText(part: Part): string {
       return tr.devices.ledColors[strProp(p, 'color', ['red', 'green', 'blue'] as const, 'red')] ?? '';
     case 'zener':
       return formatSI(numProp(p, 'zenerVoltage', 5.1), 'V', { trim: true, digits: 4 });
-    case 'npn':
+    case 'diode':
+    case 'njfet':
+    case 'nmos':
+      return modelName(part);
+    case 'npn': {
+      const beta = `β = ${formatNumber(numProp(p, 'beta', 200), 0)}`;
+      const model = modelName(part);
+      return model ? `${model} · ${beta}` : beta;
+    }
     case 'pnp':
       return `β = ${formatNumber(numProp(p, 'beta', 200), 0)}`;
     case 'funcgen': {

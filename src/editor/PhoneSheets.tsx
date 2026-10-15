@@ -5,7 +5,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { tr } from '../i18n/tr';
-import { CATALOG, CATEGORIES, type Category, type NumberPropDef, type PropDef } from '../model/catalog';
+import { CATALOG, CATEGORIES, withProp, type Category, type NumberPropDef, type PropDef } from '../model/catalog';
 import type { CircuitDoc, Part } from '../model/types';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { DeviceType, PropValue } from '../sim/netlist';
@@ -533,7 +533,7 @@ function partValues(part: Part): Record<string, PropValue> {
   const def = CATALOG[part.type];
   const values: Record<string, PropValue> = {};
   for (const prop of def.propDefs) {
-    const value = currentProp(part, prop.key, def.defaultProps);
+    const value = currentProp(part, prop.key);
     if (value !== undefined) values[prop.key] = value;
   }
   return values;
@@ -616,7 +616,7 @@ export function PartSheetBody({ part, doc, settings, expanded: expandedState, on
     firstRef.current?.select();
   }, [focusRequest]);
 
-  const commit = (key: string) => (value: PropValue) => onUpdatePart(part.id, { props: { ...part.props, [key]: value } });
+  const commit = (key: string) => (value: PropValue) => onUpdatePart(part.id, { props: withProp(part.type, part.props, key, value) });
   const primaryHint =
     primary?.kind === 'number'
       ? `${stepKind(primary) === 'e12' ? tr.phone.e12Hint : tr.phone.stepHint} ${tr.properties.unitHint}`
@@ -721,7 +721,7 @@ export function MeasureSheetBody({ part, doc, frame, status, settings, expanded:
   const rows = readout?.rows ?? [];
   const running = status === 'running';
   const otherLabels = new Set(doc.parts.filter((p) => p.id !== part.id).map((p) => p.label));
-  const commit = (key: string) => (value: PropValue) => onUpdatePart(part.id, { props: { ...part.props, [key]: value } });
+  const commit = (key: string) => (value: PropValue) => onUpdatePart(part.id, { props: withProp(part.type, part.props, key, value) });
   const primaryValue = primary && typeof values[primary.key] === 'number' ? (values[primary.key] as number) : null;
   const down = primary && primaryValue !== null ? stepValue(primary, primaryValue, -1) : null;
   const up = primary && primaryValue !== null ? stepValue(primary, primaryValue, 1) : null;

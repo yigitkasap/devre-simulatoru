@@ -527,7 +527,7 @@ export class CircuitSimulator {
     this.xIter.set(this.x);
     for (let iteration = 0; iteration < NR_MAX_ITERATIONS; iteration++) {
       this.iterSys.copyFrom(this.stepSys);
-      for (const device of nonlinear) device.stampNonlinear(this.iterSys);
+      for (const device of nonlinear) device.stampNonlinear(this.iterSys, ctx);
       this.luWork = luFactor(this.iterSys.A, n, this.luWork);
       luSolve(this.luWork, this.iterSys.z, this.xNew);
       this.checkFinite(this.xNew);
