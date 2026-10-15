@@ -888,6 +888,7 @@ export default function Simulator() {
               lockChip: !lockChipClosed,
               onLockChipClose: () => setLockChipClosed(true),
               strip: phone && sheet?.size === 'full',
+              emptyTop: phone,
               ...(tablet ? { emptyHint: tr.tablet.empty } : {}),
             }
           : null

@@ -168,9 +168,13 @@ try {
   // --- Parça ekle sayfası: daha açık başlar, başlıktan çekilerek tam boy olur, aşağı çekince kapanır --
   {
     const { page, cdp } = await phone();
+    const examples = page.getByRole('button', { name: 'Örneklerden başla' });
+    const before = await examples.boundingBox();
     await page.getByRole('button', { name: 'Parça', exact: true }).tap(); await page.waitForTimeout(500);
     const sheet = page.getByRole('dialog', { name: 'Parça ekle' });
     const half = await sheet.boundingBox();
+    const after = await examples.boundingBox();
+    check('boş tuvalde "Örneklerden başla" parça sayfası açılınca yerinde ve aynı boyda kalıyor', before !== null && after !== null && Math.abs(before.y - after.y) < 1 && Math.abs(before.height - after.height) < 1, `${Math.round(before?.y ?? 0)} → ${Math.round(after?.y ?? 0)} px`);
     check('Parça ekle sayfası pencerenin ≈ %60’ı kadar açılıyor', half !== null && half.height > 844 * 0.55 && half.height < 844 * 0.65, `${Math.round(half?.height ?? 0)} px`);
     const chips = sheet.getByRole('tablist');
     const hidden = await chips.evaluate((el) => getComputedStyle(el).scrollbarWidth === 'none');
@@ -180,6 +184,7 @@ try {
     await page.waitForTimeout(300);
     const full = await sheet.boundingBox();
     const canvas = await page.locator('svg.schematic').boundingBox();
+    check('tam boy sayfada boş tuval ipucu gizli (şerit sıkışmıyor)', !(await examples.isVisible()));
     check('başlıktan yukarı çekince sayfa tam boy; tuvalde devre şeridi kalıyor', full !== null && half !== null && full.height > half.height + 60 && canvas !== null && canvas.height >= 100, `${Math.round(full?.height ?? 0)} px, tuval ${Math.round(canvas?.height ?? 0)} px`);
     const handle = await sheet.getByRole('button', { name: /^Sayfanın boyunu değiştir/ }).boundingBox();
     await drag(page, cdp, { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }, { x: handle.x + handle.width / 2, y: handle.y + 420 });

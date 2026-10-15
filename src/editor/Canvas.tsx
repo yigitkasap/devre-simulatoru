@@ -102,6 +102,11 @@ export interface PhoneCanvas {
   readonly strip?: boolean;
   /** Boş tuvaldeki ipucu (tablette Parça düğmesi solda). */
   readonly emptyHint?: string;
+  /**
+   * Boş tuval ipucu tuvalin üstüne sabitlenir (telefon): alt sayfa açılıp çekildikçe tuval kısalsa da
+   * yeri ve boyu değişmez. Yoksa (tablet) tuvalin ortasındadır.
+   */
+  readonly emptyTop?: boolean;
 }
 
 /** Tuvalin altındaki ipucu şeridinin gösterdiği durum. */
@@ -1814,9 +1819,19 @@ export function Canvas({
         </nav>
       )}
 
-      {doc.parts.length === 0 && doc.wires.length === 0 && tool.kind === 'select' && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-muted">
-          <svg width="64" height="40" viewBox="0 0 64 40" aria-hidden="true">
+      {doc.parts.length === 0 && doc.wires.length === 0 && tool.kind === 'select' && !phone?.strip && (
+        <div
+          className={`pointer-events-none absolute flex flex-col items-center gap-3 text-center text-muted ${
+            phone?.emptyTop ? 'inset-x-0 top-0 px-6 pt-6' : 'inset-0 justify-center p-6'
+          }`}
+        >
+          <svg
+            width="64"
+            height="40"
+            viewBox="0 0 64 40"
+            aria-hidden="true"
+            className={phone?.emptyTop ? '[@media(max-height:700px)]:hidden' : undefined}
+          >
             <path
               d="M4 20H20L23 13L29 27L35 13L41 27L44 20H60"
               fill="none"

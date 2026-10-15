@@ -321,7 +321,9 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
     seçili parça görünür tutulur). Tutamaçtan ya da başlık satırından çekilen sayfa parmağı izler,
     bırakınca en yakın boya oturur (en küçüğün altına çekilirse kapanır); çekerken tuval yeniden
     sığdırılmaz. Parça ekle sayfası pencerenin ≈ %60'ı kadar açılır ve yukarı çekilince tam boy
-    olur (kullanıcı isteği); kategori çiplerinin kaydırma çubuğu gizlidir, sağ kenar solar. Karartmalı sayfalar (Dosya, ⋯, Örnekler) açıkken tuvalin
+    olur (kullanıcı isteği); kategori çiplerinin kaydırma çubuğu gizlidir, sağ kenar solar.
+    Boş tuval ipucu ("Örneklerden başla") telefonda tuvalin üstüne sabittir: sayfa açılıp
+    çekildikçe yeri ve boyu değişmez; tam boy sayfada gizlenir. Karartmalı sayfalar (Dosya, ⋯, Örnekler) açıkken tuvalin
     `touch-action` değeri kaldırılır; WebKit, `touch-action: none` bölgesini üstüne binen katmanlara
     da uygulayabiliyor.
   - Tuvalin tüm çizimi olay almaz (`pointer-events: none`); hedef her zaman SVG'dir. Dokunmatikte
@@ -343,7 +345,7 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 113 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 115 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
