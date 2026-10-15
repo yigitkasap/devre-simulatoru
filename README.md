@@ -322,8 +322,8 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
     bırakınca en yakın boya oturur (en küçüğün altına çekilirse kapanır); çekerken tuval yeniden
     sığdırılmaz. Parça ekle sayfası pencerenin ≈ %60'ı kadar açılır ve yukarı çekilince tam boy
     olur (kullanıcı isteği); kategori çiplerinin kaydırma çubuğu gizlidir, sağ kenar solar.
-    Boş tuval ipucu ("Örneklerden başla") telefonda tuvalin üstüne sabittir: sayfa açılıp
-    çekildikçe yeri ve boyu değişmez; tam boy sayfada gizlenir. Karartmalı sayfalar (Dosya, ⋯, Örnekler) açıkken tuvalin
+    Boş tuval ipucu ("Örneklerden başla") telefonda ekranın ortasına sabittir: sayfa açılıp
+    çekildikçe yeri ve boyu değişmez, sayfa üstüne biner (kullanıcı isteği); tam boy sayfada gizlenir. Karartmalı sayfalar (Dosya, ⋯, Örnekler) açıkken tuvalin
     `touch-action` değeri kaldırılır; WebKit, `touch-action: none` bölgesini üstüne binen katmanlara
     da uygulayabiliyor.
   - Tuvalin tüm çizimi olay almaz (`pointer-events: none`); hedef her zaman SVG'dir. Dokunmatikte

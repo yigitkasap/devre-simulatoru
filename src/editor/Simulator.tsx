@@ -888,7 +888,7 @@ export default function Simulator() {
               lockChip: !lockChipClosed,
               onLockChipClose: () => setLockChipClosed(true),
               strip: phone && sheet?.size === 'full',
-              emptyTop: phone,
+              ...(phone && !layout.landscape && phoneAreaHeight > 0 ? { emptyAreaHeight: phoneAreaHeight } : {}),
               ...(tablet ? { emptyHint: tr.tablet.empty } : {}),
             }
           : null

@@ -103,10 +103,11 @@ export interface PhoneCanvas {
   /** Boş tuvaldeki ipucu (tablette Parça düğmesi solda). */
   readonly emptyHint?: string;
   /**
-   * Boş tuval ipucu tuvalin üstüne sabitlenir (telefon): alt sayfa açılıp çekildikçe tuval kısalsa da
-   * yeri ve boyu değişmez. Yoksa (tablet) tuvalin ortasındadır.
+   * Telefonda (dikey) boş tuval ipucu bu yükseklikteki alanın ortasına sabitlenir: alanın tamamı,
+   * alt sayfa kapalıyken tuvalin boyu. Sayfa açılıp çekildikçe tuval kısalsa da ipucunun yeri ve
+   * boyu değişmez; sayfa üstüne biner. Yoksa (tablet, yatay telefon) tuvalin ortasındadır.
    */
-  readonly emptyTop?: boolean;
+  readonly emptyAreaHeight?: number;
 }
 
 /** Tuvalin altındaki ipucu şeridinin gösterdiği durum. */
@@ -1821,17 +1822,12 @@ export function Canvas({
 
       {doc.parts.length === 0 && doc.wires.length === 0 && tool.kind === 'select' && !phone?.strip && (
         <div
-          className={`pointer-events-none absolute flex flex-col items-center gap-3 text-center text-muted ${
-            phone?.emptyTop ? 'inset-x-0 top-0 px-6 pt-6' : 'inset-0 justify-center p-6'
+          className={`pointer-events-none absolute flex flex-col items-center justify-center gap-3 p-6 text-center text-muted ${
+            phone?.emptyAreaHeight ? 'inset-x-0 top-0' : 'inset-0'
           }`}
+          style={phone?.emptyAreaHeight ? { height: phone.emptyAreaHeight } : undefined}
         >
-          <svg
-            width="64"
-            height="40"
-            viewBox="0 0 64 40"
-            aria-hidden="true"
-            className={phone?.emptyTop ? '[@media(max-height:700px)]:hidden' : undefined}
-          >
+          <svg width="64" height="40" viewBox="0 0 64 40" aria-hidden="true">
             <path
               d="M4 20H20L23 13L29 27L35 13L41 27L44 20H60"
               fill="none"
