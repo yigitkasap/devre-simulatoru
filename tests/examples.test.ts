@@ -33,14 +33,23 @@ function withProps(doc: CircuitDoc, label: string, props: Record<string, number 
 
 describe('Örnekler', () => {
   for (const id of EXAMPLE_IDS) {
-    it(`${id}: hatasız açılır, bütün uçlar bağlı (osiloskop kanalları ve TTL çıkışı dışında), metinleri var`, () => {
+    it(`${id}: hatasız açılır, bütün uçlar bağlı (osiloskop kanalları ve kullanılmayan cihaz çıkışları dışında), metinleri var`, () => {
       const doc = load(id);
       const connectivity = buildConnectivity(doc);
-      const scopeChannels = new Set([
+      const open = connectivity.unconnectedPins;
+      // Boş kalabilecek uçlar: osiloskop kanalları, üretecin OUT ya da TTL çıkışı (biri kullanılır),
+      // güç kaynağının iki ucu da boş olan çıkışı.
+      const allowed = new Set([
         ...doc.parts.filter((p) => p.type === 'oscilloscope').flatMap((p) => [`${p.id}#0`, `${p.id}#1`]),
-        ...doc.parts.filter((p) => p.type === 'funcgen').map((p) => `${p.id}#1`),
+        ...doc.parts.filter((p) => p.type === 'funcgen').flatMap((p) => [`${p.id}#0`, `${p.id}#1`]),
+        ...doc.parts
+          .filter((p) => p.type === 'dcsupply')
+          .flatMap((p) => [0, 2].filter((k) => open.has(`${p.id}#${k}`) && open.has(`${p.id}#${k + 1}`)).flatMap((k) => [`${p.id}#${k}`, `${p.id}#${k + 1}`])),
       ]);
-      expect([...connectivity.unconnectedPins].filter((pin) => !scopeChannels.has(pin))).toEqual([]);
+      expect([...open].filter((pin) => !allowed.has(pin))).toEqual([]);
+      for (const fg of doc.parts.filter((p) => p.type === 'funcgen')) {
+        expect(open.has(`${fg.id}#0`) && open.has(`${fg.id}#1`), `${fg.label} kullanılmıyor`).toBe(false);
+      }
       expect(connectivity.danglingEnds).toEqual([]);
       expect(new CircuitSimulator(connectivity.netlist).topologyDiagnostics).toEqual([]);
       const texts = tr.examples.texts[id];
@@ -110,20 +119,20 @@ describe('Örnekler', () => {
     return { max, min };
   }
 
-  it('Yarım dalga doğrultmaç: yükte ≈ 9,3 V tepe, DC voltmetre ≈ 2,9 V; ters diyotla negatif yarılar', () => {
+  it('Yarım dalga doğrultmaç (föy): yükte ≈ 9,0 V tepe, DC voltmetre ≈ 2,8 V; ters diyotla negatif yarılar', () => {
     const doc = load('yarim-dalga');
     const sim = simulate(doc, 0.1);
     const reading = sim.status(idOf(doc, 'V1')).reading!;
-    expect(reading).toBeGreaterThan(2.85);
-    expect(reading).toBeLessThan(3.0);
+    expect(reading).toBeGreaterThan(2.7);
+    expect(reading).toBeLessThan(2.85);
     const { max, min } = swing(sim, idOf(doc, 'V1'), 0.02);
-    expect(max).toBeGreaterThan(9.25);
-    expect(max).toBeLessThan(9.4);
+    expect(max).toBeGreaterThan(8.9);
+    expect(max).toBeLessThan(9.05);
     expect(min).toBeGreaterThan(-0.01);
     const flipped = simulate(flipParts(doc, new Set([idOf(doc, 'D1')])), 0.1);
     const reverse = swing(flipped, idOf(doc, 'V1'), 0.02);
     expect(reverse.max).toBeLessThan(0.01);
-    expect(reverse.min).toBeLessThan(-9.25);
+    expect(reverse.min).toBeLessThan(-8.9);
   });
 
   it('Kare dalga ile RC: yarım periyot sonunda ≈ 9,93 V; 5 Hz’de kondansatör tam dolamaz', () => {

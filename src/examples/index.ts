@@ -7,44 +7,50 @@ import { parseDoc } from '../model/serialize';
 import type { CircuitDoc } from '../model/types';
 import ampermetreEtkisi from './ampermetre-etkisi.json';
 import bjtAnahtar from './bjt-anahtar.json';
+import bjtAnahtarEmetor from './bjt-anahtar-emetor.json';
 import bjtYukseltec from './bjt-yukseltec.json';
+import ciftKirpici from './cift-kirpici.json';
+import diyotDc from './diyot-dc.json';
 import diyotKarakteristigi from './diyot-karakteristigi.json';
 import diyotYonu from './diyot-yonu.json';
-import fetCikisKarakteristigi from './fet-cikis-karakteristigi.json';
-import fetTransferKarakteristigi from './fet-transfer-karakteristigi.json';
 import fetYukseltec from './fet-yukseltec.json';
 import gerilimBolucu from './gerilim-bolucu.json';
-import gerilimIkileyici from './gerilim-ikileyici.json';
-import kopruFiltre from './kopru-filtre.json';
+import gerilimKatlayici from './gerilim-katlayici.json';
+import jfetKarakteristik from './jfet-karakteristik.json';
+import kopruDogrultmac from './kopru-dogrultmac.json';
+import ledKarakteristigi from './led-karakteristigi.json';
 import ledOnDirenc from './led-on-direnc.json';
-import mosfetAnahtar from './mosfet-anahtar.json';
 import mosfetYukseltec from './mosfet-yukseltec.json';
+import negatifKenetleyici from './negatif-kenetleyici.json';
 import paralelKirpici from './paralel-kirpici.json';
 import pozitifKenetleyici from './pozitif-kenetleyici.json';
 import rcDolma from './rc-dolma.json';
 import rcKareDalga from './rc-kare-dalga.json';
-import tamDalgaOrtaUclu from './tam-dalga-orta-uclu.json';
 import toprakTuzagi from './toprak-tuzagi.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
-import zenerKirpici from './zener-kirpici.json';
+import zenerKarakteristigi from './zener-karakteristigi.json';
 
-/** Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir. */
+/**
+ * Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir.
+ * "Temel" ve "aletler" dışındaki gruplar Fizik 2. sınıf Elektronik Laboratuvarı föyünün dokuz
+ * deneyidir; devreler föydeki parçalar ve değerlerle kuruludur.
+ */
 export const EXAMPLE_GROUPS = [
   {
     id: 'temel',
     ids: ['led-on-direnc', 'gerilim-bolucu', 'voltmetre-yukleme', 'ampermetre-etkisi', 'rc-dolma', 'rc-kare-dalga', 'diyot-yonu'],
   },
   { id: 'aletler', ids: ['toprak-tuzagi'] },
-  { id: 'diyot-karakteristigi', ids: ['diyot-karakteristigi'] },
-  { id: 'dogrultucu', ids: ['yarim-dalga', 'tam-dalga-orta-uclu', 'kopru-filtre'] },
-  { id: 'kenetleyici', ids: ['pozitif-kenetleyici', 'gerilim-ikileyici'] },
-  { id: 'kirpici', ids: ['paralel-kirpici', 'zener-kirpici'] },
-  { id: 'fet-karakteristigi', ids: ['fet-cikis-karakteristigi', 'fet-transfer-karakteristigi'] },
+  { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
+  { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
+  { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
+  { id: 'kirpici', ids: ['paralel-kirpici', 'cift-kirpici'] },
+  { id: 'fet-karakteristigi', ids: ['jfet-karakteristik'] },
   { id: 'fet-yukseltec', ids: ['fet-yukseltec'] },
   { id: 'bjt-yukseltec', ids: ['bjt-yukseltec'] },
   { id: 'mosfet-yukseltec', ids: ['mosfet-yukseltec'] },
-  { id: 'anahtar', ids: ['bjt-anahtar', 'mosfet-anahtar'] },
+  { id: 'anahtar', ids: ['bjt-anahtar', 'bjt-anahtar-emetor'] },
 ] as const;
 
 export type ExampleGroupId = (typeof EXAMPLE_GROUPS)[number]['id'];
@@ -61,22 +67,24 @@ const DATA: Record<ExampleId, unknown> = {
   'rc-dolma': rcDolma,
   'rc-kare-dalga': rcKareDalga,
   'diyot-yonu': diyotYonu,
+  'toprak-tuzagi': toprakTuzagi,
+  'diyot-dc': diyotDc,
   'diyot-karakteristigi': diyotKarakteristigi,
+  'zener-karakteristigi': zenerKarakteristigi,
+  'led-karakteristigi': ledKarakteristigi,
   'yarim-dalga': yarimDalga,
-  'tam-dalga-orta-uclu': tamDalgaOrtaUclu,
-  'kopru-filtre': kopruFiltre,
+  'kopru-dogrultmac': kopruDogrultmac,
+  'negatif-kenetleyici': negatifKenetleyici,
   'pozitif-kenetleyici': pozitifKenetleyici,
-  'gerilim-ikileyici': gerilimIkileyici,
+  'gerilim-katlayici': gerilimKatlayici,
   'paralel-kirpici': paralelKirpici,
-  'zener-kirpici': zenerKirpici,
-  'fet-cikis-karakteristigi': fetCikisKarakteristigi,
-  'fet-transfer-karakteristigi': fetTransferKarakteristigi,
+  'cift-kirpici': ciftKirpici,
+  'jfet-karakteristik': jfetKarakteristik,
   'fet-yukseltec': fetYukseltec,
   'bjt-yukseltec': bjtYukseltec,
   'mosfet-yukseltec': mosfetYukseltec,
   'bjt-anahtar': bjtAnahtar,
-  'mosfet-anahtar': mosfetAnahtar,
-  'toprak-tuzagi': toprakTuzagi,
+  'bjt-anahtar-emetor': bjtAnahtarEmetor,
 };
 
 /** Örneğin devresi; JSON bozuksa null (testler bunu yakalar). */

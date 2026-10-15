@@ -1,5 +1,5 @@
-// Laboratuvar örnekleri (diyot uygulamaları ve transistörler): cevap metinlerindeki sayılar
-// simülasyonla tutar.
+// Föy örnekleri (Fizik 2. sınıf Elektronik Laboratuvarı, Deney 1–9) ve laboratuvar cihazları:
+// cevap metinlerindeki sayılar simülasyonla tutar.
 
 import { describe, expect, it } from 'vitest';
 import { buildScopeView } from '../src/editor/scopeView';
@@ -29,7 +29,7 @@ function swing(sim: CircuitSimulator, value: () => number, duration: number, sli
   let max = Number.NEGATIVE_INFINITY;
   let min = Number.POSITIVE_INFINITY;
   const end = sim.time + duration;
-  while (sim.time < end - 1e-12) {
+  while (sim.time < end - 1e-15) {
     expect(sim.advance(slice).ok).toBe(true);
     const v = value();
     max = Math.max(max, v);
@@ -37,93 +37,225 @@ function swing(sim: CircuitSimulator, value: () => number, duration: number, sli
   }
   return { max, min };
 }
+const between = (value: number, lo: number, hi: number) => {
+  expect(value).toBeGreaterThan(lo);
+  expect(value).toBeLessThan(hi);
+};
 
-describe('Diyot uygulamaları', () => {
-  it('Diyot karakteristiği: en büyük akım ≈ 3,96 mA, o anda V_D ≈ 0,65 V; X-Y eğrisi çizilir', () => {
+describe('Deney 1: diyot karakteristikleri', () => {
+  it('1N4001 doğru akımda: 5 V’ta V_D ≈ 0,56 V, I ≈ 4,4 mA; 10 V’ta ≈ 9,4 mA; ters yönde < 1 µA', () => {
+    const doc = load('diyot-dc');
+    const at = (v: number) => run(withProps(doc, 'PS1', { voltage1: v }), 0);
+    const five = at(5);
+    between(five.measure(idOf(doc, 'D1'))!.voltage, 0.55, 0.57);
+    between(five.status(idOf(doc, 'A1')).reading!, 4.4e-3, 4.48e-3);
+    between(five.status(idOf(doc, 'V1')).reading!, 0.55, 0.57);
+    const ten = at(10);
+    between(ten.measure(idOf(doc, 'D1'))!.current, 9.35e-3, 9.45e-3);
+    between(at(0.5).measure(idOf(doc, 'D1'))!.current, 0.12e-3, 0.135e-3);
+    const reverse = run(flipParts(doc, new Set([idOf(doc, 'D1')])), 0);
+    expect(Math.abs(reverse.status(idOf(doc, 'A1')).reading!)).toBeLessThan(1e-6);
+  });
+
+  it('1N4001 X-Y: 1 kHz’te en büyük akım ≈ 4,2 mA (V_D ≈ 0,56 V); 100 kHz’te ≈ −4,8 mA ters akım; topraklı üreteçte R kısa devre', () => {
     const doc = load('diyot-karakteristigi');
-    const sim = run(doc, 1);
     const d = idOf(doc, 'D1');
-    const current = swing(sim, () => sim.measure(d)!.current, 1, 1e-3);
-    expect(current.max).toBeGreaterThan(3.9e-3);
-    expect(current.max).toBeLessThan(4.0e-3);
-    expect(current.min).toBeGreaterThan(-1e-9);
-    const voltage = swing(sim, () => sim.measure(d)!.voltage, 1, 1e-3);
-    expect(voltage.max).toBeGreaterThan(0.63);
-    expect(voltage.max).toBeLessThan(0.66);
+    const sim = run(doc, 3e-3);
+    const current = swing(sim, () => sim.measure(d)!.current, 2e-3, 1e-5);
+    between(current.max, 4.15e-3, 4.3e-3);
+    expect(current.min).toBeGreaterThan(-0.15e-3);
+    between(swing(sim, () => sim.measure(d)!.voltage, 2e-3, 1e-5).max, 0.54, 0.57);
     const scope = doc.parts.find((p) => p.type === 'oscilloscope')!;
     const view = buildScopeView((sim.device(scope.id) as OscilloscopeDevice).recorder, scopeSettings(scope.props), [true, true]);
-    expect(view.xyPath.length).toBeGreaterThan(1000);
+    expect(view.xyPath.length).toBeGreaterThan(100);
+    const fast = run(withProps(doc, 'FG1', { frequency: 1e5 }), 30e-6);
+    between(swing(fast, () => fast.measure(d)!.current, 20e-6, 1e-7).min, -5e-3, -4.5e-3);
+    const earthed = run(withProps(doc, 'FG1', { earthed: true }), 3e-3);
+    expect(Math.abs(swing(earthed, () => earthed.measure(idOf(doc, 'R1'))!.voltage, 1e-3, 1e-5).max)).toBeLessThan(1e-6);
+    expect(swing(earthed, () => earthed.measure(d)!.current, 1e-3, 1e-5).max).toBeGreaterThan(80e-3);
   });
 
-  it('Orta uçlu tam dalga: tepe ≈ 9,3 V, çıkış frekansı 100 Hz', () => {
-    const doc = load('tam-dalga-orta-uclu');
-    const sim = run(doc, 0.1);
-    const out = swing(sim, () => sim.measure(idOf(doc, 'RL'))!.voltage, 0.04);
-    expect(out.max).toBeGreaterThan(9.25);
-    expect(out.max).toBeLessThan(9.4);
-    expect(out.min).toBeGreaterThan(-0.01);
+  it('Zener 5,6 V: ters yönde ≈ −5,4 V’ta ≈ 4,4 mA; ileri yönde ≈ 0,7 V’ta ≈ 8,9 mA', () => {
+    const doc = load('zener-karakteristigi');
+    const z = idOf(doc, 'Z1');
+    const sim = run(doc, 3e-3);
+    const i = swing(sim, () => sim.measure(z)!.current, 2e-3, 1e-5);
+    between(i.min, -4.5e-3, -4.3e-3);
+    between(i.max, 8.8e-3, 9e-3);
+    const v = swing(sim, () => sim.measure(z)!.voltage, 2e-3, 1e-5);
+    between(v.min, -5.45, -5.3);
+    between(v.max, 0.65, 0.72);
+  });
+
+  it('LED: en büyük akım ≈ 3,1 mA, o anda V_F ≈ 1,69 V', () => {
+    const doc = load('led-karakteristigi');
+    const led = idOf(doc, 'LED1');
+    const sim = run(doc, 3e-3);
+    between(swing(sim, () => sim.measure(led)!.current, 2e-3, 1e-5).max, 3.05e-3, 3.2e-3);
+    between(swing(sim, () => sim.measure(led)!.voltage, 2e-3, 1e-5).max, 1.65, 1.72);
+  });
+});
+
+describe('Deney 2: doğrultucular', () => {
+  it('Yarım dalga filtreleri: 22 µF’ta ≈ 4,2–8,5 V (ortalama ≈ 6,2 V); 470 µF’ta dalgalanma ≈ 0,2 V, tepe ≈ 7,1 V', () => {
+    const doc = load('yarim-dalga');
+    const out = (sim: CircuitSimulator) => swing(sim, () => sim.measure(idOf(doc, 'RL'))!.voltage, 0.04, 1e-4);
+    const c1 = run(withProps(doc, 'S1', { closed: true }), 0.3);
+    expect(out(c1).min).toBeLessThan(0.01);
+    const c22 = run(withProps(doc, 'S2', { closed: true }), 0.5);
+    const r22 = out(c22);
+    between(r22.min, 4.1, 4.35);
+    between(r22.max, 8.4, 8.55);
+    between(c22.status(idOf(doc, 'V1')).reading!, 6.1, 6.35);
+    const c470 = run(withProps(doc, 'S3', { closed: true }), 1);
+    const r470 = out(c470);
+    between(r470.max - r470.min, 0.15, 0.3);
+    between(r470.max, 7.0, 7.2);
+  });
+
+  it('Köprü: 100 kΩ’da iki yarıda da ≈ 9,3 V tepe (A − B ölçümü doğru, prob toprağı toprakta)', () => {
+    const doc = load('kopru-dogrultmac');
+    const sim = run(doc, 0.105);
+    const vl = () => sim.measure(idOf(doc, 'RL'))!.voltage;
+    between(vl(), 9.2, 9.35);
+    sim.runUntil(0.115);
+    between(vl(), 9.2, 9.35);
     const scope = doc.parts.find((p) => p.type === 'oscilloscope')!;
-    const view = buildScopeView((sim.device(scope.id) as OscilloscopeDevice).recorder, scopeSettings(scope.props), [true, true]);
-    expect(view.channels[1].stats!.frequency).toBeCloseTo(100, 0);
-    expect(view.channels[0].stats!.frequency).toBeCloseTo(50, 0);
+    expect(scopeSettings(scope.props).mode).toBe('add');
+  });
+});
+
+describe('Deney 3: kenetleyici ve katlayıcı', () => {
+  it('Negatif kenetleyici: sinüste ≈ +0,56 V ile −9,1 V; karede ≈ +0,5 V ile −9,5 V; pozitif kenetleyici bunun aynası', () => {
+    const doc = load('negatif-kenetleyici');
+    const rl = (d: CircuitDoc) => {
+      const sim = run(d, 0.2);
+      return swing(sim, () => sim.measure(idOf(d, 'RL'))!.voltage, 0.004, 1e-5);
+    };
+    const sine = rl(doc);
+    between(sine.max, 0.5, 0.62);
+    between(sine.min, -9.2, -9.0);
+    const square = rl(withProps(doc, 'FG1', { waveform: 'square' }));
+    between(square.max, 0.45, 0.58);
+    between(square.min, -9.55, -9.4);
+    const positive = rl(load('pozitif-kenetleyici'));
+    between(positive.max, 9.0, 9.2);
+    between(positive.min, -0.62, -0.5);
   });
 
-  it('Köprü doğrultmaç: tepe ≈ 8,7 V; filtre kondansatörüyle dalgalanma ≈ 0,7 V tepe-tepe', () => {
-    const doc = load('kopru-filtre');
-    const open = run(doc, 0.1);
-    const raw = swing(open, () => open.measure(idOf(doc, 'RL'))!.voltage, 0.04);
-    expect(raw.max).toBeGreaterThan(8.55);
-    expect(raw.max).toBeLessThan(8.75);
-    const filtered = withProps(doc, 'S1', { closed: true });
-    const sim = run(filtered, 1);
-    const out = swing(sim, () => sim.measure(idOf(doc, 'RL'))!.voltage, 0.04);
-    expect(out.max - out.min).toBeGreaterThan(0.6);
-    expect(out.max - out.min).toBeLessThan(0.8);
-    expect(out.min).toBeGreaterThan(7.8);
+  it('Gerilim katlayıcı: 5 ms’de ≈ 4,9 V, 50 ms’de ≈ 8,7 V, sonunda ≈ 9,1 V', () => {
+    const doc = load('gerilim-katlayici');
+    const c2 = idOf(doc, 'C2');
+    const sim = run(doc, 0.005);
+    between(sim.measure(c2)!.voltage, 4.7, 5.05);
+    sim.runUntil(0.05);
+    between(sim.measure(c2)!.voltage, 8.6, 8.8);
+    sim.runUntil(0.3);
+    between(sim.measure(c2)!.voltage, 9.05, 9.2);
   });
+});
 
-  it('Pozitif kenetleyici: çıkış ≈ −0,6 V ile ≈ 9,4 V arasında; tepe-tepe 10 V', () => {
-    const doc = load('pozitif-kenetleyici');
-    const sim = run(doc, 0.2);
-    const out = swing(sim, () => sim.measure(idOf(doc, 'RL'))!.voltage, 0.04);
-    expect(out.min).toBeGreaterThan(-0.7);
-    expect(out.min).toBeLessThan(-0.5);
-    expect(out.max).toBeGreaterThan(9.3);
-    expect(out.max).toBeLessThan(9.5);
-    expect(out.max - out.min).toBeCloseTo(10, 1);
-    const negative = run(flipParts(doc, new Set([idOf(doc, 'D1')])), 0.2);
-    const neg = swing(negative, () => negative.measure(idOf(doc, 'RL'))!.voltage, 0.04);
-    expect(neg.max).toBeLessThan(0.7);
-    expect(neg.min).toBeLessThan(-9.3);
-  });
-
-  it('Gerilim ikileyici: çıkış ≈ 8,7 V, 0,2 s içinde dolar', () => {
-    const doc = load('gerilim-ikileyici');
-    const sim = run(doc, 0.2);
-    expect(sim.measure(idOf(doc, 'C2'))!.voltage).toBeGreaterThan(8.6);
-    sim.runUntil(0.5);
-    const reading = sim.status(idOf(doc, 'V1')).reading!;
-    expect(reading).toBeGreaterThan(8.6);
-    expect(reading).toBeLessThan(8.8);
-  });
-
-  it('Öngerilimli paralel kırpıcı: pozitif tepeler ≈ 3,7 V’ta kırpılır, negatif yarı geçer', () => {
+describe('Deney 4: kırpıcılar', () => {
+  it('4 V öngerilimli kırpıcı: ≈ 4,45 V’ta kırpar, negatif yarı geçer', () => {
     const doc = load('paralel-kirpici');
-    const sim = run(doc, 0.1);
-    const out = swing(sim, () => sim.voltageAt(`${idOf(doc, 'D1')}#0`)!, 0.04);
-    expect(out.max).toBeGreaterThan(3.6);
-    expect(out.max).toBeLessThan(3.75);
-    expect(out.min).toBeLessThan(-9.99);
+    const sim = run(doc, 0.01);
+    const out = swing(sim, () => sim.voltageAt(`${idOf(doc, 'D1')}#0`)!, 0.004, 1e-5);
+    between(out.max, 4.4, 4.5);
+    expect(out.min).toBeLessThan(-9.8);
   });
 
-  it('Çift yönlü zener kırpıcı: ≈ ±5,5 V’ta kırpar', () => {
-    const doc = load('zener-kirpici');
-    const sim = run(doc, 0.1);
-    const out = swing(sim, () => sim.voltageAt(`${idOf(doc, 'R1')}#1`)!, 0.04);
-    expect(out.max).toBeGreaterThan(5.4);
-    expect(out.max).toBeLessThan(5.7);
-    expect(out.min).toBeLessThan(-5.4);
-    expect(out.min).toBeGreaterThan(-5.7);
+  it('Çift yönlü kırpıcı (3 V ve −2 V): ≈ +3,46 V ile −2,47 V arasında', () => {
+    const doc = load('cift-kirpici');
+    const sim = run(doc, 0.01);
+    const out = swing(sim, () => sim.voltageAt(`${idOf(doc, 'D1')}#0`)!, 0.004, 1e-5);
+    between(out.max, 3.4, 3.5);
+    between(out.min, -2.52, -2.42);
+  });
+});
+
+describe('Deney 5: JFET karakteristikleri', () => {
+  it('BF245A, V_DS = 10 V: V_GS = 0’da ≈ 4,1 mA, −0,2 V’ta ≈ 3,2 mA, −0,4 V’ta ≈ 2,5 mA; −1,8 V’ta kesim', () => {
+    const doc = load('jfet-karakteristik');
+    const id = (vgg: number) => run(withProps(doc, 'PS1', { voltage2: vgg }), 0).status(idOf(doc, 'A1')).reading!;
+    between(id(0), 4.1e-3, 4.18e-3);
+    between(id(0.2), 3.2e-3, 3.28e-3);
+    between(id(0.4), 2.42e-3, 2.49e-3);
+    // Kesimde yalnızca V_DS voltmetresinin (10 MΩ) akımı kalır.
+    expect(id(1.8)).toBeLessThan(2e-6);
+    const sim = run(withProps(doc, 'PS1', { voltage2: 0.4 }), 0);
+    between(sim.status(idOf(doc, 'V2')).reading!, -0.41, -0.39);
+  });
+});
+
+describe('Deney 6–8: yükselteçler', () => {
+  /** Yükseltecin kazancı (çıkış tepe / giriş tepe) ve çıkış uçları. */
+  function amplifier(doc: CircuitDoc, q: string, frequency = 1e3, until = 0.3) {
+    const fg = doc.parts.find((p) => p.label === 'FG1')!.props;
+    const vin = ((fg.amplitude as number) * (fg.attenuate ? 0.1 : 1)) / 2;
+    const sim = run(withProps(doc, 'FG1', { frequency }), until);
+    const out = swing(sim, () => sim.voltageAt(`${idOf(doc, q)}#0`)!, 2 / frequency, 1 / (100 * frequency));
+    return { sim, out, gain: (out.max - out.min) / 2 / vin };
+  }
+
+  it('JFET (BF245A, R_D = 2,7 kΩ): I_D ≈ 3,8 mA, kazanç ≈ 10; 2 V tepe-tepe girişte bozulma', () => {
+    const doc = load('fet-yukseltec');
+    const { sim, gain } = amplifier(doc, 'J1', 1e3, 0.05);
+    between(gain, 9.8, 10.3);
+    between(sim.pinCurrents(idOf(doc, 'J1'))![0]!, 3.7e-3, 3.9e-3);
+    expect(sim.status(idOf(doc, 'J1')).region).toBe('saturation');
+    const big = amplifier(withProps(doc, 'FG1', { amplitude: 2 }), 'J1', 1e3, 0.05).out;
+    expect(big.max).toBeGreaterThan(14);
+    expect(big.min).toBeLessThan(1.5);
+  });
+
+  it('BJT (BC107, R_B = 2,2 MΩ, R_C = 5,6 kΩ): I_C ≈ 1,1 mA, V_CE ≈ 5,9 V, kazanç ≈ 215; 1 MHz’te ≈ 150', () => {
+    const doc = load('bjt-yukseltec');
+    const { sim, gain } = amplifier(doc, 'Q1');
+    between(gain, 205, 225);
+    between(sim.pinCurrents(idOf(doc, 'Q1'))![0]!, 1.04e-3, 1.13e-3);
+    between(sim.measure(idOf(doc, 'Q1'))!.voltage, 5.6, 6.2);
+    expect(sim.status(idOf(doc, 'Q1')).region).toBe('active');
+    between(amplifier(doc, 'Q1', 1e6, 300e-6).gain, 140, 165);
+  });
+
+  it('MOSFET (IRF510, R_D = 10 kΩ, R_S = 1 kΩ, offset 4,55 V): I_D ≈ 0,70 mA, kazanç ≈ 9,7, ters faz', () => {
+    const doc = load('mosfet-yukseltec');
+    const { sim, gain } = amplifier(doc, 'M1', 1e3, 0.05);
+    between(gain, 9.5, 9.9);
+    between(sim.pinCurrents(idOf(doc, 'M1'))![0]!, 0.68e-3, 0.72e-3);
+    // Ters faz: girişin pozitif tepesinde (1/4 periyot) çıkış en küçük, negatif tepesinde en büyüktür.
+    const phase = run(doc, 0.05025);
+    const atInputPeak = phase.voltageAt(`${idOf(doc, 'M1')}#0`)!;
+    phase.runUntil(0.05075);
+    expect(phase.voltageAt(`${idOf(doc, 'M1')}#0`)! - atInputPeak).toBeGreaterThan(0.9);
+    const big = amplifier(withProps(doc, 'FG1', { amplitude: 1 }), 'M1', 1e3, 0.05).out;
+    between(big.max, 12.6, 13.1);
+    between(big.min, 3.0, 3.35);
+  });
+});
+
+describe('Deney 9: transistör anahtar', () => {
+  it('LED kollektörde: giriş 5 V’ta doyum (I_C ≈ 10 mA, V_CE ≈ 0,04 V); 0 V’ta kesim', () => {
+    const doc = load('bjt-anahtar');
+    const q = idOf(doc, 'Q1');
+    const sim = run(doc, 0.25);
+    const [ic, ib] = sim.pinCurrents(q)!;
+    between(ic!, 9.9e-3, 10.4e-3);
+    between(ib!, 0.41e-3, 0.45e-3);
+    expect(sim.measure(q)!.voltage).toBeLessThan(0.1);
+    expect(sim.status(q).region).toBe('saturation');
+    sim.runUntil(0.75);
+    expect(Math.abs(sim.pinCurrents(q)![0]!)).toBeLessThan(1e-9);
+    expect(sim.status(q).region).toBe('cutoff');
+  });
+
+  it('LED emetörde: transistör aktif bölgede kalır, LED’den yalnızca ≈ 2,6 mA geçer (V_CE ≈ 7,8 V)', () => {
+    const doc = load('bjt-anahtar-emetor');
+    const q = idOf(doc, 'Q1');
+    const sim = run(doc, 0.25);
+    between(sim.measure(idOf(doc, 'LED1'))!.current, 2.4e-3, 2.7e-3);
+    expect(sim.status(q).region).toBe('active');
+    between(sim.measure(q)!.voltage, 7.5, 8);
   });
 });
 
@@ -141,94 +273,5 @@ describe('Laboratuvar cihazları', () => {
     expect(vi()).toBeGreaterThan(3.2);
     isolated.runUntil(0.00475);
     expect(vi()).toBeGreaterThan(3.2);
-  });
-});
-
-describe('Transistörler', () => {
-  const drainSwing = (doc: CircuitDoc) => {
-    const sim = run(doc, 1);
-    return swing(sim, () => sim.pinCurrents(idOf(doc, 'J1'))![0]!, 1, 1e-3);
-  };
-
-  it('JFET çıkış karakteristiği: V_GS = −0,5 V’ta 10 V’taki akım ≈ 1,47 mA; 0 V’ta ≈ 3,3 mA; −1 V’ta ≈ 0,37 mA', () => {
-    const doc = load('fet-cikis-karakteristigi');
-    expect(drainSwing(doc).max).toBeCloseTo(1.467e-3, 4);
-    expect(drainSwing(withProps(doc, 'VGG', { voltage: 0 })).max).toBeCloseTo(3.3e-3, 4);
-    expect(drainSwing(withProps(doc, 'VGG', { voltage: 1 })).max).toBeCloseTo(0.367e-3, 4);
-  });
-
-  it('JFET transfer karakteristiği: en büyük akım ≈ 3,3 mA, V_GS = −1,5 V’ta kesim', () => {
-    const doc = load('fet-transfer-karakteristigi');
-    const s = drainSwing(doc);
-    expect(s.max).toBeGreaterThan(3.25e-3);
-    expect(s.max).toBeLessThan(3.35e-3);
-    expect(s.min).toBeLessThan(1e-9);
-  });
-
-  /** Yükselteç: girişin tepe anında çıkış / giriş (işaretli kazanç). */
-  function gain(id: ExampleId): { gain: number; peak: number } {
-    const doc = load(id);
-    const sim = run(doc, 0.05);
-    const out = swing(sim, () => sim.measure(idOf(doc, 'RL'))!.voltage, 0.004, 1e-5);
-    sim.runUntil(0.30025);
-    const vin = sim.measure(idOf(doc, 'AC1'))!.voltage;
-    return { gain: sim.measure(idOf(doc, 'RL'))!.voltage / vin, peak: (out.max - out.min) / 2 };
-  }
-
-  it('JFET’li yükselteç: kazanç ≈ −12, çıkış ≈ 0,6 V tepe', () => {
-    const { gain: g, peak } = gain('fet-yukseltec');
-    expect(g).toBeLessThan(-11);
-    expect(g).toBeGreaterThan(-13);
-    expect(peak).toBeGreaterThan(0.55);
-    expect(peak).toBeLessThan(0.65);
-  });
-
-  it('BJT’li yükselteç: kazanç ≈ −155, çıkış ≈ 0,78 V tepe; çalışma noktası I_C ≈ 0,96 mA', () => {
-    const { gain: g, peak } = gain('bjt-yukseltec');
-    expect(g).toBeLessThan(-145);
-    expect(g).toBeGreaterThan(-170);
-    expect(peak).toBeGreaterThan(0.73);
-    expect(peak).toBeLessThan(0.83);
-    const doc = load('bjt-yukseltec');
-    const sim = run(doc, 0.0101);
-    expect(sim.status(idOf(doc, 'Q1')).region).toBe('active');
-  });
-
-  it('MOSFET’li yükselteç: kazanç ≈ −54', () => {
-    const { gain: g } = gain('mosfet-yukseltec');
-    expect(g).toBeLessThan(-50);
-    expect(g).toBeGreaterThan(-58);
-  });
-
-  it('BJT anahtar: giriş 5 V’ta doyum (I_C ≈ 18 mA, V_CE ≈ 0,06 V, LED yanar); 0 V’ta kesim', () => {
-    const doc = load('bjt-anahtar');
-    const sim = run(doc, 0.25);
-    const q = idOf(doc, 'Q1');
-    const [ic, ib] = sim.pinCurrents(q)!;
-    expect(ic!).toBeGreaterThan(17.5e-3);
-    expect(ic!).toBeLessThan(19e-3);
-    expect(ib!).toBeGreaterThan(0.4e-3);
-    expect(ib!).toBeLessThan(0.45e-3);
-    expect(sim.measure(q)!.voltage).toBeLessThan(0.1);
-    expect(sim.status(q).region).toBe('saturation');
-    expect(sim.status(idOf(doc, 'LED1')).brightness!).toBeGreaterThan(0.9);
-    sim.runUntil(0.75);
-    expect(Math.abs(sim.pinCurrents(q)![0]!)).toBeLessThan(1e-9);
-    expect(sim.status(q).region).toBe('cutoff');
-  });
-
-  it('MOSFET anahtar: kapalı anahtarla omik bölge, V_DS ≈ 0,06 V, I_D ≈ 17 mA, kapı akımı 0; açıkken kesim', () => {
-    const doc = load('mosfet-anahtar');
-    const off = run(doc, 0);
-    expect(Math.abs(off.pinCurrents(idOf(doc, 'M1'))![0]!)).toBeLessThan(1e-9);
-    expect(off.status(idOf(doc, 'M1')).region).toBe('cutoff');
-    const on = run(withProps(doc, 'S1', { closed: true }), 0);
-    const [id, ig] = on.pinCurrents(idOf(doc, 'M1'))!;
-    expect(id!).toBeGreaterThan(16.5e-3);
-    expect(id!).toBeLessThan(18e-3);
-    expect(ig).toBe(0);
-    expect(on.status(idOf(doc, 'V1')).reading!).toBeGreaterThan(0.05);
-    expect(on.status(idOf(doc, 'V1')).reading!).toBeLessThan(0.07);
-    expect(on.status(idOf(doc, 'M1')).region).toBe('ohmic');
   });
 });

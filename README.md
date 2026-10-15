@@ -13,7 +13,9 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 
 - **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç, kondansatör,
   diyot, zener diyot, LED (kırmızı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
-  N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi).
+  N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi). Diyot, NPN, N kanallı JFET
+  ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
+  kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
 - **Laboratuvar cihazları:** fonksiyon üreteci (GFG-8015G benzeri: 0,2 Hz – 2 MHz, 50 Ω, offset,
   simetri, −20 dB, TTL çıkışı), iki çıkışlı akım sınırlamalı DC güç kaynağı (CV/CC), iki kanallı
   osiloskop. Üretecin ve osiloskobun COM ucu laboratuvardaki gibi şebeke toprağına bağlıdır.
@@ -39,11 +41,11 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 11 grupta 23 hazır devre (temel devreler,
-  laboratuvar cihazları: köprüde toprak tuzağı,
-  diyot karakteristiği, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET karakteristikleri,
-  FET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması); her birinde tahmin
-  sorusu, cevap simülasyon çalışınca açılır.
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 11 grupta 25 hazır devre: temel devreler,
+  laboratuvar cihazları (köprüde toprak tuzağı) ve Elektronik Laboratuvarı föyünün dokuz deneyi
+  (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
+  karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması);
+  her birinde tahmin sorusu, cevap simülasyon çalışınca açılır.
 - **Kaydetme ve paylaşma:** tarayıcıya otomatik kayıt, JSON dışa/içe aktarma, paylaşım bağlantısı.
 
 ## Kurulum ve komutlar
@@ -215,7 +217,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 206 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 211 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -558,18 +560,45 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   (telefonda alt sayfada). Gruplar ve sıraları
   [`src/examples/index.ts`](src/examples/index.ts) içindedir; iOS kuralı gereği pencere açıkken
   tuvalin `touch-action` değeri kaldırılır (pencere parmakla kaydırılabilsin).
-- **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC");
-  kullanıcının listesindeki deneyler: diyot karakteristiği (X-Y), doğrultucular (yarım dalga,
-  orta uçlu tam dalga, köprü + filtre), kenetleyici ve gerilim ikileyici, kırpıcılar
-  (öngerilimli paralel, çift yönlü zener), FET çıkış ve transfer karakteristikleri (X-Y), JFET,
-  BJT ve MOSFET yükselteçleri, BJT ve MOSFET ile anahtarlama.
-- **Karakteristik eğrileri:** Laboratuvardaki gibi gerilim üçgen dalgayla taranır, akım küçük
-  bir ölçme direncinin geriliminden okunur ve osiloskop X-Y kipinde çizer. Ölçme direnci
-  toprak tarafında olduğundan gerilimi ters işaretlidir; B kanalı ters çevrilir.
-- **Orta uçlu transformatör** yerine seri iki AC kaynak kullanılır (transformatör parçası yok).
-  Köprü doğrultmaçta kaynak yüzer olduğundan osiloskobun yalnızca A kanalı kullanılır.
-- **Yükselteçlerde** kuplaj ve köprüleme kondansatörlerinin başlangıç gerilimi DC çalışma
-  noktasına ayarlıdır; Oynat'a basınca uzun bir dolma beklemeden kararlı çalışma görülür.
+- **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC"),
+  Laboratuvar cihazları ("Toprak tuzağı") ve Fizik 2. sınıf Elektronik Laboratuvarı föyünün
+  dokuz deneyi (föy 3. aşama; eski genel laboratuvar örneklerinin yerine). Föy örneklerinde
+  föydeki parçalar (1N4001, BC107, BF245A, IRF510, föydeki direnç ve kondansatör değerleri) ve
+  laboratuvar cihazları (fonksiyon üreteci, iki çıkışlı DC güç kaynağı, osiloskop) kullanılır:
+
+  | Deney | Örnekler |
+  |---|---|
+  | 1 Diyot karakteristikleri | 1N4001 doğru akımda (güç kaynağı, ampermetre, voltmetre); 1N4001, 5,6 V zener ve LED X-Y'de |
+  | 2 Doğrultucular | Yarım dalga + 1 / 22 / 470 µF filtre (anahtarlarla); dört 1N4001'lik köprü, 100 kΩ |
+  | 3 Kenetleyici ve katlayıcı | Negatif ve pozitif kenetleyici (2,2 µF, 10 kΩ); iki 1N4001 + iki 10 µF ikileyici |
+  | 4 Kırpıcılar | 4 V öngerilimli paralel kırpıcı; 3 V ve −2 V çift yönlü kırpıcı (güç kaynağının iki çıkışı) |
+  | 5 FET karakteristikleri | BF245A: V_DD ve V_GG güç kaynağından, I_D ampermetreyle |
+  | 6–8 Yükselteçler | BF245A (R_D = 2,7 kΩ, kazanç ≈ 10), BC107 (R_B = 2,2 MΩ, R_C = 5,6 kΩ), IRF510 (R_D = 10 kΩ, R_S = 1 kΩ) |
+  | 9 Transistör anahtar | BC107, R1 = 10 kΩ, R2 = 1 kΩ, LED kollektörde ve emetörde; üretecin TTL çıkışı, 1 Hz |
+
+- **Föyden çıkarılamayan ayrıntılarda varsayımlar** (föyün tam metni elimizde değil; deney
+  listesi ve parça değerleri biliniyor):
+  - **Zener:** Föy değerini vermiyor. Düzeni en çok benzeyen föyler (Bilecik ve Bandırma: 1N4001,
+    LED ve zener, 1 kΩ) 5,6 V (1N4734A) kullanıyor; ±10 V'luk üreteçle kırılma da net görünüyor.
+  - **X-Y düzeneği:** Klasik akım-gerilim çizici: osiloskobun COM'u eleman ile 1 kΩ'un
+    birleşiminde, B ters çevrilmiş; bu yüzden üreteç topraktan yalıtılmış. Üreteç topraklıysa
+    direnç iki toprak arasında kısa devre olur (cevapta anlatılır).
+  - **Doğrultucularda 50 Hz:** 1 / 22 / 470 µF ile 1 kΩ, RC = 1 / 22 / 470 ms verir; 20 ms'lik
+    periyotla "filtre yok – orta – iyi" sırası en anlamlı bu frekansta.
+  - **Genlikler tepe-tepe:** Föydeki "0,5 V", "0,1 V" gibi giriş değerleri üretecin ön
+    panelindeki gibi tepe-tepe alındı; JFET'te 2 V'ta bozulma, MOSFET'te 1 V'ta belirgin
+    olmayan bozulma föydeki anlatımla tutuyor.
+  - **MOSFET yükselteci:** "IRF510, 10 kΩ, 1 kΩ" R_D = 10 kΩ, R_S = 1 kΩ olarak yorumlandı (kazanç
+    ≈ R_D / R_S ≈ 10); kapı, üretecin DC offset'iyle (4,55 V) sürülür.
+  - **Tasarım ödevleri** (JFET'te R_D, BJT'de R_B ve R_C) için birer çözüm konuldu; cevap
+    metni tasarım formülünü verir.
+- **Yükselteçlerde** BJT'nin kuplaj kondansatörünün başlangıç gerilimi çalışma noktasındaki
+  V_BE'dir (2,2 MΩ üzerinden dolması 22 s sürerdi); Oynat'a basınca kararlı çalışma görülür.
+- **Kullanılmayan cihaz çıkışları:** Üretecin kullanılmayan OUT ya da TTL çıkışı ve güç
+  kaynağının iki ucu da boş olan çıkışı "boşta uç" uyarısı vermez (tek ucu bağlı çıkış uyarır).
+- **Osiloskobun AC kuplajı** artık girişte 1 MΩ ile seri ≈ 16 nF'lık kuplaj kondansatörü gibi
+  davranır: doğru akım çekmez. Önceden AC kuplajda da 1 MΩ doğru akımda devreyi yüklüyordu;
+  sabit öngerilimli BJT'nin bazına bağlanan prob baz akımının ≈ %12'sini çalıyordu.
 - Devreler `src/examples/*.json` dosyalarında, metinleri (başlık, açıklama, tahmin sorusu,
   cevap) `i18n/tr.ts` içindedir; böylece arayüz metinlerinin tamamı tek dosyada kalır.
 - **Tahmin sorusu (kullanıcı isteği):** Örnek kartında önce açıklama ve soru görünür; cevap,

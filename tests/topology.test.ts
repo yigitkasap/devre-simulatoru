@@ -46,6 +46,20 @@ describe('10. Topoloji', () => {
     expect(new CircuitSimulator(netlist).advance(0).ok).toBe(true);
   });
 
+  it('güç kaynağının hiç kullanılmayan çıkışı ve üretecin boş OUT/TTL çıkışı uyarı vermez; yarım bağlı çıkış uyarır', () => {
+    const supply = (connectMinus2: boolean) =>
+      compileNetlist(
+        circuit()
+          .add('dcsupply', 'PS1', ['a', 'gnd', 'p2', connectMinus2 ? 'gnd' : 'm2'], { voltage1: 5, voltage2: 5 })
+          .ground('G1', 'gnd')
+          .resistor('R1', 'a', 'gnd', 1000)
+          .add('funcgen', 'FG1', ['out', 'ttl', 'gnd'], {})
+          .build(),
+      ).diagnostics;
+    expect(supply(false)).toEqual([]);
+    expect(supply(true)).toEqual([expect.objectContaining({ code: 'floating-pin', elementIds: ['PS1'], pin: 2 })]);
+  });
+
   it('iç direnci 0 olan pilin uçları kabloyla birleştirilirse döngü hatası', () => {
     expect(codes(circuit().battery('B1', 'a', 'b', 9, 0).ground('G1', 'b').wire('a', 'b'))).toContain('error:voltage-loop');
   });

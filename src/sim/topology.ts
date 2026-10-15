@@ -59,11 +59,14 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
   // --- Boşta uçlar ------------------------------------------------------------------
   for (const el of netlist.elements) {
     if (el.type === 'ground' && !groundConnected) continue; // zaten hata olarak bildirildi
+    const floating = (index: number) => (pinCount.get(wiring.findKey(el.pins[index]!)) ?? 0) <= 1;
     el.pins.forEach((pin, index) => {
-      // Osiloskobun kullanılmayan bir kanalı (A ya da B) ve fonksiyon üretecinin kullanılmayan TTL
-      // çıkışı normaldir; ortak uçlar ise bağlanmalıdır.
+      // Osiloskobun kullanılmayan bir kanalı (A ya da B), fonksiyon üretecinin kullanılmayan OUT ya
+      // da TTL çıkışı ve güç kaynağının iki ucu da boş olan çıkışı normaldir; ortak uçlar ise
+      // bağlanmalıdır.
       if (el.type === 'oscilloscope' && index < 2) return;
-      if (el.type === 'funcgen' && index === 1) return;
+      if (el.type === 'funcgen' && index < 2) return;
+      if (el.type === 'dcsupply' && floating(index) && floating(index ^ 1)) return;
       const root = wiring.findKey(pin);
       if ((pinCount.get(root) ?? 0) <= 1) {
         diagnostics.push({

@@ -154,14 +154,14 @@ try {
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
     check('örnekler açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
     await page.waitForTimeout(1000);
-    const group = page.getByRole('button', { name: /^Transistörlerin anahtar olarak kullanılması/ });
+    const group = page.getByRole('button', { name: /^Deney 9 · Transistörün anahtar olarak kullanılması/ });
     await group.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
     await group.tap(); await page.waitForTimeout(300);
-    const last = page.getByRole('button', { name: 'MOSFET’in anahtar olarak kullanılması', exact: true });
+    const last = page.getByRole('button', { name: 'Transistör anahtar: LED emetörde', exact: true });
     await last.scrollIntoViewIfNeeded(); await page.waitForTimeout(300);
     await last.tap(); await page.waitForTimeout(600);
     const example = (await page.getByRole('region', { name: 'Örnek' }).textContent().catch(() => '')) ?? '';
-    check(`son gruptaki son örneğe ulaşılıp açılıyor; tahmin sorusu alttaki sayfada (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'nmos') && example.includes('Tahmin et'));
+    check(`son gruptaki son örneğe ulaşılıp açılıyor; tahmin sorusu alttaki sayfada (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'npn' && p.label === 'Q1') && (await doc(page)).parts.some((p) => p.label === 'LED1') && example.includes('Tahmin et'));
     await page.context().close();
   }
 
@@ -313,7 +313,7 @@ try {
     await sp.getByRole('button', { name: 'Cihazlar' }).tap(); await sp.waitForTimeout(1200);
     const devices = sp.getByRole('region', { name: 'Cihazlar' });
     const text = (await devices.textContent().catch(() => '')) ?? '';
-    check('Cihazlar sayfası tam boy açılıyor; ekran ve ölçümler görünüyor', /Tepe-tepe 20,0 V/.test(text), text.slice(0, 50));
+    check('Cihazlar sayfası tam boy açılıyor; ekran ve ölçümler görünüyor', /Tepe-tepe \d+,\d V/.test(text), text.slice(0, 50));
     const before = (await part(sp, 'OSC1')).props.voltsPerDivB ?? 5;
     await sp.getByRole('button', { name: 'B volt/bölme artır' }).tap(); await sp.waitForTimeout(200);
     const after = (await part(sp, 'OSC1')).props.voltsPerDivB;

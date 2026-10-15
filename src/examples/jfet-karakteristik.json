@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 0, "y": 4, "rotation": 0, "props": {"voltage1": 10, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
+    {"id": "p2", "type": "ammeter", "label": "A1", "x": 18, "y": -4, "rotation": 0, "props": {"mode": "dc", "resistance": 0.1, "ideal": false}},
+    {"id": "p3", "type": "njfet", "label": "J1", "x": 30, "y": 12, "rotation": 0, "props": {"model": "BF245A", "idss": 0.00352, "pinchOff": -1.74}},
+    {"id": "p4", "type": "voltmeter", "label": "V1", "x": 40, "y": 12, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000.0, "ideal": false}},
+    {"id": "p5", "type": "voltmeter", "label": "V2", "x": 22, "y": 16, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000.0, "ideal": false}},
+    {"id": "p6", "type": "ground", "label": "GND1", "x": 11, "y": 4, "rotation": 0, "props": {}},
+    {"id": "p7", "type": "ground", "label": "GND2", "x": 32, "y": 20, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[5, 1], [8, 1], [8, -4], [14, -4]]},
+    {"id": "w2", "points": [[22, -4], [32, -4], [32, 8]]},
+    {"id": "w3", "points": [[5, 3], [7, 3], [7, 5], [5, 5]]},
+    {"id": "w4", "points": [[7, 4], [11, 4]]},
+    {"id": "w5", "points": [[5, 7], [9, 7], [9, 12], [22, 12]]},
+    {"id": "w6", "points": [[22, 12], [26, 12]]},
+    {"id": "w7", "points": [[32, 8], [40, 8]]},
+    {"id": "w8", "points": [[40, 16], [32, 16]]},
+    {"id": "w9", "points": [[32, 16], [32, 20]]},
+    {"id": "w10", "points": [[22, 20], [32, 20]]}
+  ]
+}

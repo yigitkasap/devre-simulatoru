@@ -29,6 +29,8 @@ export const SCOPE_INPUT_RESISTANCE = 1e6;
 export const SCOPE_INPUT_CAPACITANCE = 25e-12;
 /** AC kuplajın alt kesim frekansı (analog osiloskoplarda tipik ≈ 10 Hz). */
 export const SCOPE_AC_CUTOFF = 10;
+/** AC kuplajda girişteki seri kondansatör: 1 MΩ ile 10 Hz'lik kesim verir (≈ 16 nF). */
+const SCOPE_AC_CAPACITANCE = 1 / (2 * Math.PI * SCOPE_AC_CUTOFF * SCOPE_INPUT_RESISTANCE);
 
 /** Yeni yerleştirilen osiloskobun ayarları (laboratuvardaki gibi gerçek giriş ve topraklı COM). */
 export const OSCILLOSCOPE_DEFAULTS = {
@@ -81,7 +83,9 @@ export type ScopeSettings = ReturnType<typeof scopeSettings>;
  * Kanallar ortak uca göre gerilimi ölçer: A = v(A) − v(COM), B = v(B) − v(COM).
  *
  * - Gerçek girişte her kanal (GND kuplajı dışında) COM'a 1 MΩ ‖ 25 pF ile bağlıdır: devreyi
- *   gerçek bir osiloskop gibi yükler. İdeal girişte matrise hiçbir şey eklenmez.
+ *   gerçek bir osiloskop gibi yükler. AC kuplajda 1 MΩ'un önünde ≈ 16 nF'lık seri kuplaj
+ *   kondansatörü vardır: doğru akım çekmez (ör. sabit öngerilimli bir transistörün bazını
+ *   yüklemez). İdeal girişte matrise hiçbir şey eklenmez.
  * - AC kuplaj, kaydedilen değere 10 Hz'lik birinci dereceden yüksek geçiren süzgeç (giriş
  *   kondansatörü + 1 MΩ) olarak uygulanır: y(n) = a·(y(n−1) + x(n) − x(n−1)), a = RC / (RC + Δt).
  * - COM topraklıysa (varsayılan) devrenin toprağıyla aynı düğümdür.
@@ -93,6 +97,8 @@ export class OscilloscopeDevice extends Device {
   recorder: ScopeRecorder;
   /** Giriş kapasitelerinin gerilimi (geri Euler durumu). */
   private capVoltage: [number, number] = [0, 0];
+  /** AC kuplaj kondansatörlerinin gerilimi (1 MΩ ile seri; zaman sabiti adımdan çok büyük). */
+  private couplingVoltage: [number, number] = [0, 0];
   /** AC kuplaj süzgecinin durumu. */
   private filter: [{ x: number; y: number } | null, { x: number; y: number } | null] = [null, null];
   private lastTime: number | null = null;
@@ -123,17 +129,28 @@ export class OscilloscopeDevice extends Device {
     }
   }
 
+  /** AC kuplajlı (doğru akımı kuplaj kondansatörüyle kesilen) gerçek giriş. */
+  private acLoaded(channel: 0 | 1): boolean {
+    return this.loaded(channel) && this.settings.coupling[channel] === 'ac';
+  }
+
   override stampStep(sys: MnaSystem, ctx: StepContext): void {
-    if (ctx.h <= 0) return;
     for (const c of [0, 1] as const) {
-      if (!this.loaded(c)) continue;
+      // AC kuplajda 1 MΩ'dan geçen akım (v − v_kuplaj)/R: iletkenliğin yanında v_kuplaj/R'lik kaynak.
+      if (this.acLoaded(c)) sys.currentSource(this.nodes[2]!, this.nodes[c]!, this.couplingVoltage[c] / SCOPE_INPUT_RESISTANCE);
+      if (ctx.h <= 0 || !this.loaded(c)) continue;
       sys.currentSource(this.nodes[2]!, this.nodes[c]!, (SCOPE_INPUT_CAPACITANCE / ctx.h) * this.capVoltage[c]);
     }
   }
 
-  override accept(x: Float64Array): void {
+  override accept(x: Float64Array, ctx: StepContext): void {
     const [a, b] = this.raw(x);
     this.capVoltage = [a, b];
+    for (const c of [0, 1] as const) {
+      if (!this.acLoaded(c) || ctx.h <= 0) continue;
+      const current = ([a, b][c]! - this.couplingVoltage[c]) / SCOPE_INPUT_RESISTANCE;
+      this.couplingVoltage[c] += (ctx.h * current) / SCOPE_AC_CAPACITANCE;
+    }
   }
 
   /** İki kanalın uçlarındaki ham gerilimler. */
@@ -182,9 +199,11 @@ export class OscilloscopeDevice extends Device {
 
   /** Girişlerin çektiği akım (gerçek girişte 1 MΩ üzerinden; kapasitif akım ihmal edilir). */
   override pinCurrents(x: Float64Array): number[] {
-    const [a, b] = this.raw(x);
-    const ia = this.loaded(0) ? a / SCOPE_INPUT_RESISTANCE : 0;
-    const ib = this.loaded(1) ? b / SCOPE_INPUT_RESISTANCE : 0;
+    const raw = this.raw(x);
+    const current = (c: 0 | 1) =>
+      this.loaded(c) ? (raw[c] - (this.acLoaded(c) ? this.couplingVoltage[c] : 0)) / SCOPE_INPUT_RESISTANCE : 0;
+    const ia = current(0);
+    const ib = current(1);
     return [ia, ib, -(ia + ib)];
   }
 
@@ -199,7 +218,10 @@ export class OscilloscopeDevice extends Device {
     this.lastTime = prev.lastTime;
     this.shown = prev.shown;
     for (const c of [0, 1] as const) {
-      if (prev.settings.coupling[c] === this.settings.coupling[c]) this.filter[c] = prev.filter[c];
+      if (prev.settings.coupling[c] === this.settings.coupling[c]) {
+        this.filter[c] = prev.filter[c];
+        this.couplingVoltage[c] = prev.couplingVoltage[c];
+      }
     }
   }
 }
