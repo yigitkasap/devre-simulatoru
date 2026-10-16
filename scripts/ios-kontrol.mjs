@@ -811,66 +811,129 @@ try {
     await tCtx.close();
   }
 
-  // --- Baraj sayfası (/baraj/): telefonda dikey düzen, masaüstünde devre yanda -------------
+  // --- Baraj sayfası (/baraj/): ders düzeni (docs/tasarim/baraj) ------------------------------
   const BARAJ = `${URL0.replace(/\/?$/, '/')}baraj/`;
   const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);
-  const barajStatus = async (pg) => (await pg.locator('[role=status]').first().textContent()) ?? '';
+  /** Sahnedeki tutamağın değeri (su seviyesi, %). */
+  const barajLevel = async (pg) => Number(await pg.getByRole('slider', { name: 'Su seviyesi' }).first().getAttribute('aria-valuenow'));
+  const flowChecked = async (pg) => (await pg.getByRole('radiogroup', { name: 'Su akışı' }).getByRole('radio', { checked: true }).textContent())?.replace(/[↓↑]|Boşluk/g, '').trim();
+  const sceneLabel = async (pg) => (await pg.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
+  /** Seviye `n` olana kadar bekler (en çok `ms`). */
+  const waitLevel = async (pg, n, ms) => { const end = Date.now() + ms; while (Date.now() < end && (await barajLevel(pg)) !== n) await pg.waitForTimeout(150); return barajLevel(pg); };
   {
-    const { page } = await phone();
-    await page.goto(BARAJ, { waitUntil: 'networkidle' });
+    const { page, cdp } = await phone();
+    await page.goto(BARAJ, { waitUntil: 'networkidle' }); await page.waitForTimeout(400);
     const tabs = await page.getByRole('tab').allTextContents();
-    const firstSelected = await page.locator('[role=tab][aria-selected=true]').textContent();
-    check('baraj (telefon): sayfa kaymıyor; sahne ve Oynat görünür, anlatım kapalı başlıyor (Kontroller / Devre)', !(await pageScrolls(page)) && (await page.getByRole('img', { name: /Baraj kesiti/ }).isVisible()) && (await page.getByRole('button', { name: 'Oynat', exact: true }).isVisible()) && tabs.join(',') === 'Kontroller,Devre' && firstSelected === 'Kontroller', tabs.join('/'));
-    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(4500);
-    const status = await barajStatus(page);
-    const lamps = (await page.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
-    check('baraj (telefon): Oynat’ta su yükseliyor, Seviye 1’de yeşil ışık yanıyor', /%4\d\. Normal/.test(status) && lamps.includes('yeşil yanıyor') && lamps.includes('sarı sönük'), status);
-    await page.getByRole('tab', { name: 'Devre' }).tap(); await page.waitForTimeout(300);
-    check('baraj (telefon): Devre sekmesinde şema görünüyor', await page.getByRole('img', { name: /devresinin şeması/ }).isVisible());
-    const small = await page.evaluate(() => [...document.querySelectorAll('button, a, [role=tab], [role=radio], input')]
+    check('baraj (telefon): sayfa kaymıyor; açılışta su %20, akış Durdur; Durum | Devre sekmeleri ve kumanda görünür',
+      !(await pageScrolls(page)) && (await barajLevel(page)) === 20 && (await flowChecked(page)) === 'Durdur' && tabs.join(',') === 'Durum,Devre' && (await page.getByRole('group', { name: 'Kumanda' }).isVisible()),
+      `%${await barajLevel(page)} · ${await flowChecked(page)} · ${tabs.join('/')}`);
+    await page.getByRole('button', { name: 'Seviye 1', exact: true }).tap();
+    const reached = await waitLevel(page, 50, 9000); await page.waitForTimeout(900);
+    const tableText = (await page.getByRole('table').textContent()) ?? '';
+    check('baraj (telefon): Seviye 1 suyu %50’ye doldurup durduruyor; yeşil yanıyor, tabloda Q1 doyumda',
+      reached === 50 && (await flowChecked(page)) === 'Durdur' && (await sceneLabel(page)).includes('yeşil yanıyor') && /Q1\s*doyum/.test(tableText), `%${reached} · ${tableText.slice(-40)}`);
+    const small = await page.evaluate(() => [...document.querySelectorAll('button, a:not([href="#kumanda"]), [role=tab], [role=radio], [role=slider], input')]
       .map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 20), w: r.width, h: r.height }; })
       .filter((r) => r.w > 0 && r.h > 0 && (r.h < 43.5 || r.w < 43.5)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
     check('baraj (telefon): bütün dokunma hedefleri en az 44 px', small.length === 0, small.join(', '));
-    await page.getByRole('radio', { name: 'Tek ışık' }).tap(); await page.waitForTimeout(300);
-    check('baraj (telefon): Tek ışık’a geçince simülasyon başa dönüyor', (await page.getByRole('button', { name: 'Oynat', exact: true }).isVisible()) && (await barajStatus(page)).includes('%20'), await barajStatus(page));
-    await page.getByRole('tab', { name: 'Kontroller' }).tap(); await page.waitForTimeout(300);
-    const slider = page.locator('input[type=range]');
-    await slider.focus(); await page.keyboard.press('End'); await page.waitForTimeout(200);
-    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(1500);
-    const lampsFull = (await page.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
-    check('baraj (telefon): seviye elle %100 yapılınca tek ışıkta yalnızca kırmızı yanıyor', (await barajStatus(page)).includes('Tehlike') && lampsFull.includes('kırmızı yanıyor') && lampsFull.includes('sarı sönük') && lampsFull.includes('yeşil sönük'), lampsFull.slice(-60));
-    await page.getByRole('button', { name: 'Anlatımı aç' }).tap(); await page.waitForTimeout(300);
-    const openTabs = await page.getByRole('tab').allTextContents();
-    const openSelected = await page.locator('[role=tab][aria-selected=true]').textContent();
-    const infoText = (await page.getByRole('tabpanel').textContent()) ?? '';
-    await page.getByRole('button', { name: 'Anlatımı kapat' }).tap(); await page.waitForTimeout(300);
-    const closedTabs = await page.getByRole('tab').allTextContents();
-    await page.reload({ waitUntil: 'networkidle' });
-    const reloadTabs = await page.getByRole('tab').allTextContents();
-    check('baraj (telefon): "Anlatımı aç" anlatımı getiriyor, "Anlatımı kapat" kaldırıyor, sayfa yine kapalı açılıyor',
-      openTabs.join(',') === 'Anlatım,Kontroller,Devre' && openSelected === 'Anlatım' && infoText.includes('Tahmin et') && closedTabs.join(',') === 'Kontroller,Devre' && reloadTabs.join(',') === 'Kontroller,Devre',
-      `${openTabs.join('/')} → kapat ${closedTabs.join('/')} → yenile ${reloadTabs.join('/')}`);
+    await page.getByRole('radio', { name: 'Tek ışık' }).tap(); await page.waitForTimeout(1200);
+    check('baraj (telefon): Tek ışık’a geçince su aynı yerde kalıyor, devre çalışmaya devam ediyor', (await barajLevel(page)) === 50 && (await sceneLabel(page)).includes('yeşil yanıyor'), `%${await barajLevel(page)}`);
+    await page.getByRole('button', { name: 'Soru', exact: true }).tap(); await page.waitForTimeout(300);
+    const sheet = page.getByRole('dialog', { name: 'Soru' });
+    const hiddenAnswer = (await sheet.getByRole('status').count()) === 0;
+    await sheet.getByRole('button', { name: 'Cevabı göster' }).tap(); await page.waitForTimeout(200);
+    const answer = (await sheet.getByRole('status').textContent()) ?? '';
+    check('baraj (telefon): Soru alt sayfada; cevap yalnızca "Cevabı göster" ile açılıyor; kumanda açık kalıyor',
+      hiddenAnswer && answer.includes('Q4') && (await page.getByRole('button', { name: 'Seviye 2', exact: true }).isVisible()), answer.slice(0, 40));
+    await sheet.getByRole('button', { name: 'Soruyu kapat' }).tap(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: /^Diğer/ }).tap(); await page.waitForTimeout(200);
+    await page.getByRole('menuitem', { name: 'Ayarlar' }).tap(); await page.waitForTimeout(300);
+    const settings = page.getByRole('dialog', { name: 'Ayarlar' });
+    await settings.getByRole('radio', { name: /Saf su/ }).tap(); await page.waitForTimeout(200);
+    const pure = await settings.getByRole('radio', { name: /Saf su/ }).getAttribute('aria-checked');
+    const resistance = (await settings.getByText('1 MΩ', { exact: true }).count()) > 0;
+    await settings.getByRole('button', { name: 'Varsayılanlara dön' }).tap(); await page.waitForTimeout(200);
+    const tapWater = await settings.getByRole('radio', { name: /Musluk suyu/ }).getAttribute('aria-checked');
+    await settings.getByRole('button', { name: 'Ayarları kapat' }).tap(); await page.waitForTimeout(200);
+    check('baraj (telefon): ⋯ menüsünden Ayarlar; Saf su 1 MΩ seçiliyor, Varsayılanlara dön musluk suyuna döndürüyor',
+      pure === 'true' && resistance && tapWater === 'true' && (await page.getByRole('dialog', { name: 'Ayarlar' }).count()) === 0);
+    const handle = await page.getByRole('slider', { name: 'Su seviyesi' }).first().boundingBox();
+    await drag(page, cdp, { x: handle.x + 20, y: handle.y + handle.height / 2 }, { x: handle.x + 20, y: handle.y + handle.height / 2 - 60 }, 40);
+    await page.waitForTimeout(600);
+    const dragged = await barajLevel(page);
+    check('baraj (telefon): sahnedeki tutamak sürüklenince su bırakılan yerde kalıyor, akış Durdur', dragged > 60 && dragged <= 100 && (await flowChecked(page)) === 'Durdur', `%50 → %${dragged}`);
     await page.context().close();
+  }
+  {
+    const lCtx = await browser.newContext({
+      viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR',
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    });
+    const lp = await lCtx.newPage();
+    lp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await lp.goto(BARAJ, { waitUntil: 'networkidle' }); await lp.waitForTimeout(400);
+    const bar = await lp.getByRole('group', { name: 'Kumanda' }).boundingBox();
+    const sceneBox = await lp.getByRole('img', { name: /Baraj kesiti/ }).boundingBox();
+    const tableBox = await lp.getByRole('table').boundingBox();
+    check('baraj (yatay telefon): sayfa kaymıyor; sahne solda, Durum sağda, kumanda tek satır', !(await pageScrolls(lp)) && bar !== null && bar.height <= 60 && sceneBox !== null && tableBox !== null && tableBox.x > sceneBox.x + sceneBox.width - 2,
+      `kumanda ${Math.round(bar?.height ?? 0)} px`);
+    await lCtx.close();
   }
   {
     const bCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     const bp = await bCtx.newPage();
     bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     bp.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
-    await bp.goto(BARAJ, { waitUntil: 'networkidle' });
-    const scene = await bp.getByRole('img', { name: /Baraj kesiti/ }).boundingBox();
-    const side = await bp.getByRole('region', { name: 'Devre, anlatım ve kontroller' }).boundingBox();
-    const circuit = await bp.getByRole('img', { name: /devresinin şeması/ }).boundingBox();
-    const panelFits = await bp.getByRole('tabpanel').evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
-    check('baraj (masaüstü): sayfa kaymıyor; devre sahnenin sağında, sağ sütun daha geniş, anlatım kapalı ve kontroller kaydırmasız', !(await pageScrolls(bp)) && scene !== null && side !== null && circuit !== null && circuit.x > scene.x + scene.width && side.width > scene.width && (await bp.getByRole('tab').count()) === 1 && panelFits && (await bp.locator('input[type=range]').isVisible()), `sahne ${Math.round(scene?.width ?? 0)} · sağ ${Math.round(side?.width ?? 0)} px`);
-    await bp.getByRole('button', { name: 'Tam ekran', exact: true }).click(); await bp.waitForTimeout(400);
+    await bp.goto(BARAJ, { waitUntil: 'networkidle' }); await bp.waitForTimeout(400);
+    const bandTexts = await bp.locator('svg.schematic text').allTextContents();
+    check('baraj (masaüstü): sayfa kaymıyor; sahne, Durum tablosu, şema (üç seviye bandı) ve kaydırıcılı kumanda',
+      !(await pageScrolls(bp)) && (await bp.getByRole('table').isVisible()) && ['Seviye 1 · yeşil', 'Seviye 2 · sarı', 'Seviye 3 · kırmızı'].every((t) => bandTexts.includes(t)) && (await bp.getByRole('slider', { name: 'Su seviyesi' }).count()) === 2);
+    // Ayarlar: dolma süresini kısalt (klavye denemesi hızlı bitsin).
+    await bp.getByRole('button', { name: 'Ayarlar', exact: true }).click(); await bp.waitForTimeout(200);
+    const card = bp.getByRole('dialog', { name: 'Ayarlar' });
+    for (let i = 0; i < 3; i++) await card.getByRole('button', { name: /Dolma süresi.*azalt|azalt.*Dolma süresi/ }).click().catch(() => {});
+    const fillText = (await card.textContent()) ?? '';
+    const switchOn = await card.getByRole('switch', { name: /Tek tuş kısayolları/ }).getAttribute('aria-checked');
+    await bp.keyboard.press('Escape'); await bp.waitForTimeout(200);
+    check('baraj (masaüstü): Ayarlar kartı açılıyor (dolma süresi, tek tuş kısayolları), Esc ile kapanıyor', fillText.includes('2 s') && switchOn === 'true' && (await bp.getByRole('dialog', { name: 'Ayarlar' }).count()) === 0, fillText.match(/\d+ s/)?.[0] ?? '');
+    await bp.locator('body').click({ position: { x: 700, y: 30 } }).catch(() => {});
+    await bp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await bp.keyboard.press('ArrowUp'); await bp.waitForTimeout(200);
+    const upFlow = await flowChecked(bp);
+    await bp.keyboard.press(' '); await bp.waitForTimeout(200);
+    const spaceFlow = await flowChecked(bp);
+    await bp.keyboard.press('2');
+    const at2 = await waitLevel(bp, 75, 4000);
+    await bp.keyboard.press('PageDown');
+    const at3 = await waitLevel(bp, 95, 4000);
+    await bp.keyboard.press('r'); await bp.waitForTimeout(400);
+    check('baraj (masaüstü): klavye: ↑ Doldur, Boşluk Durdur, 2 → %75, Sayfa Aşağı → %95, R başa alır (%20)',
+      upFlow === 'Doldur' && spaceFlow === 'Durdur' && at2 === 75 && at3 === 95 && (await barajLevel(bp)) === 20 && (await flowChecked(bp)) === 'Durdur', `${upFlow}, ${spaceFlow}, %${at2}, %${at3}, %${await barajLevel(bp)}`);
+    await bp.keyboard.press('s'); await bp.waitForTimeout(200);
+    const strip = bp.getByRole('region', { name: 'Soru' });
+    await strip.getByRole('button', { name: 'Cevabı göster' }).click(); await bp.waitForTimeout(200);
+    const shown = (await strip.getByRole('status').textContent()) ?? '';
+    await bp.getByRole('radio', { name: 'Tek ışık' }).click(); await bp.waitForTimeout(400);
+    check('baraj (masaüstü): Soru şeridi (S); cevap düğmeyle açılıyor, devre değişince yeniden gizleniyor',
+      shown.includes('%37,5') && (await strip.getByRole('status').count()) === 0 && (await strip.getByRole('button', { name: 'Cevabı göster' }).isVisible()), shown.slice(0, 30));
+    await bp.getByRole('button', { name: 'Durum tablosunu gizle' }).click(); await bp.waitForTimeout(200);
+    await bp.reload({ waitUntil: 'networkidle' }); await bp.waitForTimeout(300);
+    const stillHidden = (await bp.getByRole('table').count()) === 0;
+    await bp.getByRole('button', { name: 'Durum tablosunu göster' }).click(); await bp.waitForTimeout(200);
+    check('baraj (masaüstü): Durum tablosu Gizle ile kalkıyor, yenileyince gizli kalıyor, Göster ile geri geliyor', stillHidden && (await bp.getByRole('table').count()) === 1);
+    await bp.getByRole('button', { name: 'Tam ekran', exact: true }).click(); await bp.waitForTimeout(500);
+    const cellSize = await bp.getByRole('cell').nth(1).evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
     const fsOn = await bp.evaluate(() => document.fullscreenElement?.tagName ?? null);
-    await bp.getByRole('button', { name: 'Tam ekrandan çık', exact: true }).click(); await bp.waitForTimeout(400);
-    check('baraj (masaüstü): başlıktaki düğme tarayıcıyı tam ekrana alıp çıkarıyor', fsOn === 'HTML' && (await bp.evaluate(() => document.fullscreenElement)) === null && (await bp.getByRole('button', { name: 'Tam ekran', exact: true }).count()) === 1);
-    await bp.getByRole('link', { name: /Devreyi simülatörde aç/ }).click();
+    const keyHints = await bp.getByRole('group', { name: 'Kumanda' }).getByText('Boşluk', { exact: true }).count();
+    await bp.getByRole('button', { name: 'Tam ekrandan çık', exact: true }).click(); await bp.waitForTimeout(300);
+    check('baraj (masaüstü): tam ekranda (projeksiyon) tablo yazıları en az 16 px, kumandada klavye ipucu yok', fsOn === 'HTML' && cellSize >= 16 && keyHints === 0, `${cellSize} px`);
+    await bp.getByRole('button', { name: 'Seviye 1', exact: true }).click();
+    await waitLevel(bp, 50, 9000);
+    await bp.getByRole('link', { name: /Simülatörde aç/ }).click();
     await bp.waitForURL((u) => !u.pathname.includes('/baraj')); await bp.waitForTimeout(800);
     const opened = await doc(bp);
-    check('baraj (masaüstü): "Devreyi simülatörde aç" devreyi simülatörde açıyor', opened?.parts.some((q) => q.type === 'tank') && opened.parts.filter((q) => q.type === 'led').length === 3, `${opened?.parts.length ?? 0} parça`);
+    const tankPart = opened?.parts.find((q) => q.type === 'tank');
+    check('baraj (masaüstü): "Simülatörde aç" devreyi o anki seviyeyle simülatörde açıyor', tankPart !== undefined && Math.abs(tankPart.props.level - 50) < 1 && opened.parts.filter((q) => q.type === 'led').length === 3, `${opened?.parts.length ?? 0} parça, %${tankPart?.props.level}`);
     await bCtx.close();
   }
 } finally {

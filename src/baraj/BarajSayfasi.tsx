@@ -1,14 +1,18 @@
-// Baraj su seviyesi uyarısı sayfası (/baraj): büyük baraj sahnesi, devre (salt görüntü), kontroller
-// ve anlatım. Simülasyon ana simülatörün motoruyla çalışır; devre Örnekler'deki iki proje
-// devresinden biridir (çubuk gösterge / tek ışık). Değişiklikler yalnızca bu sayfada kalır (tarayıcıya
-// kaydedilmez); "Devreyi simülatörde aç" devreyi paylaşım bağlantısıyla ana simülatöre taşır.
+// Baraj su seviyesi uyarısı sayfası (/baraj), ders düzeni (tasarım: docs/tasarim/baraj, bağlayıcı belge
+// BN). Öğretmen yansıtırken tek elle yönetir; sınıf aynı anda barajı, devreyi ve durumu görür. Anlatım
+// metni yok: ekrandaki her şey ya bir ölçüm ya bir düğme.
 //
-// Düzen: dikey telefonda üstte sahne, altında Oynat satırı ve sekmeler (Anlatım / Kontroller / Devre);
-// sayfa kaymaz, yalnızca sekme içeriği kayar. Geniş ekranda solda sahne, sağda (daha geniş) devre ve
-// sekmeler. Anlatım kapalı açılır; sekme satırının sağındaki düğmeyle açılıp kapanır. Başlıktaki düğme
-// tarayıcıyı tam ekrana alır (destekleyen tarayıcılarda).
+// Tek kumanda: ayrı Oynat yok. Açılışta örnek yüklenir, tank Durdur'da (%20) ve simülasyon kendiliğinden
+// başlar; Su akışı tankın mode özelliğini değiştirir (useBarajKumanda). Devre değişince seviye, akış ve
+// ayarlar taşınır, simülasyon yeniden başlar. Simülasyon ana simülatörün motoruyla çalışır; değişiklikler
+// yalnızca bu sayfada kalır, "Simülatörde aç" o anki hâli paylaşım bağlantısıyla ana simülatöre taşır.
+//
+// Düzenler: masaüstü (≥ 1100 px) başlık + soru şeridi + iki kart (sahne ve Durum tablosu | devre şeması)
+// + kumanda şeridi; tablet aynı, kaydırıcısız; telefon dikey: sahne, Durum | Devre sekmeleri, altta
+// kumanda, Soru alt sayfada; telefon yatay: sahne solda, sekmeler sağda, kumanda tek satır. Tam ekranda
+// (projeksiyon) yazılar büyür. Sayfanın kendisi hiçbir düzende kaymaz; paneller kendi içinde kayar.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { exampleDoc } from '../examples';
 import { tr } from '../i18n/tr';
 import { buildConnectivity } from '../model/connectivity';
@@ -18,23 +22,46 @@ import { shareUrl } from '../model/share';
 import type { CircuitDoc } from '../model/types';
 import { probeWetness, TANK_PROBE_HEIGHTS, tankSettings } from '../sim/devices/tank';
 import type { PropValue } from '../sim/netlist';
-import { formatNumber } from '../sim/units';
 import { CircuitView } from '../editor/CircuitView';
 import { useBrowserFullscreen } from '../editor/fullscreen';
 import { Icon } from '../editor/icons';
-import { Segmented } from '../editor/RackControls';
-import { Rich } from '../editor/Rich';
 import { useSettings } from '../editor/settings';
-import { TankControls } from '../editor/TankControls';
 import { Logo } from '../editor/TopBar';
 import { useLayout } from '../editor/useLayout';
-import { useSimulation } from '../editor/useSimulation';
-import { alertOf, BarajSahnesi } from './BarajSahnesi';
+import { useSimulation, type SimFrame } from '../editor/useSimulation';
+import { AyarlarKarti } from './AyarlarKarti';
+import { alertOf, BarajSahnesi, type Lamps, type SceneLayout } from './BarajSahnesi';
+import { DurumTablosu } from './DurumTablosu';
+import { Kumanda, type KumandaVariant } from './Kumanda';
+import { bandOf, durumRows, levelBands, START_LEVEL, stopAbove, stopBelow, type LevelNo, type Stop } from './seviye';
+import { BantLejanti, SeviyeBantlari } from './SeviyeBantlari';
+import { AlertIcon } from './simgeler';
+import { Soru } from './Soru';
+import { useBarajKumanda } from './useBarajKumanda';
 
 type Variant = 'baraj-cubuk' | 'baraj-tek-isik';
-type Tab = 'info' | 'controls' | 'circuit';
+const VARIANTS: readonly Variant[] = ['baraj-cubuk', 'baraj-tek-isik'];
 
 const BASE = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const TABLE_KEY = 'devre-simulatoru:baraj-durum-gizli';
+const KEYS_KEY = 'devre-simulatoru:baraj-kisayollar-kapali';
+
+/** Tarayıcıda tutulan küçük tercih (yalnızca kolaylık; depolama yoksa varsayılan). */
+function readFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+function writeFlag(key: string, on: boolean) {
+  try {
+    if (on) localStorage.setItem(key, '1');
+    else localStorage.removeItem(key);
+  } catch {
+    // Depolama kapalı: tercih yalnızca bu açılışta geçerli.
+  }
+}
 
 function useWindowWidth(): number {
   const [width, setWidth] = useState(() => window.innerWidth);
@@ -46,280 +73,642 @@ function useWindowWidth(): number {
   return width;
 }
 
+/** Örnek devre, tank Durdur'da (örnek dosyasında Doldur). */
+function lessonDoc(variant: Variant, tank?: Record<string, PropValue>): CircuitDoc {
+  const doc = exampleDoc(variant)!;
+  const h1 = doc.parts.find((p) => p.type === 'tank')!;
+  return updatePart(doc, h1.id, { props: { ...h1.props, level: START_LEVEL, mode: 'stop', ...tank } });
+}
+
+/** LED parlaklığı azalıyor mu (sönüyor): son ≈ 0,15 s'lik eğim. */
+function useLedTrend(frame: SimFrame | null, doc: CircuitDoc): (id: string) => boolean {
+  const memory = useRef(new Map<string, { b: number; t: number; falling: boolean }>());
+  return useMemo(() => {
+    const m = memory.current;
+    if (!frame) {
+      m.clear();
+      return () => false;
+    }
+    for (const part of doc.parts) {
+      if (part.type !== 'led') continue;
+      const b = frame.live.get(part.id)?.brightness ?? 0;
+      const prev = m.get(part.id);
+      if (!prev || frame.time < prev.t) m.set(part.id, { b, t: frame.time, falling: false });
+      else if (frame.time - prev.t >= 0.15) m.set(part.id, { b, t: frame.time, falling: (b - prev.b) / (frame.time - prev.t) < -0.03 });
+    }
+    const snapshot = new Map(Array.from(m, ([id, v]) => [id, v.falling] as const));
+    return (id: string) => snapshot.get(id) ?? false;
+  }, [frame, doc]);
+}
+
+/** Canlı duyuru: yalnızca seviye bandı ya da uyarı değişince (kısa bir sakinleşmeden sonra). */
+function useAnnouncement(band: Stop, lamps: Lamps): string {
+  const lit = (['green', 'yellow', 'red'] as const).filter((c) => lamps[c] > 0.3);
+  const key = `${band}|${lit.join(',')}`;
+  const [message, setMessage] = useState('');
+  const previous = useRef<{ band: Stop; key: string } | null>(null);
+  useEffect(() => {
+    const prev = previous.current;
+    if (!prev) {
+      previous.current = { band, key };
+      return undefined;
+    }
+    if (prev.key === key) return undefined;
+    const timer = window.setTimeout(() => {
+      const parts: string[] = [];
+      if (band !== prev.band) parts.push(band > prev.band ? tr.baraj.announce.reached(band) : band === 0 ? tr.baraj.announce.dry : tr.baraj.announce.dropped(band));
+      parts.push(tr.baraj.announce.lamps(lit.map((c) => tr.baraj.lampNames[c])));
+      previous.current = { band, key };
+      setMessage(parts.join(' '));
+    }, 700);
+    return () => window.clearTimeout(timer);
+    // lit, key'den türetilir.
+  }, [key, band]);
+  return message;
+}
+
+/** Devre seçimi (Çubuk gösterge | Tek ışık): radyo grubu, oklarla da seçilir. */
+function VariantSeg({ value, onChange, className, labelledBy, big }: { value: Variant; onChange: (v: Variant) => void; className: string; labelledBy?: string; big?: boolean }) {
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+    e.preventDefault();
+    const next = value === 'baraj-cubuk' ? 'baraj-tek-isik' : 'baraj-cubuk';
+    onChange(next);
+    e.currentTarget.querySelectorAll<HTMLElement>('[role=radio]')[VARIANTS.indexOf(next)]?.focus();
+  };
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      aria-label={labelledBy ? undefined : tr.baraj.variant}
+      onKeyDown={onKeyDown}
+      className={`flex shrink-0 gap-[3px] rounded-[10px] bg-face p-[3px] ${className}`}
+    >
+      {VARIANTS.map((v) => {
+        const on = v === value;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            tabIndex={on ? 0 : -1}
+            onClick={() => onChange(v)}
+            className={`min-w-0 flex-1 rounded-[7px] px-3 font-semibold whitespace-nowrap ${big ? 'text-[16px]' : 'text-body'} ${
+              on ? 'bg-panel text-ink shadow-[0_1px_2px_rgba(29,39,51,.18),0_0_0_1px_rgba(29,39,51,.06)]' : 'text-ink-2 hover:bg-panel/50'
+            }`}
+          >
+            {tr.baraj.variants[v]}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Sahnenin sol üstündeki uyarı rozeti: simge (biçim) ve metin. */
+function UyariRozeti({ kind, size }: { kind: ReturnType<typeof alertOf>; size: 'big' | 'desk' | 'phone' | 'landscape' }) {
+  const cls = {
+    big: 'h-11 gap-2 pr-[17px] pl-3 text-[17px]',
+    desk: 'h-10 gap-2 pr-[15px] pl-[11px] text-[15px]',
+    phone: 'h-9 gap-2 pr-3.5 pl-2.5 text-body',
+    landscape: 'h-[34px] gap-2 pr-[13px] pl-2.5 text-small',
+  }[size];
+  return (
+    <div className={`pointer-events-none absolute ${size === 'phone' || size === 'landscape' ? 'top-2 left-2' : 'top-3.5 left-3.5'}`}>
+      <div className={`inline-flex items-center rounded-full border border-line-2 bg-panel font-semibold whitespace-nowrap text-ink shadow-[0_2px_8px_rgba(29,39,51,.12)] ${cls}`}>
+        <AlertIcon kind={kind} size={size === 'big' ? 22 : 20} />
+        {tr.baraj.alert[kind]}
+      </div>
+    </div>
+  );
+}
+
+const paperStyle = {
+  backgroundColor: 'var(--color-paper)',
+  backgroundImage: 'radial-gradient(circle, #b3bac3 1.3px, transparent 1.6px), radial-gradient(circle, #d3d7dc 1px, transparent 1.3px)',
+  backgroundSize: '75px 75px, 15px 15px',
+  backgroundPosition: '7px 7px, 7px 7px',
+} as const;
+
 export default function BarajSayfasi() {
-  const [settings] = useSettings();
+  const [appSettings] = useSettings();
   const layout = useLayout();
   const width = useWindowWidth();
-  const stacked = layout.kind === 'phone' && !layout.landscape;
-  const touch = layout.kind === 'phone' || layout.kind === 'tablet';
-  /** Geniş ekranda devre her zaman görünür; sekmelerde yalnızca anlatım ve kontroller. */
-  const wide = !stacked && width >= 1100 && layout.kind !== 'phone';
+  const phone = layout.kind === 'phone';
+  const landscape = phone && layout.landscape;
+  const desktop = !phone && width >= 1100;
+  const fullscreen = useBrowserFullscreen();
+  /** Projeksiyon: tam ekranda yazılar büyür (telefon hariç). */
+  const big = fullscreen.on && !phone;
 
   const [variant, setVariant] = useState<Variant>('baraj-cubuk');
-  const [doc, setDoc] = useState<CircuitDoc>(() => exampleDoc('baraj-cubuk')!);
-  const [tab, setTab] = useState<Tab>('controls');
-  /** Anlatım her açılışta kapalı başlar (kullanıcı isteği); isteyen açar. */
-  const [infoOpen, setInfoOpen] = useState(false);
-  const fullscreen = useBrowserFullscreen();
-  const [revealed, setRevealed] = useState(false);
-  const [preview, setPreview] = useState<number | null>(null);
+  const [doc, setDoc] = useState<CircuitDoc>(() => lessonDoc('baraj-cubuk'));
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
-  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow);
+  const sim = useSimulation(doc, connectivity, flowGraph, appSettings.electronFlow);
   const running = sim.status === 'running';
-  const active = sim.status !== 'stopped';
+
+  // Simülasyon hep çalışır: açılışta, Başa al'da ve devre değişince (yapı değişti) yeniden başlar.
+  // Yapı değişince motorun "düzenleme yüzünden durdu" bildirimi bu sayfada gösterilmez.
+  const { play, stop } = sim;
+  useEffect(() => {
+    if (sim.status === 'stopped') play();
+  }, [sim.status, play]);
 
   const tank = doc.parts.find((p) => p.type === 'tank')!;
-  const tankStatus = sim.frame?.statuses.get(tank.id) ?? {};
   const s = tankSettings(tank.props);
-  const level = active && tankStatus.level !== undefined ? tankStatus.level : s.level;
-  const wet = tankStatus.wetProbes ?? TANK_PROBE_HEIGHTS.map((h) => probeWetness(level, h) > 0.5);
+  const tankStatus = sim.frame?.statuses.get(tank.id);
+  const level = running && tankStatus?.level !== undefined ? tankStatus.level : s.level;
+  const [preview, setPreview] = useState<number | null>(null);
+  const shown = preview ?? level;
+  const wet = tankStatus?.wetProbes ?? TANK_PROBE_HEIGHTS.map((h) => probeWetness(level, h) > 0.5);
+  const sceneWet = preview !== null ? TANK_PROBE_HEIGHTS.map((h) => probeWetness(preview, h) > 0.5) : wet;
+
+  const changeTank = useCallback(
+    (patch: Record<string, PropValue>) =>
+      setDoc((d) => {
+        const t = d.parts.find((p) => p.type === 'tank')!;
+        return updatePart(d, t.id, { props: { ...t.props, ...patch } });
+      }),
+    [],
+  );
+  const kumanda = useBarajKumanda({ level, propsLevel: s.level, mode: s.mode, running, changeTank, restart: stop });
+
   const lamp = (label: string) => {
     const part = doc.parts.find((p) => p.label === label);
     return part ? (sim.frame?.live.get(part.id)?.brightness ?? 0) : 0;
   };
-  const lamps = { green: lamp('LED1'), yellow: lamp('LED2'), red: lamp('LED3') };
+  const lamps: Lamps = { green: lamp('LED1'), yellow: lamp('LED2'), red: lamp('LED3') };
   const alert = alertOf(lamps);
-  const texts = tr.examples.texts[variant];
+  const band = bandOf(level);
+  const direction = running && s.mode === 'fill' && level < 100 ? 'rising' : running && s.mode === 'drain' && level > 0 ? 'falling' : 'steady';
+  const falling = useLedTrend(sim.frame, doc);
+  const rows = durumRows(doc, sim.frame, wet, falling);
+  const bands = useMemo(() => levelBands(doc), [doc]);
+  const working = (n: LevelNo) => rows.find((r) => r.level === n)?.working ?? false;
+  const announcement = useAnnouncement(band, lamps);
 
-  const changeTank = (patch: Record<string, PropValue>) =>
-    setDoc((d) => {
-      const t = d.parts.find((p) => p.type === 'tank')!;
-      return updatePart(d, t.id, { props: { ...t.props, ...patch } });
+  // --- Soru, Durum, Ayarlar, sekmeler ----------------------------------------------------
+  const [soruOpen, setSoruOpen] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [tableHidden, setTableHidden] = useState(() => readFlag(TABLE_KEY));
+  const [keysOff, setKeysOff] = useState(() => readFlag(KEYS_KEY));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [tab, setTab] = useState<'durum' | 'devre'>('durum');
+  const settingsButton = useRef<HTMLButtonElement>(null);
+  const [settingsAnchor, setSettingsAnchor] = useState<HTMLButtonElement | null>(null);
+  const kumandaRef = useRef<HTMLDivElement>(null);
+  const moreButton = useRef<HTMLButtonElement>(null);
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    (phone ? moreButton.current : settingsButton.current)?.focus();
+  }, [phone]);
+  const toggleTable = () => {
+    setTableHidden((h) => {
+      writeFlag(TABLE_KEY, !h);
+      return !h;
     });
+  };
+  const toggleKeys = () => {
+    setKeysOff((off) => {
+      writeFlag(KEYS_KEY, !off);
+      return !off;
+    });
+  };
+
   const switchVariant = (next: Variant) => {
     if (next === variant) return;
-    sim.stop();
+    setDoc(lessonDoc(next, { level, mode: s.mode, waterResistance: s.waterResistance, fillTime: s.fillTime }));
     setVariant(next);
-    setDoc(exampleDoc(next)!);
     setRevealed(false);
   };
-  const play = () => {
-    sim.play();
-    setRevealed(true);
+  const texts = tr.baraj.questions[variant]!;
+
+  // "Simülatörde aç": o anki hâl (anlık seviye, akış, su direnci, dolma süresi).
+  const baseHref = useMemo(() => shareUrl(doc, BASE), [doc]);
+  const liveHref = () => shareUrl(updatePart(doc, tank.id, { props: { ...tank.props, level: Math.round(level * 10) / 10, mode: s.mode } }), BASE);
+  const refreshHref = (e: { currentTarget: HTMLAnchorElement }) => {
+    e.currentTarget.href = liveHref();
   };
-  const simulatorUrl = shareUrl(doc, BASE);
 
-  const header = (
-    <header className="flex h-14 shrink-0 items-center gap-2.5 border-b border-line bg-panel pr-2 pl-3">
-      <a href={BASE} aria-label={tr.baraj.back} title={tr.baraj.back} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-panel-2">
-        <Logo />
-      </a>
-      <h1 className="min-w-0 flex-1 truncate text-[17px] leading-tight font-semibold">{tr.baraj.title}</h1>
-      {fullscreen.supported && (
-        <button
-          type="button"
-          onClick={fullscreen.toggle}
-          aria-label={fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
-          title={fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line-2 bg-panel hover:bg-panel-2"
-        >
-          <Icon name={fullscreen.on ? 'fullscreenExit' : 'fullscreen'} />
-        </button>
-      )}
-      <a
-        href={simulatorUrl}
-        className="flex h-11 shrink-0 items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 text-sm font-medium hover:bg-panel-2"
-      >
-        <span className={stacked ? 'sr-only' : ''}>{tr.baraj.openInSimulator}</span>
-        <Icon name="external" className="h-[18px] w-[18px]" />
-      </a>
-    </header>
-  );
-
-  const controlsRow = (
-    <div className="flex shrink-0 flex-wrap items-center gap-2 px-3 py-2">
-      <button
-        type="button"
-        onClick={running ? sim.pause : play}
-        className={`flex h-11 items-center gap-1.5 rounded-md border pr-4 pl-3 font-semibold text-white ${
-          running ? 'border-ink bg-ink' : 'border-ok bg-ok hover:brightness-110'
-        }`}
-      >
-        <Icon name={running ? 'pause' : 'play'} />
-        {running ? tr.baraj.pause : tr.baraj.play}
-      </button>
-      <button
-        type="button"
-        onClick={sim.stop}
-        disabled={!active}
-        title={tr.baraj.resetHint}
-        className="flex h-11 items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 font-medium disabled:opacity-45"
-      >
-        <Icon name="stop" />
-        {tr.baraj.reset}
-      </button>
-      <span className="font-mono text-sm text-muted tabular" aria-label={tr.baraj.timeLabel}>
-        {tr.baraj.time(formatNumber(sim.frame?.time ?? 0, 1))}
-      </span>
-      <span role="status" className="sr-only">
-        {`${tr.baraj.levelTitle} %${Math.round(level)}. ${tr.baraj.alert[alert]}.`}
-      </span>
-      <Segmented<Variant>
-        label={tr.baraj.variant}
-        className={stacked ? 'w-full' : 'ml-auto w-[300px]'}
-        touch={touch}
-        options={[
-          { value: 'baraj-cubuk', text: tr.baraj.variants['baraj-cubuk'] },
-          { value: 'baraj-tek-isik', text: tr.baraj.variants['baraj-tek-isik'] },
-        ]}
-        value={variant}
-        onChange={switchVariant}
-      />
-    </div>
-  );
-
-  const info = (
-    <div className="flex flex-col gap-3 p-3.5">
-      <h2 className="text-title leading-tight font-semibold">{texts.title}</h2>
-      <p className="text-sm leading-[1.55] text-ink-2">
-        <Rich text={texts.description} />
-      </p>
-      <div className="flex flex-col gap-1.5 rounded-lg border border-warn-line bg-warn-soft px-3.5 py-3">
-        <span className="text-label font-semibold text-warn">{tr.examples.predict}</span>
-        <span className="text-[15px] leading-normal">
-          <Rich text={texts.question} />
-        </span>
-      </div>
-      {revealed ? (
-        <div role="status" className="flex flex-col gap-1.5 rounded-lg border border-ok-line bg-ok-soft px-3.5 py-3">
-          <span className="text-label font-semibold text-ok">{tr.examples.answer}</span>
-          <span className="text-[15px] leading-[1.55]">
-            <Rich text={texts.answer} />
-          </span>
-        </div>
-      ) : (
-        <p className="rounded-lg border border-dashed border-line-2 bg-panel-2 p-3 text-sm text-muted">{tr.baraj.answerLocked}</p>
-      )}
-      <section className="flex flex-col gap-2" aria-labelledby="baraj-nasil">
-        <h3 id="baraj-nasil" className="text-[15px] font-semibold">
-          {tr.baraj.howTitle}
-        </h3>
-        <ul className="flex list-disc flex-col gap-1.5 pl-5 text-sm leading-[1.55] text-ink-2">
-          {tr.baraj.how.map((line) => (
-            <li key={line}>
-              <Rich text={line} />
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
-
-  const controls = (
-    <div className="p-3.5">
-      <TankControls
-        part={tank}
-        status={tankStatus}
-        running={active}
-        onChange={changeTank}
-        onJack={() => {}}
-        touch={touch}
-        jacks={false}
-        note={tr.baraj.controlsNote}
-      />
-    </div>
-  );
-
-  const circuit = (minWidth?: number) => (
-    <CircuitView doc={doc} connectivity={connectivity} frame={sim.frame} settings={settings} label={tr.baraj.circuitLabel(texts.title)} {...(minWidth ? { minWidth } : {})} />
-  );
-
-  // Geniş ekranda devre ayrı gösterilir; anlatım kapatılabilir. Seçili sekme artık yoksa ilk sekme.
-  const tabs: Tab[] = [...(infoOpen ? (['info'] as const) : []), 'controls', ...(wide ? [] : (['circuit'] as const))];
-  const current = tabs.includes(tab) ? tab : tabs[0]!;
-  const toggleInfo = () => {
-    setInfoOpen(!infoOpen);
-    if (!infoOpen) setTab('info');
+  // --- Klavye ve sunum kumandası ---------------------------------------------------------
+  const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyRef.current = (e: KeyboardEvent) => {
+    if (keysOff || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target instanceof HTMLElement || e.target instanceof SVGElement ? e.target : null;
+    if (target?.closest('input, textarea, select, [contenteditable="true"], [role=slider], [role=dialog], [role=menu]')) return;
+    // Odak bir düğmedeyken Boşluk ve Enter o düğmeye basar; radyo gruplarında oklar seçimi değiştirir.
+    if (target?.closest('button, a, [role=radio], [role=tab], [role=switch]') && (e.key === ' ' || e.key === 'Enter')) return;
+    if (target?.closest('[role=radio], [role=tab]') && e.key.startsWith('Arrow')) return;
+    const key = e.key.length === 1 ? e.key.toLocaleLowerCase('tr') : e.key;
+    let handled = true;
+    if (key === 'ArrowUp') kumanda.setFlow('fill');
+    else if (key === 'ArrowDown') kumanda.setFlow('drain');
+    else if (key === ' ') kumanda.toggleStop();
+    else if (key === '0' || key === '1' || key === '2' || key === '3') kumanda.goTo(Number(key) as Stop);
+    else if (key === 'PageDown') kumanda.goTo(stopAbove(level));
+    else if (key === 'PageUp') kumanda.goTo(stopBelow(level));
+    else if (key === 'r') kumanda.reset();
+    else if (key === 't') switchVariant(variant === 'baraj-cubuk' ? 'baraj-tek-isik' : 'baraj-cubuk');
+    else if (key === 's') setSoruOpen((o) => !o);
+    else if (key === 'f' && fullscreen.supported) fullscreen.toggle();
+    else handled = false;
+    if (handled) e.preventDefault();
   };
-  const tabbed = (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-end gap-1 border-b border-line px-2">
-        <div role="tablist" aria-label={tr.baraj.tabsLabel} className="flex min-w-0 gap-0.5">
-          {tabs.map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              id={`baraj-tab-${t}`}
-              aria-selected={current === t}
-              aria-controls={`baraj-panel-${t}`}
-              onClick={() => setTab(t)}
-              className={`-mb-px h-11 shrink-0 border-b-2 px-3 text-sm font-semibold ${current === t ? 'border-accent text-ink' : 'border-transparent text-muted'}`}
-            >
-              {tr.baraj.tabs[t]}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={toggleInfo}
-          className={`ml-auto flex h-11 shrink-0 items-center gap-1.5 self-center rounded-md px-2.5 font-medium text-muted hover:bg-panel-2 hover:text-ink ${
-            stacked ? 'text-[13px]' : 'text-sm'
-          }`}
-        >
-          <Icon name={infoOpen ? 'close' : 'book'} className="h-4 w-4" />
-          {infoOpen ? tr.baraj.hideInfo : tr.baraj.showInfo}
-        </button>
-      </div>
-      <div
-        role="tabpanel"
-        id={`baraj-panel-${current}`}
-        aria-labelledby={`baraj-tab-${current}`}
-        className={`min-h-0 flex-1 ${current === 'circuit' ? 'bg-paper' : 'overflow-y-auto overscroll-contain'}`}
-      >
-        {current === 'info' ? info : current === 'controls' ? controls : circuit(stacked ? 620 : undefined)}
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyRef.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
-  // Sahne kutusu dar (telefon, tablet, küçük masaüstü): sol yamaç kırpılır, yazılar büyür.
-  const compactScene = layout.kind === 'phone' || width < 1280;
+  // --- Parçalar ---------------------------------------------------------------------------
+  const sceneLayout: SceneLayout = landscape ? 'landscape' : phone ? 'phone' : desktop || big ? 'wide' : 'tablet';
+  const textPx = big ? 16.7 : desktop ? 14.7 : 13;
+  const onPreview = (v: number | null) => {
+    setPreview(v);
+    if (v !== null && s.mode !== 'stop') kumanda.setFlow('stop');
+  };
   const scene = (
-    <div className="relative h-full w-full overflow-hidden">
+    <>
       <BarajSahnesi
-        level={preview ?? level}
-        wet={wet}
+        level={shown}
+        wet={sceneWet}
         lamps={lamps}
         mode={s.mode}
         running={running}
-        layout={layout.kind === 'phone' ? 'phone' : compactScene ? 'tablet' : 'wide'}
-        textPx={layout.kind === 'phone' ? 13 : 14.5}
-        lampLabels={layout.kind !== 'phone'}
-        onPreview={setPreview}
-        onCommit={(v) => changeTank({ level: v })}
+        layout={sceneLayout}
+        textPx={textPx}
+        lampLabels={!phone}
+        onPreview={onPreview}
+        onCommit={kumanda.commitLevel}
         className="h-full w-full"
       />
+      <UyariRozeti kind={alert} size={big ? 'big' : landscape ? 'landscape' : phone ? 'phone' : 'desk'} />
+    </>
+  );
+  const circuit = (minWidth?: number) => (
+    <CircuitView
+      doc={doc}
+      connectivity={connectivity}
+      frame={sim.frame}
+      settings={appSettings}
+      label={tr.baraj.circuitLabel(tr.baraj.variants[variant] ?? '')}
+      underlay={<SeviyeBantlari bands={bands} working={working} />}
+      {...(minWidth ? { minWidth } : {})}
+    />
+  );
+  const kumandaVariant: KumandaVariant = landscape ? 'landscape' : phone ? 'phone' : desktop ? 'desktop' : 'tablet';
+  const kumandaBar = (
+    <Kumanda
+      ref={kumandaRef}
+      variant={kumandaVariant}
+      big={big}
+      keys={!keysOff}
+      mode={s.mode}
+      level={shown}
+      direction={direction}
+      band={band}
+      onFlow={kumanda.setFlow}
+      onGoTo={kumanda.goTo}
+      onPreview={onPreview}
+      onCommit={kumanda.commitLevel}
+      onReset={kumanda.reset}
+      {...(phone
+        ? {}
+        : {
+            settings: {
+              open: settingsOpen,
+              onToggle: () => setSettingsOpen((o) => !o),
+              buttonRef: (el: HTMLButtonElement | null) => {
+                settingsButton.current = el;
+                setSettingsAnchor(el);
+              },
+            },
+          })}
+    />
+  );
+  const settingsCard = settingsOpen && (
+    <AyarlarKarti
+      waterResistance={s.waterResistance}
+      fillTime={s.fillTime}
+      onChange={changeTank}
+      onClose={closeSettings}
+      variant={phone ? 'sheet' : 'popover'}
+      anchor={phone ? moreButton.current : settingsAnchor}
+      {...(desktop ? { shortcuts: { on: !keysOff, onToggle: toggleKeys } } : {})}
+    />
+  );
+  const skipLink = (
+    <a
+      href="#kumanda"
+      onClick={(e) => {
+        e.preventDefault();
+        kumandaRef.current?.focus();
+      }}
+      className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+    >
+      {tr.baraj.skipToControls}
+    </a>
+  );
+  const live = (
+    <div aria-live="polite" className="sr-only">
+      {announcement}
     </div>
   );
+  const logoLink = (
+    <a href={BASE} aria-label={tr.baraj.back} title={tr.baraj.back} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-panel-2">
+      <Logo />
+    </a>
+  );
+  const soruButton = (
+    <button
+      type="button"
+      aria-pressed={soruOpen}
+      onClick={() => setSoruOpen((o) => !o)}
+      className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-md border px-3.5 ${big ? 'text-[16px]' : phone ? 'text-[15px]' : 'text-body'} ${
+        soruOpen ? 'border-accent bg-accent-soft font-semibold text-accent-ink' : 'border-line-2 bg-panel font-medium hover:bg-panel-2'
+      }`}
+    >
+      <Icon name="help" className="h-[18px] w-[18px]" />
+      {tr.baraj.soru.button}
+    </button>
+  );
+  const soru = (sheet: boolean) =>
+    soruOpen && (
+      <Soru
+        question={texts.question}
+        answer={texts.answer}
+        revealed={revealed}
+        onReveal={setRevealed}
+        onClose={() => setSoruOpen(false)}
+        variant={sheet ? 'sheet' : 'strip'}
+        big={big}
+      />
+    );
 
-  if (stacked) {
-    return (
-      <div className="app-root flex flex-col overflow-hidden bg-panel">
-        {header}
-        <div className="shrink-0 border-b border-line bg-[#e9eef3]" style={{ height: 'min(38dvh, 300px)' }}>
-          {scene}
+  // --- Telefon -----------------------------------------------------------------------------
+  if (phone) {
+    const moreMenu = moreOpen && (
+      <MoreMenu
+        onClose={() => setMoreOpen(false)}
+        anchor={moreButton.current}
+        items={[
+          { kind: 'link', label: tr.baraj.openShort, href: baseHref, onActivate: refreshHref },
+          { kind: 'button', label: tr.baraj.ayarlar.title, onClick: () => setSettingsOpen(true) },
+          ...(fullscreen.supported
+            ? [{ kind: 'button' as const, label: fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen, onClick: fullscreen.toggle }]
+            : []),
+        ]}
+      />
+    );
+    const header = (
+      <header
+        className={`relative flex h-[52px] shrink-0 items-center gap-1.5 bg-panel ${landscape ? 'gap-2 border-b border-line' : ''}`}
+        style={landscape ? { paddingLeft: 'max(4px, env(safe-area-inset-left))', paddingRight: 'max(6px, env(safe-area-inset-right))' } : { paddingLeft: 4, paddingRight: 6 }}
+      >
+        {logoLink}
+        <h1 className={`m-0 min-w-0 truncate font-semibold ${landscape ? 'text-[16px]' : 'flex-1 text-[17px]'}`}>{tr.baraj.shortTitle}</h1>
+        {landscape && (
+          <>
+            <span className="flex-1" />
+            <VariantSeg value={variant} onChange={switchVariant} className="h-[50px] w-[270px]" />
+            <span className="flex-1" />
+          </>
+        )}
+        {soruButton}
+        <button
+          ref={moreButton}
+          type="button"
+          aria-label={tr.baraj.moreLabel(fullscreen.supported)}
+          title={tr.baraj.more}
+          aria-haspopup="menu"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen((o) => !o)}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-panel-2"
+        >
+          <Icon name="more" />
+        </button>
+        {moreMenu}
+      </header>
+    );
+    const tabs = (
+      <div role="tablist" aria-label={tr.baraj.tabsLabel} className="flex shrink-0 gap-0.5 border-b border-line px-2">
+        {(['durum', 'devre'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="tab"
+            id={`baraj-tab-${t}`}
+            aria-selected={tab === t}
+            aria-controls="baraj-panel"
+            onClick={() => setTab(t)}
+            className={`-mb-px h-11 border-b-2 px-4 text-[16px] font-semibold ${tab === t ? 'border-accent text-ink' : 'border-transparent text-muted'}`}
+          >
+            {tr.baraj.sekmeler[t]}
+          </button>
+        ))}
+      </div>
+    );
+    const panel = (
+      <div
+        role="tabpanel"
+        id="baraj-panel"
+        aria-labelledby={`baraj-tab-${tab}`}
+        className={`min-h-0 flex-1 ${tab === 'devre' ? '' : 'overflow-y-auto overscroll-contain'}`}
+        style={tab === 'devre' ? paperStyle : undefined}
+      >
+        {tab === 'durum' ? <DurumTablosu rows={rows} variant={landscape ? 'landscape' : 'phone'} /> : circuit(520)}
+      </div>
+    );
+    if (landscape) {
+      return (
+        <div className="app-root flex flex-col overflow-hidden bg-panel">
+          {skipLink}
+          {live}
+          {header}
+          <div className="flex min-h-0 flex-1 gap-2 bg-app" style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
+            <section aria-label={tr.baraj.sceneTitle} className="relative min-w-0 flex-[1.05] overflow-hidden bg-[#e9eef3]">
+              {scene}
+            </section>
+            <section aria-label={tr.baraj.sideTitle} className="relative flex min-w-0 flex-1 flex-col border-l border-line bg-panel">
+              {tabs}
+              {panel}
+              {soru(true)}
+              {settingsCard}
+            </section>
+          </div>
+          {kumandaBar}
         </div>
-        {controlsRow}
-        {tabbed}
+      );
+    }
+    return (
+      <div className="app-root flex flex-col overflow-hidden bg-panel" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        {skipLink}
+        {live}
+        {header}
+        <div className="shrink-0 border-b border-line bg-panel px-3 pt-1 pb-2">
+          <VariantSeg value={variant} onChange={switchVariant} className="h-[50px] w-full" big />
+        </div>
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <section aria-label={tr.baraj.sceneTitle} className="relative shrink-0 overflow-hidden bg-[#e9eef3]" style={{ height: 'clamp(190px, 37dvh, 313px)' }}>
+            {scene}
+          </section>
+          <section aria-label={tr.baraj.sideTitle} className="relative flex min-h-0 flex-1 flex-col">
+            {tabs}
+            {panel}
+            {soru(true)}
+          </section>
+          {settingsCard}
+        </div>
+        {kumandaBar}
       </div>
     );
   }
 
+  // --- Masaüstü ve tablet ---------------------------------------------------------------------
   return (
     <div className="app-root flex flex-col overflow-hidden bg-app">
-      {header}
-      <main className="grid min-h-0 flex-1 gap-3 p-3" style={{ gridTemplateColumns: wide ? 'minmax(0, 1fr) minmax(420px, 1.2fr)' : 'minmax(0, 1fr) minmax(320px, 1fr)' }}>
+      {skipLink}
+      {live}
+      <header className={`flex shrink-0 items-center gap-3 border-b border-line bg-panel pr-3 pl-2 ${big ? 'h-[52px]' : 'h-14'}`}>
+        {logoLink}
+        <h1 className={`m-0 font-semibold whitespace-nowrap ${big ? 'text-[19px]' : 'text-[18px]'}`}>{tr.baraj.title}</h1>
+        <span className="flex-1" />
+        <span id="baraj-devre-lbl" className={`font-semibold text-muted ${big ? 'text-[15px]' : 'text-small'}`}>
+          {tr.baraj.variant}
+        </span>
+        <VariantSeg
+          value={variant}
+          onChange={switchVariant}
+          className={`${layout.kind === 'tablet' ? 'h-[50px]' : 'h-10'} ${desktop ? 'w-[300px]' : 'w-[276px]'}`}
+          labelledBy="baraj-devre-lbl"
+          big={big}
+        />
+        <span className="flex-1" />
+        {soruButton}
+        {fullscreen.supported && (
+          <button
+            type="button"
+            onClick={fullscreen.toggle}
+            aria-label={fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
+            title={fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line-2 bg-panel hover:bg-panel-2"
+          >
+            <Icon name={fullscreen.on ? 'fullscreenExit' : 'fullscreen'} />
+          </button>
+        )}
+        <a
+          href={baseHref}
+          onPointerDown={refreshHref}
+          onFocus={refreshHref}
+          onClick={refreshHref}
+          className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-line-2 bg-panel px-3.5 font-medium text-ink no-underline hover:bg-panel-2 ${big ? 'text-[16px]' : 'text-body'}`}
+        >
+          {tr.baraj.openShort}
+          <Icon name="external" className="h-[18px] w-[18px]" />
+        </a>
+      </header>
+      {soru(false)}
+      <main className={`grid min-h-0 flex-1 ${big ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`} style={{ gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)' }}>
         <section aria-label={tr.baraj.sceneTitle} className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
-          <div className="min-h-0 flex-1 bg-[#e9eef3]">{scene}</div>
-          <div className="border-t border-line">{controlsRow}</div>
+          <div className="relative min-h-0 flex-1 overflow-hidden bg-[#e9eef3]">{scene}</div>
+          <div className="shrink-0 border-t border-line">
+            <div className={`flex h-10 items-center gap-2.5 pr-2.5 ${desktop ? 'pl-4' : 'pl-3.5'}`}>
+              <span className={`font-semibold ${big ? 'text-[17px]' : 'text-[15px]'}`}>{tr.baraj.durum.title}</span>
+              <span className={`text-muted ${big ? 'text-[16px]' : 'text-[12.5px]'}`}>{tr.baraj.durum.chain}</span>
+              <span className="flex-1" />
+              <button
+                type="button"
+                onClick={toggleTable}
+                aria-label={tableHidden ? tr.baraj.durum.showLabel : tr.baraj.durum.hideLabel}
+                aria-expanded={!tableHidden}
+                className={`inline-flex h-8 items-center rounded-md px-2.5 text-muted hover:bg-panel-2 ${big ? 'text-[16px]' : 'text-small'}`}
+              >
+                {tableHidden ? tr.baraj.durum.show : tr.baraj.durum.hide}
+              </button>
+            </div>
+            {!tableHidden && <DurumTablosu rows={rows} variant={desktop ? 'desktop' : 'tablet'} big={big} />}
+          </div>
         </section>
-        <section aria-label={tr.baraj.sideTitle} className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
-          {wide && <div className="min-h-0 flex-[1.25] border-b border-line bg-paper">{circuit()}</div>}
-          {/* Anlatım kapalıyken geniş ekranda kontroller içerikleri kadar yer alır (kaydırmadan görünür); kalan yer devrenin. */}
-          <div className={`flex min-h-0 flex-col ${wide && !infoOpen ? 'max-h-[60%] shrink-0' : 'flex-1'}`}>{tabbed}</div>
+        <section aria-label={tr.baraj.devre.title} className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
+          <div className="flex h-11 shrink-0 items-center gap-3.5 border-b border-line px-4">
+            <span className={`font-semibold ${big ? 'text-[17px]' : 'text-[15px]'}`}>{tr.baraj.devre.title}</span>
+            <span className={`text-muted ${big ? 'text-[16px]' : 'text-small'}`}>{tr.baraj.variants[variant]}</span>
+            <span className="flex-1" />
+            <BantLejanti />
+          </div>
+          <div
+            tabIndex={0}
+            role="group"
+            aria-label={tr.baraj.circuitLabel(tr.baraj.variants[variant] ?? '')}
+            className="min-h-0 flex-1 p-2 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+            style={paperStyle}
+          >
+            {circuit()}
+          </div>
         </section>
       </main>
+      <div className="relative shrink-0">
+        {kumandaBar}
+        {settingsCard}
+      </div>
+    </div>
+  );
+}
+
+type MenuItem =
+  | { readonly kind: 'link'; readonly label: string; readonly href: string; readonly onActivate: (e: { currentTarget: HTMLAnchorElement }) => void }
+  | { readonly kind: 'button'; readonly label: string; readonly onClick: () => void };
+
+/** Telefonda ⋯ menüsü: Simülatörde aç, Ayarlar, Tam ekran (destekleniyorsa). */
+function MoreMenu({ items, onClose, anchor }: { items: readonly MenuItem[]; onClose: () => void; anchor: HTMLElement | null }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('[role=menuitem]')?.focus();
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (ref.current?.contains(target) || anchor?.contains(target)) return;
+      onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        anchor?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose, anchor]);
+  const cls = 'flex min-h-12 w-full items-center px-4 text-left text-[16px] font-medium text-ink no-underline hover:bg-panel-2';
+  return (
+    <div ref={ref} role="menu" aria-label={tr.baraj.more} className="absolute top-[50px] right-1.5 z-40 flex w-60 flex-col overflow-hidden rounded-xl border border-line-2 bg-panel py-1 shadow-[0_14px_36px_rgba(29,39,51,.24)]">
+      {items.map((item) =>
+        item.kind === 'link' ? (
+          <a key={item.label} role="menuitem" href={item.href} onPointerDown={item.onActivate} onClick={item.onActivate} className={cls}>
+            {item.label}
+          </a>
+        ) : (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              onClose();
+              item.onClick();
+            }}
+            className={cls}
+          >
+            {item.label}
+          </button>
+        ),
+      )}
     </div>
   );
 }

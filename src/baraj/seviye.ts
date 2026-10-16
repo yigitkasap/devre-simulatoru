@@ -159,9 +159,10 @@ export function levelBands(doc: CircuitDoc, pad = 1.5): ReadonlyArray<{ readonly
   return bands;
 }
 
-/** LED akımı mA olarak: 10 mA altında bir ondalık, üstünde tam sayı. */
+/** LED akımı mA olarak: 10 mA ve üstü tam sayı, 0,1–10 mA bir ondalık, daha küçüğü iki ondalık. */
 export function milliamps(current: number): { readonly value: number; readonly decimals: number } {
   const mA = Math.abs(current) * 1000;
-  if (mA < 0.05) return { value: 0, decimals: 0 };
+  if (mA < 0.005) return { value: 0, decimals: 0 };
+  if (mA < 0.1) return { value: mA, decimals: 2 };
   return mA < 10 ? { value: mA, decimals: 1 } : { value: mA, decimals: 0 };
 }

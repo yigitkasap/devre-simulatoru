@@ -349,7 +349,12 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
 
     </svg>
     {/* Seviye etiketi ve sürükleme tutamağı (ayrı katman) */}
-    <svg viewBox={viewBox.join(' ')} className="pointer-events-none absolute inset-0 h-full w-full overflow-visible" preserveAspectRatio="xMidYMid meet">
+    <svg
+      viewBox={viewBox.join(' ')}
+      className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+      style={{ touchAction: 'none' }}
+      preserveAspectRatio="xMidYMid meet"
+    >
       <g
         role="slider"
         tabIndex={0}

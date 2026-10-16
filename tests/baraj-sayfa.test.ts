@@ -70,6 +70,7 @@ describe('Baraj sayfası: seviye mantığı', () => {
     expect(ledState(0.01, true)).toBe('off');
     expect(milliamps(14.4e-3)).toEqual({ value: 14.4, decimals: 0 });
     expect(milliamps(0.52e-3).decimals).toBe(1);
+    expect(milliamps(35e-6).decimals).toBe(2);
     expect(milliamps(1e-6)).toEqual({ value: 0, decimals: 0 });
   });
 
