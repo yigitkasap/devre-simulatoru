@@ -62,6 +62,7 @@ export default function BarajSayfasi() {
   const [infoOpen, setInfoOpen] = useState(false);
   const fullscreen = useBrowserFullscreen();
   const [revealed, setRevealed] = useState(false);
+  const [preview, setPreview] = useState<number | null>(null);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
   const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow);
@@ -276,7 +277,19 @@ export default function BarajSayfasi() {
   const compactScene = layout.kind === 'phone' || width < 1280;
   const scene = (
     <div className="relative h-full w-full overflow-hidden">
-      <BarajSahnesi level={level} wet={wet} lamps={lamps} mode={s.mode} running={running} compact={compactScene} className="h-full w-full" />
+      <BarajSahnesi
+        level={preview ?? level}
+        wet={wet}
+        lamps={lamps}
+        mode={s.mode}
+        running={running}
+        layout={layout.kind === 'phone' ? 'phone' : compactScene ? 'tablet' : 'wide'}
+        textPx={layout.kind === 'phone' ? 13 : 14.5}
+        lampLabels={layout.kind !== 'phone'}
+        onPreview={setPreview}
+        onCommit={(v) => changeTank({ level: v })}
+        className="h-full w-full"
+      />
     </div>
   );
 

@@ -834,7 +834,7 @@ try {
     await page.getByRole('radio', { name: 'Tek ışık' }).tap(); await page.waitForTimeout(300);
     check('baraj (telefon): Tek ışık’a geçince simülasyon başa dönüyor', (await page.getByRole('button', { name: 'Oynat', exact: true }).isVisible()) && (await barajStatus(page)).includes('%20'), await barajStatus(page));
     await page.getByRole('tab', { name: 'Kontroller' }).tap(); await page.waitForTimeout(300);
-    const slider = page.getByRole('slider');
+    const slider = page.locator('input[type=range]');
     await slider.focus(); await page.keyboard.press('End'); await page.waitForTimeout(200);
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(1500);
     const lampsFull = (await page.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
@@ -862,7 +862,7 @@ try {
     const side = await bp.getByRole('region', { name: 'Devre, anlatım ve kontroller' }).boundingBox();
     const circuit = await bp.getByRole('img', { name: /devresinin şeması/ }).boundingBox();
     const panelFits = await bp.getByRole('tabpanel').evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
-    check('baraj (masaüstü): sayfa kaymıyor; devre sahnenin sağında, sağ sütun daha geniş, anlatım kapalı ve kontroller kaydırmasız', !(await pageScrolls(bp)) && scene !== null && side !== null && circuit !== null && circuit.x > scene.x + scene.width && side.width > scene.width && (await bp.getByRole('tab').count()) === 1 && panelFits && (await bp.getByRole('slider').isVisible()), `sahne ${Math.round(scene?.width ?? 0)} · sağ ${Math.round(side?.width ?? 0)} px`);
+    check('baraj (masaüstü): sayfa kaymıyor; devre sahnenin sağında, sağ sütun daha geniş, anlatım kapalı ve kontroller kaydırmasız', !(await pageScrolls(bp)) && scene !== null && side !== null && circuit !== null && circuit.x > scene.x + scene.width && side.width > scene.width && (await bp.getByRole('tab').count()) === 1 && panelFits && (await bp.locator('input[type=range]').isVisible()), `sahne ${Math.round(scene?.width ?? 0)} · sağ ${Math.round(side?.width ?? 0)} px`);
     await bp.getByRole('button', { name: 'Tam ekran', exact: true }).click(); await bp.waitForTimeout(400);
     const fsOn = await bp.evaluate(() => document.fullscreenElement?.tagName ?? null);
     await bp.getByRole('button', { name: 'Tam ekrandan çık', exact: true }).click(); await bp.waitForTimeout(400);
