@@ -48,8 +48,10 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
   baraj su seviyesi uyarısı projesi; her birinde tahmin sorusu, cevap simülasyon çalışınca açılır.
 - **Baraj sayfası:** <https://yigitkasap.github.io/devre-simulatoru/baraj/>: transistörlerle su
-  seviyesi uyarısı (su yükseldikçe yeşil → sarı → kırmızı). Büyük baraj kesiti ve ışık kulesi,
-  yanında devrenin canlı şeması; çubuk gösterge (3 transistör) ya da tek ışık (5 transistör).
+  seviyesi uyarısı (su yükseldikçe yeşil → sarı → kırmızı), derste projeksiyonla kullanılacak düzen:
+  numaralı problar ve ışık kulesi, canlı Durum tablosu (prob → transistör → LED), seviye bantlı şema,
+  tek kumanda (Su akışı, Kuru / Seviye 1–3), Soru, klavye ve sunum kumandası; çubuk gösterge
+  (3 transistör) ya da tek ışık (5 transistör).
 - **Kaydetme ve paylaşma:** tarayıcıya otomatik kayıt, JSON dışa/içe aktarma, paylaşım bağlantısı.
 
 ## Kurulum ve komutlar
@@ -222,7 +224,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 221 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 229 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -350,7 +352,7 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 129 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 134 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
@@ -546,38 +548,75 @@ doğrulanır.
 - Testler (`tests/examples-lab.test.ts`): LED'lerin yanma anları ve sırası, doyum/kesim,
   baz akımı, saf su, boşaltırken ışığın geri dönüşü. Devreler yavaş olduğu için testte 2 ms adım.
 
-### Baraj sayfası (C aşaması)
+### Baraj sayfası (ders düzeni)
 
 Ayrı sayfa: `/baraj/` (`src/pages/baraj.astro` → `src/baraj/BarajSayfasi.tsx`). Örnekler
 penceresinde baraj grubunun altındaki bağlantıdan ve baraj örneklerinin "Örnek" sekmesinden açılır.
+Tasarım `docs/tasarim/baraj/` altında (B00–B07 ekranları, bağlayıcı belge BN). Derste projeksiyonla
+kullanılır: öğretmen tek elle yönetir, sınıf barajı, devreyi ve durumu aynı anda görür; anlatım metni
+yok, ekrandaki her şey ya bir ölçüm ya bir düğme.
 
-- **Sahne** (`BarajSahnesi.tsx`, SVG): baraj kesiti, haznedeki su (seviyeyle yükselir, dalgalı
-  yüzey), seviye cetveli, ortak prob + üç seviye probu (eşik çizgileriyle), Doldur'da akan nehir,
-  Boşalt'ta dip savağından fışkıran su, kontrol evi ve kırmızı / sarı / yeşil ışık kulesi. Işıkların
-  parlaklığı devredeki LED'lerin simülasyondaki parlaklığından gelir; sahnede ayrı bir mantık yok.
-  Görünüm kutusu haznenin, barajın ve ışık kulesinin olduğu kısma kırpılır (sol yamacın ve mansabın
-  boş kenarları dışarıda kalır; dar ekranda, yani telefon, tablet ve 1280 px altında daha sıkı
-  kırpılır, yazılar büyür). Gökyüzü ve zemin görünüm kutusunun dışına taşar: kutu hangi oranda
-  olursa olsun boş şerit kalmaz. Seviye sağdaki Kontroller panelinin ekranında gösterilir (sahnenin
-  sol üstündeki seviye kutusu kullanıcı isteğiyle kaldırıldı).
-- **Devre** (`src/editor/CircuitView.tsx`): örnek devrenin salt okunur çizimi; kablolar gerilime
-  göre renkli, LED'ler yanar. Devre simülatördekiyle aynı `useSimulation` ile çalışır.
-- **Kontroller:** Oynat / Duraklat / Başa al, süre, Çubuk gösterge ↔ Tek ışık seçimi; Kontroller
-  sekmesinde hazne paneli (seviye kaydırıcısı, Boşalt / Dur / Doldur, dolma süresi, su direnci).
-  "Devreyi simülatörde aç", devreyi paylaşım bağlantısıyla (`#d=…`) simülatörde açar. Başlıktaki
-  köşeli düğme tarayıcıyı tam ekrana alır (F11 gibi; destekleyen tarayıcılarda görünür, iPhone
-  Safari'de yok).
-- **Anlatım:** örneğin metni, Tahmin et sorusu (cevap Oynat'tan sonra açılır) ve "Nasıl çalışır".
-  Sayfa her açılışta anlatım kapalı başlar (kullanıcı isteği; ilk sekme Kontroller): sekme
-  satırının sağındaki "Anlatımı aç" Anlatım sekmesini getirir, "Anlatımı kapat" kaldırır. Seçim
-  hatırlanmaz. Geniş ekranda anlatım kapalıyken devre ve kontroller kaydırmadan birlikte görünür.
-- **Düzen:** telefonda dikey (sahne, kontrol satırı, Anlatım / Kontroller / Devre sekmeleri);
-  geniş ekranda iki sütun (solda sahne, sağda devre + sekmeler; sağ sütun daha geniş, 1 : 1,2);
-  tablet ve yatay telefonda devre sekmede (sütunlar eşit). Sayfanın kendisi hiçbir düzende kaymaz; yalnızca sekme içeriği kayar.
-- `npm run ios-kontrol` baraj sayfası için 10 madde içerir (telefonda sayfa kaymıyor, yeşil ışık,
-  Devre sekmesi, 44 px hedefler, örnek değişince başa dönme, elle %100'de yalnızca kırmızı,
-  anlatımın kapalı başlaması ve açılıp kapanması; masaüstünde devre yanda ve sağ sütun geniş,
-  kontroller kaydırmasız, tam ekran düğmesi, simülatörde açma).
+- **Tek kumanda** (`useBarajKumanda.ts`): ayrı Oynat / Duraklat yok. Açılışta örnek yüklenir, tankın
+  `mode`'u `stop` yapılır (örnek dosyasında `fill`), simülasyon kendiliğinden başlar; su %20'de durur.
+  Su akışı (Boşalt / Durdur / Doldur) tankın `mode` özelliğini değiştirir; yalnızca değer değiştiği
+  için simülasyon durumunu korur, seviye kaldığı yerden sürer. %100'de (Doldur) ya da %0'da (Boşalt)
+  kendiliğinden Durdur. Kuru / Seviye 1 / 2 / 3 düğmeleri hedef tutar (%25 / 50 / 75 / 95), doldurarak
+  ya da boşaltarak gider, hedefi geçince durur (su atlamaz). Sahnedeki tutamak ve kumandadaki kaydırıcı
+  sürüklenirken akış durur ve önizleme gösterilir; bırakınca `level` uygulanır. Motor, `level`
+  özelliği değişmezse anlık seviyeyi korur (`adoptState`); aynı seviye yeniden istenirse özellik
+  görünmez bir payla (1e-9) değiştirilir. Başa al: %20, Durdur, zaman 0; su direnci ve dolma süresi
+  korunur. Devre değişince yeni dokümanda tankın `level`'ı anlık seviye olur, akış ve ayarlar taşınır;
+  yapı değiştiği için simülasyon yeniden başlatılır ("düzenleme yüzünden durdu" bildirimi gösterilmez),
+  açık cevap gizlenir.
+- **Sahne** (`BarajSahnesi.tsx`, SVG): baraj kesiti, haznedeki su, ölçü iskelesi, numaralı problar
+  (renkli rozet ve "Seviye n"; ortak prob "+" rozeti ve "Ortak +9 V"), lambaların içinde numara.
+  İskelenin solunda seviye etiketi ve sürükleme tutamağı (`role="slider"`, çizimle aynı görünüm
+  kutusunda ayrı bir SVG katmanı; oklar, Sayfa tuşları, Home/End). Sol üstte uyarı rozeti, simge ve
+  metinle: Uyarı yok (boş daire), Normal (yeşil onay), Dikkat: su yüksek (sarı üçgen), Tehlike: su
+  taşmak üzere (kırmızı sekizgen); uyarı lambalara bakar (`alertOf`). Görünüm kutusu düzene göre
+  kırpılır (geniş, tablet, telefon `240 40 552 400`, yatay telefon); yazılar sahnenin ekrandaki
+  ölçeğine göre istenen px boyunda (masaüstü ≈ 14,7, tablet ve telefon 13, projeksiyon 16,7).
+  Telefonda lambaların yan yazıları yok.
+- **Durum tablosu** (`DurumTablosu.tsx`, `seviye.ts`): satırlar Seviye 3, 2, 1; Prob (ıslak / kuru,
+  damla simgesiyle), Transistör (Qn ve kesim / aktif / doyum), LED (nokta, yanıyor / sönük / çok zayıf /
+  sönüyor, akım). Veri karede: tankın `wetProbes`'u, Qn'nin `region`'u, LED'in parlaklığı ve akımı.
+  Parlaklık 0,3'ün üstünde yanıyor; 0,02–0,3 arası azalıyorsa sönüyor, değilse çok zayıf. Tek ışıkta
+  Q1 kesimde ve Q4 doyumdaysa "Q4 susturuyor" (Q2 için Q5); prob kuru ama Qn kesimde değilse "Cn
+  boşalıyor". Çalışan katın satırı seviye renginin açık tonuyla boyanır. "Gizle" tabloyu kaldırır
+  (tercih `localStorage`'da, okuma ve yazma try/catch içinde).
+- **Şema:** `CircuitView`'in isteğe bağlı `underlay` katmanında her katın bandı (RBn, Cn, RPn, Qn,
+  LEDn, RCn'nin sınır kutusu): çalışan kat açık ton ve kenarlık, kesimdeki kat kesik gri kenarlık,
+  sol altta "Seviye n · renk". Ana simülatör etkilenmez.
+- **Soru:** kapalı açılır; masaüstü ve tablette başlığın altında şerit ("Tahmin et" ve soru; "Cevabı
+  göster" ya da açılmış cevap ve "Cevabı gizle"), telefonda alt sayfa (sahne ve kumanda açık kalır).
+  Soru ve cevaplar `tr.baraj.questions` altında; cevaplarda saniye yerine seviye.
+- **Ayarlar:** su ön ayarı (Musluk suyu 5 kΩ / Saf su 1 MΩ), su direnci ("iki ıslak prob arası") ve
+  dolma süresi ("boştan doluya") adımlayıcıları (sınırlar `TANK_LIMITS`, adımlar 1-2-5), Varsayılanlara
+  dön; masaüstünde "Tek tuş kısayolları" anahtarı. Masaüstü ve tablette kumandanın üstüne açılan kart,
+  telefonda alt sayfa; dışarı dokununca ya da Esc ile kapanır.
+- **Klavye ve sunum kumandası:** ↑ Doldur, ↓ Boşalt, Boşluk Durdur ↔ son akışı sürdür, 0–3 seviyeye
+  git, Sayfa Aşağı bir üst seviyeye doldur, Sayfa Yukarı bir alt seviyeye boşalt, R Başa al, T devre
+  değiştir, S Soru, F tam ekran. Odak bir giriş alanında, kaydırıcıda ya da açık kartta iken çalışmaz;
+  odak bir düğmedeyken Boşluk ve Enter o düğmeye basar, radyo gruplarında oklar seçimi değiştirir.
+- **Erişilebilirlik:** "Kumandaya atla" bağlantısı; odak sırası başlık → soru → sahne (tutamak) → durum
+  tablosu → devre (tek durak) → kumanda; canlı duyuru (`aria-live="polite"`) yalnızca seviye bandı ya
+  da yanan lambalar değişince ("Su Seviye 2’ye ulaştı. Yeşil ve sarı yanıyor."); seviye numarası her
+  yerde, uyarı simgesi biçimle, transistör durumu yazıyla; dokunmatikte hedefler en az 44 px; sayfa
+  kaymaz, paneller kendi içinde kayar; güvenli alanlar.
+- **Düzenler:** masaüstü (≥ 1100 px): başlık (Devre seçimi, Soru, Tam ekran, Simülatörde aç), soru
+  şeridi, iki kart (sahne + Durum | devre şeması ve lejant), altta kumanda şeridi (Su akışı, seviye ve
+  yön, 1-2-3 işaretli kaydırıcı, Kuru / Seviye 1–3, Başa al, Ayarlar). Tablet (< 1100 px): aynısı,
+  kaydırıcısız. Telefon dikey: başlık (Soru, ⋯: Simülatörde aç, Ayarlar, Tam ekran), devre seçimi,
+  sahne, Durum | Devre sekmeleri, altta kumanda. Telefon yatay: sahne solda, sekmeler sağda, kumanda
+  tek satır. Tam ekranda (projeksiyon) sahne yazıları, tablo değerleri ve düğmeler en az 16 px,
+  kumandadaki klavye ipuçları gizli.
+- "Simülatörde aç", devrenin o anki hâlini (anlık seviye, akış, su direnci, dolma süresi) paylaşım
+  bağlantısıyla (`#d=…`) ana simülatörde açar. Raftaki `TankControls` ana simülatörde aynen kalır.
+- Testler: `tests/baraj-sayfa.test.ts` (bant, hedefler, LED durumu, Durum satırları gerçek
+  simülasyonla, şema bantları). `npm run ios-kontrol` baraj sayfası için 15 madde içerir (telefonda
+  açılış, Seviye 1, 44 px hedefler, devre değişimi, Soru alt sayfası, ⋯ → Ayarlar, tutamak
+  sürükleme; yatay telefon; masaüstünde düzen ve bantlar, Ayarlar ve Esc, klavye, Soru şeridi, Durum
+  Gizle, projeksiyon yazı boyu, Simülatörde aç).
 
 ### Föy parça modelleri (föy için 2. aşama)
 
