@@ -217,7 +217,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 217 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 221 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -521,6 +521,25 @@ doğrulanır.
 - **Denetimler:** Cihaz rafında ve telefonun Cihazlar sayfasında aynı bileşen
   ([`TankControls.tsx`](src/editor/TankControls.tsx)): seviye göstergesi, ıslak prob lambaları,
   kaydırıcı, su akışı, dolma süresi, su direnci, jaklar. Sembolde su canlı yükselir.
+
+### Baraj su seviyesi uyarısı devreleri (B aşaması)
+
+Örnekler penceresinde "Proje · Baraj su seviyesi uyarısı" grubu: iki devre, aynı hazne
+(%20'den Doldur, 20 s'lik dolma süresi: %37,5 / %62,5 / %87,5'e 3,4 / 8,4 / 13,4 s'de ulaşır).
+
+- **Çubuk gösterge (3 transistör):** Her seviye için prob → 10 kΩ → BC107 bazı (10 µF ve 100 kΩ
+  toprağa: dalgalı yüzeyde titremeyi önler, LED yumuşak yanar) ; kollektörde LED + 470 Ω, +9 V.
+  Ortak prob +9 V'ta. Seviye 1'de I_B ≈ (9 − 0,65) / (5 kΩ + 10 kΩ) ≈ 0,55 mA, transistör
+  doyumda, LED ≈ 14,5 mA. Su direnci 1 MΩ olunca (çok saf su) LED'den yalnızca ≈ 0,5 mA geçer.
+- **Tek ışık (5 transistör):** Ek iki susturma transistörü: Q4 Seviye 2'den, Q5 Seviye 3'ten
+  sürülür; kollektörleri yeşilin ve sarının baz düğümünü toprağa çeker (yeşil = Seviye 1 VE
+  Seviye 2 DEĞİL). Aynı anda tek LED yanar.
+- **Yerleşim:** Satırlar haznedeki probların sırasıyla (üstte kırmızı, altta yeşil): prob
+  kabloları kesişmez. Susturma transistörü satırın sol üstünde, kollektör kablosu etiketinin
+  sağından baz düğümüne iner. Devreler, uç konumlarını katalogdan hesaplayıp kabloları doğrulayan
+  bir üreticiyle kuruldu (föy örnekleri gibi).
+- Testler (`tests/examples-lab.test.ts`): LED'lerin yanma anları ve sırası, doyum/kesim,
+  baz akımı, saf su, boşaltırken ışığın geri dönüşü. Devreler yavaş olduğu için testte 2 ms adım.
 
 ### Föy parça modelleri (föy için 2. aşama)
 

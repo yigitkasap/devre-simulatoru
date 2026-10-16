@@ -259,6 +259,59 @@ describe('Deney 9: transistör anahtar', () => {
   });
 });
 
+describe('Proje: baraj su seviyesi uyarısı', () => {
+  // Devreler yavaş (hazne 16 s'de dolar, baz kondansatörünün zaman sabiti ≈ 0,1 s): testte 2 ms adım.
+  const simOf = (doc: CircuitDoc) => new CircuitSimulator(buildConnectivity(doc).netlist, { timeStep: 2e-3 });
+  /** LED'lerin yanık olup olmadığı (≥ 5 mA). */
+  const lit = (sim: CircuitSimulator, doc: CircuitDoc) => ['LED1', 'LED2', 'LED3'].map((l) => sim.measure(idOf(doc, l))!.current > 5e-3);
+
+  it('çubuk gösterge: yeşil ≈ 3,4 s, sarı ≈ 8,4 s, kırmızı ≈ 13,4 s’de eklenir; doluyken üçü doyumda, ≈ 14,5 mA', () => {
+    const doc = load('baraj-cubuk');
+    const sim = simOf(doc);
+    sim.runUntil(3.2);
+    expect(lit(sim, doc)).toEqual([false, false, false]);
+    sim.runUntil(3.7);
+    expect(lit(sim, doc)).toEqual([true, false, false]);
+    sim.runUntil(8.7);
+    expect(lit(sim, doc)).toEqual([true, true, false]);
+    sim.runUntil(13.7);
+    expect(lit(sim, doc)).toEqual([true, true, true]);
+    for (const q of ['Q1', 'Q2', 'Q3']) {
+      expect(sim.status(idOf(doc, q)).region).toBe('saturation');
+      between(sim.measure(idOf(doc, q))!.voltage, 0.03, 0.07);
+    }
+    between(sim.measure(idOf(doc, 'LED1'))!.current, 14e-3, 15e-3);
+    // Seviye 1'de baz akımı ≈ 0,55 mA.
+    const one = simOf(withProps(doc, 'H1', { level: 45, mode: 'stop' }));
+    one.runUntil(2);
+    between(one.pinCurrents(idOf(doc, 'Q1'))![1]!, 0.52e-3, 0.57e-3);
+    // Çok saf su (1 MΩ): LED'den yalnızca ≈ 0,5 mA geçer.
+    const pure = simOf(withProps(doc, 'H1', { level: 45, mode: 'stop', waterResistance: 1e6 }));
+    pure.runUntil(5);
+    between(pure.measure(idOf(doc, 'LED1'))!.current, 0.3e-3, 0.7e-3);
+  });
+
+  it('tek ışık: aynı anda tek LED (yeşil → sarı → kırmızı); doluyken Q3–Q5 doyumda, Q1 ve Q2 kesimde', () => {
+    const doc = load('baraj-tek-isik');
+    const sim = simOf(doc);
+    sim.runUntil(6);
+    expect(lit(sim, doc)).toEqual([true, false, false]);
+    sim.runUntil(11);
+    expect(lit(sim, doc)).toEqual([false, true, false]);
+    sim.runUntil(16);
+    expect(lit(sim, doc)).toEqual([false, false, true]);
+    for (const q of ['Q3', 'Q4', 'Q5']) expect(sim.status(idOf(doc, q)).region).toBe('saturation');
+    for (const q of ['Q1', 'Q2']) expect(sim.status(idOf(doc, q)).region).toBe('cutoff');
+    expect(sim.measure(idOf(doc, 'Q4'))!.voltage).toBeLessThan(0.02);
+    // Boşaltınca ışık geri döner: kırmızı → sarı → yeşil.
+    const drain = simOf(withProps(doc, 'H1', { level: 100, mode: 'drain' }));
+    drain.runUntil(5);
+    expect(lit(drain, doc)).toEqual([false, true, false]);
+    drain.runUntil(10);
+    expect(lit(drain, doc)).toEqual([true, false, false]);
+  });
+});
+
 describe('Laboratuvar cihazları', () => {
   it('Toprak tuzağı: topraklı prob yükün − ucundayken yük yalnızca pozitif yarıda akım alır', () => {
     const doc = load('toprak-tuzagi');

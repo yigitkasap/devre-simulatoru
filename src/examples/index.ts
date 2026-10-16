@@ -6,6 +6,8 @@
 import { parseDoc } from '../model/serialize';
 import type { CircuitDoc } from '../model/types';
 import ampermetreEtkisi from './ampermetre-etkisi.json';
+import barajCubuk from './baraj-cubuk.json';
+import barajTekIsik from './baraj-tek-isik.json';
 import bjtAnahtar from './bjt-anahtar.json';
 import bjtAnahtarEmetor from './bjt-anahtar-emetor.json';
 import bjtYukseltec from './bjt-yukseltec.json';
@@ -51,6 +53,8 @@ export const EXAMPLE_GROUPS = [
   { id: 'bjt-yukseltec', ids: ['bjt-yukseltec'] },
   { id: 'mosfet-yukseltec', ids: ['mosfet-yukseltec'] },
   { id: 'anahtar', ids: ['bjt-anahtar', 'bjt-anahtar-emetor'] },
+  // Proje: baraj su seviyesi uyarısı (ayrı sayfası da var: /baraj).
+  { id: 'baraj', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
 ] as const;
 
 export type ExampleGroupId = (typeof EXAMPLE_GROUPS)[number]['id'];
@@ -85,6 +89,8 @@ const DATA: Record<ExampleId, unknown> = {
   'mosfet-yukseltec': mosfetYukseltec,
   'bjt-anahtar': bjtAnahtar,
   'bjt-anahtar-emetor': bjtAnahtarEmetor,
+  'baraj-cubuk': barajCubuk,
+  'baraj-tek-isik': barajTekIsik,
 };
 
 /** Örneğin devresi; JSON bozuksa null (testler bunu yakalar). */

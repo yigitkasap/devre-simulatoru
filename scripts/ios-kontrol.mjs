@@ -154,14 +154,14 @@ try {
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
     check('örnekler açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
     await page.waitForTimeout(1000);
-    const group = page.getByRole('button', { name: /^Deney 9 · Transistörün anahtar olarak kullanılması/ });
+    const group = page.getByRole('button', { name: /^Proje · Baraj su seviyesi uyarısı/ });
     await group.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
     await group.tap(); await page.waitForTimeout(300);
-    const last = page.getByRole('button', { name: 'Transistör anahtar: LED emetörde', exact: true });
+    const last = page.getByRole('button', { name: 'Baraj uyarısı: tek ışık', exact: true });
     await last.scrollIntoViewIfNeeded(); await page.waitForTimeout(300);
     await last.tap(); await page.waitForTimeout(600);
     const example = (await page.getByRole('region', { name: 'Örnek' }).textContent().catch(() => '')) ?? '';
-    check(`son gruptaki son örneğe ulaşılıp açılıyor; tahmin sorusu alttaki sayfada (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'npn' && p.label === 'Q1') && (await doc(page)).parts.some((p) => p.label === 'LED1') && example.includes('Tahmin et'));
+    check(`son gruptaki son örneğe ulaşılıp açılıyor; tahmin sorusu alttaki sayfada (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'tank') && (await doc(page)).parts.some((p) => p.label === 'Q5') && example.includes('Tahmin et'));
     await page.context().close();
   }
 

@@ -559,6 +559,24 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     answer:
       'LED’den yalnızca ≈ 2,6 mA geçer ve LED sönük yanar. Transistör doyuma girmez, aktif bölgededir (V_{CE} ≈ 7,8 V). Emetör, bazın ≈ 0,65 V altını izler (emetör izleyici): I_{E} ≈ (5 V − 0,65 V − V_{LED}) / (R_{2} + R_{1} / β) ≈ 2,5 mA. Akımı V_{CC} değil, giriş gerilimi belirler. Anahtar olarak kullanmak için yük kollektörde olmalıdır.',
   },
+  'baraj-cubuk': {
+    title: 'Baraj uyarısı: çubuk gösterge',
+    description:
+      'Baraj haznesinin dibinde ortak prob (+9 V) ve üç seviye probu var. Su bir proba ulaşınca, suyun direnci (≈ 5 kΩ) ve 10 kΩ’luk baz direnci üzerinden o seviyenin BC107’sine baz akımı akar; transistör doyuma girer ve LED’ini yakar: Seviye 1 yeşil, Seviye 2 sarı, Seviye 3 kırmızı. Bazdaki 10 µF’lık kondansatör ve 100 kΩ’luk direnç, dalgalı su yüzeyinde LED’in titremesini önler. Hazne Doldur kipinde: Oynat’a basınca su %20’den 16 saniyede dolar (cihaz rafından ayarlanır).',
+    question:
+      'Su yükseldikçe LED’ler hangi sırayla yanar? Su Seviye 1’e ulaşınca transistör doyuma girer mi? Baz akımını kabaca hesapla (V_{BE} ≈ 0,65 V).',
+    answer:
+      'Önce yeşil (≈ 3,4 s’de, su %37,5’e gelince), sonra yeşilin yanında sarı (≈ 8,4 s), sonra üçü birden (≈ 13,4 s). I_{B} ≈ (9 V − 0,65 V) / (5 kΩ + 10 kΩ) ≈ 0,55 mA; β · I_{B} ≈ 110 mA olurdu, ama LED devresi en fazla ≈ (9 V − 2,2 V) / 470 Ω ≈ 14 mA’e izin verir: transistör doyumdadır (V_{CE} ≈ 0,05 V), LED’den ≈ 14,5 mA geçer. Su akışını Boşalt yap: LED’ler ters sırayla, kondansatör yüzünden yumuşakça söner. Su direncini 1 MΩ yap (çok saf su): 100 kΩ’luk direnç baz akımının çoğunu çeker, LED’den yalnızca ≈ 0,5 mA geçer ve LED zor görünür. Gerçek devrelerde baz ve çekme dirençleri suyun direncine göre seçilir.',
+  },
+  'baraj-tek-isik': {
+    title: 'Baraj uyarısı: tek ışık',
+    description:
+      'Çubuk göstergenin aynısı, iki “susturma” transistörü eklenmiş. Q4’ün bazı Seviye 2 probundan, Q5’in bazı Seviye 3 probundan 10 kΩ ile sürülür; kollektörleri yeşilin (Q1) ve sarının (Q2) baz düğümüne bağlıdır. Hazne yine %20’den 16 saniyede dolar.',
+    question:
+      'Su Seviye 2’ye ulaşınca yeşil LED’e ne olur, neden? Hazne doluyken hangi transistörler doyumda, hangileri kesimde?',
+    answer:
+      'Seviye 2 ıslanınca (≈ 8,4 s) Q4 doyuma girer ve Q1’in bazını ≈ 0,01 V’a çeker: Q1 kesime gider, yeşil söner, aynı anda sarı yanar. Seviye 3’te (≈ 13,4 s) Q5 sarıyı söndürür; yalnız kırmızı kalır. Hazne doluyken Q3, Q4 ve Q5 doyumda, Q1 ve Q2 kesimde. Bu bir öncelik mantığıdır: yeşil = Seviye 1 VE (Seviye 2 DEĞİL). Su akışını Boşalt yap: ışık kırmızıdan sarıya, sonra yeşile döner.',
+  },
 };
 
 export const tr = {
@@ -831,6 +849,7 @@ export const tr = {
       'bjt-yukseltec': 'Deney 7 · BJT’li yükselteç',
       'mosfet-yukseltec': 'Deney 8 · MOSFET’li yükselteç',
       anahtar: 'Deney 9 · Transistörün anahtar olarak kullanılması',
+      baraj: 'Proje · Baraj su seviyesi uyarısı',
     } as Record<ExampleGroupId, string>,
     texts: EXAMPLES,
     badge: 'Örnek',
