@@ -1,9 +1,10 @@
 // Baraj sahnesi: kesitten bakılan vadi, beton baraj, hazne ve problar, ölçü iskelesi, kontrol
 // kulübesi ve üç lambalı ışık kulesi. Su seviyesi ve lambalar simülasyondan gelir: lambalar
 // devredeki LED'lerin parlaklığını izler. Doldururken nehirden su gelir, boşaltırken dip savaktan
-// akar. Çizim 800 × 460'lık bir görünüm kutusunda, kutusuna sığar; gökyüzü ve zemin kutunun dışına
-// taşar (oranı farklı kutuda boş şerit kalmaz). Dar ekranda (compact) haznenin ve barajın olduğu
-// kısma kırpılır, yazılar büyür. Seviye ve durum yazısı sahnenin üstünde (HTML) gösterilir.
+// akar. Çizim 800 × 460'lık bir alanda; görünüm kutusu haznenin, barajın ve ışık kulesinin olduğu
+// kısma kırpılır (sol yamacın ve mansabın boş kenarları dışarıda kalır), kutusuna sığar. Gökyüzü ve
+// zemin kutunun dışına taşar (oranı farklı kutuda boş şerit kalmaz). Dar ekranda (compact) daha sıkı
+// kırpılır, yazılar büyür. Seviye sağdaki Kontroller panelinde gösterilir.
 
 import { useId } from 'react';
 import { tr } from '../i18n/tr';
@@ -67,7 +68,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, compact = false
 
   return (
     <svg
-      viewBox={compact ? '150 -10 650 460' : '0 0 800 460'}
+      viewBox={compact ? '150 -10 650 460' : '120 30 670 420'}
       role="img"
       aria-label={tr.baraj.sceneLabel(Math.round(level), lampText)}
       className={className}
@@ -104,6 +105,8 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, compact = false
       <path d={`M-800 80L0 96L${BANK.x0} ${BANK.y0}L${BANK.x1} ${BED_Y}L${FACE_X} ${BED_Y}V1000H-800Z`} fill="#8a7a5f" />
       <path d={`M0 96L${BANK.x0} ${BANK.y0}L${BANK.x1} ${BED_Y}`} fill="none" stroke="#6f6149" strokeWidth={3} />
       <path d="M600 418L1600 440V1000H600Z" fill="#8a7a5f" />
+      {/* Barajın altındaki temel (kutu uzadığında boş şerit kalmasın) */}
+      <rect x={470} y={416} width={150} height={600} fill="#8a7a5f" />
       <path d="M612 424L1600 446V460L612 438Z" fill="#4f8fc8" />
 
       {/* Hazne suyu ve dalgalı yüzey */}
@@ -212,21 +215,3 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, compact = false
   );
 }
 
-/** Seviye ve uyarı durumu: sahnenin sol üstünde, her ekranda okunur boyutta. */
-export function BarajDurumu({ level, lamps, compact = false }: { level: number; lamps: Lamps; compact?: boolean }) {
-  const alert = alertOf(lamps);
-  return (
-    <div
-      aria-hidden="true"
-      className={`pointer-events-none absolute top-2 left-2 flex flex-col rounded-lg border border-line bg-panel/90 shadow-sm ${compact ? 'px-2.5 py-1.5' : 'px-3.5 py-2'}`}
-    >
-      <span className="flex items-baseline justify-between gap-3">
-        <span className={`text-muted ${compact ? 'text-[12px]' : 'text-sm'}`}>{tr.baraj.levelTitle}</span>
-        <b className={`font-mono tabular ${compact ? 'text-[16px]' : 'text-[20px]'}`}>{`%${Math.round(level)}`}</b>
-      </span>
-      <b className={`${ALERT_CLASSES[alert]} ${compact ? 'text-[13px]' : 'text-sm'}`}>{tr.baraj.alert[alert]}</b>
-    </div>
-  );
-}
-
-const ALERT_CLASSES = { danger: 'text-danger', warning: 'text-warn', normal: 'text-ok', none: 'text-muted' } as const;

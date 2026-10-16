@@ -4,8 +4,9 @@
 // kaydedilmez); "Devreyi simülatörde aç" devreyi paylaşım bağlantısıyla ana simülatöre taşır.
 //
 // Düzen: dikey telefonda üstte sahne, altında Oynat satırı ve sekmeler (Anlatım / Kontroller / Devre);
-// sayfa kaymaz, yalnızca sekme içeriği kayar. Geniş ekranda solda sahne, sağda devre ve sekmeler.
-// Anlatım istenirse kapatılır (sekme satırının sağındaki düğme); seçim bu tarayıcıda hatırlanır.
+// sayfa kaymaz, yalnızca sekme içeriği kayar. Geniş ekranda solda sahne, sağda (daha geniş) devre ve
+// sekmeler. Anlatım kapalı açılır; sekme satırının sağındaki düğmeyle açılıp kapanır. Başlıktaki düğme
+// tarayıcıyı tam ekrana alır (destekleyen tarayıcılarda).
 
 import { useEffect, useMemo, useState } from 'react';
 import { exampleDoc } from '../examples';
@@ -19,6 +20,7 @@ import { probeWetness, TANK_PROBE_HEIGHTS, tankSettings } from '../sim/devices/t
 import type { PropValue } from '../sim/netlist';
 import { formatNumber } from '../sim/units';
 import { CircuitView } from '../editor/CircuitView';
+import { useBrowserFullscreen } from '../editor/fullscreen';
 import { Icon } from '../editor/icons';
 import { Segmented } from '../editor/RackControls';
 import { Rich } from '../editor/Rich';
@@ -27,34 +29,12 @@ import { TankControls } from '../editor/TankControls';
 import { Logo } from '../editor/TopBar';
 import { useLayout } from '../editor/useLayout';
 import { useSimulation } from '../editor/useSimulation';
-import { alertOf, BarajDurumu, BarajSahnesi } from './BarajSahnesi';
+import { alertOf, BarajSahnesi } from './BarajSahnesi';
 
 type Variant = 'baraj-cubuk' | 'baraj-tek-isik';
 type Tab = 'info' | 'controls' | 'circuit';
 
 const BASE = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
-const INFO_KEY = 'devre-simulatoru:baraj-anlatim';
-
-/** Anlatım açık mı; kapatılınca bu tarayıcıda hatırlanır (depolama yoksa her açılışta açık). */
-function useInfoOpen(): [boolean, (open: boolean) => void] {
-  const [open, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem(INFO_KEY) !== 'kapali';
-    } catch {
-      return true;
-    }
-  });
-  const set = (next: boolean) => {
-    setOpen(next);
-    try {
-      if (next) localStorage.removeItem(INFO_KEY);
-      else localStorage.setItem(INFO_KEY, 'kapali');
-    } catch {
-      /* depolama yok: yalnızca bu açılışta */
-    }
-  };
-  return [open, set];
-}
 
 function useWindowWidth(): number {
   const [width, setWidth] = useState(() => window.innerWidth);
@@ -77,8 +57,10 @@ export default function BarajSayfasi() {
 
   const [variant, setVariant] = useState<Variant>('baraj-cubuk');
   const [doc, setDoc] = useState<CircuitDoc>(() => exampleDoc('baraj-cubuk')!);
-  const [tab, setTab] = useState<Tab>('info');
-  const [infoOpen, setInfoOpen] = useInfoOpen();
+  const [tab, setTab] = useState<Tab>('controls');
+  /** Anlatım her açılışta kapalı başlar (kullanıcı isteği); isteyen açar. */
+  const [infoOpen, setInfoOpen] = useState(false);
+  const fullscreen = useBrowserFullscreen();
   const [revealed, setRevealed] = useState(false);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
@@ -123,6 +105,17 @@ export default function BarajSayfasi() {
         <Logo />
       </a>
       <h1 className="min-w-0 flex-1 truncate text-[17px] leading-tight font-semibold">{tr.baraj.title}</h1>
+      {fullscreen.supported && (
+        <button
+          type="button"
+          onClick={fullscreen.toggle}
+          aria-label={fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
+          title={fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line-2 bg-panel hover:bg-panel-2"
+        >
+          <Icon name={fullscreen.on ? 'fullscreenExit' : 'fullscreen'} />
+        </button>
+      )}
       <a
         href={simulatorUrl}
         className="flex h-11 shrink-0 items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 text-sm font-medium hover:bg-panel-2"
@@ -284,7 +277,6 @@ export default function BarajSayfasi() {
   const scene = (
     <div className="relative h-full w-full overflow-hidden">
       <BarajSahnesi level={level} wet={wet} lamps={lamps} mode={s.mode} running={running} compact={compactScene} className="h-full w-full" />
-      <BarajDurumu level={level} lamps={lamps} compact={layout.kind === 'phone'} />
     </div>
   );
 
@@ -304,7 +296,7 @@ export default function BarajSayfasi() {
   return (
     <div className="app-root flex flex-col overflow-hidden bg-app">
       {header}
-      <main className="grid min-h-0 flex-1 gap-3 p-3" style={{ gridTemplateColumns: wide ? 'minmax(0, 1.25fr) minmax(380px, 1fr)' : 'minmax(0, 1.1fr) minmax(320px, 1fr)' }}>
+      <main className="grid min-h-0 flex-1 gap-3 p-3" style={{ gridTemplateColumns: wide ? 'minmax(0, 1fr) minmax(420px, 1.2fr)' : 'minmax(0, 1fr) minmax(320px, 1fr)' }}>
         <section aria-label={tr.baraj.sceneTitle} className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
           <div className="min-h-0 flex-1 bg-[#e9eef3]">{scene}</div>
           <div className="border-t border-line">{controlsRow}</div>

@@ -39,6 +39,33 @@ function exitBrowserFullscreen(): void {
   }
 }
 
+function onFullscreenChange(listener: () => void): () => void {
+  document.addEventListener('fullscreenchange', listener);
+  document.addEventListener('webkitfullscreenchange', listener);
+  return () => {
+    document.removeEventListener('fullscreenchange', listener);
+    document.removeEventListener('webkitfullscreenchange', listener);
+  };
+}
+
+/** Tarayıcı sayfayı tam ekrana alabiliyor mu (iPhone Safari: hayır). */
+export function fullscreenSupported(): boolean {
+  const d = document as WebkitDocument & { webkitFullscreenEnabled?: boolean };
+  return Boolean(d.fullscreenEnabled ?? d.webkitFullscreenEnabled);
+}
+
+/** Yalnızca tarayıcı tam ekranı, panel gizlemeden (baraj sayfası). */
+export function useBrowserFullscreen(): { readonly supported: boolean; readonly on: boolean; readonly toggle: () => void } {
+  const [on, setOn] = useState(() => fullscreenElement() !== null);
+  const [supported] = useState(fullscreenSupported);
+  useEffect(() => onFullscreenChange(() => setOn(fullscreenElement() !== null)), []);
+  const toggle = () => {
+    if (fullscreenElement()) exitBrowserFullscreen();
+    else void requestBrowserFullscreen();
+  };
+  return { supported, on, toggle };
+}
+
 export interface FocusPanels {
   /** Sol taraf: kütüphane (masaüstü) ya da araç şeridi (tablet). */
   readonly left: boolean;
@@ -65,20 +92,16 @@ export function useFocusMode(beforeEnter: () => void): FocusMode {
   /** Kip tarayıcı tam ekranıyla mı açıldı: tam ekrandan çıkılınca (Esc) kip de kapanır. */
   const browser = useRef(false);
 
-  useEffect(() => {
-    const onChange = () => {
-      if (fullscreenElement() === null && browser.current) {
-        browser.current = false;
-        setOn(false);
-      }
-    };
-    document.addEventListener('fullscreenchange', onChange);
-    document.addEventListener('webkitfullscreenchange', onChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', onChange);
-      document.removeEventListener('webkitfullscreenchange', onChange);
-    };
-  }, []);
+  useEffect(
+    () =>
+      onFullscreenChange(() => {
+        if (fullscreenElement() === null && browser.current) {
+          browser.current = false;
+          setOn(false);
+        }
+      }),
+    [],
+  );
 
   const toggle = () => {
     if (on) {

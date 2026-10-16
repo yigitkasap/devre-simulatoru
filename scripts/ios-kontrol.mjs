@@ -818,8 +818,9 @@ try {
   {
     const { page } = await phone();
     await page.goto(BARAJ, { waitUntil: 'networkidle' });
-    const tabs = await page.getByRole('tab').count();
-    check('baraj (telefon): sayfa kaymıyor; sahne, Oynat ve 3 sekme görünür', !(await pageScrolls(page)) && (await page.getByRole('img', { name: /Baraj kesiti/ }).isVisible()) && (await page.getByRole('button', { name: 'Oynat', exact: true }).isVisible()) && tabs === 3, `${tabs} sekme`);
+    const tabs = await page.getByRole('tab').allTextContents();
+    const firstSelected = await page.locator('[role=tab][aria-selected=true]').textContent();
+    check('baraj (telefon): sayfa kaymıyor; sahne ve Oynat görünür, anlatım kapalı başlıyor (Kontroller / Devre)', !(await pageScrolls(page)) && (await page.getByRole('img', { name: /Baraj kesiti/ }).isVisible()) && (await page.getByRole('button', { name: 'Oynat', exact: true }).isVisible()) && tabs.join(',') === 'Kontroller,Devre' && firstSelected === 'Kontroller', tabs.join('/'));
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(4500);
     const status = await barajStatus(page);
     const lamps = (await page.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
@@ -838,17 +839,17 @@ try {
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(1500);
     const lampsFull = (await page.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
     check('baraj (telefon): seviye elle %100 yapılınca tek ışıkta yalnızca kırmızı yanıyor', (await barajStatus(page)).includes('Tehlike') && lampsFull.includes('kırmızı yanıyor') && lampsFull.includes('sarı sönük') && lampsFull.includes('yeşil sönük'), lampsFull.slice(-60));
-    await page.getByRole('tab', { name: 'Anlatım' }).tap(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Anlatımı aç' }).tap(); await page.waitForTimeout(300);
+    const openTabs = await page.getByRole('tab').allTextContents();
+    const openSelected = await page.locator('[role=tab][aria-selected=true]').textContent();
+    const infoText = (await page.getByRole('tabpanel').textContent()) ?? '';
     await page.getByRole('button', { name: 'Anlatımı kapat' }).tap(); await page.waitForTimeout(300);
     const closedTabs = await page.getByRole('tab').allTextContents();
-    const closedSelected = await page.locator('[role=tab][aria-selected=true]').textContent();
     await page.reload({ waitUntil: 'networkidle' });
     const reloadTabs = await page.getByRole('tab').allTextContents();
-    await page.getByRole('button', { name: 'Anlatımı aç' }).tap(); await page.waitForTimeout(300);
-    const reopenedSelected = await page.locator('[role=tab][aria-selected=true]').textContent();
-    check('baraj (telefon): "Anlatımı kapat" anlatım sekmesini kaldırıyor, yenileyince hatırlanıyor, "Anlatımı aç" geri getiriyor',
-      closedTabs.join(',') === 'Kontroller,Devre' && closedSelected === 'Kontroller' && reloadTabs.join(',') === 'Kontroller,Devre' && reopenedSelected === 'Anlatım',
-      `${closedTabs.join('/')} → yenile ${reloadTabs.join('/')} → aç ${reopenedSelected}`);
+    check('baraj (telefon): "Anlatımı aç" anlatımı getiriyor, "Anlatımı kapat" kaldırıyor, sayfa yine kapalı açılıyor',
+      openTabs.join(',') === 'Anlatım,Kontroller,Devre' && openSelected === 'Anlatım' && infoText.includes('Tahmin et') && closedTabs.join(',') === 'Kontroller,Devre' && reloadTabs.join(',') === 'Kontroller,Devre',
+      `${openTabs.join('/')} → kapat ${closedTabs.join('/')} → yenile ${reloadTabs.join('/')}`);
     await page.context().close();
   }
   {
@@ -858,13 +859,14 @@ try {
     bp.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await bp.goto(BARAJ, { waitUntil: 'networkidle' });
     const scene = await bp.getByRole('img', { name: /Baraj kesiti/ }).boundingBox();
+    const side = await bp.getByRole('region', { name: 'Devre, anlatım ve kontroller' }).boundingBox();
     const circuit = await bp.getByRole('img', { name: /devresinin şeması/ }).boundingBox();
-    check('baraj (masaüstü): sayfa kaymıyor; devre şeması sekmesiz, sahnenin sağında', !(await pageScrolls(bp)) && scene !== null && circuit !== null && circuit.x > scene.x + scene.width && (await bp.getByRole('tab').count()) === 2);
-    await bp.getByRole('button', { name: 'Anlatımı kapat' }).click(); await bp.waitForTimeout(300);
-    const circuitAfter = await bp.getByRole('img', { name: /devresinin şeması/ }).boundingBox();
     const panelFits = await bp.getByRole('tabpanel').evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
-    check('baraj (masaüstü): anlatım kapatılınca kontroller kaydırmadan tamamen görünüyor, devre yerinde, sayfa kaymıyor', circuitAfter !== null && circuitAfter.height > 300 && panelFits && (await bp.getByRole('slider').isVisible()) && !(await pageScrolls(bp)), `devre ${Math.round(circuit?.height ?? 0)} → ${Math.round(circuitAfter?.height ?? 0)} px`);
-    await bp.getByRole('button', { name: 'Anlatımı aç' }).click(); await bp.waitForTimeout(200);
+    check('baraj (masaüstü): sayfa kaymıyor; devre sahnenin sağında, sağ sütun daha geniş, anlatım kapalı ve kontroller kaydırmasız', !(await pageScrolls(bp)) && scene !== null && side !== null && circuit !== null && circuit.x > scene.x + scene.width && side.width > scene.width && (await bp.getByRole('tab').count()) === 1 && panelFits && (await bp.getByRole('slider').isVisible()), `sahne ${Math.round(scene?.width ?? 0)} · sağ ${Math.round(side?.width ?? 0)} px`);
+    await bp.getByRole('button', { name: 'Tam ekran', exact: true }).click(); await bp.waitForTimeout(400);
+    const fsOn = await bp.evaluate(() => document.fullscreenElement?.tagName ?? null);
+    await bp.getByRole('button', { name: 'Tam ekrandan çık', exact: true }).click(); await bp.waitForTimeout(400);
+    check('baraj (masaüstü): başlıktaki düğme tarayıcıyı tam ekrana alıp çıkarıyor', fsOn === 'HTML' && (await bp.evaluate(() => document.fullscreenElement)) === null && (await bp.getByRole('button', { name: 'Tam ekran', exact: true }).count()) === 1);
     await bp.getByRole('link', { name: /Devreyi simülatörde aç/ }).click();
     await bp.waitForURL((u) => !u.pathname.includes('/baraj')); await bp.waitForTimeout(800);
     const opened = await doc(bp);

@@ -555,25 +555,29 @@ penceresinde baraj grubunun altındaki bağlantıdan ve baraj örneklerinin "Ör
   yüzey), seviye cetveli, ortak prob + üç seviye probu (eşik çizgileriyle), Doldur'da akan nehir,
   Boşalt'ta dip savağından fışkıran su, kontrol evi ve kırmızı / sarı / yeşil ışık kulesi. Işıkların
   parlaklığı devredeki LED'lerin simülasyondaki parlaklığından gelir; sahnede ayrı bir mantık yok.
-  Sol üstte seviye ve uyarı durumu (Normal / Dikkat / Tehlike). Gökyüzü ve zemin görünüm kutusunun
-  dışına taşar: kutu hangi oranda olursa olsun boş şerit kalmaz. Dar ekranda (telefon, tablet,
-  1280 px altı) sol yamaç kırpılır ve yazılar büyür.
+  Görünüm kutusu haznenin, barajın ve ışık kulesinin olduğu kısma kırpılır (sol yamacın ve mansabın
+  boş kenarları dışarıda kalır; dar ekranda, yani telefon, tablet ve 1280 px altında daha sıkı
+  kırpılır, yazılar büyür). Gökyüzü ve zemin görünüm kutusunun dışına taşar: kutu hangi oranda
+  olursa olsun boş şerit kalmaz. Seviye sağdaki Kontroller panelinin ekranında gösterilir (sahnenin
+  sol üstündeki seviye kutusu kullanıcı isteğiyle kaldırıldı).
 - **Devre** (`src/editor/CircuitView.tsx`): örnek devrenin salt okunur çizimi; kablolar gerilime
   göre renkli, LED'ler yanar. Devre simülatördekiyle aynı `useSimulation` ile çalışır.
 - **Kontroller:** Oynat / Duraklat / Başa al, süre, Çubuk gösterge ↔ Tek ışık seçimi; Kontroller
   sekmesinde hazne paneli (seviye kaydırıcısı, Boşalt / Dur / Doldur, dolma süresi, su direnci).
-  "Devreyi simülatörde aç", devreyi paylaşım bağlantısıyla (`#d=…`) simülatörde açar.
+  "Devreyi simülatörde aç", devreyi paylaşım bağlantısıyla (`#d=…`) simülatörde açar. Başlıktaki
+  köşeli düğme tarayıcıyı tam ekrana alır (F11 gibi; destekleyen tarayıcılarda görünür, iPhone
+  Safari'de yok).
 - **Anlatım:** örneğin metni, Tahmin et sorusu (cevap Oynat'tan sonra açılır) ve "Nasıl çalışır".
-  İstenirse kapatılır (kullanıcı isteği): sekme satırının sağındaki "Anlatımı kapat" Anlatım
-  sekmesini kaldırır (geniş ekranda devre ve kontroller kaydırmadan birlikte görünür), "Anlatımı
-  aç" geri getirir. Seçim bu tarayıcıda hatırlanır (`localStorage`, depolama yoksa hep açık).
+  Sayfa her açılışta anlatım kapalı başlar (kullanıcı isteği; ilk sekme Kontroller): sekme
+  satırının sağındaki "Anlatımı aç" Anlatım sekmesini getirir, "Anlatımı kapat" kaldırır. Seçim
+  hatırlanmaz. Geniş ekranda anlatım kapalıyken devre ve kontroller kaydırmadan birlikte görünür.
 - **Düzen:** telefonda dikey (sahne, kontrol satırı, Anlatım / Kontroller / Devre sekmeleri);
-  geniş ekranda iki sütun (solda sahne, sağda devre + sekmeler); tablet ve yatay telefonda devre
-  sekmede. Sayfanın kendisi hiçbir düzende kaymaz; yalnızca sekme içeriği kayar.
+  geniş ekranda iki sütun (solda sahne, sağda devre + sekmeler; sağ sütun daha geniş, 1 : 1,2);
+  tablet ve yatay telefonda devre sekmede (sütunlar eşit). Sayfanın kendisi hiçbir düzende kaymaz; yalnızca sekme içeriği kayar.
 - `npm run ios-kontrol` baraj sayfası için 10 madde içerir (telefonda sayfa kaymıyor, yeşil ışık,
   Devre sekmesi, 44 px hedefler, örnek değişince başa dönme, elle %100'de yalnızca kırmızı,
-  anlatımı kapatıp açma; masaüstünde devre yanda, anlatım kapalıyken kontroller kaydırmasız, simülatörde
-  açma).
+  anlatımın kapalı başlaması ve açılıp kapanması; masaüstünde devre yanda ve sağ sütun geniş,
+  kontroller kaydırmasız, tam ekran düğmesi, simülatörde açma).
 
 ### Föy parça modelleri (föy için 2. aşama)
 
