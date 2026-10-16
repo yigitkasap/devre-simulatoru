@@ -12,8 +12,9 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 ## Özellikler
 
 - **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç, kondansatör,
-  diyot, zener diyot, LED (kırmızı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
-  N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi). Diyot, NPN, N kanallı JFET
+  diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
+  N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
+  seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
   kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
 - **Laboratuvar cihazları:** fonksiyon üreteci (GFG-8015G benzeri: 0,2 Hz – 2 MHz, 50 Ω, offset,
@@ -41,11 +42,14 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 11 grupta 25 hazır devre: temel devreler,
-  laboratuvar cihazları (köprüde toprak tuzağı) ve Elektronik Laboratuvarı föyünün dokuz deneyi
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 12 grupta 27 hazır devre: temel devreler,
+  laboratuvar cihazları (köprüde toprak tuzağı), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
-  karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması);
-  her birinde tahmin sorusu, cevap simülasyon çalışınca açılır.
+  karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
+  baraj su seviyesi uyarısı projesi; her birinde tahmin sorusu, cevap simülasyon çalışınca açılır.
+- **Baraj sayfası:** <https://yigitkasap.github.io/devre-simulatoru/baraj/>: transistörlerle su
+  seviyesi uyarısı (su yükseldikçe yeşil → sarı → kırmızı). Büyük baraj kesiti ve ışık kulesi,
+  yanında devrenin canlı şeması; çubuk gösterge (3 transistör) ya da tek ışık (5 transistör).
 - **Kaydetme ve paylaşma:** tarayıcıya otomatik kayıt, JSON dışa/içe aktarma, paylaşım bağlantısı.
 
 ## Kurulum ve komutlar
@@ -632,7 +636,8 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   tuvalin `touch-action` değeri kaldırılır (pencere parmakla kaydırılabilsin).
 - **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC"),
   Laboratuvar cihazları ("Toprak tuzağı") ve Fizik 2. sınıf Elektronik Laboratuvarı föyünün
-  dokuz deneyi (föy 3. aşama; eski genel laboratuvar örneklerinin yerine). Föy örneklerinde
+  dokuz deneyi (föy 3. aşama; eski genel laboratuvar örneklerinin yerine), en sonda "Proje · Baraj
+  su seviyesi uyarısı" (iki devre; bkz. baraj bölümleri). Föy örneklerinde
   föydeki parçalar (1N4001, BC107, BF245A, IRF510, föydeki direnç ve kondansatör değerleri) ve
   laboratuvar cihazları (fonksiyon üreteci, iki çıkışlı DC güç kaynağı, osiloskop) kullanılır:
 
