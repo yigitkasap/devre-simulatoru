@@ -1,8 +1,9 @@
 // Salt görüntüleyen devre çizimi (baraj sayfası gibi tanıtım sayfaları için): simülatörün parça
 // sembolleri ve gerilim renkleri, ama seçme, taşıma ve kablo çizme yok. Devre kendi kutusuna sığar;
 // `minWidth` verilirse daha dar kutuda kendi içinde kayar (telefonda büyük devre okunabilsin).
+// `underlay` kabloların altına, dünya koordinatında (px = ızgara × GRID) çizilir (ör. seviye bantları).
 
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import type { Connectivity } from '../model/connectivity';
 import { partBounds } from '../model/geometry';
 import { GRID, type CircuitDoc } from '../model/types';
@@ -20,6 +21,8 @@ export interface CircuitViewProps {
   readonly label: string;
   /** Çizimin en küçük genişliği (px); kutu daha darsa yatay kaydırılır. */
   readonly minWidth?: number;
+  /** Kabloların ve parçaların altında çizilen katman (dünya koordinatı). */
+  readonly underlay?: ReactNode;
 }
 
 /** Devrenin sınırları (ızgara birimi), kenar boşluğuyla. */
@@ -48,7 +51,7 @@ function bounds(doc: CircuitDoc) {
   return { x: x0 - pad, y: y0 - pad, w: x1 - x0 + 2 * pad + 6, h: y1 - y0 + 2 * pad };
 }
 
-export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth }: CircuitViewProps) {
+export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth, underlay }: CircuitViewProps) {
   const b = bounds(doc);
   return (
     <div className="h-full w-full overflow-auto overscroll-contain">
@@ -60,6 +63,7 @@ export const CircuitView = memo(function CircuitView({ doc, connectivity, frame,
         style={minWidth ? { minWidth, minHeight: (minWidth * b.h) / b.w } : undefined}
         preserveAspectRatio="xMidYMid meet"
       >
+        {underlay}
         {doc.wires.map((wire) => {
           let stroke = 'var(--color-symbol)';
           let dash: string | undefined;
