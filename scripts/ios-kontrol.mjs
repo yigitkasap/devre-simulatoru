@@ -775,6 +775,51 @@ try {
   const placeHint = (await cp.locator('main + div').first().textContent().catch(() => '')) ?? '';
   check('1100 px: açılır karttan parça seçilince kart kapanıyor, yerleştirme başlıyor', flyoutClosed && placeHint.includes('Kondansatör:'), placeHint.slice(0, 40));
   await compact.close();
+
+  // --- Baraj sayfası (/baraj/): telefonda dikey düzen, masaüstünde devre yanda -------------
+  const BARAJ = `${URL0.replace(/\/?$/, '/')}baraj/`;
+  const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);
+  const barajStatus = async (pg) => (await pg.locator('[role=status]').first().textContent()) ?? '';
+  {
+    const { page } = await phone();
+    await page.goto(BARAJ, { waitUntil: 'networkidle' });
+    const tabs = await page.getByRole('tab').count();
+    check('baraj (telefon): sayfa kaymıyor; sahne, Oynat ve 3 sekme görünür', !(await pageScrolls(page)) && (await page.getByRole('img', { name: /Baraj kesiti/ }).isVisible()) && (await page.getByRole('button', { name: 'Oynat', exact: true }).isVisible()) && tabs === 3, `${tabs} sekme`);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(4500);
+    const status = await barajStatus(page);
+    const lamps = (await page.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
+    check('baraj (telefon): Oynat’ta su yükseliyor, Seviye 1’de yeşil ışık yanıyor', /%4\d\. Normal/.test(status) && lamps.includes('yeşil yanıyor') && lamps.includes('sarı sönük'), status);
+    await page.getByRole('tab', { name: 'Devre' }).tap(); await page.waitForTimeout(300);
+    check('baraj (telefon): Devre sekmesinde şema görünüyor', await page.getByRole('img', { name: /devresinin şeması/ }).isVisible());
+    const small = await page.evaluate(() => [...document.querySelectorAll('button, a, [role=tab], [role=radio], input')]
+      .map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 20), w: r.width, h: r.height }; })
+      .filter((r) => r.w > 0 && r.h > 0 && (r.h < 43.5 || r.w < 43.5)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
+    check('baraj (telefon): bütün dokunma hedefleri en az 44 px', small.length === 0, small.join(', '));
+    await page.getByRole('radio', { name: 'Tek ışık' }).tap(); await page.waitForTimeout(300);
+    check('baraj (telefon): Tek ışık’a geçince simülasyon başa dönüyor', (await page.getByRole('button', { name: 'Oynat', exact: true }).isVisible()) && (await barajStatus(page)).includes('%20'), await barajStatus(page));
+    await page.getByRole('tab', { name: 'Kontroller' }).tap(); await page.waitForTimeout(300);
+    const slider = page.getByRole('slider');
+    await slider.focus(); await page.keyboard.press('End'); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(1500);
+    const lampsFull = (await page.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
+    check('baraj (telefon): seviye elle %100 yapılınca tek ışıkta yalnızca kırmızı yanıyor', (await barajStatus(page)).includes('Tehlike') && lampsFull.includes('kırmızı yanıyor') && lampsFull.includes('sarı sönük') && lampsFull.includes('yeşil sönük'), lampsFull.slice(-60));
+    await page.context().close();
+  }
+  {
+    const bCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const bp = await bCtx.newPage();
+    bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    bp.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await bp.goto(BARAJ, { waitUntil: 'networkidle' });
+    const scene = await bp.getByRole('img', { name: /Baraj kesiti/ }).boundingBox();
+    const circuit = await bp.getByRole('img', { name: /devresinin şeması/ }).boundingBox();
+    check('baraj (masaüstü): sayfa kaymıyor; devre şeması sekmesiz, sahnenin sağında', !(await pageScrolls(bp)) && scene !== null && circuit !== null && circuit.x > scene.x + scene.width && (await bp.getByRole('tab').count()) === 2);
+    await bp.getByRole('link', { name: /Devreyi simülatörde aç/ }).click();
+    await bp.waitForURL((u) => !u.pathname.includes('/baraj')); await bp.waitForTimeout(800);
+    const opened = await doc(bp);
+    check('baraj (masaüstü): "Devreyi simülatörde aç" devreyi simülatörde açıyor', opened?.parts.some((q) => q.type === 'tank') && opened.parts.filter((q) => q.type === 'led').length === 3, `${opened?.parts.length ?? 0} parça`);
+    await bCtx.close();
+  }
 } finally {
   await browser.close();
 }

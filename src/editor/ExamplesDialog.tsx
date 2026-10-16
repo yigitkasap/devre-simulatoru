@@ -100,11 +100,31 @@ function DesktopExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps
                   );
                 })}
               </ul>
+              {group.id === 'baraj' && <BarajLink />}
             </section>
           ))}
         </div>
       </div>
     </div>
+  );
+}
+
+/** Baraj projesinin ayrı sayfası (büyük sahne, ışık kulesi, kontroller). */
+function BarajLink({ touch = false }: { touch?: boolean }) {
+  const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+  return (
+    <a
+      href={`${base}baraj/`}
+      className={`mt-2 flex items-center gap-2.5 rounded-lg border border-accent bg-accent-soft/60 text-left text-accent-ink hover:bg-accent-soft ${
+        touch ? 'min-h-[52px] px-3 py-2.5' : 'px-3 py-2'
+      }`}
+    >
+      <Icon name="external" className="h-5 w-5 shrink-0" />
+      <span className="min-w-0">
+        <span className={`block font-semibold ${touch ? 'text-[15px]' : 'text-sm'}`}>{tr.baraj.examplesLink}</span>
+        <span className={`block leading-snug text-ink-2 ${touch ? 'text-[13.5px]' : 'text-xs'}`}>{tr.baraj.examplesLinkNote}</span>
+      </span>
+    </a>
   );
 }
 
@@ -202,8 +222,9 @@ function PhoneExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps) 
                 <span className="min-w-0 flex-1">{tr.examples.groups[group.id]}</span>
                 <span className="font-mono text-[13px] font-medium text-muted">{group.ids.length}</span>
               </button>
+              {expanded && group.id === 'baraj' && <BarajLink touch />}
               {expanded && (
-                <ul className="flex flex-col gap-2 pb-3">
+                <ul className="flex flex-col gap-2 pb-3 pt-2">
                   {group.ids.map((id) => {
                     const texts = tr.examples.texts[id];
                     const active = activeExample === id;

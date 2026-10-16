@@ -345,7 +345,7 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 115 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 123 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
@@ -540,6 +540,31 @@ doğrulanır.
   bir üreticiyle kuruldu (föy örnekleri gibi).
 - Testler (`tests/examples-lab.test.ts`): LED'lerin yanma anları ve sırası, doyum/kesim,
   baz akımı, saf su, boşaltırken ışığın geri dönüşü. Devreler yavaş olduğu için testte 2 ms adım.
+
+### Baraj sayfası (C aşaması)
+
+Ayrı sayfa: `/baraj/` (`src/pages/baraj.astro` → `src/baraj/BarajSayfasi.tsx`). Örnekler
+penceresinde baraj grubunun altındaki bağlantıdan ve baraj örneklerinin "Örnek" sekmesinden açılır.
+
+- **Sahne** (`BarajSahnesi.tsx`, SVG): baraj kesiti, haznedeki su (seviyeyle yükselir, dalgalı
+  yüzey), seviye cetveli, ortak prob + üç seviye probu (eşik çizgileriyle), Doldur'da akan nehir,
+  Boşalt'ta dip savağından fışkıran su, kontrol evi ve kırmızı / sarı / yeşil ışık kulesi. Işıkların
+  parlaklığı devredeki LED'lerin simülasyondaki parlaklığından gelir; sahnede ayrı bir mantık yok.
+  Sol üstte seviye ve uyarı durumu (Normal / Dikkat / Tehlike). Gökyüzü ve zemin görünüm kutusunun
+  dışına taşar: kutu hangi oranda olursa olsun boş şerit kalmaz. Dar ekranda (telefon, tablet,
+  1280 px altı) sol yamaç kırpılır ve yazılar büyür.
+- **Devre** (`src/editor/CircuitView.tsx`): örnek devrenin salt okunur çizimi; kablolar gerilime
+  göre renkli, LED'ler yanar. Devre simülatördekiyle aynı `useSimulation` ile çalışır.
+- **Kontroller:** Oynat / Duraklat / Başa al, süre, Çubuk gösterge ↔ Tek ışık seçimi; Kontroller
+  sekmesinde hazne paneli (seviye kaydırıcısı, Boşalt / Dur / Doldur, dolma süresi, su direnci).
+  "Devreyi simülatörde aç", devreyi paylaşım bağlantısıyla (`#d=…`) simülatörde açar.
+- **Anlatım:** örneğin metni, Tahmin et sorusu (cevap Oynat'tan sonra açılır) ve "Nasıl çalışır".
+- **Düzen:** telefonda dikey (sahne, kontrol satırı, Anlatım / Kontroller / Devre sekmeleri);
+  geniş ekranda iki sütun (solda sahne, sağda devre + sekmeler); tablet ve yatay telefonda devre
+  sekmede. Sayfanın kendisi hiçbir düzende kaymaz; yalnızca sekme içeriği kayar.
+- `npm run ios-kontrol` baraj sayfası için 8 madde içerir (telefonda sayfa kaymıyor, yeşil ışık,
+  Devre sekmesi, 44 px hedefler, örnek değişince başa dönme, elle %100'de yalnızca kırmızı;
+  masaüstünde devre yanda, simülatörde açma).
 
 ### Föy parça modelleri (föy için 2. aşama)
 

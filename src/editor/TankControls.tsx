@@ -38,9 +38,13 @@ export interface TankControlsProps {
   readonly onJack: (pin: number) => void;
   /** Telefon: 44 px denetimler. */
   readonly touch?: boolean;
+  /** Jaklar gösterilsin mi (tuvali olmayan sayfada gereksiz). */
+  readonly jacks?: boolean;
+  /** Alttaki not; verilmezse raftaki açıklama. */
+  readonly note?: string;
 }
 
-export function TankControls({ part, status, running, onChange, onJack, touch = false }: TankControlsProps) {
+export function TankControls({ part, status, running, onChange, onJack, touch = false, jacks = true, note }: TankControlsProps) {
   const s = tankSettings(part.props);
   const level = running && status.level !== undefined ? status.level : s.level;
   const [dragged, setDragged] = useState<number | null>(null);
@@ -123,6 +127,7 @@ export function TankControls({ part, status, running, onChange, onJack, touch = 
           />
         </div>
       </div>
+      {jacks && (
       <div className={`flex flex-wrap gap-1.5 ${touch ? '[&>button]:min-h-11 [&>button]:min-w-11' : ''}`}>
         {[0, 1, 2, 3].map((k) => (
           <Jack
@@ -134,7 +139,8 @@ export function TankControls({ part, status, running, onChange, onJack, touch = 
           />
         ))}
       </div>
-      <p className="text-[11.5px] leading-snug text-muted">{tr.rack.tankNote}</p>
+      )}
+      <p className={`leading-snug text-muted ${touch ? 'text-[13px]' : 'text-[11.5px]'}`}>{note ?? tr.rack.tankNote}</p>
     </div>
   );
 }

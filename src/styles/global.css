@@ -359,3 +359,27 @@ button {
     font-size: 16px;
   }
 }
+
+/* Baraj sahnesi: dalgalı su yüzeyi ve akan su (nehir, dip savak). Azaltılmış hareket isteyende durur. */
+@keyframes baraj-dalga {
+  to {
+    transform: translateX(-20px);
+  }
+}
+@keyframes baraj-akis {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+.baraj-dalga {
+  animation: baraj-dalga 1.8s linear infinite;
+}
+.baraj-akis {
+  animation: baraj-akis 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .baraj-dalga,
+  .baraj-akis {
+    animation: none;
+  }
+}

@@ -60,6 +60,15 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
           {tr.examples.tabBadge(groupOf(id))}
         </span>
         <h2 className="text-title leading-tight font-semibold">{texts.title}</h2>
+        {(id === 'baraj-cubuk' || id === 'baraj-tek-isik') && (
+          <a
+            href={`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}baraj/`}
+            className={`flex items-center gap-1.5 self-start text-sm font-semibold text-accent-ink underline-offset-2 hover:underline ${touch ? 'min-h-11' : ''}`}
+          >
+            <Icon name="external" className="h-[18px] w-[18px]" />
+            {tr.baraj.exampleTabLink}
+          </a>
+        )}
       </div>
       {!revealed && (
         <p className="text-sm leading-[1.55] text-ink-2">

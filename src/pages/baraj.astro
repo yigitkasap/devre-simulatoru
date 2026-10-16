@@ -1,0 +1,13 @@
+---
+// Baraj su seviyesi uyarısı: transistörlerle seviye göstergesi, büyük baraj sahnesiyle (ayrı sayfa).
+import BaseLayout from '../layouts/BaseLayout.astro';
+import BarajSayfasi from '../baraj/BarajSayfasi';
+import { tr } from '../i18n/tr';
+---
+
+<BaseLayout title={tr.baraj.title} description="Transistörlerle baraj su seviyesi uyarısı: su yükseldikçe yeşil, sarı ve kırmızı lamba yanar.">
+  <BarajSayfasi client:only="react" />
+  <noscript>
+    <p style="padding: 2rem; font-size: 1.1rem;">{tr.app.noScript}</p>
+  </noscript>
+</BaseLayout>

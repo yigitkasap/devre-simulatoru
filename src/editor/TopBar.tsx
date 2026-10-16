@@ -81,7 +81,7 @@ export interface TopBarProps {
 }
 
 /** Sitenin simgesi: koyu kare üzerinde turuncu dalga. */
-function Logo() {
+export function Logo() {
   return (
     <svg width="32" height="32" viewBox="0 0 44 44" aria-hidden="true" className="shrink-0 max-desk:h-6 max-desk:w-6">
       <rect width="44" height="44" rx="9" fill="#1d2733" />
