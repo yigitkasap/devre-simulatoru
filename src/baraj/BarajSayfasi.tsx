@@ -80,7 +80,7 @@ function lessonDoc(variant: Variant, tank?: Record<string, PropValue>): CircuitD
   return updatePart(doc, h1.id, { props: { ...h1.props, level: START_LEVEL, mode: 'stop', ...tank } });
 }
 
-/** LED parlaklığı azalıyor mu (sönüyor): son ≈ 0,15 s'lik eğim. */
+/** LED parlaklığı azalıyor mu (sönüyor): son ≈ 0,05 s'lik eğim (sönme ≈ 0,3 s sürer; kısa pencere kaçırmasın). */
 function useLedTrend(frame: SimFrame | null, doc: CircuitDoc): (id: string) => boolean {
   const memory = useRef(new Map<string, { b: number; t: number; falling: boolean }>());
   return useMemo(() => {
@@ -94,7 +94,7 @@ function useLedTrend(frame: SimFrame | null, doc: CircuitDoc): (id: string) => b
       const b = frame.live.get(part.id)?.brightness ?? 0;
       const prev = m.get(part.id);
       if (!prev || frame.time < prev.t) m.set(part.id, { b, t: frame.time, falling: false });
-      else if (frame.time - prev.t >= 0.15) m.set(part.id, { b, t: frame.time, falling: (b - prev.b) / (frame.time - prev.t) < -0.03 });
+      else if (frame.time - prev.t >= 0.05) m.set(part.id, { b, t: frame.time, falling: (b - prev.b) / (frame.time - prev.t) < -0.05 });
     }
     const snapshot = new Map(Array.from(m, ([id, v]) => [id, v.falling] as const));
     return (id: string) => snapshot.get(id) ?? false;
