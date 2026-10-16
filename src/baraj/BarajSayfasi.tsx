@@ -5,6 +5,7 @@
 //
 // Düzen: dikey telefonda üstte sahne, altında Oynat satırı ve sekmeler (Anlatım / Kontroller / Devre);
 // sayfa kaymaz, yalnızca sekme içeriği kayar. Geniş ekranda solda sahne, sağda devre ve sekmeler.
+// Anlatım istenirse kapatılır (sekme satırının sağındaki düğme); seçim bu tarayıcıda hatırlanır.
 
 import { useEffect, useMemo, useState } from 'react';
 import { exampleDoc } from '../examples';
@@ -32,6 +33,28 @@ type Variant = 'baraj-cubuk' | 'baraj-tek-isik';
 type Tab = 'info' | 'controls' | 'circuit';
 
 const BASE = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const INFO_KEY = 'devre-simulatoru:baraj-anlatim';
+
+/** Anlatım açık mı; kapatılınca bu tarayıcıda hatırlanır (depolama yoksa her açılışta açık). */
+function useInfoOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(INFO_KEY) !== 'kapali';
+    } catch {
+      return true;
+    }
+  });
+  const set = (next: boolean) => {
+    setOpen(next);
+    try {
+      if (next) localStorage.removeItem(INFO_KEY);
+      else localStorage.setItem(INFO_KEY, 'kapali');
+    } catch {
+      /* depolama yok: yalnızca bu açılışta */
+    }
+  };
+  return [open, set];
+}
 
 function useWindowWidth(): number {
   const [width, setWidth] = useState(() => window.innerWidth);
@@ -55,6 +78,7 @@ export default function BarajSayfasi() {
   const [variant, setVariant] = useState<Variant>('baraj-cubuk');
   const [doc, setDoc] = useState<CircuitDoc>(() => exampleDoc('baraj-cubuk')!);
   const [tab, setTab] = useState<Tab>('info');
+  const [infoOpen, setInfoOpen] = useInfoOpen();
   const [revealed, setRevealed] = useState(false);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
@@ -74,11 +98,6 @@ export default function BarajSayfasi() {
   const lamps = { green: lamp('LED1'), yellow: lamp('LED2'), red: lamp('LED3') };
   const alert = alertOf(lamps);
   const texts = tr.examples.texts[variant];
-
-  // Sekme düzeni değişince (döndürme) devre sekmesi seçiliyse ama artık ayrı gösteriliyorsa anlatıma dön.
-  useEffect(() => {
-    if (wide && tab === 'circuit') setTab('info');
-  }, [wide, tab]);
 
   const changeTank = (patch: Record<string, PropValue>) =>
     setDoc((d) => {
@@ -212,32 +231,50 @@ export default function BarajSayfasi() {
     <CircuitView doc={doc} connectivity={connectivity} frame={sim.frame} settings={settings} label={tr.baraj.circuitLabel(texts.title)} {...(minWidth ? { minWidth } : {})} />
   );
 
-  const tabs: Tab[] = wide ? ['info', 'controls'] : ['info', 'controls', 'circuit'];
+  // Geniş ekranda devre ayrı gösterilir; anlatım kapatılabilir. Seçili sekme artık yoksa ilk sekme.
+  const tabs: Tab[] = [...(infoOpen ? (['info'] as const) : []), 'controls', ...(wide ? [] : (['circuit'] as const))];
+  const current = tabs.includes(tab) ? tab : tabs[0]!;
+  const toggleInfo = () => {
+    setInfoOpen(!infoOpen);
+    if (!infoOpen) setTab('info');
+  };
   const tabbed = (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div role="tablist" aria-label={tr.baraj.tabsLabel} className="flex shrink-0 gap-0.5 border-b border-line px-2">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            id={`baraj-tab-${t}`}
-            aria-selected={tab === t}
-            aria-controls={`baraj-panel-${t}`}
-            onClick={() => setTab(t)}
-            className={`-mb-px h-11 border-b-2 px-3 text-sm font-semibold ${tab === t ? 'border-accent text-ink' : 'border-transparent text-muted'}`}
-          >
-            {tr.baraj.tabs[t]}
-          </button>
-        ))}
+      <div className="flex shrink-0 items-end gap-1 border-b border-line px-2">
+        <div role="tablist" aria-label={tr.baraj.tabsLabel} className="flex min-w-0 gap-0.5">
+          {tabs.map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              id={`baraj-tab-${t}`}
+              aria-selected={current === t}
+              aria-controls={`baraj-panel-${t}`}
+              onClick={() => setTab(t)}
+              className={`-mb-px h-11 shrink-0 border-b-2 px-3 text-sm font-semibold ${current === t ? 'border-accent text-ink' : 'border-transparent text-muted'}`}
+            >
+              {tr.baraj.tabs[t]}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={toggleInfo}
+          className={`ml-auto flex h-11 shrink-0 items-center gap-1.5 self-center rounded-md px-2.5 font-medium text-muted hover:bg-panel-2 hover:text-ink ${
+            stacked ? 'text-[13px]' : 'text-sm'
+          }`}
+        >
+          <Icon name={infoOpen ? 'close' : 'book'} className="h-4 w-4" />
+          {infoOpen ? tr.baraj.hideInfo : tr.baraj.showInfo}
+        </button>
       </div>
       <div
         role="tabpanel"
-        id={`baraj-panel-${tab}`}
-        aria-labelledby={`baraj-tab-${tab}`}
-        className={`min-h-0 flex-1 ${tab === 'circuit' ? 'bg-paper' : 'overflow-y-auto overscroll-contain'}`}
+        id={`baraj-panel-${current}`}
+        aria-labelledby={`baraj-tab-${current}`}
+        className={`min-h-0 flex-1 ${current === 'circuit' ? 'bg-paper' : 'overflow-y-auto overscroll-contain'}`}
       >
-        {tab === 'info' ? info : tab === 'controls' ? controls : circuit(stacked ? 620 : undefined)}
+        {current === 'info' ? info : current === 'controls' ? controls : circuit(stacked ? 620 : undefined)}
       </div>
     </div>
   );
@@ -274,7 +311,8 @@ export default function BarajSayfasi() {
         </section>
         <section aria-label={tr.baraj.sideTitle} className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
           {wide && <div className="min-h-0 flex-[1.25] border-b border-line bg-paper">{circuit()}</div>}
-          <div className={`flex min-h-0 flex-col ${wide ? 'flex-1' : 'flex-1'}`}>{tabbed}</div>
+          {/* Anlatım kapalıyken geniş ekranda kontroller içerikleri kadar yer alır (kaydırmadan görünür); kalan yer devrenin. */}
+          <div className={`flex min-h-0 flex-col ${wide && !infoOpen ? 'max-h-[60%] shrink-0' : 'flex-1'}`}>{tabbed}</div>
         </section>
       </main>
     </div>

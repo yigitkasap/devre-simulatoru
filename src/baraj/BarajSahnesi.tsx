@@ -67,7 +67,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, compact = false
 
   return (
     <svg
-      viewBox={compact ? '150 40 650 410' : '0 0 800 460'}
+      viewBox={compact ? '150 -10 650 460' : '0 0 800 460'}
       role="img"
       aria-label={tr.baraj.sceneLabel(Math.round(level), lampText)}
       className={className}

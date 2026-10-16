@@ -803,6 +803,17 @@ try {
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(1500);
     const lampsFull = (await page.getByRole('img', { name: /Baraj kesiti/ }).getAttribute('aria-label')) ?? '';
     check('baraj (telefon): seviye elle %100 yapılınca tek ışıkta yalnızca kırmızı yanıyor', (await barajStatus(page)).includes('Tehlike') && lampsFull.includes('kırmızı yanıyor') && lampsFull.includes('sarı sönük') && lampsFull.includes('yeşil sönük'), lampsFull.slice(-60));
+    await page.getByRole('tab', { name: 'Anlatım' }).tap(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Anlatımı kapat' }).tap(); await page.waitForTimeout(300);
+    const closedTabs = await page.getByRole('tab').allTextContents();
+    const closedSelected = await page.locator('[role=tab][aria-selected=true]').textContent();
+    await page.reload({ waitUntil: 'networkidle' });
+    const reloadTabs = await page.getByRole('tab').allTextContents();
+    await page.getByRole('button', { name: 'Anlatımı aç' }).tap(); await page.waitForTimeout(300);
+    const reopenedSelected = await page.locator('[role=tab][aria-selected=true]').textContent();
+    check('baraj (telefon): "Anlatımı kapat" anlatım sekmesini kaldırıyor, yenileyince hatırlanıyor, "Anlatımı aç" geri getiriyor',
+      closedTabs.join(',') === 'Kontroller,Devre' && closedSelected === 'Kontroller' && reloadTabs.join(',') === 'Kontroller,Devre' && reopenedSelected === 'Anlatım',
+      `${closedTabs.join('/')} → yenile ${reloadTabs.join('/')} → aç ${reopenedSelected}`);
     await page.context().close();
   }
   {
@@ -814,6 +825,11 @@ try {
     const scene = await bp.getByRole('img', { name: /Baraj kesiti/ }).boundingBox();
     const circuit = await bp.getByRole('img', { name: /devresinin şeması/ }).boundingBox();
     check('baraj (masaüstü): sayfa kaymıyor; devre şeması sekmesiz, sahnenin sağında', !(await pageScrolls(bp)) && scene !== null && circuit !== null && circuit.x > scene.x + scene.width && (await bp.getByRole('tab').count()) === 2);
+    await bp.getByRole('button', { name: 'Anlatımı kapat' }).click(); await bp.waitForTimeout(300);
+    const circuitAfter = await bp.getByRole('img', { name: /devresinin şeması/ }).boundingBox();
+    const panelFits = await bp.getByRole('tabpanel').evaluate((el) => el.scrollHeight <= el.clientHeight + 1);
+    check('baraj (masaüstü): anlatım kapatılınca kontroller kaydırmadan tamamen görünüyor, devre yerinde, sayfa kaymıyor', circuitAfter !== null && circuitAfter.height > 300 && panelFits && (await bp.getByRole('slider').isVisible()) && !(await pageScrolls(bp)), `devre ${Math.round(circuit?.height ?? 0)} → ${Math.round(circuitAfter?.height ?? 0)} px`);
+    await bp.getByRole('button', { name: 'Anlatımı aç' }).click(); await bp.waitForTimeout(200);
     await bp.getByRole('link', { name: /Devreyi simülatörde aç/ }).click();
     await bp.waitForURL((u) => !u.pathname.includes('/baraj')); await bp.waitForTimeout(800);
     const opened = await doc(bp);

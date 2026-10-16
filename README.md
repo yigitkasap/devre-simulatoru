@@ -349,7 +349,7 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 123 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 125 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
@@ -563,12 +563,16 @@ penceresinde baraj grubunun altındaki bağlantıdan ve baraj örneklerinin "Ör
   sekmesinde hazne paneli (seviye kaydırıcısı, Boşalt / Dur / Doldur, dolma süresi, su direnci).
   "Devreyi simülatörde aç", devreyi paylaşım bağlantısıyla (`#d=…`) simülatörde açar.
 - **Anlatım:** örneğin metni, Tahmin et sorusu (cevap Oynat'tan sonra açılır) ve "Nasıl çalışır".
+  İstenirse kapatılır (kullanıcı isteği): sekme satırının sağındaki "Anlatımı kapat" Anlatım
+  sekmesini kaldırır (geniş ekranda devre ve kontroller kaydırmadan birlikte görünür), "Anlatımı
+  aç" geri getirir. Seçim bu tarayıcıda hatırlanır (`localStorage`, depolama yoksa hep açık).
 - **Düzen:** telefonda dikey (sahne, kontrol satırı, Anlatım / Kontroller / Devre sekmeleri);
   geniş ekranda iki sütun (solda sahne, sağda devre + sekmeler); tablet ve yatay telefonda devre
   sekmede. Sayfanın kendisi hiçbir düzende kaymaz; yalnızca sekme içeriği kayar.
-- `npm run ios-kontrol` baraj sayfası için 8 madde içerir (telefonda sayfa kaymıyor, yeşil ışık,
-  Devre sekmesi, 44 px hedefler, örnek değişince başa dönme, elle %100'de yalnızca kırmızı;
-  masaüstünde devre yanda, simülatörde açma).
+- `npm run ios-kontrol` baraj sayfası için 10 madde içerir (telefonda sayfa kaymıyor, yeşil ışık,
+  Devre sekmesi, 44 px hedefler, örnek değişince başa dönme, elle %100'de yalnızca kırmızı,
+  anlatımı kapatıp açma; masaüstünde devre yanda, anlatım kapalıyken kontroller kaydırmasız, simülatörde
+  açma).
 
 ### Föy parça modelleri (föy için 2. aşama)
 

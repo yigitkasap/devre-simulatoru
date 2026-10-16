@@ -1056,6 +1056,8 @@ export const tr = {
     time: (s: string) => `${s} s`,
     tabsLabel: 'Baraj sayfası bölümleri',
     tabs: { info: 'Anlatım', controls: 'Kontroller', circuit: 'Devre' },
+    hideInfo: 'Anlatımı kapat',
+    showInfo: 'Anlatımı aç',
     sceneTitle: 'Baraj ve ışık kulesi',
     sideTitle: 'Devre, anlatım ve kontroller',
     levelTitle: 'Su seviyesi',
