@@ -776,6 +776,41 @@ try {
   check('1100 px: açılır karttan parça seçilince kart kapanıyor, yerleştirme başlıyor', flyoutClosed && placeHint.includes('Kondansatör:'), placeHint.slice(0, 40));
   await compact.close();
 
+  // --- Tam ekran (masaüstü, tablet): tarayıcı tam ekranı, yalnızca devre şeması -------------
+  {
+    const fsCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const fp = await fsCtx.newPage();
+    fp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await fp.goto(URL0, { waitUntil: 'networkidle' });
+    const fsElement = () => fp.evaluate(() => document.fullscreenElement?.tagName ?? null);
+    const libraryShown = () => fp.getByPlaceholder(/Parça ara/).count();
+    const inspectorShown = () => fp.getByRole('tab', { name: 'İncele' }).count();
+    const canvasWidth = async () => (await fp.locator('svg.schematic').boundingBox())?.width ?? 0;
+    const w0 = await canvasWidth();
+    await fp.getByRole('button', { name: 'Tam ekran', exact: true }).click(); await fp.waitForTimeout(500);
+    const w1 = await canvasWidth();
+    check('masaüstü: Tam ekran tarayıcıyı tam ekrana alıyor; kütüphane ve İnceleme paneli gizleniyor', (await fsElement()) === 'HTML' && (await libraryShown()) === 0 && (await inspectorShown()) === 0 && w1 > 1400, `tuval ${Math.round(w0)} → ${Math.round(w1)} px`);
+    await fp.getByRole('button', { name: 'Parça kütüphanesi', exact: true }).click();
+    await fp.getByRole('button', { name: 'İnceleme paneli', exact: true }).click(); await fp.waitForTimeout(300);
+    const pressed = await fp.getByRole('button', { name: 'Parça kütüphanesi', exact: true }).getAttribute('aria-pressed');
+    check('masaüstü: tam ekranda üst çubuğun iki ucundaki düğmeler sol ve sağ paneli açıyor', (await libraryShown()) === 1 && (await inspectorShown()) === 1 && pressed === 'true' && (await fsElement()) === 'HTML');
+    await fp.evaluate(() => document.exitFullscreen()); await fp.waitForTimeout(400);
+    check('masaüstü: tarayıcının tam ekranından çıkınca (Esc) kip kapanıyor, paneller yerinde', (await fp.getByRole('button', { name: 'Tam ekran', exact: true }).count()) === 1 && (await fp.getByRole('button', { name: 'Parça kütüphanesi', exact: true }).count()) === 0 && (await libraryShown()) === 1 && (await inspectorShown()) === 1);
+    await fsCtx.close();
+
+    const tCtx = await browser.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    const tp = await tCtx.newPage();
+    tp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await tp.goto(URL0, { waitUntil: 'networkidle' });
+    await tp.getByRole('button', { name: 'Tam ekran', exact: true }).tap(); await tp.waitForTimeout(500);
+    const railHidden = (await tp.getByRole('button', { name: 'Bağla', exact: true }).count()) === 0 && (await tp.getByRole('tab', { name: 'İncele' }).count()) === 0;
+    await tp.getByRole('button', { name: 'Araç şeridi (Parça ekle, Bağla)', exact: true }).tap(); await tp.waitForTimeout(300);
+    const railBack = (await tp.getByRole('button', { name: 'Bağla', exact: true }).count()) === 1;
+    await tp.getByRole('button', { name: 'Tam ekrandan çık', exact: true }).tap(); await tp.waitForTimeout(400);
+    check('tablet: Tam ekran araç şeridini ve İnceleme panelini gizliyor, düğmeyle açılıyor, çıkınca geri geliyor', railHidden && railBack && (await tp.getByRole('tab', { name: 'İncele' }).count()) === 1 && (await tp.evaluate(() => document.fullscreenElement)) === null);
+    await tCtx.close();
+  }
+
   // --- Baraj sayfası (/baraj/): telefonda dikey düzen, masaüstünde devre yanda -------------
   const BARAJ = `${URL0.replace(/\/?$/, '/')}baraj/`;
   const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);

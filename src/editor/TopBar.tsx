@@ -2,12 +2,15 @@
 // geri al / yinele, kayıt durumu, görünüm (yakınlık) ve Ayarlar. Tablette (T01, T02) sade ve dokunmatik
 // boyutlu hâli: devrenin adı ▾ (Dosya), Örnekler, Geri al / Yinele, kip rozeti, sığdır ve Ayarlar.
 // Telefonda üst şerit (PhoneTopStrip) ve alt çubuk (PhoneBar) kullanılır.
+// Tam ekran düğmesi tarayıcıyı tam ekrana alır ve yanları gizler (fullscreen.ts); tam ekranda çubuğun
+// iki ucunda sol ve sağ paneli açıp kapatan düğmeler çıkar.
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { tr } from '../i18n/tr';
 import { formatSI } from '../sim/units';
 import type { SaveState } from './autosave';
 import { voltageGradient } from './colors';
+import type { FocusPanels } from './fullscreen';
 import { Kbd } from './HintStrip';
 import { Icon, type IconName } from './icons';
 import type { Settings } from './settings';
@@ -71,6 +74,7 @@ export interface TopBarProps {
   readonly onZoomIn: () => void;
   readonly onZoomOut: () => void;
   readonly onFit: () => void;
+  readonly fullscreen: FullscreenControls;
   readonly onNew: () => void;
   readonly onExport: () => void;
   readonly onImport: () => void;
@@ -78,6 +82,32 @@ export interface TopBarProps {
   readonly onExamples: () => void;
   readonly onHelp: () => void;
   readonly onWelcome: () => void;
+}
+
+/** Tam ekran düğmesi ve tam ekranda yan panellerin düğmeleri. */
+export interface FullscreenControls {
+  readonly on: boolean;
+  readonly panels: FocusPanels;
+  readonly onToggle: () => void;
+  readonly onPanel: (side: keyof FocusPanels, open: boolean) => void;
+}
+
+/** Tam ekranda yan paneli açıp kapatan düğme (basılı = panel açık). */
+function PanelToggle({ side, label, open, onPanel, touch = false }: { side: keyof FocusPanels; label: string; open: boolean; onPanel: FullscreenControls['onPanel']; touch?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onPanel(side, !open)}
+      aria-label={label}
+      title={label}
+      aria-pressed={open}
+      className={`flex shrink-0 items-center justify-center rounded-md transition-colors ${touch ? 'h-11 w-11 rounded-[10px]' : 'h-10 w-10 desk:h-9 desk:w-9'} ${
+        open ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-app'
+      }`}
+    >
+      <Icon name={side === 'left' ? 'sideLeft' : 'sideRight'} />
+    </button>
+  );
 }
 
 /** Sitenin simgesi: koyu kare üzerinde turuncu dalga. */
@@ -134,6 +164,9 @@ export function TopBar(props: TopBarProps) {
 
   return (
     <header className="flex h-[52px] shrink-0 items-center gap-1.5 border-b border-line bg-panel pr-2.5 pl-3">
+      {props.fullscreen.on && (
+        <PanelToggle side="left" label={tr.toolbar.libraryPanel} open={props.fullscreen.panels.left} onPanel={props.fullscreen.onPanel} />
+      )}
       <div className="flex shrink-0 items-center gap-2.5 pr-1.5 max-desk:gap-2 max-desk:pr-0.5">
         <Logo />
         <h1 className="text-[15px] font-semibold whitespace-nowrap max-wide:sr-only">{tr.site.name}</h1>
@@ -165,11 +198,20 @@ export function TopBar(props: TopBarProps) {
         </span>
         <ViewButton icon="plus" label={tr.toolbar.zoomIn} onClick={props.onZoomIn} />
         <span className="h-5 w-px bg-line" aria-hidden="true" />
-        <ViewButton icon="fit" label={tr.toolbar.fit} onClick={props.onFit} />
+        <ViewButton icon="fit" label={tr.toolbar.fit} title={tr.toolbar.fitTitle} onClick={props.onFit} />
+        <ViewButton
+          icon={props.fullscreen.on ? 'fullscreenExit' : 'fullscreen'}
+          label={props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
+          title={props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreenTitle}
+          onClick={props.fullscreen.onToggle}
+        />
       </div>
 
       <ToolButton icon="help" label={tr.help.open} title={tr.help.openTitle} onClick={props.onHelp} />
       <SettingsMenu settings={props.settings} onChange={props.onSettings} onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
+      {props.fullscreen.on && (
+        <PanelToggle side="right" label={tr.toolbar.inspectorPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} />
+      )}
     </header>
   );
 }
@@ -211,13 +253,13 @@ function ToolSegment({
   );
 }
 
-function ViewButton({ icon, label, onClick }: { icon: IconName; label: string; onClick: () => void }) {
+function ViewButton({ icon, label, title = label, onClick }: { icon: IconName; label: string; title?: string; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
-      title={label}
+      title={title}
       className="flex h-[34px] w-[34px] items-center justify-center rounded-[8px] text-ink hover:bg-app"
     >
       <Icon name={icon} />
@@ -268,6 +310,7 @@ export interface TabletTopBarProps {
   readonly onUndo: () => void;
   readonly onRedo: () => void;
   readonly onFit: () => void;
+  readonly fullscreen: FullscreenControls;
   readonly onNew: () => void;
   readonly onExport: () => void;
   readonly onImport: () => void;
@@ -289,6 +332,9 @@ export function TabletTopBar(props: TabletTopBarProps) {
   const timed = props.mode === 'olc' || props.mode === 'pause';
   return (
     <header className="flex h-14 shrink-0 items-center gap-1 border-b border-line bg-panel pr-2 pl-3" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {props.fullscreen.on && (
+        <PanelToggle side="left" label={tr.toolbar.railPanel} open={props.fullscreen.panels.left} onPanel={props.fullscreen.onPanel} touch />
+      )}
       <Logo />
       <h1 className="sr-only">{tr.site.name}</h1>
       <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
@@ -314,8 +360,16 @@ export function TabletTopBar(props: TabletTopBarProps) {
       </span>
       <SaveStatus state={props.saveState} />
       <TouchIconButton icon="fit" label={tr.toolbar.fit} onClick={props.onFit} />
+      <TouchIconButton
+        icon={props.fullscreen.on ? 'fullscreenExit' : 'fullscreen'}
+        label={props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
+        onClick={props.fullscreen.onToggle}
+      />
       <TouchIconButton icon="help" label={tr.help.open} onClick={props.onHelp} />
       <SettingsMenu settings={props.settings} onChange={props.onSettings} touch onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
+      {props.fullscreen.on && (
+        <PanelToggle side="right" label={tr.toolbar.inspectorPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} touch />
+      )}
     </header>
   );
 }

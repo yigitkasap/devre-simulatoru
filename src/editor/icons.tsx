@@ -17,6 +17,10 @@ export type IconName =
   | 'minus'
   | 'plus'
   | 'fit'
+  | 'fullscreen'
+  | 'fullscreenExit'
+  | 'sideLeft'
+  | 'sideRight'
   | 'settings'
   | 'help'
   | 'close'
@@ -86,7 +90,26 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   minus: <path d="M5 10h10" />,
   plus: <path d="M5 10h10M10 5v10" />,
-  fit: <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" />,
+  fit: (
+    <>
+      <path d="M3 6.5V3h3.5M13.5 3H17v3.5M17 13.5V17h-3.5M6.5 17H3v-3.5" />
+      <rect x="7" y="7" width="6" height="6" rx="1.2" />
+    </>
+  ),
+  fullscreen: <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4" />,
+  fullscreenExit: <path d="M7 3v4H3M13 3v4h4M17 13h-4v4M3 13h4v4" />,
+  sideLeft: (
+    <>
+      <rect x="3" y="4" width="14" height="12" rx="2" />
+      <path d="M8 4v12" />
+    </>
+  ),
+  sideRight: (
+    <>
+      <rect x="3" y="4" width="14" height="12" rx="2" />
+      <path d="M12 4v12" />
+    </>
+  ),
   settings: (
     <>
       <path d="M3 6h8M15 6h2M3 14h2M9 14h8" />

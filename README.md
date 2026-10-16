@@ -122,6 +122,7 @@ Tam liste uygulamada **Yardım** penceresinde (`?`).
 | Özellikler | Parçayı seç: sağdaki İncele sekmesi; çift tık ya da Enter: ilk değer alanı |
 | Tuvalde gezinme | "Tuvale atla" (ilk Tab), oklar: en yakın parça, Shift + ok: kaydır, Esc: panelden tuvale dön |
 | Görünüm | Tekerlek ya da + / −, Shift+1: sığdır, Boşluk + sürükle ya da orta tuş: kaydır |
+| Tam ekran | Üst çubukta yakınlığın yanındaki düğme: tarayıcı tam ekranı, yalnızca devre şeması; sol ve sağ panel çubuğun iki ucundaki düğmelerle açılır; Esc ya da aynı düğme: çık |
 | Simülasyon | Oynat / Duraklat / Durdur (P: oynat/duraklat); çalışırken anahtara tıklayınca açılır/kapanır |
 | Panel | Alt+1 … 3: İncele, Örnek, Mesajlar |
 | Örnekler | Üst çubuktaki "Örnekler" düğmesi |
@@ -349,7 +350,7 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 125 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 129 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
@@ -629,6 +630,16 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   o sekmeyi açar.
 - **Ayarlar:** düğüm gerilimleri, akım noktaları, elektron akışı, renk ölçeği, direnç sembolü.
   Koyu tema ve projeksiyon kipi sonraki işlere bırakıldı.
+- **Tam ekran (kullanıcı isteği, masaüstü ve tablet):** köşeli simgeli düğme artık devreyi
+  sığdırmaz; tarayıcıyı tam ekrana alır (F11 gibi, Fullscreen API; `src/editor/fullscreen.ts`) ve
+  yalnızca devre şeması kalır: sol (kütüphane; tablette Parça / Bağla şeridi) ve sağ (İnceleme
+  paneli) gizlenir. Üst çubuğun iki ucunda çıkan düğmeler (basılı = açık) panelleri istenince
+  açar; Alt+1…3 ve tabletteki "Cihaz rafı" düğmesi sağ paneli kendiliğinden açar. Girmeden önce
+  devre sığdırılır, böylece genişleyen tuvale yeniden sığar. Esc (tarayıcının çıkışı) ya da aynı
+  düğme kipi kapatır, paneller geri gelir. Üst çubuk, raf ve simülasyon çubuğu yerinde kalır.
+  Tarayıcı tam ekranı desteklemiyorsa yalnızca paneller gizlenir. Sığdırma ayrı düğmeye
+  (çerçeve içinde kutu simgesi) taşındı, Shift+1 aynı. Telefonda değişiklik yok (iPhone Safari
+  sayfaları tam ekrana almaz; ⋯ menüsündeki "Ekrana sığdır" kaldı).
 
 ### Örnekler
 

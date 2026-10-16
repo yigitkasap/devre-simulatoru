@@ -28,6 +28,7 @@ import { markWelcomeSeen, Tour, welcomeSeen, WelcomeDialog, type TourStep } from
 import { Inspector, type InspectorTab } from './Inspector';
 import { InspectTab, type PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
+import { useFocusMode } from './fullscreen';
 import { HintStrip, type StripHint } from './HintStrip';
 import { Library, LibraryFlyout, type LibraryMode } from './Library';
 import {
@@ -154,6 +155,9 @@ export default function Simulator() {
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [fitRequest, setFitRequest] = useState(0);
+  // Tam ekran (masaüstü, tablet): önce devre sığdırılır, böylece yanlar gizlenince yeni alana yeniden sığar.
+  const focus = useFocusMode(() => canvasRef.current?.fit());
+  const fullscreenControls = { on: focus.on, panels: focus.panels, onToggle: focus.toggle, onPanel: focus.showPanel };
   const [activeExample, setActiveExample] = useState<ExampleId | null>(null);
   const [answerRevealed, setAnswerRevealed] = useState(false);
   const [chosenScope, setChosenScope] = useState<string | null>(null);
@@ -952,6 +956,7 @@ export default function Simulator() {
       if (next && !phone) {
         e.preventDefault();
         setMeasureLayout(false);
+        if (focus.on) focus.showPanel('right', true);
         setInspectorTab(next);
         window.setTimeout(() => document.getElementById(`inspector-tab-${next}`)?.focus(), 0);
       }
@@ -1156,6 +1161,7 @@ export default function Simulator() {
           onUndo={() => dispatch({ type: 'undo' })}
           onRedo={() => dispatch({ type: 'redo' })}
           onFit={() => canvasRef.current?.fit()}
+          fullscreen={fullscreenControls}
           onNew={() => loadDoc(emptyDoc(), tr.file.newDone)}
           onExport={() => downloadDoc(doc)}
           onImport={() => fileInputRef.current?.click()}
@@ -1166,20 +1172,22 @@ export default function Simulator() {
         />
         {fileInput}
         <div className="relative flex min-h-0 flex-1">
-          <TabletRail
-            partsOpen={sheet?.kind === 'parts'}
-            connecting={connect !== null}
-            locked={sim.status !== 'stopped'}
-            onParts={() => {
-              setConnect(null);
-              setSheet((s) => (s?.kind === 'parts' ? null : { kind: 'parts', size: 'half' }));
-            }}
-            onConnect={() => {
-              dispatch({ type: 'select', selection: EMPTY_SELECTION });
-              setSheet(null);
-              setConnect((c) => (c ? null : { start: null }));
-            }}
-          />
+          {focus.panels.left && (
+            <TabletRail
+              partsOpen={sheet?.kind === 'parts'}
+              connecting={connect !== null}
+              locked={sim.status !== 'stopped'}
+              onParts={() => {
+                setConnect(null);
+                setSheet((s) => (s?.kind === 'parts' ? null : { kind: 'parts', size: 'half' }));
+              }}
+              onConnect={() => {
+                dispatch({ type: 'select', selection: EMPTY_SELECTION });
+                setSheet(null);
+                setConnect((c) => (c ? null : { start: null }));
+              }}
+            />
+          )}
           <div className="flex min-w-0 flex-1 flex-col">
             <main className="relative min-h-0 flex-1" style={{ boxShadow: canvasMode === 'olc' ? 'inset 0 3px 0 var(--color-ok)' : undefined }}>
               {canvas}
@@ -1199,7 +1207,10 @@ export default function Simulator() {
               {rackDevice && inspectorTab !== 'devices' && (
                 <button
                   type="button"
-                  onClick={() => setInspectorTab('devices')}
+                  onClick={() => {
+                    setInspectorTab('devices');
+                    if (focus.on) focus.showPanel('right', true);
+                  }}
                   aria-label={tr.tablet.rackLabel(rackDevice.label)}
                   className="absolute right-3 bottom-3 z-10 flex h-11 items-center gap-2 rounded-full border border-stopped bg-face px-3.5 text-[13.5px] font-semibold text-ink shadow-sm active:brightness-95"
                 >
@@ -1238,20 +1249,22 @@ export default function Simulator() {
               onPause={sim.pause}
             />
           </div>
-          <Inspector
-            width={layout.inspectorWidth}
-            collapsed={false}
-            onExpand={setInspectorTab}
-            tab={inspectorTab}
-            onTab={setInspectorTab}
-            inspect={inspectProps}
-            example={exampleProps}
-            messages={messagesProps}
-            touch
-            devices={devicesBody}
-            inspectBody={inspectBody}
-            onKeyDown={backToCanvas}
-          />
+          {focus.panels.right && (
+            <Inspector
+              width={layout.inspectorWidth}
+              collapsed={false}
+              onExpand={setInspectorTab}
+              tab={inspectorTab}
+              onTab={setInspectorTab}
+              inspect={inspectProps}
+              example={exampleProps}
+              messages={messagesProps}
+              touch
+              devices={devicesBody}
+              inspectBody={inspectBody}
+              onKeyDown={backToCanvas}
+            />
+          )}
         </div>
         {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
         {stopAsk && (
@@ -1658,6 +1671,7 @@ export default function Simulator() {
         onZoomIn={() => canvasRef.current?.zoomIn()}
         onZoomOut={() => canvasRef.current?.zoomOut()}
         onFit={() => canvasRef.current?.fit()}
+        fullscreen={fullscreenControls}
         onNew={() => loadDoc(emptyDoc(), tr.file.newDone)}
         onExport={() => downloadDoc(doc)}
         onImport={() => fileInputRef.current?.click()}
@@ -1669,7 +1683,7 @@ export default function Simulator() {
       {fileInput}
 
       <div className="relative flex min-h-0 flex-1">
-        <Library mode={libraryMode} {...libraryProps} />
+        {focus.panels.left && <Library mode={libraryMode} {...libraryProps} />}
         <div ref={columnRef} className="flex min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 flex-1">
             {showFlyout && <LibraryFlyout {...libraryProps} />}
@@ -1725,20 +1739,22 @@ export default function Simulator() {
             fix={noGroundNotice && groundSuggestion ? { label: tr.noGround.fix(groundSuggestion.part.label), run: addSuggestedGround } : null}
           />
         </div>
-        <Inspector
-          width={layout.inspectorWidth}
-          collapsed={measureCollapse}
-          onExpand={(tab) => {
-            setMeasureLayout(false);
-            setInspectorTab(tab);
-          }}
-          tab={inspectorTab}
-          onTab={setInspectorTab}
-          inspect={inspectProps}
-          example={exampleProps}
-          messages={messagesProps}
-          onKeyDown={backToCanvas}
-        />
+        {focus.panels.right && (
+          <Inspector
+            width={layout.inspectorWidth}
+            collapsed={measureCollapse}
+            onExpand={(tab) => {
+              setMeasureLayout(false);
+              setInspectorTab(tab);
+            }}
+            tab={inspectorTab}
+            onTab={setInspectorTab}
+            inspect={inspectProps}
+            example={exampleProps}
+            messages={messagesProps}
+            onKeyDown={backToCanvas}
+          />
+        )}
       </div>
 
       {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
