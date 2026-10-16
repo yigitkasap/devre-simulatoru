@@ -46,7 +46,7 @@ export interface InspectTabProps {
 }
 
 /** Ayarları cihaz rafındaki ön panelinde olan parçalar. */
-const RACK_DEVICES: ReadonlySet<string> = new Set(['oscilloscope', 'funcgen', 'dcsupply']);
+const RACK_DEVICES: ReadonlySet<string> = new Set(['oscilloscope', 'funcgen', 'dcsupply', 'tank']);
 
 export function InspectTab(props: InspectTabProps) {
   const { doc, selection, frame } = props;

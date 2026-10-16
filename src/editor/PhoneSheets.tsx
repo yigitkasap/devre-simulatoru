@@ -23,7 +23,7 @@ import { SymbolIcon } from './symbols';
 import type { SimFrame, SimStatus } from './useSimulation';
 
 /** Ayarları Cihazlar sayfasında olan parçalar. */
-const DEVICE_TYPES: ReadonlySet<DeviceType> = new Set<DeviceType>(['oscilloscope', 'funcgen', 'dcsupply']);
+const DEVICE_TYPES: ReadonlySet<DeviceType> = new Set<DeviceType>(['oscilloscope', 'funcgen', 'dcsupply', 'tank']);
 
 /** Türkçe karakterleri sadeleştirerek arar ("kondansator" → "Kondansatör"). */
 function normalize(text: string): string {

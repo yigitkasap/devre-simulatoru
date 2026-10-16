@@ -6,6 +6,7 @@ import { rotatedBox } from '../model/geometry';
 import { GRID, type Part } from '../model/types';
 import { tr } from '../i18n/tr';
 import { funcgenSettings } from '../sim/devices/funcgen';
+import { LED_COLORS } from '../sim/devices/led';
 import { numProp, strProp } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
 import type { ResistorStyle } from './settings';
@@ -37,7 +38,7 @@ export function partValueText(part: Part): string {
     case 'capacitor':
       return formatSI(numProp(p, 'capacitance', 0), 'F', { trim: true, digits: 4 });
     case 'led':
-      return tr.devices.ledColors[strProp(p, 'color', ['red', 'green', 'blue'] as const, 'red')] ?? '';
+      return tr.devices.ledColors[strProp(p, 'color', LED_COLORS, 'red')] ?? '';
     case 'zener':
       return formatSI(numProp(p, 'zenerVoltage', 5.1), 'V', { trim: true, digits: 4 });
     case 'diode':

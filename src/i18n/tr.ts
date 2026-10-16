@@ -43,6 +43,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   voltmeter: 'Voltmetre',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
+  tank: 'Su haznesi',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -67,6 +68,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   voltmeter: 'voltmetresinin',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
+  tank: 'su haznesinin',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -90,6 +92,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   voltmeter: ['+ ucu', '− ucu'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
+  tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
 };
 
 /** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
@@ -98,6 +101,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   acsource: ['+', '−'],
   funcgen: ['OUT', 'TTL', 'COM'],
   dcsupply: ['1+', '1−', '2+', '2−'],
+  tank: ['COM', '1', '2', '3'],
   ground: ['⏚'],
   resistor: ['1', '2'],
   capacitor: ['+', '−'],
@@ -122,6 +126,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   acsource: ['+ uç', '− uç'],
   funcgen: ['OUT', 'TTL', 'COM'],
   dcsupply: ['1+', '1−', '2+', '2−'],
+  tank: ['Ortak', 'Sev. 1', 'Sev. 2', 'Sev. 3'],
   ground: ['uç'],
   resistor: ['1. uç', '2. uç'],
   capacitor: ['+ uç', '− uç'],
@@ -258,6 +263,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
+  tank:
+    'Su seviyesi probları olan hazne (baraj). Su bir proba ulaşınca o prob ile dipteki ortak prob arasında suyun direnci oluşur; kuru prob açık devredir. Seviye elle ya da Doldur / Boşalt ile zamanla değişir.',
   oscilloscope:
     'Gerilimin zamanla nasıl değiştiğini çizer; iki kanal (A, B) ortak uca göre, DC/AC/GND kuplaj, ADD, INV ve X-Y. Girişi 1 MΩ, COM ucu şebeke toprağına bağlıdır.',
 };
@@ -269,6 +276,7 @@ function fieldLabel(type: DeviceType, key: string): string {
   if (type === 'ammeter' && key === 'ideal') return 'İdeal ampermetre (iç direnç 0 Ω)';
   if (type === 'funcgen' && key === 'amplitude') return 'Genlik (tepe-tepe, açık devre)';
   if (type === 'funcgen' && key === 'offset') return 'DC offset (açık devre)';
+  if (type === 'tank' && key === 'mode') return 'Su akışı';
   const labels: Record<string, string> = {
     model: 'Model',
     mode: 'Ölçüm kipi',
@@ -286,6 +294,9 @@ function fieldLabel(type: DeviceType, key: string): string {
     threshold: 'Eşik gerilimi VT',
     k: 'İletkenlik katsayısı k',
     zenerVoltage: 'Zener gerilimi (20 mA’de)',
+    level: 'Su seviyesi (başlangıç)',
+    fillTime: 'Dolma süresi (boştan doluya)',
+    waterResistance: 'Su direnci (iki ıslak prob arası)',
     waveform: 'Dalga biçimi',
     amplitude: 'Tepe gerilimi',
     frequency: 'Frekans',
@@ -303,9 +314,9 @@ function fieldLabel(type: DeviceType, key: string): string {
 
 /** Seçmeli özelliklerin seçenek adları. */
 const OPTION_LABELS: Record<string, Record<string, string>> = {
-  color: { red: 'Kırmızı', green: 'Yeşil', blue: 'Mavi' },
+  color: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi' },
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
-  mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)' },
+  mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
   input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
   model: {
     genel: 'Genel (basit)',
@@ -579,6 +590,7 @@ export const tr = {
       transistors: 'Transistörler',
       instruments: 'Laboratuvar cihazları',
       switches: 'Anahtarlar',
+      sensors: 'Sensörler',
       meters: 'Ölçü aletleri',
     },
     hint: 'Sürükleyip tuvale bırak ya da seçip tuvale tıkla.',
@@ -734,6 +746,9 @@ export const tr = {
     funcgenNote:
       'Çıkış direnci 50 Ω: yük akımı arttıkça çıkış gerilimi düşer (50 Ω’luk yükte genlik yarıya iner).',
     funcgenEarthed: ' COM ucu şebeke toprağına bağlı: devrenin toprağıyla aynı noktadır.',
+    none: 'yok',
+    tankNote:
+      'Su, ıslak probları birbirine bağlar: iki ıslak prob arasında “su direnci” vardır, kuru prob açık devredir. Akım, ortak probdan suya geçen akımdır.',
     dcsupplyNote:
       'Yük, akım sınırını aşmaya çalışınca kaynak sabit akıma (CC) geçer ve çıkış gerilimi düşer; kısa devrede akım sınırda kalır.',
     scopeInput: (real: boolean, earthed: boolean) =>
@@ -880,6 +895,16 @@ export const tr = {
     duty: 'Simetri',
     attenuator: 'Zayıflatıcı (−20 dB)',
     dcsupply: 'DC güç kaynağı',
+    tank: 'Su haznesi',
+    level: 'Su seviyesi',
+    levelSet: 'Seviyeyi elle ayarla',
+    flow: 'Su akışı',
+    fillTime: 'Dolma süresi',
+    waterResistance: 'Su direnci',
+    probes: 'Islak problar',
+    probe: (n: number) => (n === 0 ? 'Ortak' : `Seviye ${n}`),
+    tankNote:
+      'Doldur’a basınca su simülasyon zamanıyla yükselir (boştan doluya dolma süresinde); Boşalt ile iner. Durdur’dan sonra başlangıç seviyesine döner.',
     output: (n: number) => `${n}. çıkış`,
     voltage: 'Gerilim',
     currentLimit: 'Akım sınırı',
@@ -1204,7 +1229,7 @@ export const tr = {
     backToCircuit: 'Devreye dönmek için dokun',
     backToCircuitLabel: 'Devreye dön',
     circuit: 'Devre',
-    deviceShort: { oscilloscope: 'Osiloskop', funcgen: 'Üreteç', dcsupply: 'Güç kaynağı' } as Record<string, string>,
+    deviceShort: { oscilloscope: 'Osiloskop', funcgen: 'Üreteç', dcsupply: 'Güç kaynağı', tank: 'Hazne' } as Record<string, string>,
     deviceTabs: 'Cihaz',
     waveform: 'Dalga biçimi',
     freqRange: '0,2 Hz – 2 MHz',

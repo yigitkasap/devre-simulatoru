@@ -204,6 +204,8 @@ export function useSimulation(
         live.set(part.id, { charge: (averaged && a !== null && b !== null ? a - b : m.voltage) / vmax });
       } else if (part.type === 'dcsupply') {
         live.set(part.id, { currentLimited: status.currentLimited ?? [] });
+      } else if (part.type === 'tank') {
+        live.set(part.id, status.level !== undefined ? { level: status.level } : {});
       } else if (part.type === 'oscilloscope') {
         const device = sim.device(part.id);
         if (device instanceof OscilloscopeDevice) {

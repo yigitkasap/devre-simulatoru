@@ -3,7 +3,7 @@ import { strProp } from '../netlist';
 import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement } from './device';
 import { Junction, saturationCurrentFor } from './junction';
 
-export const LED_COLORS = ['red', 'green', 'blue'] as const;
+export const LED_COLORS = ['red', 'yellow', 'green', 'blue'] as const;
 export type LedColor = (typeof LED_COLORS)[number];
 
 export const LED_DEFAULTS = { color: 'red' as LedColor };
@@ -29,6 +29,7 @@ export interface LedModelParams {
 //   Vf = Vj + I·Rs,  Is = I / (exp(Vj/(N·VT)) − 1)
 export const LED_MODELS: Readonly<Record<LedColor, LedModelParams>> = {
   red: { forwardVoltage: 1.85, maxCurrent: 30e-3, emission: 2.6, seriesResistance: 2, lightColor: '#ff3b30' },
+  yellow: { forwardVoltage: 2.1, maxCurrent: 30e-3, emission: 2.8, seriesResistance: 2.5, lightColor: '#ffc107' },
   green: { forwardVoltage: 2.2, maxCurrent: 25e-3, emission: 3.0, seriesResistance: 3, lightColor: '#34c759' },
   blue: { forwardVoltage: 3.3, maxCurrent: 30e-3, emission: 4.4, seriesResistance: 5, lightColor: '#2f7bff' },
 };

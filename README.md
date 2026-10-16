@@ -217,14 +217,14 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 211 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 217 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
 osiloskop kaydı ve ekranı (tetikleme, X-Y, ölçümler, Oto ayar), zener ve transistörlerin el
 hesabıyla bilinen çalışma noktaları (`tests/transistor.test.ts`), föy parça modelleri (1N4001,
 BC107, BF245A, IRF510: veri sayfası noktaları, ters toparlanma, frekansla kazanç düşmesi;
-`tests/models.test.ts`), laboratuvar cihazları
+`tests/models.test.ts`), su haznesi (ıslak/kuru prob, doldurma ve boşaltma; `tests/tank.test.ts`), laboratuvar cihazları
 (50 Ω çıkış, offset, simetri, TTL, CV/CC, 1 MΩ giriş, AC kuplaj, toprak tuzağı ve ADD ile doğru
 ölçüm; `tests/instruments.test.ts`), bütün hazır örneklerin
 cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım bağlantısı, mesajlar
@@ -500,6 +500,27 @@ doğrulanır.
   (V_BE, V_BC ya da V_GS, V_DS) fonksiyonu olarak verir ve bunların Jacobian'ıyla doğrusallaştırılır
   ([`sim/devices/threeTerminal.ts`](src/sim/devices/threeTerminal.ts)). FET'lerde V_GS adımı 1 V,
   V_DS adımı 5 V ile sınırlanır. Kablo akımları için her bileşen uçlarına giren akımları verir.
+
+### Su haznesi ve sarı LED (baraj projesi, A aşaması)
+
+İsmail Hoca'nın istediği baraj su seviyesi uyarısı için. Proje ayrı bir sayfada olacak
+(`/baraj`, sonraki aşamalar); parçalar ana simülatörde de kullanılabilir.
+
+- **Sarı LED:** 20 mA'de ≈ 2,1 V (kırmızı 1,85 V ile yeşil 2,2 V arası), en fazla 30 mA.
+- **Su haznesi (kütüphanede "Sensörler"):** Dört prob sağ kenarda: ortak prob dipte (%12,5),
+  Seviye 1, 2, 3 (%37,5, %62,5, %87,5) — uçların sembolde durduğu yükseklik. Her ıslak prob
+  suya (iç düğüm) R_su / 2 ile bağlanır; iki ıslak prob arası R_su (varsayılan 5 kΩ, musluk suyu
+  için birkaç kΩ). Kuru prob açık devre. Su yüzeyi probu ±%1'lik aralıkta yumuşakça ıslatır:
+  iletkenlik birden atlamaz.
+- **Seviye:** Başlangıç seviyesi (kaydırıcı) ve su akışı (Boşalt / Dur / Doldur). Doldur'da
+  seviye boştan doluya "dolma süresi"nde artar (simülasyon zamanıyla); Durdur'dan sonra
+  başlangıç seviyesine döner (kondansatörün başlangıç gerilimi gibi). Çalışırken akış ya da
+  süre değişince seviye kaldığı yerden sürer; kaydırıcı bırakılınca yeni seviye geçerlidir.
+  Seviye zamanla değişirken devre adım adım çözülür; iletkenlik seviyeye bağlı olduğu için hazne
+  Newton-Raphson iterasyonunda yeniden eklenir (`stampNonlinear`).
+- **Denetimler:** Cihaz rafında ve telefonun Cihazlar sayfasında aynı bileşen
+  ([`TankControls.tsx`](src/editor/TankControls.tsx)): seviye göstergesi, ıslak prob lambaları,
+  kaydırıcı, su akışı, dolma süresi, su direnci, jaklar. Sembolde su canlı yükselir.
 
 ### Föy parça modelleri (föy için 2. aşama)
 

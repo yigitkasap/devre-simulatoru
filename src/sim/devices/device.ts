@@ -60,6 +60,10 @@ export interface DeviceStatus {
   readonly currentLimited?: readonly boolean[];
   /** DC güç kaynağı: çıkışların uç gerilimi ve verdiği akım. */
   readonly outputs?: ReadonlyArray<{ readonly voltage: number; readonly current: number }>;
+  /** Su haznesi: su seviyesi (%). */
+  readonly level?: number;
+  /** Su haznesi: ıslak problar (ortak, Seviye 1, 2, 3). */
+  readonly wetProbes?: readonly boolean[];
 }
 
 /** Transistörün çalışma bölgesi: BJT'de kesim/aktif/doyum, FET'te kesim/omik (doğrusal)/doyum. */

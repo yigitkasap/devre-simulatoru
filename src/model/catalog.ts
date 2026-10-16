@@ -36,6 +36,9 @@ import {
   OSCILLOSCOPE_DEFAULTS,
   RESISTOR_DEFAULTS,
   SWITCH_DEFAULTS,
+  TANK_DEFAULTS,
+  TANK_LIMITS,
+  TANK_MODES,
   VOLTMETER_DEFAULTS,
   WAVEFORMS,
 } from '../sim/devices';
@@ -43,7 +46,7 @@ import type { DeviceType, PropValue } from '../sim/netlist';
 import type { UnitSymbol } from '../sim/units';
 import type { Point } from './types';
 
-export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'switches' | 'meters' | 'instruments';
+export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'switches' | 'sensors' | 'meters' | 'instruments';
 
 export interface NumberPropDef {
   readonly kind: 'number';
@@ -354,6 +357,35 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  tank: {
+    type: 'tank',
+    category: 'sensors',
+    labelPrefix: 'H',
+    // Problar sağ kenarda, sembolde ucunun durduğu yükseklikte: ortak (dipte), Seviye 1, 2, 3.
+    pins: [
+      { x: 5, y: 3 },
+      { x: 5, y: 1 },
+      { x: 5, y: -1 },
+      { x: 5, y: -3 },
+    ],
+    bounds: { x: -4, y: -4, w: 9, h: 8 },
+    // Ayarlar raftaki panelden (seviye, akış, dolma süresi, su direnci).
+    defaultProps: { ...TANK_DEFAULTS },
+    propDefs: [
+      { kind: 'number', key: 'level', unit: '%', min: { value: 0, exclusive: false }, max: 100 },
+      { kind: 'select', key: 'mode', options: TANK_MODES },
+      { kind: 'number', key: 'fillTime', unit: 's', min: { value: TANK_LIMITS.minFillTime, exclusive: false }, max: TANK_LIMITS.maxFillTime },
+      {
+        kind: 'number',
+        key: 'waterResistance',
+        unit: 'Ω',
+        min: { value: TANK_LIMITS.minWaterResistance, exclusive: false },
+        max: TANK_LIMITS.maxWaterResistance,
+      },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
   voltmeter: {
     type: 'voltmeter',
     category: 'meters',
@@ -414,6 +446,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'switches', types: ['switch'] },
+  { id: 'sensors', types: ['tank'] },
   { id: 'meters', types: ['voltmeter', 'ammeter'] },
   { id: 'instruments', types: ['funcgen', 'dcsupply', 'oscilloscope'] },
 ];

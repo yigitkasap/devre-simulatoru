@@ -1,6 +1,6 @@
 // Testlerde devreleri kısa yoldan kurmak için yardımcı.
 
-import type { DeviceType, Netlist, NetlistElement, NetlistLink, PropValue } from '../src/sim';
+import type { DeviceType, LedColor, Netlist, NetlistElement, NetlistLink, PropValue } from '../src/sim';
 
 export class NetlistBuilder {
   private readonly elements: NetlistElement[] = [];
@@ -32,7 +32,7 @@ export class NetlistBuilder {
     return this.add('diode', id, [anode, cathode]);
   }
 
-  led(id: string, anode: string, cathode: string, color: 'red' | 'green' | 'blue' = 'red'): this {
+  led(id: string, anode: string, cathode: string, color: LedColor = 'red'): this {
     return this.add('led', id, [anode, cathode], { color });
   }
 

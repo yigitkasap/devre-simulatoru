@@ -23,6 +23,7 @@ export type DeviceType =
   | 'nmos'
   | 'pmos'
   | 'switch'
+  | 'tank'
   | 'voltmeter'
   | 'ammeter'
   | 'oscilloscope';

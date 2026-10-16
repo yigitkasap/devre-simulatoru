@@ -14,7 +14,8 @@ import {
   type DeviceStatus,
   type Measurement,
 } from '../sim/devices';
-import { LED_MODELS, type LedColor } from '../sim/devices/led';
+import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
+import { tankSettings } from '../sim/devices/tank';
 import { SWITCH_ON_RESISTANCE } from '../sim/constants';
 import { boolProp, numProp, strProp, type Props } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
@@ -137,6 +138,22 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: `${t.funcgenNote}${s.earthed ? t.funcgenEarthed : ''}`,
       };
     }
+    case 'tank': {
+      const s = tankSettings(p);
+      const level = status.level ?? s.level;
+      const wet = status.wetProbes ?? [];
+      const wetNames = wet.map((on, k) => (on ? tr.rack.probe(k) : null)).filter((n): n is string => n !== null);
+      return {
+        title,
+        rows: [
+          { label: tr.rack.level, value: `%${formatNumber(level, 1)}` },
+          { label: tr.rack.probes, value: wetNames.length > 0 ? wetNames.join(', ') : t.none },
+          { label: t.current, value: a(I) },
+          { label: tr.rack.waterResistance, value: ohmValue(s.waterResistance) },
+        ],
+        note: t.tankNote,
+      };
+    }
     case 'dcsupply': {
       const s = dcsupplySettings(p);
       const outputs = status.outputs ?? [];
@@ -173,7 +190,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         { label: t.powerUsed, value: w(P) },
       ];
       if (part.type === 'led') {
-        const color = strProp(p, 'color', ['red', 'green', 'blue'] as const, 'red') as LedColor;
+        const color = strProp(p, 'color', LED_COLORS, 'red') as LedColor;
         const model = LED_MODELS[color];
         if (status.burned) {
           return { title, rows: [{ label: t.state, value: t.burned }], note: t.burnedNote };

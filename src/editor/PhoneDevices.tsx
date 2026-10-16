@@ -32,6 +32,7 @@ import { ChannelBadge, Jack, Lcd, Segmented, StatusLamp, Stepper, step125, stepL
 import { HintText } from './HintStrip';
 import { CHANNELS, SCOPE_COLORS, Screen, StatsLines, stepIn, timeLabel, voltsLabel } from './ScopeFace';
 import type { ScopeView } from './scopeView';
+import { TankControls } from './TankControls';
 
 export interface PhoneDevicesProps {
   readonly devices: readonly Part[];
@@ -186,6 +187,9 @@ export function PhoneDevicesBody(props: PhoneDevicesProps) {
           />
         )}
         {active.type === 'funcgen' && <PhoneFuncGen part={active} output={props.outputVoltage(active.id)} onChange={change} onJack={jack} />}
+        {active.type === 'tank' && (
+          <TankControls part={active} status={props.status(active.id)} running={props.running} onChange={change} onJack={jack} touch />
+        )}
         {active.type === 'dcsupply' && (
           <PhoneDcSupply
             part={active}

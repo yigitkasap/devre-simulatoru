@@ -12,6 +12,7 @@ import { DcSupplyFace, FuncGenFace } from './InstrumentFaces';
 import { Segmented } from './RackControls';
 import { ScopeFace } from './ScopeFace';
 import type { ScopeView } from './scopeView';
+import { TankFace } from './TankControls';
 
 export type RackLayout = 'side' | 'single';
 
@@ -46,6 +47,7 @@ const NAMES: Partial<Record<Part['type'], () => string>> = {
   oscilloscope: () => tr.scope.title,
   funcgen: () => tr.rack.funcgen,
   dcsupply: () => tr.rack.dcsupply,
+  tank: () => tr.rack.tank,
 };
 
 export function DeviceRack(props: DeviceRackProps) {
@@ -100,6 +102,18 @@ export function DeviceRack(props: DeviceRackProps) {
     }
     if (part.type === 'funcgen') {
       return <FuncGenFace key={part.id} {...common} part={part} className={sideBySide ? 'min-w-[260px] flex-1' : 'w-full max-w-[460px]'} />;
+    }
+    if (part.type === 'tank') {
+      return (
+        <TankFace
+          key={part.id}
+          {...common}
+          part={part}
+          status={props.status(part.id)}
+          running={props.running}
+          className={sideBySide ? 'w-[300px] shrink-0' : 'w-full max-w-[440px]'}
+        />
+      );
     }
     return (
       <DcSupplyFace

@@ -5,9 +5,9 @@
 import { CATALOG } from '../model/catalog';
 import { GRID } from '../model/types';
 import { WAVEFORMS, type Waveform } from '../sim/devices/acsource';
-import { LED_MODELS, type LedColor } from '../sim/devices/led';
+import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { Rotation } from '../model/types';
-import { boolProp, strProp, type DeviceType, type Props } from '../sim/netlist';
+import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import type { ResistorStyle } from './settings';
 
@@ -21,6 +21,8 @@ export interface LiveVisual {
   readonly charge?: number;
   /** DC güç kaynağı: akım sınırındaki (CC) çıkışlar. */
   readonly currentLimited?: readonly boolean[];
+  /** Su haznesi: su seviyesi (%). */
+  readonly level?: number;
 }
 
 export interface SymbolProps {
@@ -525,6 +527,52 @@ function DcSupply({ props, rotation, live }: { props: Props; rotation: Rotation;
   );
 }
 
+/**
+ * Su haznesi (baraj): üstü açık kap, problar sağ kenardan girer (ortak prob dipte, Seviye 1–3
+ * yukarı doğru); uçların yüksekliği probun ıslandığı yüksekliktir. Su canlı yükselir.
+ */
+function Tank({ props, rotation, live }: { props: Props; rotation: Rotation; live: LiveVisual | undefined }) {
+  const level = Math.min(100, Math.max(0, live?.level ?? numProp(props, 'level', 0)));
+  // Yükseklik %0 → y = 40, %100 → y = −40 (uçlar −30, −10, 10, 30'da: %87,5, 62,5, 37,5, 12,5).
+  const surface = Math.max(-38, 40 - 0.8 * level);
+  const probes = [
+    { y: 30, tip: -30, name: 'COM' },
+    { y: 10, tip: -6, name: '1' },
+    { y: -10, tip: -6, name: '2' },
+    { y: -30, tip: -6, name: '3' },
+  ];
+  return (
+    <g>
+      <rect x={-40} y={-40} width={70} height={80} rx={3} style={PAPER} stroke="none" />
+      {level > 0.5 && (
+        <g>
+          <rect x={-38} y={surface} width={66} height={38 - surface} fill="#5aa9e6" opacity={0.42} />
+          <path
+            d={`M-38 ${surface} q8.25 -2.5 16.5 0 t16.5 0 t16.5 0 t16.5 0`}
+            fill="none"
+            stroke="#2f7fc4"
+            strokeWidth={1.4}
+            strokeLinecap="round"
+          />
+        </g>
+      )}
+      <path d="M-40 -40V38a2 2 0 0 0 2 2H28a2 2 0 0 0 2-2V-40" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      {probes.map((p) => (
+        <g key={p.y}>
+          <line x1={p.tip} y1={p.y} x2={50} y2={p.y} {...line} />
+          <circle cx={p.tip} cy={p.y} r={2.6} fill="currentColor" />
+          <DeviceText x={40} y={p.y - 6} rotation={rotation} size={p.name.length > 1 ? 6 : 7}>
+            {p.name}
+          </DeviceText>
+        </g>
+      ))}
+      <DeviceText x={-35} y={-31} rotation={rotation} size={8} anchor="start" color="#2f7fc4">
+        {`%${Math.round(level)}`}
+      </DeviceText>
+    </g>
+  );
+}
+
 export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: SymbolProps) {
   switch (type) {
     case 'battery':
@@ -533,6 +581,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <FunctionGenerator props={props} rotation={rotation} />;
     case 'dcsupply':
       return <DcSupply props={props} rotation={rotation} live={live} />;
+    case 'tank':
+      return <Tank props={props} rotation={rotation} live={live} />;
     case 'zener':
       return <Zener />;
     case 'npn':
@@ -557,7 +607,7 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
     case 'diode':
       return <DiodeBody fill="currentColor" />;
     case 'led':
-      return <Led color={strProp(props, 'color', ['red', 'green', 'blue'] as const, 'red')} live={live} />;
+      return <Led color={strProp(props, 'color', LED_COLORS, 'red')} live={live} />;
     case 'switch':
       return <Switch closed={boolProp(props, 'closed', false)} />;
     case 'voltmeter':

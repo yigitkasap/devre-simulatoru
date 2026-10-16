@@ -19,6 +19,7 @@ import { ledModel } from './led';
 import { oscilloscopeModel } from './oscilloscope';
 import { resistorModel } from './resistor';
 import { switchModel } from './switch';
+import { tankModel } from './tank';
 import { voltmeterModel } from './voltmeter';
 import { zenerModel } from './zener';
 
@@ -40,6 +41,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   nmos: nmosModel,
   pmos: pmosModel,
   switch: switchModel,
+  tank: tankModel,
   voltmeter: voltmeterModel,
   ammeter: ammeterModel,
   oscilloscope: oscilloscopeModel,
@@ -135,4 +137,15 @@ export {
 } from './oscilloscope';
 export { ResistorDevice, RESISTOR_DEFAULTS } from './resistor';
 export { SwitchDevice, SWITCH_DEFAULTS } from './switch';
+export {
+  TANK_DEFAULTS,
+  TANK_LIMITS,
+  TANK_MODES,
+  TANK_PROBE_HEIGHTS,
+  TankDevice,
+  probeWetness,
+  tankSettings,
+  type TankMode,
+  type TankSettings,
+} from './tank';
 export { VoltmeterDevice, VOLTMETER_DEFAULTS } from './voltmeter';

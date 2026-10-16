@@ -88,7 +88,7 @@ function saveLibraryPref(pref: 'open' | 'rail'): void {
 }
 
 /** Ayarları cihaz rafındaki ön panelinde olan parçalar. */
-const RACK_TYPES: ReadonlySet<DeviceType> = new Set<DeviceType>(['oscilloscope', 'funcgen', 'dcsupply']);
+const RACK_TYPES: ReadonlySet<DeviceType> = new Set<DeviceType>(['oscilloscope', 'funcgen', 'dcsupply', 'tank']);
 
 /** Rafın düzeni (yan yana / tek tek) tarayıcıda hatırlanır. */
 const RACK_KEY = 'devre-simulatoru:raf';
