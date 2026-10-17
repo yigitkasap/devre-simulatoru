@@ -202,6 +202,19 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: t.transformerNote,
       };
     }
+    case 'opamp': {
+      const o = status.opamp ?? { differential: 0, output: 0, current: 0, mode: 'linear' as const };
+      return {
+        title,
+        rows: [
+          { label: t.opampDifferential, value: v(o.differential) },
+          { label: t.opampOutput, value: v(o.output) },
+          { label: t.opampCurrent, value: a(o.current) },
+          { label: t.state, value: t.opampModes[o.mode] },
+        ],
+        note: t.opampNotes[o.mode],
+      };
+    }
     case 'speaker': {
       const power = status.averagePower ?? 0;
       return {

@@ -47,6 +47,9 @@ import lambaAniAkim from './lamba-ani-akim.json';
 import hoparlor from './hoparlor.json';
 import buzzerSicaklik from './buzzer-sicaklik.json';
 import sigorta from './sigorta.json';
+import opampEvirmeyen from './opamp-evirmeyen.json';
+import opampEviren from './opamp-eviren.json';
+import opampKarsilastirici from './opamp-karsilastirici.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
 import zenerKarakteristigi from './zener-karakteristigi.json';
@@ -75,6 +78,7 @@ export const EXAMPLE_GROUPS = [
   { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc', 'role', 'role-transistor', 'role-muhurleme', 'dc-motor', 'motor-jenerator', 'motor-h-koprusu'] },
   { id: 'sensorler', ids: ['potansiyometre', 'ldr-gece-lambasi', 'ntc-termometre', 'lamba-ani-akim'] },
   { id: 'ses', ids: ['hoparlor', 'buzzer-sicaklik', 'sigorta'] },
+  { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici'] },
   { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
   { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
   { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
@@ -121,6 +125,9 @@ const DATA: Record<ExampleId, unknown> = {
   hoparlor,
   'buzzer-sicaklik': buzzerSicaklik,
   sigorta,
+  'opamp-evirmeyen': opampEvirmeyen,
+  'opamp-eviren': opampEviren,
+  'opamp-karsilastirici': opampKarsilastirici,
   'diyot-dc': diyotDc,
   'diyot-karakteristigi': diyotKarakteristigi,
   'zener-karakteristigi': zenerKarakteristigi,

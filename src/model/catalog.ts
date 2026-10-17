@@ -59,7 +59,7 @@ import type { DeviceType, PropValue } from '../sim/netlist';
 import type { UnitSymbol } from '../sim/units';
 import type { Point } from './types';
 
-export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'switches' | 'outputs' | 'sensors' | 'meters' | 'instruments';
+export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'ics' | 'switches' | 'outputs' | 'sensors' | 'meters' | 'instruments';
 
 export interface NumberPropDef {
   readonly kind: 'number';
@@ -508,6 +508,24 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  opamp: {
+    type: 'opamp',
+    category: 'ics',
+    labelPrefix: 'U',
+    // Eviren (−) giriş üstte, evirmeyen (+) altta, çıkış sağda; V+ üstte, V− altta.
+    pins: [
+      { x: -4, y: -1 },
+      { x: -4, y: 1 },
+      { x: 4, y: 0 },
+      { x: 0, y: -3 },
+      { x: 0, y: 3 },
+    ],
+    bounds: { x: -4, y: -3, w: 8, h: 6 },
+    defaultProps: {},
+    propDefs: [],
+    showLabel: true,
+    polarized: false,
+  },
   speaker: {
     type: 'speaker',
     category: 'outputs',
@@ -643,6 +661,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'passive', types: ['resistor', 'potentiometer', 'capacitor', 'inductor', 'transformer'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
+  { id: 'ics', types: ['opamp'] },
   { id: 'switches', types: ['switch', 'relay', 'fuse'] },
   { id: 'outputs', types: ['lamp', 'motor', 'speaker', 'buzzer'] },
   { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },

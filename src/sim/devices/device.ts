@@ -102,6 +102,16 @@ export interface DeviceStatus {
   readonly spl?: number;
   /** Buzzer: osilatör çalışıyor (ötüyor). */
   readonly sounding?: boolean;
+  /**
+   * İşlemsel yükselteç: giriş farkı v₊ − v₋, çıkış gerilimi ve akımı, çalışma durumu (doğrusal,
+   * pozitif/negatif doyum, eğim sınırı, akım sınırı).
+   */
+  readonly opamp?: {
+    readonly differential: number;
+    readonly output: number;
+    readonly current: number;
+    readonly mode: 'linear' | 'high' | 'low' | 'slewing' | 'limited';
+  };
   /** Sigorta: telin ısınması (1'de erir). */
   readonly heating?: number;
   /** Lamba: ışık akısının anma değerine oranı. */

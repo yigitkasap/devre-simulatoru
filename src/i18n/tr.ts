@@ -48,6 +48,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ldr: 'LDR (fotodirenç)',
   ntc: 'NTC termistör',
   lamp: 'Akkor lamba',
+  opamp: 'İşlemsel yükselteç',
   speaker: 'Hoparlör',
   buzzer: 'Buzzer (aktif)',
   fuse: 'Sigorta',
@@ -84,6 +85,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ldr: 'LDR’sinin',
   ntc: 'termistörünün',
   lamp: 'lambasının',
+  opamp: 'işlemsel yükseltecinin',
   speaker: 'hoparlörünün',
   buzzer: 'buzzerının',
   fuse: 'sigortasının',
@@ -118,6 +120,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   ldr: ['1. ucu', '2. ucu'],
   ntc: ['1. ucu', '2. ucu'],
   lamp: ['1. ucu', '2. ucu'],
+  opamp: ['eviren girişi (−)', 'evirmeyen girişi (+)', 'çıkışı', 'pozitif besleme ucu (V+)', 'negatif besleme ucu (V−)'],
   speaker: ['1. ucu', '2. ucu'],
   buzzer: ['+ ucu', '− ucu'],
   fuse: ['1. ucu', '2. ucu'],
@@ -156,6 +159,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   ldr: ['1', '2'],
   ntc: ['1', '2'],
   lamp: ['1', '2'],
+  opamp: ['−', '+', 'OUT', 'V+', 'V−'],
   speaker: ['1', '2'],
   buzzer: ['+', '−'],
   fuse: ['1', '2'],
@@ -192,6 +196,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   ldr: ['1. uç', '2. uç'],
   ntc: ['1. uç', '2. uç'],
   lamp: ['1. uç', '2. uç'],
+  opamp: ['− giriş', '+ giriş', 'çıkış', 'V+', 'V−'],
   speaker: ['1. uç', '2. uç'],
   buzzer: ['+ uç', '− uç'],
   fuse: ['1. uç', '2. uç'],
@@ -450,6 +455,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Işığa duyarlı direnç (kadmiyum sülfür): ışık arttıkça direnci azalır. Karanlıkta ≈ 1 MΩ, oda ışığında birkaç kΩ, güneş altında yüz ohm mertebesindedir. Aydınlık simülasyon sırasında kaydırıcıyla değiştirilir.',
   ntc:
     'Sıcaklığa duyarlı direnç (negatif sıcaklık katsayılı): sıcaklık arttıkça direnci üstel olarak azalır; 25 °C’ta 10 kΩ, 100 °C’ta ≈ 680 Ω. Sıcaklık simülasyon sırasında kaydırıcıyla değiştirilir.',
+  opamp:
+    'Çok yüksek kazançlı fark yükselteci (741): çıkış, iki girişin farkının ≈ 200 000 katıdır ve besleme gerilimleriyle sınırlıdır. Çıkıştan eviren girişe geri besleme verilince kazancı yalnızca dirençlere bağlı bir yükselteç olur; geri beslemesiz bir karşılaştırıcıdır. V+ ve V− uçları beslenmelidir.',
   speaker:
     'Elektrik akımını sese çevirir: mıknatısın alanındaki bobinden geçen değişen akım bobini ve ona bağlı zarı (koniyi) titreştirir (F = B·I·L). Sesi tarayıcıda gerçekten duyarsın. Doğru akım ses vermez, yalnızca bobini ısıtır.',
   buzzer:
@@ -813,6 +820,33 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     everyday:
       'Arabaların sigorta kutusundaki bıçak sigortalar, cihazların cam sigortaları ve evlerdeki otomatik sigortalar aynı işi görür. Otomatik sigorta erimez: aşırı yükte ısınan bir bimetal, kısa devrede bir elektromıknatıs (röle gibi) kontağı açar; kol kaldırılınca yeniden kurulur.',
   },
+  'opamp-evirmeyen': {
+    title: 'Evirmeyen yükselteç (741, ×11)',
+    description:
+      'İki 15 V’luk pil 741’i ±15 V’la besliyor (ortaları toprak). Fonksiyon üreteci (1 kHz, 1 V tepe-tepe) evirmeyen (+) girişe bağlı; R2 = 100 kΩ çıkıştan eviren (−) girişe, R1 = 10 kΩ eviren girişten toprağa. V1 girişi, V2 çıkışı AC kipte ölçüyor. Oynat’a bas; sonra üretecin genliğini 3 V tepe-tepeye, ardından frekansını 20 kHz’e çıkar.',
+    purpose:
+      'Geri beslemenin kazancı nasıl belirlediğini gösterir. 741’in kendi kazancı ≈ 200 000’dir; çıkışın bir kısmı (R1 / (R1 + R2) = 1/11’i) eviren girişe geri verilince op-amp iki girişini neredeyse eşit tutar ve kazanç yalnızca dirençlere bağlı olur: A = 1 + R2 / R1 = 11. V1 0,354 V, V2 3,889 V (etkin) gösterir; çıkış girişle aynı fazdadır. 3 V tepe-tepede çıkışın ±16,5 V olması gerekir ama besleme yetmez: dalga ±14,2 V’ta kırpılır (doyum). 20 kHz’te çıkış, 741’in en fazla 0,5 V/µs’lik eğim hızına takılır ve üçgenleşir: V2 3,35 V’a düşer.',
+    everyday:
+      'Mikrofon ve gitar yükselteçlerinin ön katları, sensör sinyallerini (termokupl, basınç algılayıcısı) ölçülebilir seviyeye çıkaran devreler ve tıbbi cihazlar (EKG) işlemsel yükselteçle kurulur. Bugün 741 yerine daha hızlı ve tek beslemeyle çalışan op-amplar kullanılır; ilkeler aynıdır.',
+  },
+  'opamp-eviren': {
+    title: 'Eviren yükselteç ve sanal toprak',
+    description:
+      '741 ±15 V’la besleniyor. 1,5 V’luk pil R1 = 10 kΩ üzerinden eviren (−) girişe bağlı; R2 = 56 kΩ çıkıştan eviren girişe; evirmeyen (+) giriş toprakta. V2 çıkışı ölçüyor. Oynat’a bas, sonra U1’in üzerine gelip giriş farkına bak; R2’yi 100 kΩ yap.',
+    purpose:
+      'Eviren yükselteçte kazanç A = −R2 / R1 = −5,6: çıkış −1,5 V × 5,6 = −8,40 V. Op-amp iki girişini eşit tutar; evirmeyen giriş toprakta olduğu için eviren giriş de ≈ 0 V’tadır (sanal toprak; fark yalnızca ≈ 40 µV). R1’den geçen 150 µA op-ampa girmez (giriş direnci 2 MΩ), hepsi R2’den çıkışa akar: V_çıkış = −150 µA × 56 kΩ. R2 = 100 kΩ yapınca çıkışın −15 V olması gerekir ama besleme yetmez: çıkış −14,2 V’ta doyar.',
+    everyday:
+      'Ses karıştırma masaları (birden çok girişi toplayan eviren yükselteç), sayısaldan analoğa çeviriciler ve ölçü aletlerinin akım-gerilim dönüştürücüleri (fotodiyot yükselteci) sanal toprak ilkesini kullanır.',
+  },
+  'opamp-karsilastirici': {
+    title: 'Karşılaştırıcı: LDR ile ışık eşiği',
+    description:
+      '741 ±15 V’la besleniyor, geri beslemesi yok. Eviren (−) girişte iki 10 kΩ’luk bölücü 7,5 V’luk eşik veriyor; evirmeyen (+) giriş LDR (GL5528) ile 10 kΩ’luk bölücünün ortasında. Çıkışta 1 kΩ ve ters paralel yeşil ve kırmızı LED. Oynat’a bas, LDR’yi seç ve aydınlığı 100 lüksten 1 lükse indir.',
+    purpose:
+      'Geri beslemesiz bir op-ampın iki gerilimi karşılaştırmasını gösterir. Kazanç çok yüksek olduğu için girişlerdeki küçük bir fark çıkışı bir uçtan öbürüne sürer: + giriş 7,5 V’un üstündeyken çıkış ≈ +12,2 V (yeşil LED, 10 mA), altındayken ≈ −12,1 V (kırmızı LED). Aydınlıkta LDR’nin direnci küçüktür ve + giriş yüksektir (100 lükste 10,9 V); LDR 10 kΩ’u geçince, yani ≈ 19,7 lüksün altında, çıkış ters döner. Çıkış ±14 V yerine ≈ ±12,2 V’tur: LED’in 10 mA’i op-ampın çıkış direncinde gerilim düşürür.',
+    everyday:
+      'Alacakaranlık şalterleri, termostatlar, pil gerilimi uyarıları ve analogdan sayısala çeviricilerin içi karşılaştırıcıyla çalışır. Gürültülü sinyallerde çıkışın titrememesi için karşılaştırıcıya küçük bir pozitif geri besleme (histerezis, Schmitt tetikleyici) eklenir.',
+  },
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
     description:
@@ -1005,6 +1039,7 @@ export const tr = {
       passive: 'Pasif',
       semiconductors: 'Yarı iletkenler',
       transistors: 'Transistörler',
+      ics: 'Entegreler',
       instruments: 'Laboratuvar cihazları',
       switches: 'Anahtarlar ve koruma',
       outputs: 'Çıkış elemanları',
@@ -1142,6 +1177,24 @@ export const tr = {
     primary: 'Birincil (P)',
     secondary: 'İkincil (S)',
     powerInOut: 'Giriş / çıkış gücü',
+    opampDifferential: 'Giriş farkı (v₊ − v₋)',
+    opampOutput: 'Çıkış gerilimi',
+    opampCurrent: 'Çıkış akımı',
+    opampModes: {
+      linear: 'Doğrusal',
+      high: 'Pozitif doyumda',
+      low: 'Negatif doyumda',
+      slewing: 'Eğim sınırında (0,5 V/µs)',
+      limited: 'Akım sınırında (25 mA)',
+    } as Record<'linear' | 'high' | 'low' | 'slewing' | 'limited', string>,
+    opampNotes: {
+      linear:
+        'Çıkış = A · (v₊ − v₋), A ≈ 200 000. Geri besleme varsa çıkış, giriş farkını neredeyse sıfırda tutacak değere gelir (sanal kısa devre): kazancı dirençler belirler.',
+      high: 'Giriş farkı, çıkışı V+’nın ≈ 1 V altına kadar sürüyor: çıkış daha yükseğe çıkamaz (doyum). Karşılaştırıcıda bu “yüksek” durumudur.',
+      low: 'Giriş farkı, çıkışı V−’nin ≈ 1 V üstüne kadar sürüyor: çıkış daha alçalamaz (doyum). Karşılaştırıcıda bu “düşük” durumudur.',
+      slewing: 'Çıkış en fazla 0,5 V/µs hızla değişebilir: hızlı ve büyük sinyaller üçgenleşir (eğim sınırı).',
+      limited: 'Çıkıştan çekilen akım iç koruma sınırında (≈ 25 mA): çıkış kısa devre ya da yük çok küçük.',
+    } as Record<'linear' | 'high' | 'low' | 'slewing' | 'limited', string>,
     averagePower: 'Ortalama güç',
     spl1m: 'Ses basıncı (1 m)',
     spl10cm: 'Ses basıncı (10 cm)',
@@ -1316,6 +1369,7 @@ export const tr = {
       elektromanyetizma: 'Elektromanyetizma',
       sensorler: 'Ayarlı parçalar ve sensörler',
       ses: 'Ses ve koruma',
+      entegreler: 'Entegreler',
       'diyot-karakteristigi': 'Deney 1 · Diyot karakteristikleri',
       dogrultucu: 'Deney 2 · Doğrultucular',
       kenetleyici: 'Deney 3 · Kenetleyici ve gerilim katlayıcı',
@@ -1694,6 +1748,8 @@ export const tr = {
         'Varsayılan değerler gerçek bir LDR’den (GL5528): 10 lükste 10–20 kΩ (burada 15 kΩ), karanlıkta en az 1 MΩ, γ = 0,6: R = R₁₀ · (E / 10 lx)^{−γ}. Aydınlık örnekleri: gece ≈ 1 lx, oda ≈ 100–300 lx, bulutlu gün ≈ 10 000 lx, güneş ≈ 100 000 lx. Gerçek LDR ışık değişimine 20–30 ms’de uyar; burada anında.',
       ntc:
         'Varsayılan değerler gerçek bir termistörden (Vishay NTCLE100E3103: 10 kΩ, B₂₅/₈₅ = 3977 K); direnç üreticinin R(T) eğrisinden (0 °C’ta 32,6 kΩ, 50 °C’ta 3,61 kΩ, 100 °C’ta 677 Ω). İçinden geçen akım onu ısıtır (öz ısınma: 7 mW/K, ısıl zaman sabiti 15 s); ortam sıcaklığı değişince hemen ona uyar.',
+      opamp:
+        'Gerçek bir 741’in değerleri (TI LM741, ±15 V, tipik): kazanç 200 V/mV, giriş direnci 2 MΩ, kazanç-bant genişliği ≈ 1,2 MHz, eğim hızı 0,5 V/µs, çıkış 10 kΩ’da ±14 V, 2 kΩ’da ±13 V, kısa devre akımı 25 mA, besleme akımı 1,7 mA. V+ ve V− uçlarını besle (ör. iki 15 V’luk pil, ortası toprak). Giriş kayma gerilimi (1 mV) ve kutuplama akımı (80 nA) modellenmez.',
       speaker:
         'Gerçek bir hoparlörün değerleri (Visaton FRS 5, 8 Ω, 5 cm): bobin 7,2 Ω ve 0,2 mH, rezonans frekansı 290 Hz (Q_{ms} = 3,19, Q_{es} = 1,81), anma gücü 5 W, 1 W’ta 1 m’de 84 dB. Empedans rezonansta ≈ 20 Ω’a çıkar. Ses yalnızca simülasyon ×1 hızdayken çalar.',
       buzzer:

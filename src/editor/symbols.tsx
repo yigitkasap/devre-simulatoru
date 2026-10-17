@@ -234,6 +234,23 @@ function Lamp({ live }: { live: LiveVisual | undefined }) {
   );
 }
 
+/**
+ * İşlemsel yükselteç: üçgen; eviren (−) giriş üstte, evirmeyen (+) altta, çıkış sağ uçta; besleme
+ * uçları üstten (V+) ve alttan (V−).
+ */
+function OpAmp({ rotation }: { rotation: Rotation }) {
+  return (
+    <g>
+      <path d="M-40,-10H-26M-40,10H-26M26,0H40M0,-30V-13M0,30V13" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <path d="M-26,-26V26L26,0Z" style={PAPER} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <path d="M-22,-10H-15M-22,10H-15M-18.5,6.5V13.5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+      <DeviceText x={-4} y={0} rotation={rotation} size={7} color="var(--color-muted)">
+        741
+      </DeviceText>
+    </g>
+  );
+}
+
 /** Ses dalgaları (yukarı doğru iki yay); koyuluk ses düzeyiyle. */
 function SoundWaves({ level, y }: { level: number; y: number }) {
   if (level <= 0.01) return null;
@@ -977,6 +994,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Ntc style={resistorStyle} rotation={rotation} />;
     case 'lamp':
       return <Lamp live={live} />;
+    case 'opamp':
+      return <OpAmp rotation={rotation} />;
     case 'speaker':
       return <Speaker level={live?.loudness ?? 0} />;
     case 'buzzer':

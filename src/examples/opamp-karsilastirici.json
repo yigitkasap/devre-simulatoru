@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": -8, "rotation": 90, "props": {"voltage": 15, "internalResistance": 0}},
+    {"id": "p2", "type": "battery", "label": "B2", "x": 0, "y": 8, "rotation": 90, "props": {"voltage": 15, "internalResistance": 0}},
+    {"id": "p3", "type": "opamp", "label": "U1", "x": 40, "y": 0, "rotation": 0, "props": {}},
+    {"id": "p4", "type": "resistor", "label": "R4", "x": 20, "y": -12, "rotation": 90, "props": {"resistance": 10000.0}},
+    {"id": "p5", "type": "resistor", "label": "R5", "x": 20, "y": 6, "rotation": 90, "props": {"resistance": 10000.0}},
+    {"id": "p6", "type": "ldr", "label": "LDR1", "x": 30, "y": -12, "rotation": 90, "props": {"illuminance": 100}},
+    {"id": "p7", "type": "resistor", "label": "R3", "x": 30, "y": 6, "rotation": 90, "props": {"resistance": 10000.0}},
+    {"id": "p8", "type": "resistor", "label": "R6", "x": 50, "y": 0, "rotation": 0, "props": {"resistance": 1000.0}},
+    {"id": "p9", "type": "led", "label": "LED1", "x": 58, "y": 5, "rotation": 90, "props": {"color": "green"}},
+    {"id": "p10", "type": "led", "label": "LED2", "x": 70, "y": 5, "rotation": 270, "props": {"color": "red"}},
+    {"id": "p11", "type": "ground", "label": "GND1", "x": 70, "y": 10, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -12], [0, -20], [20, -20], [30, -20], [40, -20], [40, -3]]},
+    {"id": "w2", "points": [[0, 12], [0, 20], [40, 20], [40, 3]]},
+    {"id": "w3", "points": [[0, -4], [0, 0], [0, 4]]},
+    {"id": "w4", "points": [[0, 0], [8, 0]]},
+    {"id": "w5", "points": [[20, -20], [20, -16]]},
+    {"id": "w6", "points": [[30, -20], [30, -16]]},
+    {"id": "w7", "points": [[20, -8], [20, -1], [20, 2]]},
+    {"id": "w8", "points": [[20, -1], [34, -1], [36, -1]]},
+    {"id": "w9", "points": [[30, -8], [30, 1], [30, 2]]},
+    {"id": "w10", "points": [[30, 1], [36, 1]]},
+    {"id": "w11", "points": [[8, 0], [8, 10], [20, 10]]},
+    {"id": "w12", "points": [[20, 10], [30, 10]]},
+    {"id": "w13", "points": [[30, 10], [58, 10], [70, 10]]},
+    {"id": "w14", "points": [[58, 9], [58, 10]]},
+    {"id": "w15", "points": [[70, 9], [70, 10]]},
+    {"id": "w16", "points": [[44, 0], [46, 0]]},
+    {"id": "w17", "points": [[54, 0], [58, 0], [58, 1]]},
+    {"id": "w18", "points": [[58, 0], [70, 0], [70, 1]]}
+  ]
+}

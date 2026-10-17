@@ -24,6 +24,7 @@ export type DeviceType =
   | 'speaker'
   | 'buzzer'
   | 'fuse'
+  | 'opamp'
   | 'diode'
   | 'zener'
   | 'led'

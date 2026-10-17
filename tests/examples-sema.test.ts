@@ -23,6 +23,11 @@ const CROSSINGS: Partial<Record<ExampleId, number>> = {
   'bjt-anahtar': 1,
   'baraj-cubuk': 2,
   'baraj-tek-isik': 4,
+  // İşlemsel yükselteçte uç sırası (−, V+, çıkış, V−, +): geri besleme V+ kablosunu, toprak hattı V−
+  // kablosunu (ya da karşılaştırıcıda iki bölücünün kolları birbirini) kesmek zorunda.
+  'opamp-evirmeyen': 2,
+  'opamp-eviren': 2,
+  'opamp-karsilastirici': 2,
 };
 
 type Segment = readonly [Point, Point];

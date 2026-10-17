@@ -52,6 +52,9 @@ export function partValueText(part: Part): string {
       return tr.properties.luxShort(formatNumber(numProp(p, 'illuminance', 100), numProp(p, 'illuminance', 100) < 10 ? 1 : 0));
     case 'ntc':
       return `${formatSI(numProp(p, 'resistance25', 10e3), 'Ω', { trim: true, digits: 4 })} · ${formatNumber(numProp(p, 'temperature', 25), 0)} °C`;
+    case 'opamp':
+      // Sembolün içinde "741" yazar.
+      return '';
     case 'speaker':
       return '8 Ω · 5 W';
     case 'buzzer':
@@ -149,7 +152,13 @@ export const PartView = memo(function PartView({
   let nameY: number;
   let valueY: number;
   let anchor: 'middle' | 'start' | 'end';
-  if (def.labelRight && part.rotation === 0) {
+  if (part.type === 'opamp' && part.rotation === 0) {
+    // İşlemsel yükselteç: üstte V+, sağda çıkış kablosu var; ad üçgenin sağ üst köşesinde.
+    anchor = 'start';
+    nameX = 8;
+    nameY = -16;
+    valueY = -16;
+  } else if (def.labelRight && part.rotation === 0) {
     // Transistör: üst ve alt uçlar kablolu olduğu için yazılar sağda (dönmüşse eski kurallar).
     anchor = 'start';
     nameX = right + 4;

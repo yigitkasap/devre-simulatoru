@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": -8, "rotation": 90, "props": {"voltage": 15, "internalResistance": 0}},
+    {"id": "p2", "type": "battery", "label": "B2", "x": 0, "y": 8, "rotation": 90, "props": {"voltage": 15, "internalResistance": 0}},
+    {"id": "p3", "type": "opamp", "label": "U1", "x": 40, "y": 0, "rotation": 0, "props": {}},
+    {"id": "p4", "type": "battery", "label": "B3", "x": 14, "y": 4, "rotation": 90, "props": {"voltage": 1.5, "internalResistance": 0}},
+    {"id": "p5", "type": "resistor", "label": "R1", "x": 24, "y": -1, "rotation": 0, "props": {"resistance": 10000.0}},
+    {"id": "p6", "type": "resistor", "label": "R2", "x": 48, "y": -4, "rotation": 90, "props": {"resistance": 56000.0}},
+    {"id": "p7", "type": "voltmeter", "label": "V2", "x": 54, "y": 5, "rotation": 90, "props": {"resistance": 10000000.0, "ideal": false}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": 54, "y": 10, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -12], [0, -20], [40, -20], [40, -3]]},
+    {"id": "w2", "points": [[0, 12], [0, 20], [40, 20], [40, 3]]},
+    {"id": "w3", "points": [[0, -4], [0, 0], [0, 4]]},
+    {"id": "w4", "points": [[0, 0], [8, 0]]},
+    {"id": "w5", "points": [[8, 0], [8, 10], [14, 10]]},
+    {"id": "w6", "points": [[14, 8], [14, 10]]},
+    {"id": "w7", "points": [[14, 10], [35, 10]]},
+    {"id": "w8", "points": [[36, 1], [35, 1], [35, 10]]},
+    {"id": "w9", "points": [[35, 10], [54, 10]]},
+    {"id": "w10", "points": [[54, 9], [54, 10]]},
+    {"id": "w11", "points": [[14, 0], [14, -1], [20, -1]]},
+    {"id": "w12", "points": [[28, -1], [34, -1], [36, -1]]},
+    {"id": "w13", "points": [[34, -1], [34, -8], [48, -8]]},
+    {"id": "w14", "points": [[44, 0], [48, 0]]},
+    {"id": "w15", "points": [[48, 0], [54, 0], [54, 1]]}
+  ]
+}

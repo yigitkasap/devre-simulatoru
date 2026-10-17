@@ -17,7 +17,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   N ve P kanallı MOSFET, anahtar, röle (elektromıknatıs, çekme/bırakma histerezisi), DC motor
   (zıt EMK, yük torku, jeneratör olarak çalışma), potansiyometre (kaydırıcıyla canlı), LDR, NTC
   termistör (öz ısınmalı), akkor lamba (filaman ısınması, ilk an akımı, aşırı gerilimde kopma),
-  hoparlör ve aktif buzzer (sesi tarayıcıda gerçekten çalınır), sigorta (I²t ile atar), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
+  hoparlör ve aktif buzzer (sesi tarayıcıda gerçekten çalınır), sigorta (I²t ile atar), işlemsel
+  yükselteç (741: kazanç-bant genişliği, eğim hızı, beslemeye bağlı doyum), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
   kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
@@ -54,10 +55,10 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 15 grupta 45 hazır devre: temel devreler,
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 16 grupta 48 hazır devre: temel devreler,
   laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör, röle, DC motor),
   ayarlı parçalar ve sensörler (potansiyometre, LDR, NTC, akkor lamba), ses ve koruma (hoparlör,
-  buzzer, sigorta), Elektronik Laboratuvarı föyünün dokuz deneyi
+  buzzer, sigorta), entegreler (işlemsel yükselteç), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
   baraj su seviyesi uyarısı projesi. Her birinin yanında devrenin ne işe yaradığı (dayandığı fizik
@@ -247,7 +248,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 496 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 512 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -266,7 +267,7 @@ akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`)
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
 ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
-rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), sensörler ve lamba (`tests/sensorler.test.ts`), ses ve sigorta (`tests/ses.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), sensörler ve lamba (`tests/sensorler.test.ts`), ses ve sigorta (`tests/ses.test.ts`), işlemsel yükselteç (`tests/opamp.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
 (`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
@@ -872,6 +873,38 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   ≈ 79 dB, rezonansta ≈ 83 dB, 100 Hz'te ≈ 57 dB), "Sıcaklık alarmı: NTC ve buzzer" (≈ 53 °C'ın
   üstünde öter), "Sigorta: kısa devrede devreyi açar" (12 V akü, 6 W lamba; kısa devrede ≈ 76 A,
   0,17 ms'de atar; lambanın ≈ 5,7 A'lik ilk an akımı attırmaz).
+
+### Yeni parçalar 7: işlemsel yükselteç (2026-10-17)
+
+- *Parça:* "İşlemsel yükselteç" (yeni kütüphane grubu "Entegreler"; etiket öneki U). Beş uç: eviren
+  (−) giriş sol üstte, evirmeyen (+) sol altta, çıkış sağda, V+ üstte, V− altta; besleme uçları
+  bağlanmalıdır. Sembol: üçgen, içinde "741"; ad sağ üst köşede (üstte V+, sağda çıkış kablosu var).
+- *Değerler* **TI LM741** veri sayfasından (±15 V, tipik): A = 200 V/mV, giriş 2 MΩ, yükselme süresi
+  0,3 µs → birim kazanç bant genişliği 0,35/0,3 µs ≈ 1,17 MHz (veri sayfasının formülü), eğim hızı
+  0,5 V/µs, kısa devre akımı 25 mA, besleme akımı 1,7 mA, salınım 10 kΩ'da ±14 V, 2 kΩ'da ±13 V. Bu
+  iki salınım noktasından raylara uzaklık H ≈ 0,73 V ve çıkış direnci ≈ 196 Ω. (TI'ın 2026'da
+  yayımladığı yeni µA741 veri sayfası başka bir yongayı anlatıyor: 540 GΩ giriş, ±14,95 V salınım;
+  okullardaki klasik bipolar 741 için LM741 alındı.) Giriş kayma gerilimi (1 mV) ve kutuplama akımı
+  (80 nA) modellenmez.
+- *Model* ([`opamp.ts`](src/sim/devices/opamp.ts), davranışsal, tek kutuplu): kazanç düğümü y (iç
+  düğüm) τ·dy/dt = A·v_d − y, τ = A/(2π·GBW) ≈ 27 ms (baskın kutup ≈ 5,8 Hz); dy/dt yumuşak olarak
+  eğim hızıyla sınırlı (S·tanh(u/(S·τ))): giriş katı v_d ≈ 70 mV'ta doyar, 1 mV'luk farkla çıkış
+  eğim hızıyla değil 2π·GBW·v_d ≈ 7 V/ms ile değişir (gerçek 741 gibi). y raylardan 1 V'tan fazla
+  uzaklaşamaz (doyumdan çabuk çıkış). Çıkış katı: y raylar arasına (V− + H, V+ − H) yumuşakça
+  kırpılır (köşe genişliği 50 mV), akım I_ks·tanh(ΔV/(R_o·I_ks)); verilen akım V+ ucundan, çekilen
+  V− ucundan gelir (beslemenin akımı doğru). Girişler arasında 2 MΩ, besleme uçları arasında
+  1,7 mA'lik yük. Hepsi Newton-Raphson ile birlikte çözülür. Bilgi kutusu: giriş farkı, çıkış
+  gerilimi ve akımı, durum (doğrusal, pozitif/negatif doyum, eğim sınırı, akım sınırı) ve duruma
+  göre not.
+- *Testler* (`tests/opamp.test.ts`, 10 test): evirmeyen (×11; hata ≈ kazanç/A) ve eviren (×−10,
+  sanal toprak < 100 µV) yükselteç; 10 kΩ'da +14 V, 2 kΩ'da +13 V doyum (veri sayfası); eğim hızı
+  (%5) ve küçük farkta 2π·GBW·v_d; 100 kHz'te kazanç 11/√(1 + (11f/GBW)²) (%3); kısa devrede 25 mA
+  ve akımın V+'tan çekilmesi; üç örneğin sayıları.
+- *Örnekler* (yeni grup "Entegreler"; şemalarda uç sırası yüzünden iki zorunlu kesişme): "Evirmeyen
+  yükselteç (741, ×11)" (fonksiyon üreteci, AC voltmetreler: 0,354 V → 3,889 V; 3 V t-t'de ±14,2 V'ta
+  kırpılma; 20 kHz'te eğim sınırı), "Eviren yükselteç ve sanal toprak" (1,5 V → −8,40 V; R2 = 100 kΩ'da
+  doyum), "Karşılaştırıcı: LDR ile ışık eşiği" (7,5 V eşik, ≈ 19,7 lüks; ters paralel yeşil/kırmızı LED,
+  çıkış LED yüküyle ±12,2 V).
 
 ### Editör
 
