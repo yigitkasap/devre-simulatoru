@@ -6,6 +6,7 @@ import { pinKey, wireKey, type Connectivity } from '../model/connectivity';
 import { solveFlows, type FlowGraph } from '../model/flow';
 import { structureKey } from '../model/serialize';
 import type { CircuitDoc } from '../model/types';
+import { numProp } from '../sim/netlist';
 import {
   CircuitSimulator,
   LED_NOMINAL_CURRENT,
@@ -212,7 +213,13 @@ export function useSimulation(
       } else if (part.type === 'resistor') {
         if (status.powerRatio !== undefined) live.set(part.id, { powerRatio: status.powerRatio });
       } else if (part.type === 'relay') {
-        live.set(part.id, { energized: status.energized ?? false });
+        live.set(part.id, { energized: status.energized ?? false, field: current });
+      } else if (part.type === 'inductor') {
+        live.set(part.id, { field: current });
+      } else if (part.type === 'transformer') {
+        // Çekirdeğin akısı N₁·i₁ + N₂·i₂ ile orantılı: birincile indirgenmiş akım i₁ + i₂ / n.
+        const pins = pinFlows.get(part.id) ?? [];
+        live.set(part.id, { field: (pins[0] ?? 0) + (pins[2] ?? 0) / Math.max(1e-3, numProp(part.props, 'turnsRatio', 16)) });
       } else if (part.type === 'motor') {
         // Mil gerçek hızının 1/MOTOR_VISUAL_RATIO'u ile döner (8000 dev/dk ekranda ≈ 80 dev/dk);
         // simülasyon zamanıyla ilerler, yavaş çekimde yavaşlar.

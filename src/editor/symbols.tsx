@@ -32,6 +32,11 @@ export interface LiveVisual {
   readonly energized?: boolean;
   /** DC motor: milin (görsel olarak yavaşlatılmış) dönme açısı (radyan). */
   readonly angle?: number;
+  /**
+   * Bobin, röle sargısı, transformatör: alanı oluşturan akım (A; transformatörde birincile
+   * indirgenmiş mıknatıslanma akımı). "Manyetik alanı göster" açıkken çizilir.
+   */
+  readonly field?: number;
 }
 
 export interface SymbolProps {

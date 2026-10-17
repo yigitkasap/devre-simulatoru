@@ -43,6 +43,9 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   akım bu hattan dönünce mesaj, toprak tuzağı uyarısı, yanan LED için önerilen ön direnç, veri
   sayfası sınırları (LED ve 1N4001'in ters gerilimi, direncin güç sınırı ve ısınması, elektrolitik
   kondansatörün ters gerilimi).
+- **Manyetik alan:** Ayarlar'da "Manyetik alanı göster" açıkken kabloların çevresinde ⊙/⊗ (sağ el
+  kuralı, yoğunluk akımla artar), bobin ve röle sargısında alan çizgileri ve N/S kutupları,
+  transformatörün çekirdeğinde akı okları.
 - **Klavye ve erişilebilirlik:** "Tuvale atla" bağlantısı, tuvalde oklarla parçadan parçaya geçiş,
   kısayollar, görünür odak, ekran okuyucu için parça listesi ve seyreltilmiş canlı duyurular.
 - **Osiloskop:** iki kanal (A, B) ortak uca göre; DC/AC/GND kuplaj, A ve B, ADD (A + B; INV ile
@@ -240,7 +243,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 454 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 457 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -259,7 +262,7 @@ akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`)
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
 ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
-rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`) ve ngspice ile çapraz doğrulama
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
 (`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
@@ -772,6 +775,26 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   geçiş diyodu, S2 ile 33 Ω fren direnci; boşta ≈ 1,5 s'de, frenle ≈ 0,5 s'de durur, akım ters
   ≈ 0,34 A), "Motorun yönü: H köprüsü" (dört anahtar; ileri/geri, dönerken yön değişince ≈ 11 A,
   aynı kolun iki anahtarı kısa devre).
+
+### Yeni parçalar 4: manyetik alanı göster (2026-10-17)
+
+- *Ayar:* Ayarlar → Akım → "Manyetik alanı göster" (varsayılan kapalı; tarayıcıda saklanır).
+  Simülasyon çalışırken açılır; gösterimde (sol alt) ⊙ ve ⊗ açıklanır.
+- *Kablolar* ([`MagneticField.tsx`](src/editor/MagneticField.tsx)): akım taşıyan her kablo
+  parçasının iki yanında (9 px) ⊙ (alan sayfadan dışarı) ve ⊗ (sayfaya doğru) işaretleri;
+  B = I·dl × r̂ (sağ el kuralı): akıma bakınca solda ⊙, sağda ⊗. Saat yönünde dönen bir akım
+  halkasının içi hep ⊗ olur. Büyüklük akımın logaritmasıyla (1 µA'de görünmez, 1 mA'de yarı, 1 A'de
+  tam): işaretler sıklaşır (40 px'ten 18 px'e) ve koyulaşır. Alan geleneksel akımdan çizilir
+  (elektron akışı seçeneğinden bağımsız). AC devrede kablo renkleri ve akım noktaları gibi karenin
+  ortalamasından: gerçek zamanda 50 Hz'in alanı ortalamada sönük görünür, yavaş çekimde yön
+  değiştirdiği görülür.
+- *Bobinler:* bobin ve röle sargısında, sargının içinden eksen boyunca geçen ve dışarıdan dönen
+  kesikli alan çizgileri, oklar ve N, S kutupları (harfler parça dönse de dik). Sembolde sargı yönü
+  belirsiz olduğu için sağ el kuralına uyan sargı varsayılır: alan sargının içinde akımın girdiği
+  uçtan çıktığı uca doğrudur (N, akımın çıktığı uçta). Transformatörde çekirdeğin iki yanında akı
+  okları; yönü ve büyüklüğü birincile indirgenmiş mıknatıslanma akımından (i₁ + i₂ / n).
+- *Testler* (`tests/manyetik.test.ts`, 3 test): sağa akan akımın üstünde ⊙, altında ⊗, akım ters
+  dönünce yer değiştirir; aşağı akan akımda ⊙ sağda (−ŷ × x̂ = +ẑ); yoğunluk akımla artar.
 
 ### Editör
 

@@ -15,6 +15,8 @@ export interface Settings {
   readonly nodeVoltages: boolean;
   /** Akım noktaları gösterilsin (M11). */
   readonly currentDots: boolean;
+  /** Simülasyon çalışırken kabloların ve bobinlerin manyetik alanı gösterilsin. */
+  readonly magneticField: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -23,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   wireScale: 'classic',
   nodeVoltages: false,
   currentDots: true,
+  magneticField: false,
 };
 
 const STORAGE_KEY = 'devre-simulatoru:ayarlar';
@@ -40,6 +43,7 @@ function loadSettings(): Settings {
       wireScale: record.wireScale === 'colorblind' ? 'colorblind' : 'classic',
       nodeVoltages: record.nodeVoltages === true,
       currentDots: record.currentDots !== false,
+      magneticField: record.magneticField === true,
     };
   } catch {
     return DEFAULT_SETTINGS;

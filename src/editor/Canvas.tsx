@@ -48,6 +48,7 @@ import {
 } from './colors';
 import { BurnBalloon, ContextMenu, ZeroMark, type MenuItem } from './CanvasOverlays';
 import { ANION_COLOR, CATION_COLOR } from './ions';
+import { FIELD_COLOR, MagneticField } from './MagneticField';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
@@ -1641,6 +1642,7 @@ export function Canvas({
           })}
           </g>
 
+          {frame && settings.magneticField && <MagneticField doc={doc} graph={flowGraph} frame={frame} />}
           {frame && settings.currentDots && <CurrentDots doc={doc} graph={flowGraph} frame={frame} />}
 
           {nodeLabels?.map((label) => (
@@ -1870,6 +1872,7 @@ export function Canvas({
             electronFlow={settings.electronFlow}
             rms={doc.parts.some((p) => p.type === 'acsource' || p.type === 'funcgen')}
             ions={doc.parts.some((p) => p.type === 'tank')}
+            field={settings.magneticField}
             onClose={phone ? () => setLegendOpen(false) : undefined}
           />
         ))}
@@ -2407,6 +2410,7 @@ function VoltageLegend({
   electronFlow,
   rms,
   ions,
+  field,
   onClose,
 }: {
   vmax: number;
@@ -2416,6 +2420,8 @@ function VoltageLegend({
   rms: boolean;
   /** Devrede su haznesi var: suda akımı iyonların taşıdığı da açıklanır. */
   ions: boolean;
+  /** Manyetik alan gösteriliyor: ⊙ ve ⊗ işaretleri açıklanır. */
+  field: boolean;
   /** Telefon: dokununca küçük düğmeye döner. */
   onClose?: () => void;
 }) {
@@ -2451,6 +2457,17 @@ function VoltageLegend({
             <path d="M23.8 5H28.2" stroke="#ffffff" strokeWidth={1.4} strokeLinecap="round" />
           </svg>
           {tr.sim.legendIons}
+        </div>
+      )}
+      {field && (
+        <div className="flex items-center gap-2 text-label text-ink-2">
+          <svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true">
+            <circle cx={8} cy={5} r={3.6} fill="none" stroke={FIELD_COLOR} strokeWidth={1.1} />
+            <circle cx={8} cy={5} r={1} fill={FIELD_COLOR} />
+            <circle cx={26} cy={5} r={3.6} fill="none" stroke={FIELD_COLOR} strokeWidth={1.1} />
+            <path d="M23.8 2.8L28.2 7.2M28.2 2.8L23.8 7.2" stroke={FIELD_COLOR} strokeWidth={1.1} />
+          </svg>
+          {tr.sim.legendField}
         </div>
       )}
     </div>

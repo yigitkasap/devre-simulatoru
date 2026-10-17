@@ -607,7 +607,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   role: {
     title: 'Röle: yalıtılmış bir devreyi anahtarlamak',
     description:
-      'Solda sargı devresi: 12 V’luk pil, S1 anahtarı, ampermetre ve röle sargısı (Omron G2R-1 tipi, 12 V); sargıya ters paralel bir 1N4001. Sağda kontak devresi: ayrı bir 9 V’luk pil C ucuna bağlı; NA kontağında yeşil, NK kontağında kırmızı LED. İki devre arasında hiç kablo yok (Mesajlar’da kontak devresinin kendi sıfır noktası olduğu yazar). Oynat’a bas, S1’i kapat, sonra aç.',
+      'Solda sargı devresi: 12 V’luk pil, S1 anahtarı, ampermetre ve röle sargısı (Omron G2R-1 tipi, 12 V); sargıya ters paralel bir 1N4001. Sağda kontak devresi: ayrı bir 9 V’luk pil C ucuna bağlı; NA kontağında yeşil, NK kontağında kırmızı LED. İki devre arasında hiç kablo yok (Mesajlar’da kontak devresinin kendi sıfır noktası olduğu yazar). Oynat’a bas, S1’i kapat, sonra aç. Ayarlar’da “Manyetik alanı göster”i açarsan sargının alanı ve kutupları da çizilir.',
     purpose:
       'Elektromıknatısla anahtarlamayı gösterir. S1 kapanınca sargının akımı τ = L/R ≈ 4,2 ms’lik bir üstelle artar (bobin akımın değişmesine karşı koyar); ≈ 30,5 mA’de (çekme gerilimi 8,4 V / 275 Ω) çekirdek paleti çeker: ≈ 5 ms sonra kırmızı LED söner, yeşil yanar. Palet çekilince hava aralığı kapanır, sargının endüktansı 1,15 H’den 2,29 H’e çıkar ve akım bir anda ≈ 15 mA’e düşer (akı bağı korunur), sonra 43,6 mA’e yükselir. S1 açılınca sargının akımı diyot üzerinden söner; ≈ 14 ms sonra bırakma akımının (1,8 V / 275 Ω ≈ 6,5 mA) altına iner ve palet bırakılır. Çekili paleti tutmak, çekmekten çok daha az akım ister (histerezis).',
     everyday:
@@ -911,6 +911,9 @@ export const tr = {
     stored: 'Bu tarayıcıda saklanır',
     nodeVoltages: 'Düğüm gerilimlerini yaz',
     nodeVoltagesNote: 'Her düğümün yanında küçük değer etiketi',
+    magneticField: 'Manyetik alanı göster',
+    magneticFieldNote:
+      'Kabloların iki yanında ⊙ (alan sayfadan dışarı) ve ⊗ (sayfaya doğru): sağ el kuralı, başparmak geleneksel akımın yönünde. Bobinlerde alan çizgileri ve N, S kutupları. Akım büyüdükçe işaretler sıklaşır ve koyulaşır.',
     currentSection: 'Akım ve görünüm',
     currentDots: 'Akım noktalarını göster',
     welcome: 'İlk açılış turunu göster',
@@ -961,6 +964,7 @@ export const tr = {
     legendConventional: 'Akım · geleneksel yön',
     legendElectron: 'Akım · elektron yönü',
     legendIons: 'Suda iyonlar · + akım yönünde, − ters',
+    legendField: 'Manyetik alan · ⊙ dışarı, ⊗ içeri',
   },
   readout: {
     voltage: 'Gerilim',

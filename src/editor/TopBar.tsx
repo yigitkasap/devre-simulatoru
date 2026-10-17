@@ -674,6 +674,13 @@ export function SettingsFields({
           checked={settings.electronFlow}
           onChange={(on) => onChange({ electronFlow: on })}
         />
+        <SwitchRow
+          touch={touch}
+          label={tr.settings.magneticField}
+          note={settings.magneticField ? tr.settings.magneticFieldNote : undefined}
+          checked={settings.magneticField}
+          onChange={(on) => onChange({ magneticField: on })}
+        />
       </section>
       {(onWelcome || onShortcuts) && (
         <div className="flex flex-wrap gap-2 border-t border-app pt-3">
