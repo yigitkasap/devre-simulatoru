@@ -77,6 +77,8 @@ export interface DeviceStatus {
   readonly outputs?: ReadonlyArray<{ readonly voltage: number; readonly current: number }>;
   /** Su haznesi: su seviyesi (%). */
   readonly level?: number;
+  /** Transformatör: birincil ve ikincil sargının uç gerilimi ve akımı (ikincilde yüke verilen). */
+  readonly windings?: ReadonlyArray<{ readonly voltage: number; readonly current: number }>;
   /** Su haznesi: ıslak problar (ortak, Seviye 1, 2, 3). */
   readonly wetProbes?: readonly boolean[];
   /** Su haznesi: her probdan suya akan akım (A; probdan çıkıp suya giren pozitif). */

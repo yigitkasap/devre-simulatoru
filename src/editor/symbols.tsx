@@ -159,6 +159,26 @@ function Inductor() {
   );
 }
 
+/**
+ * Transformatör: solda birincil, sağda ikincil sargı (dört sarım), ortada demir çekirdek (iki
+ * çizgi). Noktalar, aynı anda aynı işaretli gerilimde olan uçları gösterir.
+ */
+function Transformer() {
+  const coil = (x: number, dir: 1 | -1) =>
+    `M${x},-24 ${Array.from({ length: 4 }, () => `a6,6 0 0 ${dir === 1 ? 1 : 0} 0,12`).join(' ')}`;
+  return (
+    <g>
+      <path d="M-40,-30H-20V-24M-40,30H-20V24M40,-30H20V-24M40,30H20V24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={coil(-20, 1)} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <path d={coil(20, -1)} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <line x1={-4} y1={-28} x2={-4} y2={28} stroke="currentColor" strokeWidth={2} />
+      <line x1={4} y1={-28} x2={4} y2={28} stroke="currentColor" strokeWidth={2} />
+      <circle cx={-27} cy={-21} r={2.6} fill="currentColor" />
+      <circle cx={27} cy={-21} r={2.6} fill="currentColor" />
+    </g>
+  );
+}
+
 /** Kondansatör: elektrolitikte + ucu işaretli (kutuplu), seramik/filmde işaretsiz. */
 function Capacitor({ polarized }: { polarized: boolean }) {
   return (
@@ -735,6 +755,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Capacitor polarized={partProp('capacitor', props, 'kind') === 'electrolytic'} />;
     case 'inductor':
       return <Inductor />;
+    case 'transformer':
+      return <Transformer />;
     case 'diode':
       return <DiodeBody fill="currentColor" />;
     case 'led':

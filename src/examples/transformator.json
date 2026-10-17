@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "acsource", "label": "AC1", "x": 0, "y": 0, "rotation": 90, "props": {"waveform": "sine", "amplitude": 325.27, "frequency": 50, "offset": 0, "internalResistance": 0}},
+    {"id": "p2", "type": "ammeter", "label": "A1", "x": 10, "y": -8, "rotation": 0, "props": {"mode": "ac", "resistance": 0.1, "ideal": false}},
+    {"id": "p3", "type": "voltmeter", "label": "V1", "x": 22, "y": 0, "rotation": 90, "props": {"mode": "ac", "resistance": 10000000.0, "ideal": false}},
+    {"id": "p4", "type": "transformer", "label": "T1", "x": 36, "y": 0, "rotation": 0, "props": {}},
+    {"id": "p5", "type": "ammeter", "label": "A2", "x": 48, "y": -8, "rotation": 0, "props": {"mode": "ac", "resistance": 0.1, "ideal": false}},
+    {"id": "p6", "type": "resistor", "label": "RL", "x": 58, "y": 0, "rotation": 90, "props": {"resistance": 96, "powerRating": "2"}},
+    {"id": "p7", "type": "voltmeter", "label": "V2", "x": 68, "y": 0, "rotation": 90, "props": {"mode": "ac", "resistance": 10000000.0, "ideal": false}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -8], [6, -8]]},
+    {"id": "w2", "points": [[14, -8], [32, -8], [32, -3]]},
+    {"id": "w3", "points": [[22, -8], [22, -4]]},
+    {"id": "w4", "points": [[0, 4], [0, 8], [32, 8], [32, 3]]},
+    {"id": "w5", "points": [[22, 4], [22, 8]]},
+    {"id": "w6", "points": [[40, -3], [40, -8], [44, -8]]},
+    {"id": "w7", "points": [[52, -8], [58, -8], [58, -4]]},
+    {"id": "w8", "points": [[58, -8], [68, -8], [68, -4]]},
+    {"id": "w9", "points": [[40, 3], [40, 8], [58, 8], [58, 4]]},
+    {"id": "w10", "points": [[58, 8], [68, 8], [68, 4]]}
+  ]
+}

@@ -31,6 +31,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   resistor: 'Direnç',
   capacitor: 'Kondansatör',
   inductor: 'Bobin',
+  transformer: 'Transformatör',
   diode: 'Diyot',
   zener: 'Zener diyot',
   led: 'LED',
@@ -57,6 +58,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   resistor: 'direncinin',
   capacitor: 'kondansatörünün',
   inductor: 'bobininin',
+  transformer: 'transformatörünün',
   diode: 'diyotunun',
   zener: 'zener diyotunun',
   led: 'LED’inin',
@@ -82,6 +84,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   resistor: ['1. ucu', '2. ucu'],
   capacitor: ['+ ucu', '− ucu'],
   inductor: ['1. ucu', '2. ucu'],
+  transformer: ['birincil sargının noktalı (•) ucu', 'birincil sargının öbür ucu', 'ikincil sargının noktalı (•) ucu', 'ikincil sargının öbür ucu'],
   diode: ['anot ucu', 'katot ucu'],
   zener: ['anot ucu', 'katot ucu'],
   led: ['anot ucu', 'katot ucu'],
@@ -109,6 +112,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   resistor: ['1', '2'],
   capacitor: ['+', '−'],
   inductor: ['1', '2'],
+  transformer: ['P•', 'P', 'S•', 'S'],
   diode: ['A', 'K'],
   zener: ['A', 'K'],
   led: ['A', 'K'],
@@ -135,6 +139,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   resistor: ['1. uç', '2. uç'],
   capacitor: ['+ uç', '− uç'],
   inductor: ['1. uç', '2. uç'],
+  transformer: ['birincil •', 'birincil', 'ikincil •', 'ikincil'],
   diode: ['anot', 'katot'],
   zener: ['anot', 'katot'],
   led: ['anot', 'katot'],
@@ -263,6 +268,16 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'Güç sınırı daha büyük bir direnç seç ya da akımı azalt.',
       };
     case 'inductor-spike':
+      if (first !== undefined && ctx.type(first) === 'transformer') {
+        return {
+          title: 'Transformatörün akımı aniden kesildi',
+          detail:
+            `Transformatörün akımı aniden kesildi: yüksek gerilim sıçraması (Lenz yasası). ${firstLabel} transformatörünün sargılarında ` +
+            `${formatSI(p.voltage ?? 0, 'V')} görüldü. Çekirdekteki manyetik akı bir anda kaybolamaz: akımın yolu açılınca ` +
+            'depolanan enerji sargıların küçük kapasitesine ve ikincildeki yüke boşalır. Gerçekte anahtarın kontaklarında kıvılcım ' +
+            'oluşur. Birincile ters paralel bir diyot ya da ikincile bir yük bu sıçramayı sınırlar.',
+        };
+      }
       return {
         title: 'Bobin akımı aniden kesildi',
         detail:
@@ -311,6 +326,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   capacitor: 'Yük depolar; bir direnç üzerinden zamanla dolar ya da boşalır.',
   inductor:
     'Akımı manyetik alanında enerji olarak depolar ve akımın değişmesine karşı koyar: v = L · di/dt (Faraday ve Lenz yasaları). Sargısının küçük bir direnci vardır.',
+  transformer:
+    'Aynı çekirdeğe sarılı iki bobin: birincildeki değişen akım, ikincilde sarım oranıyla orantılı bir gerilim indükler (Faraday). Doğru akımı geçirmez; iki taraf arasında iletken yol yoktur (galvanik yalıtım).',
   diode: 'Akımı yalnızca bir yönde, anottan katoda geçirir; ileri yönde yaklaşık 0,6 V düşürür. Föydeki 1N4001 olarak gelir.',
   zener: 'Ters yönde, kırılma (zener) geriliminde iletime geçen diyot; gerilimi sınırlamak ve kırpmak için kullanılır.',
   led: 'Işık yayan diyot; fazla akım geçerse yanar, bu yüzden seri bir ön direnç gerekir.',
@@ -367,6 +384,11 @@ function fieldLabel(type: DeviceType, key: string): string {
     capacitance: 'Kapasite',
     inductance: 'Endüktans',
     dcResistance: 'Sargı direnci (DC)',
+    turnsRatio: 'Sarım oranı N₁ / N₂',
+    primaryInductance: 'Birincil endüktansı L₁',
+    coupling: 'Kuplaj katsayısı k',
+    primaryResistance: 'Birincil sargı direnci',
+    secondaryResistance: 'İkincil sargı direnci',
     initialVoltage: 'Başlangıç gerilimi',
     powerRating: 'Güç sınırı',
     kind: 'Tür',
@@ -497,6 +519,33 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'Topraklı iki cihazla yapılan yaygın bir ölçüm hatasını gösterir. İki cihazın COM ucu şebeke toprağı üzerinden birbirine bağlıdır. Prob toprağı yükün − ucuna takılınca D4 kısa devre olur; negatif yarıda üretecin çıkışı D3 üzerinden toprağa kısa devre olur ve yükten akım geçmez: ekranda tam dalga yerine yarım dalga görünür, Mesajlar’da uyarı çıkar. Doğru ölçüm “Köprü tipi tam dalga doğrultmaç” örneğindeki gibidir: COM üretecin COM’unda, A yükün + ucunda, B − ucunda; B ters (INV) ve A + B (ADD) seçilince ekranda A − B, yani yükün gerilimi görünür. Osiloskobun özelliklerinden toprak bağlantısını kaldırmak (yalıtılmış osiloskop) da sorunu çözer.',
     everyday:
       'Şebekeye bağlı cihazların kasası ve sinyal toprağı güvenlik için binanın toprak hattına bağlıdır. Doğrultmaç ve motor sürücü gibi güç devrelerinde ölçüm yapan teknisyenler bu yüzden diferansiyel prob ya da yalıtılmış osiloskop kullanır; yanlış yere takılan prob toprağı devreyi kısa devre edip cihazlara zarar verebilir.',
+  },
+  transformator: {
+    title: 'Transformatör: şebekeden 12 V',
+    description:
+      'Şebeke gerilimi (230 V etkin, 50 Hz) küçük bir transformatörün (RS 504-464 tipi) birincil sargısını besliyor; ikincilde 96 Ω’luk yük var. Ampermetreler ve voltmetreler AC kipte etkin değeri gösteriyor. Toprak yalnızca birincil tarafında: ikincil devre şebekeden yalıtılmış (Mesajlar’da kendi sıfır noktası olduğu yazar).',
+    purpose:
+      'Alternatif gerilimi küçültür. Birincildeki değişen akım demir çekirdekte değişen bir manyetik akı oluşturur; aynı akı ikincilin her sarımında ε = −dΦ/dt kadar gerilim indükler (Faraday). Bu yüzden gerilimler sarım sayılarıyla orantılıdır: V₂ / V₁ ≈ N₂ / N₁ = 1/16. Yüksüzken ikincilde ≈ 14,2 V, 96 Ω’luk yükte ≈ 11,8 V ve 123 mA; aradaki fark sargıların direncinde düşer. Birincilden ≈ 16 mA çekilir: çekirdeği mıknatıslayan ≈ 15 mA ile yükün birincile yansıyan ≈ 7,7 mA’i (I₁ ≈ I₂ · N₂ / N₁), aralarındaki faz farkı yüzünden toplanmaz. Giriş gücü ≈ 2,0 W, yüke giden ≈ 1,45 W: verim ≈ %73, kayıp sargılarda ısıya dönüşür.',
+    everyday:
+      'Elektrik şebekesi transformatörlerle kurulur: santralin gerilimi iletim için 380 kV’a yükseltilir (aynı güç için akım küçülür, tellerdeki I²R kaybı azalır), mahalledeki trafoda 230 V’a indirilir. Eski tip adaptörler, kapı zilleri, halojen lamba trafoları ve kaynak makineleri de transformatördür. Banyolardaki tıraş makinesi prizi yalıtım transformatörüyle beslenir: ikincil taraf topraktan yalıtıldığı için tek bir uca dokunmak akım yolu oluşturmaz.',
+  },
+  adaptor: {
+    title: 'Adaptör: transformatör, köprü ve filtre',
+    description:
+      'Şebeke (230 V, 50 Hz) → transformatör (230 V → 12 V) → dört 1N4001’lik köprü doğrultmaç → 470 µF’lık filtre kondansatörü → 470 Ω’luk yük. Voltmetre DC kipte çıkışı ölçüyor. Çıkış devresi topraktan yalıtılmış.',
+    purpose:
+      'Şebekenin alternatif gerilimini küçük ve düzgün bir doğru gerilime çevirir; eski tip bir adaptörün içi budur. Transformatör gerilimi düşürür ve devreyi şebekeden yalıtır, köprü iki yarım dalgayı da aynı yöne çevirir, kondansatör tepelerde dolup aralarda yükü besler. Yüksüz çıkış ≈ 19,1 V (ikincilin tepe gerilimi eksi iki diyot gerilimi); 470 Ω’da ≈ 15,8 V DC ve ≈ 0,47 V’luk 100 Hz dalgalanma. Kondansatör yalnızca tepelerde kısa sürede dolduğu için diyotlardan ≈ 144 mA’lik akım darbeleri geçer.',
+    everyday:
+      'Eski telefon ve modem adaptörleri, oyuncak trenlerin ve ses sistemlerinin güç kaynakları bu yapıdadır. Bugünkü şarj aletleri önce doğrultup sonra onlarca kHz’lik küçük bir transformatör kullanır: frekans yükselince aynı güç için çok daha küçük bir çekirdek yeter.',
+  },
+  'transformator-dc': {
+    title: 'Transformatörde doğru akım (Faraday)',
+    description:
+      '12 V’luk pil bir anahtarla transformatörün birincilini besliyor; ikincilde 10 kΩ ve osiloskop var (A kanalı, 20 ms/bölme). Toprak ikincil tarafında, osiloskobun ortak ucuyla aynı noktada. Oynat’a bas, anahtarı kapat, sonra aç.',
+    purpose:
+      'Faraday yasasını gösterir: gerilimi akım değil, akının değişmesi indükler. Anahtar kapanınca birincil akımı τ = L₁ / R₁ ≈ 42 ms’lik bir üstelle 12 V / 1167 Ω ≈ 10,3 mA’e çıkar; akım değiştiği sürece ikincilde ≈ 0,74 V’tan başlayıp sönen bir darbe görülür. Akım sabitlenince ikincil 0 V’a döner: doğru akım transformatörden geçmez. Darbenin alanı akı bağının değişimine eşittir (∫ε dt = M · ΔI₁). Anahtarı açınca akım bir anda kesilir: çekirdekteki enerji ikincilde ≈ −270 V’luk, birincilde kilovoltluk bir sıçrama yapar ve Lenz uyarısı çıkar.',
+    everyday:
+      'Arabanın ateşleme bobini bir transformatördür: 12 V’luk akım kesilince ikincilde bujide kıvılcım çaktıran on binlerce volt oluşur. Elektrikli çit cihazları ve flaş tetikleyicileri de aynı ilkeyle çalışır.',
   },
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
@@ -816,6 +865,12 @@ export const tr = {
     inductorRising: 'Akım artıyor: bobin bu değişime karşı koyar (Lenz), uçlarında v = L·di/dt kadar gerilim var.',
     inductorFalling: 'Akım azalıyor: bobin depoladığı enerjiyi devreye geri veriyor (v = L·di/dt).',
     inductorSteady: 'Akım değişmiyor: bobin, sargı direnci kadar bir dirençtir.',
+    turnsRatio: 'Sarım oranı N₁ : N₂',
+    primary: 'Birincil (P)',
+    secondary: 'İkincil (S)',
+    powerInOut: 'Giriş / çıkış gücü',
+    transformerNote:
+      'Birincildeki değişen akım çekirdekte değişen bir manyetik akı oluşturur; bu akı ikincilde ε = −N₂·dΦ/dt kadar gerilim indükler (Faraday). Gerilim oranı ≈ N₁ / N₂, akım oranı bunun tersi. Doğru akımda akı değişmez, ikincilde gerilim olmaz. İki sargı arasında iletken yol yoktur (galvanik yalıtım).',
     forwardVoltage: 'Gerilim (anot − katot)',
     brightness: 'Parlaklık',
     state: 'Durum',
@@ -938,6 +993,7 @@ export const tr = {
     groups: {
       temel: 'Temel devreler',
       aletler: 'Laboratuvar cihazları',
+      elektromanyetizma: 'Elektromanyetizma',
       'diyot-karakteristigi': 'Deney 1 · Diyot karakteristikleri',
       dogrultucu: 'Deney 2 · Doğrultucular',
       kenetleyici: 'Deney 3 · Kenetleyici ve gerilim katlayıcı',
@@ -1307,6 +1363,8 @@ export const tr = {
       capacitor: 'Başlangıç gerilimi, simülasyon başladığında (ve Durdur’dan sonra) kondansatörün + ucu ile − ucu arasındaki gerilimdir.',
       inductor:
         'Varsayılan değerler gerçek bir bobinden (Bourns RLB1314-103KL: 10 mH, sargı direnci 12 Ω, en fazla 100 mA). Sargı direncini 0 yaparsan ideal bobin olur.',
+      transformer:
+        'Varsayılan değerler gerçek bir transformatörden (RS PRO 504-464: 230 V → 12 V, sargı başına 1,5 VA; birincil 1167 Ω, ikincil 14,8 Ω, yüksüz giriş akımı ≈ 30 mA). Sarım oranı N₁ / N₂ = 16: 230 V’ta yüksüz ≈ 14,4 V, tam yükte (125 mA) ≈ 12 V. Oranı 1’den küçük yaparsan gerilim yükseltilir.',
       diode: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer.',
       voltmeter:
         'Gerçek voltmetrelerin iç direnci sonludur. Ölçtüğün kaynağın iç direnci büyükse voltmetre gerçek değerden düşük okur (yükleme etkisi).',

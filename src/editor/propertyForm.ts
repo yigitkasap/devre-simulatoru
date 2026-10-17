@@ -80,6 +80,7 @@ const PRESETS: Partial<Record<DeviceType, Record<string, readonly number[]>>> = 
   resistor: { resistance: [100, 220, 330, 470, 1e3, 4.7e3, 10e3, 100e3] },
   capacitor: { capacitance: [1e-6, 2.2e-6, 10e-6, 22e-6, 100e-6, 470e-6] },
   inductor: { inductance: [1e-3, 2.2e-3, 4.7e-3, 10e-3, 22e-3, 100e-3] },
+  transformer: { turnsRatio: [0.5, 1, 2, 5, 10, 16] },
   battery: { voltage: [1.5, 3, 4.5, 5, 9, 12] },
 };
 

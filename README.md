@@ -13,7 +13,7 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 
 - **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç (güç sınırlı),
   kondansatör (elektrolitik ya da seramik/film), bobin (sargı direnci ve sargı kapasitesiyle; akımı
-  kesilince Lenz uyarısı), diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
+  kesilince Lenz uyarısı), transformatör (karşılıklı indüktans, galvanik yalıtım), diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
   N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
@@ -48,8 +48,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 12 grupta 29 hazır devre: temel devreler,
-  laboratuvar cihazları (köprüde toprak tuzağı), Elektronik Laboratuvarı föyünün dokuz deneyi
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 13 grupta 32 hazır devre: temel devreler,
+  laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
   baraj su seviyesi uyarısı projesi. Her birinin yanında devrenin ne işe yaradığı (dayandığı fizik
@@ -239,7 +239,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 405 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 421 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -258,7 +258,7 @@ akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`)
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
 ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
-rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek) ve ngspice ile çapraz doğrulama
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`) ve ngspice ile çapraz doğrulama
 (`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
@@ -642,6 +642,50 @@ ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta
 - *Örnekler:* "RL devresi" (10 V, anahtar, 100 Ω / 1 W, ideal ampermetre, 10 mH bobin, bobine
   voltmetre; τ = L/(R + R_L) ≈ 89 µs, son akım ≈ 89 mA) ve "Bobin ve serbest geçiş diyotu" (aynı
   devre, bobine ters paralel 1N4001).
+
+### Yeni parçalar 1: transformatör (2026-10-17)
+
+Kullanıcı simülatöre dört grup parça eklenmesini istedi (elektromanyetizma, ayarlı parçalar ve
+sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 1. aşama.
+
+- *Parça:* "Transformatör" (pasif parçalar, etiket öneki T). Dört uç: birincil • ve birincil
+  (solda), ikincil • ve ikincil (sağda); noktalı uçlar aynı anda aynı işaretli gerilimdedir.
+  Özellikler: sarım oranı N₁ / N₂, birincil endüktansı L₁, kuplaj k (en fazla 0,999: k = 1'de
+  endüktans matrisi tekil), birincil ve ikincil sargı dirençleri. Sembol: iki sargı (dört sarım),
+  ortada demir çekirdek (iki çizgi), polarite noktaları.
+- *Model* ([`transformer.ts`](src/sim/devices/transformer.ts)): iki sargı, her biri "sargı direnci
+  + endüktans", MNA'da iki akım bilinmeyeniyle; v_L₁ = L₁·di₁/dt + M·di₂/dt, v_L₂ = M·di₁/dt +
+  L₂·di₂/dt, M = k·√(L₁L₂), L₂ = L₁ / n². Yamuk kuralı ve LTE denetimi bobindeki gibi (dal
+  satırlarına −cs·[[L₁, M], [M, L₂]]). Doğru akımda sargılar kısa devredir, ikincilde gerilim
+  yoktur. Sargı kapasiteleri (C₁ = 100 pF, C₂ = C₁·n²; birincilin öz rezonansı ≈ 3 kHz, küçük
+  şebeke transformatörlerindeki kHz mertebesi; veri sayfasında yok) akımı kesilen sargının
+  gerilimini sonlu tutar ve geri Euler ile çözülür. Akımı aniden kesilince bobindeki Lenz uyarısı
+  transformatöre de verilir (kendi metniyle). Çekirdek kaybı ve doyma modellenmez.
+- *Varsayılanlar gerçek bir parçadan:* **RS PRO 504-464** (3 VA, 230 V → 12 + 12 V, baskı devre
+  tipi; RS veri sayfası). Birincil sargı direnci 1167 Ω, ilk ikincil sargısı 14,8 Ω. Birincil
+  endüktansı veri sayfasının kayıplarından: tam yükte bakır kaybı 1,05 W, ikincillerin payı
+  (2 × 125 mA, 14,8 + 17,3 Ω) 0,50 W, birincilin akımı ≈ 21,7 mA; yükün yansıyan akımı (15,6 mA)
+  çıkınca mıknatıslanma akımı ≈ 15 mA (veri sayfasının en büyük değeri 30 mA), L₁ = 230 V /
+  (2π·50 Hz·15,1 mA) ≈ 48,5 H. Sarım oranı 16: yüksüz ≈ 14,2 V, sargı başına tam yükte (125 mA)
+  ≈ 11,8 V, düzenleme ≈ %20 (veri sayfası: tipik < %22). Kuplaj 0,99 (küçük EI
+  transformatörlerinde kaçak endüktans ≈ %1).
+- *Galvanik yalıtım:* İki sargı ayrı iletken gruplar ve ayrı adalardır (`couplingPins`). Topraksız
+  ikincil devre kendi sıfır noktasını alır (Mesajlar'da bilgi). Önce dört uç tek ada sayılıyordu:
+  topraksız köprü doğrultmaçta dört diyot birden kesime girince ikincil tarafın ortak gerilimini
+  yalnızca GMIN belirliyordu ve Newton-Raphson yakınsamıyordu. Örnek testleri artık yalnızca hata
+  ve uyarıları "sorun" sayar (bilgi olabilir).
+- *Testler* (`tests/transformator.test.ts`, 9 test): yüksüz ve 96 Ω yükte akım, gerilim ve faz
+  fazör (karmaşık sayı) çözümüyle %0,5 ve 1° içinde; enerji korunumu (giriş gücü = yük gücü +
+  sargı kayıpları, %0,5); neredeyse ideal transformatörde V₂ / V₁ = N₂ / N₁ (2, 10 ve 0,5 ile
+  yükseltme); doğru akımda Faraday: anahtar kapanınca ∫ε dt = M·ΔI₁ (%1), kararlı durumda ikincilde
+  gerilim yok; galvanik yalıtım (iki taraf arasındaki 100 V'luk farktan ortalama akım geçmez);
+  üç örneğin metnindeki sayılar. ngspice karşılaştırmasına transformatör eklendi (iki bobin ve K
+  bağlaşımı; açılıştan itibaren iki periyot, en büyük fark %0,0003).
+- *Örnekler* (yeni grup "Elektromanyetizma"): "Transformatör: şebekeden 12 V" (230 V, 96 Ω yük,
+  AC kipte ölçü aletleri; 11,8 V, 123 mA, birincilde 16,4 mA, verim ≈ %73), "Adaptör:
+  transformatör, köprü ve filtre" (470 µF, 470 Ω: 15,8 V DC, 0,47 V dalgalanma, yüksüz 19,1 V),
+  "Transformatörde doğru akım (Faraday)" (12 V ve anahtar; kapanışta ikincilde ≈ 0,74 V'tan
+  τ = L₁/R₁ ≈ 42 ms ile sönen darbe, açılışta ≈ −270 V ve Lenz uyarısı).
 
 ### Editör
 

@@ -42,6 +42,8 @@ export function partValueText(part: Part): string {
       const r = numProp(p, 'dcResistance', 0);
       return r > 0 ? `${L} · ${formatSI(r, 'Ω', { trim: true, digits: 3 })}` : L;
     }
+    case 'transformer':
+      return `${formatNumber(numProp(p, 'turnsRatio', 16), 2)} : 1`;
     case 'led':
       return tr.devices.ledColors[strProp(p, 'color', LED_COLORS, 'red')] ?? '';
     case 'zener':

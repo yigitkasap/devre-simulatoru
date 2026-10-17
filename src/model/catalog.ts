@@ -34,6 +34,8 @@ import {
   CAPACITOR_KINDS,
   CAPACITOR_LEGACY_KIND,
   INDUCTOR_DEFAULTS,
+  TRANSFORMER_DEFAULTS,
+  TRANSFORMER_MAX_COUPLING,
   LED_COLORS,
   LED_DEFAULTS,
   OSCILLOSCOPE_DEFAULTS,
@@ -293,6 +295,29 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  transformer: {
+    type: 'transformer',
+    category: 'passive',
+    labelPrefix: 'T',
+    // Birincil solda (noktalı uç üstte), ikincil sağda.
+    pins: [
+      { x: -4, y: -3 },
+      { x: -4, y: 3 },
+      { x: 4, y: -3 },
+      { x: 4, y: 3 },
+    ],
+    bounds: { x: -4, y: -4, w: 8, h: 8 },
+    defaultProps: { ...TRANSFORMER_DEFAULTS },
+    propDefs: [
+      { kind: 'number', key: 'turnsRatio', unit: '', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'primaryInductance', unit: 'H', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'coupling', unit: '', min: { value: 0, exclusive: false }, max: TRANSFORMER_MAX_COUPLING },
+      { kind: 'number', key: 'primaryResistance', unit: 'Ω', min: { value: 0, exclusive: false } },
+      { kind: 'number', key: 'secondaryResistance', unit: 'Ω', min: { value: 0, exclusive: false } },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
   diode: {
     type: 'diode',
     category: 'semiconductors',
@@ -466,7 +491,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
 /** Kütüphane panelindeki sıra. */
 export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: readonly DeviceType[] }> = [
   { id: 'sources', types: ['battery', 'acsource', 'ground'] },
-  { id: 'passive', types: ['resistor', 'capacitor', 'inductor'] },
+  { id: 'passive', types: ['resistor', 'capacitor', 'inductor', 'transformer'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'switches', types: ['switch'] },

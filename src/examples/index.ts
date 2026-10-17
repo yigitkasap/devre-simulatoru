@@ -31,6 +31,9 @@ import rcDolma from './rc-dolma.json';
 import rcKareDalga from './rc-kare-dalga.json';
 import rlDevresi from './rl-devresi.json';
 import toprakTuzagi from './toprak-tuzagi.json';
+import transformator from './transformator.json';
+import adaptor from './adaptor.json';
+import transformatorDc from './transformator-dc.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
 import zenerKarakteristigi from './zener-karakteristigi.json';
@@ -56,6 +59,7 @@ export const EXAMPLE_GROUPS = [
     ],
   },
   { id: 'aletler', ids: ['toprak-tuzagi'] },
+  { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc'] },
   { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
   { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
   { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
@@ -86,6 +90,9 @@ const DATA: Record<ExampleId, unknown> = {
   'bobin-serbest-gecis': bobinSerbestGecis,
   'diyot-yonu': diyotYonu,
   'toprak-tuzagi': toprakTuzagi,
+  transformator,
+  adaptor,
+  'transformator-dc': transformatorDc,
   'diyot-dc': diyotDc,
   'diyot-karakteristigi': diyotKarakteristigi,
   'zener-karakteristigi': zenerKarakteristigi,

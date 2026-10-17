@@ -10,6 +10,7 @@
 //   - MOSFET: LEVEL 1, W = L, KP = 2β (bizde I_D = β·(V_GS − V_T)²), VTO, LAMBDA; gövde source'a
 //     bağlı.
 //   - Bobin: sargı direnci + L + uçlar arasındaki sargı kapasitesi (bizdeki yapı).
+//   - Transformatör: iki sargı (direnç + L + sargı kapasitesi) ve aralarında K bağlaşımı.
 // Sıcaklık 300 K (bizim VT'miz): TEMP = TNOM = 26,85 °C. ngspice her eklemin paralelinde GMIN =
 // 10⁻¹² S kullanır (bizdeki gibi).
 
@@ -24,6 +25,7 @@ import { DIODE_MODEL_PARAMS, DiodeDevice } from '../../src/sim/devices/diode';
 import { INDUCTOR_WINDING_CAPACITANCE, InductorDevice } from '../../src/sim/devices/inductor';
 import { LED_MODELS, LedDevice } from '../../src/sim/devices/led';
 import { ResistorDevice } from '../../src/sim/devices/resistor';
+import { TransformerDevice } from '../../src/sim/devices/transformer';
 import { ZenerDevice } from '../../src/sim/devices/zener';
 
 const GROUND = -1;
@@ -74,6 +76,19 @@ export function toSpice(netlist: Netlist, options: { acMagnitude?: boolean } = {
       if (device.dcResistance > 0) lines.push(`R${id}_dc ${n(device, 0)} ${start} ${num(device.dcResistance)}`);
       lines.push(`L${id} ${start} ${n(device, 1)} ${num(device.inductance)} IC=${num(device.current)}`);
       lines.push(`C${id}_p ${n(device, 0)} ${n(device, 1)} ${num(INDUCTOR_WINDING_CAPACITANCE)} IC=0`);
+    } else if (device instanceof TransformerDevice) {
+      // P• ── R₁ ── iç 1 ── L₁ ── P;  S• ── R₂ ── iç 2 ── L₂ ── S;  K = M / √(L₁L₂).
+      const windings = [
+        { l: device.l1, r: device.r1, c: device.c1, a: 0, b: 1, inner: 4 },
+        { l: device.l2, r: device.r2, c: device.c2, a: 2, b: 3, inner: 5 },
+      ];
+      windings.forEach((w, k) => {
+        const start = w.r > 0 ? n(device, w.inner) : n(device, w.a);
+        if (w.r > 0) lines.push(`R${id}_${k} ${n(device, w.a)} ${start} ${num(w.r)}`);
+        lines.push(`L${id}_${k} ${start} ${n(device, w.b)} ${num(w.l)} IC=0`);
+        lines.push(`C${id}_${k} ${n(device, w.a)} ${n(device, w.b)} ${num(w.c)} IC=0`);
+      });
+      lines.push(`K${id} L${id}_0 L${id}_1 ${num(device.mutual / Math.sqrt(device.l1 * device.l2))}`);
     } else if (device instanceof BatteryDevice) {
       // (−) ── ideal kaynak ── iç düğüm ── R_iç ── (+)
       if (device.internalResistance > 0) {

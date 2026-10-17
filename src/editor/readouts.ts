@@ -183,6 +183,23 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: m.current > 1e-9 ? t.charging : m.current < -1e-9 ? t.discharging : t.steady,
       };
     }
+    case 'transformer': {
+      const [w1, w2] = status.windings ?? [
+        { voltage: m.voltage, current: m.current },
+        { voltage: 0, current: 0 },
+      ];
+      const n = numProp(p, 'turnsRatio', 16);
+      return {
+        title,
+        rows: [
+          { label: t.turnsRatio, value: `${formatNumber(n, 2)} : 1` },
+          { label: t.primary, value: `${v(w1!.voltage)} · ${a(w1!.current)}` },
+          { label: t.secondary, value: `${v(w2!.voltage)} · ${a(w2!.current)}` },
+          { label: t.powerInOut, value: `${formatSI(w1!.voltage * w1!.current, 'W', { digits: 3 })} / ${formatSI(w2!.voltage * w2!.current, 'W', { digits: 3 })}` },
+        ],
+        note: t.transformerNote,
+      };
+    }
     case 'inductor': {
       const L = numProp(p, 'inductance', 10e-3);
       // L'nin kendi gerilimi (uç geriliminden sargı direncinin payı çıkınca): işareti akımın arttığını ya da azaldığını söyler.

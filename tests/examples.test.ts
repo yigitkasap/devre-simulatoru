@@ -51,7 +51,8 @@ describe('Örnekler', () => {
         expect(open.has(`${fg.id}#0`) && open.has(`${fg.id}#1`), `${fg.label} kullanılmıyor`).toBe(false);
       }
       expect(connectivity.danglingEnds).toEqual([]);
-      expect(new CircuitSimulator(connectivity.netlist).topologyDiagnostics).toEqual([]);
+      // Hata ve uyarı yok; bilgi olabilir (ör. transformatörün yalıtılmış ikincilinin kendi sıfır noktası).
+      expect(new CircuitSimulator(connectivity.netlist).topologyDiagnostics.filter((d) => d.severity !== 'info')).toEqual([]);
       const texts = tr.examples.texts[id];
       for (const text of [texts.title, texts.description, texts.purpose, texts.everyday]) expect(text.length).toBeGreaterThan(5);
     });

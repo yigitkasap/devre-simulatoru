@@ -34,6 +34,7 @@ import {
   DEVICE_MODELS,
   InductorDevice,
   LedDevice,
+  TransformerDevice,
   type Device,
   type DeviceStatus,
   type Measurement,
@@ -425,7 +426,7 @@ export class CircuitSimulator {
     // başlangıç gerilimlerinin iki katını (en az 20 V) aşıyor.
     const reference = this.referenceVoltage();
     for (const device of this.circuit.devices) {
-      if (!(device instanceof InductorDevice)) continue;
+      if (!(device instanceof InductorDevice) && !(device instanceof TransformerDevice)) continue;
       const voltage = device.spikeVoltage();
       if (voltage > Math.max(20, 2 * reference)) {
         result.push({ severity: 'warning', code: 'inductor-spike', elementIds: [device.id], netKeys: [], params: { voltage } });
