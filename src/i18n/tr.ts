@@ -398,268 +398,268 @@ function optionLabel(key: string, option: string): string {
 
 export interface ExampleTexts {
   readonly title: string;
-  /** Devrenin kurulumu (cevabı vermeden). */
+  /** Devrenin kurulumu: parçalar, değerler, ölçü aletlerinin yeri ve ne yapılacağı. */
   readonly description: string;
-  /** Simülasyonu başlatmadan önce öğrencinin tahmin etmesi için soru. */
-  readonly question: string;
-  /** Simülasyon çalıştırılınca gösterilen cevap ve deneme önerisi. */
-  readonly answer: string;
+  /** Devrenin ne işe yaradığı, dayandığı fizik yasası ve simülasyonda görülen sayılar. */
+  readonly purpose: string;
+  /** Günlük hayatta nerelerde kullanıldığı. */
+  readonly everyday: string;
 }
+
+/** Şemada kaçınılmaz bir kablo kesişmesi olan örneklerde açıklamanın sonuna eklenir. */
+const CROSSING = 'Dolu nokta olmayan kablo kesişmeleri bağlı değildir.';
 
 const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'led-on-direnc': {
     title: 'LED ve ön direnç',
     description:
-      'İdeal 5 V’luk pil, 330 Ω’luk ön direnç ve kırmızı bir LED seri bağlı; ampermetre devreden geçen akımı ölçüyor. Ön direnç, LED’den geçen akımı sınırlar.',
-    question: 'Ampermetre kaç mA gösterir? LED’in üzerinde yaklaşık 1,8 V düştüğünü düşünerek önce hesapla, sonra Oynat’a bas.',
-    answer:
-      'Yaklaşık 9,7 mA: I = (5 V − 1,8 V) / 330 Ω. Ön direnci 100 Ω’a düşürürsen akım 30 mA’i aşar ve LED yanar; dene ve açıklamayı oku.',
+      'İdeal 5 V’luk pil, 330 Ω’luk ön direnç, ampermetre ve kırmızı bir LED tek bir döngüde seri bağlı: akım pilin + ucundan çıkar, LED’den geçer ve alt hattan pilin − ucuna döner.',
+    purpose:
+      'LED’i güvenli bir akımla yakar. LED iletirken üzerindeki gerilim neredeyse sabittir (kırmızıda ≈ 1,8 V); kalan gerilim ön dirence düşer ve akımı Ohm yasası belirler: I = (5 V − 1,8 V) / 330 Ω ≈ 9,7 mA. Direnç olmasaydı akımı sınırlayan bir şey kalmazdı. Ön direnci 100 Ω’a düşür: akım 30 mA’i aşar ve LED yanar.',
+    everyday:
+      'Cihazlardaki açık/kapalı ve şarj ışıkları, klavye ve ekran arka ışıkları, araç ve trafik LED’leri: her LED’in önünde akımı sınırlayan bir direnç ya da bir LED sürücüsü vardır.',
   },
   'gerilim-bolucu': {
     title: 'Gerilim bölücü',
     description:
-      'İki eşit direnç (1 kΩ + 1 kΩ) ideal 9 V’luk bir pile seri bağlı. Voltmetre, dirençlerin birleştiği orta noktanın gerilimini ölçüyor.',
-    question: 'Voltmetre kaç volt gösterir? Önce hesapla, sonra Oynat’a bas.',
-    answer:
-      '4,5 V: V_{çıkış} = V · R_{2} / (R_{1} + R_{2}) = 9 V · 1 kΩ / 2 kΩ. Dirençlerden birinin değerini değiştirip çıkış geriliminin nasıl değiştiğine bak.',
+      'İki eşit direnç (1 kΩ + 1 kΩ) ideal 9 V’luk pile seri bağlı. Voltmetre, dirençlerin birleştiği orta nokta ile alt hat arasındaki gerilimi ölçüyor.',
+    purpose:
+      'Bir gerilimi istenen oranda küçültür. Seri dirençlerden aynı akım geçer (Kirchhoff’un akım yasası), bu yüzden pilin gerilimi dirençlerle orantılı paylaşılır: V_{çıkış} = V · R_{2} / (R_{1} + R_{2}) = 9 V · 1 kΩ / 2 kΩ = 4,5 V. Dirençlerden birinin değerini değiştirip oranın nasıl değiştiğine bak.',
+    everyday:
+      'Ses ayar düğmesi (potansiyometre) ayarlanabilir bir gerilim bölücüdür. Pil göstergeleri ve şarj devreleri ölçtükleri gerilimi bölücüyle küçültür; ışık ve sıcaklık sensörleri (LDR, termistör) de bir bölücünün içinde çalışır.',
   },
   'voltmetre-yukleme': {
     title: 'Voltmetrenin yükleme etkisi',
     description:
-      '12 V’luk ideal kaynağa seri bağlı 200 kΩ’luk direnç, iç direnci büyük bir sensörü temsil ediyor. Çıkışı iç direnci 1 MΩ olan bir voltmetreyle ölçüyoruz.',
-    question: 'Voltmetre kaç volt gösterir? Önce hesapla, sonra Oynat’a bas.',
-    answer:
-      'Voltmetre 12 V yerine 10 V gösterir: voltmetre de devrenin bir parçasıdır ve 200 kΩ ile bir gerilim bölücü kurar, V = 12 V · R_{V} / (200 kΩ + R_{V}) = 10 V. Voltmetrenin iç direncini 20 MΩ’a çıkarıp farkı gör.',
+      '12 V’luk ideal kaynağa seri bağlı 200 kΩ’luk direnç, iç direnci büyük bir sensörü temsil ediyor. Çıkışı iç direnci 1 MΩ olan bir voltmetre ölçüyor.',
+    purpose:
+      'Ölçü aletinin ölçtüğü devreyi nasıl değiştirdiğini gösterir. Voltmetre de bir dirençtir: 200 kΩ ile bir gerilim bölücü kurar ve 12 V yerine 10 V okunur: V = 12 V · R_{V} / (200 kΩ + R_{V}). Voltmetrenin iç direnci, ölçülen devreninkinden çok büyük olmalıdır: 20 MΩ yapınca okuma ≈ 11,88 V’a çıkar.',
+    everyday:
+      'Dijital multimetrelerin iç direnci 10 MΩ civarındadır; pH metreler ve bazı sensörler için çok daha yüksek dirençli girişler gerekir. Elektronikte sinyali yüklemeden aktaran tampon (buffer) katları bu yüzden kullanılır.',
   },
   'ampermetre-etkisi': {
     title: 'Ampermetrenin etkisi',
-    description: '12 V’luk ideal kaynak, 100 Ω’luk (2 W’lık) direnç ve seri bağlı, iç direnci 1 Ω olan bir ampermetre.',
-    question: 'Ampermetre kaç mA gösterir? Önce hesapla, sonra Oynat’a bas.',
-    answer:
-      'Ampermetre 120 mA yerine 118,8 mA gösterir: ampermetrenin iç direnci de akıma karşı koyar, I = 12 V / (100 Ω + R_{A}) = 12 V / 101 Ω. İdeal ampermetreye geçip farkı gör.',
+    description: '12 V’luk ideal kaynak, 100 Ω’luk (2 W’lık) direnç ve iç direnci 1 Ω olan bir ampermetre seri bağlı.',
+    purpose:
+      'Ampermetrenin de akıma karşı koyduğunu gösterir. Ampermetre devreye seri girer ve iç direnci toplam dirence eklenir: I = 12 V / (100 Ω + 1 Ω) ≈ 118,8 mA (ideal ölçümde 120 mA olurdu). Ampermetrenin iç direnci, devredeki dirençlerden çok küçük olmalıdır. İdeal ampermetreye geçip farkı gör.',
+    everyday:
+      'Pens ampermetreler akımı kabloyu kesmeden, telin çevresindeki manyetik alandan ölçer ve devreye hiç direnç eklemez. Güç kaynaklarındaki akım ölçme dirençleri (şönt) bu yüzden miliohm düzeyindedir.',
   },
   'rc-dolma': {
     title: 'RC dolma',
     description:
-      '10 V’luk pil, anahtar, 1 kΩ’luk direnç ve 100 µF’lık kondansatör seri bağlı; voltmetre kondansatörün gerilimini ölçüyor. Zaman sabiti τ = R · C = 0,1 s; t = τ anında kondansatör yaklaşık %63 dolar.',
-    question:
-      'Anahtarı kapattıktan 0,1 s sonra voltmetre kaç volt gösterir? Önce hesapla; sonra hızı ×0,1’e çek, Oynat’a bas ve anahtara tıkla.',
-    answer:
-      'Yaklaşık 6,3 V: V = 10 V · (1 − e⁻¹), yani 10 V’un %63’ü. 5τ = 0,5 s sonra kondansatör neredeyse tamamen dolar (≈ 9,9 V). Anahtarı açınca kondansatör yükünü korur; yalnızca voltmetrenin 10 MΩ’luk iç direnci üzerinden çok yavaş boşalır.',
+      '10 V’luk pil, anahtar, 1 kΩ’luk direnç ve 100 µF’lık kondansatör seri bağlı; voltmetre kondansatörün gerilimini ölçüyor. Hızı ×0,1’e çek, Oynat’a bas ve anahtara tıkla.',
+    purpose:
+      'Kondansatörde yükün zamanla birikmesini gösterir. Kondansatör doldukça gerilimi artar, direnç üzerindeki gerilim ve dolayısıyla akım azalır: v = 10 V · (1 − e^(−t/τ)), τ = R · C = 0,1 s. t = τ’da ≈ 6,3 V (%63), 5τ = 0,5 s’de ≈ 9,9 V. Anahtarı açınca kondansatör yükünü korur; yalnızca voltmetrenin 10 MΩ’luk iç direnci üzerinden çok yavaş boşalır.',
+    everyday:
+      'Fotoğraf makinesi flaşının kondansatörü, zamanlayıcı devreler (ör. 555 entegresi), cihazların açılışta kendini sıfırlama (reset) devreleri ve düğme sıçramasını bastıran devreler RC zaman sabitine dayanır.',
   },
   'rl-devresi': {
     title: 'RL devresi',
     description:
-      '10 V’luk pil, anahtar, 100 Ω’luk (1 W’lık) direnç, ampermetre ve 10 mH’lik bobin (sargı direnci 12 Ω) seri bağlı; voltmetre bobinin uç gerilimini ölçüyor. Zaman sabiti τ = L / (R + R_{L}) = 10 mH / 112 Ω ≈ 89 µs.',
-    question:
-      'Anahtarı kapatınca akım hemen mi yükselir, son akım kaç mA olur? Sonra anahtarı aç: bobinin uçlarında ne olur? Önce tahmin et; hızı ×0,001’e çek, Oynat’a bas ve anahtara tıkla.',
-    answer:
-      'Akım hemen yükselmez: bobin akımın değişmesine karşı koyar (v = L·di/dt; Faraday ve Lenz yasaları). İlk anda bütün gerilim bobindedir (voltmetre ≈ 10 V); akım τ ≈ 89 µs’lik bir üstelle 10 V / 112 Ω ≈ 89 mA’e çıkar ve bobinde yalnızca sargı direncinin payı kalır (≈ 1,07 V). Anahtarı açınca akımın yolu kesilir: bobin akımı sürdürmeye çalışır, uçlarında kilovoltlarca bir gerilim sıçraması olur (½LI² ≈ 40 µJ’lük enerji sargının küçük kapasitesine boşalır) ve Mesajlar’da uyarı çıkar. Gerçek devrede anahtarın kontaklarında kıvılcım görülür. Çözüm sonraki örnekte: serbest geçiş diyodu.',
+      '10 V’luk pil, anahtar, 100 Ω’luk (1 W’lık) direnç, ampermetre ve 10 mH’lik bobin (sargı direnci 12 Ω) seri bağlı; voltmetre bobinin uç gerilimini ölçüyor. Hızı ×0,001’e çek, Oynat’a bas, anahtarı kapat, sonra aç.',
+    purpose:
+      'Bobinin akımdaki değişime karşı koymasını gösterir (Faraday ve Lenz yasaları: v = L · di/dt). Anahtar kapanınca akım hemen yükselmez: ilk anda bütün gerilim bobindedir; akım τ = L / (R + R_{L}) ≈ 89 µs’lik bir üstelle 10 V / 112 Ω ≈ 89 mA’e çıkar ve bobinde yalnızca sargı direncinin payı (≈ 1,07 V) kalır. Manyetik alanda ½LI² ≈ 40 µJ enerji birikir. Anahtar açılınca akımın yolu kesilir, bobin akımı sürdürmeye çalışır ve uçlarında kilovoltlarca bir gerilim sıçraması olur; Mesajlar’da uyarı çıkar.',
+    everyday:
+      'Arabaların ateşleme bobini bu sıçramayla bujide kıvılcım çakar. Telefon şarj aletleri gibi anahtarlamalı güç kaynakları ve DC-DC dönüştürücüler, bobinin akımı sürdürme eğilimini kullanır. Aynı etki röle ve şalter kontaklarında kıvılcıma ve aşınmaya yol açar.',
   },
   'bobin-serbest-gecis': {
     title: 'Bobin ve serbest geçiş diyotu',
     description:
-      'RL devresindeki bobine ters paralel bir 1N4001 bağlı (katodu bobinin üst ucunda): serbest geçiş (flyback) diyodu. Anahtar kapalıyken diyot ters yönde kutuplanmıştır, akım geçirmez.',
-    question:
-      'Anahtarı açınca bobinin uçlarındaki gerilim ne kadar olur, akım nereden akar? Hızı ×0,001’e çek, Oynat’a bas, anahtarı kapatıp sonra aç.',
-    answer:
-      'Anahtar açılınca bobin akımı diyottan dolaşmaya devam eder: bobinin üst ucu yalnızca bir diyot gerilimi kadar (≈ −0,6 V) eksiye iner, kilovoltluk sıçrama olmaz ve uyarı çıkmaz. Akım, sargı direnci ve diyot üzerinden yaklaşık bir milisaniyede söner; ½LI² ≈ 40 µJ’lük enerji ısıya dönüşür. Röle ve motor sürücülerinde bobine bu yüzden ters paralel diyot bağlanır.',
+      'RL devresindeki bobine ters paralel bir 1N4001 bağlı (katodu bobinin üst ucunda): serbest geçiş (flyback) diyodu. Anahtar kapalıyken diyot ters kutuplanmıştır, akım geçirmez. Hızı ×0,001’e çek, anahtarı kapat, sonra aç.',
+    purpose:
+      'Bobinin akımı kesildiğinde oluşan yüksek gerilimi zararsız hâle getirir. Anahtar açılınca bobin akımı diyot üzerinden dolaşmaya devam eder: bobinin üst ucu yalnızca bir diyot gerilimi kadar (≈ −0,6 V) eksiye iner, kilovoltluk sıçrama olmaz ve uyarı çıkmaz. Akım sargı direnci ve diyot üzerinden yaklaşık bir milisaniyede söner; ½LI² ≈ 40 µJ’lük enerji ısıya dönüşür.',
+    everyday:
+      'Rölelerin, solenoid valflerin, elektrikli kapı kilitlerinin ve DC motorların sürücülerinde bobine ters paralel bir diyot bağlanır; diyot olmasa sürücü transistör ilk kapanışta bozulabilir. Bilgisayar fanlarının ve araç rölelerinin devre kartlarında bu diyodu görebilirsin.',
   },
   'diyot-yonu': {
     title: 'Diyot yönü',
     description: 'İdeal 5 V’luk pil, 1 kΩ’luk direnç, ileri yönde bağlı bir silisyum diyot ve seri bir ampermetre.',
-    question:
-      'Ampermetre kaç mA gösterir? Diyotun üzerinde yaklaşık 0,65 V düştüğünü düşünerek önce hesapla, sonra Oynat’a bas.',
-    answer:
-      'Yaklaşık 4,35 mA: I = (5 V − 0,65 V) / 1 kΩ. Şimdi diyotu seçip F’ye bas (ya da sağ tıklayıp “Ters çevir”i seç) ve yeniden Oynat’a bas: akım neredeyse sıfıra düşer, çünkü ters yönde diyot yalnızca çok küçük bir sızıntı akımı geçirir.',
+    purpose:
+      'Diyodun akımı yalnızca bir yönde geçirdiğini gösterir. İleri yönde diyot ≈ 0,65 V düşürür ve akım I = (5 V − 0,65 V) / 1 kΩ ≈ 4,35 mA olur. Diyodu seçip F’ye bas (ya da sağ tıklayıp “Ters çevir”i seç) ve yeniden Oynat’a bas: ters yönde yalnızca çok küçük bir sızıntı akımı geçer, ampermetre neredeyse sıfır gösterir.',
+    everyday:
+      'Pil ters takılınca cihazı korumak için girişe seri bir diyot konur. Şarj cihazlarındaki doğrultmaçlar, güneş panellerindeki bypass diyotları ve araçların alternatöründeki diyotlar akımın yönünü bu şekilde denetler.',
   },
   'rc-kare-dalga': {
     title: 'Kare dalga ile RC',
     description:
-      'AC kaynak 0 V ile 10 V arasında gidip gelen 1 Hz’lik kare dalga veriyor (5 V tepe + 5 V DC kayma). 1 kΩ’luk direnç üzerinden 100 µF’lık kondansatör dolup boşalıyor; A kanalı kaynağı, B kanalı kondansatörün gerilimini gösteriyor. Zaman sabiti τ = R · C = 0,1 s.',
-    question:
-      'Kare dalganın her yarım periyodu (0,5 s) kaç τ eder? B kanalındaki eğri yarım periyodun sonunda kaç volta ulaşır? Önce tahmin et, sonra Oynat’a bas.',
-    answer:
-      'Yarım periyot 5τ’dur: kondansatör her yarım periyotta ≈ %99,3 dolar (≈ 9,93 V) ve sonraki yarıda neredeyse tamamen boşalır. B kanalı üstel dolma ve boşalma eğrilerini çizer. Kaynağın frekansını 5 Hz’e çıkar (yarım periyot = τ): kondansatör artık tam dolup boşalamaz, eğri 10 V ile 0 V’a hiç ulaşmaz.',
+      'AC kaynak 0 V ile 10 V arasında gidip gelen 1 Hz’lik kare dalga veriyor (5 V tepe + 5 V DC kayma). 1 kΩ’luk direnç üzerinden 100 µF’lık kondansatör dolup boşalıyor. Osiloskobun A kanalı kaynağı (giriş), B kanalı kondansatörün gerilimini (çıkış) gösteriyor; COM alt hatta.',
+    purpose:
+      'Kondansatörün dolmasını ve boşalmasını art arda gösterir. Zaman sabiti τ = R · C = 0,1 s; yarım periyot (0,5 s) 5τ olduğu için kondansatör her yarıda ≈ %99,3 dolar (≈ 9,93 V) ve sonraki yarıda neredeyse tamamen boşalır. Kaynağın frekansını 5 Hz’e çıkar: yarım periyot τ’ya eşit olur, kondansatör tam dolup boşalamaz ve eğri 0 V ile 10 V’a hiç ulaşmaz. Devre hızlı değişimleri yumuşatan bir alçak geçiren süzgeçtir.',
+    everyday:
+      'Ses devrelerindeki tiz ve bas süzgeçleri, LED’lerin yumuşak açılıp kapanması, dijital sinyallerdeki parazitin bastırılması ve PWM sinyalinden ayarlanabilir bir DC gerilim elde etmek RC süzgeçle yapılır.',
   },
   'toprak-tuzagi': {
     title: 'Toprak tuzağı: köprüde prob toprağı',
     description:
-      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe) dört diyotlu bir köprüyü besliyor; yük 100 kΩ. Osiloskobun A ucu yükün + ucunda, prob toprağı (COM) yükün − ucunda. Laboratuvardaki gibi hem üretecin hem osiloskobun COM ucu şebeke toprağına bağlı.',
-    question: 'Osiloskopta tam dalga mı, yarım dalga mı görürsün? Neden? Önce tahmin et, sonra Oynat’a bas.',
-    answer:
-      'Yarım dalga! İki cihazın COM ucu şebeke toprağı üzerinden birbirine bağlıdır. Prob toprağı yükün − ucuna takılınca D4 kısa devre olur; negatif yarıda üretecin çıkışı D3 üzerinden toprağa kısa devre olur ve yükten akım geçmez. Doğru ölçüm: COM’u üretecin COM’una (sağdaki düğüm) taşı, A’yı yükün + ucuna, B’yi − ucuna bağla; panelde B ters (INV) ve A + B (ADD) seç: ekranda A − B, yani yükün gerilimi (tam dalga, tepe ≈ 3,6 V) görünür. Osiloskobun özelliklerinden toprak bağlantısını kaldırmak (yalıtılmış osiloskop) da sorunu çözer.',
+      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe) dört diyotlu bir köprüyü besliyor; yük 100 kΩ. Osiloskobun A ucu yükün + ucunda, prob toprağı (COM) yükün − ucunda. Laboratuvardaki gibi hem üretecin hem osiloskobun COM ucu şebeke toprağına bağlı; tuvaldeki kesikli “toprak hattı” bu bağlantıyı gösterir.',
+    purpose:
+      'Topraklı iki cihazla yapılan yaygın bir ölçüm hatasını gösterir. İki cihazın COM ucu şebeke toprağı üzerinden birbirine bağlıdır. Prob toprağı yükün − ucuna takılınca D4 kısa devre olur; negatif yarıda üretecin çıkışı D3 üzerinden toprağa kısa devre olur ve yükten akım geçmez: ekranda tam dalga yerine yarım dalga görünür, Mesajlar’da uyarı çıkar. Doğru ölçüm “Köprü tipi tam dalga doğrultmaç” örneğindeki gibidir: COM üretecin COM’unda, A yükün + ucunda, B − ucunda; B ters (INV) ve A + B (ADD) seçilince ekranda A − B, yani yükün gerilimi görünür. Osiloskobun özelliklerinden toprak bağlantısını kaldırmak (yalıtılmış osiloskop) da sorunu çözer.',
+    everyday:
+      'Şebekeye bağlı cihazların kasası ve sinyal toprağı güvenlik için binanın toprak hattına bağlıdır. Doğrultmaç ve motor sürücü gibi güç devrelerinde ölçüm yapan teknisyenler bu yüzden diferansiyel prob ya da yalıtılmış osiloskop kullanır; yanlış yere takılan prob toprağı devreyi kısa devre edip cihazlara zarar verebilir.',
   },
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
     description:
-      'Laboratuvar güç kaynağının 1. çıkışı (5 V), 1 kΩ’luk direnç üzerinden bir 1N4001 diyodunu ileri yönde besliyor. Ampermetre devreden geçen akımı, voltmetre diyodun gerilimini ölçüyor.',
-    question:
-      'Diyodun gerilimi ve devreden geçen akım kaç olur? Diyot gerilimini ≈ 0,6 V alarak akımı hesapla, sonra Oynat’a bas.',
-    answer:
-      'V_{D} ≈ 0,56 V, I ≈ 4,4 mA: I = (5 V − 0,56 V) / 1 kΩ. Kaynağın gerilimini değiştirip föydeki tabloyu doldur: 0,5 V’ta I ≈ 0,13 mA (V_{D} ≈ 0,37 V), 1 V’ta ≈ 0,55 mA (0,45 V), 2 V’ta ≈ 1,5 mA (0,50 V), 10 V’ta ≈ 9,4 mA (0,60 V). Akım on kat artınca diyodun gerilimi yalnızca ≈ 0,12 V artar: karakteristik üsteldir. Diyodu ters çevirince (F) akım 1 µA’in altına düşer.',
+      'Laboratuvar güç kaynağının 1. çıkışı (5 V), ampermetre ve 1 kΩ’luk direnç üzerinden bir 1N4001 diyodunu ileri yönde besliyor; akım alt hattan kaynağın − ucuna döner. Voltmetre diyodun gerilimini ölçüyor.',
+    purpose:
+      'Diyodun akım-gerilim ilişkisini nokta nokta ölçmeyi sağlar. 5 V’ta V_{D} ≈ 0,56 V ve I = (5 V − 0,56 V) / 1 kΩ ≈ 4,4 mA. Kaynağın gerilimini değiştirip föydeki tabloyu doldur: 0,5 V’ta I ≈ 0,13 mA (V_{D} ≈ 0,37 V), 1 V’ta ≈ 0,55 mA (0,45 V), 2 V’ta ≈ 1,5 mA (0,50 V), 10 V’ta ≈ 9,4 mA (0,60 V). Akım on kat artınca diyodun gerilimi yalnızca ≈ 0,12 V artar: karakteristik üsteldir (Shockley denklemi). Diyodu ters çevirince (F) akım 1 µA’in altına düşer.',
+    everyday:
+      '1N4001 gibi doğrultma diyotları adaptörlerde, şarj cihazlarında ve güç kaynaklarında kullanılır. Diyodun ileri gerilimi sıcaklık arttıkça düştüğü için basit sıcaklık sensörleri de bu özelliği kullanır.',
   },
   'diyot-karakteristigi': {
     title: '1N4001: X-Y’de akım-gerilim eğrisi',
     description:
-      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe sinüs), 1 kΩ’luk direnç ile 1N4001’i seri besliyor. Osiloskop X-Y kipinde; COM ucu diyot ile direncin birleştiği noktada. A (yatay, 1 V/bölme) diyodun gerilimini, ters çevrilmiş B (dikey, 1 V/bölme = 1 mA) direncin gerilimini yani akımı gösteriyor. İki cihazın COM’u farklı noktalarda olduğu için üreteç topraktan yalıtılmış (COM’u şebeke toprağına bağlı değil).',
-    question:
-      'Eğri hangi gerilimden sonra dikleşir, en büyük akım kaç mA olur? Sonra üretecin frekansını 10 kHz, 100 kHz ve 1 MHz yap: eğri nasıl değişir?',
-    answer:
-      'Akım ≈ 0,4 V’tan sonra belirginleşir; en büyük akım ≈ 4,2 mA, o anda V_{D} ≈ 0,56 V: I = (5 V − 0,56 V) / (1 kΩ + 50 Ω). Ters yönde akım yok denecek kadar azdır. Frekans artınca 1N4001’in ileri yönde depoladığı yük, diyot ters kutuplanınca bir süre ters akım geçirir (ters toparlanma): 10 kHz’te ≈ −1,3 mA, 100 kHz’te ≈ −4,8 mA’lik ters akım görünür ve eğri ilmek açar. 1 MHz’te diyot artık doğrultmaz. Osiloskobun hızını Oto ile ayarla. Üretecin COM’unu şebeke toprağına bağlarsan (özelliklerinden) direnç iki toprak arasında kısa devre olur: B sıfır çizgisinde kalır ve diyottan ≈ 86 mA geçer.',
+      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe sinüs) 1N4001 ile 1 kΩ’luk direnci seri besliyor. Osiloskop X-Y kipinde ve döngünün içinde: COM ucu diyot ile direncin birleştiği noktada (toprak burası), A (yatay, 1 V/bölme) diyodun gerilimini, ters çevrilmiş B (dikey, 1 V/bölme = 1 mA) direncin gerilimini yani akımı gösteriyor. Üreteç topraktan yalıtılmış (COM’u şebeke toprağına bağlı değil).',
+    purpose:
+      'Diyodun akım-gerilim eğrisini ekranda tek seferde çizer. Akım ≈ 0,4 V’tan sonra belirginleşir; en büyük akım ≈ 4,2 mA, o anda V_{D} ≈ 0,56 V: I = (5 V − 0,56 V) / (1 kΩ + 50 Ω). Ters yönde akım yok denecek kadar azdır. Frekansı 10 kHz, 100 kHz ve 1 MHz yap: 1N4001 ileri yönde depoladığı yük yüzünden ters kutuplanınca bir süre ters akım geçirir (ters toparlanma; 100 kHz’te ≈ −4,8 mA) ve eğri ilmek açar. Üretecin COM’unu şebeke toprağına bağlarsan direnç iki toprak arasında kısa devre olur: B sıfırda kalır, diyottan ≈ 86 mA geçer.',
+    everyday:
+      'Yarı iletken üreticileri veri sayfalarındaki karakteristik eğrileri bu yöntemle (eğri izleyici) çıkarır. Hızlı anahtarlama yapan güç kaynaklarında 1N4001 yerine ters toparlanması kısa “hızlı” ya da Schottky diyotların seçilmesinin nedeni de bu deneyde görülür.',
   },
   'zener-karakteristigi': {
     title: 'Zener diyot (5,6 V): X-Y’de karakteristik',
     description:
       'Aynı düzenek; diyodun yerinde 5,6 V’luk bir zener (1N4734A gibi), üreteç 20 V tepe-tepe. A 2 V/bölme, B 1 V/bölme = 1 mA. Föy zenerin değerini vermiyor: laboratuvardaki zenerin değeri farklıysa özelliklerinden değiştir.',
-    question:
-      'Ters yönde zener hangi gerilimde iletime geçer, o anda kaç mA geçer? İleri yönde eğri sıradan bir diyottan farklı mı?',
-    answer:
-      'Ters yönde ≈ −5,4 V’ta kırılır; en büyük ters akım ≈ 4,4 mA: I = (10 V − 5,4 V) / 1,05 kΩ. V_{Z} 20 mA için tanımlıdır; birkaç mA’de biraz daha düşüktür. İleri yönde sıradan bir diyot gibi ≈ 0,7 V’ta iletir (en büyük akım ≈ 8,9 mA). Zener gerilimini 3,3 V ya da 9,1 V yapıp kırılmanın nasıl kaydığına bak: 9,1 V’ta ±10 V’luk sinüs kırılmayı ancak gösterir (≈ 0,9 mA).',
+    purpose:
+      'Zenerin ters yönde belirli bir gerilimde iletime geçtiğini gösterir. Ters yönde ≈ −5,4 V’ta kırılır; en büyük ters akım ≈ 4,4 mA: I = (10 V − 5,4 V) / 1,05 kΩ (V_{Z} 20 mA için tanımlıdır, birkaç mA’de biraz daha düşüktür). Kırılmadan sonra akım değişse de gerilim neredeyse sabit kalır. İleri yönde sıradan bir diyot gibi ≈ 0,7 V’ta iletir (≈ 8,9 mA). Zener gerilimini 3,3 V ya da 9,1 V yapıp kırılmanın nasıl kaydığına bak.',
+    everyday:
+      'Zener diyotlar basit gerilim regülatörlerinde (ör. bir sensöre sabit 5,1 V vermek), aşırı gerilim korumasında ve referans gerilimi üreten devrelerde kullanılır. Telefon ve bilgisayar girişlerindeki koruma diyotları (TVS) aynı kırılma ilkesiyle çalışır.',
   },
   'led-karakteristigi': {
     title: 'LED: X-Y’de karakteristik',
-    description:
-      'Aynı düzenek; diyodun yerinde kırmızı bir LED, üreteç 10 V tepe-tepe. A 1 V/bölme, B 1 V/bölme = 1 mA.',
-    question:
-      'LED hangi gerilimde iletime geçer, en büyük akım kaç mA olur? 1N4001 ile karşılaştır.',
-    answer:
-      'Kırmızı LED ≈ 1,5–1,7 V’ta iletir; en büyük akım ≈ 3,1 mA, o anda V_{F} ≈ 1,69 V. Eşik, silisyum diyodun yaklaşık üç katıdır çünkü LED’in yarı iletkeninin yasak enerji aralığı daha büyüktür. LED’in rengini yeşil ya da mavi yapıp eşiğin nasıl kaydığına bak. Ters yönde akım geçmez; gerçek LED’ler ≈ 5 V’tan büyük ters gerilime dayanamaz.',
+    description: 'Aynı düzenek; diyodun yerinde kırmızı bir LED, üreteç 10 V tepe-tepe. A 1 V/bölme, B 1 V/bölme = 1 mA.',
+    purpose:
+      'LED’in eşik geriliminin silisyum diyodunkinden büyük olduğunu gösterir. Kırmızı LED ≈ 1,5–1,7 V’ta iletir; en büyük akım ≈ 3,1 mA, o anda V_{F} ≈ 1,69 V. LED’in yarı iletkeninin yasak enerji aralığı daha büyüktür ve bu aralığı geçen elektronun yaydığı fotonun enerjisi rengi belirler (E = h · f). Rengi yeşil ya da mavi yap: dalga boyu kısaldıkça foton enerjisi ve eşik büyür. Ters yönde akım geçmez; gerçek LED’ler ≈ 5 V’tan büyük ters gerilime dayanamaz.',
+    everyday:
+      'LED ampuller, ekranların arka ışığı, uzaktan kumandaların kızılötesi vericisi ve trafik ışıkları. LED sürücüleri LED’i gerilimle değil akımla besler, çünkü eşiğin biraz üstünde akım çok hızlı artar.',
   },
   'yarim-dalga': {
     title: 'Yarım dalga doğrultmaç',
     description:
       'Fonksiyon üreteci (50 Hz, 20 V tepe-tepe sinüs) bir 1N4001 üzerinden 1 kΩ’luk yükü besliyor. S1, S2 ve S3 anahtarları yüke 1 µF, 22 µF ve 470 µF’lık filtre kondansatörlerini bağlar. Osiloskobun A kanalı girişi, B kanalı yükün gerilimini gösteriyor; voltmetre yükün DC (ortalama) gerilimini ölçüyor.',
-    question:
-      'Filtresiz durumda yükteki tepe gerilim ve voltmetrenin gösterdiği ortalama kaç olur? Sonra anahtarları sırayla kapat: dalgalanma nasıl değişir?',
-    answer:
-      'Filtresiz tepe ≈ 9,0 V (üretecin 50 Ω’unda ve diyotta ≈ 1 V düşer), ortalama ≈ 2,8 V ≈ V_{tepe} / π. 1 µF’ta (RC = 1 ms, periyot 20 ms) neredeyse fark yoktur. 22 µF’ta (RC = 22 ms) çıkış ≈ 4,2 V ile 8,5 V arasında dalgalanır, ortalama ≈ 6,2 V. 470 µF’ta dalgalanma ≈ 0,2 V’a iner, ortalama ≈ 7,0 V. Peki tepe neden ≈ 7,1 V’a düştü? Kondansatör her periyotta kısa bir anda dolar; bu büyük akım üretecin 50 Ω’luk çıkış direncinde gerilim düşürür (A kanalının tepesine bak). Diyodu ters çevirirsen (F) negatif yarılar geçer.',
+    purpose:
+      'Alternatif akımı tek yönlü akıma çevirir. Diyot yalnızca pozitif yarılarda iletir: filtresiz tepe ≈ 9,0 V (üretecin 50 Ω’unda ve diyotta ≈ 1 V düşer), ortalama ≈ 2,8 V ≈ V_{tepe} / π. Anahtarları sırayla kapat: kondansatör tepelerde dolup aralarda yükü besler. 22 µF’ta (RC = 22 ms) çıkış ≈ 4,2 V ile 8,5 V arasında dalgalanır (ortalama ≈ 6,2 V); 470 µF’ta dalgalanma ≈ 0,2 V’a iner. Diyodu ters çevirirsen (F) negatif yarılar geçer.',
+    everyday:
+      'Basit adaptörler ve küçük şarj devreleri yarım dalga doğrultmaç kullanır. Filtre kondansatörü bütün güç kaynaklarında vardır; kurumuş bir filtre kondansatörü, hoparlörde duyulan şebeke vızıltısının en yaygın nedenidir.',
   },
   'kopru-dogrultmac': {
     title: 'Köprü tipi tam dalga doğrultmaç',
     description:
-      'Dört 1N4001’lik köprü, fonksiyon üretecinden (50 Hz, 20 V tepe-tepe) 100 kΩ’luk yükü besliyor. Yükün iki ucu da topraktan farklı gerilimde olduğu için osiloskop yükü iki kanalla ölçüyor: A yükün + ucunda, B − ucunda; B ters çevrilmiş ve ADD açık (ekranda A − B). Prob toprağı toprakta, yani üretecin COM’uyla aynı noktada (ikisi de şebeke toprağına bağlı).',
-    question:
-      'Yükün tepe gerilimi kaç volt olur, çıkışın frekansı kaç Hz’dir? Prob toprağını yükün − ucuna takarsan ne olur?',
-    answer:
-      'Tepe ≈ 9,3 V: her yarım periyotta iki diyot iletir. 100 kΩ’da akım küçük olduğundan her 1N4001’de yalnızca ≈ 0,35 V düşer. Çıkış her yarım periyotta tekrarlar: 100 Hz. Prob toprağını yükün − ucuna takarsan bu nokta şebeke toprağı üzerinden üretecin COM’uyla birleşir ve bir diyodu kısa devre eder: ekranda tam dalga yerine yarım dalga görülür (Laboratuvar cihazları grubundaki “Toprak tuzağı” örneği).',
+      'Dört 1N4001’lik köprü, fonksiyon üretecinden (50 Hz, 20 V tepe-tepe) 100 kΩ’luk yükü besliyor. Yükün iki ucu da topraktan farklı gerilimde olduğu için osiloskop yükü iki kanalla ölçüyor: A yükün + ucunda, B − ucunda, COM üretecin COM’unda (sağ kolun ortası). B ters çevrilmiş ve ADD açık: ekranda A − B.',
+    purpose:
+      'İki yarım dalgayı da aynı yöne çevirir (tam dalga doğrultma). Pozitif yarıda D1 ile D4, negatif yarıda D2 ile D3 iletir; yükten akım her zaman aynı yönde geçer. Tepe ≈ 9,3 V: her yarıda iki diyot iletir ve 100 kΩ’da akım küçük olduğundan her birinde ≈ 0,35 V düşer. Çıkış her yarım periyotta tekrarlar: 100 Hz. Bu yüzden aynı filtre kondansatörüyle dalgalanma yarım dalga doğrultmacınkinin yarısı kadardır.',
+    everyday:
+      'Telefon şarj aletlerinin, dizüstü bilgisayar adaptörlerinin ve neredeyse bütün şebeke beslemeli cihazların girişinde köprü doğrultmaç vardır; çoğu zaman dört diyot tek bir küçük paketin içindedir.',
   },
   'negatif-kenetleyici': {
     title: 'Negatif kenetleyici',
     description:
       'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe sinüs), 2,2 µF’lık kondansatör üzerinden 10 kΩ’luk yüke bağlı; 1N4001 yüke paralel, anodu çıkışta. Osiloskobun A kanalı girişi, B kanalı çıkışı gösteriyor (ikisi de DC kuplaj, 5 V/bölme).',
-    question:
-      'Çıkışın en büyük ve en küçük değeri ne olur? Tepe-tepe değeri değişir mi?',
-    answer:
-      'Çıkış ≈ +0,56 V ile ≈ −9,1 V arasında salınır. Kondansatör pozitif tepede ≈ 4,4 V’a dolar ve bütün dalgayı aşağı kaydırır; dalganın biçimi ve tepe-tepe değeri (≈ 9,6 V) neredeyse aynı kalır. RC = 22 ms periyottan (1 ms) çok büyük olduğu için kondansatör bir periyotta pek boşalmaz. Üreteci kare dalgaya al: çıkış ≈ +0,5 V ile −9,5 V arasında olur. B kanalını AC kuplaja alırsan kayma kaybolur; kenetlemeyi görmek için DC kuplaj gerekir.',
+    purpose:
+      'Dalganın biçimini bozmadan onu aşağı kaydırır. Pozitif tepede diyot iletir ve kondansatör ≈ 4,4 V’a dolar; bu gerilim seri bir pil gibi bütün dalgayı aşağı taşır. Çıkış ≈ +0,56 V ile ≈ −9,1 V arasında salınır, tepe-tepe değeri (≈ 9,6 V) neredeyse aynı kalır. RC = 22 ms periyottan (1 ms) çok büyük olduğu için kondansatör bir periyotta pek boşalmaz. Üreteci kare dalgaya al: ≈ +0,5 V ile −9,5 V. B’yi AC kuplaja alırsan kayma kaybolur.',
+    everyday:
+      'Televizyon ve video devrelerinde görüntü sinyalinin siyah seviyesini sabitlemek (DC restorer), bir sinyali dönüştürücünün giriş aralığına kaydırmak için kullanılır; gerilim katlayıcıların ilk katı da bir kenetleyicidir.',
   },
   'pozitif-kenetleyici': {
     title: 'Pozitif kenetleyici',
     description:
-      'Negatif kenetleyicinin aynısı; yalnızca 1N4001 ters bağlı, katodu çıkışta. Üreteç 1 kHz, 10 V tepe-tepe sinüs; C = 2,2 µF, yük 10 kΩ.',
-    question:
-      'Çıkış hangi gerilimler arasında salınır?',
-    answer:
-      'Çıkış ≈ −0,56 V ile ≈ +9,1 V arasında salınır: dalga yukarı kayar, en alt noktası diyot gerilimi kadar sıfırın altındadır. Kare dalgada ≈ −0,5 V ile +9,5 V. Diyoda seri bir DC kaynak eklersen kenetleme seviyesi o kadar kayar (öngerilimli kenetleyici).',
+      'Negatif kenetleyicinin aynısı; yalnızca 1N4001 ters bağlı (katodu çıkışta) ve elektrolitik kondansatörün + ucu çıkış tarafında. Üreteç 1 kHz, 10 V tepe-tepe sinüs; C = 2,2 µF, yük 10 kΩ.',
+    purpose:
+      'Dalgayı yukarı kaydırır. Negatif tepede diyot iletir, kondansatör dolar ve dalgayı yukarı taşır: çıkış ≈ −0,56 V ile ≈ +9,1 V arasında salınır, en alt noktası bir diyot gerilimi kadar sıfırın altındadır. Kare dalgada ≈ −0,5 V ile +9,5 V. Diyoda seri bir DC kaynak eklersen kenetleme seviyesi o kadar kayar (öngerilimli kenetleyici).',
+    everyday:
+      'Yalnızca pozitif gerilim ölçebilen bir analog-dijital dönüştürücüye artı-eksi salınan bir sinyali vermek ve analog ses ile görüntü arabirimlerinde sinyal seviyesini ayarlamak için kullanılır.',
   },
   'gerilim-katlayici': {
     title: 'Gerilim katlayıcı (ikileyici)',
     description:
-      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe yani 5 V tepe sinüs), iki 1N4001 ve iki 10 µF’lık kondansatörden oluşan yarım dalga gerilim ikileyiciyi besliyor. C1 ile D1 bir kenetleyici, D2 ile C2 bir tepe dedektörüdür. Osiloskobun A kanalı girişi, B kanalı çıkışı (C2) gösteriyor.',
-    question:
-      'Çıkıştaki DC gerilim kaç volt olur? Kaç milisaniyede dolar?',
-    answer:
-      'Çıkış ≈ 9,1 V ≈ 2 · 5 V − 2 · V_{D}: D1 girişi yukarı kenetler (≈ 0 ile 9,5 V arası), D2 bu dalganın tepesini C2’ye yükler. C2 ilk 5 ms’de ≈ 4,9 V’a, 50 ms’de ≈ 8,7 V’a ulaşır. Çıkışa bir yük direnci (ör. 10 kΩ) bağla: gerilim düşer ve dalgalanmaya başlar.',
+      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe yani 5 V tepe sinüs), iki 1N4001 ve iki 10 µF’lık kondansatörden oluşan yarım dalga gerilim ikileyiciyi besliyor. Osiloskobun A kanalı girişi, B kanalı çıkışı (C2) gösteriyor.',
+    purpose:
+      'Girişin tepe geriliminin yaklaşık iki katında bir DC gerilim üretir. C1 ile D1 bir kenetleyicidir: girişi ≈ 0 V ile 9,5 V arasına kaydırır. D2 ile C2 bir tepe dedektörüdür: bu dalganın tepesini C2’ye yükler. Çıkış ≈ 9,1 V ≈ 2 · 5 V − 2 · V_{D}; C2 ilk 5 ms’de ≈ 4,9 V’a, 50 ms’de ≈ 8,7 V’a ulaşır. Çıkışa bir yük direnci (ör. 10 kΩ) bağla: gerilim düşer ve dalgalanır, çünkü katlayıcı ancak küçük akım verebilir.',
+    everyday:
+      'Mikrodalga fırınların yüksek gerilim beslemesi, lazer yazıcıların ve fotokopi makinelerinin yüksek gerilim katları, sinek öldürücü raketler ve Geiger sayaçları gerilim katlayıcıyla (çok katlı Cockcroft-Walton) yüksek gerilim üretir.',
   },
   'paralel-kirpici': {
     title: 'Öngerilimli paralel kırpıcı (4 V)',
     description:
-      'Fonksiyon üreteci (1 kHz, 20 V tepe-tepe sinüs) 10 kΩ üzerinden çıkışa bağlı. 1N4001’in anodu çıkışta, katodu DC güç kaynağının 4 V’luk 1. çıkışında. Osiloskobun A kanalı girişi, B kanalı çıkışı gösteriyor.',
-    question:
-      'Çıkış hangi gerilimde kırpılır? Negatif yarı nasıl görünür?',
-    answer:
-      'Pozitif tepeler ≈ 4,45 V’ta kırpılır: 4 V + V_{D} (akım ≈ 0,55 mA olduğundan V_{D} ≈ 0,45 V). Negatif yarı olduğu gibi geçer (≈ −9,9 V). Föydeki öbür kırpıcıları bu devreden kurabilirsin. Diyodu ters çevirirsen (F) çıkış ≈ 3,55 V’un altına inemez. Kaynağı 3 V ya da 2 V yaparsan kırpma seviyesi o kadar kayar. Kaynağın uçlarını değiştirirsen seviye negatife geçer.',
+      'Fonksiyon üreteci (1 kHz, 20 V tepe-tepe sinüs) 10 kΩ üzerinden çıkışa bağlı. 1N4001’in anodu çıkışta, katodu DC güç kaynağının 4 V’luk 1. çıkışında; kaynağın − ucu ortak hatta. Osiloskobun A kanalı girişi, B kanalı çıkışı gösteriyor.',
+    purpose:
+      'Sinyalin belirli bir seviyenin üstündeki kısmını keser. Çıkış 4 V + V_{D}’yi geçmeye çalışınca diyot iletir ve fazla gerilim 10 kΩ’un üzerine düşer: pozitif tepeler ≈ 4,45 V’ta kırpılır (akım ≈ 0,55 mA olduğundan V_{D} ≈ 0,45 V). Negatif yarı olduğu gibi geçer (≈ −9,9 V). Kaynağı 3 V ya da 2 V yaparsan kırpma seviyesi o kadar kayar; diyodu ters çevirirsen (F) çıkış ≈ 3,55 V’un altına inemez.',
+    everyday:
+      'Elektronik girişleri aşırı gerilime karşı korumak (ör. bir mikrodenetleyici pinini besleme gerilimiyle sınırlamak), gitar distorsiyon pedallarında sinyali kasıtlı olarak kırpmak ve radyolarda gürültü darbelerini sınırlamak için kullanılır.',
   },
   'cift-kirpici': {
     title: 'Çift yönlü kırpıcı (3 V ve 2 V)',
     description:
-      'Fonksiyon üreteci (1 kHz, 20 V tepe-tepe sinüs), 10 kΩ’luk seri direnç ve iki 1N4001. D1’in katodu DC güç kaynağının 3 V’luk 1. çıkışında. D2’nin anodu 2. çıkışın − ucunda; bu çıkışın + ucu toprakta, yani D2’nin anodu −2 V’ta.',
-    question:
-      'Çıkış hangi iki gerilim arasında kalır?',
-    answer:
-      'Çıkış ≈ +3,46 V ile ≈ −2,47 V arasında kalır: pozitif tepelerde D1 iletir (3 V + V_{D}), negatif tepelerde D2 iletir (−2 V − V_{D}). Güç kaynağının çıkışları topraktan yalıtılmış olduğundan bir çıkışı ters bağlayıp negatif gerilim elde edebilirsin.',
+      'Fonksiyon üreteci (1 kHz, 20 V tepe-tepe sinüs), 10 kΩ’luk seri direnç ve iki 1N4001. D1’in katodu 3 V’luk B1 pilinin + ucunda; D2’nin anodu ters bağlı 2 V’luk B2 pilinin − ucunda, yani −2 V’ta. Laboratuvarda bu iki kaynak, güç kaynağının topraktan yalıtılmış iki çıkışıdır (2. çıkış ters bağlanır). Osiloskobun A kanalı girişi, B kanalı çıkışı gösteriyor.',
+    purpose:
+      'Sinyali iki yönden sınırlar ve bir pencerenin içinde tutar. Pozitif tepelerde D1 iletir (3 V + V_{D}), negatif tepelerde D2 iletir (−2 V − V_{D}): çıkış ≈ +3,46 V ile ≈ −2,47 V arasında kalır. Pillerin gerilimini değiştirip pencerenin nasıl kaydığına bak.',
+    everyday:
+      'Ölçü aletlerinin ve ses kartlarının girişleri bu tür çift diyotla korunur; radyo ve televizyon yayınlarında sinyalin belirli bir genliği aşmaması için sınırlayıcı (limiter) olarak kullanılır.',
   },
   'jfet-karakteristik': {
     title: 'BF245A: çıkış ve transfer karakteristiği',
-    description:
-      'DC güç kaynağının 1. çıkışı (V_{DD} = 10 V) ampermetre üzerinden BF245A’nın drain’ini besliyor. 2. çıkış ters bağlı: + ucu toprakta (source), − ucu kapıda; böylece V_{GS} = −V_{GG}. V1, V_{DS}’yi; V2, V_{GS}’yi ölçüyor. Başlangıçta V_{GG} = 0.',
-    question:
-      'V_{GS} = 0’da drain akımı (≈ I_{DSS}) kaç mA olur? V_{GS} = −0,2 V ve −0,4 V’ta?',
-    answer:
-      'V_{DS} = 10 V’ta I_{D} ≈ 4,1 mA (V_{GS} = 0), ≈ 3,2 mA (−0,2 V) ve ≈ 2,5 mA (−0,4 V). Doyumda I_{D} = I_{DSS} · (1 − V_{GS} / V_{P})² · (1 + λV_{DS}); bu BF245A’da I_{DSS} ≈ 3,5 mA, V_{P} ≈ −1,74 V, λ ≈ 0,018 V⁻¹ (akım V_{DS} ile biraz artar). Çıkış eğrisi için V_{DD}’yi 0–15 V arasında değiştir: V_{DS} < V_{GS} − V_{P} iken akım hızla artar (omik bölge), sonra neredeyse sabittir (doyum). V_{GG}’yi akım sıfırlanana kadar artır: kısılma gerilimi ≈ 1,74 V. Kendi transistöründe ölçtüğün I_{DSS} ve V_{P}’yi özelliklerinden yazabilirsin.',
+    description: `DC güç kaynağının 1. çıkışı (V_{DD} = 10 V) ampermetre üzerinden BF245A’nın drain’ini besliyor. 2. çıkış ters bağlı: + ucu source tarafındaki ortak hatta, − ucu kapıda; böylece V_{GS} = −V_{GG}. V1, V_{DS}’yi; V2, V_{GS}’yi ölçüyor. Başlangıçta V_{GG} = 0. Ortak hat kapı kablosunu keserek geçer: ${CROSSING}`,
+    purpose:
+      'Kapı geriliminin drain akımını nasıl denetlediğini ölçer: JFET gerilimle kontrol edilen bir dirençtir ve kapısından neredeyse hiç akım geçmez. V_{DS} = 10 V’ta I_{D} ≈ 4,1 mA (V_{GS} = 0), ≈ 3,2 mA (−0,2 V) ve ≈ 2,5 mA (−0,4 V). Doyumda I_{D} = I_{DSS} · (1 − V_{GS} / V_{P})² · (1 + λV_{DS}); bu BF245A’da I_{DSS} ≈ 3,5 mA, V_{P} ≈ −1,74 V. Çıkış eğrisi için V_{DD}’yi 0–15 V arasında değiştir: önce omik bölge, sonra doyum. V_{GG}’yi akım sıfırlanana kadar artır: kısılma gerilimi ≈ 1,74 V.',
+    everyday:
+      'JFET’ler giriş direnci çok yüksek olduğu için gitar ve mikrofon ön yükselteçlerinde, multimetrelerin ve osiloskopların giriş katlarında ve analog anahtarlarda kullanılır.',
   },
   'fet-yukseltec': {
     title: 'BF245A ile ortak kaynaklı yükselteç (kazanç 10)',
-    description:
-      'Föydeki tasarım ödevinin bir çözümü: kapı R_{G} = 1 MΩ ile toprağa bağlı (V_{GS} = 0, I_{D} ≈ I_{DSS}), V_{DD} = 15 V, R_{D} = 2,7 kΩ. Giriş 1 µF ile kuplajlı: 1 kHz, 0,5 V tepe-tepe sinüs. Osiloskobun A kanalı çıkışı (drain; AC kuplaj, 2 V/bölme), B kanalı girişi (kapı; 0,2 V/bölme) gösteriyor.',
-    question:
-      'Kazanç kaç olur? Giriş ile çıkış arasında faz farkı var mı?',
-    answer:
-      'Kazanç ≈ −10: A_{v} = −g_{m} · (R_{D} ∥ r_{o}). Burada g_{m} = 2 · I_{D} / |V_{P}| ≈ 4,4 mS (I_{D} ≈ 3,8 mA) ve r_{o} ≈ 1 / (λ · I_{DSS}) ≈ 16 kΩ. Çıkış girişle ters fazlıdır (180°). Çalışma noktası V_{DS} ≈ 4,7 V. Girişi 2 V tepe-tepeye çıkar: çıkış bozulur (≈ 1,2 V ile 14,5 V arası). Negatif yarıda transistör kesime yaklaşır; pozitif yarıda kapı-kaynak eklemi iletmeye başlar ve kare yasası dalgayı eğer. Kendi tasarımın için R_{D}’yi değiştirip kazancı karşılaştır.',
+    description: `Föydeki tasarım ödevinin bir çözümü: kapı R_{G} = 1 MΩ ile ortak hatta bağlı (V_{GS} = 0, I_{D} ≈ I_{DSS}), V_{DD} = 15 V, R_{D} = 2,7 kΩ. Giriş 1 µF ile kuplajlı: 1 kHz, 0,5 V tepe-tepe sinüs. Osiloskobun A kanalı girişi (kapı; AC kuplaj, 0,2 V/bölme), B kanalı çıkışı (drain; AC, 2 V/bölme) gösteriyor. A’nın kablosu V_{DD} hattını keserek geçer: ${CROSSING}`,
+    purpose:
+      'Küçük bir gerilim değişimini yaklaşık on kat büyütür. Kapıdaki küçük değişim drain akımını değiştirir; bu akım R_{D} üzerinde büyük bir gerilim değişimi oluşturur. Kazanç ≈ −10: A_{v} = −g_{m} · (R_{D} ∥ r_{o}), g_{m} = 2 · I_{D} / |V_{P}| ≈ 4,4 mS (I_{D} ≈ 3,8 mA). Eksi işareti, çıkışın girişle ters fazlı (180°) olduğunu söyler. Girişi 2 V tepe-tepeye çıkar: çıkış bozulur (≈ 1,2 V ile 14,5 V arası), çünkü transistör doğrusal bölgenin dışına çıkar.',
+    everyday:
+      'Elektro gitarların ve kondansatör mikrofonların içindeki ilk yükseltme katı çoğu zaman tek bir JFET’tir; radyo alıcılarının anten girişindeki düşük gürültülü yükselteçlerde de JFET kullanılır.',
   },
   'bjt-yukseltec': {
     title: 'BC107 ile ortak emetörlü yükselteç',
-    description:
-      'Föydeki tasarımın bir çözümü: V_{CC} = 12 V, R_{B} = 2,2 MΩ (sabit baz akımı), R_{C} = 5,6 kΩ, β = 200. Üreteç 1 kHz sinüs, −20 dB zayıflatıcıyla 20 mV tepe-tepe; girişte 10 µF’lık kuplaj kondansatörü var. Osiloskobun A kanalı çıkışı (kollektör; AC, 1 V/bölme), B kanalı girişi (baz; AC, 5 mV/bölme) gösteriyor.',
-    question:
-      'Çalışma noktası (I_{C}, V_{CE}) ve kazanç ne olur? Frekansı 100 kHz, 1 MHz ve 2 MHz yap: kazanç değişir mi?',
-    answer:
-      'I_{B} = (12 V − 0,63 V) / 2,2 MΩ ≈ 5,2 µA ve I_{C} ≈ β · I_{B} ≈ 1,1 mA (Early etkisiyle biraz fazla). V_{CE} ≈ 5,9 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −215: A_{v} ≈ −g_{m} · R_{C}, g_{m} = I_{C} / V_{T} ≈ 42 mS. 100 kHz’e kadar kazanç sabittir; 1 MHz’te ≈ 150’ye, 2 MHz’te ≈ 100’e düşer. Bunun nedeni, BC107’nin kollektör-baz kapasitesi ile osiloskobun 25 pF’lık girişinin R_{C} ile alçak geçiren süzgeç oluşturmasıdır. Girişi 100 mV tepe-tepeye çıkar: çıkış doyumla (≈ 0,1 V) ve kesimle (≈ 11,6 V) kırpılır. Kare dalgayı da dene. β’yı değiştirince çalışma noktası kayar: sabit baz akımlı öngerilim β’ya bağlıdır.',
+    description: `Föydeki tasarımın bir çözümü: V_{CC} = 12 V, R_{B} = 2,2 MΩ (sabit baz akımı), R_{C} = 5,6 kΩ, β = 200. Üreteç 1 kHz sinüs, −20 dB zayıflatıcıyla 20 mV tepe-tepe; girişte 10 µF’lık kuplaj kondansatörü var. Osiloskobun A kanalı girişi (baz; AC, 5 mV/bölme), B kanalı çıkışı (kollektör; AC, 1 V/bölme) gösteriyor. A’nın kablosu V_{CC} hattını keserek geçer (bu devrede bir kesişme kaçınılmazdır): ${CROSSING}`,
+    purpose:
+      'Küçük bir sinyali iki yüz kattan fazla büyütür. I_{B} = (12 V − 0,63 V) / 2,2 MΩ ≈ 5,2 µA ve I_{C} ≈ β · I_{B} ≈ 1,1 mA; V_{CE} ≈ 5,9 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −215: A_{v} ≈ −g_{m} · R_{C}, g_{m} = I_{C} / V_{T} ≈ 42 mS; çıkış ters fazlıdır. 1 MHz’te kazanç ≈ 150’ye düşer (kollektör-baz kapasitesi ve osiloskobun 25 pF’lık girişi). Girişi 100 mV tepe-tepeye çıkar: çıkış doyumla (≈ 0,1 V) ve kesimle (≈ 11,6 V) kırpılır. β’yı değiştirince çalışma noktası kayar: sabit baz akımlı öngerilim β’ya bağlıdır.',
+    everyday:
+      'Ortak emetörlü yükselteç radyoların, işitme cihazlarının, mikrofon ön yükselteçlerinin ve sensör devrelerinin temel yapı taşıdır; işlemsel yükselteç entegrelerinin içinde de aynı kat vardır.',
   },
   'mosfet-yukseltec': {
     title: 'IRF510 ile ortak kaynaklı yükselteç',
-    description:
-      'V_{DD} = 15 V, R_{D} = 10 kΩ, R_{S} = 1 kΩ. Kapıyı fonksiyon üreteci doğrudan sürüyor: 4,55 V DC offset üzerine 1 kHz, 0,1 V tepe-tepe sinüs. IRF510’un eşiği ≈ 3,8 V olduğundan offset, transistörü küçük bir akımla iletime sokar. Osiloskobun A kanalı çıkışı (drain; AC, 0,5 V/bölme), B kanalı girişi (kapı; AC, 50 mV/bölme) gösteriyor.',
-    question:
-      'Kazanç kaç olur, giriş ile çıkış arasında faz farkı kaç derece? Girişi 1 V tepe-tepeye çıkarınca ne olur?',
-    answer:
-      'I_{D} ≈ 0,70 mA, V_{GS} ≈ 3,85 V (eşiğin yalnızca ≈ 20 mV üstünde), V_{DS} ≈ 7,3 V. Kazanç ≈ −9,7: A_{v} ≈ −R_{D} / (R_{S} + 1 / g_{m}), g_{m} = 2 · √(k · I_{D}) ≈ 59 mS. Çıkış girişle 180° ters fazlıdır. 1 V tepe-tepe girişte çıkış ≈ 3,2 V ile 12,9 V arasında salınır: kare yasası yüzünden iki yarı eşit değildir. Offset’i değiştirip çalışma noktasının ne kadar hassas olduğuna bak: IRF510’un eşiği parçadan parçaya 2–4 V arasında değişir. Frekansı 1 MHz yapınca kazanç ≈ 2,3’e düşer (C_{GD} ve osiloskop girişi).',
+    description: `V_{DD} = 15 V, R_{D} = 10 kΩ, R_{S} = 1 kΩ. Kapıyı fonksiyon üreteci doğrudan sürüyor: 4,55 V DC offset üzerine 1 kHz, 0,1 V tepe-tepe sinüs. IRF510’un eşiği ≈ 3,8 V olduğundan offset, transistörü küçük bir akımla iletime sokar. Osiloskobun A kanalı girişi (kapı; AC, 50 mV/bölme), B kanalı çıkışı (drain; AC, 0,5 V/bölme) gösteriyor. A’nın kablosu V_{DD} hattını keserek geçer: ${CROSSING}`,
+    purpose:
+      'MOSFET’le gerilim yükseltir. I_{D} ≈ 0,70 mA, V_{DS} ≈ 7,3 V. Kazanç ≈ −9,7: A_{v} ≈ −R_{D} / (R_{S} + 1 / g_{m}), g_{m} = 2 · √(k · I_{D}) ≈ 59 mS. R_{S} negatif geri besleme yapar: kazancı transistörün dağınık özelliklerinden çok dirençlerin oranı belirler ve çalışma noktası kararlı olur. Çıkış girişle 180° ters fazlıdır. 1 V tepe-tepe girişte çıkış ≈ 3,2 V ile 12,9 V arasında salınır; kare yasası yüzünden iki yarı eşit değildir.',
+    everyday:
+      'IRF510 gibi güç MOSFET’leri çoğunlukla anahtar olarak motor sürücülerde, LED dimmerlerde ve güç kaynaklarında çalışır; amatör telsizciler onları kısa dalga verici yükselteçlerinde de kullanır. Bilgisayar işlemcilerindeki milyarlarca transistör de MOSFET’tir.',
   },
   'bjt-anahtar': {
     title: 'Transistör anahtar: LED kollektörde',
-    description:
-      'Fonksiyon üretecinin TTL (darbe) çıkışı 1 Hz’lik 0/5 V kare dalga veriyor; R_{1} = 10 kΩ BC107’nin bazını sürüyor. Kollektörde R_{2} = 1 kΩ ve kırmızı LED, V_{CC} = 12 V’a bağlı. Osiloskobun A kanalı kollektörü (V_{CE}), B kanalı girişi gösteriyor.',
-    question:
-      'Giriş 5 V iken transistör doyumda mı? LED’den kaç mA geçer, V_{CE} kaç volt olur? Giriş 0 V’ta ne olur?',
-    answer:
-      'I_{B} = (5 V − 0,7 V) / 10 kΩ ≈ 0,43 mA. β · I_{B} ≈ 86 mA olurdu, ama kollektör akımı en fazla (12 V − 1,8 V) / 1 kΩ ≈ 10 mA olabilir. β · I_{B} bundan çok büyük olduğu için transistör doyumdadır: V_{CE} ≈ 0,04 V, LED’den ≈ 10 mA geçer. Giriş 0 V’ta baz akımı yoktur: transistör kesimde, LED sönük, V_{CE} ≈ 12 V − V_{LED}. Küçük bir baz akımı büyük bir akımı açıp kapatır.',
+    description: `Fonksiyon üretecinin TTL (darbe) çıkışı 1 Hz’lik 0/5 V kare dalga veriyor; R_{1} = 10 kΩ BC107’nin bazını sürüyor. Kollektörde R_{2} = 1 kΩ ve kırmızı LED, V_{CC} = 12 V’a bağlı. Osiloskobun A kanalı girişi (TTL), B kanalı kollektörü (V_{CE}) gösteriyor. A’nın kablosu V_{CC} hattını keserek geçer: ${CROSSING}`,
+    purpose:
+      'Küçük bir baz akımıyla büyük bir yükü açıp kapatır. Giriş 5 V’ta I_{B} = (5 V − 0,7 V) / 10 kΩ ≈ 0,43 mA; β · I_{B} ≈ 86 mA olurdu, ama kollektör akımı en fazla (12 V − 1,8 V) / 1 kΩ ≈ 10 mA olabilir. Transistör doyuma girer: V_{CE} ≈ 0,04 V, LED’den ≈ 10 mA geçer. Giriş 0 V’ta baz akımı yoktur: transistör kesimde, LED sönük. Transistör ya tam açık ya tam kapalı olduğu için üzerinde çok az güç harcanır.',
+    everyday:
+      'Bir mikrodenetleyicinin (Arduino gibi) pininden röle, motor, buzzer ya da LED şeridi sürmek bu devreyle yapılır. Araçlardaki sinyal lambaları ve bilgisayarların dijital devreleri de transistörü anahtar olarak kullanır.',
   },
   'bjt-anahtar-emetor': {
     title: 'Transistör anahtar: LED emetörde',
     description:
-      'Aynı parçalar; bu kez kollektör doğrudan 12 V’ta, LED ve R_{2} = 1 kΩ emetör ile toprak arasında. Baz yine TTL çıkışından R_{1} = 10 kΩ ile sürülüyor.',
-    question:
-      'Giriş 5 V iken LED’den kaç mA geçer? Transistör doyumda mı? Kollektördeki devreyle karşılaştır.',
-    answer:
-      'LED’den yalnızca ≈ 2,6 mA geçer ve LED sönük yanar. Transistör doyuma girmez, aktif bölgededir (V_{CE} ≈ 7,8 V). Emetör, bazın ≈ 0,65 V altını izler (emetör izleyici): I_{E} ≈ (5 V − 0,65 V − V_{LED}) / (R_{2} + R_{1} / β) ≈ 2,5 mA. Akımı V_{CC} değil, giriş gerilimi belirler. Anahtar olarak kullanmak için yük kollektörde olmalıdır.',
+      'Aynı parçalar; bu kez kollektör doğrudan 12 V’ta, LED ve R_{2} = 1 kΩ emetör ile ortak hat arasında. Baz yine TTL çıkışından R_{1} = 10 kΩ ile sürülüyor.',
+    purpose:
+      'Yük yanlış yerdeyken transistörün anahtar gibi çalışmadığını gösterir. LED’den yalnızca ≈ 2,6 mA geçer ve LED sönük yanar; transistör doyuma girmez, aktif bölgede kalır (V_{CE} ≈ 7,8 V). Emetör bazın ≈ 0,65 V altını izler (emetör izleyici): I_{E} ≈ (5 V − 0,65 V − V_{LED}) / (R_{2} + R_{1} / β) ≈ 2,5 mA. Akımı V_{CC} değil giriş gerilimi belirler; anahtar olarak kullanmak için yük kollektörde olmalıdır.',
+    everyday:
+      'Emetör izleyici, bir sinyali yüklemeden başka bir devreye aktaran bir tampondur: ses yükselteçlerinin çıkış katları ve doğrusal gerilim regülatörlerinin geçiş transistörü bu bağlantıda çalışır.',
   },
   'baraj-cubuk': {
     title: 'Baraj uyarısı: çubuk gösterge',
-    description:
-      'Baraj haznesinin dibinde ortak prob (+9 V) ve üç seviye probu var. Su bir proba ulaşınca, suyun direnci (≈ 5 kΩ) ve 10 kΩ’luk baz direnci üzerinden o seviyenin BC107’sine baz akımı akar; transistör doyuma girer ve LED’ini yakar: Seviye 1 yeşil, Seviye 2 sarı, Seviye 3 kırmızı. Bazdaki 10 µF’lık kondansatör ve 100 kΩ’luk direnç, dalgalı su yüzeyinde LED’in titremesini önler. Hazne Doldur kipinde: Oynat’a basınca su %20’den 16 saniyede dolar (dolma süresi ayarlanabilir).',
-    question:
-      'Su yükseldikçe LED’ler hangi sırayla yanar? Su Seviye 1’e ulaşınca transistör doyuma girer mi? Baz akımını kabaca hesapla (V_{BE} ≈ 0,65 V).',
-    answer:
-      'Önce yeşil (≈ 3,4 s’de, su %37,5’e gelince), sonra yeşilin yanında sarı (≈ 8,4 s), sonra üçü birden (≈ 13,4 s). I_{B} ≈ (9 V − 0,65 V) / (5 kΩ + 10 kΩ) ≈ 0,55 mA; β · I_{B} ≈ 110 mA olurdu, ama LED devresi en fazla ≈ (9 V − 2,2 V) / 470 Ω ≈ 14 mA’e izin verir: transistör doyumdadır (V_{CE} ≈ 0,05 V), LED’den ≈ 14,5 mA geçer. Su akışını Boşalt yap: LED’ler ters sırayla, kondansatör yüzünden yumuşakça söner. Su direncini 1 MΩ yap (çok saf su): 100 kΩ’luk direnç baz akımının çoğunu çeker, LED’den yalnızca ≈ 0,5 mA geçer ve LED zor görünür. Gerçek devrelerde baz ve çekme dirençleri suyun direncine göre seçilir.',
+    description: `Baraj haznesinin dibinde ortak prob (+9 V) ve üç seviye probu var. Her seviyenin devresi kendi bandında: prob → 10 kΩ’luk baz direnci → BC107; bazda 10 µF ve 100 kΩ, kollektörde LED ve 470 Ω. Bantların ortak hattı sağdaki ortak baradan pilin − ucuna döner; bara iki RC bağlantısını keserek geçer: ${CROSSING} Hazne Doldur kipinde: Oynat’a basınca su %20’den 16 saniyede dolar.`,
+    purpose:
+      'Suyun yüksekliğini ışıklı bir çubukla gösterir. Su bir proba ulaşınca, suyun direnci (≈ 5 kΩ) ve baz direnci üzerinden baz akımı akar: I_{B} ≈ (9 V − 0,65 V) / 15 kΩ ≈ 0,55 mA. β · I_{B}, LED devresinin izin verdiği akımdan (≈ 14 mA) çok büyük olduğu için transistör doyuma girer ve LED’i yakar: önce yeşil (≈ 3,4 s), sonra sarı (≈ 8,4 s), sonra kırmızı (≈ 13,4 s). Bazdaki kondansatör ve 100 kΩ, dalgalı su yüzeyinde LED’in titremesini önler. Su direncini 1 MΩ yap (çok saf su): LED’den yalnızca ≈ 0,5 mA geçer.',
+    everyday:
+      'Su depolarında ve hidroforlarda seviye göstergeleri, kahve ve bulaşık makinelerindeki su seviyesi sensörleri, bodrumlarda su baskını alarmları. Barajlarda gerçek seviye ölçümü çoğunlukla basınç ya da ultrasonik sensörlerle yapılır, ama uyarı mantığı aynıdır.',
   },
   'baraj-tek-isik': {
     title: 'Baraj uyarısı: tek ışık',
-    description:
-      'Çubuk göstergenin aynısı, iki “susturma” transistörü eklenmiş. Q4’ün bazı Seviye 2 probundan, Q5’in bazı Seviye 3 probundan 10 kΩ ile sürülür; kollektörleri yeşilin (Q1) ve sarının (Q2) baz düğümüne bağlıdır. Hazne yine %20’den 16 saniyede dolar.',
-    question:
-      'Su Seviye 2’ye ulaşınca yeşil LED’e ne olur, neden? Hazne doluyken hangi transistörler doyumda, hangileri kesimde?',
-    answer:
-      'Seviye 2 ıslanınca (≈ 8,4 s) Q4 doyuma girer ve Q1’in bazını ≈ 0,01 V’a çeker: Q1 kesime gider, yeşil söner, aynı anda sarı yanar. Seviye 3’te (≈ 13,4 s) Q5 sarıyı söndürür; yalnız kırmızı kalır. Hazne doluyken Q3, Q4 ve Q5 doyumda, Q1 ve Q2 kesimde. Bu bir öncelik mantığıdır: yeşil = Seviye 1 VE (Seviye 2 DEĞİL). Su akışını Boşalt yap: ışık kırmızıdan sarıya, sonra yeşile döner.',
+    description: `Çubuk göstergenin aynısı, iki “susturma” transistörü eklenmiş. Q4’ün bazı Seviye 2 probundan, Q5’in bazı Seviye 3 probundan 10 kΩ ile sürülür; kollektörleri yeşilin (Q1) ve sarının (Q2) baz hattına, emetörleri ortak hatta bağlıdır. Q4 ve Q5’in prob kabloları birer prob kablosunu keserek geçer: ${CROSSING} Hazne yine %20’den 16 saniyede dolar.`,
+    purpose:
+      'Aynı anda yalnızca en yüksek seviyenin ışığını yakar (öncelik mantığı). Seviye 2 ıslanınca (≈ 8,4 s) Q4 doyuma girer ve Q1’in bazını ≈ 0,01 V’a çeker: Q1 kesime gider, yeşil söner, aynı anda sarı yanar. Seviye 3’te (≈ 13,4 s) Q5 sarıyı söndürür; yalnız kırmızı kalır. Hazne doluyken Q3, Q4 ve Q5 doyumda, Q1 ve Q2 kesimde: yeşil = Seviye 1 VE (Seviye 2 DEĞİL). Su akışını Boşalt yap: ışık kırmızıdan sarıya, sonra yeşile döner.',
+    everyday:
+      'Tek ışıklı durum göstergeleri (yeşil-sarı-kırmızı), yakıt ve batarya göstergelerinin en yüksek seviyeyi gösteren mantığı, asansörlerin kat göstergeleri ve öncelikli alarm panelleri aynı mantık kapılarıyla kurulur.',
   },
 };
 
@@ -931,7 +931,7 @@ export const tr = {
     section: 'Örnekler',
     button: 'Örnekler',
     dialogTitle: 'Örnek devreler',
-    dialogHint: 'Bir örneğe tıkla: devre açılır; açıklaması ve tahmin sorusu sağdaki Örnek sekmesinde çıkar.',
+    dialogHint: 'Bir örneğe tıkla: devre açılır; ne işe yaradığı ve günlük hayatta nerede kullanıldığı sağdaki Örnek sekmesinde çıkar.',
     dialogClose: 'Örnekler penceresini kapat',
     groups: {
       temel: 'Temel devreler',
@@ -949,20 +949,17 @@ export const tr = {
     } as Record<ExampleGroupId, string>,
     texts: EXAMPLES,
     badge: 'Örnek',
-    predict: 'Tahmin et',
-    answer: 'Cevap',
-    answerHidden: 'Cevabı görmek için Oynat’a bas.',
+    purpose: 'Ne işe yarar?',
+    everyday: 'Günlük hayatta',
     loaded: 'Örnek yüklendi.',
     tabBadge: (group: string) => `Örnek · ${group}`,
-    predictionLabel: 'Tahminin (isteğe bağlı)',
-    predictionShown: 'Tahminin:',
     previous: '← Önceki',
     next: 'Sonraki →',
     previousLabel: 'Önceki örnek',
     nextLabel: 'Sonraki örnek',
     closeExample: 'Örneği kapat',
     noneTitle: 'Açık örnek yok',
-    noneText: 'Örnekler penceresinden bir devre açınca açıklaması, tahmin sorusu ve cevabı burada çıkar.',
+    noneText: 'Örnekler penceresinden bir devre açınca açıklaması, ne işe yaradığı ve günlük hayatta nerede kullanıldığı burada çıkar.',
     browse: 'Örneklere göz at',
   },
   rack: {
@@ -1275,7 +1272,7 @@ export const tr = {
     empty: 'Parça sürükle ya da tıklayıp tuvale tıkla · [[W]] kablo · [[R]] döndür',
     select:
       'Kablo çekmek için bir parçanın ucuna tıkla · seçince özellikler sağda açılır · [[R]] döndür · [[F]] ters çevir · [[Delete]] sil · [[Boşluk]] + sürükle: kaydır',
-    example: 'Örnek açık: önce sağdaki soruyu yanıtla, sonra **Oynat**’a bas.',
+    example: 'Örnek açık: ne işe yaradığı Örnek sekmesinde; çalıştırmak için **Oynat**’a bas.',
     exampleUndo: 'Önceki devrene dönmek için [[Ctrl+Z]]',
     allShortcuts: 'Tüm kısayollar: [[?]]',
     place: (name: string) =>
@@ -1491,7 +1488,7 @@ export const tr = {
     // Örnekler (P12)
     examplesSearch: 'Örnek ara…',
     examplesSearchLabel: 'Örnek ara',
-    examplesHint: 'Bir örneğe dokun: devre açılır, tahmin sorusu alttaki sayfada çıkar.',
+    examplesHint: 'Bir örneğe dokun: devre açılır, ne işe yaradığı alttaki sayfada çıkar.',
     exampleOpen: 'Açık',
     examplesNone: 'Bu aramayla eşleşen örnek yok.',
   },
@@ -1634,7 +1631,7 @@ export const tr = {
     title: `${SITE_NAME}’ne hoş geldin`,
     subtitle: 'Şemayı çiz, Oynat’a bas, devrenin neden öyle davrandığını gör. Devren bu tarayıcıda kendiliğinden kaydedilir.',
     examples: 'Örnekle başla',
-    examplesText: 'Hazır bir devre aç; önce tahmin et, sonra Oynat’la doğrula.',
+    examplesText: 'Hazır bir devre aç; ne işe yaradığını oku, Oynat’la çalıştır.',
     blank: 'Boş tuvalde kur',
     blankText: 'Kütüphaneden parça sürükle, uçlarından kablo çek.',
     blankTextTouch: 'Parça ekle, iki dokunuşla bağla.',

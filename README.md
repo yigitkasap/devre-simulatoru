@@ -48,11 +48,12 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 12 grupta 27 hazır devre: temel devreler,
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 12 grupta 29 hazır devre: temel devreler,
   laboratuvar cihazları (köprüde toprak tuzağı), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
-  baraj su seviyesi uyarısı projesi; her birinde tahmin sorusu, cevap simülasyon çalışınca açılır.
+  baraj su seviyesi uyarısı projesi. Her birinin yanında devrenin ne işe yaradığı (dayandığı fizik
+  yasası ve simülasyonda görülen sayılarla) ve günlük hayatta nerede kullanıldığı anlatılır.
 - **Baraj sayfası:** <https://yigitkasap.github.io/devre-simulatoru/baraj/>: transistörlerle su
   seviyesi uyarısı (su yükseldikçe yeşil → sarı → kırmızı), derste projeksiyonla kullanılacak düzen:
   numaralı problar ve ışık kulesi, canlı Durum tablosu (prob → transistör → LED), seviye bantlı şema,
@@ -238,7 +239,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 374 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 404 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -248,7 +249,9 @@ BC107, BF245A, IRF510: veri sayfası noktaları, ters toparlanma, frekansla kaza
 `tests/models.test.ts`), su haznesi (ıslak/kuru prob, doldurma ve boşaltma; `tests/tank.test.ts`), laboratuvar cihazları
 (50 Ω çıkış, offset, simetri, TTL, CV/CC, 1 MΩ giriş, AC kuplaj, toprak tuzağı ve ADD ile doğru
 ölçüm; `tests/instruments.test.ts`), bütün hazır örneklerin
-cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım bağlantısı, mesajlar
+metinlerindeki sayılar (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), örnek şemalarının
+kalitesi (`tests/examples-sema.test.ts`: dik kablolar, gövdeden geçmeyen kablolar, ayrık parçalar,
+tek toprak sembolü, akımın kablodan dönmesi, kesişme sınırı), paylaşım bağlantısı, mesajlar
 (toprak tuzağı, ön direnç önerisi), renk ölçekleri ve telefon yardımcıları (ekler, zincirle ekleme,
 kablo yolu; `tests/phone.test.ts`), toprak isteğe bağlı (`tests/toprak.test.ts`), açık devrede tam 0
 akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`) ve zaman adımı
@@ -427,11 +430,10 @@ geçiyor. Aşamaların kararları aşağıda.
   Topraklı bir cihazın COM ucu (toprak sembolü olmadan) akım taşıyorsa **uyarı**dır: gerçek toprak
   döngüsü (Ek A F'de R2 kısa devre olur). Toprak tuzağı mesajı varsa aynı durumu çözümüyle anlattığı
   için toprak hattı mesajı ayrıca gösterilmez.
-- *Örneklerde:* toprak tuzağında uyarı (toprak tuzağı mesajı). Bilgi: paralel kırpıcı 0,56 mA, çift
-  kırpıcı 0,76 mA, JFET karakteristiği 4,14 mA, JFET yükselteç 4,77 mA, BJT yükselteç 1,53 mA,
-  MOSFET yükselteç 0,75 mA, BJT anahtar 10,6 mA, emetör yüklü anahtar 2,56 mA; baraj örnekleri su
-  yükselip LED'ler yanınca. Köprü doğrultmaçta (doğru bağlanmış topraklı prob) ve öteki
-  örneklerde mesaj yok. Bilgi sorun olmadığı için Mesajlar sekmesinin rozeti ve ipucu şeridi
+- *Örneklerde:* toprak tuzağında uyarı (toprak tuzağı mesajı). Örnek şemaları 2026-10-17'de
+  yeniden çizildi (bkz. "Örnekler"): her devrede tek toprak sembolü var ve dönüş akımı kablodan
+  döner, bu yüzden öteki örneklerde toprak hattı da mesaj da yok (önceden ayrı toprak sembolleriyle
+  çizilen föy ve baraj devrelerinde 0,56–10,6 mA "bilgi" olarak toprak hattından dönüyordu). Bilgi sorun olmadığı için Mesajlar sekmesinin rozeti ve ipucu şeridi
   yalnızca hata ve uyarıları sayar.
 
 **Fizik 4: zaman adımı doğruluğu (yamuk kuralı, LTE denetimli uyarlanır adım).**
@@ -701,13 +703,24 @@ ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 138 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 140 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
     Dokunmatik davranışı değiştiren işler ayrıca gerçek bir iPhone'da denenmelidir.
 - **Kütüphanenin bilgi alanı:** Masaüstünde kütüphanenin altında, fareyle üzerine gelinen (ya da
   yerleştirilmekte olan, seçili) parçanın açıklaması gösterilir; telefonda yoktur.
+- **Sabit boyutlar (kullanıcı isteği, 2026-10-17):** Yazısı değişen bileşenler yazıyla büyüyüp
+  küçülmez, çünkü değişen boy yanındaki öğeleri kaydırıyor ve fareyle gezinmeyi bozuyordu.
+  Kütüphanenin bilgi kutusunda bütün açıklamalar aynı ızgara hücresinde üst üste durur (görünmeyenler
+  gizli): kutu en uzun açıklama kadardır ve sabit kalır; ekran okuyucu için ayrı bir canlı bölge
+  vardır. Hız penceresinin alt cümlesi iki satırlık sabit yükseklikte, hız düğmesindeki değer ve not
+  sabit genişlikte; simülasyon çubuğu sabit yükseklikte (darda iki satır), iletisi tek satır (tamamı
+  ipucunda) ve yanında düğme olsa da olmasa da 32 px yüksekliğinde, zaman göstergesi sabit
+  genişlikte; baraj Durum tablosunun satırları sabit yükseklikte. Denetim: tarayıcıda her öğenin
+  yüksekliği izlenir (ResizeObserver); kütüphanede bütün parçaların üzerinde gezinme, hız sürgüsü,
+  29 örneğin çalıştırılması ve baraj seviyeleri boyunca boyu değişen öğe kalmaz. ios-kontrol'de iki
+  madde (bilgi kutusu ve hız penceresi).
 - **Yükleme:** Örnek açmak, JSON içe aktarmak, paylaşım bağlantısı açmak ve "Yeni devre"
   mevcut devrenin yerine geçer ama geri alma geçmişine girer. Bu yüzden onay sorulmaz; bildirimde
   5 saniye Geri al düğmesi durur (Ctrl+Z ve alt çubuktaki Geri al da çalışır).
@@ -1039,8 +1052,8 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
 
 - **Örnekler penceresi (kullanıcı isteği):** Örnekler sol panelden kaldırıldı; üst çubuktaki
   "Örnekler" düğmesi gruplanmış bir pencere açar (telefonda tam ekran, aramalı ve açılır gruplu
-  liste). Açılan örneğin açıklaması, tahmin sorusu ve cevabı İnceleme panelinin Örnek sekmesinde
-  (telefonda alt sayfada). Gruplar ve sıraları
+  liste). Açılan örneğin açıklaması, "Ne işe yarar?" ve "Günlük hayatta" bölümleri İnceleme
+  panelinin Örnek sekmesinde (telefonda alt sayfada). Gruplar ve sıraları
   [`src/examples/index.ts`](src/examples/index.ts) içindedir; iOS kuralı gereği pencere açıkken
   tuvalin `touch-action` değeri kaldırılır (pencere parmakla kaydırılabilsin).
 - **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC",
@@ -1056,7 +1069,7 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   | 1 Diyot karakteristikleri | 1N4001 doğru akımda (güç kaynağı, ampermetre, voltmetre); 1N4001, 5,6 V zener ve LED X-Y'de |
   | 2 Doğrultucular | Yarım dalga + 1 / 22 / 470 µF filtre (anahtarlarla); dört 1N4001'lik köprü, 100 kΩ |
   | 3 Kenetleyici ve katlayıcı | Negatif ve pozitif kenetleyici (2,2 µF, 10 kΩ); iki 1N4001 + iki 10 µF ikileyici |
-  | 4 Kırpıcılar | 4 V öngerilimli paralel kırpıcı; 3 V ve −2 V çift yönlü kırpıcı (güç kaynağının iki çıkışı) |
+  | 4 Kırpıcılar | 4 V öngerilimli paralel kırpıcı (güç kaynağı); 3 V ve −2 V çift yönlü kırpıcı (iki pil; laboratuvarda güç kaynağının iki çıkışı) |
   | 5 FET karakteristikleri | BF245A: V_DD ve V_GG güç kaynağından, I_D ampermetreyle |
   | 6–8 Yükselteçler | BF245A (R_D = 2,7 kΩ, kazanç ≈ 10), BC107 (R_B = 2,2 MΩ, R_C = 5,6 kΩ), IRF510 (R_D = 10 kΩ, R_S = 1 kΩ) |
   | 9 Transistör anahtar | BC107, R1 = 10 kΩ, R2 = 1 kΩ, LED kollektörde ve emetörde; üretecin TTL çıkışı, 1 Hz |
@@ -1067,7 +1080,7 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
     LED ve zener, 1 kΩ) 5,6 V (1N4734A) kullanıyor; ±10 V'luk üreteçle kırılma da net görünüyor.
   - **X-Y düzeneği:** Klasik akım-gerilim çizici: osiloskobun COM'u eleman ile 1 kΩ'un
     birleşiminde, B ters çevrilmiş; bu yüzden üreteç topraktan yalıtılmış. Üreteç topraklıysa
-    direnç iki toprak arasında kısa devre olur (cevapta anlatılır).
+    direnç iki toprak arasında kısa devre olur (metinde anlatılır).
   - **Doğrultucularda 50 Hz:** 1 / 22 / 470 µF ile 1 kΩ, RC = 1 / 22 / 470 ms verir; 20 ms'lik
     periyotla "filtre yok – orta – iyi" sırası en anlamlı bu frekansta.
   - **Genlikler tepe-tepe:** Föydeki "0,5 V", "0,1 V" gibi giriş değerleri üretecin ön
@@ -1075,8 +1088,8 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
     olmayan bozulma föydeki anlatımla tutuyor.
   - **MOSFET yükselteci:** "IRF510, 10 kΩ, 1 kΩ" R_D = 10 kΩ, R_S = 1 kΩ olarak yorumlandı (kazanç
     ≈ R_D / R_S ≈ 10); kapı, üretecin DC offset'iyle (4,55 V) sürülür.
-  - **Tasarım ödevleri** (JFET'te R_D, BJT'de R_B ve R_C) için birer çözüm konuldu; cevap
-    metni tasarım formülünü verir.
+  - **Tasarım ödevleri** (JFET'te R_D, BJT'de R_B ve R_C) için birer çözüm konuldu; "Ne işe
+    yarar?" metni tasarım formülünü verir.
 - **Yükselteçlerde** BJT'nin kuplaj kondansatörünün başlangıç gerilimi çalışma noktasındaki
   V_BE'dir (2,2 MΩ üzerinden dolması 22 s sürerdi); Oynat'a basınca kararlı çalışma görülür.
 - **Kullanılmayan cihaz çıkışları:** Üretecin kullanılmayan OUT ya da TTL çıkışı ve güç
@@ -1084,15 +1097,50 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
 - **Osiloskobun AC kuplajı** artık girişte 1 MΩ ile seri ≈ 16 nF'lık kuplaj kondansatörü gibi
   davranır: doğru akım çekmez. Önceden AC kuplajda da 1 MΩ doğru akımda devreyi yüklüyordu;
   sabit öngerilimli BJT'nin bazına bağlanan prob baz akımının ≈ %12'sini çalıyordu.
-- Devreler `src/examples/*.json` dosyalarında, metinleri (başlık, açıklama, tahmin sorusu,
-  cevap) `i18n/tr.ts` içindedir; böylece arayüz metinlerinin tamamı tek dosyada kalır.
-- **Tahmin sorusu (kullanıcı isteği):** Örnek kartında önce açıklama ve soru görünür; cevap,
-  örnek yüklendikten sonra Oynat'a basılınca açılır. Görevde açıklamada verilen sonuç cümleleri
-  (ör. "Voltmetre 12 V yerine 10 V gösterir…") cevabı önceden söylememek için cevap bölümüne
-  taşındı.
+- Devreler `src/examples/*.json` dosyalarında, metinleri (başlık, açıklama, ne işe yarar, günlük
+  hayatta) `i18n/tr.ts` içindedir; böylece arayüz metinlerinin tamamı tek dosyada kalır.
+- **Ne işe yarar ve günlük hayatta (kullanıcı isteği, 2026-10-17):** Örneklerdeki tahmin sorusu,
+  isteğe bağlı tahmin alanı ve Oynat'la açılan cevap kaldırıldı. Örnek sekmesinde kurulum
+  açıklamasının altında iki bölüm var: "Ne işe yarar?" (devrenin işlevi, dayandığı yasa — Ohm,
+  Kirchhoff, Faraday ve Lenz, diyot denklemi vb. —, simülasyonda görülen sayılar ve denenecek
+  değişiklikler) ve "Günlük hayatta" (devrenin gerçek cihazlarda nerede kullanıldığı). Şeritteki
+  yönlendirme "Örnek açık: ne işe yaradığı Örnek sekmesinde; çalıştırmak için Oynat'a bas" oldu ve
+  ilk Oynat'ta kalkar. Baraj sayfasının kendi "Soru" şeridi ders düzeninin parçası olduğu için kaldı.
+- **Şemalar sıfırdan yeniden çizildi (kullanıcı isteği, 2026-10-17):** Eski şemalarda föy ve baraj
+  devrelerinin çoğunda devre başına 3–9 toprak sembolü vardı; dönüş akımı aralarındaki kesikli
+  "toprak hattı" üzerinden, şemada görünmeden dönüyordu (köprü doğrultmaçta osiloskobun COM'u
+  yalnızca bir toprak sembolüne bağlıydı). Yeni kurallar:
+  - Her akımın dönüş yolu kablodur ve her devrede kapalı döngüler görünür (Kirchhoff yasaları);
+    devre başına **tek toprak sembolü**, ortak dönüş hattında. Toprak hattı yalnızca, bilerek iki
+    cihaz toprağı arasında kurulan "Toprak tuzağı"nda çizilir.
+  - Cihazların COM uçları ortak hatta kabloyla bağlanır (prob toprak klipsi devrenin ortağına
+    takılır); güç kaynağının − ucu ortak hatta döner.
+  - Osiloskopta **A kanalı giriş, B kanalı çıkış** (yükselteçlerde ve transistör anahtarda önceden
+    tersiydi; volt/bölme ve tetik buna göre değişti).
+  - Kablolar dik; kablo bir parçanın gövdesinden geçmez, parçalar üst üste binmez, yazılar kablolara
+    değmez. **Kesişme** yalnızca topolojik olarak kaçınılmaz olduğu yerde: yükselteçlerde ve
+    transistör anahtarda osiloskobun giriş kablosu besleme hattını keser (transistör, osiloskop ve
+    besleme giriş, çıkış ve ortak düğümün üçüne birden bağlıdır: K3,3, düzlemde kesişmesiz
+    çizilemez); JFET karakteristiğinde güç kaynağının uç sırası yüzünden ortak hat kapı kablosunu
+    keser; barajda her seviye bandı hazneden V_CC rayına uzanan bir duvar olduğundan ortak bara iki
+    RC bağlantısını keser (tek ışıkta susturma transistörlerinin beslemesi de birer prob kablosunu).
+    Bu örneklerin açıklaması "Dolu nokta olmayan kablo kesişmeleri bağlı değildir" der.
+  - X-Y ölçümünde ve köprü doğrultmaçta osiloskop döngünün içindedir: üç prob kablosunun sırası
+    (A, B, COM) ancak böyle kesişmesiz bağlanır. Köprüde üretecin COM'u köprünün altından dolaşıp
+    sağ kolun ortasına gelir.
+  - Çift yönlü kırpıcıda güç kaynağı yerine iki pil (3 V ve ters bağlı 2 V): iki çıkışlı güç
+    kaynağının uç sırası (1+, 1−, 2+, 2−) bu kırpıcıyı kesişmesiz çizdirmiyor; açıklama
+    laboratuvardaki karşılığını söyler.
+  - Föy değerleri, parça adları (baraj sayfası RBn, Cn, RPn, Qn, LEDn, RCn ile bantları bulur) ve
+    bütün sayısal sonuçlar aynı kaldı; fizik testlerinin hepsi yeni şemalarla geçti. Baraj
+    şemaları dikeyde sıkıştırıldı (bantlar 26 birim arayla, pil ve toprak sağ altta).
+  - Kalıcı denetim: `tests/examples-sema.test.ts`. Eski şemalarla çalıştırıldığında 29 örneğin
+    19'unda hata bulur (çoklu toprak, toprak hattından dönen akım), yenilerde geçer. Tarayıcıda
+    (Edge, ×1 hız) bütün örnekler gerçek zamanı tutar; çift yönlü kırpıcı aynı oturumda eski
+    şemayla 15–23, yenisiyle 44–51 fps (çözücünün adım sayısı aynı).
 - Elle hesabın temiz çıkması için örneklerdeki pillerin iç direnci 0'dır (açıklamada "ideal"
-  yazar). Her örneğin cevabı `tests/examples.test.ts` ve `tests/examples-lab.test.ts` ile
-  simülasyona karşı doğrulanır.
+  yazar). Her örneğin metnindeki sayılar `tests/examples.test.ts` ve `tests/examples-lab.test.ts`
+  ile simülasyona karşı doğrulanır.
 - Örnek yüklenince görünüm, sol üstteki örnek kartının kapladığı alan boş kalacak şekilde
   devreye sığdırılır (telefonda kartın altına).
 

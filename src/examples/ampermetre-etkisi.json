@@ -1,15 +1,14 @@
 {
   "version": 1,
   "parts": [
-    { "id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": { "voltage": 12, "internalResistance": 0 } },
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 12, "internalResistance": 0}},
     {"id": "p2", "type": "resistor", "label": "R1", "x": 8, "y": -8, "rotation": 0, "props": {"resistance": 100, "powerRating": "2"}},
-    { "id": "p3", "type": "ammeter", "label": "A1", "x": 16, "y": 0, "rotation": 90, "props": { "resistance": 1, "ideal": false } },
-    { "id": "p4", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {} }
+    {"id": "p3", "type": "ammeter", "label": "A1", "x": 18, "y": 0, "rotation": 90, "props": {"resistance": 1, "ideal": false}},
+    {"id": "p4", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}}
   ],
   "wires": [
-    { "id": "w1", "points": [[0, -4], [0, -8], [4, -8]] },
-    { "id": "w2", "points": [[12, -8], [16, -8], [16, -4]] },
-    { "id": "w3", "points": [[16, 4], [16, 8], [0, 8]] },
-    { "id": "w4", "points": [[0, 4], [0, 8]] }
+    {"id": "w1", "points": [[0, -4], [0, -8], [4, -8]]},
+    {"id": "w2", "points": [[12, -8], [18, -8], [18, -4]]},
+    {"id": "w3", "points": [[18, 4], [18, 8], [0, 8], [0, 4]]}
   ]
 }

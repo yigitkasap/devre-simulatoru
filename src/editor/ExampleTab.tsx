@@ -1,7 +1,7 @@
-// İnceleme paneli → Örnek sekmesi (tasarım: M05a, M05b). Açıklama, tahmin sorusu (isteğe bağlı
-// tahmin alanıyla) ve Oynat'a basılınca açılan cevap; altta önceki/sonraki örnek.
+// İnceleme paneli → Örnek sekmesi (tasarım: M05a, M05b). Devrenin kurulumu, ne işe yaradığı (dayandığı
+// fizik yasasıyla) ve günlük hayatta nerede kullanıldığı; altta önceki/sonraki örnek.
 
-import { useId } from 'react';
+import type { ReactNode } from 'react';
 import { EXAMPLE_GROUPS, EXAMPLE_IDS, type ExampleId } from '../examples';
 import { tr } from '../i18n/tr';
 import { Icon } from './icons';
@@ -10,11 +10,6 @@ import { useTouchUi } from './touchUi';
 
 export interface ExampleTabProps {
   readonly id: ExampleId | null;
-  readonly revealed: boolean;
-  /** Öğrencinin yazdığı tahmin (yalnızca bu oturumda tutulur). */
-  readonly prediction: string;
-  readonly onPrediction: (text: string) => void;
-  readonly onPlay: () => void;
   readonly onOpen: (id: ExampleId) => void;
   readonly onClose: () => void;
   readonly onBrowse: () => void;
@@ -25,9 +20,21 @@ function groupOf(id: ExampleId): string {
   return group ? tr.examples.groups[group.id] : '';
 }
 
-export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onOpen, onClose, onBrowse }: ExampleTabProps) {
-  const inputId = useId();
-  // Telefonda dokunma hedefleri 44 px, yazı alanı 16 px.
+/** Başlıklı metin bölümü (Ne işe yarar, Günlük hayatta). */
+function Section({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-1.5 rounded-lg border border-line bg-panel-2 px-3.5 py-3">
+      <h3 className="flex items-center gap-1.5 text-label font-semibold text-accent-ink">
+        {icon}
+        {title}
+      </h3>
+      <p className="text-sm leading-[1.55]">{children}</p>
+    </section>
+  );
+}
+
+export function ExampleTab({ id, onOpen, onClose, onBrowse }: ExampleTabProps) {
+  // Telefonda dokunma hedefleri 44 px.
   const touch = useTouchUi();
   const h9 = touch ? 'h-11' : 'h-9';
   if (!id) {
@@ -51,7 +58,6 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
   const index = EXAMPLE_IDS.indexOf(id);
   const previous = index > 0 ? EXAMPLE_IDS[index - 1] : undefined;
   const next = index < EXAMPLE_IDS.length - 1 ? EXAMPLE_IDS[index + 1] : undefined;
-  const guess = prediction.trim();
 
   return (
     <div className={`flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain pb-5 ${touch ? 'px-4 pt-2' : 'px-5 pt-4'}`}>
@@ -70,75 +76,30 @@ export function ExampleTab({ id, revealed, prediction, onPrediction, onPlay, onO
           </a>
         )}
       </div>
-      {!revealed && (
-        <p className="text-sm leading-[1.55] text-ink-2">
-          <Rich text={texts.description} />
-        </p>
-      )}
+      <p className="text-sm leading-[1.55] text-ink-2">
+        <Rich text={texts.description} />
+      </p>
 
-      <div className="flex flex-col gap-2 rounded-lg border border-warn-line bg-warn-soft px-3.5 py-3">
-        <span className="flex items-center gap-1.5 text-label font-semibold text-warn">
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-            <path d="M7 14h6M8 17h4M10 2a5 5 0 0 0-3 9c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a5 5 0 0 0-3-9z" />
+      <Section
+        title={tr.examples.purpose}
+        icon={
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M11 2L4 11h5l-1 7 7-9h-5l1-7z" />
           </svg>
-          {tr.examples.predict}
-        </span>
-        <span className={revealed ? 'text-sm leading-normal' : 'text-[15px] leading-normal'}>
-          <Rich text={texts.question} />
-        </span>
-        {revealed ? (
-          guess && (
-            <span className="text-small text-muted">
-              {tr.examples.predictionShown} <b className="font-mono text-ink">{guess}</b>
-            </span>
-          )
-        ) : (
-          <>
-            <label htmlFor={inputId} className="pt-0.5 text-label text-muted">
-              {tr.examples.predictionLabel}
-            </label>
-            <input
-              id={inputId}
-              value={prediction}
-              onChange={(e) => onPrediction(e.target.value)}
-              autoComplete="off"
-              className={`rounded-md border border-warn-line bg-panel px-2.5 font-mono font-medium ${touch ? 'h-12 text-base' : 'h-10 text-[15px]'} outline-none focus:border-accent focus:ring-3 focus:ring-accent-soft`}
-            />
-          </>
-        )}
-      </div>
-
-      {revealed ? (
-        <div role="status" className="flex flex-col gap-2 rounded-lg border border-ok-line bg-ok-soft px-3.5 py-3">
-          <span className="flex items-center gap-1.5 text-label font-semibold text-ok">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 10l4 4 8-8" />
-            </svg>
-            {tr.examples.answer}
-          </span>
-          <span className="text-[15px] leading-[1.55]">
-            <Rich text={texts.answer} />
-          </span>
-        </div>
-      ) : (
-        <div className="flex flex-col items-start gap-2.5 rounded-lg border border-dashed border-line-2 bg-panel-2 p-3.5">
-          <span className="flex items-center gap-2 text-sm text-muted">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-              <rect x="4" y="9" width="12" height="8" rx="2" />
-              <path d="M7 9V6.5a3 3 0 0 1 6 0V9" />
-            </svg>
-            {tr.examples.answerHidden}
-          </span>
-          <button
-            type="button"
-            onClick={onPlay}
-            className={`flex ${h9} items-center gap-1.5 rounded-md bg-ok px-3.5 text-sm font-semibold text-white hover:brightness-110`}
-          >
-            <Icon name="play" />
-            {tr.sim.play}
-          </button>
-        </div>
-      )}
+        }
+      >
+        <Rich text={texts.purpose} />
+      </Section>
+      <Section
+        title={tr.examples.everyday}
+        icon={
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 9.5L10 3l7 6.5M5 8v9h10V8M8.5 17v-5h3v5" />
+          </svg>
+        }
+      >
+        <Rich text={texts.everyday} />
+      </Section>
 
       <div className="mt-auto flex items-center justify-between border-t border-app pt-3">
         <button

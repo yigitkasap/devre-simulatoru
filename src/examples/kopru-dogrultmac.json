@@ -1,26 +1,26 @@
 {
   "version": 1,
   "parts": [
-    {"id": "p7", "type": "oscilloscope", "label": "OSC1", "x": 66, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.005, "voltsPerDivA": 2, "voltsPerDivB": 2, "positionA": -2, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "add", "invertB": true, "input": "real", "earthed": true}},
-    {"id": "p1", "type": "funcgen", "label": "FG1", "x": 22, "y": 0, "rotation": 0, "props": {"waveform": "sine", "frequency": 50, "amplitude": 20, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
-    {"id": "p2", "type": "diode", "label": "D1", "x": 10, "y": -8, "rotation": 270, "props": {"model": "1N4001"}},
-    {"id": "p3", "type": "diode", "label": "D3", "x": 10, "y": 8, "rotation": 270, "props": {"model": "1N4001"}},
-    {"id": "p4", "type": "diode", "label": "D2", "x": 42, "y": -8, "rotation": 270, "props": {"model": "1N4001"}},
-    {"id": "p5", "type": "diode", "label": "D4", "x": 42, "y": 8, "rotation": 270, "props": {"model": "1N4001"}},
-    {"id": "p6", "type": "resistor", "label": "RL", "x": 50, "y": 0, "rotation": 90, "props": {"resistance": 100000.0}},
-    {"id": "p8", "type": "ground", "label": "GND1", "x": 59, "y": 6, "rotation": 0, "props": {}}
+    {"id": "p7", "type": "oscilloscope", "label": "OSC1", "x": 39, "y": -6, "rotation": 0, "props": {"timePerDiv": 0.005, "voltsPerDivA": 2, "voltsPerDivB": 2, "positionA": -2, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "add", "invertB": true, "input": "real", "earthed": true}},
+    {"id": "p1", "type": "funcgen", "label": "FG1", "x": 0, "y": 0, "rotation": 0, "props": {"waveform": "sine", "frequency": 50, "amplitude": 20, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
+    {"id": "p2", "type": "diode", "label": "D1", "x": 14, "y": -8, "rotation": 270, "props": {"model": "1N4001"}},
+    {"id": "p3", "type": "diode", "label": "D3", "x": 14, "y": 8, "rotation": 270, "props": {"model": "1N4001"}},
+    {"id": "p4", "type": "diode", "label": "D2", "x": 50, "y": -8, "rotation": 270, "props": {"model": "1N4001"}},
+    {"id": "p5", "type": "diode", "label": "D4", "x": 50, "y": 8, "rotation": 270, "props": {"model": "1N4001"}},
+    {"id": "p6", "type": "resistor", "label": "RL", "x": 22, "y": 0, "rotation": 90, "props": {"resistance": 100000}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": 8, "y": 20, "rotation": 0, "props": {}}
   ],
   "wires": [
-    {"id": "w1", "points": [[10, 4], [10, -4]]},
-    {"id": "w2", "points": [[42, 4], [42, -4]]},
-    {"id": "w3", "points": [[10, -12], [10, -14], [42, -14], [42, -12]]},
-    {"id": "w4", "points": [[10, 12], [10, 14], [42, 14], [42, 12]]},
-    {"id": "w5", "points": [[27, -2], [29, -2], [29, -6], [16, -6], [16, 0], [10, 0]]},
-    {"id": "w6", "points": [[27, 2], [36, 2], [36, 0], [42, 0]]},
-    {"id": "w7", "points": [[26, -14], [26, -18], [50, -18], [50, -4]]},
-    {"id": "w8", "points": [[50, 4], [50, 18], [26, 18], [26, 14]]},
-    {"id": "w9", "points": [[50, -18], [58, -18], [58, -2], [61, -2]]},
-    {"id": "w10", "points": [[50, 18], [56, 18], [56, 0], [61, 0]]},
-    {"id": "w11", "points": [[61, 2], [59, 2], [59, 6]]}
+    {"id": "w1", "points": [[14, -4], [14, 4]]},
+    {"id": "w2", "points": [[5, -2], [14, -2]]},
+    {"id": "w3", "points": [[14, -12], [14, -16], [50, -16], [50, -12]]},
+    {"id": "w4", "points": [[50, -4], [50, 4]]},
+    {"id": "w5", "points": [[14, 12], [14, 16], [50, 16], [50, 12]]},
+    {"id": "w6", "points": [[22, -16], [22, -4]]},
+    {"id": "w7", "points": [[22, 4], [22, 16]]},
+    {"id": "w8", "points": [[5, 2], [8, 2], [8, 20], [58, 20], [58, 4], [50, 4]]},
+    {"id": "w9", "points": [[34, -8], [27, -8], [27, -16]]},
+    {"id": "w10", "points": [[34, -6], [29, -6], [29, 16]]},
+    {"id": "w11", "points": [[34, -4], [31, -4], [31, 0], [50, 0]]}
   ]
 }

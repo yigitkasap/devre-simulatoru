@@ -1,31 +1,27 @@
 {
   "version": 1,
   "parts": [
-    {"id": "p11", "type": "oscilloscope", "label": "OSC1", "x": 54, "y": 4, "rotation": 0, "props": {"timePerDiv": 0.0005, "voltsPerDivA": 2, "voltsPerDivB": 0.2, "positionA": 0, "positionB": 0, "couplingA": "ac", "couplingB": "ac", "trigger": "B", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
-    {"id": "p3", "type": "funcgen", "label": "FG1", "x": -2, "y": 6, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 0.5, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
-    {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 0, "y": -12, "rotation": 0, "props": {"voltage1": 15, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
-    {"id": "p2", "type": "ground", "label": "GND1", "x": 9, "y": -13, "rotation": 0, "props": {}},
-    {"id": "p4", "type": "capacitor", "label": "C1", "x": 8, "y": 4, "rotation": 0, "props": {"capacitance": 1e-06, "initialVoltage": 0, "kind": "film"}},
-    {"id": "p5", "type": "resistor", "label": "RG", "x": 14, "y": 8, "rotation": 90, "props": {"resistance": 1000000.0}},
-    {"id": "p6", "type": "resistor", "label": "RD", "x": 28, "y": -6, "rotation": 90, "props": {"resistance": 2700.0}},
-    {"id": "p7", "type": "njfet", "label": "J1", "x": 26, "y": 4, "rotation": 0, "props": {"model": "BF245A", "idss": 0.00352, "pinchOff": -1.74}},
-    {"id": "p8", "type": "ground", "label": "GND2", "x": 14, "y": 14, "rotation": 0, "props": {}},
-    {"id": "p9", "type": "ground", "label": "GND3", "x": 28, "y": 10, "rotation": 0, "props": {}},
-    {"id": "p10", "type": "ground", "label": "GND4", "x": 5, "y": 10, "rotation": 0, "props": {}},
-    {"id": "p12", "type": "ground", "label": "GND5", "x": 47, "y": 9, "rotation": 0, "props": {}}
+    {"id": "p8", "type": "oscilloscope", "label": "OSC1", "x": 63, "y": -2, "rotation": 0, "props": {"timePerDiv": 0.0005, "voltsPerDivA": 0.2, "voltsPerDivB": 2, "positionA": 0, "positionB": 0, "couplingA": "ac", "couplingB": "ac", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
+    {"id": "p5", "type": "funcgen", "label": "FG1", "x": 16, "y": 6, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 0.5, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
+    {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 0, "y": -8, "rotation": 0, "props": {"voltage1": 15, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
+    {"id": "p2", "type": "ground", "label": "GND1", "x": 7, "y": 16, "rotation": 0, "props": {}},
+    {"id": "p3", "type": "resistor", "label": "RD", "x": 44, "y": -8, "rotation": 90, "props": {"resistance": 2700.0}},
+    {"id": "p4", "type": "njfet", "label": "J1", "x": 42, "y": 4, "rotation": 0, "props": {"model": "BF245A", "idss": 0.00352, "pinchOff": -1.74}},
+    {"id": "p6", "type": "capacitor", "label": "C1", "x": 27, "y": 4, "rotation": 0, "props": {"capacitance": 1e-06, "initialVoltage": 0, "kind": "film"}},
+    {"id": "p7", "type": "resistor", "label": "RG", "x": 35, "y": 10, "rotation": 90, "props": {"resistance": 1000000.0}}
   ],
   "wires": [
-    {"id": "w1", "points": [[5, -13], [9, -13]]},
-    {"id": "w2", "points": [[3, 4], [4, 4]]},
-    {"id": "w3", "points": [[12, 4], [14, 4]]},
-    {"id": "w4", "points": [[14, 4], [22, 4]]},
-    {"id": "w5", "points": [[14, 12], [14, 14]]},
-    {"id": "w6", "points": [[28, 8], [28, 10]]},
-    {"id": "w7", "points": [[5, -15], [28, -15], [28, -10]]},
-    {"id": "w8", "points": [[28, -2], [28, 0]]},
-    {"id": "w9", "points": [[3, 8], [5, 8], [5, 10]]},
-    {"id": "w10", "points": [[28, -1], [46, -1], [46, 2], [49, 2]]},
-    {"id": "w11", "points": [[20, 4], [20, 18], [44, 18], [44, 4], [49, 4]]},
-    {"id": "w12", "points": [[49, 6], [47, 6], [47, 9]]}
+    {"id": "w1", "points": [[5, -11], [9, -11], [9, -16], [44, -16], [44, -12]]},
+    {"id": "w2", "points": [[5, -9], [7, -9], [7, 16], [56, 16]]},
+    {"id": "w3", "points": [[44, -4], [44, 0]]},
+    {"id": "w4", "points": [[44, 8], [44, 16]]},
+    {"id": "w5", "points": [[21, 4], [23, 4]]},
+    {"id": "w6", "points": [[31, 4], [38, 4]]},
+    {"id": "w7", "points": [[35, 4], [35, 6]]},
+    {"id": "w8", "points": [[35, 14], [35, 16]]},
+    {"id": "w9", "points": [[21, 8], [23, 8], [23, 16]]},
+    {"id": "w10", "points": [[32, 4], [32, -20], [54, -20], [54, -4], [58, -4]]},
+    {"id": "w11", "points": [[44, -2], [58, -2]]},
+    {"id": "w12", "points": [[58, 0], [56, 0], [56, 16]]}
   ]
 }

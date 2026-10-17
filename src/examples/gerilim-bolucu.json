@@ -1,18 +1,17 @@
 {
   "version": 1,
   "parts": [
-    { "id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": { "voltage": 9, "internalResistance": 0 } },
-    { "id": "p2", "type": "resistor", "label": "R1", "x": 12, "y": -6, "rotation": 90, "props": { "resistance": 1000 } },
-    { "id": "p3", "type": "resistor", "label": "R2", "x": 12, "y": 6, "rotation": 90, "props": { "resistance": 1000 } },
-    { "id": "p4", "type": "voltmeter", "label": "V1", "x": 22, "y": 4, "rotation": 90, "props": { "resistance": 10000000, "ideal": false } },
-    { "id": "p5", "type": "ground", "label": "GND1", "x": 0, "y": 10, "rotation": 0, "props": {} }
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 9, "internalResistance": 0}},
+    {"id": "p2", "type": "resistor", "label": "R1", "x": 14, "y": -6, "rotation": 90, "props": {"resistance": 1000}},
+    {"id": "p3", "type": "resistor", "label": "R2", "x": 14, "y": 6, "rotation": 90, "props": {"resistance": 1000}},
+    {"id": "p4", "type": "voltmeter", "label": "V1", "x": 24, "y": 6, "rotation": 90, "props": {"resistance": 10000000, "ideal": false}},
+    {"id": "p5", "type": "ground", "label": "GND1", "x": 0, "y": 10, "rotation": 0, "props": {}}
   ],
   "wires": [
-    { "id": "w1", "points": [[0, -4], [0, -10], [12, -10]] },
-    { "id": "w2", "points": [[12, -2], [12, 2]] },
-    { "id": "w3", "points": [[22, 0], [12, 0]] },
-    { "id": "w4", "points": [[22, 8], [22, 10], [12, 10]] },
-    { "id": "w5", "points": [[12, 10], [0, 10]] },
-    { "id": "w6", "points": [[0, 4], [0, 10]] }
+    {"id": "w1", "points": [[0, -4], [0, -10], [14, -10]]},
+    {"id": "w2", "points": [[14, -2], [14, 2]]},
+    {"id": "w3", "points": [[14, 2], [24, 2]]},
+    {"id": "w4", "points": [[0, 4], [0, 10], [14, 10]]},
+    {"id": "w5", "points": [[14, 10], [24, 10]]}
   ]
 }

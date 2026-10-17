@@ -139,8 +139,6 @@ export default function Simulator() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('inspect');
   /** Artınca İncele sekmesindeki (telefonda parça sayfasındaki) ilk değer alanına odaklanılır. */
   const [focusRequest, setFocusRequest] = useState(0);
-  /** Öğrencinin örneklere yazdığı tahminler (yalnızca bu oturumda). */
-  const [predictions, setPredictions] = useState<Partial<Record<ExampleId, string>>>({});
   // Cihaz rafı ve Ölç düzeni (N01).
   const [rackLayout, setRackLayout] = useState<RackLayout>(loadRackLayout);
   const [rackActive, setRackActive] = useState<string | null>(null);
@@ -159,7 +157,8 @@ export default function Simulator() {
   const focus = useFocusMode(() => canvasRef.current?.fit());
   const fullscreenControls = { on: focus.on, panels: focus.panels, onToggle: focus.toggle, onPanel: focus.showPanel };
   const [activeExample, setActiveExample] = useState<ExampleId | null>(null);
-  const [answerRevealed, setAnswerRevealed] = useState(false);
+  /** Açık örnek en az bir kez oynatıldı mı (şeritteki "örnek açık" yönlendirmesi o zamana kadar durur). */
+  const [examplePlayed, setExamplePlayed] = useState(false);
   const [chosenScope, setChosenScope] = useState<string | null>(null);
   // Telefon: tek alt sayfa, Bağla kipi ve karartmalı sayfalar.
   const [sheet, setSheet] = useState<{ kind: PhoneSheetKind; size: SheetSize } | null>(null);
@@ -195,7 +194,7 @@ export default function Simulator() {
 
   // --- Kütüphane (masaüstü) -----------------------------------------------------------------
   // Ölç düzeninde (açık bir örnek yoksa) kütüphane şeride, İnceleme paneli 48 px'e iner. Örnek açıkken
-  // cevap Örnek sekmesinde göründüğü için paneller açık kalır, yalnızca raf büyür.
+  // açıklaması Örnek sekmesinde okunduğu için paneller açık kalır, yalnızca raf büyür.
   const measureCollapse = measureLayout && !phone && activeExample === null;
   const libraryMode: LibraryMode = layout.kind === 'compact' || libraryPref === 'rail' || measureCollapse ? 'rail' : 'full';
   const showFlyout = layout.kind === 'compact' && flyoutOpen && !measureCollapse;
@@ -217,11 +216,11 @@ export default function Simulator() {
     dispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
     dispatch({ type: 'set-tool', tool: { kind: 'select' } });
     setActiveExample(example);
-    setAnswerRevealed(false);
+    setExamplePlayed(false);
     setConnect(null);
     if (example) {
       setInspectorTab('example');
-      // Telefonda örneğin açıklaması ve tahmin sorusu alttaki sayfada (P06).
+      // Telefonda örneğin açıklaması alttaki sayfada (P06).
       setPanelTab('example');
       setSheet({ kind: 'panel', size: 'half' });
     } else {
@@ -284,11 +283,11 @@ export default function Simulator() {
     else showToast(tr.file.importError, 'error');
   };
 
-  // Örneğin cevabı, örnek yüklendikten sonra Oynat'a basılınca açılır. (Simülasyon çalışırken başka
-  // bir örnek yüklenirse simülasyon bir sonraki çizimde durur; bu arada cevap açılmamalı.)
+  // Örnek yüklendikten sonra Oynat'a basılınca şeritteki yönlendirme kalkar. (Simülasyon çalışırken
+  // başka bir örnek yüklenirse simülasyon bir sonraki çizimde durur; bu arada kalkmamalı.)
   const previousStatus = useRef(sim.status);
   useEffect(() => {
-    if (activeExample && sim.status === 'running' && previousStatus.current !== 'running') setAnswerRevealed(true);
+    if (activeExample && sim.status === 'running' && previousStatus.current !== 'running') setExamplePlayed(true);
     previousStatus.current = sim.status;
   }, [activeExample, sim.status]);
 
@@ -563,7 +562,7 @@ export default function Simulator() {
         ? { kind: 'issues', text: tr.messages.stripRuntime(summary), tone: errorCount > 0 ? 'error' : 'warn' }
         : measureLayout && idleHint
           ? { kind: 'measure', example: activeExample !== null }
-          : activeExample && !answerRevealed && idleHint && canvasStatus.hint.kind !== 'simulating'
+          : activeExample && !examplePlayed && idleHint && canvasStatus.hint.kind !== 'simulating'
             ? { kind: 'example' }
             : canvasStatus.hint;
 
@@ -799,12 +798,6 @@ export default function Simulator() {
 
   const exampleProps = {
     id: activeExample,
-    revealed: answerRevealed,
-    prediction: activeExample ? (predictions[activeExample] ?? '') : '',
-    onPrediction: (text: string) => {
-      if (activeExample) setPredictions((p) => ({ ...p, [activeExample]: text }));
-    },
-    onPlay: sim.play,
     onOpen: loadExample,
     onClose: () => setActiveExample(null),
     onBrowse: () => setExamplesOpen(true),
@@ -1055,7 +1048,7 @@ export default function Simulator() {
           ? runtimeIssues
             ? { text: tr.messages.stripRuntime(summary), tone: errorCount > 0 ? 'error' : 'warn' }
             : { text: settings.electronFlow ? tr.sim.electronNote : tr.sim.conventionalNote }
-          : activeExample && !answerRevealed
+          : activeExample && !examplePlayed
             ? { text: tr.hints.example }
             : doc.parts.length === 0 && doc.wires.length === 0
               ? { text: tr.tablet.empty }

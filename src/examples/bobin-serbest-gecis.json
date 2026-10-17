@@ -1,25 +1,24 @@
 {
   "version": 1,
   "parts": [
-    { "id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": { "voltage": 10, "internalResistance": 0 } },
-    { "id": "p2", "type": "switch", "label": "S1", "x": 8, "y": -8, "rotation": 0, "props": { "closed": false } },
-    { "id": "p3", "type": "resistor", "label": "R1", "x": 20, "y": -8, "rotation": 0, "props": { "resistance": 100, "powerRating": "1" } },
-    { "id": "p4", "type": "ammeter", "label": "A1", "x": 32, "y": -8, "rotation": 0, "props": { "resistance": 0.1, "ideal": true } },
-    { "id": "p5", "type": "inductor", "label": "L1", "x": 40, "y": 0, "rotation": 90, "props": { "inductance": 0.01, "dcResistance": 12 } },
-    { "id": "p6", "type": "diode", "label": "D1", "x": 52, "y": 0, "rotation": 270, "props": { "model": "1N4001" } },
-    { "id": "p7", "type": "voltmeter", "label": "V1", "x": 64, "y": 0, "rotation": 90, "props": { "resistance": 10000000, "ideal": false } },
-    { "id": "p8", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {} }
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 10, "internalResistance": 0}},
+    {"id": "p2", "type": "switch", "label": "S1", "x": 8, "y": -8, "rotation": 0, "props": {"closed": false}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 20, "y": -8, "rotation": 0, "props": {"resistance": 100, "powerRating": "1"}},
+    {"id": "p4", "type": "ammeter", "label": "A1", "x": 32, "y": -8, "rotation": 0, "props": {"resistance": 0.1, "ideal": true}},
+    {"id": "p5", "type": "inductor", "label": "L1", "x": 42, "y": 0, "rotation": 90, "props": {"inductance": 0.01, "dcResistance": 12}},
+    {"id": "p6", "type": "voltmeter", "label": "V1", "x": 64, "y": 0, "rotation": 90, "props": {"resistance": 10000000, "ideal": false}},
+    {"id": "p7", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}},
+    {"id": "p8", "type": "diode", "label": "D1", "x": 54, "y": 0, "rotation": 270, "props": {"model": "1N4001"}}
   ],
   "wires": [
-    { "id": "w1", "points": [[0, -4], [0, -8], [4, -8]] },
-    { "id": "w2", "points": [[12, -8], [16, -8]] },
-    { "id": "w3", "points": [[24, -8], [28, -8]] },
-    { "id": "w4", "points": [[36, -8], [40, -8], [40, -4]] },
-    { "id": "w5", "points": [[52, -4], [52, -6], [40, -6]] },
-    { "id": "w6", "points": [[64, -4], [64, -6], [52, -6]] },
-    { "id": "w7", "points": [[40, 4], [40, 8], [0, 8]] },
-    { "id": "w8", "points": [[52, 4], [52, 6], [40, 6]] },
-    { "id": "w9", "points": [[64, 4], [64, 6], [52, 6]] },
-    { "id": "w10", "points": [[0, 4], [0, 8]] }
+    {"id": "w1", "points": [[0, -4], [0, -8], [4, -8]]},
+    {"id": "w2", "points": [[12, -8], [16, -8]]},
+    {"id": "w3", "points": [[24, -8], [28, -8]]},
+    {"id": "w4", "points": [[36, -8], [42, -8], [42, -4]]},
+    {"id": "w5", "points": [[42, -8], [54, -8], [54, -4]]},
+    {"id": "w6", "points": [[54, -8], [64, -8], [64, -4]]},
+    {"id": "w7", "points": [[54, 4], [54, 8]]},
+    {"id": "w8", "points": [[64, 4], [64, 8], [0, 8], [0, 4]]},
+    {"id": "w9", "points": [[42, 4], [42, 8]]}
   ]
 }

@@ -1,5 +1,5 @@
 // Hazır örnek devreler. Devreler bu klasördeki JSON dosyalarında (belge biçimi, sürüm 1);
-// başlık, açıklama, tahmin sorusu ve cevap metinleri i18n/tr.ts → examples içindedir.
+// başlık, açıklama, "Ne işe yarar?" ve "Günlük hayatta" metinleri i18n/tr.ts → examples içindedir.
 // Yeni bir örnek eklemek için: JSON dosyasını ekle, aşağıdaki gruplardan birine yaz, tr.ts'e
 // metinlerini ekle. Örnekler üst çubuktaki "Örnekler" penceresinde bu gruplarla listelenir.
 

@@ -1,4 +1,4 @@
-// Hazır örnekler: devreler hatasız açılır ve örnek metinlerindeki cevaplar simülasyonla tutar.
+// Hazır örnekler: devreler hatasız açılır ve örnek metinlerindeki sayılar simülasyonla tutar.
 // Paylaşım bağlantısı: sıkıştırma ve geri okuma.
 
 import { describe, expect, it } from 'vitest';
@@ -53,7 +53,7 @@ describe('Örnekler', () => {
       expect(connectivity.danglingEnds).toEqual([]);
       expect(new CircuitSimulator(connectivity.netlist).topologyDiagnostics).toEqual([]);
       const texts = tr.examples.texts[id];
-      for (const text of [texts.title, texts.description, texts.question, texts.answer]) expect(text.length).toBeGreaterThan(5);
+      for (const text of [texts.title, texts.description, texts.purpose, texts.everyday]) expect(text.length).toBeGreaterThan(5);
     });
   }
 

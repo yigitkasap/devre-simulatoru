@@ -1,20 +1,20 @@
 {
   "version": 1,
   "parts": [
-    {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 0, "y": 0, "rotation": 0, "props": {"voltage1": 5, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
-    {"id": "p2", "type": "ammeter", "label": "A1", "x": 14, "y": -6, "rotation": 0, "props": {"mode": "dc", "resistance": 0.1, "ideal": false}},
-    {"id": "p3", "type": "resistor", "label": "R1", "x": 26, "y": -6, "rotation": 0, "props": {"resistance": 1000}},
-    {"id": "p4", "type": "diode", "label": "D1", "x": 34, "y": 2, "rotation": 90, "props": {"model": "1N4001"}},
-    {"id": "p5", "type": "voltmeter", "label": "V1", "x": 42, "y": 2, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000.0, "ideal": false}},
-    {"id": "p6", "type": "ground", "label": "GND1", "x": 20, "y": 12, "rotation": 0, "props": {}}
+    {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 0, "y": 9, "rotation": 0, "props": {"voltage1": 5, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
+    {"id": "p2", "type": "ammeter", "label": "A1", "x": 16, "y": -8, "rotation": 0, "props": {"mode": "dc", "resistance": 0.1, "ideal": false}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 28, "y": -8, "rotation": 0, "props": {"resistance": 1000}},
+    {"id": "p4", "type": "diode", "label": "D1", "x": 38, "y": 0, "rotation": 90, "props": {"model": "1N4001"}},
+    {"id": "p5", "type": "voltmeter", "label": "V1", "x": 48, "y": 0, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000.0, "ideal": false}},
+    {"id": "p6", "type": "ground", "label": "GND1", "x": 16, "y": 10, "rotation": 0, "props": {}}
   ],
   "wires": [
-    {"id": "w1", "points": [[5, -3], [7, -3], [7, -6], [10, -6]]},
-    {"id": "w2", "points": [[18, -6], [22, -6]]},
-    {"id": "w3", "points": [[30, -6], [34, -6], [34, -2]]},
-    {"id": "w4", "points": [[34, -6], [42, -6], [42, -2]]},
-    {"id": "w5", "points": [[42, 6], [42, 10], [34, 10], [34, 6]]},
-    {"id": "w6", "points": [[34, 10], [9, 10], [9, -1], [5, -1]]},
-    {"id": "w7", "points": [[20, 10], [20, 12]]}
+    {"id": "w1", "points": [[5, 6], [8, 6], [8, -8], [12, -8]]},
+    {"id": "w2", "points": [[20, -8], [24, -8]]},
+    {"id": "w3", "points": [[32, -8], [38, -8], [38, -4]]},
+    {"id": "w4", "points": [[38, -8], [48, -8], [48, -4]]},
+    {"id": "w5", "points": [[48, 4], [48, 8], [5, 8]]},
+    {"id": "w6", "points": [[38, 4], [38, 8]]},
+    {"id": "w7", "points": [[16, 8], [16, 10]]}
   ]
 }

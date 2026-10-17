@@ -1,5 +1,5 @@
 // Föy örnekleri (Fizik 2. sınıf Elektronik Laboratuvarı, Deney 1–9) ve laboratuvar cihazları:
-// cevap metinlerindeki sayılar simülasyonla tutar.
+// metinlerdeki ("Ne işe yarar?") sayılar simülasyonla tutar.
 
 import { describe, expect, it } from 'vitest';
 import { buildScopeView } from '../src/editor/scopeView';

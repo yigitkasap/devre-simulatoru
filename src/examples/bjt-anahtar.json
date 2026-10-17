@@ -1,29 +1,26 @@
 {
   "version": 1,
   "parts": [
-    {"id": "p7", "type": "oscilloscope", "label": "OSC1", "x": 54, "y": 6, "rotation": 0, "props": {"timePerDiv": 0.2, "voltsPerDivA": 5, "voltsPerDivB": 5, "positionA": 0, "positionB": -2, "couplingA": "dc", "couplingB": "dc", "trigger": "B", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
-    {"id": "p1", "type": "funcgen", "label": "FG1", "x": 0, "y": 6, "rotation": 0, "props": {"waveform": "square", "frequency": 1, "amplitude": 10, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
-    {"id": "p6", "type": "dcsupply", "label": "PS1", "x": 0, "y": -18, "rotation": 0, "props": {"voltage1": 12, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
-    {"id": "p2", "type": "resistor", "label": "R1", "x": 16, "y": 6, "rotation": 0, "props": {"resistance": 10000.0}},
-    {"id": "p3", "type": "npn", "label": "Q1", "x": 26, "y": 6, "rotation": 0, "props": {"model": "BC107", "beta": 200}},
-    {"id": "p4", "type": "led", "label": "LED1", "x": 28, "y": -4, "rotation": 90, "props": {"color": "red"}},
-    {"id": "p5", "type": "resistor", "label": "R2", "x": 28, "y": -14, "rotation": 90, "props": {"resistance": 1000.0}},
-    {"id": "p8", "type": "ground", "label": "GND1", "x": 7, "y": 12, "rotation": 0, "props": {}},
-    {"id": "p9", "type": "ground", "label": "GND2", "x": 28, "y": 12, "rotation": 0, "props": {}},
-    {"id": "p10", "type": "ground", "label": "GND3", "x": 9, "y": -17, "rotation": 0, "props": {}},
-    {"id": "p11", "type": "ground", "label": "GND4", "x": 47, "y": 11, "rotation": 0, "props": {}}
+    {"id": "p7", "type": "oscilloscope", "label": "OSC1", "x": 63, "y": 1, "rotation": 0, "props": {"timePerDiv": 0.2, "voltsPerDivA": 5, "voltsPerDivB": 5, "positionA": -2, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
+    {"id": "p5", "type": "funcgen", "label": "FG1", "x": 16, "y": 6, "rotation": 0, "props": {"waveform": "square", "frequency": 1, "amplitude": 10, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
+    {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 0, "y": -8, "rotation": 0, "props": {"voltage1": 12, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
+    {"id": "p2", "type": "resistor", "label": "R2", "x": 44, "y": -14, "rotation": 90, "props": {"resistance": 1000.0}},
+    {"id": "p3", "type": "led", "label": "LED1", "x": 44, "y": -4, "rotation": 90, "props": {"color": "red"}},
+    {"id": "p4", "type": "npn", "label": "Q1", "x": 42, "y": 6, "rotation": 0, "props": {"model": "BC107", "beta": 200}},
+    {"id": "p6", "type": "resistor", "label": "R1", "x": 31, "y": 6, "rotation": 0, "props": {"resistance": 10000.0}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": 7, "y": 16, "rotation": 0, "props": {}}
   ],
   "wires": [
-    {"id": "w1", "points": [[5, 6], [12, 6]]},
-    {"id": "w2", "points": [[20, 6], [22, 6]]},
-    {"id": "w3", "points": [[28, 10], [28, 12]]},
-    {"id": "w4", "points": [[5, 8], [7, 8], [7, 12]]},
-    {"id": "w5", "points": [[28, 2], [28, 0]]},
-    {"id": "w6", "points": [[28, -8], [28, -10]]},
-    {"id": "w7", "points": [[5, -21], [28, -21], [28, -18]]},
-    {"id": "w8", "points": [[5, -19], [9, -19], [9, -17]]},
-    {"id": "w9", "points": [[28, 1], [46, 1], [46, 4], [49, 4]]},
-    {"id": "w10", "points": [[10, 6], [10, 16], [44, 16], [44, 6], [49, 6]]},
-    {"id": "w11", "points": [[49, 8], [47, 8], [47, 11]]}
+    {"id": "w1", "points": [[5, -11], [9, -11], [9, -20], [44, -20], [44, -18]]},
+    {"id": "w2", "points": [[44, -10], [44, -8]]},
+    {"id": "w3", "points": [[44, 0], [44, 2]]},
+    {"id": "w4", "points": [[44, 10], [44, 16]]},
+    {"id": "w5", "points": [[5, -9], [7, -9], [7, 16], [56, 16]]},
+    {"id": "w6", "points": [[21, 6], [27, 6]]},
+    {"id": "w7", "points": [[35, 6], [38, 6]]},
+    {"id": "w8", "points": [[21, 8], [23, 8], [23, 16]]},
+    {"id": "w9", "points": [[25, 6], [25, -24], [54, -24], [54, -1], [58, -1]]},
+    {"id": "w10", "points": [[44, 1], [58, 1]]},
+    {"id": "w11", "points": [[58, 3], [56, 3], [56, 16]]}
   ]
 }

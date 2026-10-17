@@ -161,7 +161,7 @@ try {
     await last.scrollIntoViewIfNeeded(); await page.waitForTimeout(300);
     await last.tap(); await page.waitForTimeout(600);
     const example = (await page.getByRole('region', { name: 'Örnek' }).textContent().catch(() => '')) ?? '';
-    check(`son gruptaki son örneğe ulaşılıp açılıyor; tahmin sorusu alttaki sayfada (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'tank') && (await doc(page)).parts.some((p) => p.label === 'Q5') && example.includes('Tahmin et'));
+    check(`son gruptaki son örneğe ulaşılıp açılıyor; ne işe yaradığı alttaki sayfada (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'tank') && (await doc(page)).parts.some((p) => p.label === 'Q5') && example.includes('Ne işe yarar?') && example.includes('Günlük hayatta'));
     await page.context().close();
   }
 
@@ -670,7 +670,7 @@ try {
   await dp.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await dp.waitForTimeout(500);
   const exampleTab = await dp.getByRole('tab', { name: 'Örnek' }).getAttribute('aria-selected');
   const exampleText = (await dp.getByRole('tabpanel').textContent()) ?? '';
-  check('masaüstü: örnek açılınca Örnek sekmesi soruyla açılıyor', exampleTab === 'true' && exampleText.includes('Tahmin et') && exampleText.includes('Cevabı görmek için'));
+  check('masaüstü: örnek açılınca Örnek sekmesi "Ne işe yarar?" ve "Günlük hayatta" ile açılıyor, soru yok', exampleTab === 'true' && exampleText.includes('Ne işe yarar?') && exampleText.includes('Günlük hayatta') && !exampleText.includes('Tahmin'));
   const stripText = (await dp.locator('main + div').first().textContent()) ?? '';
   check('masaüstü: ipucu şeridi örnek yönlendirmesini gösteriyor', stripText.includes('Örnek açık'), stripText.slice(0, 40));
   const deskR1 = await part(dp, 'R1');
@@ -692,8 +692,9 @@ try {
   const live = (await dp.getByRole('tabpanel').textContent()) ?? '';
   check('masaüstü: İncele sekmesinde canlı ölçüm görünüyor', live.includes('canlı') && /Akım\s*[\d,]+\s*mA/.test(live), live.slice(0, 60));
   await dp.getByRole('tab', { name: 'Örnek' }).click(); await dp.waitForTimeout(150);
-  const answer = (await dp.getByRole('tabpanel').getByRole('status').textContent().catch(() => '')) ?? '';
-  check('masaüstü: Oynat’tan sonra Örnek sekmesinde cevap açık', answer.includes('Cevap'), answer.slice(0, 30));
+  const after = (await dp.getByRole('tabpanel').textContent()) ?? '';
+  const stripAfter = (await dp.locator('main + div').first().textContent()) ?? '';
+  check('masaüstü: Oynat’tan sonra Örnek sekmesi aynı açıklamayı gösteriyor, şeritteki örnek yönlendirmesi kalkıyor', after.includes('Ne işe yarar?') && !stripAfter.includes('Örnek açık'), stripAfter.slice(0, 40));
   await desk.close();
 
   // --- Masaüstü: cihaz rafı ve Ölç düzeni ------------------------------------------------

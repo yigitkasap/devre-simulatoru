@@ -1,21 +1,21 @@
 {
   "version": 1,
   "parts": [
-    {"id": "p5", "type": "oscilloscope", "label": "OSC1", "x": 48, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.0005, "voltsPerDivA": 5, "voltsPerDivB": 5, "positionA": 0, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
-    {"id": "p1", "type": "funcgen", "label": "FG1", "x": 0, "y": 2, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 10, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
-    {"id": "p2", "type": "capacitor", "label": "C1", "x": 14, "y": -4, "rotation": 180, "props": {"capacitance": 2.2e-06, "initialVoltage": 0, "kind": "electrolytic"}},
+    {"id": "p6", "type": "oscilloscope", "label": "OSC1", "x": 49, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.0005, "voltsPerDivA": 5, "voltsPerDivB": 5, "positionA": 0, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
+    {"id": "p1", "type": "funcgen", "label": "FG1", "x": 0, "y": 0, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 10, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
+    {"id": "p2", "type": "capacitor", "label": "C1", "x": 14, "y": -8, "rotation": 180, "props": {"capacitance": 2.2e-06, "initialVoltage": 0, "kind": "electrolytic"}},
     {"id": "p3", "type": "diode", "label": "D1", "x": 24, "y": 0, "rotation": 270, "props": {"model": "1N4001"}},
-    {"id": "p4", "type": "resistor", "label": "RL", "x": 32, "y": 0, "rotation": 90, "props": {"resistance": 10000.0}}
+    {"id": "p4", "type": "resistor", "label": "RL", "x": 32, "y": 0, "rotation": 90, "props": {"resistance": 10000.0}},
+    {"id": "p5", "type": "ground", "label": "GND1", "x": 8, "y": 8, "rotation": 0, "props": {}}
   ],
   "wires": [
-    {"id": "w1", "points": [[5, 0], [7, 0], [7, -4], [10, -4]]},
-    {"id": "w2", "points": [[18, -4], [24, -4]]},
-    {"id": "w3", "points": [[24, -4], [32, -4]]},
-    {"id": "w4", "points": [[24, 4], [24, 8]]},
-    {"id": "w5", "points": [[24, 8], [32, 8], [32, 4]]},
-    {"id": "w6", "points": [[24, 8], [9, 8], [9, 4], [5, 4]]},
-    {"id": "w7", "points": [[7, -4], [7, -8], [40, -8], [40, -2], [43, -2]]},
-    {"id": "w8", "points": [[32, -4], [38, -4], [38, 0], [43, 0]]},
-    {"id": "w9", "points": [[32, 8], [41, 8], [41, 2], [43, 2]]}
+    {"id": "w1", "points": [[5, -2], [8, -2], [8, -8], [10, -8]]},
+    {"id": "w2", "points": [[18, -8], [24, -8], [24, -4]]},
+    {"id": "w3", "points": [[24, -8], [32, -8], [32, -4]]},
+    {"id": "w4", "points": [[5, 2], [8, 2], [8, 8], [32, 8], [32, 4]]},
+    {"id": "w5", "points": [[24, 4], [24, 8]]},
+    {"id": "w6", "points": [[8, -8], [8, -12], [40, -12], [40, -2], [44, -2]]},
+    {"id": "w7", "points": [[32, -8], [38, -8], [38, 0], [44, 0]]},
+    {"id": "w8", "points": [[32, 8], [42, 8], [42, 2], [44, 2]]}
   ]
 }

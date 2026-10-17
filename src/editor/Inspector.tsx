@@ -1,6 +1,6 @@
 // Sağdaki İnceleme paneli (masaüstü 320–336 px, tablet 320–340 px; tasarım: M01–M07, N01, T01, T02).
-// Sekmeler: İncele (seçili parçanın canlı ölçümleri ve özellikleri), Örnek (açık örneğin sorusu ve
-// cevabı), tablette Cihazlar (ön paneller; masaüstünde raf tuvalin altında) ve Mesajlar (hata ve
+// Sekmeler: İncele (seçili parçanın canlı ölçümleri ve özellikleri), Örnek (açık örneğin ne işe yaradığı ve
+// günlük hayattaki yeri), tablette Cihazlar (ön paneller; masaüstünde raf tuvalin altında) ve Mesajlar (hata ve
 // uyarılar). Tablette dokunmatik boyutlar.
 
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
