@@ -61,6 +61,11 @@ export class DcSupplyDevice extends Device {
     return Math.max(...this.settings.voltage);
   }
 
+  /** İki çıkış birbirinden yalıtılmıştır: her çıkış kendi + ve − ucu ve iç düğümüyle bir grup. */
+  override conductiveGroups(): ReadonlyArray<readonly number[]> {
+    return [0, 1].map((k) => [this.plus(k), this.minus(k), this.inner(k)]);
+  }
+
   private plus(k: number): number {
     return this.nodes[2 * k]!;
   }

@@ -23,6 +23,11 @@ export class SwitchDevice extends Device {
     if (this.closed) sys.conductance(this.nodes[0]!, this.nodes[1]!, 1 / SWITCH_ON_RESISTANCE);
   }
 
+  /** Açık anahtar iletmez. */
+  override conductiveGroups(): ReadonlyArray<readonly number[]> {
+    return this.closed ? [this.nodes] : [];
+  }
+
   measure(x: Float64Array): Measurement {
     const voltage = this.v(x, 0) - this.v(x, 1);
     return this.twoTerminal(x, this.closed ? voltage / SWITCH_ON_RESISTANCE : 0);

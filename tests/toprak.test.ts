@@ -7,11 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { CircuitSimulator, compileNetlist, type Netlist } from '../src/sim';
 import { circuit } from './helpers';
 
-/**
- * Toprağa giden akımın üst sınırı. Her düğümdeki 1 TΩ'luk gmin, kendi adası içinde ≈ 10⁻¹¹ A'lık bir
- * kaçak oluşturur (adalar arasında değil); Aşama 2 bunu kaldırır.
- */
-const GMIN_LEAK = 1e-10;
+/** Toprağa giden akımın üst sınırı: gmin yalnızca referanssız düğümlere eklendiği için tam 0 (Fizik 2). */
+const GMIN_LEAK = 1e-15;
 
 /** Bir grup bileşenin, toprak ağındaki uçlarından toprağa giden toplam akım. */
 function currentIntoGround(s: CircuitSimulator, n: Netlist, ids: readonly string[]): number {

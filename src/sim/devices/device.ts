@@ -141,6 +141,27 @@ export abstract class Device {
     return false;
   }
 
+  /**
+   * İletken yollar: bu bileşenin içinden akımın akabildiği düğüm grupları (pinler ve iç düğümler;
+   * −1 = toprak). Bir gruptaki düğümler bu bileşen üzerinden birbirine bağlıdır. Motor, referansa
+   * hiçbir iletken yolu olmayan düğümlere gmin ekler (engine.ts). `transient`: geçici çözüm (h > 0);
+   * kondansatör ve kapasiteler yalnızca o zaman iletir. Varsayılan: bütün düğümler tek grup.
+   * Emin olunamayan bir yol (değeri sıfıra inebilen iletkenlik) burada sayılmamalıdır: fazladan gmin
+   * zararsızdır, eksik gmin matrisi tekil yapar.
+   */
+  conductiveGroups(_transient: boolean): ReadonlyArray<readonly number[]> {
+    return [this.nodes];
+  }
+
+  /**
+   * İletebilecek her yol (akımı tam 0 sayılan uçları bulmak için; fazla saymak güvenlidir).
+   * Varsayılan: conductiveGroups. Değeri simülasyon sırasında sıfıra inebilen bir iletkenlik burada
+   * sayılır, conductiveGroups'ta sayılmaz (su haznesinin probları).
+   */
+  possibleGroups(transient: boolean): ReadonlyArray<readonly number[]> {
+    return this.conductiveGroups(transient);
+  }
+
   /** Topoloji kontrolü için: bu bileşenin içindeki ideal gerilim dalları (düğüm çiftleri). */
   idealVoltageBranches(): Array<readonly [number, number]> {
     return [];

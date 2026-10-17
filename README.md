@@ -224,7 +224,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 306 test çalıştırır (8'i fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 313 test çalıştırır (7'si fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -336,6 +336,37 @@ normal teste çevrilir. Aşamaların kararları aşağıda.
   kalabalık yapar). Etiket ekran ölçüsündedir (yakınlaştırmayla küçülmez); dokunmatikte hedefi
   44 px. Dokununca ya da tıklayınca kısa açıklama açılır. Eski "devrede toprak yok" afişi ve tek
   tıkla toprak ekleme kaldırıldı.
+
+**Fizik 2: açık devrede akım tam sıfır.**
+
+- *Sorun:* her düğümden toprağa 1 TΩ (gmin = 1e-12 S) ekleniyordu; bu, açık devreyi toprak üzerinden
+  kapatıyordu. Kablosu eksik devrede ampermetre 3,56·10⁻¹¹ A ("35,6 pA") gösteriyordu; KCL ve enerji
+  korunumu artıkları 10⁻⁹ mertebesindeydi.
+- *gmin yalnızca gerekli yerde* (`engine.ts`, `floatingNodes`): her bileşen hangi düğümlerini iletken
+  bir yolla bağladığını söyler (`conductiveGroups`). Direnç, kapalı anahtar, gerilim kaynakları,
+  gerçek ölçü aletleri, ideal ampermetre, diyot/LED/zener eklemleri ve transistörler (eklemlerdeki
+  paralel gmin sayesinde), geçici çözümde (h > 0) kondansatör iletken yol sayılır; açık anahtar,
+  ideal voltmetre, osiloskobun ideal girişi, yanmış LED, MOSFET'in yalıtılmış kapısı (doğru akımda)
+  ve iç direnci 0 olan pilin kullanılmayan iç düğümü sayılmaz. Su haznesinin probları, seviye
+  yapıyı değiştirmeden değiştiği için iletken sayılmaz (fazladan gmin zararsızdır). Referansa (toprak
+  ya da otomatik sıfır noktası) iletken yolu olmayan her düğüm grubuna gmin **tek bir düğümden**
+  eklenir: matris tekil olmaz, ve tek noktadan bağlı bir gruptan net akım geçemeyeceği için gmin hiçbir
+  yerde kaçak oluşturmaz. Eklemlerin içindeki gmin (Newton-Raphson yakınsaması için) değişmedi.
+- *Köprü kenarları tam 0* (`findZeroPins`): iletken çizgide (düğümler ve bileşenler; çok uçlu
+  bileşen sanal bir düğüme yıldız) köprü olan bir kenar kesilince çizge ikiye ayrılır; iki yan
+  arasında başka yol olmadığından köprüden geçen net akım KCL gereği 0'dır. Bu uçların akımı
+  (ölçüm, uç akımları, kablo animasyonu, ampermetre okuması) çözümün yuvarlama artığı (≈ 10⁻¹⁵ A)
+  yerine tam 0 verilir. Köprüler Tarjan'ın algoritmasıyla, her derlemede ve zaman adımı değişince
+  bulunur (O(düğüm + kenar)). Burada "iletebilecek" her yol sayılır (su haznesinin probları dahil):
+  bir yolu eksik saymak gerçek bir akımı sıfırlardı.
+- *Doğru akım çözümünde bir Newton adımı daha:* Newton-Raphson'un yakınsama ölçütü düğüm gerilimine
+  göredir (|ΔV| < 1e-3·|V| + 1 µV, SPICE'taki RELTOL/VNTOL); bu, transistörlü devrede 10⁻⁸
+  mertebesinde bir KCL artığı bırakıyordu. Doğru akım çözümü devre değişince bir kez yapıldığı için
+  yakınsamadan sonra bir yineleme daha yapılır (maliyeti yok); artık 10⁻¹⁵'e iner.
+- *Sonuç (Ek A):* kablosu eksik devre 2,66·10⁻¹¹ A → 0; açık devrede ampermetre 3,56·10⁻¹¹ A → 0
+  (ekranda "0,000 A"); köprüde KCL artığı 4,7·10⁻⁹ → 2,7·10⁻¹⁶, enerji korunumu 3,7·10⁻⁹ →
+  2,1·10⁻¹⁶; BJT devresinde KCL 8,5·10⁻⁸ → 2,3·10⁻¹⁵. Föy, baraj ve transistörlü örneklerde yakınsama
+  sorunu çıkmadı (bütün testler geçiyor).
 
 ### Editör
 

@@ -82,6 +82,11 @@ export class LedDevice extends Device {
     return !this.burned;
   }
 
+  /** Yanmış LED açık devredir (matrise hiçbir şey eklemez). */
+  override conductiveGroups(): ReadonlyArray<readonly number[]> {
+    return this.burned ? [] : [this.nodes];
+  }
+
   /** Seri direnç Rs: anot ile iç düğüm arasında G = 1/Rs iletkenliği. */
   override stampStatic(sys: MnaSystem): void {
     if (this.burned) return;

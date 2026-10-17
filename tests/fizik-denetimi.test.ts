@@ -94,7 +94,7 @@ describe('A. Doğru akım temel yasaları', () => {
   it('Köprü: köprü akımı I(R5)', () => check(g, 'Köprü: köprü akımı I(R5)', I(bridge(), 'R5') * 1e3, 0.12903225806451601, 1e-5, 'mA'));
   it('KCL: her düğümde ΣI = 0 (köprü)', () => {
     const k = kclResidual(bridge(), bridgeNet);
-    check(g, 'KCL: her düğümde ΣI = 0 (köprü)', k.worst / k.scale, 0, 1e-6, '(oran)', 'artık gmin kaçağından');
+    check(g, 'KCL: her düğümde ΣI = 0 (köprü)', k.worst / k.scale, 0, 1e-6, '(oran)', 'Aşama 2: gmin kaçağı yok');
   });
   it('KVL: A→B→C→A döngüsü ΣV = 0', () => {
     const s = bridge();
@@ -103,7 +103,7 @@ describe('A. Doğru akım temel yasaları', () => {
   it('Enerji korunumu (Tellegen): ΣP = 0', () => {
     const s = bridge();
     const sumP = ['B', 'R1', 'R2', 'R3', 'R4', 'R5'].reduce((a, id) => a + P(s, id), 0);
-    check(g, 'Enerji korunumu (Tellegen): ΣP = 0', sumP / Math.abs(P(s, 'B')), 0, 1e-6, '(oran)', 'artık gmin kaçağından');
+    check(g, 'Enerji korunumu (Tellegen): ΣP = 0', sumP / Math.abs(P(s, 'B')), 0, 1e-6, '(oran)', 'Aşama 2: gmin kaçağı yok');
   });
   const superposition = (v1: number, v2: number) => {
     const s = sim(circuit().battery('B1', 'A', 'g', v1, 0).battery('B2', 'C', 'g', v2, 0).ground('G', 'g')
@@ -174,8 +174,8 @@ describe('B. Açık devre, anahtar, kısa devre, toprak', () => {
     const r = s.advance(0);
     check(g, 'Kablosu eksik devre: akım 0', I(s, 'R1'), 0, 1e-9, 'A', r.ok ? undefined : r.error?.code);
   });
-  // Aşama 2'de düzelir: gmin yalnızca gerçekten gerekli düğümlere.
-  it.fails('Açık devrede ampermetre tam 0 göstermeli (Aşama 2)', () => {
+  // Aşama 2'de düzeldi: gmin yalnızca gerçekten gerekli düğümlere.
+  it('Açık devrede ampermetre tam 0 göstermeli', () => {
     const s = sim(circuit().battery('B', 'a', 'g', 9, 0).ground('G', 'g').ammeter('A', 'a', 'x').resistor('R', 'x', 'y', 1000).led('L', 'y', 'z').build());
     s.advance(0);
     const r = s.status('A').reading!;
@@ -417,7 +417,7 @@ describe('E. Yarı iletkenler', () => {
   });
   it('BJT devresi: her düğümde KCL', () => {
     const k = kclResidual(bjt(), bjtNet);
-    check(g, 'BJT devresi: her düğümde KCL', k.worst / k.scale, 0, 1e-6, '(oran)', 'artık gmin kaçağından');
+    check(g, 'BJT devresi: her düğümde KCL', k.worst / k.scale, 0, 1e-6, '(oran)', 'Aşama 2: gmin kaçağı yok');
   });
   it('BJT aktif bölge: IC/IB = β (≈ 100-300)', () => {
     const pc = bjt().pinCurrents('Q')!;

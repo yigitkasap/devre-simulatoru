@@ -105,6 +105,11 @@ export class AcSourceDevice extends Device {
   private get minus(): number {
     return this.nodes[1]!;
   }
+  /** İç direnç 0 iken iç düğüm kullanılmaz (yalnızca + ve − uçlar bağlıdır). */
+  override conductiveGroups(): ReadonlyArray<readonly number[]> {
+    return this.internalResistance > 0 ? [this.nodes] : [[this.plus, this.minus]];
+  }
+
   private get inner(): number {
     return this.nodes[2]!;
   }

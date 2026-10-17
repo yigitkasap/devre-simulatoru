@@ -121,6 +121,11 @@ export class OscilloscopeDevice extends Device {
     return this.loaded(0) || this.loaded(1);
   }
 
+  /** Gerçek giriş (1 MΩ ‖ 25 pF) kanalı COM'a bağlar; ideal giriş ve GND kuplaj iletmez. */
+  override conductiveGroups(): ReadonlyArray<readonly number[]> {
+    return ([0, 1] as const).filter((c) => this.loaded(c)).map((c) => [this.nodes[c]!, this.nodes[2]!]);
+  }
+
   override stampStatic(sys: MnaSystem, ctx: StepContext): void {
     for (const c of [0, 1] as const) {
       if (!this.loaded(c)) continue;

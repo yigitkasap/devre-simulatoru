@@ -31,8 +31,9 @@ import {
   type StepContext,
 } from './devices';
 import { luFactor, luSolve, SingularMatrixError, type LUFactorization } from './lu';
-import { MnaSystem } from './mna';
+import { GROUND, MnaSystem } from './mna';
 import type { Netlist } from './netlist';
+import { UnionFind } from './unionFind';
 
 export interface SimulatorOptions {
   /** En büyük (ve başlangıç) zaman adımı (s). */
@@ -114,6 +115,11 @@ export class CircuitSimulator {
   /** Son NR denemesinde yakınsamayan bileşenler. */
   private nonConverged: string[] = [];
   private burnedThisCall: string[] = [];
+  /**
+   * KCL gereği akımı tam 0 olan uçlar (bileşen kimliği → uç başına): iletken çizgide köprü olan
+   * kenarlar. Çözümün yuvarlama artığı (≈ 1e-15 A) yerine tam 0 gösterilir (bkz. findZeroPins).
+   */
+  private zeroPins = new Map<string, readonly boolean[]>();
 
   constructor(netlist: Netlist, options: Partial<SimulatorOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -298,11 +304,29 @@ export class CircuitSimulator {
   }
 
   measure(id: string): Measurement | null {
-    return this.circuit.deviceById.get(id)?.measure(this.x) ?? null;
+    const device = this.circuit.deviceById.get(id);
+    if (!device) return null;
+    const m = device.measure(this.x);
+    return this.isOpenPath(device) ? { voltage: m.voltage, current: 0, power: 0 } : m;
   }
 
   status(id: string): DeviceStatus {
-    return this.circuit.deviceById.get(id)?.status(this.x) ?? {};
+    const device = this.circuit.deviceById.get(id);
+    if (!device) return {};
+    const status = device.status(this.x);
+    // Akımı KCL gereği 0 olan ampermetre tam 0 gösterir.
+    return device.type === 'ammeter' && this.isOpenPath(device) ? { ...status, reading: 0 } : status;
+  }
+
+  /** İki uçlu bir bileşenin içinden akım geçemiyor mu (bir ucu köprü kenarında). */
+  private isOpenPath(device: Device): boolean {
+    const zero = this.zeroPins.get(device.id);
+    return device.nodes.length >= 2 && zero !== undefined && zero.length === 2 && (zero[0]! || zero[1]!);
+  }
+
+  private maskPins(id: string, currents: number[]): number[] {
+    const zero = this.zeroPins.get(id);
+    return zero ? currents.map((c, k) => (zero[k] ? 0 : c)) : currents;
   }
 
   /** Devredeki en büyük kaynak (tepe) gerilimi (kablo renk ölçeği için). */
@@ -326,15 +350,16 @@ export class CircuitSimulator {
 
   /** Bir bileşenin uçlarına giren anlık akımlar. */
   pinCurrents(id: string): number[] | null {
-    return this.circuit.deviceById.get(id)?.pinCurrents(this.x) ?? null;
+    const currents = this.circuit.deviceById.get(id)?.pinCurrents(this.x);
+    return currents ? this.maskPins(id, currents) : null;
   }
 
   /** Son advance() çağrısı boyunca uçlara giren ortalama akımlar (adım atılmadıysa anlık). */
   averagePinCurrents(id: string): number[] | null {
     const index = this.deviceIndex.get(id);
     if (index === undefined) return null;
-    if (this.intervalTime <= 0) return this.circuit.devices[index]!.pinCurrents(this.x);
-    return Array.from(this.pinSums[index]!, (sum) => sum / this.intervalTime);
+    if (this.intervalTime <= 0) return this.maskPins(id, this.circuit.devices[index]!.pinCurrents(this.x));
+    return this.maskPins(id, Array.from(this.pinSums[index]!, (sum) => sum / this.intervalTime));
   }
 
   /** Son advance() çağrısı boyunca bir bileşenin (1. ucuna giren) ortalama akımı. */
@@ -499,11 +524,129 @@ export class CircuitSimulator {
     if (key === this.staticKey) return key;
     const sys = this.staticSys;
     sys.clear();
-    // Her düğümü toprağa 1e-12 S ile bağla: boşta düğümler matrisi tekil yapmasın.
-    for (let i = 0; i < this.circuit.nodeUnknowns; i++) sys.add(i, i, GMIN);
+    for (const node of this.floatingNodes(ctx.h > 0)) sys.add(node, node, GMIN);
+    this.zeroPins = this.findZeroPins(ctx.h > 0);
     for (const device of this.circuit.devices) device.stampStatic(sys, ctx);
     this.staticKey = key;
     return key;
+  }
+
+  /**
+   * gmin gereken düğümler: bileşenler üzerinden referansa (toprak) hiçbir iletken yolu olmayan
+   * düğüm grupları (açık anahtarın, ideal voltmetrenin, doğru akımda kondansatörün arkasında kalan
+   * parçalar; kullanılmayan iç düğümler). Her böyle grubun YALNIZCA BİR düğümü toprağa 1e-12 S ile
+   * bağlanır: matris tekil olmaz, ve tek noktadan bağlı bir gruptan net akım geçemeyeceği için (KCL)
+   * gmin hiçbir yerde kaçak akım oluşturmaz. Referansa bağlı düğümlere gmin eklenmez: açık devrede
+   * (kablosu eksik, anahtarı açık) akım tam 0'dır. Diyot ve transistör eklemlerindeki paralel gmin
+   * (Newton-Raphson yakınsaması için) bileşenlerin içindedir ve değişmez.
+   */
+  private floatingNodes(transient: boolean): number[] {
+    const n = this.circuit.nodeUnknowns;
+    const groundIndex = n;
+    const uf = new UnionFind();
+    for (let i = 0; i <= n; i++) uf.add();
+    const index = (node: number) => (node === GROUND ? groundIndex : node);
+    for (const device of this.circuit.devices) {
+      for (const group of device.conductiveGroups(transient)) {
+        const first = group[0];
+        if (first === undefined) continue;
+        for (const node of group) uf.union(index(first), index(node));
+      }
+    }
+    const ground = uf.find(groundIndex);
+    const tied = new Set<number>();
+    const result: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const root = uf.find(i);
+      if (root === ground || tied.has(root)) continue;
+      tied.add(root);
+      result.push(i);
+    }
+    return result;
+  }
+
+  /**
+   * Akımı KCL gereği tam 0 olan uçlar. İletken çizgi: düğümler (toprak dahil) ve bileşenlerin iletken
+   * grupları (iki düğümlü grup bir kenar; daha büyüğü, bileşene ait sanal bir düğüme yıldız). Bir
+   * köprü kenarı kesilince çizge ikiye ayrılır ve iki yan arasında başka yol kalmaz: köprüden geçen
+   * net akım 0'dır (ucu boşta kalan dal, kablosu eksik devre). Hiçbir iletken gruba girmeyen uç
+   * (açık anahtar, ideal voltmetre) da akım taşımaz. Köprüler Tarjan'ın algoritmasıyla bulunur.
+   */
+  private findZeroPins(transient: boolean): Map<string, readonly boolean[]> {
+    const n = this.circuit.nodeUnknowns;
+    const vertex = (node: number) => (node === GROUND ? n : node);
+    let vertexCount = n + 1;
+    const edges: Array<{ u: number; v: number }> = [];
+    /** Her bileşenin her ucu için o ucu taşıyan kenarlar. */
+    const pinEdges: number[][][] = [];
+    this.circuit.devices.forEach((device, i) => {
+      const pins = this.circuit.netlist.elements[i]!.pins.length;
+      const perPin: number[][] = Array.from({ length: pins }, () => []);
+      for (const members of device.possibleGroups(transient)) {
+        if (members.length < 2) continue;
+        // İki düğümlü grup tek kenardır (iki ucu aynı düğümdeyse kendine dönen kenar: hiç köprü olmaz).
+        // Daha büyüğü bileşene ait sanal bir düğüme yıldızdır; aynı düğüme giden iki kol koşut kenardır
+        // (ör. iki ucu kısa devre edilmiş pilin içindeki halka).
+        if (members.length === 2) {
+          const e = edges.length;
+          edges.push({ u: vertex(members[0]!), v: vertex(members[1]!) });
+          for (let k = 0; k < pins; k++) if (device.nodes[k] === members[0] || device.nodes[k] === members[1]) perPin[k]!.push(e);
+          continue;
+        }
+        const hub = vertexCount++;
+        for (const member of members) {
+          const e = edges.length;
+          edges.push({ u: hub, v: vertex(member) });
+          for (let k = 0; k < pins; k++) if (device.nodes[k] === member) perPin[k]!.push(e);
+        }
+      }
+      pinEdges.push(perPin);
+    });
+    const adjacency: number[][] = Array.from({ length: vertexCount }, () => []);
+    edges.forEach((e, i) => {
+      adjacency[e.u]!.push(i);
+      adjacency[e.v]!.push(i);
+    });
+    // Tarjan: tin[v] ziyaret sırası, low[v] alt ağaçtan geri kenarla ulaşılan en küçük sıra.
+    const tin = new Int32Array(vertexCount).fill(-1);
+    const low = new Int32Array(vertexCount);
+    const bridge = new Uint8Array(edges.length);
+    let timer = 0;
+    for (let root = 0; root < vertexCount; root++) {
+      if (tin[root] !== -1) continue;
+      const stack: Array<{ v: number; parentEdge: number; next: number }> = [{ v: root, parentEdge: -1, next: 0 }];
+      tin[root] = low[root] = timer++;
+      while (stack.length > 0) {
+        const top = stack[stack.length - 1]!;
+        const list = adjacency[top.v]!;
+        if (top.next < list.length) {
+          const e = list[top.next++]!;
+          if (e === top.parentEdge) continue;
+          const edge = edges[e]!;
+          const to = edge.u === top.v ? edge.v : edge.u;
+          if (tin[to] === -1) {
+            tin[to] = low[to] = timer++;
+            stack.push({ v: to, parentEdge: e, next: 0 });
+          } else {
+            low[top.v] = Math.min(low[top.v]!, tin[to]!);
+          }
+        } else {
+          stack.pop();
+          const parent = stack[stack.length - 1];
+          if (parent) {
+            low[parent.v] = Math.min(low[parent.v]!, low[top.v]!);
+            if (low[top.v]! > tin[parent.v]!) bridge[top.parentEdge] = 1;
+          }
+        }
+      }
+    }
+    const result = new Map<string, readonly boolean[]>();
+    this.circuit.devices.forEach((device, i) => {
+      // Ucun bütün kenarları köprüyse (ya da hiç kenarı yoksa) o uçtan akım geçmez.
+      const zero = pinEdges[i]!.map((list) => list.every((e) => bridge[e] === 1));
+      if (zero.some(Boolean)) result.set(device.id, zero);
+    });
+    return result;
   }
 
   /** Bir adımı (gerekirse Newton-Raphson ile) çözer; sonuç xNew'dadır. */
@@ -540,11 +683,25 @@ export class CircuitSimulator {
       this.xIter.set(this.xNew);
       if (unconverged.length === 0 && voltagesConverged) {
         this.nonConverged = [];
+        // Doğru akım çözümünde (devre değişince bir kez) bir yineleme daha: yakınsama ölçütü düğüm
+        // gerilimine göredir (≈ 1e-3·|V|); ucu boşta kalan bir eklemde bu, ≈ 1e-14 A'lık sahte bir akım
+        // bırakır. Newton adımı bunu karesel olarak sıfırlar (açık devrede akım tam 0).
+        if (ctx.h === 0) this.polish(nonlinear, ctx, n);
         return true;
       }
       this.nonConverged = unconverged.length > 0 ? unconverged : nonlinear.map((d) => d.id);
     }
     return false;
+  }
+
+  /** Yakınsamış Newton-Raphson çözümünde bir adım daha (sonuç xNew'da). */
+  private polish(nonlinear: readonly Device[], ctx: StepContext, n: number): void {
+    this.iterSys.copyFrom(this.stepSys);
+    for (const device of nonlinear) device.stampNonlinear(this.iterSys, ctx);
+    this.luWork = luFactor(this.iterSys.A, n, this.luWork);
+    luSolve(this.luWork, this.iterSys.z, this.xNew);
+    this.checkFinite(this.xNew);
+    for (const device of nonlinear) device.updateIterate(this.xNew);
   }
 
   /** |ΔV| < 1e-3·|V| + 1e-6 V (düğüm gerilimleri); akımlar için mutlak tolerans 1e-12 A. */

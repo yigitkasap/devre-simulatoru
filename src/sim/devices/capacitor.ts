@@ -23,6 +23,11 @@ export class CapacitorDevice extends Device {
     return true;
   }
 
+  /** Doğru akımda (h = 0) açık devre; geçici çözümde geq = C/h iletkenliği. */
+  override conductiveGroups(transient: boolean): ReadonlyArray<readonly number[]> {
+    return transient ? [this.nodes] : [];
+  }
+
   /**
    * Geri Euler eşdeğer modeli: i = C·dv/dt ≈ C·(v(n+1) − v(n))/h
    *   ⇒ i = geq·v(n+1) − Ieq,  geq = C/h,  Ieq = geq·v(n)

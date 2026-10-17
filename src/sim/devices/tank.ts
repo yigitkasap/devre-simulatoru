@@ -92,6 +92,19 @@ export class TankDevice extends Device {
     return TANK_PROBE_HEIGHTS.map((height) => g * probeWetness(level, height));
   }
 
+  /**
+   * Problar suyla yalnızca ıslakken bağlanır ve seviye simülasyon sırasında (yapı değişmeden) değişir;
+   * bu yüzden iletken yol sayılmaz (gerekirse su düğümüne fazladan, zararsız bir gmin eklenir).
+   */
+  override conductiveGroups(): ReadonlyArray<readonly number[]> {
+    return [];
+  }
+
+  /** Islak problar su düğümüne bağlanır: akımı 0 sayılmamalı. */
+  override possibleGroups(): ReadonlyArray<readonly number[]> {
+    return [this.nodes];
+  }
+
   override stampNonlinear(sys: MnaSystem, ctx: StepContext): void {
     const water = this.nodes[4]!;
     this.conductances(this.levelAfter(ctx.h)).forEach((g, k) => {

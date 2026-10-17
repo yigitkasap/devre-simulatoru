@@ -33,6 +33,11 @@ export class VoltmeterDevice extends Device {
     if (!this.ideal) sys.conductance(this.nodes[0]!, this.nodes[1]!, 1 / this.resistance);
   }
 
+  /** İdeal voltmetre akım çekmez (iletmez). */
+  override conductiveGroups(): ReadonlyArray<readonly number[]> {
+    return this.ideal ? [] : [this.nodes];
+  }
+
   /** Uçları arasındaki anlık gerilim. */
   instantaneous(x: Float64Array): number {
     return this.v(x, 0) - this.v(x, 1);

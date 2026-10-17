@@ -215,6 +215,16 @@ abstract class FetDevice extends Device {
     return true;
   }
 
+  /**
+   * Kanal (drain–source) her zaman iletir (paralel gmin dahil). JFET'in kapısı bir pn eklemidir
+   * (iletir); MOSFET'in kapısı yalıtılmıştır, yalnızca geçici çözümde kapasiteleriyle bağlanır.
+   */
+  override conductiveGroups(transient: boolean): ReadonlyArray<readonly number[]> {
+    const insulatedGate = this.type === 'nmos' || this.type === 'pmos';
+    if (!insulatedGate || (transient && this.hasCharges)) return [this.nodes];
+    return [[this.nodes[0]!, this.nodes[2]!]];
+  }
+
   protected controls(x: Float64Array): { vgs: number; vds: number } {
     const vd = this.v(x, 0);
     const vg = this.v(x, 1);
