@@ -124,7 +124,7 @@ export function SimBar(props: SimBarProps) {
 
         {message && (
           <p
-            className={`flex min-w-0 flex-1 items-center justify-end gap-2 text-small @max-[640px]:basis-full @max-[640px]:justify-start ${
+            className={`flex h-8 min-w-0 flex-1 items-center justify-end gap-2 text-small @max-[640px]:basis-full @max-[640px]:justify-start ${
               message.tone === 'error' ? 'text-danger' : 'text-muted'
             }`}
             role={message.tone === 'error' ? 'alert' : undefined}
