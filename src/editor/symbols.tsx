@@ -9,6 +9,7 @@ import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
+import { ANION_COLOR, CATION_COLOR, ionsOnLine, jiggle, seeded, type IonView, type PlacedIon } from './ions';
 import type { ResistorStyle } from './settings';
 
 /** Simülasyon sırasında sembolün görünümünü değiştiren değerler (Aşama 3-4). */
@@ -23,6 +24,8 @@ export interface LiveVisual {
   readonly currentLimited?: readonly boolean[];
   /** Su haznesi: su seviyesi (%). */
   readonly level?: number;
+  /** Su haznesi: suda akımı taşıyan iyonlar. */
+  readonly ions?: IonView;
   /** Direnç: harcanan gücün güç sınırına oranı (1'i aşınca ısınıyormuş gibi çizilir). */
   readonly powerRatio?: number;
 }
@@ -575,16 +578,97 @@ function DcSupply({ props, rotation, live }: { props: Props; rotation: Rotation;
  * Su haznesi (baraj): üstü açık kap, problar sağ kenardan girer (ortak prob dipte, Seviye 1–3
  * yukarı doğru); uçların yüksekliği probun ıslandığı yüksekliktir. Su canlı yükselir.
  */
+/** Hazne sembolündeki problar: çubuğun yüksekliği ve suyun içindeki ucu (yerel piksel). */
+const TANK_PROBES = [
+  { y: 30, tip: -30, name: 'COM' },
+  { y: 10, tip: -6, name: '1' },
+  { y: -10, tip: -6, name: '2' },
+  { y: -30, tip: -6, name: '3' },
+] as const;
+
+/** Bir iyon: renkli daire ve içinde + (katyon) ya da − (anyon). */
+function Ion({ ion, r, opacity = 1 }: { ion: PlacedIon; r: number; opacity?: number }) {
+  const g = r * 0.5;
+  return (
+    <g opacity={opacity}>
+      <circle cx={ion.x} cy={ion.y} r={r} fill={ion.cation ? CATION_COLOR : ANION_COLOR} stroke="#ffffff" strokeWidth={r * 0.25} />
+      <path
+        d={ion.cation ? `M${ion.x - g} ${ion.y}H${ion.x + g}M${ion.x} ${ion.y - g}V${ion.y + g}` : `M${ion.x - g} ${ion.y}H${ion.x + g}`}
+        stroke="#ffffff"
+        strokeWidth={r * 0.36}
+        strokeLinecap="round"
+      />
+    </g>
+  );
+}
+
+/**
+ * Hazne sembolünde suyun içindeki iyonlar. Akım taşıyan her anot → katot kanalında üç alan çizgisi
+ * boyunca katyonlar akım yönünde, anyonlar ters yönde sürüklenir; aradaki prob çubuğunun
+ * üstünden geçmesin diye arada başka prob varsa çizgi sola doğru kavis yapar. Akım taşımayan
+ * suda birkaç iyon yerinde kıpırdar. Akım taşıyan probun çubuğunda gaz kabarcıkları çıkar
+ * (elektroliz: katotta H₂, anotta O₂).
+ */
+function TankIons({ ions, surface }: { ions: IonView; surface: number }) {
+  const placed: PlacedIon[] = [];
+  const endpoint = (k: number, other: number, c: number) => {
+    const probe = TANK_PROBES[k]!;
+    const xs = k === 0 ? [-20, -6, 8] : [-3, 7, 17];
+    return { x: xs[c]!, y: probe.y + 2.8 * Math.sign(TANK_PROBES[other]!.y - probe.y) };
+  };
+  for (const ch of ions.channels) {
+    const y0 = TANK_PROBES[ch.from]!.y;
+    const y1 = TANK_PROBES[ch.to]!.y;
+    const between = TANK_PROBES.some((p, k) => k !== ch.from && k !== ch.to && p.y > Math.min(y0, y1) && p.y < Math.max(y0, y1));
+    for (let c = 0; c < 3; c++) {
+      const p0 = endpoint(ch.from, ch.to, c);
+      const p1 = endpoint(ch.to, ch.from, c);
+      const control = between ? { x: -40, y: (p0.y + p1.y) / 2 } : { x: (p0.x + p1.x) / 2 - 3, y: (p0.y + p1.y) / 2 };
+      const perSign = between ? 3 : 2;
+      placed.push(...ionsOnLine(`${ch.from}-${ch.to}-${c}`, p0, control, p1, ch.phase, perSign, ch.from * 7 + ch.to * 3 + c, ions.clock, 0.8));
+    }
+  }
+  // Akım taşımayan su da iyon doludur: yerinde kıpırdayan birkaç iyon.
+  const still: PlacedIon[] = [];
+  if (38 - surface > 6) {
+    for (let n = 0; n < 8; n++) {
+      const j = jiggle(100 + n, ions.clock, 1.1);
+      const y = surface + 3 + seeded(40 + n) * (35 - surface) + j.dy;
+      still.push({ key: `s${n}`, x: -34 + seeded(60 + n) * 58 + j.dx, y, cation: n % 2 === 0 });
+    }
+  }
+  // Gaz kabarcıkları: akımla orantılı sayıda, çubuktan yukarı yükselip söner.
+  const bubbles = ions.probeCurrents.flatMap((current, k) => {
+    const streams = Math.min(3, Math.floor(Math.abs(current) / 0.15e-3) + (Math.abs(current) > 2e-6 ? 1 : 0));
+    return Array.from({ length: streams }, (_, m) => {
+      const age = (ions.clock * (0.7 + 0.2 * m) + seeded(k * 5 + m)) % 1;
+      const probe = TANK_PROBES[k]!;
+      const x = (k === 0 ? -24 : -2) + 12 * m + 1.2 * Math.sin(ions.clock * 6 + m);
+      return { key: `b${k}-${m}`, x, y: probe.y - 2 - 9 * age, opacity: 0.9 * (1 - age), r: k === 0 ? 1.5 : 1.2 };
+    });
+  });
+  return (
+    <g pointerEvents="none">
+      {still.map((ion) => (
+        <Ion key={ion.key} ion={ion} r={1.9} opacity={0.6} />
+      ))}
+      {placed.map((ion) => (
+        <Ion key={ion.key} ion={ion} r={2.3} />
+      ))}
+      {bubbles
+        .filter((b) => b.y > surface + 1)
+        .map((b) => (
+          <circle key={b.key} cx={b.x} cy={b.y} r={b.r} fill="#e9f6ff" fillOpacity={0.5} stroke="#ffffff" strokeWidth={0.6} opacity={b.opacity} />
+        ))}
+    </g>
+  );
+}
+
 function Tank({ props, rotation, live }: { props: Props; rotation: Rotation; live: LiveVisual | undefined }) {
   const level = Math.min(100, Math.max(0, live?.level ?? numProp(props, 'level', 0)));
   // Yükseklik %0 → y = 40, %100 → y = −40 (uçlar −30, −10, 10, 30'da: %87,5, 62,5, 37,5, 12,5).
   const surface = Math.max(-38, 40 - 0.8 * level);
-  const probes = [
-    { y: 30, tip: -30, name: 'COM' },
-    { y: 10, tip: -6, name: '1' },
-    { y: -10, tip: -6, name: '2' },
-    { y: -30, tip: -6, name: '3' },
-  ];
+  const probes = TANK_PROBES;
   return (
     <g>
       <rect x={-40} y={-40} width={70} height={80} rx={3} style={PAPER} stroke="none" />
@@ -600,6 +684,7 @@ function Tank({ props, rotation, live }: { props: Props; rotation: Rotation; liv
           />
         </g>
       )}
+      {level > 0.5 && live?.ions && <TankIons ions={live.ions} surface={surface} />}
       <path d="M-40 -40V38a2 2 0 0 0 2 2H28a2 2 0 0 0 2-2V-40" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
       {probes.map((p) => (
         <g key={p.y}>

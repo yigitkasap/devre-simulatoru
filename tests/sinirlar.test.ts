@@ -185,5 +185,6 @@ describe('Fizik 5: örneklerde gereksiz uyarı yok', () => {
         expect(ratings(s).map((d) => d.code), name).toEqual([]);
       }
     }
-  });
+    // Bütün örnekleri ve varyantlarını çözer: yüklü makinede 5 s'lik varsayılan süre yetmeyebilir.
+  }, 60000);
 });

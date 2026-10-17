@@ -281,14 +281,15 @@ describe('Proje: baraj su seviyesi uyarısı', () => {
       between(sim.measure(idOf(doc, q))!.voltage, 0.03, 0.07);
     }
     between(sim.measure(idOf(doc, 'LED1'))!.current, 14e-3, 15e-3);
-    // Seviye 1'de baz akımı ≈ 0,55 mA.
+    // Seviye 1'de baz akımı ≈ 0,43 mA: (9 V − 0,65 V − ≈ 1,7 V elektroliz) / 15 kΩ.
     const one = simOf(withProps(doc, 'H1', { level: 45, mode: 'stop' }));
     one.runUntil(2);
-    between(one.pinCurrents(idOf(doc, 'Q1'))![1]!, 0.52e-3, 0.57e-3);
-    // Çok saf su (1 MΩ): LED'den yalnızca ≈ 0,5 mA geçer.
+    between(one.pinCurrents(idOf(doc, 'Q1'))![1]!, 0.41e-3, 0.45e-3);
+    between(one.status(idOf(doc, 'H1')).polarization!, 1.65, 1.75);
+    // Çok saf su (1 MΩ): LED'den yalnızca ≈ 0,25 mA geçer.
     const pure = simOf(withProps(doc, 'H1', { level: 45, mode: 'stop', waterResistance: 1e6 }));
     pure.runUntil(5);
-    between(pure.measure(idOf(doc, 'LED1'))!.current, 0.3e-3, 0.7e-3);
+    between(pure.measure(idOf(doc, 'LED1'))!.current, 0.15e-3, 0.35e-3);
   });
 
   it('tek ışık: aynı anda tek LED (yeşil → sarı → kırmızı); doluyken Q3–Q5 doyumda, Q1 ve Q2 kesimde', () => {

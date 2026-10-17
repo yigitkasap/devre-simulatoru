@@ -102,6 +102,7 @@ export function AyarlarKarti({ waterResistance, fillTime, onChange, onClose, sho
             );
           })}
         </div>
+        <span className={note}>{tr.baraj.ayarlar.waterNote}</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">

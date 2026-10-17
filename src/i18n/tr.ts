@@ -324,7 +324,7 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
   tank:
-    'Su seviyesi probları olan hazne (baraj). Su bir proba ulaşınca o prob ile dipteki ortak prob arasında suyun direnci oluşur; kuru prob açık devredir. Seviye elle ya da Doldur / Boşalt ile zamanla değişir.',
+    'Su seviyesi probları olan hazne (baraj). Su bir proba ulaşınca o prob ile dipteki ortak prob arasında suyun direnci oluşur ve akımı sudaki iyonlar taşır; elektrotlarda ≈ 1,5–2 V elektrolize harcanır. Kuru prob açık devredir. Seviye elle ya da Doldur / Boşalt ile zamanla değişir.',
   oscilloscope:
     'Gerilimin zamanla nasıl değiştiğini çizer; iki kanal (A, B) ortak uca göre, DC/AC/GND kuplaj, ADD, INV ve X-Y. Girişi 1 MΩ, COM ucu şebeke toprağına bağlıdır.',
 };
@@ -647,17 +647,17 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   },
   'baraj-cubuk': {
     title: 'Baraj uyarısı: çubuk gösterge',
-    description: `Baraj haznesinin dibinde ortak prob (+9 V) ve üç seviye probu var. Her seviyenin devresi kendi bandında: prob → 10 kΩ’luk baz direnci → BC107; bazda 10 µF ve 100 kΩ, kollektörde LED ve 470 Ω. Bantların ortak hattı sağdaki ortak baradan pilin − ucuna döner; bara iki RC bağlantısını keserek geçer: ${CROSSING} Hazne Doldur kipinde: Oynat’a basınca su %20’den 16 saniyede dolar.`,
+    description: `Baraj haznesinin dibinde ortak prob (+9 V) ve üç seviye probu var. Her seviyenin devresi kendi bandında: prob → 10 kΩ’luk baz direnci → BC107; bazda 10 µF ve 100 kΩ, kollektörde LED ve 470 Ω. Bantların ortak hattı sağdaki ortak baradan pilin − ucuna döner; bara iki RC bağlantısını keserek geçer: ${CROSSING} Hazne Doldur kipinde: Oynat’a basınca su %20’den 16 saniyede dolar. Suyun içinde neler olduğunu görmek için hazneye yaklaş.`,
     purpose:
-      'Suyun yüksekliğini ışıklı bir çubukla gösterir. Su bir proba ulaşınca, suyun direnci (≈ 5 kΩ) ve baz direnci üzerinden baz akımı akar: I_{B} ≈ (9 V − 0,65 V) / 15 kΩ ≈ 0,55 mA. β · I_{B}, LED devresinin izin verdiği akımdan (≈ 14 mA) çok büyük olduğu için transistör doyuma girer ve LED’i yakar: önce yeşil (≈ 3,4 s), sonra sarı (≈ 8,4 s), sonra kırmızı (≈ 13,4 s). Bazdaki kondansatör ve 100 kΩ, dalgalı su yüzeyinde LED’in titremesini önler. Su direncini 1 MΩ yap (çok saf su): LED’den yalnızca ≈ 0,5 mA geçer.',
+      'Suyun yüksekliğini ışıklı bir çubukla gösterir. Prob kuruyken devre açıktır; su bir proba ulaşınca ortak prob ile o prob arasındaki su devreyi tamamlar. Su, içinde çözünmüş iyonlar (Ca²⁺, Mg²⁺, Na⁺, Cl⁻, HCO₃⁻…) olduğu için iletir: telde akımı elektronlar, suda iyonlar taşır; katyonlar (+) akım yönünde, anyonlar (−) ters yönde sürüklenir (hazneye yaklaşınca görülür). Yük, metal ile su arasında ancak elektrolizle geçer: + uçta (ortak prob) O₂ çıkar ya da metal çözünür, − uçta H₂ çıkar; bunun için elektrotlarda ≈ 1,7 V harcanır (polarizasyon). Baz akımı I_{B} ≈ (9 V − 0,65 V − 1,7 V) / (5 kΩ + 10 kΩ) ≈ 0,43 mA. β · I_{B}, LED devresinin izin verdiği akımdan (≈ 14 mA) çok büyük olduğu için transistör doyuma girer ve LED’i yakar: önce yeşil (≈ 3,4 s), sonra sarı (≈ 8,4 s), sonra kırmızı (≈ 13,4 s). Bazdaki kondansatör ve 100 kΩ, dalgalı su yüzeyinde LED’in titremesini önler. Su direncini 1 MΩ yap (çok saf su, iyon az): LED’den yalnızca ≈ 0,25 mA geçer.',
     everyday:
-      'Su depolarında ve hidroforlarda seviye göstergeleri, kahve ve bulaşık makinelerindeki su seviyesi sensörleri, bodrumlarda su baskını alarmları. Barajlarda gerçek seviye ölçümü çoğunlukla basınç ya da ultrasonik sensörlerle yapılır, ama uyarı mantığı aynıdır.',
+      'Su depolarında ve hidroforlarda seviye göstergeleri, kahve ve bulaşık makinelerindeki su seviyesi sensörleri, bodrumlarda su baskını alarmları. Barajlarda gerçek seviye ölçümü çoğunlukla basınç ya da ultrasonik sensörlerle yapılır, ama uyarı mantığı aynıdır. Doğru akım elektrotları zamanla aşındırır (Faraday’ın elektroliz yasası: 0,5 mA’lik sürekli akım bir yılda ≈ 5 g bakır çözer); bu yüzden gerçek sensörlerde paslanmaz çelik ya da grafit problar kullanılır ve problar alternatif akımla ya da yalnızca kısa aralıklarla beslenir.',
   },
   'baraj-tek-isik': {
     title: 'Baraj uyarısı: tek ışık',
     description: `Çubuk göstergenin aynısı, iki “susturma” transistörü eklenmiş. Q4’ün bazı Seviye 2 probundan, Q5’in bazı Seviye 3 probundan 10 kΩ ile sürülür; kollektörleri yeşilin (Q1) ve sarının (Q2) baz hattına, emetörleri ortak hatta bağlıdır. Q4 ve Q5’in prob kabloları birer prob kablosunu keserek geçer: ${CROSSING} Hazne yine %20’den 16 saniyede dolar.`,
     purpose:
-      'Aynı anda yalnızca en yüksek seviyenin ışığını yakar (öncelik mantığı). Seviye 2 ıslanınca (≈ 8,4 s) Q4 doyuma girer ve Q1’in bazını ≈ 0,01 V’a çeker: Q1 kesime gider, yeşil söner, aynı anda sarı yanar. Seviye 3’te (≈ 13,4 s) Q5 sarıyı söndürür; yalnız kırmızı kalır. Hazne doluyken Q3, Q4 ve Q5 doyumda, Q1 ve Q2 kesimde: yeşil = Seviye 1 VE (Seviye 2 DEĞİL). Su akışını Boşalt yap: ışık kırmızıdan sarıya, sonra yeşile döner.',
+      'Aynı anda yalnızca en yüksek seviyenin ışığını yakar (öncelik mantığı). Problar çubuk göstergedeki gibi çalışır: su devreyi tamamlar, suda akımı iyonlar taşır ve elektrotlarda ≈ 1,7 V elektrolize harcanır. Seviye 2 ıslanınca (≈ 8,4 s) Q4 doyuma girer ve Q1’in bazını ≈ 0,01 V’a çeker: Q1 kesime gider, yeşil söner, aynı anda sarı yanar. Seviye 3’te (≈ 13,4 s) Q5 sarıyı söndürür; yalnız kırmızı kalır. Hazne doluyken Q3, Q4 ve Q5 doyumda, Q1 ve Q2 kesimde: yeşil = Seviye 1 VE (Seviye 2 DEĞİL). Su akışını Boşalt yap: ışık kırmızıdan sarıya, sonra yeşile döner.',
     everyday:
       'Tek ışıklı durum göstergeleri (yeşil-sarı-kırmızı), yakıt ve batarya göstergelerinin en yüksek seviyeyi gösteren mantığı, asansörlerin kat göstergeleri ve öncelikli alarm panelleri aynı mantık kapılarıyla kurulur.',
   },
@@ -799,6 +799,7 @@ export const tr = {
     legendTitle: 'Gösterim',
     legendConventional: 'Akım · geleneksel yön',
     legendElectron: 'Akım · elektron yönü',
+    legendIons: 'Suda iyonlar · + akım yönünde, − ters',
   },
   readout: {
     voltage: 'Gerilim',
@@ -862,7 +863,8 @@ export const tr = {
     funcgenEarthed: ' COM ucu şebeke toprağına bağlı: devrenin toprağıyla aynı noktadır.',
     none: 'yok',
     tankNote:
-      'Su, ıslak probları birbirine bağlar: iki ıslak prob arasında “su direnci” vardır, kuru prob açık devredir. Akım, ortak probdan suya geçen akımdır.',
+      'Su, içinde çözünmüş iyonlar (Ca²⁺, Na⁺, Cl⁻, HCO₃⁻…) olduğu için iletir: suda akımı iyonlar taşır, katyonlar akım yönünde, anyonlar ters yönde sürüklenir. Kuru prob açık devredir. Yük, metal ile su arasında ancak elektrolizle geçer (anotta O₂ çıkar ya da metal çözünür, katotta H₂ çıkar); bunun için elektrotlarda ≈ 1,5–2 V harcanır (polarizasyon). Akım, ortak probdan suya geçen akımdır.',
+    polarization: 'Elektrotlarda (elektroliz)',
     dcsupplyNote:
       'Yük, akım sınırını aşmaya çalışınca kaynak sabit akıma (CC) geçer ve çıkış gerilimi düşer; kısa devrede akım sınırda kalır.',
     scopeInput: (real: boolean, earthed: boolean) =>
@@ -1166,6 +1168,12 @@ export const tr = {
     bandLabel: (n: number) => `Seviye ${n} · ${({ 1: 'yeşil', 2: 'sarı', 3: 'kırmızı' } as Record<number, string>)[n] ?? ''}`,
     handle: 'Su seviyesi',
     handleText: (n: number) => `%${n}`,
+    ions: {
+      cation: 'katyon: akım yönünde',
+      anion: 'anyon: ters yönde',
+      gas: 'gaz: elektroliz',
+      sceneLabel: 'Suda akımı iyonlar taşıyor: katyonlar akım yönünde, anyonlar ters yönde; problarda elektroliz gazı çıkıyor.',
+    },
     soru: {
       button: 'Soru',
       title: 'Soru',
@@ -1180,7 +1188,7 @@ export const tr = {
         question:
           'Su yükseldikçe LED’ler hangi sırayla yanar? Su Seviye 1’e ulaşınca transistör doyuma girer mi? Baz akımını kabaca hesapla (V_{BE} ≈ 0,65 V).',
         answer:
-          'Önce yeşil (su %37,5’e gelince), sonra yeşilin yanında sarı (%62,5’te), sonra üçü birden (%87,5’te). I_{B} ≈ (9 V − 0,65 V) / (5 kΩ + 10 kΩ) ≈ 0,55 mA; β · I_{B} ≈ 110 mA olurdu, ama LED devresi en fazla ≈ (9 V − 2,2 V) / 470 Ω ≈ 14 mA’e izin verir: transistör doyumdadır (V_{CE} ≈ 0,05 V), LED’den ≈ 14,5 mA geçer. Boşalt’a bas: LED’ler ters sırayla, kondansatör yüzünden yumuşakça söner. Ayarlar’dan Saf su’yu (1 MΩ) seç: 100 kΩ’luk direnç baz akımının çoğunu çeker, LED’den yalnızca ≈ 0,5 mA geçer ve LED zor görünür. Gerçek devrelerde baz ve çekme dirençleri suyun direncine göre seçilir.',
+          'Önce yeşil (su %37,5’e gelince), sonra yeşilin yanında sarı (%62,5’te), sonra üçü birden (%87,5’te). Prob kuruyken devre açıktır; su gelince devreyi su tamamlar: suda akımı iyonlar taşır (katyonlar akım yönünde, anyonlar ters yönde; sahnede görülür). Yük metal ile su arasında ancak elektrolizle geçer (+ uçta O₂, − uçta H₂) ve elektrotlarda ≈ 1,7 V harcanır. I_{B} ≈ (9 V − 0,65 V − 1,7 V) / (5 kΩ + 10 kΩ) ≈ 0,43 mA; β · I_{B} ≈ 86 mA olurdu, ama LED devresi en fazla ≈ (9 V − 2,2 V) / 470 Ω ≈ 14 mA’e izin verir: transistör doyumdadır (V_{CE} ≈ 0,05 V), LED’den ≈ 14,5 mA geçer. Boşalt’a bas: LED’ler ters sırayla, kondansatör yüzünden yumuşakça söner. Ayarlar’dan Saf su’yu (1 MΩ) seç: suda iyon azdır, elektroliz gerilimi de düşünce baz akımı çok küçülür; LED’den yalnızca ≈ 0,25 mA geçer ve LED zor görünür. Gerçek devrelerde baz ve çekme dirençleri suyun direncine göre seçilir.',
       },
       'baraj-tek-isik': {
         question:
@@ -1235,6 +1243,8 @@ export const tr = {
       pure: 'Saf su',
       waterResistance: 'Su direnci',
       waterResistanceNote: 'iki ıslak prob arası',
+      waterNote:
+        'Su, içinde çözünmüş iyonlar (Ca²⁺, Na⁺, Cl⁻…) olduğu için iletir; saf suda iyon çok azdır, direnç MΩ düzeyine çıkar.',
       fillTime: 'Dolma süresi',
       fillTimeNote: 'boştan doluya',
       waterDown: 'Su direncini azalt',

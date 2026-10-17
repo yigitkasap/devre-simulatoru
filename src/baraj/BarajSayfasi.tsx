@@ -341,6 +341,7 @@ export default function BarajSayfasi() {
         layout={sceneLayout}
         textPx={textPx}
         lampLabels={!phone}
+        ions={preview === null ? sim.frame?.live.get(tank.id)?.ions : undefined}
         onPreview={onPreview}
         onCommit={kumanda.commitLevel}
         className="h-full w-full"

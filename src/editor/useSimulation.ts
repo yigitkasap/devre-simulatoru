@@ -17,6 +17,7 @@ import {
   type Measurement,
   type ScopeRecorder,
 } from '../sim';
+import { IonPhases } from './ions';
 import { buildScopeView, type ScopeView } from './scopeView';
 import type { LiveVisual } from './symbols';
 
@@ -117,6 +118,8 @@ export function useSimulation(
   const phases = useRef({ segments: new Float64Array(0), parts: new Map<string, number>() });
   /** AC devrede LED'lerin yumuşatılmış parlaklığı. */
   const ledGlow = useRef(new Map<string, number>());
+  /** Su haznelerinde iyonların sürüklenme konumları. */
+  const ionPhases = useRef(new Map<string, IonPhases>());
 
   const latest = useRef({ doc, connectivity, flowGraph, electronFlow, structure });
   latest.current = { doc, connectivity, flowGraph, electronFlow, structure };
@@ -207,7 +210,12 @@ export function useSimulation(
       } else if (part.type === 'dcsupply') {
         live.set(part.id, { currentLimited: status.currentLimited ?? [] });
       } else if (part.type === 'tank') {
-        live.set(part.id, status.level !== undefined ? { level: status.level } : {});
+        // Suda akımı iyonlar taşır: katyonlar akım yönünde, anyonlar ters yönde (elektron akışı
+        // seçeneğinden bağımsız; ikisi de gerçekten hareket eder).
+        let phases = ionPhases.current.get(part.id);
+        if (!phases) ionPhases.current.set(part.id, (phases = new IonPhases()));
+        const ions = phases.advance(pinFlows.get(part.id) ?? status.probeCurrents ?? [], dtReal, dotSpeed);
+        live.set(part.id, { ...(status.level !== undefined ? { level: status.level } : {}), ions });
       } else if (part.type === 'oscilloscope') {
         const device = sim.device(part.id);
         if (device instanceof OscilloscopeDevice) {
@@ -239,6 +247,7 @@ export function useSimulation(
     startedStructure.current = null;
     phases.current = { segments: new Float64Array(0), parts: new Map() };
     ledGlow.current = new Map();
+    ionPhases.current = new Map();
     setStatus('stopped');
     setFrame(null);
     setNotice(null);

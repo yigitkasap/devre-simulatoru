@@ -1,10 +1,13 @@
-// Su haznesi (baraj seviye probları): kuru prob açık devre, ıslak problar arasında su direnci;
-// Doldur / Boşalt ile seviye simülasyon zamanıyla değişir.
+// Su haznesi (baraj seviye probları): kuru prob açık devre, ıslak problar arasında su direnci ve
+// elektrot polarizasyonu (elektroliz); Doldur / Boşalt ile seviye simülasyon zamanıyla değişir.
 
 import { describe, expect, it } from 'vitest';
 import { CircuitSimulator, type PropValue } from '../src/sim';
 import { LED_MODELS } from '../src/sim/devices/led';
-import { probeWetness, TANK_PROBE_HEIGHTS } from '../src/sim/devices/tank';
+import { ELECTRODE_EXCHANGE_CURRENT, ELECTRODE_SLOPE, electrodeBranch, probeWetness, TANK_PROBE_HEIGHTS } from '../src/sim/devices/tank';
+
+/** Bir anot ile bir katodun i akımındaki toplam polarizasyonu: 2·b·asinh(i / 2i₀). */
+const pairPolarization = (i: number) => 2 * ELECTRODE_SLOPE * Math.asinh(i / (2 * ELECTRODE_EXCHANGE_CURRENT));
 import { circuit } from './helpers';
 
 /** 9 V, her seviye probu 10 kΩ ile pile bağlı; ortak prob toprakta. */
@@ -19,20 +22,47 @@ function tank(props: Record<string, PropValue>) {
 }
 
 describe('Su haznesi', () => {
-  it('kuru problar açık devre; seviye bir probu geçince o prob ortak proba su direnciyle bağlanır', () => {
+  it('kuru problar açık devre; seviye bir probu geçince o prob ortak proba su direnci ve elektrotlarla bağlanır', () => {
     const dry = new CircuitSimulator(tank({ level: 0 }).build());
     dry.advance(0);
     expect(dry.voltageAt('p1')!).toBeCloseTo(9, 3);
+    expect(dry.pinCurrents('H')!.every((i) => i === 0)).toBe(true);
     const half = new CircuitSimulator(tank({ level: 50 }).build());
     half.advance(0);
-    // Seviye 1 ıslak: 10 kΩ ile 5 kΩ'luk su direnci → 3 V; Seviye 2 ve 3 kuru.
-    expect(half.voltageAt('p1')!).toBeCloseTo(3, 3);
+    // Seviye 1 ıslak: 9 V = I·(10 kΩ + 5 kΩ) + polarizasyon(I) → I ≈ 0,485 mA, p1 ≈ 4,15 V.
+    // (Polarizasyon olmasaydı I = 0,6 mA, p1 = 3 V olurdu.) Seviye 2 ve 3 kuru.
+    // Bu düzenekte Seviye 1 probu + (anot), ortak prob − (katot): akım S1'den suya, sudan ortak proba.
+    const i = half.pinCurrents('H')![1]!;
+    expect(i).toBeGreaterThan(0.47e-3);
+    expect(i).toBeLessThan(0.5e-3);
+    expect(half.voltageAt('p1')!).toBeCloseTo(9 - 10e3 * i, 6);
+    expect(Math.abs(9 - 15e3 * i - pairPolarization(i))).toBeLessThan(1e-6);
+    expect(half.status('H').polarization!).toBeCloseTo(pairPolarization(i), 6);
     expect(half.voltageAt('p2')!).toBeCloseTo(9, 3);
     expect(half.status('H').wetProbes).toEqual([true, true, false, false]);
-    expect(half.pinCurrents('H')![0]!).toBeCloseTo(-0.6e-3, 6);
+    // Kirchhoff: Seviye 1 probundan suya giren akım ortak probdan çıkar.
+    expect(half.pinCurrents('H')![0]!).toBeCloseTo(-i, 9);
     const full = new CircuitSimulator(tank({ level: 100 }).build());
     full.advance(0);
     expect(full.status('H').wetProbes).toEqual([true, true, true, true]);
+  });
+
+  it('elektrot polarizasyonu: bir anot–katot çiftinde 0,1 mA’de ≈ 1,55 V, 1 mA’de ≈ 1,8 V; 1 V’ta akım 1 µA’in altında', () => {
+    expect(pairPolarization(0.1e-3)).toBeCloseTo(1.553, 2);
+    expect(pairPolarization(0.4e-3)).toBeCloseTo(1.70, 1);
+    expect(pairPolarization(1e-3)).toBeCloseTo(1.79, 2);
+    // Dal (arayüz + direnç): simetrik, artan; büyük gerilimde direnç belirler.
+    for (const v of [0.2, 0.9, 3, 9]) {
+      const plus = electrodeBranch(v, 2500);
+      const minus = electrodeBranch(-v, 2500);
+      expect(minus.current).toBeCloseTo(-plus.current, 15);
+      expect(plus.current).toBeCloseTo((v - plus.overpotential) / 2500, 12);
+    }
+    expect(electrodeBranch(3, 2500).current).toBeGreaterThan(electrodeBranch(0.9, 2500).current);
+    // 1 V'luk bir çift (her elektrotta 0,5 V): akım yok denecek kadar az.
+    const below = electrodeBranch(0.5, 1).current;
+    expect(below).toBeGreaterThan(0);
+    expect(below).toBeLessThan(1e-6);
   });
 
   it('Doldur: boştan doluya dolma süresinde; 5 s’de %50 (yalnız Seviye 1 ıslak), 7 s’de %70', () => {

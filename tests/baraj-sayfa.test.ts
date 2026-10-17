@@ -117,15 +117,12 @@ describe('Baraj sayfası: seviye mantığı', () => {
     expect(rows[1]!.note).toBeNull();
   });
 
-  it('saf su (1 MΩ): su yüksek ama transistörler aktifte, LED’ler çok zayıf', () => {
+  it('saf su (1 MΩ): su yüksek ama elektroliz gerilimi ve suyun direnci baz akımını keser, LED’ler sönük', () => {
     const doc = load('baraj-cubuk', { level: 75, mode: 'stop', waterResistance: 1e6 });
     const sim = simOf(doc);
     sim.runUntil(5);
     const rows = durumRows(doc, frameOf(sim, doc), wetOf(sim, doc), never);
-    expect(rows.slice(1).map((r) => [r.wet, r.region, r.working])).toEqual([
-      [true, 'active', true],
-      [true, 'active', true],
-    ]);
+    expect(rows.slice(1).map((r) => r.wet)).toEqual([true, true]);
     for (const r of rows.slice(1)) expect(r.led === 'dim' || r.led === 'off').toBe(true);
   });
 

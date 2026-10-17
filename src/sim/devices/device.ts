@@ -79,6 +79,10 @@ export interface DeviceStatus {
   readonly level?: number;
   /** Su haznesi: ıslak problar (ortak, Seviye 1, 2, 3). */
   readonly wetProbes?: readonly boolean[];
+  /** Su haznesi: her probdan suya akan akım (A; probdan çıkıp suya giren pozitif). */
+  readonly probeCurrents?: readonly number[];
+  /** Su haznesi: elektrolize harcanan gerilim (bir anot ile bir katodun arayüz gerilimleri toplamı, V). */
+  readonly polarization?: number;
   /** Direnç: harcanan gücün (AC'de bir periyodun ortalaması) güç sınırına oranı. */
   readonly powerRatio?: number;
 }

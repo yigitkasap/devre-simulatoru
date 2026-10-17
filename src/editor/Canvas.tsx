@@ -47,6 +47,7 @@ import {
   type WireScale,
 } from './colors';
 import { BurnBalloon, ContextMenu, ZeroMark, type MenuItem } from './CanvasOverlays';
+import { ANION_COLOR, CATION_COLOR } from './ions';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
@@ -1868,6 +1869,7 @@ export function Canvas({
             scale={settings.wireScale}
             electronFlow={settings.electronFlow}
             rms={doc.parts.some((p) => p.type === 'acsource' || p.type === 'funcgen')}
+            ions={doc.parts.some((p) => p.type === 'tank')}
             onClose={phone ? () => setLegendOpen(false) : undefined}
           />
         ))}
@@ -2404,6 +2406,7 @@ function VoltageLegend({
   scale,
   electronFlow,
   rms,
+  ions,
   onClose,
 }: {
   vmax: number;
@@ -2411,6 +2414,8 @@ function VoltageLegend({
   electronFlow: boolean;
   /** AC devrede renkler etkin değerden (kare ortalamasından) çizilir. */
   rms: boolean;
+  /** Devrede su haznesi var: suda akımı iyonların taşıdığı da açıklanır. */
+  ions: boolean;
   /** Telefon: dokununca küçük düğmeye döner. */
   onClose?: () => void;
 }) {
@@ -2437,6 +2442,17 @@ function VoltageLegend({
         </svg>
         {electronFlow ? tr.sim.legendElectron : tr.sim.legendConventional}
       </div>
+      {ions && (
+        <div className="flex items-center gap-2 text-label text-ink-2">
+          <svg width="34" height="10" viewBox="0 0 34 10" aria-hidden="true">
+            <circle cx={8} cy={5} r={4.4} fill={CATION_COLOR} stroke="#ffffff" strokeWidth={1} />
+            <path d="M5.8 5H10.2M8 2.8V7.2" stroke="#ffffff" strokeWidth={1.4} strokeLinecap="round" />
+            <circle cx={26} cy={5} r={4.4} fill={ANION_COLOR} stroke="#ffffff" strokeWidth={1} />
+            <path d="M23.8 5H28.2" stroke="#ffffff" strokeWidth={1.4} strokeLinecap="round" />
+          </svg>
+          {tr.sim.legendIons}
+        </div>
+      )}
     </div>
   );
 }

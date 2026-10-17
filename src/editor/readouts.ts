@@ -149,6 +149,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
           { label: tr.rack.level, value: `%${formatNumber(level, 1)}` },
           { label: tr.rack.probes, value: wetNames.length > 0 ? wetNames.join(', ') : t.none },
           { label: t.current, value: a(I) },
+          { label: t.polarization, value: v(status.polarization ?? 0) },
           { label: tr.rack.waterResistance, value: ohmValue(s.waterResistance) },
         ],
         note: t.tankNote,

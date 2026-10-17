@@ -10,6 +10,7 @@
 // sahnenin ekrandaki ölçeğine göre `textPx` piksel boyunda çizilir (projeksiyonda büyür).
 
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { ANION_COLOR, CATION_COLOR, ionsOnLine, jiggle, seeded, type IonView, type PlacedIon } from '../editor/ions';
 import { tr } from '../i18n/tr';
 import { TANK_PROBE_HEIGHTS, type TankMode } from '../sim/devices/tank';
 import { LEVEL_COLORS, type LevelNo } from './seviye';
@@ -45,6 +46,8 @@ export interface BarajSahnesiProps {
   readonly textPx: number;
   /** Lambaların yanında "Seviye n" yazısı (telefonda yok: numara lambanın içinde). */
   readonly lampLabels?: boolean;
+  /** Suda akımı taşıyan iyonlar (simülasyon çalışırken). */
+  readonly ions?: IonView;
   /** Tutamak sürüklenirken önizleme seviyesi; bırakınca null. */
   readonly onPreview: (level: number | null) => void;
   /** Tutamak bırakıldı ya da tuşla değişti: seviye uygulanır. */
@@ -100,7 +103,134 @@ function useScale(viewBox: readonly [number, number, number, number]) {
   return { ref, scale };
 }
 
-export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx, lampLabels = true, onPreview, onCommit, className = '' }: BarajSahnesiProps) {
+/** Probun ucu (sahnede): problar barajın yüzünden suya uzanır, uçları x = 452'de. */
+const TIP_X = 452;
+
+/** Bir iyon: renkli daire, içinde + (katyon) ya da − (anyon). */
+function SceneIon({ ion, r, opacity = 1 }: { ion: PlacedIon; r: number; opacity?: number }) {
+  const g = r * 0.5;
+  return (
+    <g opacity={opacity}>
+      <circle cx={ion.x} cy={ion.y} r={r} fill={ion.cation ? CATION_COLOR : ANION_COLOR} stroke="#ffffff" strokeWidth={r * 0.22} />
+      <path
+        d={ion.cation ? `M${ion.x - g} ${ion.y}H${ion.x + g}M${ion.x} ${ion.y - g}V${ion.y + g}` : `M${ion.x - g} ${ion.y}H${ion.x + g}`}
+        stroke="#ffffff"
+        strokeWidth={r * 0.32}
+        strokeLinecap="round"
+      />
+    </g>
+  );
+}
+
+/**
+ * Haznedeki iyonlar ve gaz kabarcıkları. Su iyon doludur: akım yokken iyonlar yerinde kıpırdar.
+ * Akım taşıyan her anot → katot kanalında, uçlar arasında sola doğru kavisli üç alan çizgisi
+ * boyunca katyonlar akım yönünde (anottan katoda), anyonlar ters yönde sürüklenir. Akım taşıyan
+ * probun ucunda elektroliz gazı çıkar: katotta H₂, anotta (aynı yük için yarısı kadar) O₂.
+ */
+function SceneIons({ ions, surface, r }: { ions: IonView; surface: number; r: number }) {
+  const tipY = TANK_PROBE_HEIGHTS.map((h) => levelY(h));
+  const placed: PlacedIon[] = [];
+  for (const ch of ions.channels) {
+    const y0 = tipY[ch.from]!;
+    const y1 = tipY[ch.to]!;
+    const dir = Math.sign(y1 - y0);
+    for (let c = 0; c < 3; c++) {
+      const p0 = { x: TIP_X - 4 - 3 * c, y: y0 + 6 * dir };
+      const p1 = { x: TIP_X - 4 - 3 * c, y: y1 - 6 * dir };
+      // Kavis, ölçü iskelesinin (x = 404–416) sağında kalır; aradaki probun ucunun solundan geçer.
+      const between = tipY.some((y, k) => k !== ch.from && k !== ch.to && y > Math.min(y0, y1) && y < Math.max(y0, y1));
+      const control = { x: TIP_X - (between ? 34 : 14) - 9 * c, y: (y0 + y1) / 2 };
+      const perSign = Math.max(2, Math.round(Math.abs(y1 - y0) / 55));
+      placed.push(...ionsOnLine(`${ch.from}-${ch.to}-${c}`, p0, control, p1, ch.phase, perSign, ch.from * 7 + ch.to * 3 + c, ions.clock, 2.2));
+    }
+  }
+  const still: PlacedIon[] = [];
+  const depth = BED_Y - 8 - (surface + 10);
+  if (depth > 6) {
+    for (let n = 0; n < 24; n++) {
+      const y = surface + 10 + seeded(200 + n) * depth;
+      const x0 = bankX(y) + 14;
+      const j = jiggle(300 + n, ions.clock, 2.4);
+      still.push({ key: `s${n}`, x: x0 + seeded(400 + n) * (TIP_X - 30 - x0) + j.dx, y: y + j.dy, cation: n % 2 === 0 });
+    }
+  }
+  const bubbles = ions.probeCurrents.flatMap((current, k) => {
+    const abs = Math.abs(current);
+    if (abs < 2e-6) return [];
+    const cathode = current < 0;
+    const streams = Math.min(4, 1 + Math.floor(abs / 0.15e-3));
+    const count = cathode ? streams : Math.max(1, Math.ceil(streams / 2));
+    return Array.from({ length: count }, (_, m) => {
+      const age = (ions.clock * (0.55 + 0.15 * m) + seeded(k * 9 + m)) % 1;
+      const x = TIP_X - 6 - 7 * m + 2 * Math.sin(ions.clock * 5 + 2 * m);
+      return { key: `b${k}-${m}`, x, y: tipY[k]! - 7 - 46 * age, opacity: 0.95 * (1 - age), r: cathode ? 2.4 : 3.1 };
+    });
+  });
+  return (
+    <g>
+      {still.map((ion) => (
+        <SceneIon key={ion.key} ion={ion} r={r * 0.8} opacity={0.55} />
+      ))}
+      {placed.map((ion) => (
+        <SceneIon key={ion.key} ion={ion} r={r} />
+      ))}
+      {bubbles
+        .filter((b) => b.y > surface + 3)
+        .map((b) => (
+          <circle key={b.key} cx={b.x} cy={b.y} r={b.r} fill="#e9f6ff" fillOpacity={0.45} stroke="#ffffff" strokeWidth={1} opacity={b.opacity} />
+        ))}
+    </g>
+  );
+}
+
+/**
+ * Sahnenin en altında, su yatağının altındaki toprak şeridinde tek satırlık iyon açıklaması:
+ * katyon, anyon ve gaz kabarcığı. Prob yazılarına ve ölçü iskelesine binmez; yer darsa yazı küçülür.
+ */
+function IonLegend({ viewBox, fs }: { viewBox: readonly [number, number, number, number]; fs: number }) {
+  const items = [
+    { kind: 'cation' as const, text: tr.baraj.ions.cation },
+    { kind: 'anion' as const, text: tr.baraj.ions.anion },
+    { kind: 'gas' as const, text: tr.baraj.ions.gas },
+  ];
+  const chars = items.reduce((n, item) => n + item.text.length, 0);
+  // Genişlik ≈ boyut · (iki kenar boşluğu + üç simge ve aralığı + iki öğe arası + harfler).
+  const units = 1.2 + items.length * 1.7 + (items.length - 1) * 1.1 + chars * 0.5;
+  const size = Math.min(fs * 0.72, (viewBox[2] - 16) / units);
+  const pad = size * 0.6;
+  const h = size * 1.7;
+  const x = viewBox[0] + 8;
+  const y = viewBox[1] + viewBox[3] - h - 6;
+  const r = size * 0.5;
+  let cursor = x + pad;
+  const placed = items.map((item) => {
+    const cx = cursor + r;
+    cursor = cx + r + size * 0.45 + item.text.length * size * 0.5 + size * 1.1;
+    return { ...item, cx };
+  });
+  const w = cursor - size * 1.1 + pad - x;
+  const cy = y + h / 2;
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} rx={h / 2} fill="#ffffff" fillOpacity={0.9} stroke="#c3cad2" strokeWidth={1} />
+      {placed.map((item) => (
+        <g key={item.kind}>
+          {item.kind === 'gas' ? (
+            <circle cx={item.cx} cy={cy} r={r * 0.8} fill="#e9f6ff" stroke="#5f8fb8" strokeWidth={1.2} />
+          ) : (
+            <SceneIon ion={{ key: item.kind, x: item.cx, y: cy, cation: item.kind === 'cation' }} r={r} />
+          )}
+          <text x={item.cx + r + size * 0.45} y={cy + size * 0.36} fontSize={size} fill="#1d2733" style={{ fontFamily: 'var(--font-sans)' }}>
+            {item.text}
+          </text>
+        </g>
+      ))}
+    </g>
+  );
+}
+
+export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx, lampLabels = true, ions, onPreview, onCommit, className = '' }: BarajSahnesiProps) {
   const id = useId().replace(/:/g, '');
   const viewBox = VIEW_BOXES[layout];
   const { ref, scale } = useScale(viewBox);
@@ -187,7 +317,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
       ref={ref}
       viewBox={viewBox.join(' ')}
       role="img"
-      aria-label={tr.baraj.sceneLabel(Math.round(level), lampText)}
+      aria-label={tr.baraj.sceneLabel(Math.round(level), lampText) + (ions && ions.channels.length > 0 ? ` ${tr.baraj.ions.sceneLabel}` : '')}
       className="absolute inset-0 h-full w-full"
       preserveAspectRatio="xMidYMid meet"
     >
@@ -242,6 +372,9 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
           </g>
         </g>
       )}
+
+      {/* Sudaki iyonlar ve elektroliz kabarcıkları (simülasyon çalışırken) */}
+      {level > 0.2 && ions && <SceneIons ions={ions} surface={surface} r={Math.max(4.5, fs * 0.38)} />}
 
       {/* Doldururken nehir */}
       <path
@@ -347,6 +480,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
         );
       })}
 
+      {ions && level > TANK_PROBE_HEIGHTS[0] && <IonLegend viewBox={viewBox} fs={fs} />}
     </svg>
     {/* Seviye etiketi ve sürükleme tutamağı (ayrı katman) */}
     <svg

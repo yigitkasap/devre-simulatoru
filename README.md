@@ -239,7 +239,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 404 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 405 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -891,6 +891,43 @@ doğrulanır.
 - **Denetimler:** Cihaz rafında ve telefonun Cihazlar sayfasında aynı bileşen
   ([`TankControls.tsx`](src/editor/TankControls.tsx)): seviye göstergesi, ıslak prob lambaları,
   kaydırıcı, su akışı, dolma süresi, su direnci, jaklar. Sembolde su canlı yükselir.
+- **Suda akımı iyonlar taşır (kullanıcı isteği, 2026-10-17):** Prob kuruyken devre açıktır; su
+  gelince devreyi su tamamlar, çünkü içinde çözünmüş iyonlar (Ca²⁺, Mg²⁺, Na⁺, Cl⁻, HCO₃⁻…) vardır.
+  Simülasyon çalışırken hazne sembolünde ve baraj sahnesinde iyonlar çizilir
+  ([`ions.ts`](src/editor/ions.ts)): prob akımları anot → katot kanallarına ayrılır (her anodun
+  akımı katotlara, katot akımlarıyla orantılı; toplamlar korunur), her kanalda üç alan çizgisi
+  boyunca katyonlar (turuncu, +) akım yönünde, anyonlar (mor, −) ters yönde sürüklenir; arada
+  başka bir prob varsa çizgi onun ucunun solundan kavis yapar. Hız, kablolardaki akım
+  noktalarının ölçeğidir (gerçek sürüklenme µm/s düzeyindedir) ve "elektron akışı" seçeneğinden
+  bağımsızdır: iki iyon türü de gerçekten hareket eder. Akım taşımayan su da iyon doludur:
+  birkaç iyon yerinde kıpırdar (ısıl hareket). Akım taşıyan probun ucunda gaz kabarcıkları çıkar
+  (katotta H₂; anotta, aynı yük için yarısı kadar O₂), sayısı akımla artar. Tuvalin gerilim
+  göstergesine "Suda iyonlar · + akım yönünde, − ters" satırı, baraj sahnesinin altına tek
+  satırlık açıklama eklenir; sahnenin ekran okuyucu etiketi de iyonları söyler.
+- **Elektrot polarizasyonu (elektroliz; kullanıcı isteği, 2026-10-17):** Yük metal ile su arasında
+  ancak kimyasal tepkimeyle geçer: anotta su yükseltgenir (O₂) ya da metal çözünür, katotta H₂
+  çıkar. Bunun için suyun ayrışma gerilimi (tersinir 1,23 V) ve aşırı gerilimler gerekir. Her ıslak
+  prob dalı artık "elektrot arayüzü + R_su / 2" seridir; arayüz Butler–Volmer biçiminde
+  (α = 0,5): i = 2·i₀·sinh(η / b), b = 2·V_T ≈ 52 mV (Tafel eğimi ≈ 119 mV/onlu). Tersinir gerilim
+  ve aşırı gerilimler bu tek terime toplandı; i₀ = 3·10⁻¹¹ A, bir anot ile bir katodun toplamı
+  0,1 mA'de 1,55 V, 0,4 mA'de 1,70 V, 1 mA'de 1,79 V olacak biçimde seçildi (suyun elektrolizinde
+  gözlenen 1,5–2 V); 1 V'luk çiftte akım 1 µA'in altındadır. Dalın akımı, η + R·i(η) = V'nin kökü
+  olarak Newton ile çözülür (f artan ve dışbükey; önceki çözümden başlar), Newton-Raphson'a
+  türeviyle eklenir; yakınsama denetiminde çözülen dal bir sonraki doğrusallaştırmada yeniden
+  kullanılır. Çift katmanın kapasitesi modellenmez. İnceleme panelinde "Elektrotlarda
+  (elektroliz)" satırı bu gerilimi gösterir.
+  - *Sonuçlar:* musluk suyunda (5 kΩ) Seviye 1'in baz akımı 0,55 → 0,43 mA (I_B ≈ (9 − 0,65 −
+    1,7) V / 15 kΩ); transistör yine doyumda, LED'ler aynı anlarda yanar (3,4 / 8,4 / 13,4 s).
+    Saf suda (1 MΩ) LED akımı 0,48 → 0,25 mA. Su direnci büyüdükçe devre polarizasyon yüzünden
+    daha erken çalışmaz olur (100 kΩ'da transistör aktif bölgeye iner).
+  - *Hız:* baraj örnekleri Node'da aynı oturumda eski modele göre ≈ %8 (dolarken) ile %15–30
+    (hazne doluyken) yavaş; tarayıcıda gerçek zamanı tutar.
+  - *Testler:* `tests/tank.test.ts` (polarizasyon eğrisi, dalın simetrisi ve tekdüzeliği, 9 V /
+    10 kΩ devresinde 9 = I·15 kΩ + polarizasyon(I), Kirchhoff), baraj testlerinde yeni sayılar.
+  - *Gerçekte de:* doğru akım elektrotları aşındırır (Faraday'ın elektroliz yasası: 0,5 mA'lik
+    sürekli akım bir yılda ≈ 5 g bakır çözer); gerçek sensörlerde paslanmaz çelik ya da grafit
+    prob, alternatif akım ya da kısa aralıklı ölçüm kullanılır. Bu, örnek metinlerinde ve baraj
+    sayfasının Soru cevabında anlatılır.
 
 ### Baraj su seviyesi uyarısı devreleri (B aşaması)
 
