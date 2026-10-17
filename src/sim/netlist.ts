@@ -15,6 +15,7 @@ export type DeviceType =
   | 'capacitor'
   | 'inductor'
   | 'transformer'
+  | 'relay'
   | 'diode'
   | 'zener'
   | 'led'

@@ -14,7 +14,7 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 - **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç (güç sınırlı),
   kondansatör (elektrolitik ya da seramik/film), bobin (sargı direnci ve sargı kapasitesiyle; akımı
   kesilince Lenz uyarısı), transformatör (karşılıklı indüktans, galvanik yalıtım), diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
-  N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
+  N ve P kanallı MOSFET, anahtar, röle (elektromıknatıs, çekme/bırakma histerezisi), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
   kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
@@ -48,8 +48,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 13 grupta 32 hazır devre: temel devreler,
-  laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör), Elektronik Laboratuvarı föyünün dokuz deneyi
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 13 grupta 35 hazır devre: temel devreler,
+  laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör, röle), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
   baraj su seviyesi uyarısı projesi. Her birinin yanında devrenin ne işe yaradığı (dayandığı fizik
@@ -239,7 +239,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 421 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 436 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -258,7 +258,7 @@ akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`)
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
 ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
-rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`) ve ngspice ile çapraz doğrulama
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`) ve ngspice ile çapraz doğrulama
 (`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
@@ -686,6 +686,52 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   transformatör, köprü ve filtre" (470 µF, 470 Ω: 15,8 V DC, 0,47 V dalgalanma, yüksüz 19,1 V),
   "Transformatörde doğru akım (Faraday)" (12 V ve anahtar; kapanışta ikincilde ≈ 0,74 V'tan
   τ = L₁/R₁ ≈ 42 ms ile sönen darbe, açılışta ≈ −270 V ve Lenz uyarısı).
+
+### Yeni parçalar 2: röle (2026-10-17)
+
+- *Parça:* "Röle" (anahtarlar, etiket öneki K). Beş uç: solda sargının iki ucu, sağda kontak:
+  NK (normalde kapalı) ve NA (normalde açık) üstte, ortak uç C altta. Bu sıra, sargı ve kontak
+  devrelerinin (kendini tutma, transistörlü sürücü) kablo kesişmeden çizilebilmesi için seçildi.
+  Özellikler: sargı direnci, sargı endüktansı (palet açıkken), çekme ve bırakma gerilimi. Sembol:
+  IEC röle sargısı (dikdörtgen, palet çekiliyken hafifçe dolu), kesikli çizgiyle bağlı değiştirme
+  kontağı; dil bırakılmışken NK'ya, çekiliyken NA'ya değer. Kullanılmayan NA ya da NK boşta
+  kalabilir (uyarı yok).
+- *Model* ([`relay.ts`](src/sim/devices/relay.ts)): sargı bobindeki gibi (R + L, sargı kapasitesi
+  100 pF), kontak C ile kapalı uç arasında 30 mΩ. Sargının akımı |i| çekme akımına (V_ç / R)
+  ulaşınca palet çekilir, bırakma akımının (V_b / R) altına inince bırakılır (kuvvet akımın
+  karesiyle orantılı: yön önemsiz). Palet çekilince hava aralığı kapanır, endüktans 1,15 H'den
+  2,29 H'e çıkar; palet anında hareket eder ve akı bağı λ = L·i korunur: çekme anında akım yarıya
+  düşer (gerçek rölelerdeki "akım çukuru"), bırakmada iki katına çıkar. Bu yüzden bırakma akımı
+  çekme akımının en fazla 0,45 katı olabilir (yoksa palet aynı anda geri çekilirdi). Dal satırının
+  sağ tarafı akı bağıyla yazılır (yamukta v_L − cs·L·i = −cs·λ(n) − v_L(n)). Paletin hareket süresi
+  ve kontak sıçraması modellenmez. Akımı aniden kesilen sargıya bobindeki Lenz uyarısı (kendi
+  metniyle) verilir; uyarı devre değişmeden de (transistör kesince) çıkar.
+- *Eşik olayları (motor):* `Device.switching`, `eventFraction` ve `switchState`. Bir adımın
+  çözümünde eşik aşılıyorsa (son kabul edilen adımdan doğrusal aradeğerle) adım, geçişin en fazla
+  10 ns sonrasına kısaltılır (`EVENT_RESOLUTION`); geçiş adımın sonuna gelince bileşenin durumu
+  değişir ve adım yeni durumla yeniden çözülür (LED'in yanması gibi), sonraki adım geri Euler'dir.
+  Geçişten önceki çözüm de hata (LTE) denetiminden geçer: yoksa akımı kesilen sargının salınımı
+  tek bir kaba adımla geçiliyor, sıçramanın tepesi adımlamaya göre 2 kV ile 5 kV arasında
+  değişiyordu. Çekme anı analitik değerle 2 µs içinde.
+- *Varsayılanlar gerçek bir röleden:* **Omron G2R-1, 12 V DC** (Omron veri sayfası; Farnell
+  1648376): sargı 275 Ω ±%10 (43,6 mA, 0,53 W), endüktans (referans değer) palet açıkken 1,15 H,
+  çekiliyken 2,29 H; çekme gerilimi en fazla %70 (8,4 V), bırakma gerilimi en az %15 (1,8 V);
+  kontak direnci en fazla 30 mΩ. Eşikler veri sayfasının garanti sınırlarıdır. Anma geriliminde
+  çekme süresi τ·ln(1/0,3) ≈ 5,0 ms (veri sayfası: en fazla 15 ms), diyotsuz bırakma µs'ler
+  içinde (en fazla 5 ms); serbest geçiş diyoduyla ≈ 14 ms (diyodun bırakmayı geciktirdiği bilinir).
+  Güncel G2R veri sayfasında endüktans satırı yok; değerler Farnell'deki eski Omron sayfasından.
+- *Testler* (`tests/role.test.ts`, 9 test): çekme anı −τ·ln(1 − 0,7) ≈ 5,035 ms (2 µs içinde);
+  çekmede akının korunması (akım L₁/L₂ oranında düşer) ve ardından τ = L_ç/R ile yükselme (%0,2);
+  kontak akımları (NK 50 mA, NA 100 mA) ve sargıdan yalıtım; histerezis (8,3 V'ta çekmez, 8,5 V'ta
+  çeker, 1,9 V'ta tutar, 1,7 V'ta bırakır); diyotsuz açılışta µs'de bırakma ve kilovoltluk sıçrama;
+  serbest geçiş diyoduyla bırakma süresi (L·di/dt = −(R·i + V_D) tahmininin %15'i içinde) ve
+  bırakmada akımın sıçraması; üç örneğin metnindeki sayılar.
+- *Örnekler* ("Elektromanyetizma" grubuna): "Röle: yalıtılmış bir devreyi anahtarlamak" (12 V,
+  anahtar, ampermetre, serbest geçiş diyodu; kontakta ayrı 9 V'luk pil, NA'da yeşil, NK'da kırmızı
+  LED; ≈ 5 ms'de çeker, akım ≈ 15 mA'e düşüp 43,6 mA'e çıkar, ≈ 14 ms'de bırakır), "Röle sürücüsü:
+  transistör ve serbest geçiş diyodu" (TTL 1 Hz, 4,7 kΩ, BC107; S2 ile diyot çıkarılınca
+  kollektörde ≈ 5 kV ve Lenz uyarısı), "Kendini tutma (mühürleme) devresi" (BAŞLAT S1 ile NA
+  kontağı paralel, DUR S2 seri).
 
 ### Editör
 

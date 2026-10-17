@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "relay", "label": "K1", "x": 24, "y": 0, "rotation": 0, "props": {}},
+    {"id": "p2", "type": "switch", "label": "S1", "x": 34, "y": -2, "rotation": 90, "props": {"closed": false}},
+    {"id": "p3", "type": "switch", "label": "S2", "x": 40, "y": 2, "rotation": 0, "props": {"closed": true}},
+    {"id": "p4", "type": "battery", "label": "B1", "x": 48, "y": 6, "rotation": 90, "props": {"voltage": 12, "internalResistance": 0}},
+    {"id": "p5", "type": "diode", "label": "D1", "x": 8, "y": 4, "rotation": 270, "props": {"model": "1N4001"}},
+    {"id": "p6", "type": "resistor", "label": "R1", "x": -2, "y": -2, "rotation": 90, "props": {"resistance": 1000.0}},
+    {"id": "p7", "type": "led", "label": "LED1", "x": -2, "y": 8, "rotation": 90, "props": {"color": "green"}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": 48, "y": 12, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[20, -2], [16, -2], [16, -6], [34, -6]]},
+    {"id": "w2", "points": [[28, -2], [30, -2], [30, -6]]},
+    {"id": "w3", "points": [[28, 2], [34, 2]]},
+    {"id": "w4", "points": [[34, 2], [36, 2]]},
+    {"id": "w5", "points": [[44, 2], [48, 2]]},
+    {"id": "w6", "points": [[48, 10], [48, 12], [-2, 12]]},
+    {"id": "w7", "points": [[20, 2], [16, 2], [16, 12]]},
+    {"id": "w8", "points": [[8, 0], [8, -6], [16, -6]]},
+    {"id": "w9", "points": [[8, 8], [8, 12]]},
+    {"id": "w10", "points": [[-2, -6], [8, -6]]},
+    {"id": "w11", "points": [[-2, 2], [-2, 4]]}
+  ]
+}

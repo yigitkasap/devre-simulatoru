@@ -34,6 +34,7 @@ import {
   CAPACITOR_KINDS,
   CAPACITOR_LEGACY_KIND,
   INDUCTOR_DEFAULTS,
+  RELAY_DEFAULTS,
   TRANSFORMER_DEFAULTS,
   TRANSFORMER_MAX_COUPLING,
   LED_COLORS,
@@ -406,6 +407,30 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  relay: {
+    type: 'relay',
+    category: 'switches',
+    labelPrefix: 'K',
+    // Sargı solda (iki ucu), kontak sağda: NK ve NA üstte, ortak uç C altta. Bu sırayla sargı ve
+    // kontak devreleri (kendini tutma, transistörlü sürücü) kablo kesişmeden çizilebilir.
+    pins: [
+      { x: -4, y: -2 },
+      { x: -4, y: 2 },
+      { x: 4, y: 2 },
+      { x: 4, y: -2 },
+      { x: 4, y: -3 },
+    ],
+    bounds: { x: -4, y: -4, w: 8, h: 6.4 },
+    defaultProps: { ...RELAY_DEFAULTS },
+    propDefs: [
+      { kind: 'number', key: 'coilResistance', unit: 'Ω', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'inductance', unit: 'H', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'pullInVoltage', unit: 'V', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'dropOutVoltage', unit: 'V', min: { value: 0, exclusive: false } },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
   tank: {
     type: 'tank',
     category: 'sensors',
@@ -494,7 +519,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'passive', types: ['resistor', 'capacitor', 'inductor', 'transformer'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
-  { id: 'switches', types: ['switch'] },
+  { id: 'switches', types: ['switch', 'relay'] },
   { id: 'sensors', types: ['tank'] },
   { id: 'meters', types: ['voltmeter', 'ammeter'] },
   { id: 'instruments', types: ['funcgen', 'dcsupply', 'oscilloscope'] },

@@ -207,6 +207,8 @@ export function useSimulation(
         live.set(part.id, { charge: (averaged && a !== null && b !== null ? a - b : m.voltage) / vmax });
       } else if (part.type === 'resistor') {
         if (status.powerRatio !== undefined) live.set(part.id, { powerRatio: status.powerRatio });
+      } else if (part.type === 'relay') {
+        live.set(part.id, { energized: status.energized ?? false });
       } else if (part.type === 'dcsupply') {
         live.set(part.id, { currentLimited: status.currentLimited ?? [] });
       } else if (part.type === 'tank') {

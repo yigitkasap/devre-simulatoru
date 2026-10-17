@@ -38,9 +38,10 @@ describe('Örnekler', () => {
       const connectivity = buildConnectivity(doc);
       const open = connectivity.unconnectedPins;
       // Boş kalabilecek uçlar: osiloskop kanalları, üretecin OUT ya da TTL çıkışı (biri kullanılır),
-      // güç kaynağının iki ucu da boş olan çıkışı.
+      // güç kaynağının iki ucu da boş olan çıkışı, rölenin kullanılmayan NA ya da NK kontağı.
       const allowed = new Set([
         ...doc.parts.filter((p) => p.type === 'oscilloscope').flatMap((p) => [`${p.id}#0`, `${p.id}#1`]),
+        ...doc.parts.filter((p) => p.type === 'relay').flatMap((p) => [`${p.id}#3`, `${p.id}#4`]),
         ...doc.parts.filter((p) => p.type === 'funcgen').flatMap((p) => [`${p.id}#0`, `${p.id}#1`]),
         ...doc.parts
           .filter((p) => p.type === 'dcsupply')

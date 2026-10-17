@@ -20,6 +20,7 @@ import { ledModel } from './led';
 import { oscilloscopeModel } from './oscilloscope';
 import { resistorModel } from './resistor';
 import { switchModel } from './switch';
+import { relayModel } from './relay';
 import { tankModel } from './tank';
 import { transformerModel } from './transformer';
 import { voltmeterModel } from './voltmeter';
@@ -35,6 +36,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   capacitor: capacitorModel,
   inductor: inductorModel,
   transformer: transformerModel,
+  relay: relayModel,
   diode: diodeModel,
   zener: zenerModel,
   led: ledModel,
@@ -99,6 +101,7 @@ export {
 export { ZENER_DEFAULTS, ZENER_TEST_CURRENT, ZenerDevice } from './zener';
 export { CapacitorDevice, CAPACITOR_DEFAULTS, CAPACITOR_KINDS, CAPACITOR_LEGACY_KIND, type CapacitorKind } from './capacitor';
 export { InductorDevice, INDUCTOR_DEFAULTS, INDUCTOR_SRF, INDUCTOR_WINDING_CAPACITANCE } from './inductor';
+export { RelayDevice, RELAY_DEFAULTS, RELAY_INDUCTANCE_RATIO, RELAY_CONTACT_RESISTANCE, relaySettings } from './relay';
 export { TransformerDevice, TRANSFORMER_DEFAULTS, TRANSFORMER_MAX_COUPLING, TRANSFORMER_PRIMARY_CAPACITANCE } from './transformer';
 export {
   DiodeDevice,

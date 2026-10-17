@@ -12,6 +12,7 @@
 import { compileNetlist, devicesTouching, netKeysOfNode, type CompiledCircuit } from './compile';
 import {
   DEFAULT_TIME_STEP,
+  EVENT_RESOLUTION,
   GMIN,
   LTE_ABSTOL_CURRENT,
   LTE_RELTOL,
@@ -34,6 +35,7 @@ import {
   DEVICE_MODELS,
   InductorDevice,
   LedDevice,
+  RelayDevice,
   TransformerDevice,
   type Device,
   type DeviceStatus,
@@ -148,8 +150,11 @@ export class CircuitSimulator {
   private breakpointDevices: readonly Device[] = [];
   /** Son adım denemesinin LTE oranı (|LTE|/tolerans; tahmin yapılamadıysa null). */
   private lteRatioLast: number | null = null;
-  /** Son adımda bir bileşenin durumu değişti mi (LED yandı): süreksizlik. */
+  /** Son adımda bir bileşenin durumu değişti mi (LED yandı, röle çekti): süreksizlik. */
   private limitEvent = false;
+  /** Durumu eşikle değişen bileşenler (röle) ve son reddedilen adımda eşiğin aşıldığı kesir. */
+  private switchingDevices: readonly Device[] = [];
+  private eventFractionLast = 1;
   /** gmin düğümleri ve akımı tam 0 olan uçlar hangi sürüm ve çözüm türü için hesaplandı. */
   private topologyVersion = -1;
   private topologyTransient = false;
@@ -218,6 +223,7 @@ export class CircuitSimulator {
       : this.options.timeStep;
     this.sampleSpacing = Number.isFinite(shortest) ? shortest / AVERAGE_SAMPLES_PER_PERIOD : 0;
     this.nonlinearDevices = this.circuit.devices.filter((d) => d.nonlinear);
+    this.switchingDevices = this.circuit.devices.filter((d) => d.switching);
     this.connectPins();
     this.lteStates = this.circuit.devices.flatMap((d) => d.lteStates());
     this.breakpointDevices = this.circuit.devices.filter((d) => d.timeVarying);
@@ -422,11 +428,11 @@ export class CircuitSimulator {
         result.push({ severity: 'warning', code: warning.code, elementIds: [device.id], netKeys: [], params: { ...warning.params } });
       }
     }
-    // Bobinin akımı aniden kesildi (Lenz): uç gerilimi devredeki kaynakların ve kondansatörlerin
-    // başlangıç gerilimlerinin iki katını (en az 20 V) aşıyor.
+    // Bobinin (transformatörün, rölenin sargısının) akımı aniden kesildi (Lenz): uç gerilimi devredeki
+    // kaynakların ve kondansatörlerin başlangıç gerilimlerinin iki katını (en az 20 V) aşıyor.
     const reference = this.referenceVoltage();
     for (const device of this.circuit.devices) {
-      if (!(device instanceof InductorDevice) && !(device instanceof TransformerDevice)) continue;
+      if (!(device instanceof InductorDevice) && !(device instanceof TransformerDevice) && !(device instanceof RelayDevice)) continue;
       const voltage = device.spikeVoltage();
       if (voltage > Math.max(20, 2 * reference)) {
         result.push({ severity: 'warning', code: 'inductor-spike', elementIds: [device.id], netKeys: [], params: { voltage } });
@@ -726,6 +732,11 @@ export class CircuitSimulator {
         }
         continue;
       }
+      if (outcome === 'event') {
+        // Bir bileşenin eşiği bu adımın içinde aşılıyor: adım, geçişin hemen sonrasına kısaltılır.
+        this.h = Math.max(minStep, h * this.eventFractionLast + EVENT_RESOLUTION / 2);
+        continue;
+      }
       const order = ctx.trap ? 2 : 1;
       const ratio = this.lteRatioLast;
       if (outcome === 'rejected') {
@@ -882,13 +893,39 @@ export class CircuitSimulator {
   /**
    * Tek bir zaman adımı (ya da DC çözüm). LED yanarsa aynı adım LED açık devre olarak
    * yeniden çözülür. Başarılıysa durum kaydedilir.
+   *
+   * Bir eşik (rölenin çekme akımı) adımın içinde aşılıyorsa ve geçiş adımın sonundan
+   * EVENT_RESOLUTION'dan daha önceyse adım 'event' ile reddedilir: çağıran adımı geçişin hemen
+   * sonrasına kısaltır. Geçiş adımın sonuna yeterince yakınsa bileşenin durumu değişir ve adım yeni
+   * durumla yeniden çözülür (LED'in yanması gibi).
    */
-  private step(ctx: StepContext, checkError = false): 'ok' | 'failed' | 'rejected' {
+  private step(ctx: StepContext, checkError = false): 'ok' | 'failed' | 'rejected' | 'event' {
     this.limitEvent = false;
     for (let attempt = 0; attempt <= this.circuit.devices.length; attempt++) {
       if (!this.solve(ctx)) {
         this.restoreIterates();
         return 'failed';
+      }
+      if (attempt === 0 && ctx.h > EVENT_RESOLUTION && this.switchingDevices.length > 0) {
+        let fraction = Number.POSITIVE_INFINITY;
+        for (const device of this.switchingDevices) {
+          const f = device.eventFraction(this.xNew);
+          if (f !== null) fraction = Math.min(fraction, Math.max(0, f));
+        }
+        if (fraction < Number.POSITIVE_INFINITY && (1 - fraction) * ctx.h > EVENT_RESOLUTION) {
+          this.eventFractionLast = fraction;
+          this.restoreIterates();
+          return 'event';
+        }
+        // Geçiş bu adımın sonunda: durum değişmeden önceki çözümün hatası da denetlenir (yoksa
+        // geçişe kadarki hızlı değişim, ör. kesilen sargının salınımı, tek bir kaba adımla geçilirdi).
+        if (fraction < Number.POSITIVE_INFINITY && checkError) {
+          this.lteRatioLast = this.lteRatio(ctx);
+          if (this.lteRatioLast !== null && this.lteRatioLast > 1) {
+            this.restoreIterates();
+            return 'rejected';
+          }
+        }
       }
       let changed = false;
       for (const device of this.circuit.devices) {
@@ -896,6 +933,9 @@ export class CircuitSimulator {
           changed = true;
           this.burnedThisCall.push(device.id);
         }
+      }
+      for (const device of this.switchingDevices) {
+        if (device.switchState(this.xNew)) changed = true;
       }
       if (!changed) break;
       this.limitEvent = true;

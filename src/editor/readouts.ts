@@ -15,6 +15,7 @@ import {
   type Measurement,
 } from '../sim/devices';
 import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
+import { relaySettings } from '../sim/devices/relay';
 import { tankSettings } from '../sim/devices/tank';
 import { SWITCH_ON_RESISTANCE } from '../sim/constants';
 import { boolProp, numProp, strProp, type Props } from '../sim/netlist';
@@ -198,6 +199,20 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
           { label: t.powerInOut, value: `${formatSI(w1!.voltage * w1!.current, 'W', { digits: 3 })} / ${formatSI(w2!.voltage * w2!.current, 'W', { digits: 3 })}` },
         ],
         note: t.transformerNote,
+      };
+    }
+    case 'relay': {
+      const s = relaySettings(p);
+      const coil = status.coil ?? { voltage: m.voltage, current: m.current };
+      return {
+        title,
+        rows: [
+          { label: t.state, value: status.energized ? t.relayEnergized : t.relayReleased },
+          { label: t.relayCoil, value: `${v(coil.voltage)} · ${a(coil.current)}` },
+          { label: t.relayThresholds, value: `${an(s.pullInCurrent)} / ${an(s.dropOutCurrent)}` },
+          { label: t.relayContact, value: a(Math.abs(status.contactCurrent ?? 0)) },
+        ],
+        note: t.relayNote,
       };
     }
     case 'inductor': {

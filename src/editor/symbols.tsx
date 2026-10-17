@@ -28,6 +28,8 @@ export interface LiveVisual {
   readonly ions?: IonView;
   /** Direnç: harcanan gücün güç sınırına oranı (1'i aşınca ısınıyormuş gibi çizilir). */
   readonly powerRatio?: number;
+  /** Röle: palet çekili mi? */
+  readonly energized?: boolean;
 }
 
 export interface SymbolProps {
@@ -258,6 +260,45 @@ function Switch({ closed }: { closed: boolean }) {
       )}
       <circle cx={-14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
       <circle cx={14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+    </g>
+  );
+}
+
+/**
+ * Röle: solda sargı (IEC röle sargısı: dikdörtgen), sağda değiştirme kontağı; kesikli çizgi
+ * sargının paleti (kontak dilini) çektiğini gösterir. Sargı uçları (−40, ∓20); kontak: NK (40, −30),
+ * NA (40, −20), C (40, 20). Dil C'nin ucunda döner: bırakılmışken NK'ya, çekiliyken NA'ya değer.
+ */
+function Relay({ energized, rotation }: { energized: boolean; rotation: Rotation }) {
+  const tipX = energized ? 23 : 5;
+  // Dilin y = 2'deki konumu (kesikli çizgi oraya kadar).
+  const linkX = 14 + ((tipX - 14) * 14) / 27;
+  return (
+    <g>
+      <path
+        d="M-40,-20H-22V-16M-40,20H-22V16M40,-30H4V-15M40,-20H24V-15M40,20H14V16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x={-30} y={-16} width={16} height={32} rx={1.5} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      {energized && <rect x={-30} y={-16} width={16} height={32} rx={1.5} fill="currentColor" opacity={0.18} />}
+      <line x1={-14} y1={2} x2={linkX - 1.5} y2={2} stroke="currentColor" strokeWidth={1.4} strokeDasharray="3 3" />
+      <line x1={14} y1={16} x2={tipX} y2={-11} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+      <circle cx={14} cy={16} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={4} cy={-12} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={24} cy={-12} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <DeviceText x={32} y={-35} rotation={rotation} size={7}>
+        NK
+      </DeviceText>
+      <DeviceText x={32} y={-25} rotation={rotation} size={7}>
+        NA
+      </DeviceText>
+      <DeviceText x={30} y={14} rotation={rotation} size={7}>
+        C
+      </DeviceText>
     </g>
   );
 }
@@ -763,6 +804,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Led color={strProp(props, 'color', LED_COLORS, 'red')} live={live} />;
     case 'switch':
       return <Switch closed={boolProp(props, 'closed', false)} />;
+    case 'relay':
+      return <Relay energized={live?.energized ?? false} rotation={rotation} />;
     case 'voltmeter':
       return <Meter letter="V" rotation={rotation} />;
     case 'ammeter':

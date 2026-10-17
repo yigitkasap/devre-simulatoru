@@ -77,6 +77,12 @@ export interface DeviceStatus {
   readonly outputs?: ReadonlyArray<{ readonly voltage: number; readonly current: number }>;
   /** Su haznesi: su seviyesi (%). */
   readonly level?: number;
+  /** Röle: palet çekili mi (NA kontağı kapalı)? */
+  readonly energized?: boolean;
+  /** Röle: kapalı kontaktan (C'den kapalı uca) geçen akım. */
+  readonly contactCurrent?: number;
+  /** Röle: sargının uç gerilimi ve akımı. */
+  readonly coil?: { readonly voltage: number; readonly current: number };
   /** Transformatör: birincil ve ikincil sargının uç gerilimi ve akımı (ikincilde yüke verilen). */
   readonly windings?: ReadonlyArray<{ readonly voltage: number; readonly current: number }>;
   /** Su haznesi: ıslak problar (ortak, Seviye 1, 2, 3). */
@@ -167,6 +173,25 @@ export abstract class Device {
 
   /** Akım sınırı aşıldıysa durumu değiştirir (ör. LED yanar) ve true döner. */
   checkLimits(_x: Float64Array): boolean {
+    return false;
+  }
+
+  /** Durumu bir eşiğin aşılmasıyla değişen bileşen mi (röle)? */
+  get switching(): boolean {
+    return false;
+  }
+
+  /**
+   * Bu adımın çözümünde bir eşik aşılıyorsa, geçişin adımın hangi kesrinde olduğu (son kabul edilen
+   * adımdan doğrusal aradeğerle, 0..1); aşılmıyorsa null. Motor adımı geçişin hemen sonrasına
+   * kısaltır (EVENT_RESOLUTION), sonra switchState çağrılır.
+   */
+  eventFraction(_x: Float64Array): number | null {
+    return null;
+  }
+
+  /** Eşik aşıldıysa durumu değiştirir (röle çeker ya da bırakır) ve true döner. */
+  switchState(_x: Float64Array): boolean {
     return false;
   }
 

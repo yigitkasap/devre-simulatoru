@@ -42,6 +42,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   nmos: 'N kanallı MOSFET',
   pmos: 'P kanallı MOSFET',
   switch: 'Anahtar',
+  relay: 'Röle',
   voltmeter: 'Voltmetre',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
@@ -69,6 +70,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   nmos: 'MOSFET’inin',
   pmos: 'MOSFET’inin',
   switch: 'anahtarının',
+  relay: 'rölesinin',
   voltmeter: 'voltmetresinin',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
@@ -95,6 +97,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   nmos: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
   pmos: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
   switch: ['1. ucu', '2. ucu'],
+  relay: ['sargısının 1. ucu', 'sargısının 2. ucu', 'kontağının ortak ucu (C)', 'normalde açık kontak ucu (NA)', 'normalde kapalı kontak ucu (NK)'],
   voltmeter: ['+ ucu', '− ucu'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
@@ -123,6 +126,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   nmos: ['D', 'G', 'S'],
   pmos: ['D', 'G', 'S'],
   switch: ['1', '2'],
+  relay: ['1', '2', 'C', 'NA', 'NK'],
   voltmeter: ['+', '−'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
@@ -150,6 +154,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   nmos: ['drain', 'gate', 'source'],
   pmos: ['drain', 'gate', 'source'],
   switch: ['1. uç', '2. uç'],
+  relay: ['sargı 1', 'sargı 2', 'C', 'NA', 'NK'],
   voltmeter: ['+ uç', '− uç'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
@@ -268,6 +273,16 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'Güç sınırı daha büyük bir direnç seç ya da akımı azalt.',
       };
     case 'inductor-spike':
+      if (first !== undefined && ctx.type(first) === 'relay') {
+        return {
+          title: 'Röle sargısının akımı aniden kesildi',
+          detail:
+            `Röle sargısının akımı aniden kesildi: yüksek gerilim sıçraması (Lenz yasası). ${firstLabel} rölesinin sargısında ` +
+            `${formatSI(p.voltage ?? 0, 'V')} görüldü. Sargının manyetik alanındaki enerji bir anda kaybolamaz: akımın yolu açılınca ` +
+            'sargının küçük kapasitesine boşalır. Gerçekte bu gerilim sargıyı süren transistörü bozar ya da anahtarda kıvılcım çıkarır. ' +
+            'Sargıya ters paralel bir diyot (serbest geçiş diyodu: katodu + tarafa) bağla; sıçrama bir diyot gerilimiyle sınırlanır.',
+        };
+      }
       if (first !== undefined && ctx.type(first) === 'transformer') {
         return {
           title: 'Transformatörün akımı aniden kesildi',
@@ -338,6 +353,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   nmos: 'Kapısı yalıtılmış alan etkili transistör; VGS eşik gerilimini (VT) aşınca iletime geçer. Anahtar ve yükselteç olarak kullanılır. Föydeki IRF510 olarak gelir.',
   pmos: 'P kanallı MOSFET: kapı kaynaktan yeterince düşük olunca (VGS < VT < 0) iletime geçer.',
   switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
+  relay:
+    'Elektromıknatısla çalışan anahtar: sargısından yeterli akım geçince demir paleti çeker ve kontağı değiştirir (C, NK’dan ayrılıp NA’ya değer). Küçük bir akımla, sargıdan yalıtılmış başka bir devreyi açıp kapatır.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
   tank:
@@ -354,6 +371,7 @@ function fieldLabel(type: DeviceType, key: string): string {
   if (type === 'funcgen' && key === 'amplitude') return 'Genlik (tepe-tepe, açık devre)';
   if (type === 'funcgen' && key === 'offset') return 'DC offset (açık devre)';
   if (type === 'tank' && key === 'mode') return 'Su akışı';
+  if (type === 'relay' && key === 'inductance') return 'Sargı endüktansı (palet açıkken)';
   const labels: Record<string, string> = {
     model: 'Model',
     mode: 'Ölçüm kipi',
@@ -384,6 +402,9 @@ function fieldLabel(type: DeviceType, key: string): string {
     capacitance: 'Kapasite',
     inductance: 'Endüktans',
     dcResistance: 'Sargı direnci (DC)',
+    coilResistance: 'Sargı direnci',
+    pullInVoltage: 'Çekme gerilimi',
+    dropOutVoltage: 'Bırakma gerilimi',
     turnsRatio: 'Sarım oranı N₁ / N₂',
     primaryInductance: 'Birincil endüktansı L₁',
     coupling: 'Kuplaj katsayısı k',
@@ -546,6 +567,33 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'Faraday yasasını gösterir: gerilimi akım değil, akının değişmesi indükler. Anahtar kapanınca birincil akımı τ = L₁ / R₁ ≈ 42 ms’lik bir üstelle 12 V / 1167 Ω ≈ 10,3 mA’e çıkar; akım değiştiği sürece ikincilde ≈ 0,74 V’tan başlayıp sönen bir darbe görülür. Akım sabitlenince ikincil 0 V’a döner: doğru akım transformatörden geçmez. Darbenin alanı akı bağının değişimine eşittir (∫ε dt = M · ΔI₁). Anahtarı açınca akım bir anda kesilir: çekirdekteki enerji ikincilde ≈ −270 V’luk, birincilde kilovoltluk bir sıçrama yapar ve Lenz uyarısı çıkar.',
     everyday:
       'Arabanın ateşleme bobini bir transformatördür: 12 V’luk akım kesilince ikincilde bujide kıvılcım çaktıran on binlerce volt oluşur. Elektrikli çit cihazları ve flaş tetikleyicileri de aynı ilkeyle çalışır.',
+  },
+  role: {
+    title: 'Röle: yalıtılmış bir devreyi anahtarlamak',
+    description:
+      'Solda sargı devresi: 12 V’luk pil, S1 anahtarı, ampermetre ve röle sargısı (Omron G2R-1 tipi, 12 V); sargıya ters paralel bir 1N4001. Sağda kontak devresi: ayrı bir 9 V’luk pil C ucuna bağlı; NA kontağında yeşil, NK kontağında kırmızı LED. İki devre arasında hiç kablo yok (Mesajlar’da kontak devresinin kendi sıfır noktası olduğu yazar). Oynat’a bas, S1’i kapat, sonra aç.',
+    purpose:
+      'Elektromıknatısla anahtarlamayı gösterir. S1 kapanınca sargının akımı τ = L/R ≈ 4,2 ms’lik bir üstelle artar (bobin akımın değişmesine karşı koyar); ≈ 30,5 mA’de (çekme gerilimi 8,4 V / 275 Ω) çekirdek paleti çeker: ≈ 5 ms sonra kırmızı LED söner, yeşil yanar. Palet çekilince hava aralığı kapanır, sargının endüktansı 1,15 H’den 2,29 H’e çıkar ve akım bir anda ≈ 15 mA’e düşer (akı bağı korunur), sonra 43,6 mA’e yükselir. S1 açılınca sargının akımı diyot üzerinden söner; ≈ 14 ms sonra bırakma akımının (1,8 V / 275 Ω ≈ 6,5 mA) altına iner ve palet bırakılır. Çekili paleti tutmak, çekmekten çok daha az akım ister (histerezis).',
+    everyday:
+      'Arabada marş motoru, korna ve farlar rölelerle çalışır: kontak anahtarındaki küçük akım, yüz amperlik devreleri kalın kablolarla kumanda eder. Çamaşır makinesi, kombi ve klimanın elektronik kartı da şebekedeki motoru ve ısıtıcıyı rölelerle açıp kapatır; kartı şebekeden yalıtan da röledir. Arduino gibi kartlarla kullanılan röle modülleri bu yapıdadır.',
+  },
+  'role-transistor': {
+    title: 'Röle sürücüsü: transistör ve serbest geçiş diyodu',
+    description:
+      'Fonksiyon üretecinin TTL çıkışı (1 Hz, 0/5 V) 4,7 kΩ üzerinden BC107’yi anahtarlıyor; röle sargısı + 12 V ile kollektör arasında. Sargıya ters paralel bir 1N4001 S2 üzerinden bağlı. Röle çekince NA kontağı yeşil LED’i yakar. Osiloskop (A kanalı, 0,1 s/bölme) kollektör gerilimini gösteriyor. Oynat’a bas; birkaç periyot sonra S2’yi aç.',
+    purpose:
+      'Bir mikrodenetleyicinin çıkışı (birkaç mA) röle sargısını (43,6 mA) doğrudan süremez; transistör akımı yükseltir: ≈ 0,9 mA’lik baz akımı onu doyuma sokar. TTL yüksekken kollektör ≈ 0,1 V’a iner ve röle ≈ 5 ms sonra çeker. TTL düşünce transistör keser; sargının akımı bir anda kesilemez (Lenz): diyot bu akıma yol açar, kollektör 12 V’un bir diyot gerilimi üstünde kalır ve palet ≈ 14 ms sonra bırakılır. S2’yi açıp diyodu çıkarırsan transistör kestiği anda sargının enerjisi küçük sargı kapasitesine boşalır: kollektörde ≈ 5 kV’luk bir sıçrama olur ve Lenz uyarısı çıkar. Gerçek bir BC107 en fazla 45 V’a dayanır; diyotsuz devrede transistör ilk kesişte bozulur.',
+    everyday:
+      'Röle süren her devrede sargıya ters paralel bir diyot vardır: Arduino röle modüllerinde, araç elektroniğinde, kombi kartlarında. Diyot paletin bırakmasını geciktirir; hızlı bırakması gereken yerlerde diyoda seri bir zener diyot eklenir (sıçrama zener gerilimiyle sınırlanır, akım daha hızlı söner).',
+  },
+  'role-muhurleme': {
+    title: 'Kendini tutma (mühürleme) devresi',
+    description:
+      '12 V’luk pil, S2 (DUR, kapalı) üzerinden rölenin C ucunu besliyor. S1 (BAŞLAT, açık) ile rölenin NA kontağı paralel; ikisi de sargıya gider. Sargıya paralel bir yeşil LED (1 kΩ ile) rölenin çektiğini gösteriyor; sargıya ters paralel bir 1N4001. Oynat’a bas; S1’i kapat ve yeniden aç, sonra S2’yi aç ve yeniden kapat.',
+    purpose:
+      'Rölenin kendi kontağıyla kendini beslemesini, yani bir biti hatırlamasını gösterir. S1 kapanınca röle çeker ve NA kontağı kapanır; bu kontak S1’e paralel olduğu için S1 açılsa da sargı beslenmeye devam eder: röle çekili kalır (mühürlenir). S2’yi açmak sargının beslemesini keser: akım diyot üzerinden söner, palet ≈ 14 ms sonra bırakılır ve NA açılır. S2’yi yeniden kapatmak röleyi çalıştırmaz; yeniden S1’e basmak gerekir.',
+    everyday:
+      'Fabrikalardaki motorlar, tezgâhlar ve yürüyen merdivenler bu devreyle çalışır (rölenin büyüğüne kontaktör denir): yeşil BAŞLAT düğmesi bırakılınca motor dönmeye devam eder, kırmızı DUR düğmesi onu durdurur. Elektrik kesilip geri gelince makine kendiliğinden çalışmaz; bu bir güvenlik önlemidir.',
   },
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
@@ -869,6 +917,13 @@ export const tr = {
     primary: 'Birincil (P)',
     secondary: 'İkincil (S)',
     powerInOut: 'Giriş / çıkış gücü',
+    relayEnergized: 'Çekili: C–NA kapalı, NK açık',
+    relayReleased: 'Bırakılmış: C–NK kapalı, NA açık',
+    relayCoil: 'Sargı',
+    relayThresholds: 'Çekme / bırakma akımı',
+    relayContact: 'Kontak akımı',
+    relayNote:
+      'Sargıdan geçen akım demir çekirdeği mıknatıslar ve paleti çeker (elektromıknatıs); palet kontağı değiştirir. Çekili paletin hava aralığı kapalı olduğu için onu tutmak çekmekten çok daha az akım ister. Sargı ile kontak arasında iletken yol yoktur.',
     transformerNote:
       'Birincildeki değişen akım çekirdekte değişen bir manyetik akı oluşturur; bu akı ikincilde ε = −N₂·dΦ/dt kadar gerilim indükler (Faraday). Gerilim oranı ≈ N₁ / N₂, akım oranı bunun tersi. Doğru akımda akı değişmez, ikincilde gerilim olmaz. İki sargı arasında iletken yol yoktur (galvanik yalıtım).',
     forwardVoltage: 'Gerilim (anot − katot)',
@@ -1366,6 +1421,8 @@ export const tr = {
       transformer:
         'Varsayılan değerler gerçek bir transformatörden (RS PRO 504-464: 230 V → 12 V, sargı başına 1,5 VA; birincil 1167 Ω, ikincil 14,8 Ω, yüksüz giriş akımı ≈ 30 mA). Sarım oranı N₁ / N₂ = 16: 230 V’ta yüksüz ≈ 14,4 V, tam yükte (125 mA) ≈ 12 V. Oranı 1’den küçük yaparsan gerilim yükseltilir.',
       diode: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer.',
+      relay:
+        'Varsayılan değerler gerçek bir röleden (Omron G2R-1, 12 V DC): sargı 275 Ω (43,6 mA), endüktans 1,15 H (palet çekilince 2,29 H); veri sayfasına göre en geç 8,4 V’ta çeker, en erken 1,8 V’ta bırakır; kontak 30 mΩ. Sargı akımı çekme akımına (V_{ç} / R) ulaşınca palet çekilir, bırakma akımının altına inince bırakılır. Sargının akımını bir transistörle ya da anahtarla kesiyorsan sargıya ters paralel bir diyot (serbest geçiş diyodu) bağla.',
       voltmeter:
         'Gerçek voltmetrelerin iç direnci sonludur. Ölçtüğün kaynağın iç direnci büyükse voltmetre gerçek değerden düşük okur (yükleme etkisi).',
       ammeter:

@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 12, "internalResistance": 0}},
+    {"id": "p2", "type": "switch", "label": "S1", "x": 6, "y": -8, "rotation": 0, "props": {"closed": false}},
+    {"id": "p3", "type": "ammeter", "label": "A1", "x": 16, "y": -8, "rotation": 0, "props": {"resistance": 0.1, "ideal": false}},
+    {"id": "p4", "type": "diode", "label": "D1", "x": 24, "y": 0, "rotation": 270, "props": {"model": "1N4001"}},
+    {"id": "p5", "type": "relay", "label": "K1", "x": 34, "y": 0, "rotation": 0, "props": {}},
+    {"id": "p6", "type": "resistor", "label": "R1", "x": 46, "y": -6, "rotation": 0, "props": {"resistance": 470}},
+    {"id": "p7", "type": "led", "label": "LED1", "x": 56, "y": -6, "rotation": 0, "props": {"color": "green"}},
+    {"id": "p8", "type": "resistor", "label": "R2", "x": 46, "y": -14, "rotation": 0, "props": {"resistance": 470}},
+    {"id": "p9", "type": "led", "label": "LED2", "x": 56, "y": -14, "rotation": 0, "props": {"color": "red"}},
+    {"id": "p10", "type": "battery", "label": "B2", "x": 64, "y": 0, "rotation": 270, "props": {"voltage": 9, "internalResistance": 0}},
+    {"id": "p11", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -8], [2, -8]]},
+    {"id": "w2", "points": [[10, -8], [12, -8]]},
+    {"id": "w3", "points": [[20, -8], [28, -8], [28, -2], [30, -2]]},
+    {"id": "w4", "points": [[30, 2], [28, 2], [28, 8], [0, 8], [0, 4]]},
+    {"id": "w5", "points": [[24, -4], [24, -8]]},
+    {"id": "w6", "points": [[24, 4], [24, 8]]},
+    {"id": "w7", "points": [[38, -3], [40, -3], [40, -14], [42, -14]]},
+    {"id": "w8", "points": [[38, -2], [42, -2], [42, -6]]},
+    {"id": "w9", "points": [[50, -6], [52, -6]]},
+    {"id": "w10", "points": [[50, -14], [52, -14]]},
+    {"id": "w11", "points": [[60, -14], [64, -14], [64, -4]]},
+    {"id": "w12", "points": [[60, -6], [64, -6]]},
+    {"id": "w13", "points": [[38, 2], [42, 2], [42, 8], [64, 8], [64, 4]]}
+  ]
+}

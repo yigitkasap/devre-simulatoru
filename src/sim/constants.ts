@@ -50,6 +50,12 @@ export const NR_VNTOL = 1e-6;
 /** Akım değişkenleri ve eklem akımları için mutlak tolerans (A). */
 export const NR_ABSTOL = 1e-12;
 
+/**
+ * Eşik olaylarının (rölenin çekmesi ya da bırakması) zaman çözünürlüğü: 10 ns. Bir adımın içinde
+ * eşik aşılıyorsa adım, geçişin en fazla bu kadar sonrasına denk gelecek biçimde kısaltılır.
+ */
+export const EVENT_RESOLUTION = 1e-8;
+
 /** Kapalı anahtarın direnci: 1 mΩ. */
 export const SWITCH_ON_RESISTANCE = 1e-3;
 

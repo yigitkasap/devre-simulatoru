@@ -44,6 +44,8 @@ export function partValueText(part: Part): string {
     }
     case 'transformer':
       return `${formatNumber(numProp(p, 'turnsRatio', 16), 2)} : 1`;
+    case 'relay':
+      return formatSI(numProp(p, 'coilResistance', 275), 'Ω', { trim: true, digits: 4 });
     case 'led':
       return tr.devices.ledColors[strProp(p, 'color', LED_COLORS, 'red')] ?? '';
     case 'zener':

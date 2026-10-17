@@ -34,6 +34,9 @@ import toprakTuzagi from './toprak-tuzagi.json';
 import transformator from './transformator.json';
 import adaptor from './adaptor.json';
 import transformatorDc from './transformator-dc.json';
+import role from './role.json';
+import roleTransistor from './role-transistor.json';
+import roleMuhurleme from './role-muhurleme.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
 import zenerKarakteristigi from './zener-karakteristigi.json';
@@ -59,7 +62,7 @@ export const EXAMPLE_GROUPS = [
     ],
   },
   { id: 'aletler', ids: ['toprak-tuzagi'] },
-  { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc'] },
+  { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc', 'role', 'role-transistor', 'role-muhurleme'] },
   { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
   { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
   { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
@@ -93,6 +96,9 @@ const DATA: Record<ExampleId, unknown> = {
   transformator,
   adaptor,
   'transformator-dc': transformatorDc,
+  role,
+  'role-transistor': roleTransistor,
+  'role-muhurleme': roleMuhurleme,
   'diyot-dc': diyotDc,
   'diyot-karakteristigi': diyotKarakteristigi,
   'zener-karakteristigi': zenerKarakteristigi,
