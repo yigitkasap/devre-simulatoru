@@ -50,6 +50,9 @@ import sigorta from './sigorta.json';
 import opampEvirmeyen from './opamp-evirmeyen.json';
 import opampEviren from './opamp-eviren.json';
 import opampKarsilastirici from './opamp-karsilastirici.json';
+import astabil555 from './555-astabil.json';
+import ses555 from './555-ses.json';
+import monostabil555 from './555-monostabil.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
 import zenerKarakteristigi from './zener-karakteristigi.json';
@@ -78,7 +81,7 @@ export const EXAMPLE_GROUPS = [
   { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc', 'role', 'role-transistor', 'role-muhurleme', 'dc-motor', 'motor-jenerator', 'motor-h-koprusu'] },
   { id: 'sensorler', ids: ['potansiyometre', 'ldr-gece-lambasi', 'ntc-termometre', 'lamba-ani-akim'] },
   { id: 'ses', ids: ['hoparlor', 'buzzer-sicaklik', 'sigorta'] },
-  { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici'] },
+  { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici', '555-astabil', '555-monostabil', '555-ses'] },
   { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
   { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
   { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
@@ -128,6 +131,9 @@ const DATA: Record<ExampleId, unknown> = {
   'opamp-evirmeyen': opampEvirmeyen,
   'opamp-eviren': opampEviren,
   'opamp-karsilastirici': opampKarsilastirici,
+  '555-astabil': astabil555,
+  '555-ses': ses555,
+  '555-monostabil': monostabil555,
   'diyot-dc': diyotDc,
   'diyot-karakteristigi': diyotKarakteristigi,
   'zener-karakteristigi': zenerKarakteristigi,

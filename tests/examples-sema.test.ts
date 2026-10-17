@@ -28,6 +28,8 @@ const CROSSINGS: Partial<Record<ExampleId, number>> = {
   'opamp-evirmeyen': 2,
   'opamp-eviren': 2,
   'opamp-karsilastirici': 2,
+  // Tetik kolu (TRIG'den S1 ve çekme direncine) zamanlama kondansatörünün toprak kablosunu keser.
+  '555-monostabil': 1,
 };
 
 type Segment = readonly [Point, Point];

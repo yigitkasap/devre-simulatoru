@@ -526,6 +526,28 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  timer555: {
+    type: 'timer555',
+    category: 'ics',
+    labelPrefix: 'U',
+    // Veri sayfasının sırası: GND (1), TRIG (2), OUT (3), RESET (4), CONT (5), THRES (6), DISCH (7), VCC (8).
+    // Solda DISCH, THRES, TRIG (zamanlama kolu); sağda OUT; üstte VCC ve RESET; altta GND ve CONT.
+    pins: [
+      { x: -1, y: 4 },
+      { x: -4, y: 2 },
+      { x: 4, y: 0 },
+      { x: 1, y: -4 },
+      { x: 1, y: 4 },
+      { x: -4, y: 0 },
+      { x: -4, y: -2 },
+      { x: -1, y: -4 },
+    ],
+    bounds: { x: -4, y: -4, w: 8, h: 8 },
+    defaultProps: {},
+    propDefs: [],
+    showLabel: true,
+    polarized: false,
+  },
   speaker: {
     type: 'speaker',
     category: 'outputs',
@@ -661,7 +683,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'passive', types: ['resistor', 'potentiometer', 'capacitor', 'inductor', 'transformer'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
-  { id: 'ics', types: ['opamp'] },
+  { id: 'ics', types: ['opamp', 'timer555'] },
   { id: 'switches', types: ['switch', 'relay', 'fuse'] },
   { id: 'outputs', types: ['lamp', 'motor', 'speaker', 'buzzer'] },
   { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },

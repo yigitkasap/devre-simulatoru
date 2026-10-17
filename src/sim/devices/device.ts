@@ -112,6 +112,15 @@ export interface DeviceStatus {
     readonly current: number;
     readonly mode: 'linear' | 'high' | 'low' | 'slewing' | 'limited';
   };
+  /** 555: çıkış yüksek mi, çıkış, eşik ve tetik girişlerinin gerilimi, iç eşikler (2/3 ve 1/3 V_CC). */
+  readonly timer?: {
+    readonly high: boolean;
+    readonly output: number;
+    readonly threshold: number;
+    readonly trigger: number;
+    readonly upper: number;
+    readonly lower: number;
+  };
   /** Sigorta: telin ısınması (1'de erir). */
   readonly heating?: number;
   /** Lamba: ışık akısının anma değerine oranı. */

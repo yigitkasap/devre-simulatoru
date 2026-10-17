@@ -25,6 +25,7 @@ import { relayModel } from './relay';
 import { lampModel, ldrModel, ntcModel, potentiometerModel } from './sensors';
 import { buzzerModel, fuseModel, speakerModel } from './sound';
 import { opampModel } from './opamp';
+import { timer555Model } from './timer555';
 import { tankModel } from './tank';
 import { transformerModel } from './transformer';
 import { voltmeterModel } from './voltmeter';
@@ -50,6 +51,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   buzzer: buzzerModel,
   fuse: fuseModel,
   opamp: opampModel,
+  timer555: timer555Model,
   diode: diodeModel,
   zener: zenerModel,
   led: ledModel,
@@ -115,6 +117,7 @@ export { ZENER_DEFAULTS, ZENER_TEST_CURRENT, ZenerDevice } from './zener';
 export { CapacitorDevice, CAPACITOR_DEFAULTS, CAPACITOR_KINDS, CAPACITOR_LEGACY_KIND, type CapacitorKind } from './capacitor';
 export { InductorDevice, INDUCTOR_DEFAULTS, INDUCTOR_SRF, INDUCTOR_WINDING_CAPACITANCE } from './inductor';
 export { OpAmpDevice, OPAMP } from './opamp';
+export { Timer555Device, TIMER555 } from './timer555';
 export {
   BuzzerDevice,
   BUZZER,

@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 9, "internalResistance": 0}},
+    {"id": "p2", "type": "timer555", "label": "U1", "x": 30, "y": 0, "rotation": 0, "props": {}},
+    {"id": "p3", "type": "capacitor", "label": "CV", "x": 31, "y": 9, "rotation": 90, "props": {"capacitance": 1e-08, "initialVoltage": 0, "kind": "film"}},
+    {"id": "p4", "type": "resistor", "label": "RA", "x": 20, "y": -8, "rotation": 90, "props": {"resistance": 1000.0}},
+    {"id": "p5", "type": "resistor", "label": "RB", "x": 20, "y": 2, "rotation": 90, "props": {"resistance": 68000.0}},
+    {"id": "p6", "type": "capacitor", "label": "C1", "x": 20, "y": 11, "rotation": 90, "props": {"capacitance": 1e-05, "initialVoltage": 0, "kind": "electrolytic"}},
+    {"id": "p7", "type": "voltmeter", "label": "V1", "x": 12, "y": 11, "rotation": 90, "props": {"resistance": 10000000.0, "ideal": false}},
+    {"id": "p8", "type": "resistor", "label": "R1", "x": 40, "y": 0, "rotation": 0, "props": {"resistance": 470}},
+    {"id": "p9", "type": "led", "label": "LED1", "x": 48, "y": 4, "rotation": 90, "props": {"color": "red"}},
+    {"id": "p10", "type": "ground", "label": "GND1", "x": 48, "y": 16, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[31, -4], [31, -8], [29, -8]]},
+    {"id": "w2", "points": [[31, 4], [31, 5]]},
+    {"id": "w3", "points": [[29, 4], [29, 16]]},
+    {"id": "w4", "points": [[31, 13], [31, 16]]},
+    {"id": "w5", "points": [[29, 16], [31, 16]]},
+    {"id": "w6", "points": [[0, -4], [0, -12], [20, -12]]},
+    {"id": "w7", "points": [[20, -12], [29, -12], [29, -8], [29, -4]]},
+    {"id": "w8", "points": [[20, -4], [20, -2]]},
+    {"id": "w9", "points": [[20, -2], [26, -2]]},
+    {"id": "w10", "points": [[20, 6], [25, 6], [25, 2], [25, 0], [26, 0]]},
+    {"id": "w11", "points": [[25, 2], [26, 2]]},
+    {"id": "w12", "points": [[20, 6], [20, 7]]},
+    {"id": "w13", "points": [[20, 15], [20, 16]]},
+    {"id": "w14", "points": [[20, 16], [29, 16]]},
+    {"id": "w15", "points": [[12, 7], [20, 7]]},
+    {"id": "w16", "points": [[0, 4], [0, 16], [12, 16]]},
+    {"id": "w17", "points": [[12, 15], [12, 16]]},
+    {"id": "w18", "points": [[12, 16], [20, 16]]},
+    {"id": "w19", "points": [[34, 0], [36, 0]]},
+    {"id": "w20", "points": [[44, 0], [48, 0]]},
+    {"id": "w21", "points": [[48, 8], [48, 16]]},
+    {"id": "w22", "points": [[31, 16], [48, 16]]}
+  ]
+}

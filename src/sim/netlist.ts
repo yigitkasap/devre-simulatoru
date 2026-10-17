@@ -25,6 +25,7 @@ export type DeviceType =
   | 'buzzer'
   | 'fuse'
   | 'opamp'
+  | 'timer555'
   | 'diode'
   | 'zener'
   | 'led'

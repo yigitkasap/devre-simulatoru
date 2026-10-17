@@ -49,6 +49,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ntc: 'NTC termistör',
   lamp: 'Akkor lamba',
   opamp: 'İşlemsel yükselteç',
+  timer555: '555 zamanlayıcı',
   speaker: 'Hoparlör',
   buzzer: 'Buzzer (aktif)',
   fuse: 'Sigorta',
@@ -86,6 +87,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ntc: 'termistörünün',
   lamp: 'lambasının',
   opamp: 'işlemsel yükseltecinin',
+  timer555: '555 zamanlayıcısının',
   speaker: 'hoparlörünün',
   buzzer: 'buzzerının',
   fuse: 'sigortasının',
@@ -120,6 +122,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   ldr: ['1. ucu', '2. ucu'],
   ntc: ['1. ucu', '2. ucu'],
   lamp: ['1. ucu', '2. ucu'],
+  timer555: ['GND ucu (1)', 'TRIG (tetik) ucu (2)', 'OUT (çıkış) ucu (3)', 'RESET ucu (4)', 'CONT (kontrol) ucu (5)', 'THRES (eşik) ucu (6)', 'DISCH (deşarj) ucu (7)', 'VCC ucu (8)'],
   opamp: ['eviren girişi (−)', 'evirmeyen girişi (+)', 'çıkışı', 'pozitif besleme ucu (V+)', 'negatif besleme ucu (V−)'],
   speaker: ['1. ucu', '2. ucu'],
   buzzer: ['+ ucu', '− ucu'],
@@ -160,6 +163,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   ntc: ['1', '2'],
   lamp: ['1', '2'],
   opamp: ['−', '+', 'OUT', 'V+', 'V−'],
+  timer555: ['GND', 'TRG', 'OUT', 'RST', 'CV', 'THR', 'DIS', 'VCC'],
   speaker: ['1', '2'],
   buzzer: ['+', '−'],
   fuse: ['1', '2'],
@@ -197,6 +201,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   ntc: ['1. uç', '2. uç'],
   lamp: ['1. uç', '2. uç'],
   opamp: ['− giriş', '+ giriş', 'çıkış', 'V+', 'V−'],
+  timer555: ['GND', 'TRIG', 'OUT', 'RESET', 'CONT', 'THRES', 'DISCH', 'VCC'],
   speaker: ['1. uç', '2. uç'],
   buzzer: ['+ uç', '− uç'],
   fuse: ['1. uç', '2. uç'],
@@ -455,6 +460,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Işığa duyarlı direnç (kadmiyum sülfür): ışık arttıkça direnci azalır. Karanlıkta ≈ 1 MΩ, oda ışığında birkaç kΩ, güneş altında yüz ohm mertebesindedir. Aydınlık simülasyon sırasında kaydırıcıyla değiştirilir.',
   ntc:
     'Sıcaklığa duyarlı direnç (negatif sıcaklık katsayılı): sıcaklık arttıkça direnci üstel olarak azalır; 25 °C’ta 10 kΩ, 100 °C’ta ≈ 680 Ω. Sıcaklık simülasyon sırasında kaydırıcıyla değiştirilir.',
+  timer555:
+    'İki karşılaştırıcı ve bir flip-flop: TRIG 1/3·V_CC’nin altına inince çıkış yüksek olur, THRES 2/3·V_CC’yi geçince düşük olur ve DISCH ucu toprağa bağlanır. Bir kondansatör ve dirençlerle kare dalga üreteci (astabil) ya da süre ölçen zamanlayıcı (monostabil) kurulur.',
   opamp:
     'Çok yüksek kazançlı fark yükselteci (741): çıkış, iki girişin farkının ≈ 200 000 katıdır ve besleme gerilimleriyle sınırlıdır. Çıkıştan eviren girişe geri besleme verilince kazancı yalnızca dirençlere bağlı bir yükselteç olur; geri beslemesiz bir karşılaştırıcıdır. V+ ve V− uçları beslenmelidir.',
   speaker:
@@ -847,6 +854,33 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     everyday:
       'Alacakaranlık şalterleri, termostatlar, pil gerilimi uyarıları ve analogdan sayısala çeviricilerin içi karşılaştırıcıyla çalışır. Gürültülü sinyallerde çıkışın titrememesi için karşılaştırıcıya küçük bir pozitif geri besleme (histerezis, Schmitt tetikleyici) eklenir.',
   },
+  '555-astabil': {
+    title: '555 ile yanıp sönen LED (astabil)',
+    description:
+      '9 V’luk pil; 555’in RESET’i ve VCC’si + 9 V’ta, CONT’u 10 nF’la toprakta. R_A = 1 kΩ ve R_B = 68 kΩ ile 10 µF’lık kondansatör zamanlama kolunu kuruyor; THRES ve TRIG kondansatörde, DISCH iki direncin arasında. Çıkışta 470 Ω ve kırmızı LED; voltmetre kondansatörün gerilimini gösteriyor. Oynat’a bas.',
+    purpose:
+      '555’in kendi kendine kare dalga üretmesini (astabil çalışma) gösterir. Çıkış yüksekken kondansatör R_A + R_B üzerinden dolar; gerilimi 2/3·V_CC’ye (6 V) ulaşınca çıkış düşer ve deşarj anahtarı kondansatörü R_B üzerinden boşaltır; 1/3·V_CC’ye (3 V) inince çıkış yeniden yükselir. Voltmetre 3 V ile 6 V arasında gidip gelir. Yüksek süre ln2·(R_A + R_B)·C ≈ 0,48 s, düşük süre ≈ 0,49 s (deşarj anahtarının üzerindeki ≈ 0,17 V yüzünden ln2·R_B·C’den biraz uzun): LED saniyede ≈ 1 kez yanıp söner. İlk yüksek süre daha uzundur (0,76 s): kondansatör 0 V’tan başlar.',
+    everyday:
+      'Yanıp sönen uyarı ışıkları, araçların sinyal lambası devreleri, oyuncakların ışıkları ve basit saat sinyalleri 555 ile yapılır. 1971’den beri üretilen 555, dünyada en çok üretilen entegrelerden biridir.',
+  },
+  '555-monostabil': {
+    title: '555 ile zamanlayıcı (monostabil)',
+    description:
+      '9 V’luk pil; TRIG 10 kΩ ile + 9 V’a çekili, S1 onu toprağa bağlar. THRES ve DISCH, 100 kΩ ile 47 µF’ın arasında. Çıkışta 470 Ω ve LED. Oynat’a bas; S1’i kapatıp hemen aç ve LED’in ne kadar yandığını izle.',
+    purpose:
+      'Bir tetikle belirli bir süre açık kalan zamanlayıcıyı (monostabil) gösterir. S1 TRIG’i 1/3·V_CC’nin altına çekince çıkış yükselir ve deşarj anahtarı açılır: kondansatör 100 kΩ üzerinden dolmaya başlar. Gerilimi 2/3·V_CC’ye ulaşınca çıkış düşer ve kondansatör hemen boşaltılır. Süre t = R·C·ln3 ≈ 1,1·R·C = 5,16 s; dirençle ya da kondansatörle ayarlanır. S1 kapalı kalırsa TRIG etkin kalır ve çıkış düşmez.',
+    everyday:
+      'Merdiven otomatiği (basınca birkaç dakika yanan ışık), mikrodalga ve çamaşır makinelerinin eski zamanlayıcıları, kapı zilleri ve buton tıklamalarındaki sıçramayı süzen devreler monostabil çalışır.',
+  },
+  '555-ses': {
+    title: '555 ile ses (hoparlör)',
+    description:
+      '9 V’luk pil; 555 astabil: R_A = 1 kΩ, R_B = 10 kΩ, C = 68 nF. Çıkış, 100 µF’lık kondansatör ve 47 Ω üzerinden 8 Ω’luk hoparlöre bağlı. Hız ×1’deyken Oynat’a bas: sesi duyarsın. Sonra R_B’yi 22 kΩ yap.',
+    purpose:
+      'Zamanlama kondansatörü küçülünce 555 ses frekansında salınır: ≈ 990 Hz (1,44 / ((R_A + 2R_B)·C) formülü 1008 Hz verir; deşarj anahtarının gerilimi düşük süreyi biraz uzatır). 100 µF’lık kondansatör çıkışın doğru gerilimini keser, hoparlöre yalnızca değişen akım gider; 47 Ω akımı sınırlar. Kare dalga temel frekansın yanında tek katlı harmonikler de içerdiği için ses sinüsünkinden daha “sert”tir. R_B’yi büyütünce frekans ve perde düşer.',
+    everyday:
+      'Alarm sirenleri, kapı zilleri, elektronik oyuncakların sesleri ve eski bilgisayarların bip sesleri bu tür kare dalga üreteçleriyle çıkar. İki 555 birlikte iki tonlu siren (ambulans sesi) yapar.',
+  },
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
     description:
@@ -1177,6 +1211,14 @@ export const tr = {
     primary: 'Birincil (P)',
     secondary: 'İkincil (S)',
     powerInOut: 'Giriş / çıkış gücü',
+    timerOutput: 'Çıkış',
+    timerHigh: 'Yüksek',
+    timerLow: 'Düşük',
+    timerThreshold: 'THRES / eşik (2/3·V_CC)',
+    timerTrigger: 'TRIG / eşik (1/3·V_CC)',
+    timerDischarge: 'Deşarj anahtarı',
+    timerNote:
+      'TRIG 1/3·V_CC’nin altına inince çıkış yüksek olur ve deşarj anahtarı açılır; THRES 2/3·V_CC’yi geçince çıkış düşer ve anahtar kapanarak DISCH’i toprağa bağlar. Kondansatörün dolma ve boşalma süresi (τ = R·C) zamanlamayı belirler.',
     opampDifferential: 'Giriş farkı (v₊ − v₋)',
     opampOutput: 'Çıkış gerilimi',
     opampCurrent: 'Çıkış akımı',
@@ -1748,6 +1790,8 @@ export const tr = {
         'Varsayılan değerler gerçek bir LDR’den (GL5528): 10 lükste 10–20 kΩ (burada 15 kΩ), karanlıkta en az 1 MΩ, γ = 0,6: R = R₁₀ · (E / 10 lx)^{−γ}. Aydınlık örnekleri: gece ≈ 1 lx, oda ≈ 100–300 lx, bulutlu gün ≈ 10 000 lx, güneş ≈ 100 000 lx. Gerçek LDR ışık değişimine 20–30 ms’de uyar; burada anında.',
       ntc:
         'Varsayılan değerler gerçek bir termistörden (Vishay NTCLE100E3103: 10 kΩ, B₂₅/₈₅ = 3977 K); direnç üreticinin R(T) eğrisinden (0 °C’ta 32,6 kΩ, 50 °C’ta 3,61 kΩ, 100 °C’ta 677 Ω). İçinden geçen akım onu ısıtır (öz ısınma: 7 mW/K, ısıl zaman sabiti 15 s); ortam sıcaklığı değişince hemen ona uyar.',
+      timer555:
+        'Gerçek bir 555’in değerleri (TI NE555): eşikler 2/3 ve 1/3 V_CC (içeride üç 5 kΩ’luk bölücü), RESET 0,7 V, çıkış yüksekte V_CC − 1,7 V (100 mA), düşükte 0,1 V (10 mA), deşarj anahtarı 8 mA’de 0,15 V, besleme akımı 15 V’ta 10 mA. RESET’i kullanmıyorsan VCC’ye bağla; CONT’u 10 nF’la toprağa bağlamak gürültüyü azaltır.',
       opamp:
         'Gerçek bir 741’in değerleri (TI LM741, ±15 V, tipik): kazanç 200 V/mV, giriş direnci 2 MΩ, kazanç-bant genişliği ≈ 1,2 MHz, eğim hızı 0,5 V/µs, çıkış 10 kΩ’da ±14 V, 2 kΩ’da ±13 V, kısa devre akımı 25 mA, besleme akımı 1,7 mA. V+ ve V− uçlarını besle (ör. iki 15 V’luk pil, ortası toprak). Giriş kayma gerilimi (1 mV) ve kutuplama akımı (80 nA) modellenmez.',
       speaker:

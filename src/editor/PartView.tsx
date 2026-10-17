@@ -53,7 +53,8 @@ export function partValueText(part: Part): string {
     case 'ntc':
       return `${formatSI(numProp(p, 'resistance25', 10e3), 'Ω', { trim: true, digits: 4 })} · ${formatNumber(numProp(p, 'temperature', 25), 0)} °C`;
     case 'opamp':
-      // Sembolün içinde "741" yazar.
+    case 'timer555':
+      // Sembolün içinde "741" / "555" yazar.
       return '';
     case 'speaker':
       return '8 Ω · 5 W';

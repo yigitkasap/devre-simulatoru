@@ -202,6 +202,19 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: t.transformerNote,
       };
     }
+    case 'timer555': {
+      const tm = status.timer ?? { high: false, output: 0, threshold: 0, trigger: 0, upper: 0, lower: 0 };
+      return {
+        title,
+        rows: [
+          { label: t.timerOutput, value: `${tm.high ? t.timerHigh : t.timerLow} · ${v(tm.output)}` },
+          { label: t.timerThreshold, value: `${v(tm.threshold)} / ${v(tm.upper)}` },
+          { label: t.timerTrigger, value: `${v(tm.trigger)} / ${v(tm.lower)}` },
+          { label: t.timerDischarge, value: tm.high ? t.open : t.closed },
+        ],
+        note: t.timerNote,
+      };
+    }
     case 'opamp': {
       const o = status.opamp ?? { differential: 0, output: 0, current: 0, mode: 'linear' as const };
       return {

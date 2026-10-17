@@ -30,6 +30,8 @@ export interface LiveVisual {
   readonly powerRatio?: number;
   /** Röle: palet çekili mi? */
   readonly energized?: boolean;
+  /** 555: çıkış yüksek mi? */
+  readonly high?: boolean;
   /** Hoparlör ve buzzer: ses düzeyi (0..1; dalgaların koyuluğu). */
   readonly loudness?: number;
   /** Akkor lamba: ışık akısının anma değerine oranı ve filaman sıcaklığı (K). */
@@ -247,6 +249,41 @@ function OpAmp({ rotation }: { rotation: Rotation }) {
       <DeviceText x={-4} y={0} rotation={rotation} size={7} color="var(--color-muted)">
         741
       </DeviceText>
+    </g>
+  );
+}
+
+/**
+ * 555 zamanlayıcı: kutu, uç adları ve ortada "555". Çıkış yüksekken OUT'un yanında dolu bir nokta.
+ */
+function Timer555({ rotation, high }: { rotation: Rotation; high: boolean }) {
+  const label = (x: number, y: number, text: string, anchor: 'start' | 'middle' | 'end' = 'middle') => (
+    <DeviceText key={text} x={x} y={y} rotation={rotation} size={6} anchor={anchor} weight={600} color="var(--color-muted)">
+      {text}
+    </DeviceText>
+  );
+  return (
+    <g>
+      <path
+        d="M-40,-20H-30M-40,0H-30M-40,20H-30M30,0H40M-10,-40V-30M10,-40V-30M-10,40V30M10,40V30"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <rect x={-30} y={-30} width={60} height={60} rx={3} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      {label(-27, -20, 'DIS', 'start')}
+      {label(-27, 0, 'THR', 'start')}
+      {label(-27, 20, 'TRG', 'start')}
+      {label(27, 0, 'OUT', 'end')}
+      {label(-7, -24, 'VCC')}
+      {label(10, -24, 'RST')}
+      {label(-7, 24, 'GND')}
+      {label(10, 24, 'CV')}
+      <DeviceText x={1} y={-9} rotation={rotation} size={11}>
+        555
+      </DeviceText>
+      <circle cx={34} cy={-5} r={2.6} fill={high ? '#e8a317' : 'none'} stroke={high ? '#e8a317' : 'none'} />
     </g>
   );
 }
@@ -996,6 +1033,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Lamp live={live} />;
     case 'opamp':
       return <OpAmp rotation={rotation} />;
+    case 'timer555':
+      return <Timer555 rotation={rotation} high={live?.high ?? false} />;
     case 'speaker':
       return <Speaker level={live?.loudness ?? 0} />;
     case 'buzzer':

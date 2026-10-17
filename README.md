@@ -18,7 +18,7 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   (zıt EMK, yük torku, jeneratör olarak çalışma), potansiyometre (kaydırıcıyla canlı), LDR, NTC
   termistör (öz ısınmalı), akkor lamba (filaman ısınması, ilk an akımı, aşırı gerilimde kopma),
   hoparlör ve aktif buzzer (sesi tarayıcıda gerçekten çalınır), sigorta (I²t ile atar), işlemsel
-  yükselteç (741: kazanç-bant genişliği, eğim hızı, beslemeye bağlı doyum), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
+  yükselteç (741: kazanç-bant genişliği, eğim hızı, beslemeye bağlı doyum), 555 zamanlayıcı, voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
   kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
@@ -55,10 +55,10 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 16 grupta 48 hazır devre: temel devreler,
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 16 grupta 51 hazır devre: temel devreler,
   laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör, röle, DC motor),
   ayarlı parçalar ve sensörler (potansiyometre, LDR, NTC, akkor lamba), ses ve koruma (hoparlör,
-  buzzer, sigorta), entegreler (işlemsel yükselteç), Elektronik Laboratuvarı föyünün dokuz deneyi
+  buzzer, sigorta), entegreler (işlemsel yükselteç, 555), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
   baraj su seviyesi uyarısı projesi. Her birinin yanında devrenin ne işe yaradığı (dayandığı fizik
@@ -248,7 +248,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 512 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 526 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -267,7 +267,7 @@ akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`)
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
 ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
-rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), sensörler ve lamba (`tests/sensorler.test.ts`), ses ve sigorta (`tests/ses.test.ts`), işlemsel yükselteç (`tests/opamp.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), sensörler ve lamba (`tests/sensorler.test.ts`), ses ve sigorta (`tests/ses.test.ts`), işlemsel yükselteç (`tests/opamp.test.ts`), 555 (`tests/timer555.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
 (`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
@@ -905,6 +905,30 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   kırpılma; 20 kHz'te eğim sınırı), "Eviren yükselteç ve sanal toprak" (1,5 V → −8,40 V; R2 = 100 kΩ'da
   doyum), "Karşılaştırıcı: LDR ile ışık eşiği" (7,5 V eşik, ≈ 19,7 lüks; ters paralel yeşil/kırmızı LED,
   çıkış LED yüküyle ±12,2 V).
+
+### Yeni parçalar 8: 555 zamanlayıcı (2026-10-17)
+
+- *Parça:* "555 zamanlayıcı" (Entegreler, U). Sekiz uç veri sayfasının sırasıyla (GND, TRIG, OUT,
+  RESET, CONT, THRES, DISCH, VCC); sembolde solda DISCH, THRES, TRIG (zamanlama kolu sırasıyla),
+  sağda OUT, üstte VCC ve RESET, altta GND ve CV; kutuda uç adları ve "555"; çıkış yüksekken OUT'un
+  yanında sarı nokta.
+- *Model* ([`timer555.ts`](src/sim/devices/timer555.ts)), **TI NE555** veri sayfası (SLFS022K):
+  VCC–CONT–iç düğüm–GND arasında üç 5 kΩ (eşikler 2/3 ve 1/3 V_CC), RESET 0,7 V; flip-flop: TRIG <
+  1/3·V_CC → yüksek (öncelikli), THRES > CONT → düşük, RESET → düşük. Çıkış yüksekte V_CC − 0,9 V
+  arkasında 8 Ω (100 mA'de V_CC − 1,7 V, 200 mA'de − 2,5 V), düşükte 0,025 V arkasında 7,5 Ω (10 mA'de
+  0,1 V, 50 mA'de 0,4 V); deşarj anahtarı 19 Ω (8 mA'de 0,15 V); besleme akımı bölücü + 1,67 kΩ (15 V'ta
+  10 mA, 5 V'ta 3 mA). Geçişler motorun eşik olaylarıyla 10 ns içinde bulunur (zamanlama doğru);
+  çıkışın 100 ns'lik yükselme süresi ve girişlerin nA'lik akımları modellenmez. Deşarj anahtarının
+  gerilimi gerçekteki gibi düşük süreyi uzatır: R_A = 1 kΩ, 9 V'ta ≈ 0,17 V, düşük süre ln2·R_B·C
+  yerine (R_B + R_ds)·C·ln((2V/3 − V_d)/(V/3 − V_d)) (%4 uzun; 1 kHz'lik devre 1008 değil ≈ 990 Hz).
+- *Testler* (`tests/timer555.test.ts`, 8 test): astabilde ilk yüksek süre RC·ln3, yüksek ve düşük
+  süre (%1), 1 kHz'lik devrenin frekansı, kondansatörün 1/3–2/3 V_CC arasında salınması, RESET;
+  monostabil süresi RC·ln3; 15 V'ta çıkış seviyeleri (100 mA'de 13,3 V, 10 mA'de 0,1 V) ve besleme
+  akımı (10 mA); üç örneğin sayıları.
+- *Örnekler* ("Entegreler"): "555 ile yanıp sönen LED (astabil)" (1 kΩ, 68 kΩ, 10 µF; ≈ 1 Hz,
+  kondansatörde voltmetre 3–6 V), "555 ile zamanlayıcı (monostabil)" (S1 ile tetik, 100 kΩ ve 47 µF:
+  5,16 s), "555 ile ses (hoparlör)" (1 kΩ, 10 kΩ, 68 nF; ≈ 990 Hz, 100 µF ve 47 Ω üzerinden hoparlöre;
+  1 s'lik simülasyon ≈ 0,2 s'de: ses kesintisiz çalar).
 
 ### Editör
 
