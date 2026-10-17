@@ -224,7 +224,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 229 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 300 test çalıştırır (9'u fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -238,6 +238,14 @@ cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım 
 (toprak tuzağı, ön direnç önerisi), renk ölçekleri ve telefon yardımcıları (ekler, zincirle ekleme,
 kablo yolu; `tests/phone.test.ts`). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
+
+**Fizik denetimi** (`tests/fizik-denetimi.test.ts`): 71 kontrol, her biri analitik olarak hesaplanan
+değerle karşılaştırılır: Ohm, iç direnç, seri/paralel, KCL ve KVL (dengesiz köprü), enerji korunumu
+(Tellegen), süperpozisyon, Thévenin/Norton, en büyük güç aktarımı, ölçü aleti yüklemesi, açık/kapalı
+devre ve toprak, RC dolma/boşalma ve enerji, seri/paralel kondansatör, yük paylaşımı, AC etkin değer,
+güç, reaktans ve faz, RC süzgeç, doğrultucu, diyot/LED/zener/BJT/MOSFET çalışma noktaları, güç
+kaynağının akım sınırı ve osiloskop toprak döngüsü. `FIZIK_RAPOR=dosya.txt npx vitest run
+tests/fizik-denetimi.test.ts` her kontrolün beklenen ve bulunan değerini dosyaya yazar.
 
 ## Kararlar
 
@@ -291,6 +299,15 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   "toprağa bağlı olmayan parça" uyarısı verilir (gerilimleri yalnızca gmin belirler).
 - **Değer girişi:** Görevdeki önekler dışında `K` (kilo) ve `4k7` yazımı da kabul edilir.
   Rakamlar arasındaki boşluk hata sayılır ("1 2").
+
+### Fizik denetimi ve düzeltmeler (2026-10)
+
+Çözücü 71 kontrolle denetlendi (commit 3d9bc92; `tests/fizik-denetimi.test.ts`). 62 kontrol doğru
+çıktı; 9 kontrol, sırasıyla düzeltilecek eksikleri gösteriyor ve testte `it.fails` ile işaretli:
+toprak zorunluluğu (Aşama 1), açık devrede gmin kaçak akımı (Aşama 2), iki toprak sembolü üzerinden
+görünmez kapanma (Aşama 3), küçük zaman sabitinde ve RC süzgeçte zaman adımı hatası (Aşama 4), LED
+ters gerilimi, direnç gücü ve kutuplu kondansatör sınırları (Aşama 5). Her aşamada düzelen kontroller
+normal teste çevrilir. Aşamaların kararları aşağıda.
 
 ### Editör
 
