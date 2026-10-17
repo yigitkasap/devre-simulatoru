@@ -23,6 +23,17 @@ const REGION_CLASS: Readonly<Record<Region, string>> = {
   cutoff: 'bg-panel text-muted border-line-2',
 };
 
+/**
+ * Satır yükseklikleri (normal, büyük yazı). Yatay telefonda not ikinci satıra iner: iki satırlık yer
+ * baştan ayrılır.
+ */
+const ROW_HEIGHT: Readonly<Record<TableVariant, readonly [string, string]>> = {
+  desktop: ['h-[46px]', 'h-[48px]'],
+  tablet: ['h-[46px]', 'h-[48px]'],
+  phone: ['h-[46px]', 'h-[48px]'],
+  landscape: ['h-[58px]', 'h-[66px]'],
+};
+
 function LedDot({ state, level, size }: { state: LedState; level: 1 | 2 | 3; size: number }) {
   const c = LEVEL_COLORS[level];
   const style =
@@ -67,7 +78,8 @@ export function DurumTablosu({ rows, variant, big = false }: DurumTablosuProps) 
           <div
             key={row.level}
             role="row"
-            className={`grid items-center gap-2.5 border-b border-[#eef0f3] ${pad} ${big ? 'min-h-11' : 'min-h-[46px]'} py-1`}
+            // Sabit satır yüksekliği: transistör durumu, akım ya da not gelip gidince tablo boy değiştirmesin.
+            className={`grid items-center gap-2.5 overflow-hidden border-b border-[#eef0f3] ${pad} ${ROW_HEIGHT[variant][big ? 1 : 0]}`}
             style={{ gridTemplateColumns: cols, background: row.working ? c.soft : undefined }}
           >
             <span role="cell" className="inline-flex items-center gap-2 font-semibold">
@@ -78,7 +90,7 @@ export function DurumTablosu({ rows, variant, big = false }: DurumTablosuProps) 
               <DropIcon wet={row.wet} size={big ? 18 : 16} />
               {row.wet ? tr.baraj.durum.wet : tr.baraj.durum.dry}
             </span>
-            <span role="cell" className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span role="cell" className={`flex min-w-0 items-center gap-x-2 gap-y-0.5 ${variant === 'landscape' ? 'flex-wrap' : 'flex-nowrap'}`}>
               <span className="font-mono font-semibold">{row.transistor}</span>
               {row.region ? (
                 <span
@@ -92,7 +104,7 @@ export function DurumTablosu({ rows, variant, big = false }: DurumTablosuProps) 
                 <span className="text-muted">{tr.baraj.durum.noSim}</span>
               )}
               {row.note && (
-                <span className={`text-muted ${big ? 'text-[16px]' : 'text-small'} ${variant === 'landscape' ? 'basis-full' : ''}`}>
+                <span className={`min-w-0 truncate text-muted ${big ? 'text-[16px]' : 'text-small'} ${variant === 'landscape' ? 'basis-full' : ''}`}>
                   {row.note.kind === 'silenced' ? tr.baraj.durum.silenced(row.note.by) : tr.baraj.durum.discharging(row.note.capacitor)}
                 </span>
               )}

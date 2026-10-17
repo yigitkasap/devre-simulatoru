@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState, type Dispatch, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { tr } from '../i18n/tr';
-import { CATEGORIES, type Category } from '../model/catalog';
+import { CATALOG, CATEGORIES, type Category } from '../model/catalog';
 import type { DeviceType } from '../sim/netlist';
 import { Icon } from './icons';
 import type { Settings } from './settings';
@@ -28,6 +28,8 @@ function normalize(text: string): string {
 }
 
 const CATEGORY_OF = new Map<DeviceType, Category>(CATEGORIES.flatMap((c) => c.types.map((t) => [t, c.id] as const)));
+/** Bilgi kutusunda açıklaması gösterilebilen bütün parça türleri (kutunun yüksekliği en uzununa göre). */
+const INFO_TYPES = Object.keys(CATALOG) as DeviceType[];
 
 export type LibraryMode = 'full' | 'rail';
 
@@ -248,13 +250,29 @@ function LibraryPanel({
         })}
       </nav>
 
-      <div aria-live="polite" className="flex flex-col gap-1.5 border-t border-line bg-panel-2 px-3.5 pt-3 pb-3.5">
-        <div className="flex items-center justify-between gap-2">
-          <b className="text-sm font-semibold">{tr.devices.names[infoType]}</b>
-          {category && <span className="text-[11px] text-muted">{tr.library.categories[category]}</span>}
+      {/* Bilgi kutusu: bütün parçaların açıklamaları aynı ızgara hücresinde üst üste durur, yalnızca
+          gösterilen görünür. Kutu böylece en uzun açıklama kadar sabit yükseklikte kalır; fare parçalar
+          üzerinde gezinirken üstündeki liste kaymaz (yazı tipi ve yakınlaştırma değişse de). */}
+      <div className="flex flex-col gap-1.5 border-t border-line bg-panel-2 px-3.5 pt-3 pb-3.5">
+        <div className="grid">
+          {INFO_TYPES.map((type) => {
+            const shown = type === infoType;
+            const cat = CATEGORY_OF.get(type);
+            return (
+              <div key={type} aria-hidden={!shown} className={`flex flex-col gap-1.5 [grid-area:1/1] ${shown ? '' : 'invisible'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <b className="text-sm font-semibold">{tr.devices.names[type]}</b>
+                  {cat && <span className="text-[11px] text-muted">{tr.library.categories[cat]}</span>}
+                </div>
+                <p className="text-small leading-[1.45] text-ink-2">{tr.devices.descriptions[type]}</p>
+              </div>
+            );
+          })}
         </div>
-        <p className="text-small leading-[1.45] text-ink-2">{tr.devices.descriptions[infoType]}</p>
         <span className="text-label text-muted">{tr.library.hint}</span>
+        <span aria-live="polite" className="sr-only">
+          {`${tr.devices.names[infoType]}${category ? `, ${tr.library.categories[category]}` : ''}: ${tr.devices.descriptions[infoType]}`}
+        </span>
       </div>
     </>
   );

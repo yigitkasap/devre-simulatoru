@@ -79,9 +79,10 @@ export function SimBar(props: SimBarProps) {
 
   return (
     // Çubuğun genişliğine göre (container query): sütun daraldıkça önce hız açıklaması, sonra düğme ve
-    // durum yazıları simgeye iner (yazı ekran okuyucuya kalır); çok darda satırlara taşar.
+    // durum yazıları simgeye iner (yazı ekran okuyucuya kalır); çok darda ileti ikinci satıra iner.
+    // Yükseklik sabittir (52 px; darda iki satır, 88 px): ileti gelip gidince tuval boy değiştirmez.
     <div role="region" aria-label={tr.sim.region} className="@container shrink-0 border-t border-line bg-panel">
-      <div className="flex min-h-[52px] items-center gap-2.5 px-3 text-sm @max-[780px]:gap-2 @max-[640px]:flex-wrap @max-[640px]:gap-y-1 @max-[640px]:px-2 @max-[640px]:py-1.5">
+      <div className="flex h-[52px] items-center gap-2.5 px-3 text-sm @max-[780px]:gap-2 @max-[640px]:h-[88px] @max-[640px]:flex-wrap @max-[640px]:content-center @max-[640px]:gap-y-1 @max-[640px]:px-2 @max-[640px]:py-1.5">
         <div className="flex items-center gap-2.5 @max-[640px]:gap-1.5">
           <button
             type="button"
@@ -106,7 +107,7 @@ export function SimBar(props: SimBarProps) {
         </span>
         <span className="text-small whitespace-nowrap text-muted">
           {tr.sim.time}:{' '}
-          <span className="font-mono font-semibold text-ink tabular">{formatSI(active ? props.time : 0, 's', { digits: 4 })}</span>
+          <span className="inline-block min-w-[8ch] font-mono font-semibold text-ink tabular">{formatSI(active ? props.time : 0, 's', { digits: 4 })}</span>
         </span>
 
         <SpeedControl speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} open={speedOpen} setOpen={setSpeedOpen} />
@@ -130,7 +131,7 @@ export function SimBar(props: SimBarProps) {
             title={plainText(message.text)}
           >
             <Icon name="info" className="h-5 w-5 shrink-0" />
-            <span className="truncate whitespace-nowrap @max-[640px]:whitespace-normal">
+            <span className="truncate whitespace-nowrap">
               <Rich text={message.text} />
             </span>
             {message.action && (
@@ -237,8 +238,9 @@ function SpeedControl({
       >
         <Icon name="speed" />
         {tr.sim.speed}
-        <span className="font-mono text-small font-semibold">{speedLabel(speed)}</span>
-        <span className="text-small font-normal text-muted @max-[960px]:hidden">{speedNote(speed)}</span>
+        {/* Sabit genişlik: hız değiştikçe düğme ve yanındaki öğeler kaymasın. */}
+        <span className="inline-block w-[7ch] text-left font-mono text-small font-semibold">{speedLabel(speed)}</span>
+        <span className="inline-block w-[13ch] truncate text-left text-small font-normal text-muted @max-[960px]:hidden">{speedNote(speed)}</span>
         <Icon name="chevronUp" className="h-4 w-4" />
       </button>
       {open && (
@@ -355,7 +357,9 @@ export function SpeedOptions({
             </span>
           ))}
         </div>
-        <p className="text-small">
+        {/* Hız değiştikçe cümle bir ya da iki satır olabilir: iki satırlık sabit yükseklik, pencere
+            sürgü sürüklenirken büyüyüp sürgüyü imlecin altından kaydırmasın. */}
+        <p className="h-[2.9em] overflow-hidden text-small leading-[1.45]">
           <HintText text={tr.sim.speedSentence(speedTime(speed))} />
         </p>
       </div>

@@ -834,6 +834,34 @@ try {
     await ctx.close();
   }
 
+  // --- Sabit boyutlar: bilgi kutusu ve hız penceresi yazıya göre büyüyüp küçülmez -----------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const fp = await ctx.newPage();
+    fp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await fp.goto(URL0, { waitUntil: 'networkidle' });
+    const listHeights = new Set();
+    for (const name of ['Pil', 'Direnç', 'Osiloskop', 'Su haznesi', 'Toprak']) {
+      await fp.getByRole('button', { name, exact: true }).hover(); await fp.waitForTimeout(60);
+      listHeights.add(Math.round((await fp.locator('nav[aria-label] ').filter({ has: fp.locator('li') }).first().boundingBox())?.height ?? 0));
+    }
+    check('masaüstü: parçaların üzerine gelince kütüphane listesi ve bilgi kutusu boy değiştirmez', listHeights.size === 1, [...listHeights].join(','));
+    await fp.getByRole('button', { name: /^Hız/ }).first().click(); await fp.waitForTimeout(200);
+    const dialog = fp.getByRole('dialog', { name: /hız/i }).first();
+    const heights = new Set();
+    for (const v of ['0.00', '1.37', '2.50', '3.91', '5.20', '6.00']) {
+      await fp.locator('input[type=range]').first().evaluate((el, value) => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, value);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }, v);
+      await fp.waitForTimeout(60);
+      heights.add(Math.round((await dialog.boundingBox())?.height ?? 0));
+    }
+    check('masaüstü: hız sürgüsü kaydırılınca hız penceresi boy değiştirmez', heights.size === 1, [...heights].join(','));
+    await ctx.close();
+  }
+
   // --- Bobin (Fizik 7): kütüphanede, RL örneğinde anahtar açılınca Lenz uyarısı -------------
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
