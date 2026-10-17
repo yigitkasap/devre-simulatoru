@@ -37,6 +37,9 @@ import transformatorDc from './transformator-dc.json';
 import role from './role.json';
 import roleTransistor from './role-transistor.json';
 import roleMuhurleme from './role-muhurleme.json';
+import dcMotor from './dc-motor.json';
+import motorJenerator from './motor-jenerator.json';
+import motorHKoprusu from './motor-h-koprusu.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
 import zenerKarakteristigi from './zener-karakteristigi.json';
@@ -62,7 +65,7 @@ export const EXAMPLE_GROUPS = [
     ],
   },
   { id: 'aletler', ids: ['toprak-tuzagi'] },
-  { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc', 'role', 'role-transistor', 'role-muhurleme'] },
+  { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc', 'role', 'role-transistor', 'role-muhurleme', 'dc-motor', 'motor-jenerator', 'motor-h-koprusu'] },
   { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
   { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
   { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
@@ -99,6 +102,9 @@ const DATA: Record<ExampleId, unknown> = {
   role,
   'role-transistor': roleTransistor,
   'role-muhurleme': roleMuhurleme,
+  'dc-motor': dcMotor,
+  'motor-jenerator': motorJenerator,
+  'motor-h-koprusu': motorHKoprusu,
   'diyot-dc': diyotDc,
   'diyot-karakteristigi': diyotKarakteristigi,
   'zener-karakteristigi': zenerKarakteristigi,

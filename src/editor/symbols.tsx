@@ -30,6 +30,8 @@ export interface LiveVisual {
   readonly powerRatio?: number;
   /** Röle: palet çekili mi? */
   readonly energized?: boolean;
+  /** DC motor: milin (görsel olarak yavaşlatılmış) dönme açısı (radyan). */
+  readonly angle?: number;
 }
 
 export interface SymbolProps {
@@ -299,6 +301,26 @@ function Relay({ energized, rotation }: { energized: boolean; rotation: Rotation
       <DeviceText x={30} y={14} rotation={rotation} size={7}>
         C
       </DeviceText>
+    </g>
+  );
+}
+
+/**
+ * DC motor (IEC: daire içinde M). Dairenin içindeki nokta milin dönüşünü gösterir (görsel olarak
+ * yavaşlatılmış); + uç solda.
+ */
+function Motor({ angle, rotation }: { angle: number; rotation: Rotation }) {
+  const r = 12.5;
+  return (
+    <g>
+      <Lead from={-40} to={-17} />
+      <Lead from={17} to={40} />
+      <circle cx={0} cy={0} r={17} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <circle cx={r * Math.cos(angle - Math.PI / 2)} cy={r * Math.sin(angle - Math.PI / 2)} r={2.2} fill="currentColor" />
+      <DeviceText x={0} y={0} rotation={rotation} size={13}>
+        M
+      </DeviceText>
+      <Plus x={-26} y={-8} />
     </g>
   );
 }
@@ -806,6 +828,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Switch closed={boolProp(props, 'closed', false)} />;
     case 'relay':
       return <Relay energized={live?.energized ?? false} rotation={rotation} />;
+    case 'motor':
+      return <Motor angle={live?.angle ?? 0} rotation={rotation} />;
     case 'voltmeter':
       return <Meter letter="V" rotation={rotation} />;
     case 'ammeter':

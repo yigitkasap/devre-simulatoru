@@ -35,6 +35,7 @@ import {
   DEVICE_MODELS,
   InductorDevice,
   LedDevice,
+  MotorDevice,
   RelayDevice,
   TransformerDevice,
   type Device,
@@ -432,7 +433,7 @@ export class CircuitSimulator {
     // kaynakların ve kondansatörlerin başlangıç gerilimlerinin iki katını (en az 20 V) aşıyor.
     const reference = this.referenceVoltage();
     for (const device of this.circuit.devices) {
-      if (!(device instanceof InductorDevice) && !(device instanceof TransformerDevice) && !(device instanceof RelayDevice)) continue;
+      if (!(device instanceof InductorDevice || device instanceof TransformerDevice || device instanceof RelayDevice || device instanceof MotorDevice)) continue;
       const voltage = device.spikeVoltage();
       if (voltage > Math.max(20, 2 * reference)) {
         result.push({ severity: 'warning', code: 'inductor-spike', elementIds: [device.id], netKeys: [], params: { voltage } });

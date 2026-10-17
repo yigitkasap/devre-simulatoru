@@ -34,6 +34,7 @@ import {
   CAPACITOR_KINDS,
   CAPACITOR_LEGACY_KIND,
   INDUCTOR_DEFAULTS,
+  MOTOR_DEFAULTS,
   RELAY_DEFAULTS,
   TRANSFORMER_DEFAULTS,
   TRANSFORMER_MAX_COUPLING,
@@ -53,7 +54,7 @@ import type { DeviceType, PropValue } from '../sim/netlist';
 import type { UnitSymbol } from '../sim/units';
 import type { Point } from './types';
 
-export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'switches' | 'sensors' | 'meters' | 'instruments';
+export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'switches' | 'outputs' | 'sensors' | 'meters' | 'instruments';
 
 export interface NumberPropDef {
   readonly kind: 'number';
@@ -407,6 +408,25 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  motor: {
+    type: 'motor',
+    category: 'outputs',
+    labelPrefix: 'M',
+    pins: TWO_PINS,
+    bounds: { x: -4, y: -2, w: 8, h: 4 },
+    defaultProps: { ...MOTOR_DEFAULTS },
+    // Tork mN·m, tork sabiti mN·m/A, atalet g·cm² cinsinden (veri sayfalarındaki gibi).
+    propDefs: [
+      { kind: 'number', key: 'loadTorque', unit: '', min: { value: 0, exclusive: false } },
+      { kind: 'number', key: 'armatureResistance', unit: 'Ω', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'armatureInductance', unit: 'H', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'torqueConstant', unit: '', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'inertia', unit: '', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'frictionTorque', unit: '', min: { value: 0, exclusive: false } },
+    ],
+    showLabel: true,
+    polarized: true,
+  },
   relay: {
     type: 'relay',
     category: 'switches',
@@ -520,6 +540,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'switches', types: ['switch', 'relay'] },
+  { id: 'outputs', types: ['motor'] },
   { id: 'sensors', types: ['tank'] },
   { id: 'meters', types: ['voltmeter', 'ammeter'] },
   { id: 'instruments', types: ['funcgen', 'dcsupply', 'oscilloscope'] },

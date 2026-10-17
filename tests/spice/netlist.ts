@@ -24,6 +24,7 @@ import type { Device } from '../../src/sim/devices/device';
 import { DIODE_MODEL_PARAMS, DiodeDevice } from '../../src/sim/devices/diode';
 import { INDUCTOR_WINDING_CAPACITANCE, InductorDevice } from '../../src/sim/devices/inductor';
 import { LED_MODELS, LedDevice } from '../../src/sim/devices/led';
+import { MOTOR_STICTION_SPEED, MOTOR_TERMINAL_CAPACITANCE, MotorDevice } from '../../src/sim/devices/motor';
 import { ResistorDevice } from '../../src/sim/devices/resistor';
 import { TransformerDevice } from '../../src/sim/devices/transformer';
 import { ZenerDevice } from '../../src/sim/devices/zener';
@@ -76,6 +77,15 @@ export function toSpice(netlist: Netlist, options: { acMagnitude?: boolean } = {
       if (device.dcResistance > 0) lines.push(`R${id}_dc ${n(device, 0)} ${start} ${num(device.dcResistance)}`);
       lines.push(`L${id} ${start} ${n(device, 1)} ${num(device.inductance)} IC=${num(device.current)}`);
       lines.push(`C${id}_p ${n(device, 0)} ${n(device, 1)} ${num(INDUCTOR_WINDING_CAPACITANCE)} IC=0`);
+    } else if (device instanceof MotorDevice) {
+      // + ── R ── iç ── L ── e ── (C_m = J/k² ‖ sürtünme) ── −;  uç kapasitesi + ile − arasında.
+      const e = n(device, 3);
+      const drag = (device.frictionTorque + device.loadTorque) / device.k;
+      lines.push(`R${id}_a ${n(device, 0)} ${n(device, 2)} ${num(device.resistance)}`);
+      lines.push(`L${id} ${n(device, 2)} ${e} ${num(device.inductance)} IC=0`);
+      lines.push(`C${id}_m ${e} ${n(device, 1)} ${num(device.mechanicalCapacitance)} IC=0`);
+      lines.push(`C${id}_p ${n(device, 0)} ${n(device, 1)} ${num(MOTOR_TERMINAL_CAPACITANCE)} IC=0`);
+      if (drag > 0) lines.push(`B${id} ${e} ${n(device, 1)} I=${num(drag)}*tanh(V(${e},${n(device, 1)})/${num(device.k * MOTOR_STICTION_SPEED)})`);
     } else if (device instanceof TransformerDevice) {
       // P• ── R₁ ── iç 1 ── L₁ ── P;  S• ── R₂ ── iç 2 ── L₂ ── S;  K = M / √(L₁L₂).
       const windings = [

@@ -177,6 +177,12 @@ suite('Fizik 6: ngspice ile geçici durum karşılaştırması (.tran, en fazla 
     await compareTran('Transformatör', n, 's', null, range(0.25e-3, 40e-3, 0.25e-3), { tmax: 2e-6, uic: true });
   });
 
+  it('DC motor (maxon A-max 26, 12 V, 1 Ω seri, 5 mN·m yük): uç gerilimi kalkıştan itibaren 60 ms', async () => {
+    const n = circuit().battery('B', 'p', 'g', 12).ground('G', 'g').resistor('R', 'p', 'm', 1)
+      .add('motor', 'M', ['m', 'g'], { loadTorque: 5 }).build();
+    await compareTran('DC motor', n, 'm', null, range(0.25e-3, 60e-3, 0.25e-3), { tmax: 2e-6, uic: true });
+  });
+
   it('Yarım dalga doğrultucu (50 Hz, 10 V tepe, 1N4001, 1 kΩ)', async () => {
     const n = circuit().acsource('S', 'a', 'g', { waveform: 'sine', amplitude: 10, frequency: 50, offset: 0, internalResistance: 0 }).ground('G', 'g')
       .add('diode', 'D', ['a', 'k'], { model: '1N4001' }).resistor('R', 'k', 'g', 1000).build();

@@ -16,6 +16,7 @@ export type DeviceType =
   | 'inductor'
   | 'transformer'
   | 'relay'
+  | 'motor'
   | 'diode'
   | 'zener'
   | 'led'

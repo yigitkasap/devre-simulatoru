@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 12, "internalResistance": 0}},
+    {"id": "p2", "type": "switch", "label": "S1", "x": 16, "y": -6, "rotation": 90, "props": {"closed": false}},
+    {"id": "p3", "type": "switch", "label": "S3", "x": 16, "y": 6, "rotation": 90, "props": {"closed": false}},
+    {"id": "p4", "type": "switch", "label": "S2", "x": 44, "y": -6, "rotation": 90, "props": {"closed": false}},
+    {"id": "p5", "type": "switch", "label": "S4", "x": 44, "y": 6, "rotation": 90, "props": {"closed": false}},
+    {"id": "p6", "type": "ammeter", "label": "A1", "x": 24, "y": 0, "rotation": 0, "props": {"resistance": 0.01, "ideal": false}},
+    {"id": "p7", "type": "motor", "label": "M1", "x": 36, "y": 0, "rotation": 0, "props": {}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": 0, "y": 10, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -10], [16, -10]]},
+    {"id": "w2", "points": [[16, -10], [44, -10]]},
+    {"id": "w3", "points": [[0, 4], [0, 10], [16, 10]]},
+    {"id": "w4", "points": [[16, 10], [44, 10]]},
+    {"id": "w5", "points": [[16, -2], [16, 2]]},
+    {"id": "w6", "points": [[44, -2], [44, 2]]},
+    {"id": "w7", "points": [[16, 0], [20, 0]]},
+    {"id": "w8", "points": [[28, 0], [32, 0]]},
+    {"id": "w9", "points": [[40, 0], [44, 0]]}
+  ]
+}

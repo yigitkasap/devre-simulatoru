@@ -99,6 +99,8 @@ const MAX_FRAME_SECONDS = 0.1;
  * ortalama bir parlaklık olarak görür. Yavaşlatılmış simülasyonda LED'in yanıp söndüğü yine görülür.
  */
 const LED_PERSISTENCE = 0.06;
+/** DC motorun tuvaldeki dönüşü gerçek hızının bu kadarda biri (8000 dev/dk ekranda ≈ 80 dev/dk). */
+const MOTOR_VISUAL_RATIO = 100;
 
 export function useSimulation(
   doc: CircuitDoc,
@@ -120,6 +122,8 @@ export function useSimulation(
   const ledGlow = useRef(new Map<string, number>());
   /** Su haznelerinde iyonların sürüklenme konumları. */
   const ionPhases = useRef(new Map<string, IonPhases>());
+  /** DC motorların görsel dönme açısı ve son karenin simülasyon zamanı. */
+  const motorAngles = useRef(new Map<string, { angle: number; time: number }>());
 
   const latest = useRef({ doc, connectivity, flowGraph, electronFlow, structure });
   latest.current = { doc, connectivity, flowGraph, electronFlow, structure };
@@ -209,6 +213,13 @@ export function useSimulation(
         if (status.powerRatio !== undefined) live.set(part.id, { powerRatio: status.powerRatio });
       } else if (part.type === 'relay') {
         live.set(part.id, { energized: status.energized ?? false });
+      } else if (part.type === 'motor') {
+        // Mil gerçek hızının 1/MOTOR_VISUAL_RATIO'u ile döner (8000 dev/dk ekranda ≈ 80 dev/dk);
+        // simülasyon zamanıyla ilerler, yavaş çekimde yavaşlar.
+        const previous = motorAngles.current.get(part.id) ?? { angle: 0, time: sim.time };
+        const angle = (previous.angle + ((status.motor?.speed ?? 0) / MOTOR_VISUAL_RATIO) * (sim.time - previous.time)) % (2 * Math.PI);
+        motorAngles.current.set(part.id, { angle, time: sim.time });
+        live.set(part.id, { angle });
       } else if (part.type === 'dcsupply') {
         live.set(part.id, { currentLimited: status.currentLimited ?? [] });
       } else if (part.type === 'tank') {
@@ -250,6 +261,7 @@ export function useSimulation(
     phases.current = { segments: new Float64Array(0), parts: new Map() };
     ledGlow.current = new Map();
     ionPhases.current = new Map();
+    motorAngles.current = new Map();
     setStatus('stopped');
     setFrame(null);
     setNotice(null);

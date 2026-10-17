@@ -77,6 +77,17 @@ export interface DeviceStatus {
   readonly outputs?: ReadonlyArray<{ readonly voltage: number; readonly current: number }>;
   /** Su haznesi: su seviyesi (%). */
   readonly level?: number;
+  /**
+   * DC motor: açısal hız (rad/s), zıt EMK (V), motor torku k·i (N·m), yüke verilen mekanik güç (W)
+   * ve sargının ısınması (ortalama bakır kaybının sürekli çalışma sınırına oranı).
+   */
+  readonly motor?: {
+    readonly speed: number;
+    readonly backEmf: number;
+    readonly torque: number;
+    readonly loadPower: number;
+    readonly heating: number;
+  };
   /** Röle: palet çekili mi (NA kontağı kapalı)? */
   readonly energized?: boolean;
   /** Röle: kapalı kontaktan (C'den kapalı uca) geçen akım. */
@@ -97,7 +108,7 @@ export interface DeviceStatus {
 
 /** Gerçek parçanın sınırı aşıldı (Fizik 5): uyarı kodu ve ayrıntıları (gerilim, güç, sınır). */
 export interface RatingWarning {
-  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse'>;
+  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse' | 'motor-overload'>;
   readonly params: Readonly<Record<string, number>>;
 }
 

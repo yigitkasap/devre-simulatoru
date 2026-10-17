@@ -43,6 +43,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   pmos: 'P kanallı MOSFET',
   switch: 'Anahtar',
   relay: 'Röle',
+  motor: 'DC motor',
   voltmeter: 'Voltmetre',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
@@ -71,6 +72,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   pmos: 'MOSFET’inin',
   switch: 'anahtarının',
   relay: 'rölesinin',
+  motor: 'motorunun',
   voltmeter: 'voltmetresinin',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
@@ -97,6 +99,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   nmos: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
   pmos: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
   switch: ['1. ucu', '2. ucu'],
+  motor: ['+ ucu', '− ucu'],
   relay: ['sargısının 1. ucu', 'sargısının 2. ucu', 'kontağının ortak ucu (C)', 'normalde açık kontak ucu (NA)', 'normalde kapalı kontak ucu (NK)'],
   voltmeter: ['+ ucu', '− ucu'],
   ammeter: ['+ ucu', '− ucu'],
@@ -127,6 +130,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   pmos: ['D', 'G', 'S'],
   switch: ['1', '2'],
   relay: ['1', '2', 'C', 'NA', 'NK'],
+  motor: ['+', '−'],
   voltmeter: ['+', '−'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
@@ -155,6 +159,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   pmos: ['drain', 'gate', 'source'],
   switch: ['1. uç', '2. uç'],
   relay: ['sargı 1', 'sargı 2', 'C', 'NA', 'NK'],
+  motor: ['+ uç', '− uç'],
   voltmeter: ['+ uç', '− uç'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
@@ -272,7 +277,25 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           `${String(p.rating ?? 0).replace('.', ',')} W. Gerçek direnç aşırı ısınır, rengi kararır ve bozulabilir. ` +
           'Güç sınırı daha büyük bir direnç seç ya da akımı azalt.',
       };
+    case 'motor-overload':
+      return {
+        title: 'Motor zorlanıyor',
+        detail:
+          `${firstLabel} motorunun sargısında ortalama ${formatSI(p.power ?? 0, 'W')} ısıya dönüşüyor; sürekli çalışmada en fazla ` +
+          `${formatSI(p.limit ?? 0, 'W')} (anma akımı). Motor yükü kaldıramıyor ya da dönmesi engellenmiş: zıt EMK küçük olduğu için akım ` +
+          'büyük. Gerçek motorun sargısı ısınır ve yalıtımı yanabilir. Yük torkunu azalt.',
+      };
     case 'inductor-spike':
+      if (first !== undefined && ctx.type(first) === 'motor') {
+        return {
+          title: 'Motorun akımı aniden kesildi',
+          detail:
+            `Motorun akımı aniden kesildi: yüksek gerilim sıçraması (Lenz yasası). ${firstLabel} motorunun uçlarında ` +
+            `${formatSI(p.voltage ?? 0, 'V')} görüldü. Sargının manyetik enerjisi bir anda kaybolamaz: akımın yolu açılınca sargının ` +
+            'küçük kapasitesine boşalır. Gerçekte anahtarda ve fırçalarda kıvılcım oluşur; motoru süren transistör bozulabilir. ' +
+            'Motora ters paralel bir diyot (serbest geçiş diyodu: katodu + uca) bağla.',
+        };
+      }
       if (first !== undefined && ctx.type(first) === 'relay') {
         return {
           title: 'Röle sargısının akımı aniden kesildi',
@@ -353,6 +376,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   nmos: 'Kapısı yalıtılmış alan etkili transistör; VGS eşik gerilimini (VT) aşınca iletime geçer. Anahtar ve yükselteç olarak kullanılır. Föydeki IRF510 olarak gelir.',
   pmos: 'P kanallı MOSFET: kapı kaynaktan yeterince düşük olunca (VGS < VT < 0) iletime geçer.',
   switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
+  motor:
+    'Elektrik enerjisini dönme hareketine çevirir: mıknatısın alanındaki akım taşıyan sargıya kuvvet etkir (F = I·L·B). Dönen sargıda hızla orantılı bir zıt EMK indüklenir (Lenz) ve akımı sınırlar; bu yüzden motor dururken çok, boşta dönerken az akım çeker. Dışarıdan çevrilince jeneratör olur.',
   relay:
     'Elektromıknatısla çalışan anahtar: sargısından yeterli akım geçince demir paleti çeker ve kontağı değiştirir (C, NK’dan ayrılıp NA’ya değer). Küçük bir akımla, sargıdan yalıtılmış başka bir devreyi açıp kapatır.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
@@ -372,6 +397,17 @@ function fieldLabel(type: DeviceType, key: string): string {
   if (type === 'funcgen' && key === 'offset') return 'DC offset (açık devre)';
   if (type === 'tank' && key === 'mode') return 'Su akışı';
   if (type === 'relay' && key === 'inductance') return 'Sargı endüktansı (palet açıkken)';
+  if (type === 'motor') {
+    const motor: Record<string, string> = {
+      loadTorque: 'Yük torku (mN·m)',
+      armatureResistance: 'Sargı direnci',
+      armatureInductance: 'Sargı endüktansı',
+      torqueConstant: 'Tork sabiti k (mN·m/A)',
+      inertia: 'Rotor ataleti J (g·cm²)',
+      frictionTorque: 'Sürtünme torku (mN·m)',
+    };
+    if (motor[key]) return motor[key];
+  }
   const labels: Record<string, string> = {
     model: 'Model',
     mode: 'Ölçüm kipi',
@@ -595,6 +631,33 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     everyday:
       'Fabrikalardaki motorlar, tezgâhlar ve yürüyen merdivenler bu devreyle çalışır (rölenin büyüğüne kontaktör denir): yeşil BAŞLAT düğmesi bırakılınca motor dönmeye devam eder, kırmızı DUR düğmesi onu durdurur. Elektrik kesilip geri gelince makine kendiliğinden çalışmaz; bu bir güvenlik önlemidir.',
   },
+  'dc-motor': {
+    title: 'DC motor: kalkış akımı, zıt EMK ve yük',
+    description:
+      '12 V’luk pil, S1 anahtarı ve ampermetre üzerinden bir DC motoru (maxon A-max 26 tipi) besliyor; voltmetre motorun uçlarında. Oynat’a bas, S1’i kapat. Sonra motoru seçip yük torkunu 10 mN·m, ardından 100 mN·m yap. Kalkışı yavaş çekimde görmek için hızı ×0,01’e indir.',
+    purpose:
+      'Motorun akımını zıt EMK’nın belirlediğini gösterir. Dururken motor yalnızca 2,07 Ω’luk bir dirençtir: S1 kapanınca akım ≈ 5,6 A’e fırlar (kalkış akımı). Mil hızlandıkça dönen sargıda hızla orantılı bir zıt EMK (e = k·ω, Lenz) indüklenir ve akımı azaltır: I = (V − e) / R. Hız τ = R·J/k² ≈ 15 ms’lik bir üstelle artar; boşta ≈ 8160 dev/dk’da zıt EMK 11,88 V’a ulaşır ve akım yalnızca sürtünmeyi yenen 57 mA’dir. 10 mN·m’lik yükte hız ≈ 7130 dev/dk’ya düşer, akım 0,78 A’e çıkar: motor 9,3 W alır, yüke 7,5 W verir (verim ≈ %80). Yük durma torkunu (≈ 80 mN·m) aşarsa motor durur, zıt EMK kalmaz, akım 5,8 A olur ve yarım saniye içinde sargının ısındığı uyarısı çıkar.',
+    everyday:
+      'Elektrikli süpürge, matkap ve mutfak robotu zorlanınca sesleri kalınlaşır (hız düşer) ve daha çok akım çekerler; sıkışan bir motorun yanması bu yüzdendir. Büyük motorlar kalkışta anma akımlarının birkaç katını çeker: buzdolabının motoru çalışınca ışıkların bir an kısılması bundandır.',
+  },
+  'motor-jenerator': {
+    title: 'Motor jeneratör olur: boşta dönme ve frenleme',
+    description:
+      '12 V’luk pil S1 üzerinden motoru besliyor (S1 kapalı). Motora ters paralel bir 1N4001, S2 ile bağlanan 33 Ω’luk fren direnci, motorla seri bir ampermetre ve motorun uçlarında bir voltmetre var. Oynat’a bas; motor hızlanınca S1’i aç. Sonra S1’i kapat, motor hızlanınca S1’i aç ve S2’yi kapat.',
+    purpose:
+      'Elektrik motoru ile jeneratörün aynı makine olduğunu gösterir. S1 açılınca motor ataletiyle dönmeye devam eder ve dönen sargıda zıt EMK indüklenmeye devam eder: voltmetre artık motorun ürettiği gerilimi gösterir (jeneratör). Sürtünme yavaşlattıkça gerilim azalır (0,25 s sonra ≈ 9,9 V, 1 s sonra ≈ 3,8 V) ve motor ≈ 1,5 s’de durur. S2 kapalıyken motor ürettiği akımı 33 Ω’luk dirence verir: ampermetre ters yönde ≈ 0,34 A gösterir. Bu akım mile dönmeye karşı bir tork uygular (Lenz) ve motor ≈ 0,5 s’de durur; rotorun kinetik enerjisi dirençte ısıya dönüşür (dinamik frenleme).',
+    everyday:
+      'Elektrikli ve hibrit araçlar, tramvaylar ve asansörler fren yaparken motorlarını jeneratör olarak kullanır; üretilen enerji bataryaya ya da şebekeye geri verilir (rejeneratif frenleme). Bisiklet dinamosu, rüzgâr türbini ve hidroelektrik santralinin jeneratörü de dönen bir sargıda gerilim indükler.',
+  },
+  'motor-h-koprusu': {
+    title: 'Motorun yönü: H köprüsü',
+    description:
+      '12 V’luk pil, dört anahtar (S1–S4) ve ortalarında bir DC motor ile ampermetre; anahtarların hepsi açık. Oynat’a bas; S1 ile S4’ü kapat. Sonra ikisini açıp S2 ile S3’ü kapat.',
+    purpose:
+      'DC motorun dönme yönünün akımın yönüyle değiştiğini gösterir. S1 ve S4 kapalıyken akım motordan soldan sağa geçer ve motor ileri döner (≈ 8160 dev/dk). S2 ve S3 kapalıyken akım ters yönde geçer: mıknatısın alanındaki sargıya etkiyen kuvvet (F = I·L × B) de ters döner ve motor geri döner (−8160 dev/dk). Motor ileri dönerken yönü değiştirmek, pilin gerilimine zıt EMK’yı da ekler: akım bir an ≈ 11 A’e çıkar (kalkış akımının iki katı). Aynı kolun iki anahtarını (S1 ile S3 ya da S2 ile S4) birlikte kapatmak pili kısa devre eder: Mesajlar’da uyarı çıkar.',
+    everyday:
+      'Oyuncak arabalar, elektrikli cam ve koltuk motorları, robotlar ve 3B yazıcılar motorlarının yönünü H köprüsüyle değiştirir; anahtarların işini dört transistör yapar (L298N, DRV8833 gibi sürücü entegreleri). Bu entegreler aynı koldaki iki transistörün birlikte iletmesini özellikle engeller.',
+  },
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
     description:
@@ -789,6 +852,7 @@ export const tr = {
       transistors: 'Transistörler',
       instruments: 'Laboratuvar cihazları',
       switches: 'Anahtarlar',
+      outputs: 'Çıkış elemanları',
       sensors: 'Sensörler',
       meters: 'Ölçü aletleri',
     },
@@ -917,6 +981,16 @@ export const tr = {
     primary: 'Birincil (P)',
     secondary: 'İkincil (S)',
     powerInOut: 'Giriş / çıkış gücü',
+    motorSpeed: 'Hız',
+    motorRpm: (rpm: string) => `${rpm} dev/dk`,
+    motorEmf: 'Zıt EMK (e = k·ω)',
+    motorTorque: 'Motor torku (k·I)',
+    motorLoadPower: 'Yüke verilen güç',
+    motorStalled: 'Motor dönmüyor: zıt EMK yok, akımı yalnızca sargı direnci sınırlıyor (I = V / R). Uzun sürerse sargı ısınır.',
+    motorGenerating:
+      'Motor jeneratör gibi çalışıyor: dönen mil zıt EMK üretiyor ve akım devreye geri akıyor. Bu akım mile ters yönde tork uygular (Lenz): motor frenlenir.',
+    motorRunning:
+      'Dönen sargıda hızla orantılı bir zıt EMK (e = k·ω) oluşur ve akımı azaltır: I = (V − e) / R. Yük arttıkça hız düşer, akım artar.',
     relayEnergized: 'Çekili: C–NA kapalı, NK açık',
     relayReleased: 'Bırakılmış: C–NK kapalı, NA açık',
     relayCoil: 'Sargı',
@@ -1421,6 +1495,8 @@ export const tr = {
       transformer:
         'Varsayılan değerler gerçek bir transformatörden (RS PRO 504-464: 230 V → 12 V, sargı başına 1,5 VA; birincil 1167 Ω, ikincil 14,8 Ω, yüksüz giriş akımı ≈ 30 mA). Sarım oranı N₁ / N₂ = 16: 230 V’ta yüksüz ≈ 14,4 V, tam yükte (125 mA) ≈ 12 V. Oranı 1’den küçük yaparsan gerilim yükseltilir.',
       diode: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer.',
+      motor:
+        'Varsayılan değerler gerçek bir motordan (maxon A-max 26, 12 V, 11 W): sargı 2,07 Ω ve 0,227 mH, tork sabiti 13,9 mN·m/A (zıt EMK 13,9 mV/(rad/s)), rotor ataleti 13,6 g·cm², boşta 57 mA (sürtünme 0,79 mN·m). 12 V’ta boşta ≈ 8160 dev/dk, kalkış akımı ≈ 5,8 A, durma torku ≈ 80 mN·m. Yük torku mile bağlanan yükü temsil eder (her mN·m hızı ≈ 102 dev/dk düşürür); sürekli çalışmada en fazla ≈ 14 mN·m (1,08 A).',
       relay:
         'Varsayılan değerler gerçek bir röleden (Omron G2R-1, 12 V DC): sargı 275 Ω (43,6 mA), endüktans 1,15 H (palet çekilince 2,29 H); veri sayfasına göre en geç 8,4 V’ta çeker, en erken 1,8 V’ta bırakır; kontak 30 mΩ. Sargı akımı çekme akımına (V_{ç} / R) ulaşınca palet çekilir, bırakma akımının altına inince bırakılır. Sargının akımını bir transistörle ya da anahtarla kesiyorsan sargıya ters paralel bir diyot (serbest geçiş diyodu) bağla.',
       voltmeter:
@@ -1468,6 +1544,8 @@ export const tr = {
     } as Record<string, string>,
     meterModeNote:
       'AC kaynaklı devrede DC kipi bir periyottaki ortalamayı, AC kipi etkin değeri (√(ortalama v²)) gösterir; gösterge her periyotta bir güncellenir.',
+    motorNoLoad: 'boşta',
+    motorLoadShort: (load: string) => `yük ${load} mN·m`,
     acSpec: (rms: string, period: string) =>
       `Etkin değer ≈ ${rms} · periyot T = 1 / f = ${period}. Türkiye’de şebeke gerilimi 230 V etkin değerli (tepe ≈ 325 V), 50 Hz’liktir.`,
     ledSpec: (vf: string, max: string) => `20 mA’de ileri gerilim ≈ ${vf}; en fazla ${max} akıma dayanır.`,

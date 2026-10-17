@@ -46,6 +46,10 @@ export function partValueText(part: Part): string {
       return `${formatNumber(numProp(p, 'turnsRatio', 16), 2)} : 1`;
     case 'relay':
       return formatSI(numProp(p, 'coilResistance', 275), 'Ω', { trim: true, digits: 4 });
+    case 'motor': {
+      const load = numProp(p, 'loadTorque', 0);
+      return load > 0 ? tr.properties.motorLoadShort(formatNumber(load, 3)) : tr.properties.motorNoLoad;
+    }
     case 'led':
       return tr.devices.ledColors[strProp(p, 'color', LED_COLORS, 'red')] ?? '';
     case 'zener':

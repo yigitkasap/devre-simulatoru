@@ -201,6 +201,22 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: t.transformerNote,
       };
     }
+    case 'motor': {
+      const motor = status.motor ?? { speed: 0, backEmf: 0, torque: 0, loadPower: 0, heating: 0 };
+      const rpm = (motor.speed * 60) / (2 * Math.PI);
+      const stalled = Math.abs(rpm) < 10 && Math.abs(m.current) > 0.2;
+      return {
+        title,
+        rows: [
+          { label: t.motorSpeed, value: t.motorRpm(formatNumber(rpm, 0)) },
+          { label: t.motorEmf, value: v(motor.backEmf) },
+          { label: t.current, value: a(m.current) },
+          { label: t.motorTorque, value: `${formatNumber(motor.torque * 1e3, 3)} mN·m` },
+          { label: t.motorLoadPower, value: w(motor.loadPower) },
+        ],
+        note: stalled ? t.motorStalled : m.current * motor.speed < 0 ? t.motorGenerating : t.motorRunning,
+      };
+    }
     case 'relay': {
       const s = relaySettings(p);
       const coil = status.coil ?? { voltage: m.voltage, current: m.current };

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 12, "internalResistance": 0}},
+    {"id": "p2", "type": "switch", "label": "S1", "x": 6, "y": -10, "rotation": 0, "props": {"closed": true}},
+    {"id": "p3", "type": "diode", "label": "D1", "x": 14, "y": 0, "rotation": 270, "props": {"model": "1N4001"}},
+    {"id": "p4", "type": "switch", "label": "S2", "x": 22, "y": -6, "rotation": 90, "props": {"closed": false}},
+    {"id": "p5", "type": "resistor", "label": "RB", "x": 22, "y": 4, "rotation": 90, "props": {"resistance": 33, "powerRating": "5"}},
+    {"id": "p6", "type": "ammeter", "label": "A1", "x": 32, "y": -6, "rotation": 90, "props": {"resistance": 0.01, "ideal": false}},
+    {"id": "p7", "type": "motor", "label": "M1", "x": 32, "y": 4, "rotation": 90, "props": {}},
+    {"id": "p8", "type": "voltmeter", "label": "V1", "x": 42, "y": 4, "rotation": 90, "props": {"resistance": 10000000.0, "ideal": false}},
+    {"id": "p9", "type": "ground", "label": "GND1", "x": 0, "y": 10, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -10], [2, -10]]},
+    {"id": "w2", "points": [[10, -10], [14, -10]]},
+    {"id": "w3", "points": [[14, -10], [22, -10]]},
+    {"id": "w4", "points": [[22, -10], [32, -10]]},
+    {"id": "w5", "points": [[14, -4], [14, -10]]},
+    {"id": "w6", "points": [[22, -2], [22, 0]]},
+    {"id": "w7", "points": [[32, -2], [32, 0]]},
+    {"id": "w8", "points": [[32, -1], [42, -1], [42, 0]]},
+    {"id": "w9", "points": [[0, 4], [0, 10], [42, 10], [42, 8]]},
+    {"id": "w10", "points": [[14, 4], [14, 10]]},
+    {"id": "w11", "points": [[22, 8], [22, 10]]},
+    {"id": "w12", "points": [[32, 8], [32, 10]]}
+  ]
+}

@@ -14,7 +14,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 - **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç (güç sınırlı),
   kondansatör (elektrolitik ya da seramik/film), bobin (sargı direnci ve sargı kapasitesiyle; akımı
   kesilince Lenz uyarısı), transformatör (karşılıklı indüktans, galvanik yalıtım), diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
-  N ve P kanallı MOSFET, anahtar, röle (elektromıknatıs, çekme/bırakma histerezisi), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
+  N ve P kanallı MOSFET, anahtar, röle (elektromıknatıs, çekme/bırakma histerezisi), DC motor
+  (zıt EMK, yük torku, jeneratör olarak çalışma), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
   kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
@@ -48,8 +49,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 13 grupta 35 hazır devre: temel devreler,
-  laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör, röle), Elektronik Laboratuvarı föyünün dokuz deneyi
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 13 grupta 38 hazır devre: temel devreler,
+  laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör, röle, DC motor), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
   baraj su seviyesi uyarısı projesi. Her birinin yanında devrenin ne işe yaradığı (dayandığı fizik
@@ -239,7 +240,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 436 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 454 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -258,7 +259,7 @@ akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`)
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
 ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
-rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`) ve ngspice ile çapraz doğrulama
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`) ve ngspice ile çapraz doğrulama
 (`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
@@ -732,6 +733,45 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   transistör ve serbest geçiş diyodu" (TTL 1 Hz, 4,7 kΩ, BC107; S2 ile diyot çıkarılınca
   kollektörde ≈ 5 kV ve Lenz uyarısı), "Kendini tutma (mühürleme) devresi" (BAŞLAT S1 ile NA
   kontağı paralel, DUR S2 seri).
+
+### Yeni parçalar 3: DC motor (2026-10-17)
+
+- *Parça:* "DC motor" (yeni kütüphane grubu "Çıkış elemanları"; etiket öneki M). İki uç (+ solda;
+  akım + uçtan girince ileri döner), yönlü (ters çevrilebilir). Özellikler: yük torku (mN·m;
+  canlı değiştirilebilir), sargı direnci ve endüktansı, tork sabiti k (mN·m/A), rotor ataleti J
+  (g·cm²), sürtünme torku (mN·m); birimler veri sayfalarındaki gibi. Sembol: daire içinde M
+  (IEC); dairedeki nokta milin dönüşünü gerçek hızın 1/100'üyle gösterir (simülasyon zamanıyla
+  ilerler, ters dönüşte ters döner). Bilgi kutusu: hız (dev/dk), zıt EMK, akım, motor torku,
+  yüke verilen güç; notu duruma göre (dönüyor, durmuş, jeneratör/frenleme).
+- *Model* ([`motor.ts`](src/sim/devices/motor.ts)): elektriksel eşdeğer devre, ayrı bir mekanik
+  çözücü yok. Mil denklemi J·dω/dt = k·i − T zıt EMK e = k·ω ile yazılınca (J/k²)·de/dt = i − T/k
+  olur: sargının (R + L) akımı bir C_m = J/k² kapasitesini doldurur (kinetik enerji ½Jω² =
+  ½C_m·e²). Sürtünme ve yük torku dönmeye karşı koyan doğrusal olmayan bir akım:
+  (T/k)·tanh(ω/ω_s), ω_s = 0,1 rad/s (Newton-Raphson ile; durgun motorda yön değişimini
+  yumuşatır, sürünme en fazla birkaç dev/dk). Uçlar arasında 1 nF (sargı ve fırça kapasitesi; veri
+  sayfasında yok). Akımı kesilen motor boşta döner ve uçlarında zıt EMK görülür (jeneratör); kısa
+  devre edilince akım ters döner ve motor frenlenir. Lenz uyarısı motora da (kendi metniyle).
+- *Aşırı yük:* sargının bakır kaybı (R·I²) ısıl zaman sabitiyle (13 s, veri sayfası) ortalanır;
+  sürekli çalışma sınırını (1,08 A, 2,4 W) aşınca "Motor zorlanıyor" uyarısı (`motor-overload`).
+  Durmuş motorda (5,8 A) ≈ 0,5 s sonra çıkar; kalkıştaki kısa akım darbesi çıkarmaz.
+- *Varsayılanlar gerçek bir motordan:* **maxon A-max 26 (110937; 12 V, 11 W, grafit fırçalı)**,
+  maxon veri sayfası: R = 2,07 Ω, L = 0,227 mH, k = 13,9 mN·m/A, J = 13,6 g·cm², boşta 57 mA
+  (sürtünme k·I₀ = 0,792 mN·m). Model veri sayfasını tutturuyor: boşta 8163 dev/dk (8190),
+  kalkış ≈ 5,8 A (5,79 A), durma torku ≈ 79,8 mN·m (80,2), mekanik zaman sabiti 14,6 ms (14,6 ms),
+  hız/tork eğimi 102 dev/dk/mN·m (103), 10 mN·m'de verim %80 (en yüksek verim %81).
+- *Testler* (`tests/motor.test.ts`, 11 test): boşta hız ve akım; kalkış akımı ve τ_m'de %63,2; yük
+  altında akım I₀ + T/k ve hız düşümü; enerji korunumu (pilin verdiği = bakır kaybı + sürtünme ve
+  yük işi + ½Jω² + ½LI², %0,5); durma ve aşırı yük uyarısı; jeneratör olarak boşta dönme (hız
+  sürtünmeyle doğrusal azalır, J·ω₀/T ≈ 1,47 s'de durur); 1 Ω'la dinamik frenleme (akım ters,
+  τ = (R + 1 Ω)·J/k²); diyotsuz açılışta yüzlerce voltluk sıçrama, diyotla yok; üç örneğin
+  metnindeki sayılar. ngspice karşılaştırmasına motor eklendi (R, L, C_m, uç kapasitesi ve
+  sürtünme için B kaynağı; 12 V, 1 Ω seri, 5 mN·m yük, kalkıştan 60 ms: en büyük fark %0,07).
+- *Örnekler* ("Elektromanyetizma" grubuna): "DC motor: kalkış akımı, zıt EMK ve yük" (12 V, S1,
+  ampermetre, voltmetre; ≈ 5,6 A kalkış, boşta 57 mA ve 11,88 V zıt EMK, 10 mN·m'de 7130 dev/dk ve
+  0,78 A, 100 mN·m'de durma ve uyarı), "Motor jeneratör olur: boşta dönme ve frenleme" (serbest
+  geçiş diyodu, S2 ile 33 Ω fren direnci; boşta ≈ 1,5 s'de, frenle ≈ 0,5 s'de durur, akım ters
+  ≈ 0,34 A), "Motorun yönü: H köprüsü" (dört anahtar; ileri/geri, dönerken yön değişince ≈ 11 A,
+  aynı kolun iki anahtarı kısa devre).
 
 ### Editör
 
