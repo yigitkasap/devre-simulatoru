@@ -186,7 +186,7 @@ export default function Simulator() {
   const saveState = useAutosave(doc);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
-  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow);
+  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound);
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
   const canFlip = selectedParts.some((p) => CATALOG[p.type].polarized);
@@ -433,7 +433,7 @@ export default function Simulator() {
   /** Mesajın düzeltme düğmeleri: yanan LED için Onar ve (tek seri direnç varsa) önerilen ön direnç. */
   const messageActions = (item: MessageItem): MessageAction[] => {
     const d = item.diagnostic;
-    if (d?.code === 'lamp-burned') return [{ label: tr.messages.repair, primary: true, run: () => sim.repair(d.elementIds[0]!) }];
+    if (d?.code === 'lamp-burned' || d?.code === 'fuse-blown') return [{ label: tr.messages.repair, primary: true, run: () => sim.repair(d.elementIds[0]!) }];
     if (d?.code !== 'led-burned') return [];
     const ledId = d.elementIds[0]!;
     const actions: MessageAction[] = [{ label: tr.messages.repair, primary: true, run: () => sim.repair(ledId) }];

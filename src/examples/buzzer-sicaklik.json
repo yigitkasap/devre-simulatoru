@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 5, "internalResistance": 0}},
+    {"id": "p2", "type": "ntc", "label": "NTC1", "x": 10, "y": -6, "rotation": 90, "props": {"temperature": 25, "resistance25": 10000.0}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 10, "y": 6, "rotation": 90, "props": {"resistance": 560}},
+    {"id": "p4", "type": "npn", "label": "Q1", "x": 22, "y": 0, "rotation": 0, "props": {"model": "BC107", "beta": 200}},
+    {"id": "p5", "type": "buzzer", "label": "BZ1", "x": 24, "y": -10, "rotation": 90, "props": {}},
+    {"id": "p6", "type": "ground", "label": "GND1", "x": 0, "y": 10, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -14], [10, -14], [10, -10]]},
+    {"id": "w2", "points": [[10, -14], [24, -14]]},
+    {"id": "w3", "points": [[24, -6], [24, -4]]},
+    {"id": "w4", "points": [[10, -2], [10, 0], [10, 2]]},
+    {"id": "w5", "points": [[10, 0], [18, 0]]},
+    {"id": "w6", "points": [[0, 4], [0, 10], [10, 10]]},
+    {"id": "w7", "points": [[10, 10], [24, 10], [24, 4]]}
+  ]
+}

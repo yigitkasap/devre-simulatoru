@@ -23,6 +23,7 @@ import { switchModel } from './switch';
 import { motorModel } from './motor';
 import { relayModel } from './relay';
 import { lampModel, ldrModel, ntcModel, potentiometerModel } from './sensors';
+import { buzzerModel, fuseModel, speakerModel } from './sound';
 import { tankModel } from './tank';
 import { transformerModel } from './transformer';
 import { voltmeterModel } from './voltmeter';
@@ -44,6 +45,9 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   ldr: ldrModel,
   ntc: ntcModel,
   lamp: lampModel,
+  speaker: speakerModel,
+  buzzer: buzzerModel,
+  fuse: fuseModel,
   diode: diodeModel,
   zener: zenerModel,
   led: ledModel,
@@ -108,6 +112,19 @@ export {
 export { ZENER_DEFAULTS, ZENER_TEST_CURRENT, ZenerDevice } from './zener';
 export { CapacitorDevice, CAPACITOR_DEFAULTS, CAPACITOR_KINDS, CAPACITOR_LEGACY_KIND, type CapacitorKind } from './capacitor';
 export { InductorDevice, INDUCTOR_DEFAULTS, INDUCTOR_SRF, INDUCTOR_WINDING_CAPACITANCE } from './inductor';
+export {
+  BuzzerDevice,
+  BUZZER,
+  buzzerLevel,
+  FuseDevice,
+  FUSE_DEFAULTS,
+  fuseBlowTime,
+  fuseSettings,
+  SpeakerDevice,
+  SPEAKER,
+  SPEAKER_REFERENCE_CURRENT,
+  type SoundSample,
+} from './sound';
 export {
   LampDevice,
   LAMP_DEFAULTS,

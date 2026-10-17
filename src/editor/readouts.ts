@@ -202,6 +202,41 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: t.transformerNote,
       };
     }
+    case 'speaker': {
+      const power = status.averagePower ?? 0;
+      return {
+        title,
+        rows: [
+          { label: t.voltage, value: v(m.voltage) },
+          { label: t.current, value: a(m.current) },
+          { label: t.averagePower, value: w(power) },
+          { label: t.spl1m, value: status.spl !== undefined ? `${formatNumber(status.spl, 0)} dB` : t.none },
+        ],
+        note: t.speakerNote,
+      };
+    }
+    case 'buzzer':
+      return {
+        title,
+        rows: [
+          { label: t.voltage, value: v(m.voltage) },
+          { label: t.current, value: a(m.current) },
+          { label: t.state, value: status.sounding ? t.buzzerOn : t.buzzerOff },
+          { label: t.spl10cm, value: status.spl !== undefined ? `${formatNumber(status.spl, 0)} dB` : t.none },
+        ],
+        note: t.buzzerNote,
+      };
+    case 'fuse':
+      if (status.burned) return { title, rows: [{ label: t.state, value: t.fuseBlown }], note: t.fuseBlownNote };
+      return {
+        title,
+        rows: [
+          { label: t.current, value: a(I) },
+          { label: t.voltageDrop, value: v(V) },
+          { label: t.fuseHeat, value: `%${formatNumber(Math.min(100, (status.heating ?? 0) * 100), 0)}` },
+        ],
+        note: t.fuseNote,
+      };
     case 'potentiometer': {
       const wiper = status.wiper ?? { voltage: 0, r12: 0, r23: 0 };
       return {

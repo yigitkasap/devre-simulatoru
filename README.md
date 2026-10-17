@@ -16,7 +16,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   kesilince Lenz uyarısı), transformatör (karşılıklı indüktans, galvanik yalıtım), diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
   N ve P kanallı MOSFET, anahtar, röle (elektromıknatıs, çekme/bırakma histerezisi), DC motor
   (zıt EMK, yük torku, jeneratör olarak çalışma), potansiyometre (kaydırıcıyla canlı), LDR, NTC
-  termistör (öz ısınmalı), akkor lamba (filaman ısınması, ilk an akımı, aşırı gerilimde kopma), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
+  termistör (öz ısınmalı), akkor lamba (filaman ısınması, ilk an akımı, aşırı gerilimde kopma),
+  hoparlör ve aktif buzzer (sesi tarayıcıda gerçekten çalınır), sigorta (I²t ile atar), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
   kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
@@ -53,9 +54,10 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 14 grupta 42 hazır devre: temel devreler,
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 15 grupta 45 hazır devre: temel devreler,
   laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör, röle, DC motor),
-  ayarlı parçalar ve sensörler (potansiyometre, LDR, NTC, akkor lamba), Elektronik Laboratuvarı föyünün dokuz deneyi
+  ayarlı parçalar ve sensörler (potansiyometre, LDR, NTC, akkor lamba), ses ve koruma (hoparlör,
+  buzzer, sigorta), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
   baraj su seviyesi uyarısı projesi. Her birinin yanında devrenin ne işe yaradığı (dayandığı fizik
@@ -245,7 +247,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 481 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 496 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -264,7 +266,7 @@ akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`)
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
 ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
-rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), sensörler ve lamba (`tests/sensorler.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), sensörler ve lamba (`tests/sensorler.test.ts`), ses ve sigorta (`tests/ses.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
 (`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
@@ -836,6 +838,40 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   lambası" (100 kΩ + LDR bölücüsü, BC107; ≈ 40 lüksün altında yanar), "NTC ile termometre" (5 V,
   10 kΩ; −20 °C'ta 0,47 V … 100 °C'ta 4,68 V), "Akkor lamba: ilk an akımı" (1 Ω ölçme direnci ve
   osiloskop; ≈ 1,21 A'den ≈ 6 ms'de 0,2 A'in altına).
+
+### Yeni parçalar 6: hoparlör, buzzer, sigorta (2026-10-17)
+
+- *Ses* ([`audio.ts`](src/editor/audio.ts), npm bağımlılığı yok): WebAudio ile. Her karede
+  simülasyonun ilerlediği aralığın sesi hazırlanıp ≈ 90 ms gecikmeyle çalma sırasına eklenir
+  (AudioBufferSource parçaları). Hoparlörün sesi adım adım kaydedilen zar ivmesidir (ses kartının
+  hızına doğrusal aradeğerle); aktif buzzerin osilatörü simülasyonda olmadığından ses 2400 Hz'lik
+  ton olarak üretilir (genlik uç gerilimiyle, ≈ 3 V'un altında sessiz). Yumuşak kırpma (tanh). Ses
+  yalnızca ×1 hızda ve simülasyon yetişirken çalar; ses bağlamı Oynat'a basınca açılır (tarayıcı
+  kuralı). Ayarlar → "Sesi çal (hoparlör, buzzer)" (varsayılan açık).
+- *Hoparlör* (çıkış elemanları, HP): **Visaton FRS 5 (8 Ω)** veri sayfası: R_dc 7,2 Ω, L 0,2 mH,
+  f_s 290 Hz, Q_ms 3,19, Q_es 1,81, 5 W, 84 dB (1 W, 1 m). Thiele-Small elektriksel eşdeğeri: R_e +
+  L_e ile seri, paralel C_mes = Q_es/(2πf_sR_e) ≈ 138 µF (kütle), L_ces ≈ 2,18 mH (askı), R_es =
+  R_e·Q_ms/Q_es ≈ 12,7 Ω (kayıplar). Ses basıncı C_mes'in akımıyla (zarın ivmesi) orantılı; ses
+  düzeyi (1 m) bundan: 1 kHz'te 1 W'ta 84 dB. Empedans rezonansta ≈ 19,9 Ω. Ortalama güç (2 s ısıl
+  ortalama) anma gücünü aşınca uyarı (doğru akım da bobini ısıtır). Bilgi kutusu: gerilim, akım,
+  ortalama güç, ses basıncı (1 m). Sembol: mıknatıs ve koni; çalarken üstünde ses dalgaları.
+- *Aktif buzzer* (çıkış elemanları, BZ; kutuplu): **Same Sky (CUI) CMI-1295IC-0585T**: 5 V'ta
+  30 mA, 4–7 V, 2400 Hz, 10 cm'de 85 dB. Elektriksel model: iç sürücünün eklemi (diyot) + seri
+  direnç: ters bağlanınca akım geçmez. Ses basıncı 85 dB + 20·log(V/5 V).
+- *Sigorta* (anahtarlar ve koruma, F): **Littelfuse 217, 1 A hızlı** (ürün sayfası: soğuk direnç
+  0,09635 Ω, erime I²t 1,042 A²s). Telin ısınması τ·dθ/dt = (I/I_min)² − θ (θ = 1'de erir), τ =
+  I²t/I_min², en küçük eritme akımı I_min = 1,8·I_n: IEC 60127-2 hızlı sigorta noktalarını tutar
+  (2,75·I_n'de 0,18 s, 4·I_n'de 73 ms, 10·I_n'de 10,6 ms; 1,5·I_n'de atmaz). Erime anı motorun
+  eşik olaylarıyla bulunur; atan sigorta açık devredir (`fuse-blown`, Onar ile yenisi). Sigortalı
+  dirençli bir devre de zamanla çözülür (telin ısısı bir durumdur).
+- *Testler* (`tests/ses.test.ts`, 9 test): hoparlörün empedansı 290 Hz ve 1 kHz'te fazör çözümüyle
+  (%1, 1°), 1 W'ta ses örneklerinin ölçeği, doğru akımın ses vermemesi ve aşırı güç uyarısı;
+  buzzerin 5 V'ta 30 mA ve 85 dB'i, 2,5 V'ta sessizliği, ters bağlantıda akımsızlığı; sigortanın
+  atma süreleri (ısıl denklemle %3 içinde) ve 1,5 A'de atmaması, Onar; üç örneğin sayıları.
+- *Örnekler* (yeni grup "Ses ve koruma"): "Hoparlör: elektrikten ses" (fonksiyon üreteci 440 Hz;
+  ≈ 79 dB, rezonansta ≈ 83 dB, 100 Hz'te ≈ 57 dB), "Sıcaklık alarmı: NTC ve buzzer" (≈ 53 °C'ın
+  üstünde öter), "Sigorta: kısa devrede devreyi açar" (12 V akü, 6 W lamba; kısa devrede ≈ 76 A,
+  0,17 ms'de atar; lambanın ≈ 5,7 A'lik ilk an akımı attırmaz).
 
 ### Editör
 

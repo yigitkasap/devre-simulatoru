@@ -35,7 +35,7 @@ export function messageKey(d: Diagnostic): string {
  * Yanan LED ve kısa devre, çözücüde simülasyonu durdurmayan uyarılardır; bir parçanın zarar gördüğünü
  * anlattıkları için arayüzde hata olarak gösterilir (tasarım: M07a).
  */
-const SHOWN_AS_ERROR: ReadonlySet<string> = new Set(['led-burned', 'lamp-burned', 'short-circuit']);
+const SHOWN_AS_ERROR: ReadonlySet<string> = new Set(['led-burned', 'lamp-burned', 'fuse-blown', 'short-circuit']);
 
 export function itemFromDiagnostic(d: Diagnostic, context: DiagnosticContext): MessageItem {
   const { title, detail } = tr.diagnostics.describe(d, context);

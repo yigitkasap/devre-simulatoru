@@ -18,6 +18,7 @@ import {
   type Measurement,
   type ScopeRecorder,
 } from '../sim';
+import { SimAudio } from './audio';
 import { IonPhases } from './ions';
 import { buildScopeView, type ScopeView } from './scopeView';
 import type { LiveVisual } from './symbols';
@@ -108,8 +109,13 @@ export function useSimulation(
   connectivity: Connectivity,
   flowGraph: FlowGraph,
   electronFlow: boolean,
+  /** Hoparlör ve buzzerin sesi çalınsın mı (Ayarlar). */
+  sound = true,
 ): SimulationApi {
   const simRef = useRef<CircuitSimulator | null>(null);
+  const audio = useRef<SimAudio | null>(null);
+  const soundRef = useRef(sound);
+  soundRef.current = sound;
   const [status, setStatusState] = useState<SimStatus>('stopped');
   const statusRef = useRef<SimStatus>('stopped');
   const [frame, setFrame] = useState<SimFrame | null>(null);
@@ -214,6 +220,14 @@ export function useSimulation(
         if (status.powerRatio !== undefined) live.set(part.id, { powerRatio: status.powerRatio });
       } else if (part.type === 'relay') {
         live.set(part.id, { energized: status.energized ?? false, field: current });
+      } else if (part.type === 'speaker') {
+        // Dalgaların koyuluğu ses basıncı düzeyinden: 44 dB'de görünür, 84 dB'de (1 W) tam.
+        const spl = status.spl ?? 0;
+        live.set(part.id, { loudness: Math.min(1, Math.max(0, (spl - 44) / 40)) });
+      } else if (part.type === 'buzzer') {
+        live.set(part.id, { loudness: status.sounding ? 1 : 0 });
+      } else if (part.type === 'fuse') {
+        live.set(part.id, { burned: status.burned ?? false });
       } else if (part.type === 'lamp') {
         live.set(part.id, { glow: status.glow ?? 0, burned: status.burned ?? false, ...(status.temperature !== undefined ? { temperature: status.temperature } : {}) });
       } else if (part.type === 'inductor') {
@@ -271,6 +285,7 @@ export function useSimulation(
     ledGlow.current = new Map();
     ionPhases.current = new Map();
     motorAngles.current = new Map();
+    audio.current?.reset();
     setStatus('stopped');
     setFrame(null);
     setNotice(null);
@@ -278,6 +293,9 @@ export function useSimulation(
 
   const play = useCallback(() => {
     setNotice(null);
+    // Tarayıcı sesi yalnızca bir kullanıcı etkileşiminde açar: Oynat düğmesi.
+    if (!audio.current) audio.current = new SimAudio();
+    audio.current.unlock();
     let sim = simRef.current;
     if (!sim) {
       // Yeni simülasyon: LED'ler onarılmış, kondansatörler başlangıç geriliminde başlar.
@@ -366,6 +384,7 @@ export function useSimulation(
         return;
       }
       setFrame(buildFrame(sim, dtReal, lagSamples > 0.5));
+      audio.current?.render(sim.devices, sim.time, soundRef.current && speedRef.current === 1 && lagSamples <= 0.5);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);

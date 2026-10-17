@@ -48,6 +48,9 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ldr: 'LDR (fotodirenç)',
   ntc: 'NTC termistör',
   lamp: 'Akkor lamba',
+  speaker: 'Hoparlör',
+  buzzer: 'Buzzer (aktif)',
+  fuse: 'Sigorta',
   voltmeter: 'Voltmetre',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
@@ -81,6 +84,9 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ldr: 'LDR’sinin',
   ntc: 'termistörünün',
   lamp: 'lambasının',
+  speaker: 'hoparlörünün',
+  buzzer: 'buzzerının',
+  fuse: 'sigortasının',
   voltmeter: 'voltmetresinin',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
@@ -112,6 +118,9 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   ldr: ['1. ucu', '2. ucu'],
   ntc: ['1. ucu', '2. ucu'],
   lamp: ['1. ucu', '2. ucu'],
+  speaker: ['1. ucu', '2. ucu'],
+  buzzer: ['+ ucu', '− ucu'],
+  fuse: ['1. ucu', '2. ucu'],
   relay: ['sargısının 1. ucu', 'sargısının 2. ucu', 'kontağının ortak ucu (C)', 'normalde açık kontak ucu (NA)', 'normalde kapalı kontak ucu (NK)'],
   voltmeter: ['+ ucu', '− ucu'],
   ammeter: ['+ ucu', '− ucu'],
@@ -147,6 +156,9 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   ldr: ['1', '2'],
   ntc: ['1', '2'],
   lamp: ['1', '2'],
+  speaker: ['1', '2'],
+  buzzer: ['+', '−'],
+  fuse: ['1', '2'],
   voltmeter: ['+', '−'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
@@ -180,6 +192,9 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   ldr: ['1. uç', '2. uç'],
   ntc: ['1. uç', '2. uç'],
   lamp: ['1. uç', '2. uç'],
+  speaker: ['1. uç', '2. uç'],
+  buzzer: ['+ uç', '− uç'],
+  fuse: ['1. uç', '2. uç'],
   voltmeter: ['+ uç', '− uç'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
@@ -290,6 +305,14 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
       };
     }
     case 'resistor-overpower':
+      if (first !== undefined && ctx.type(first) === 'speaker') {
+        return {
+          title: 'Hoparlör zorlanıyor',
+          detail:
+            `${firstLabel} hoparlörüne ortalama ${formatSI(p.power ?? 0, 'W')} veriliyor; anma gücü ${formatSI(p.rating ?? 5, 'W', { trim: true })}. ` +
+            'Bobin ısınır, yalıtımı yanabilir; doğru akım zarı bir yana iter ve ses vermeden yalnızca ısıtır. Gerilimi düşür ya da seri bir direnç koy.',
+        };
+      }
       if (first !== undefined && ctx.type(first) === 'potentiometer') {
         return {
           title: 'Potansiyometre ısınıyor',
@@ -305,6 +328,14 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           `${firstLabel} direncinde ${formatSI(p.power ?? 0, 'W')} harcanıyor; direncin güç sınırı ` +
           `${String(p.rating ?? 0).replace('.', ',')} W. Gerçek direnç aşırı ısınır, rengi kararır ve bozulabilir. ` +
           'Güç sınırı daha büyük bir direnç seç ya da akımı azalt.',
+      };
+    case 'fuse-blown':
+      return {
+        title: 'Sigorta attı',
+        detail:
+          `${firstLabel} sigortasının teli eridi ve devreyi açtı: içinden ${formatSI(p.current ?? 0, 'A')} geçiyordu (anma akımı ` +
+          `${formatSI(p.rating ?? 1, 'A', { trim: true })}). Sigorta kabloları ve parçaları aşırı akımdan korur; kısa devre ya da aşırı yük ` +
+          'giderilmeden yenisini takmak onu da attırır. Arızayı giderip “Onar” ile yeni sigorta tak.',
       };
     case 'lamp-burned':
       return {
@@ -419,6 +450,12 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Işığa duyarlı direnç (kadmiyum sülfür): ışık arttıkça direnci azalır. Karanlıkta ≈ 1 MΩ, oda ışığında birkaç kΩ, güneş altında yüz ohm mertebesindedir. Aydınlık simülasyon sırasında kaydırıcıyla değiştirilir.',
   ntc:
     'Sıcaklığa duyarlı direnç (negatif sıcaklık katsayılı): sıcaklık arttıkça direnci üstel olarak azalır; 25 °C’ta 10 kΩ, 100 °C’ta ≈ 680 Ω. Sıcaklık simülasyon sırasında kaydırıcıyla değiştirilir.',
+  speaker:
+    'Elektrik akımını sese çevirir: mıknatısın alanındaki bobinden geçen değişen akım bobini ve ona bağlı zarı (koniyi) titreştirir (F = B·I·L). Sesi tarayıcıda gerçekten duyarsın. Doğru akım ses vermez, yalnızca bobini ısıtır.',
+  buzzer:
+    'İçinde osilatör olan sesli uyarıcı: doğru gerilim verilince kendiliğinden 2,4 kHz’lik bir ses çıkarır. Kutupludur (+ uç solda); ters bağlanınca çalışmaz. Sesi tarayıcıda gerçekten duyarsın.',
+  fuse:
+    'İnce bir tel: içinden geçen akım onu ısıtır, akım çok büyürse tel erir ve devreyi açar. Kısa devrede kabloların ısınıp yangın çıkarmasını önler. Atan sigorta Onar ile yenisiyle değiştirilir.',
   lamp:
     'Tungsten telden (filaman) akım geçince tel ≈ 2500 K’e ısınır ve ışık verir. Metallerin direnci sıcaklıkla arttığı için soğuk filamanın direnci sıcağının ≈ 13’te biridir: lamba yakıldığı an çok büyük bir akım çeker. Gerilimi fazla gelirse filaman erir.',
   motor:
@@ -450,6 +487,7 @@ function fieldLabel(type: DeviceType, key: string): string {
   if (type === 'ntc' && key === 'temperature') return 'Ortam sıcaklığı (°C)';
   if (type === 'ntc' && key === 'resistance25') return '25 °C’taki direnç';
   if (type === 'lamp' && key === 'ratedVoltage') return 'Anma gerilimi';
+  if (type === 'fuse' && key === 'rating') return 'Anma akımı';
   if (type === 'lamp' && key === 'ratedPower') return 'Anma gücü';
   if (type === 'motor') {
     const motor: Record<string, string> = {
@@ -748,6 +786,33 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     everyday:
       'Akkor ampuller ve halojen lambalar, ısıtıcı teller ve tost makinesinin rezistansı da sıcaklıkla direnci artan metallerdir. Büyük lamba gruplarını süren devreler ilk an akımına göre boyutlandırılır; tiyatro dimmerleri lambaları yavaşça açar.',
   },
+  hoparlor: {
+    title: 'Hoparlör: elektrikten ses',
+    description:
+      'Fonksiyon üreteci (440 Hz, 20 V tepe-tepe, sinüs) bir ampermetre (AC kipte) üzerinden 8 Ω’luk bir hoparlörü (Visaton FRS 5) sürüyor; osiloskop hoparlörün gerilimini gösteriyor. Hız ×1’deyken Oynat’a bas: sesi duyarsın (Ayarlar’da ses açık olmalı). Sonra üretecin frekansını 100 Hz, 290 Hz ve 1 kHz yap.',
+    purpose:
+      'Bobinden geçen değişen akım, mıknatısın alanında zarı ileri geri iter (F = B·I·L); zar havayı titreştirir ve ses olur. Sesin perdesi frekanstan gelir: 440 Hz diyapazonun la sesidir. Akım ≈ 0,12 A (etkin), 1 m’de ses ≈ 79 dB. Küçük hoparlörün zarı ve askısı 290 Hz’de rezonansa girer: bu frekansta empedans ≈ 20 Ω’a çıkar, akım 0,10 A’e düşer ama zar en çok salındığı için ses ≈ 83 dB’e yükselir. 100 Hz’te zar neredeyse hiç ivmelenmez ve ses ≈ 57 dB’e iner: küçük hoparlörler bu yüzden bas sesleri veremez.',
+    everyday:
+      'Telefonların, kulaklıkların, televizyonların ve arabaların hoparlörleri aynı ilkeyle çalışır; bas hoparlörleri (woofer) düşük bir rezonans frekansı için büyük ve ağır zarlıdır. Dinamik mikrofon aynı yapıyı tersine kullanır: ses zarı titreştirir, mıknatısın alanında hareket eden bobinde gerilim indüklenir.',
+  },
+  'buzzer-sicaklik': {
+    title: 'Sıcaklık alarmı: NTC ve buzzer',
+    description:
+      '5 V’luk pil; NTC termistör (25 °C’ta 10 kΩ) üstte, 560 Ω altta, ortası BC107’nin bazında. Aktif buzzer (CMI-1295IC) + 5 V ile kollektör arasında. Hız ×1’deyken Oynat’a bas, NTC’yi seç ve sıcaklığı 25 °C’tan 60 °C’a çıkar.',
+    purpose:
+      'Bir sensörün bir uyarıcıyı sürmesini gösterir. Isındıkça NTC’nin direnci azalır ve bazın gerilimi artar: 25 °C’ta 0,27 V (transistör keser, buzzer sessiz); ≈ 50 °C’ta 0,65 V’a yaklaşınca transistör iletmeye başlar. Buzzerin içindeki osilatör ≈ 3 V’ta çalışır: ≈ 53 °C’ın üstünde öter, 55 °C’ta neredeyse tam gerilimde (4,8 V, 28 mA, ≈ 85 dB). Buzzerin sesini tarayıcıda duyarsın.',
+    everyday:
+      'Fırınların, ütülerin ve 3B yazıcıların aşırı ısınma uyarıları, ısı algılayıcılı yangın dedektörleri ve arabalardaki motor sıcaklığı uyarısı bu yapıdadır. Gerçek devrelerde eşik bir karşılaştırıcıyla (işlemsel yükselteç) daha keskin yapılır.',
+  },
+  sigorta: {
+    title: 'Sigorta: kısa devrede devreyi açar',
+    description:
+      '12 V’luk akü (iç direnci 0,05 Ω), 1 A’lik hızlı sigorta (Littelfuse 217), ampermetre ve 12 V 6 W’lık lamba. S2 lambanın iki ucunu kısa devre eder. Oynat’a bas; lamba yanınca S2’yi kapat. Sonra S2’yi açıp sigortayı “Onar” ile değiştir.',
+    purpose:
+      'Sigortanın teli akımın karesiyle ısınır. Lambanın 0,5 A’i teli erime sıcaklığının ancak %8’ine ısıtır; lamba yakıldığı an çektiği ≈ 5,7 A’lik ilk an akımı da birkaç milisaniye sürdüğü için sigortayı attırmaz. S2 kapanınca akımı yalnızca akünün iç direnci ve sigortanın kendisi sınırlar: ≈ 76 A. Tel 0,17 ms’de erir ve devreyi açar (erime I²t = 1,04 A²s); sigorta olmasaydı bu akım kabloları ısıtıp yangın çıkarabilirdi. Sigorta anma akımının 1,5 katına kadar atmaz, 2,75 katında ≈ 0,18 s’de, 10 katında ≈ 11 ms’de atar.',
+    everyday:
+      'Arabaların sigorta kutusundaki bıçak sigortalar, cihazların cam sigortaları ve evlerdeki otomatik sigortalar aynı işi görür. Otomatik sigorta erimez: aşırı yükte ısınan bir bimetal, kısa devrede bir elektromıknatıs (röle gibi) kontağı açar; kol kaldırılınca yeniden kurulur.',
+  },
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
     description:
@@ -941,7 +1006,7 @@ export const tr = {
       semiconductors: 'Yarı iletkenler',
       transistors: 'Transistörler',
       instruments: 'Laboratuvar cihazları',
-      switches: 'Anahtarlar',
+      switches: 'Anahtarlar ve koruma',
       outputs: 'Çıkış elemanları',
       sensors: 'Sensörler',
       meters: 'Ölçü aletleri',
@@ -1001,6 +1066,8 @@ export const tr = {
     stored: 'Bu tarayıcıda saklanır',
     nodeVoltages: 'Düğüm gerilimlerini yaz',
     nodeVoltagesNote: 'Her düğümün yanında küçük değer etiketi',
+    sound: 'Sesi çal (hoparlör, buzzer)',
+    soundNote: 'Yalnızca ×1 hızda çalar',
     magneticField: 'Manyetik alanı göster',
     magneticFieldNote:
       'Kabloların iki yanında ⊙ (alan sayfadan dışarı) ve ⊗ (sayfaya doğru): sağ el kuralı, başparmak geleneksel akımın yönünde. Bobinlerde alan çizgileri ve N, S kutupları. Akım büyüdükçe işaretler sıklaşır ve koyulaşır.',
@@ -1075,6 +1142,19 @@ export const tr = {
     primary: 'Birincil (P)',
     secondary: 'İkincil (S)',
     powerInOut: 'Giriş / çıkış gücü',
+    averagePower: 'Ortalama güç',
+    spl1m: 'Ses basıncı (1 m)',
+    spl10cm: 'Ses basıncı (10 cm)',
+    speakerNote:
+      'Bobinden geçen değişen akım mıknatısın alanında bir kuvvetle (F = B·I·L) zarı ileri geri iter; zar havayı titreştirir. Ses basıncı zarın ivmesiyle orantılıdır. Doğru akım zarı yalnızca bir yana iter, ses vermez.',
+    buzzerOn: 'Ötüyor (2,4 kHz)',
+    buzzerOff: 'Sessiz',
+    buzzerNote: 'İçindeki osilatör bobini 2,4 kHz’te açıp kapar; çekilen demir diyafram titreşir. ≈ 3 V’un altında osilatör çalışmaz.',
+    fuseHeat: 'Telin ısınması (erime: %100)',
+    fuseBlown: 'Attı (tel eridi)',
+    fuseNote:
+      'Tel akımın karesiyle ısınır (Joule): büyük akım teli çabuk eritir (I²t), anma akımına yakın akımlarda tel ısısını çevreye verip dengede kalır.',
+    fuseBlownNote: 'Tel eridi, devre açık. Arızayı (kısa devreyi) giderip sağ tıklayarak “Onar”ı seç: yeni sigorta takılır.',
     potPosition: 'Sürgünün konumu',
     potHalves: 'Direnç 1–S / S–3',
     potWiper: 'Sürgünün gerilimi (3. uca göre)',
@@ -1235,6 +1315,7 @@ export const tr = {
       aletler: 'Laboratuvar cihazları',
       elektromanyetizma: 'Elektromanyetizma',
       sensorler: 'Ayarlı parçalar ve sensörler',
+      ses: 'Ses ve koruma',
       'diyot-karakteristigi': 'Deney 1 · Diyot karakteristikleri',
       dogrultucu: 'Deney 2 · Doğrultucular',
       kenetleyici: 'Deney 3 · Kenetleyici ve gerilim katlayıcı',
@@ -1613,6 +1694,12 @@ export const tr = {
         'Varsayılan değerler gerçek bir LDR’den (GL5528): 10 lükste 10–20 kΩ (burada 15 kΩ), karanlıkta en az 1 MΩ, γ = 0,6: R = R₁₀ · (E / 10 lx)^{−γ}. Aydınlık örnekleri: gece ≈ 1 lx, oda ≈ 100–300 lx, bulutlu gün ≈ 10 000 lx, güneş ≈ 100 000 lx. Gerçek LDR ışık değişimine 20–30 ms’de uyar; burada anında.',
       ntc:
         'Varsayılan değerler gerçek bir termistörden (Vishay NTCLE100E3103: 10 kΩ, B₂₅/₈₅ = 3977 K); direnç üreticinin R(T) eğrisinden (0 °C’ta 32,6 kΩ, 50 °C’ta 3,61 kΩ, 100 °C’ta 677 Ω). İçinden geçen akım onu ısıtır (öz ısınma: 7 mW/K, ısıl zaman sabiti 15 s); ortam sıcaklığı değişince hemen ona uyar.',
+      speaker:
+        'Gerçek bir hoparlörün değerleri (Visaton FRS 5, 8 Ω, 5 cm): bobin 7,2 Ω ve 0,2 mH, rezonans frekansı 290 Hz (Q_{ms} = 3,19, Q_{es} = 1,81), anma gücü 5 W, 1 W’ta 1 m’de 84 dB. Empedans rezonansta ≈ 20 Ω’a çıkar. Ses yalnızca simülasyon ×1 hızdayken çalar.',
+      buzzer:
+        'Gerçek bir buzzerin değerleri (Same Sky CMI-1295IC-0585T): 5 V’ta 30 mA, 2,4 kHz, 10 cm’de 85 dB; 4–7 V arasında çalışır, ≈ 3 V’un altında ötmez. Ses yalnızca simülasyon ×1 hızdayken çalar.',
+      fuse:
+        'Varsayılan değerler gerçek bir sigortadan (Littelfuse 217, 5×20 mm hızlı, 1 A): soğuk direnç 0,096 Ω, erime I²t 1,042 A²s. Anma akımının 1,5 katında atmaz, 2,75 katında ≈ 0,18 s’de, 4 katında ≈ 73 ms’de, 10 katında ≈ 11 ms’de atar.',
       lamp:
         'Varsayılan: 12 V, 0,1 A (1,2 W) minyatür lamba. Sıcakken 120 Ω, soğukken ≈ 8,9 Ω (tungstenin direnci ≈ T^{1,2} ile artar); yakıldığı an ≈ 1,35 A çeker, filaman ≈ 10 ms’de ısınır. Işık gerilimle çok hızlı artar (≈ V^{3,4}). Filaman 3695 K’de erir: anma geriliminin ≈ 2,5 katında lamba yanar.',
       motor:
@@ -1665,6 +1752,7 @@ export const tr = {
     meterModeNote:
       'AC kaynaklı devrede DC kipi bir periyottaki ortalamayı, AC kipi etkin değeri (√(ortalama v²)) gösterir; gösterge her periyotta bir güncellenir.',
     luxShort: (lux: string) => `${lux} lx`,
+    fuseShort: (rating: string) => `${rating} hızlı`,
     motorNoLoad: 'boşta',
     motorLoadShort: (load: string) => `yük ${load} mN·m`,
     acSpec: (rms: string, period: string) =>

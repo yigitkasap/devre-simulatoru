@@ -674,6 +674,7 @@ export function SettingsFields({
           checked={settings.electronFlow}
           onChange={(on) => onChange({ electronFlow: on })}
         />
+        <SwitchRow touch={touch} label={tr.settings.sound} note={tr.settings.soundNote} checked={settings.sound} onChange={(on) => onChange({ sound: on })} />
         <SwitchRow
           touch={touch}
           label={tr.settings.magneticField}

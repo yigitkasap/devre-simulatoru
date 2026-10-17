@@ -17,6 +17,8 @@ export interface Settings {
   readonly currentDots: boolean;
   /** Simülasyon çalışırken kabloların ve bobinlerin manyetik alanı gösterilsin. */
   readonly magneticField: boolean;
+  /** Hoparlör ve buzzerin sesi çalınsın. */
+  readonly sound: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,6 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   nodeVoltages: false,
   currentDots: true,
   magneticField: false,
+  sound: true,
 };
 
 const STORAGE_KEY = 'devre-simulatoru:ayarlar';
@@ -44,6 +47,7 @@ function loadSettings(): Settings {
       nodeVoltages: record.nodeVoltages === true,
       currentDots: record.currentDots !== false,
       magneticField: record.magneticField === true,
+      sound: record.sound !== false,
     };
   } catch {
     return DEFAULT_SETTINGS;

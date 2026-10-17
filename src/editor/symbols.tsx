@@ -30,6 +30,8 @@ export interface LiveVisual {
   readonly powerRatio?: number;
   /** Röle: palet çekili mi? */
   readonly energized?: boolean;
+  /** Hoparlör ve buzzer: ses düzeyi (0..1; dalgaların koyuluğu). */
+  readonly loudness?: number;
   /** Akkor lamba: ışık akısının anma değerine oranı ve filaman sıcaklığı (K). */
   readonly glow?: number;
   readonly temperature?: number;
@@ -228,6 +230,63 @@ function Lamp({ live }: { live: LiveVisual | undefined }) {
       <circle cx={0} cy={0} r={13} style={visible > 0.02 ? { fill: color, fillOpacity: 0.25 + 0.6 * visible } : PAPER} stroke="currentColor" strokeWidth={2} />
       <path d="M-9.2,-9.2L9.2,9.2M9.2,-9.2L-9.2,9.2" stroke={live?.burned ? '#4a4a4a' : 'currentColor'} strokeWidth={2} strokeLinecap="round" />
       {live?.burned && <BurnMark />}
+    </g>
+  );
+}
+
+/** Ses dalgaları (yukarı doğru iki yay); koyuluk ses düzeyiyle. */
+function SoundWaves({ level, y }: { level: number; y: number }) {
+  if (level <= 0.01) return null;
+  const opacity = 0.25 + 0.75 * Math.min(1, level);
+  return (
+    <path
+      d={`M-7,${y}Q0,${y - 5} 7,${y}M-12,${y - 5}Q0,${y - 12} 12,${y - 5}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      opacity={opacity}
+    />
+  );
+}
+
+/** Hoparlör (IEC): mıknatıs (dikdörtgen) ve koni; çalarken üstünde ses dalgaları. */
+function Speaker({ level }: { level: number }) {
+  return (
+    <g>
+      <Lead from={-40} to={-7} />
+      <Lead from={7} to={40} />
+      <rect x={-7} y={-4} width={14} height={14} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <path d="M-7,-4L-16,-18H16L7,-4" style={PAPER} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <SoundWaves level={level} y={-21} />
+    </g>
+  );
+}
+
+/** Aktif buzzer: kubbe; + uç solda; öterken üstünde ses dalgaları. */
+function Buzzer({ level }: { level: number }) {
+  return (
+    <g>
+      <path d="M-40,0H-8V4M40,0H8V4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <path d="M-16,4H16A16,16 0 0 0 -16,4Z" style={PAPER} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <Plus x={-24} y={-8} />
+      <SoundWaves level={level} y={-15} />
+    </g>
+  );
+}
+
+/** Sigorta (IEC): dikdörtgen ve içinden geçen tel; atınca tel kopuk ve gövde kararır. */
+function Fuse({ blown }: { blown: boolean }) {
+  return (
+    <g>
+      <Lead from={-40} to={-16} />
+      <Lead from={16} to={40} />
+      <rect x={-16} y={-6} width={32} height={12} rx={1.5} style={blown ? { fill: '#5b5f66', fillOpacity: 0.25 } : PAPER} stroke="currentColor" strokeWidth={2} />
+      {blown ? (
+        <path d="M-16,0H-5M5,0H16M-3,-3.5L0,3.5M2,-3.5L5,3.5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+      ) : (
+        <line x1={-16} y1={0} x2={16} y2={0} stroke="currentColor" strokeWidth={1.8} />
+      )}
     </g>
   );
 }
@@ -918,6 +977,12 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Ntc style={resistorStyle} rotation={rotation} />;
     case 'lamp':
       return <Lamp live={live} />;
+    case 'speaker':
+      return <Speaker level={live?.loudness ?? 0} />;
+    case 'buzzer':
+      return <Buzzer level={live?.loudness ?? 0} />;
+    case 'fuse':
+      return <Fuse blown={live?.burned ?? false} />;
     case 'voltmeter':
       return <Meter letter="V" rotation={rotation} />;
     case 'ammeter':

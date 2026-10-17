@@ -34,6 +34,7 @@ import {
   CapacitorDevice,
   DEVICE_MODELS,
   InductorDevice,
+  FuseDevice,
   LampDevice,
   LedDevice,
   MotorDevice,
@@ -407,6 +408,15 @@ export class CircuitSimulator {
             voltage: device.peakVoltage,
             internalResistance: device.internalResistance,
           },
+        });
+      }
+      if (device instanceof FuseDevice && device.blown) {
+        result.push({
+          severity: 'warning',
+          code: 'fuse-blown',
+          elementIds: [device.id],
+          netKeys: [],
+          params: { current: device.blowCurrent, rating: device.settings.rating },
         });
       }
       if (device instanceof LampDevice && device.burned) {

@@ -97,6 +97,13 @@ export interface DeviceStatus {
   /** NTC, lamba: sıcaklık (K); NTC'de ortam sıcaklığı da. */
   readonly temperature?: number;
   readonly ambient?: number;
+  /** Hoparlör: ortalama elektrik gücü (W). Hoparlör ve buzzer: ses basıncı düzeyi (dB). */
+  readonly averagePower?: number;
+  readonly spl?: number;
+  /** Buzzer: osilatör çalışıyor (ötüyor). */
+  readonly sounding?: boolean;
+  /** Sigorta: telin ısınması (1'de erir). */
+  readonly heating?: number;
   /** Lamba: ışık akısının anma değerine oranı. */
   readonly glow?: number;
   /** Röle: kapalı kontaktan (C'den kapalı uca) geçen akım. */
