@@ -2,18 +2,17 @@
 // Çözücü metin üretmez; yalnızca kod ve sayısal parametre döndürür. Türkçe metinler
 // src/i18n/tr.ts içindedir.
 
-export type DiagnosticSeverity = 'error' | 'warning';
+/** Hata simülasyonu başlatmaz; uyarı ve bilgi başlatır (bilgi: bir sorun değil, açıklama). */
+export type DiagnosticSeverity = 'error' | 'warning' | 'info';
 
 export type DiagnosticCode =
-  /** Devrede hiç toprak sembolü yok. */
-  | 'no-ground'
-  /** Toprak sembolü var ama devreye bağlı değil. */
+  /** Toprak sembolü var ama devreye bağlı değil (uyarı; toprak isteğe bağlıdır). */
   | 'ground-unconnected'
   /** Yalnızca ideal gerilim kaynakları, ideal ampermetreler ve kablolardan oluşan döngü. */
   | 'voltage-loop'
   /** Bir bileşenin bir ucu hiçbir yere bağlı değil. */
   | 'floating-pin'
-  /** Devrenin bir parçası toprağa hiçbir bileşen üzerinden bağlı değil. */
+  /** Toprak varken devrenin bir parçası toprağa bağlı değil; gerilimleri kendi sıfır noktasına göre (bilgi). */
   | 'floating-island'
   /** Ampermetre doğrudan bir pilin iki ucuna bağlanmış. */
   | 'ammeter-parallel'

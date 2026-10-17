@@ -34,8 +34,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 - **Eğitsel görünüm:** akım noktaları (geleneksel akım ya da elektron akışı), gerilime göre kablo
   rengi (klasik ya da renk körlüğüne uygun ölçek), düğüm gerilimi etiketleri, LED parlaklığı ve
   yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, İnceleme panelinde canlı V/I/P ve Ohm
-  yasası notu, hata ve uyarı rozetleri, "devrede toprak yok" için tek tıkla düzeltme, toprak
-  tuzağı uyarısı, yanan LED için önerilen ön direnç.
+  yasası notu, hata ve uyarı rozetleri, toprak isteğe bağlı (toprak yokken sıfır noktasında
+  "0 V" işareti), toprak tuzağı uyarısı, yanan LED için önerilen ön direnç.
 - **Klavye ve erişilebilirlik:** "Tuvale atla" bağlantısı, tuvalde oklarla parçadan parçaya geçiş,
   kısayollar, görünür odak, ekran okuyucu için parça listesi ve seyreltilmiş canlı duyurular.
 - **Osiloskop:** iki kanal (A, B) ortak uca göre; DC/AC/GND kuplaj, A ve B, ADD (A + B; INV ile
@@ -224,7 +224,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 300 test çalıştırır (9'u fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 306 test çalıştırır (8'i fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -295,8 +295,8 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   kaynak adımlama (%10, %20 … %100) denenir.
 - **Zaman ilerletme:** Kare süresi h'nin katı değilse kalan süre bir sonraki kareye aktarılır;
   böylece LU ayrıştırması her karede yeniden yapılmaz ve simülasyon zamanı kaymaz.
-- **Ek uyarı:** Toprağa hiçbir bileşen üzerinden bağlı olmayan devre parçaları için
-  "toprağa bağlı olmayan parça" uyarısı verilir (gerilimleri yalnızca gmin belirler).
+- **Toprak isteğe bağlı:** ayrıntı aşağıda, "Fizik 1". Toprak varken toprağa bağlı olmayan devre
+  parçaları kendi sıfır noktasını alır; Mesajlar'da bilgi olarak gösterilir.
 - **Değer girişi:** Görevdeki önekler dışında `K` (kilo) ve `4k7` yazımı da kabul edilir.
   Rakamlar arasındaki boşluk hata sayılır ("1 2").
 
@@ -308,6 +308,34 @@ toprak zorunluluğu (Aşama 1), açık devrede gmin kaçak akımı (Aşama 2), i
 görünmez kapanma (Aşama 3), küçük zaman sabitinde ve RC süzgeçte zaman adımı hatası (Aşama 4), LED
 ters gerilimi, direnç gücü ve kutuplu kondansatör sınırları (Aşama 5). Her aşamada düzelen kontroller
 normal teste çevrilir. Aşamaların kararları aşağıda.
+
+**Fizik 1: toprak isteğe bağlı, her ada için otomatik sıfır noktası.**
+
+- *Gerekçe:* Fizikte gerilim iki nokta arasındaki farktır; toprak yalnızca sıfır noktasının
+  seçimidir. Pille çalışan bir devre gerçekte toprağa bağlı değildir ve yine de çalışır. Eskiden
+  toprak sembolü yoksa `no-ground` hatası verilip simülasyon başlatılmıyordu; bu hata kaldırıldı.
+- *Ada:* kablolarla ve bileşenlerin içinden birbirine bağlanan pinler (`couplingPins`). Yalnızca
+  matrise kesinlikle hiçbir şey eklemeyen bağlantılar adaları ayırır: açık anahtar, ideal voltmetre,
+  osiloskobun ideal girişi ya da GND kuplajı, DC güç kaynağının birbirinden yalıtılmış iki çıkışı.
+  Ötekiler (kondansatör, su haznesi dahil) iki yanını aynı ada sayar.
+- *Sıfır noktası seçimi* (`compile.ts`, `chooseReferences`): toprağa (toprak sembolü ya da topraklı
+  cihaz) bağlı olmayan her ada için önce adadaki bir kaynağın − ucu (pil, AC kaynak, DC güç
+  kaynağının çıkışı, topraksız fonksiyon üretecinin COM'u), yoksa adanın ilk pini. Sıra bileşen ve
+  pin sırasıdır; devre değişmedikçe aynı nokta seçilir. Seçilen pin derlemede toprak ağına katılır
+  (tam 0 V; sayısal olarak iyi koşullu).
+- *Neden adalar arasında akım yolu oluşmaz:* her ada çözücünün referansına tek bir noktadan bağlanır;
+  bu bağlantılar ağaç biçimindedir, döngü yoktur. Bir adaya yalnızca bir noktadan girilebildiği için
+  o noktadan geçen net akım 0'dır (KCL). Bu yüzden adayı fazla geniş tutmak güvenlidir, bir iletken
+  yolu iki referansa bölmek değildir. Testte iki ada arasındaki akım ölçülür (`tests/toprak.test.ts`).
+- *Uyarılar:* toprak varken toprağa bağlı olmayan ada artık "gerilimler anlamsız" uyarısı değil,
+  bilgidir: "Bu devre parçası toprağa bağlı değil; gerilimler kendi sıfır noktasına göre
+  gösteriliyor." Hiçbir şeye bağlı olmayan toprak sembolü (`ground-unconnected`) hata değil
+  uyarıdır. Tanılamalara `info` önem düzeyi eklendi (tuvalde rozet almaz, sayaçlara girmez).
+- *Arayüz:* otomatik seçilen sıfır noktasında, toprak sembolüyle karışmasın diye mavi bir "0 V"
+  etiketi ve pinde halka (yalnızca kaynak içeren adalarda; tek başına duran parçada işaret
+  kalabalık yapar). Etiket ekran ölçüsündedir (yakınlaştırmayla küçülmez); dokunmatikte hedefi
+  44 px. Dokununca ya da tıklayınca kısa açıklama açılır. Eski "devrede toprak yok" afişi ve tek
+  tıkla toprak ekleme kaldırıldı.
 
 ### Editör
 

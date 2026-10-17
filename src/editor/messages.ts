@@ -9,7 +9,8 @@ import type { CompiledCircuit, Diagnostic } from '../sim';
 import { DEVICE_MODELS } from '../sim/devices';
 import type { DeviceType } from '../sim/netlist';
 
-export type MessageSeverity = 'error' | 'warning';
+/** Bilgi: bir sorun değil, açıklama (ör. toprağa bağlı olmayan parçanın kendi sıfır noktası). */
+export type MessageSeverity = 'error' | 'warning' | 'info';
 
 export interface MessageItem {
   readonly key: string;

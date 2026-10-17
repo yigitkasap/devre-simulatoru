@@ -192,5 +192,17 @@ export interface DeviceModel {
    * toprağıyla aynı düğümdür. Yoksa null.
    */
   earthPin?(props: Props): number | null;
+  /**
+   * Sıfır noktası adayı: kaynağın − ucu (pil, AC kaynak, DC güç kaynağının çıkışları, topraksız
+   * fonksiyon üretecinin COM'u). Toprağa bağlı olmayan bir adada önce bu uç sıfır noktası seçilir.
+   */
+  referencePins?(props: Props): readonly number[];
+  /**
+   * Ada (sıfır noktası) hesabında bu bileşenin içinden birbirine bağlı sayılan pin grupları.
+   * Verilmezse bütün pinler tek gruptur. Yalnızca matrise kesinlikle hiçbir şey eklemeyen
+   * bağlantılar (açık anahtar, ideal voltmetre, osiloskobun ideal girişi, güç kaynağının birbirinden
+   * yalıtılmış çıkışları) grupları ayırır: adayı fazla geniş tutmak güvenlidir, dar tutmak değil.
+   */
+  couplingPins?(props: Props): ReadonlyArray<readonly number[]>;
   create(init: DeviceInit): Device;
 }

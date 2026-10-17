@@ -166,5 +166,6 @@ export const funcgenModel: DeviceModel = {
   internalNodes: 2,
   branchCount: 2,
   earthPin: (props) => (boolProp(props, 'earthed', FUNCGEN_DEFAULTS.earthed) ? 2 : null),
+  referencePins: (props) => (boolProp(props, 'earthed', FUNCGEN_DEFAULTS.earthed) ? [] : [2]),
   create: (init) => new FuncgenDevice(init),
 };

@@ -10,7 +10,7 @@ import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
-import { boxesIntersect, nextRotation, partBounds, pinPositions } from '../model/geometry';
+import { nextRotation, pinPositions } from '../model/geometry';
 import { docFromHash, shareUrl } from '../model/share';
 import { CATALOG } from '../model/catalog';
 import { emptyDoc, type CircuitDoc } from '../model/types';
@@ -347,8 +347,9 @@ export default function Simulator() {
       items.push(itemFromDiagnostic(d, diagnosticContext));
     }
     if (earthTrap) items.push(earthTrapItem(earthTrap, doc));
-    // Önce hatalar, sonra uyarılar (kendi içlerinde sıra korunur).
-    return items.sort((a, b) => Number(b.severity === 'error') - Number(a.severity === 'error'));
+    // Önce hatalar, sonra uyarılar, en son bilgiler (kendi içlerinde sıra korunur).
+    const rank = { error: 0, warning: 1, info: 2 } as const;
+    return items.sort((a, b) => rank[a.severity] - rank[b.severity]);
   }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc]);
 
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
@@ -406,6 +407,8 @@ export default function Simulator() {
     const map = new Map<string, 'error' | 'warning'>();
     if (!showIssues) return map;
     for (const item of messages) {
+      // Bilgi bir sorun değildir: tuvalde rozet almaz.
+      if (item.severity === 'info') continue;
       for (const id of item.badgeIds ?? item.elementIds) {
         if (map.get(id) !== 'error') map.set(id, item.severity);
       }
@@ -454,52 +457,23 @@ export default function Simulator() {
     if (item) setSelectedMessage(item.key);
   };
 
-  // --- "Devrede toprak yok" afişi ve tek tıkla düzeltme --------------------------------------
-  const [noGroundDismissed, setNoGroundDismissed] = useState(false);
-  const noGroundNotice = sim.notice?.kind === 'error' && sim.notice.diagnostic.code === 'no-ground';
-  useEffect(() => setNoGroundDismissed(false), [sim.notice]);
-  /** Önerilen toprak yeri: pilin, AC kaynağın ya da güç kaynağının − ucu. */
-  const groundSuggestion = useMemo(() => {
-    if (!noGroundNotice) return null;
-    for (const type of ['battery', 'acsource', 'dcsupply'] as const) {
-      const part = doc.parts.find((p) => p.type === type);
-      const at = part ? pinPositions(part)[1] : undefined;
-      if (part && at) return { part, at };
+  // --- Sıfır noktaları: toprak yokken (ya da toprağa bağlı olmayan parçada) "0 V" işareti -------
+  // Yalnızca enerji kaynağı içeren adalarda gösterilir (tek başına duran parçalarda işaret kalabalık yapar).
+  const zeroPoints = useMemo(() => {
+    if (!compiled) return [];
+    const points: Array<{ at: { x: number; y: number }; grounded: boolean }> = [];
+    for (const ref of compiled.autoReferences) {
+      if (!ref.hasSource) continue;
+      const part = doc.parts.find((p) => p.id === ref.elementId);
+      const at = part ? pinPositions(part)[ref.pin] : undefined;
+      if (at) points.push({ at, grounded: compiled.hasGround });
     }
-    return null;
-  }, [noGroundNotice, doc]);
-  const [playAfterFix, setPlayAfterFix] = useState(false);
-  useEffect(() => {
-    if (!playAfterFix) return;
-    setPlayAfterFix(false);
-    sim.play();
-  }, [playAfterFix, doc]);
-  const addSuggestedGround = () => {
-    if (!groundSuggestion) return;
-    const p = groundSuggestion.at;
-    const occupied = doc.parts.map((part) => partBounds(part));
-    const candidates = [
-      { x: p.x, y: p.y + 3 },
-      { x: p.x, y: p.y + 5 },
-      { x: p.x - 4, y: p.y + 3 },
-      { x: p.x + 4, y: p.y + 3 },
-    ];
-    const at =
-      candidates.find((c) => {
-        const b = partBounds({ type: 'ground', x: c.x, y: c.y, rotation: 0 });
-        return !occupied.some((o) => boxesIntersect(o, b));
-      }) ?? candidates[0]!;
-    const placed = addPart(doc, 'ground', at, 0);
-    const route = at.x === p.x ? [p, at] : [p, { x: p.x, y: at.y - 0 }, at];
-    const wired = addWire(placed.doc, route);
-    dispatch({ type: 'commit', doc: wired.doc, selection: EMPTY_SELECTION });
-    setNoGroundDismissed(true);
-    setPlayAfterFix(true);
-  };
+    return points;
+  }, [compiled, doc]);
 
   // --- İpucu şeridinde hata/uyarı özeti ---------------------------------------------------
   const errorCount = messages.filter((m) => m.severity === 'error').length;
-  const warningCount = messages.length - errorCount;
+  const warningCount = messages.filter((m) => m.severity === 'warning').length;
   const runtimeIssues = messages.some((m) => (m.diagnostic && (sim.frame?.runtime ?? []).includes(m.diagnostic)) || m.code === 'earth-trap');
 
   /** Telefon: alt sayfayı panel olarak verilen sekmede açar. */
@@ -803,7 +777,7 @@ export default function Simulator() {
     ...(activeExample ? [{ id: 'example' as const, label: tr.phone.tabs.example }] : []),
     { id: 'circuit', label: sim.status === 'stopped' ? tr.phone.tabs.circuit : tr.phone.tabs.measure },
     ...(messages.length > 0
-      ? [{ id: 'messages' as const, label: tr.phone.tabs.messages, count: messages.length, tone: errorCount > 0 ? ('error' as const) : ('warn' as const) }]
+      ? [{ id: 'messages' as const, label: tr.phone.tabs.messages, count: errorCount + warningCount, tone: errorCount > 0 ? ('error' as const) : ('warn' as const) }]
       : []),
   ];
   const shownTab: PanelTab = panelTabs.some((t) => t.id === panelTab) ? panelTab : 'circuit';
@@ -907,18 +881,7 @@ export default function Simulator() {
       issuePins={issuePins}
       earthLine={earthTrap?.comPoints ?? null}
       nodeLabels={nodeLabels}
-      noGround={
-        noGroundNotice && !noGroundDismissed
-          ? {
-              banner: !phone,
-              point: groundSuggestion?.at ?? null,
-              text: `${tr.noGround.text}${groundSuggestion ? ` ${tr.noGround.where[groundSuggestion.part.type] ?? ''}` : ''}`,
-              fixLabel: groundSuggestion ? tr.noGround.fix(groundSuggestion.part.label) : null,
-              onFix: addSuggestedGround,
-              onDismiss: () => setNoGroundDismissed(true),
-            }
-          : null
-      }
+      zeroPoints={zeroPoints}
       onExplain={explain}
     />
   );
@@ -1378,16 +1341,7 @@ export default function Simulator() {
                 {...messagesProps}
                 header={
                   blocked && sim.notice?.kind === 'error' ? (
-                    noGroundNotice ? (
-                      <BlockedNotice
-                        lead={tr.phone.noGroundLead}
-                        text={tr.phone.noGroundText}
-                        fixLabel={groundSuggestion ? tr.phone.fixAndPlay(groundSuggestion.part.label) : null}
-                        onFix={addSuggestedGround}
-                      />
-                    ) : (
-                      <BlockedNotice lead={tr.diagnostics.describe(sim.notice.diagnostic, diagnosticContext).title} text="" fixLabel={null} onFix={() => {}} />
-                    )
+                    <BlockedNotice lead={tr.diagnostics.describe(sim.notice.diagnostic, diagnosticContext).title} text="" fixLabel={null} onFix={() => {}} />
                   ) : undefined
                 }
               />
@@ -1736,7 +1690,6 @@ export default function Simulator() {
             onStop={sim.stop}
             onSpeed={sim.setSpeed}
             onElectronFlow={(on) => updateSettings({ electronFlow: on })}
-            fix={noGroundNotice && groundSuggestion ? { label: tr.noGround.fix(groundSuggestion.part.label), run: addSuggestedGround } : null}
           />
         </div>
         {focus.panels.right && (

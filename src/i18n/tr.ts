@@ -156,15 +156,11 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
   const firstLabel = labels[0] ?? '';
   const p = d.params ?? {};
   switch (d.code) {
-    case 'no-ground':
-      return {
-        title: 'Devrede toprak yok',
-        detail: 'Devrede toprak (0 V referansı) yok. Bir toprak sembolü ekleyip devreye bağla.',
-      };
     case 'ground-unconnected':
       return {
         title: 'Toprak bağlı değil',
-        detail: 'Toprak sembolü devreye bağlı değil. Toprağın ucunu bir kabloyla devreye bağla.',
+        detail:
+          'Toprak sembolü devreye bağlı değil, bu yüzden hiçbir etkisi yok. Toprak isteğe bağlıdır; kullanmak istiyorsan ucunu bir kabloyla devreye bağla.',
       };
     case 'voltage-loop':
       return {
@@ -186,7 +182,7 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
     case 'floating-island':
       return {
         title: 'Toprağa bağlı olmayan parça',
-        detail: `${list(labels)} toprağa bağlı değil. Bu parçadaki gerilimler belirsizdir; parçayı bir kabloyla toprağa bağla.`,
+        detail: `Bu devre parçası (${list(labels)}) toprağa bağlı değil; gerilimler kendi sıfır noktasına göre gösteriliyor. Akımlar bundan etkilenmez.`,
       };
     case 'ammeter-parallel': {
       const source = d.elementIds[1] && ctx.type(d.elementIds[1]) === 'acsource' ? 'AC kaynağının' : 'pilinin';
@@ -1015,7 +1011,7 @@ export const tr = {
     warnings: (n: number) => `${n} uyarı`,
     none: 'Sorun yok',
     hint: 'Bir mesajı seçince ilgili parça tuvalde vurgulanır.',
-    counts: (errors: number, warnings: number) => `${errors} hata · ${warnings} uyarı`,
+    counts: (errors: number, warnings: number, infos = 0) => `${errors} hata · ${warnings} uyarı${infos > 0 ? ` · ${infos} bilgi` : ''}`,
     /** "2 hata", "1 hata, 1 uyarı", "3 uyarı". */
     summary: (errors: number, warnings: number) =>
       [errors > 0 ? `${errors} hata` : '', warnings > 0 ? `${warnings} uyarı` : ''].filter(Boolean).join(', '),
@@ -1030,7 +1026,7 @@ export const tr = {
       `${instruments} şebeke toprağıyla birleşiyor; ${shorted} kısa devre oldu. Toprağa bağlı uçları aynı noktaya bağla ya da cihazın şebeke toprağı bağlantısını kaldır.`,
     repair: 'Onar',
     setResistor: (label: string, value: string) => `${ek(label, 'i')} ${value} yap`,
-    severity: { error: 'Hata', warning: 'Uyarı' },
+    severity: { error: 'Hata', warning: 'Uyarı', info: 'Bilgi' },
     circuitTarget: 'devre',
     noneDetail: 'Devrede şu an hata ya da uyarı yok.',
   },
@@ -1170,19 +1166,13 @@ export const tr = {
     examplesLinkNote: 'Büyük baraj çizimi, ışık kulesi ve kontroller ayrı sayfada',
     exampleTabLink: 'Baraj sayfasında izle',
   },
-  noGround: {
-    title: 'Simülasyon başlamadı: devrede toprak yok',
-    text: 'Gerilimler bir referansa göre ölçülür. Toprak sembolü ekle.',
-    where: {
-      battery: 'Pilin − ucu iyi bir yer.',
-      acsource: 'AC kaynağın − ucu iyi bir yer.',
-      dcsupply: 'Güç kaynağının − ucu iyi bir yer.',
-    } as Record<string, string>,
-    fix: (label: string) => `${ek(label, 'in')} − ucuna toprak ekle`,
-    fixGeneric: 'Önerilen yere toprak ekle',
-    myself: 'Kendim eklerim',
-    close: 'Kapat',
-    suggested: 'önerilen toprak',
+  /** Toprak yokken (ya da toprağa bağlı olmayan parçada) çözücünün seçtiği sıfır noktası. */
+  zeroPoint: {
+    label: '0 V',
+    title: 'Sıfır noktası (0 V)',
+    detail: 'Devrede toprak yok. Gerilimler bu noktaya göre gösteriliyor; akımlar bundan etkilenmez.',
+    detailIsland: 'Bu devre parçası toprağa bağlı değil. Gerilimleri bu noktaya göre gösteriliyor; akımlar bundan etkilenmez.',
+    aria: 'Sıfır noktası (0 V): açıklamayı göster',
   },
   earthLine: 'şebeke toprağı (cihazlarda)',
   hints: {
@@ -1366,9 +1356,6 @@ export const tr = {
     tabsLabel: 'Sayfa',
     // Simülasyon başlamadı (P11)
     blockedTitle: 'Simülasyon başlamadı',
-    noGroundLead: 'Devrede toprak yok.',
-    noGroundText: 'Gerilimler bir referansa göre ölçülür; bir toprak ekle.',
-    fixAndPlay: (label: string) => `${ek(label, 'in')} − ucuna toprak ekle ve oynat`,
     notBlocking: 'Başlamaya engel değil.',
     // Cihazlar (P08, P09)
     devicesTitle: 'Cihazlar',
@@ -1621,7 +1608,7 @@ export const tr = {
   },
   diagnostics: {
     describe: describeDiagnostic,
-    severity: { error: 'Hata', warning: 'Uyarı' } as const,
+    severity: { error: 'Hata', warning: 'Uyarı', info: 'Bilgi' } as const,
   },
 };
 

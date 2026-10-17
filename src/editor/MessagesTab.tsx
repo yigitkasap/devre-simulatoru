@@ -27,6 +27,15 @@ export interface MessagesTabProps {
 }
 
 export function SeverityMark({ severity, size = 20 }: { severity: MessageSeverity; size?: number }) {
+  if (severity === 'info') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 20 20" className="shrink-0" aria-hidden="true">
+        <circle cx="10" cy="10" r="9" fill="var(--color-info-ink)" />
+        <path d="M10 9v5.5" stroke="white" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="10" cy="5.8" r="1.2" fill="white" />
+      </svg>
+    );
+  }
   return severity === 'error' ? (
     <svg width={size} height={size} viewBox="0 0 20 20" className="shrink-0" aria-hidden="true">
       <circle cx="10" cy="10" r="9" fill="var(--color-danger)" />
@@ -45,7 +54,8 @@ export function SeverityMark({ severity, size = 20 }: { severity: MessageSeverit
 export function MessagesTab({ items, selectedKey, onSelect, context, actions, header }: MessagesTabProps) {
   const touch = useTouchUi();
   const errors = items.filter((i) => i.severity === 'error').length;
-  const warnings = items.length - errors;
+  const warnings = items.filter((i) => i.severity === 'warning').length;
+  const infos = items.length - errors - warnings;
 
   if (items.length === 0) {
     return (
@@ -66,13 +76,14 @@ export function MessagesTab({ items, selectedKey, onSelect, context, actions, he
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain p-3">
       {header}
-      <p className="px-1 text-small font-semibold">{tr.messages.counts(errors, warnings)}</p>
+      <p className="px-1 text-small font-semibold">{tr.messages.counts(errors, warnings, infos)}</p>
       <ul className="flex flex-col gap-2">
         {items.map((item) => {
           const { severity, elementIds, title, detail } = item;
           const selected = item.key === selectedKey;
           const target = elementIds.length > 0 ? context.label(elementIds[0]!) : tr.messages.circuitTarget;
           const error = severity === 'error';
+          const info = severity === 'info';
           const buttons = selected ? actions(item) : [];
           return (
             <li
@@ -81,7 +92,9 @@ export function MessagesTab({ items, selectedKey, onSelect, context, actions, he
                 selected
                   ? error
                     ? 'border-[1.5px] border-danger bg-danger-soft'
-                    : 'border-[1.5px] border-warn bg-warn-soft'
+                    : info
+                      ? 'border-[1.5px] border-info-ink bg-info-soft'
+                      : 'border-[1.5px] border-warn bg-warn-soft'
                   : 'border border-line bg-panel hover:bg-panel-2'
               }`}
             >
@@ -93,8 +106,8 @@ export function MessagesTab({ items, selectedKey, onSelect, context, actions, he
               >
                 <SeverityMark severity={severity} />
                 <span className="flex min-w-0 flex-col gap-1">
-                  <span className={`text-label font-semibold ${error ? 'text-danger-ink' : 'text-warn'}`}>
-                    {error ? tr.messages.severity.error : tr.messages.severity.warning} · {target}
+                  <span className={`text-label font-semibold ${error ? 'text-danger-ink' : info ? 'text-info-ink' : 'text-warn'}`}>
+                    {tr.messages.severity[severity]} · {target}
                   </span>
                   <b className="font-semibold">{title}</b>
                   <span className="text-small leading-normal text-ink-2">

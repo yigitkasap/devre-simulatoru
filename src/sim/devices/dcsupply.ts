@@ -159,5 +159,11 @@ export const dcsupplyModel: DeviceModel = {
   pinCount: 4,
   internalNodes: 2,
   branchCount: 2,
+  referencePins: () => [1, 3],
+  // İki çıkış birbirinden yalıtılmıştır (laboratuvar güç kaynaklarında olduğu gibi yüzer çıkışlar).
+  couplingPins: () => [
+    [0, 1],
+    [2, 3],
+  ],
   create: (init) => new DcSupplyDevice(init),
 };

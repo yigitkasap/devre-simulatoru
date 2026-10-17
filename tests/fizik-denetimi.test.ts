@@ -186,8 +186,8 @@ describe('B. Açık devre, anahtar, kısa devre, toprak', () => {
     s.advance(0);
     check(g, 'Kısa devre: I = ε/r (r = 1 Ω)', -I(s, 'B'), 9, 1e-6, 'A');
   });
-  // Aşama 1'de düzelir: toprak isteğe bağlı.
-  it.fails('Topraksız kapalı devre çalışmalı: pil + direnç + LED (Aşama 1)', () => {
+  // Aşama 1'de düzeldi: toprak isteğe bağlı.
+  it('Topraksız kapalı devre çalışmalı: pil + direnç + LED', () => {
     const s = sim(circuit().battery('B', 'a', 'n', 9, 0).resistor('R', 'a', 'b', 470).led('L', 'b', 'n').build());
     const r = s.advance(0);
     flag(g, 'Topraksız kapalı devre çalışmalı (pil + direnç + LED)', r.ok && I(s, 'R') > 1e-3, 'çalışır, ≈ 15 mA', r.ok ? `${fmt(I(s, 'R') * 1e3)} mA` : `çalışmıyor: ${r.error?.code}`);

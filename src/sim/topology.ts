@@ -1,6 +1,8 @@
 // Topoloji ve bağlantı kontrolleri. Simülasyon başlamadan önce ve devre her değiştiğinde çalışır.
-// Hatalar simülasyonu başlatmaz, uyarılar başlatır.
+// Hatalar simülasyonu başlatmaz; uyarılar ve bilgiler başlatır. Toprak isteğe bağlıdır: toprağa
+// bağlı olmayan adalara derlemede sıfır noktası verilir (compile.ts, autoReferences).
 
+import type { AutoReference } from './compile';
 import type { Diagnostic } from './diagnostics';
 import type { Device } from './devices';
 import { GROUND } from './mna';
@@ -14,6 +16,7 @@ export interface TopologyInput {
   readonly nodeOfRoot: ReadonlyMap<string, number>;
   readonly devices: readonly Device[];
   readonly hasGround: boolean;
+  readonly autoReferences: readonly AutoReference[];
   /** Şebeke toprağına bağlı cihaz uçları: devrenin toprağı sayılır. */
   readonly earthedPins: readonly string[];
   readonly nodeUnknowns: number;
@@ -35,20 +38,18 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
   }
 
   // --- Toprak ----------------------------------------------------------------------
-  // Topraklı bir laboratuvar cihazı (osiloskop, fonksiyon üreteci) varsa devrenin toprağı odur.
+  // Toprak isteğe bağlıdır (sıfır noktası yalnızca bir seçimdir). Topraklı bir laboratuvar cihazı
+  // (osiloskop, fonksiyon üreteci) varsa devrenin toprağı odur. Hiçbir şeye bağlı olmayan toprak
+  // sembolü yalnızca uyarıdır.
   const grounds = netlist.elements.filter((el) => el.type === 'ground');
   const earthed = input.earthedPins.length > 0;
   let groundConnected = earthed;
-  if (grounds.length === 0) {
-    if (netlist.elements.length > 0 && !earthed) {
-      diagnostics.push({ severity: 'error', code: 'no-ground', elementIds: [], netKeys: [] });
-    }
-  } else {
+  if (grounds.length > 0) {
     groundConnected =
       earthed || grounds.some((g) => g.pins.some((pin) => (nonGroundPinCount.get(wiring.findKey(pin)) ?? 0) > 0));
     if (!groundConnected) {
       diagnostics.push({
-        severity: 'error',
+        severity: 'warning',
         code: 'ground-unconnected',
         elementIds: grounds.map((g) => g.id),
         netKeys: [],
@@ -82,7 +83,7 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
 
   diagnostics.push(...findVoltageLoops(input));
   diagnostics.push(...findAmmetersAcrossBatteries(input));
-  if (groundConnected) diagnostics.push(...findFloatingIslands(input));
+  if (groundConnected) diagnostics.push(...floatingIslands(input));
   return diagnostics;
 }
 
@@ -202,40 +203,24 @@ function findAmmetersAcrossBatteries(input: TopologyInput): Diagnostic[] {
 }
 
 /**
- * Toprağa hiçbir bileşen üzerinden ulaşamayan devre parçaları. Bu parçalardaki gerilimler
- * yalnızca 1e-12 S'lik gmin üzerinden belirlenir ve anlamsızdır.
+ * Toprak varken toprağa bağlı olmayan devre parçaları (bilgi). Akımlar doğrudur; gerilimler bu
+ * parçanın kendi sıfır noktasına (compile.ts'te seçilen) göre gösterilir.
  */
-function findFloatingIslands(input: TopologyInput): Diagnostic[] {
-  const groundIndex = input.nodeUnknowns;
-  const uf = new UnionFind();
-  for (let i = 0; i <= groundIndex; i++) uf.add();
-  for (const device of input.devices) {
-    // Osiloskobun girişleri ideal (akım çekmez); uçlarını elektriksel olarak birleştirmez.
-    if (device.type === 'oscilloscope') continue;
-    const first = device.nodes[0];
-    if (first === undefined) continue;
-    for (const node of device.nodes) uf.union(ufIndex(first, groundIndex), ufIndex(node, groundIndex));
-  }
-  const groundRoot = uf.find(groundIndex);
-  const islands = new Map<number, Device[]>();
-  for (const device of input.devices) {
-    if (device.type === 'ground' || device.type === 'oscilloscope') continue;
-    const root = uf.find(ufIndex(device.nodes[0]!, groundIndex));
-    if (root === groundRoot) continue;
-    if (!islands.has(root)) islands.set(root, []);
-    islands.get(root)!.push(device);
-  }
+function floatingIslands(input: TopologyInput): Diagnostic[] {
+  const byId = new Map(input.devices.map((d) => [d.id, d] as const));
   const result: Diagnostic[] = [];
-  for (const members of islands.values()) {
+  for (const island of input.autoReferences) {
+    const members = island.elementIds.filter((id) => byId.get(id)?.type !== 'oscilloscope');
     // Tek başına duran bileşenin uçları zaten "boşta uç" olarak bildirilir.
     if (members.length < 2) continue;
     const nodes = new Set<number>();
-    for (const d of members) for (const n of d.nodes) nodes.add(n);
+    for (const id of members) for (const n of byId.get(id)?.nodes ?? []) nodes.add(n);
+    nodes.delete(GROUND);
     result.push({
-      severity: 'warning',
+      severity: 'info',
       code: 'floating-island',
-      elementIds: members.map((d) => d.id),
-      netKeys: rootKeysOf(input, nodes),
+      elementIds: members,
+      netKeys: [...rootKeysOf(input, nodes), island.key],
     });
   }
   return result;

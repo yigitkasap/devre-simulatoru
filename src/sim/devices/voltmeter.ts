@@ -66,5 +66,7 @@ export const voltmeterModel: DeviceModel = {
   pinCount: 2,
   internalNodes: 0,
   branchCount: 0,
+  // İdeal voltmetre akım çekmez, matrise hiçbir şey eklemez.
+  couplingPins: (props) => (boolProp(props, 'ideal', VOLTMETER_DEFAULTS.ideal) ? [] : [[0, 1]]),
   create: (init) => new VoltmeterDevice(init),
 };

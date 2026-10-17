@@ -162,53 +162,55 @@ export function BurnBalloon({
   );
 }
 
-/** "Devrede toprak yok" afişi (M07b): Oynat'a basılınca simülasyon başlamadıysa tuvalin üstünde. */
-export function NoGroundBanner({
-  text,
-  fixLabel,
-  onFix,
-  onDismiss,
+/**
+ * Sıfır noktası işareti: toprak yokken (ya da toprağa bağlı olmayan parçada) çözücünün seçtiği 0 V
+ * referansı. Toprak sembolüyle karışmasın diye mavi bir "0 V" etiketi ve pinde halka. Dokununca ya da
+ * tıklayınca kısa açıklama açılır (fareyle üstüne gelince ipucu da çıkar). Dokunmatikte hedef 44 px.
+ */
+export function ZeroMark({
+  x,
+  y,
+  open,
+  onToggle,
+  detail,
 }: {
-  text: string;
-  /** Tek tıkla düzeltme düğmesi; önerilecek yer yoksa null. */
-  fixLabel: string | null;
-  onFix: () => void;
-  onDismiss: () => void;
+  /** Pinin ekran konumu (px). */
+  x: number;
+  y: number;
+  open: boolean;
+  onToggle: () => void;
+  detail: string;
 }) {
   return (
-    <div
-      role="alert"
-      className="absolute top-4 left-1/2 z-20 flex w-[min(560px,calc(100%-24px))] -translate-x-1/2 items-start gap-3 rounded-lg border border-danger-line bg-panel px-3.5 py-3 shadow-md"
-    >
-      <svg width="22" height="22" viewBox="0 0 20 20" className="mt-px shrink-0" aria-hidden="true">
-        <circle cx="10" cy="10" r="9" fill="var(--color-danger)" />
-        <path d="M10 5.5v5.5" stroke="white" strokeWidth="2" strokeLinecap="round" />
-        <circle cx="10" cy="14.2" r="1.2" fill="white" />
-      </svg>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <b className="text-[15px] font-semibold">{tr.noGround.title}</b>
-        <span className="text-small leading-normal text-ink-2">{text}</span>
-        <div className="flex flex-wrap gap-2">
-          {fixLabel && (
-            <button type="button" onClick={onFix} className="h-9 rounded-md bg-accent px-3.5 text-small font-semibold text-white hover:brightness-110">
-              {fixLabel}
-            </button>
-          )}
-          <button type="button" onClick={onDismiss} className="h-9 rounded-md border border-line-2 bg-panel px-3 text-small font-medium hover:bg-panel-2">
-            {tr.noGround.myself}
-          </button>
-        </div>
-      </div>
+    <>
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute z-[5] h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-info-ink bg-panel"
+        style={{ left: x, top: y }}
+      />
       <button
         type="button"
-        onClick={onDismiss}
-        aria-label={tr.noGround.close}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted hover:bg-panel-2"
+        onClick={onToggle}
+        aria-label={tr.zeroPoint.aria}
+        aria-expanded={open}
+        title={`${tr.zeroPoint.title}: ${detail}`}
+        className="absolute z-[6] flex h-[18px] w-8 items-center justify-center pointer-coarse:h-11 pointer-coarse:w-11"
+        style={{ left: x + 5, top: y + 5 }}
       >
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-          <path d="M5 5l10 10M15 5L5 15" />
-        </svg>
+        <span className="rounded-full border border-info-line bg-info-soft px-1.5 font-mono text-[11px] leading-4 font-semibold whitespace-nowrap text-info-ink shadow-sm">
+          {tr.zeroPoint.label}
+        </span>
       </button>
-    </div>
+      {open && (
+        <div
+          role="tooltip"
+          className="absolute z-10 mt-7 flex w-[240px] flex-col gap-1 rounded-lg border border-info-line bg-panel px-3 py-2.5 shadow-md pointer-coarse:mt-[52px]"
+          style={{ left: x + 8, top: y }}
+        >
+          <b className="text-small font-semibold text-info-ink">{tr.zeroPoint.title}</b>
+          <span className="text-small leading-[1.45] text-ink">{detail}</span>
+        </div>
+      )}
+    </>
   );
 }

@@ -232,5 +232,10 @@ export const oscilloscopeModel: DeviceModel = {
   internalNodes: 0,
   branchCount: 0,
   earthPin: (props) => (scopeSettings(props).earthed ? 2 : null),
+  // Gerçek giriş (1 MΩ ‖ 25 pF) kanalı COM'a bağlar; ideal giriş ve GND kuplaj hiçbir şey eklemez.
+  couplingPins: (props) => {
+    const s = scopeSettings(props);
+    return ([0, 1] as const).filter((c) => s.input === 'real' && s.coupling[c] !== 'gnd').map((c) => [c, 2]);
+  },
   create: (init) => new OscilloscopeDevice(init),
 };

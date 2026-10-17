@@ -34,5 +34,7 @@ export const switchModel: DeviceModel = {
   pinCount: 2,
   internalNodes: 0,
   branchCount: 0,
+  // Açık anahtar matrise hiçbir şey eklemez: iki ucu ayrı adalarda olabilir.
+  couplingPins: (props) => (boolProp(props, 'closed', SWITCH_DEFAULTS.closed) ? [[0, 1]] : []),
   create: (init) => new SwitchDevice(init),
 };

@@ -363,7 +363,7 @@ try {
     await sp.context().close();
   }
 
-  // --- Toprak yok (telefon) ----------------------------------------------------------------
+  // --- Toprak yok (telefon): toprak isteğe bağlı, sıfır noktasında "0 V" işareti ---------------
   {
     const groundless = { version: 1, parts: [
       { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
@@ -380,11 +380,12 @@ try {
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Oynat' }).last().tap(); await page.waitForTimeout(400);
-    const blocked = page.getByRole('alertdialog', { name: 'Simülasyon başlamadı' });
-    const fix = blocked.getByRole('button', { name: 'B1’in − ucuna toprak ekle ve oynat' });
-    check('telefonda toprak yokken Oynat’ta alt sayfada tek dokunuşla düzeltme', (await fix.count()) === 1);
-    await fix.tap(); await page.waitForTimeout(700);
-    check('toprak eklenince simülasyon başlıyor (Ölç)', (await doc(page)).parts.some((p) => p.type === 'ground') && (await mode(page)).includes('Ölç'), await mode(page));
+    const zeroMark = page.getByRole('button', { name: /^Sıfır noktası \(0 V\)/ });
+    const zeroBox = await zeroMark.boundingBox();
+    check('telefonda toprak yokken simülasyon başlıyor (Ölç); sıfır noktasında 44 px "0 V" işareti', (await mode(page)).includes('Ölç') && zeroBox !== null && zeroBox.width >= 43.5 && zeroBox.height >= 43.5, await mode(page));
+    await zeroMark.tap(); await page.waitForTimeout(200);
+    const zeroTip = (await page.getByRole('tooltip').textContent()) ?? '';
+    check('telefonda "0 V" işaretine dokununca açıklama çıkıyor', zeroTip.includes('Devrede toprak yok'), zeroTip.slice(0, 40));
     await page.getByRole('button', { name: /^Dosya ve örnekler/ }).tap(); await page.waitForTimeout(300);
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
     check('Dosya sayfası açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
@@ -741,12 +742,11 @@ try {
   gp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await gp.goto(URL0, { waitUntil: 'networkidle' });
   await gp.getByRole('button', { name: 'Oynat' }).first().click(); await gp.waitForTimeout(400);
-  const banner = gp.getByRole('alert').filter({ hasText: 'devrede toprak yok' });
-  check('masaüstü: toprak yokken Oynat’ta afiş ve tek tıkla düzeltme çıkıyor', (await banner.count()) === 1 && (await banner.getByRole('button', { name: 'B1’in − ucuna toprak ekle' }).count()) === 1);
-  await banner.getByRole('button', { name: 'B1’in − ucuna toprak ekle' }).click(); await gp.waitForTimeout(700);
-  const fixedDoc = await doc(gp);
   const runningText = (await gp.getByRole('region', { name: 'Simülasyon' }).getByRole('status').textContent()) ?? '';
-  check('masaüstü: toprak eklenince simülasyon başlıyor', fixedDoc.parts.some((p) => p.type === 'ground') && runningText.includes('Çalışıyor'), runningText);
+  const deskZero = gp.getByRole('button', { name: /^Sıfır noktası \(0 V\)/ });
+  check('masaüstü: toprak yokken simülasyon başlıyor, sıfır noktasında "0 V" işareti', runningText.includes('Çalışıyor') && (await deskZero.count()) === 1, runningText);
+  await deskZero.click(); await gp.waitForTimeout(200);
+  check('masaüstü: "0 V" işaretine tıklayınca açıklama çıkıyor', ((await gp.getByRole('tooltip').textContent()) ?? '').includes('gerilimler bu noktaya göre'.replace('gerilimler', 'Gerilimler')));
   await ngCtx.close();
 
   const trapCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });

@@ -93,5 +93,6 @@ export const batteryModel: DeviceModel = {
   // Yapının değer değişikliklerinde sabit kalması için iç düğüm ve akım satırı her zaman ayrılır.
   internalNodes: 1,
   branchCount: 1,
+  referencePins: () => [1],
   create: (init) => new BatteryDevice(init),
 };

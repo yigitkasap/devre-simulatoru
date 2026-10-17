@@ -183,5 +183,6 @@ export const acSourceModel: DeviceModel = {
   // Pil gibi: iç direnç 0 ile >0 arasında geçişte yapı değişmesin diye iç düğüm hep ayrılır.
   internalNodes: 1,
   branchCount: 1,
+  referencePins: () => [1],
   create: (init) => new AcSourceDevice(init),
 };

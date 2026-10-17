@@ -7,15 +7,20 @@ import { circuit } from './helpers';
 const codes = (b: ReturnType<typeof circuit>) => compileNetlist(b.build()).diagnostics.map((d) => `${d.severity}:${d.code}`);
 
 describe('10. Topoloji', () => {
-  it('toprak yoksa hata; simülasyon başlamaz', () => {
+  // Eskiden toprak yoksa hata verilir, simülasyon başlamazdı. Fizikte gerilim iki nokta arasındaki
+  // farktır; toprak yalnızca sıfır noktasının seçimidir (Fizik 1). Topraksız devre çalışır, pilin
+  // − ucu sıfır noktası olur.
+  it('toprak isteğe bağlı: topraksız devre çalışır, sıfır noktası pilin − ucu', () => {
     const netlist = circuit().battery('B1', 'a', 'b', 9, 1).resistor('R1', 'a', 'b', 100).build();
     const compiled = compileNetlist(netlist);
-    expect(compiled.diagnostics).toContainEqual(expect.objectContaining({ severity: 'error', code: 'no-ground' }));
+    expect(compiled.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+    expect(compiled.autoReferences.map((r) => [r.key, r.elementId, r.pin])).toEqual([['b', 'B1', 1]]);
     const sim = new CircuitSimulator(netlist);
-    expect(sim.canRun).toBe(false);
-    const result = sim.advance(0.01);
-    expect(result.ok).toBe(false);
-    expect(result.error?.code).toBe('no-ground');
+    expect(sim.canRun).toBe(true);
+    expect(sim.advance(0.01).ok).toBe(true);
+    expect(sim.measure('R1')!.current).toBeCloseTo(9 / 101, 12);
+    expect(sim.voltageAt('b')).toBe(0);
+    expect(sim.voltageAt('a')).toBeCloseTo((9 * 100) / 101, 9);
   });
 
   it('birbirine paralel iki ideal gerilim kaynağı → döngü hatası', () => {
@@ -84,22 +89,29 @@ describe('10. Topoloji', () => {
     expect(sim.measure('A1')!.current).toBeCloseTo(9 / 1.1, 5);
   });
 
-  it('toprak devreye bağlı değilse hata', () => {
-    expect(codes(circuit().battery('B1', 'a', 'b', 9, 1).resistor('R1', 'a', 'b', 10).ground('G1', 'yalniz'))).toContain(
-      'error:ground-unconnected',
-    );
+  // Eskiden hataydı; toprak isteğe bağlı olduğu için bağlı olmayan toprak sembolü yalnızca uyarıdır.
+  it('hiçbir şeye bağlı olmayan toprak sembolü uyarı (hata değil); devre kendi sıfır noktasıyla çalışır', () => {
+    const b = circuit().battery('B1', 'a', 'b', 9, 1).resistor('R1', 'a', 'b', 10).ground('G1', 'yalniz');
+    expect(codes(b)).toContain('warning:ground-unconnected');
+    expect(codes(b).some((c) => c.startsWith('error:'))).toBe(false);
+    const sim = new CircuitSimulator(b.build());
+    expect(sim.advance(0).ok).toBe(true);
+    expect(sim.measure('R1')!.current).toBeCloseTo(9 / 11, 9);
   });
 
-  it('toprağa bağlı olmayan devre parçası için uyarı', () => {
-    const list = codes(
-      circuit()
-        .battery('B1', 'a', 'gnd', 9, 1)
-        .ground('G1', 'gnd')
-        .resistor('R1', 'a', 'gnd', 10)
-        .battery('B2', 'x', 'y', 5, 1)
-        .resistor('R2', 'x', 'y', 10),
-    );
-    expect(list).toEqual(['warning:floating-island']);
+  // Eskiden "gerilimler belirsiz" uyarısıydı; artık parça kendi sıfır noktasını alır (bilgi).
+  it('toprağa bağlı olmayan devre parçası: bilgi (kendi sıfır noktası), akımı doğru', () => {
+    const b = circuit()
+      .battery('B1', 'a', 'gnd', 9, 1)
+      .ground('G1', 'gnd')
+      .resistor('R1', 'a', 'gnd', 10)
+      .battery('B2', 'x', 'y', 5, 1)
+      .resistor('R2', 'x', 'y', 10);
+    expect(codes(b)).toEqual(['info:floating-island']);
+    const sim = new CircuitSimulator(b.build());
+    sim.advance(0);
+    expect(sim.measure('R2')!.current).toBeCloseTo(5 / 11, 12);
+    expect(sim.voltageAt('y')).toBe(0);
   });
 
   it('kablolar union-find ile aynı düğümü birleştirir', () => {

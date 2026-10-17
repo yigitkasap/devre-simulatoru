@@ -46,7 +46,7 @@ import {
   voltageGradient,
   type WireScale,
 } from './colors';
-import { BurnBalloon, ContextMenu, NoGroundBanner, type MenuItem } from './CanvasOverlays';
+import { BurnBalloon, ContextMenu, ZeroMark, type MenuItem } from './CanvasOverlays';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
@@ -178,22 +178,15 @@ export interface CanvasProps {
   /** Boş tuvaldeki "Örneklerden başla" düğmesi. */
   readonly onExamples?: () => void;
   /** Hata ya da uyarısı olan parçalar: çerçeve ve köşede rozet (M07a, M07b). */
-  readonly issues?: ReadonlyMap<string, MessageSeverity>;
+  readonly issues?: ReadonlyMap<string, Exclude<MessageSeverity, 'info'>>;
   /** Uyarısı olan uçlar (boşta uç): büyütülmüş halka. */
   readonly issuePins?: readonly Point[];
   /** Toprak tuzağında topraklı cihazların COM uçları: aralarında şebeke toprağı çizgisi (M06b). */
   readonly earthLine?: readonly Point[] | null;
   /** Ayarlar → "Düğüm gerilimlerini yaz": her düğümün yanında gerilim etiketi (ızgara noktası, metin). */
   readonly nodeLabels?: readonly { readonly at: Point; readonly text: string }[];
-  /** "Devrede toprak yok": afiş ve önerilen toprak yeri (M07b). Telefonda afiş yerine alt sayfa. */
-  readonly noGround?: {
-    readonly banner: boolean;
-    readonly point: Point | null;
-    readonly text: string;
-    readonly fixLabel: string | null;
-    readonly onFix: () => void;
-    readonly onDismiss: () => void;
-  } | null;
+  /** Toprak yokken (ya da toprağa bağlı olmayan parçada) seçilen sıfır noktaları: "0 V" işareti. */
+  readonly zeroPoints?: readonly { readonly at: Point; readonly grounded: boolean }[];
   /** Yanan LED balonundaki "Neden?": Mesajlar sekmesinde açıklama. */
   readonly onExplain?: (partId: string) => void;
   readonly ref?: Ref<CanvasHandle>;
@@ -312,7 +305,7 @@ export function Canvas({
   issuePins,
   earthLine,
   nodeLabels,
-  noGround,
+  zeroPoints,
   onExplain,
   ref,
 }: CanvasProps) {
@@ -345,6 +338,8 @@ export function Canvas({
   };
   /** Kullanıcının kapattığı LED balonları (parça + yanma akımı). */
   const [dismissedBalloons, setDismissedBalloons] = useState<ReadonlySet<string>>(new Set());
+  /** Açıklaması açık olan sıfır noktası işareti. */
+  const [zeroTip, setZeroTip] = useState<number | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pointerType = useRef<string>('mouse');
   const longPress = useRef<{ timer: number; x: number; y: number; fired: boolean } | null>(null);
@@ -1449,9 +1444,10 @@ export function Canvas({
     if (blocked(false) && !blocked(true)) displayFlips.add(part.id);
   }
 
+  const highlightTone = highlight?.severity === 'error' || highlight?.severity === 'warning' ? highlight.severity : null;
   const toneOf = (id: string): PartTone =>
-    highlight && highlight.severity !== 'info' && highlight.parts.has(id)
-      ? highlight.severity
+    highlight && highlightTone && highlight.parts.has(id)
+      ? highlightTone
       : selectedParts.has(id)
         ? 'selected'
         : hover?.kind === 'part' && hover.partId === id
@@ -1603,22 +1599,6 @@ export function Canvas({
               <rect x={earthPath.mid + 14} y={earthPath.yb - 7} width={118} height={14} rx={7} fill="var(--color-ok-soft)" />
               <text x={earthPath.mid + 73} y={earthPath.yb + 3.5} textAnchor="middle" fontSize={8.5} fontWeight={500} fill="var(--color-ok-ink)">
                 {tr.earthLine}
-              </text>
-            </g>
-          )}
-          {noGround?.point && (
-            <g pointerEvents="none" aria-hidden="true" opacity={0.85}>
-              <path
-                d={`M${noGround.point.x * GRID} ${noGround.point.y * GRID}v18m-12 0h24m-20 6h16m-11 6h6`}
-                fill="none"
-                stroke="var(--color-accent)"
-                strokeWidth={2}
-                strokeDasharray="3 3"
-                strokeLinecap="round"
-              />
-              <rect x={noGround.point.x * GRID + 14} y={noGround.point.y * GRID + 12} width={58} height={14} rx={7} fill="var(--color-accent-soft)" />
-              <text x={noGround.point.x * GRID + 43} y={noGround.point.y * GRID + 22} textAnchor="middle" fontSize={8.5} fontWeight={500} fill="var(--color-accent-ink)">
-                {tr.noGround.suggested}
               </text>
             </g>
           )}
@@ -2000,9 +1980,23 @@ export function Canvas({
         );
       })()}
 
-      {noGround?.banner && (
-        <NoGroundBanner text={noGround.text} fixLabel={noGround.fixLabel} onFix={noGround.onFix} onDismiss={noGround.onDismiss} />
-      )}
+      {!phone?.strip &&
+        zeroPoints?.map((z, i) => {
+          const g = GRID * view.scale;
+          const x = z.at.x * g + view.x;
+          const y = z.at.y * g + view.y;
+          if (x < -40 || y < -40 || x > size.width + 40 || y > size.height + 40) return null;
+          return (
+            <ZeroMark
+              key={`${z.at.x},${z.at.y}`}
+              x={x}
+              y={y}
+              open={zeroTip === i}
+              onToggle={() => setZeroTip((t) => (t === i ? null : i))}
+              detail={z.grounded ? tr.zeroPoint.detailIsland : tr.zeroPoint.detail}
+            />
+          );
+        })}
 
       {phone && !isFitted && !bagla && !phone.strip && doc.parts.length > 0 && (
         <button

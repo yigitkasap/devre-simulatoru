@@ -45,7 +45,7 @@ describe('Fonksiyon üreteci', () => {
 
   it('DC offset, −20 dB zayıflatıcı ve topraklı COM (toprak sembolü gerekmez)', () => {
     const s = sim(gen(circuit().resistor('R1', 'out', 'com', 1e6), 'out', 'com', { offset: 3, amplitude: 2 }), 0.002);
-    expect(s.topologyDiagnostics.some((d) => d.code === 'no-ground')).toBe(false);
+    expect(s.topologyDiagnostics.some((d) => d.severity === 'error')).toBe(false);
     expect(s.voltageAt('com')).toBe(0);
     const w = swing(s, () => s.voltageAt('out')!, 0.001, 1e-6);
     expect(w.max).toBeCloseTo(4, 1);
