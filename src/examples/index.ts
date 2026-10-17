@@ -8,6 +8,7 @@ import type { CircuitDoc } from '../model/types';
 import ampermetreEtkisi from './ampermetre-etkisi.json';
 import barajCubuk from './baraj-cubuk.json';
 import barajTekIsik from './baraj-tek-isik.json';
+import bobinSerbestGecis from './bobin-serbest-gecis.json';
 import bjtAnahtar from './bjt-anahtar.json';
 import bjtAnahtarEmetor from './bjt-anahtar-emetor.json';
 import bjtYukseltec from './bjt-yukseltec.json';
@@ -28,6 +29,7 @@ import paralelKirpici from './paralel-kirpici.json';
 import pozitifKenetleyici from './pozitif-kenetleyici.json';
 import rcDolma from './rc-dolma.json';
 import rcKareDalga from './rc-kare-dalga.json';
+import rlDevresi from './rl-devresi.json';
 import toprakTuzagi from './toprak-tuzagi.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
@@ -41,7 +43,17 @@ import zenerKarakteristigi from './zener-karakteristigi.json';
 export const EXAMPLE_GROUPS = [
   {
     id: 'temel',
-    ids: ['led-on-direnc', 'gerilim-bolucu', 'voltmetre-yukleme', 'ampermetre-etkisi', 'rc-dolma', 'rc-kare-dalga', 'diyot-yonu'],
+    ids: [
+      'led-on-direnc',
+      'gerilim-bolucu',
+      'voltmetre-yukleme',
+      'ampermetre-etkisi',
+      'rc-dolma',
+      'rc-kare-dalga',
+      'rl-devresi',
+      'bobin-serbest-gecis',
+      'diyot-yonu',
+    ],
   },
   { id: 'aletler', ids: ['toprak-tuzagi'] },
   { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
@@ -70,6 +82,8 @@ const DATA: Record<ExampleId, unknown> = {
   'ampermetre-etkisi': ampermetreEtkisi,
   'rc-dolma': rcDolma,
   'rc-kare-dalga': rcKareDalga,
+  'rl-devresi': rlDevresi,
+  'bobin-serbest-gecis': bobinSerbestGecis,
   'diyot-yonu': diyotYonu,
   'toprak-tuzagi': toprakTuzagi,
   'diyot-dc': diyotDc,

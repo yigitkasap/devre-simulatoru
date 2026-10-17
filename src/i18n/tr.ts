@@ -30,6 +30,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ground: 'Toprak',
   resistor: 'Direnç',
   capacitor: 'Kondansatör',
+  inductor: 'Bobin',
   diode: 'Diyot',
   zener: 'Zener diyot',
   led: 'LED',
@@ -55,6 +56,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ground: 'toprak sembolünün',
   resistor: 'direncinin',
   capacitor: 'kondansatörünün',
+  inductor: 'bobininin',
   diode: 'diyotunun',
   zener: 'zener diyotunun',
   led: 'LED’inin',
@@ -79,6 +81,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   ground: ['ucu'],
   resistor: ['1. ucu', '2. ucu'],
   capacitor: ['+ ucu', '− ucu'],
+  inductor: ['1. ucu', '2. ucu'],
   diode: ['anot ucu', 'katot ucu'],
   zener: ['anot ucu', 'katot ucu'],
   led: ['anot ucu', 'katot ucu'],
@@ -105,6 +108,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   ground: ['⏚'],
   resistor: ['1', '2'],
   capacitor: ['+', '−'],
+  inductor: ['1', '2'],
   diode: ['A', 'K'],
   zener: ['A', 'K'],
   led: ['A', 'K'],
@@ -130,6 +134,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   ground: ['uç'],
   resistor: ['1. uç', '2. uç'],
   capacitor: ['+ uç', '− uç'],
+  inductor: ['1. uç', '2. uç'],
   diode: ['anot', 'katot'],
   zener: ['anot', 'katot'],
   led: ['anot', 'katot'],
@@ -257,6 +262,15 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           `${String(p.rating ?? 0).replace('.', ',')} W. Gerçek direnç aşırı ısınır, rengi kararır ve bozulabilir. ` +
           'Güç sınırı daha büyük bir direnç seç ya da akımı azalt.',
       };
+    case 'inductor-spike':
+      return {
+        title: 'Bobin akımı aniden kesildi',
+        detail:
+          `Bobin akımı aniden kesildi: yüksek gerilim sıçraması (Lenz yasası). ${firstLabel} bobininin uçlarında ` +
+          `${formatSI(p.voltage ?? 0, 'V')} görüldü. Bobin akımının değişmesine karşı koyar (v = L·di/dt): akımın yolu ` +
+          'açılınca depoladığı ½LI² enerjisi sargının küçük kapasitesine boşalır. Gerçekte anahtarın kontaklarında kıvılcım ' +
+          '(ark) oluşur. Bobine ters paralel bir diyot (serbest geçiş diyodu) bağlarsan sıçrama bir diyot gerilimiyle sınırlanır.',
+      };
     case 'capacitor-reverse':
       return {
         title: 'Elektrolitik kondansatöre ters gerilim',
@@ -292,9 +306,11 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Laboratuvardaki fonksiyon üreteci (GFG-8015G benzeri): sinüs, kare, üçgen; 0,2 Hz – 2 MHz, genlik, DC offset, simetri, −20 dB, 50 Ω çıkış, TTL darbe çıkışı. COM ucu şebeke toprağına bağlıdır.',
   dcsupply:
     'İki çıkışlı laboratuvar DC güç kaynağı: her çıkışın gerilimi (0–30 V) ve akım sınırı ayarlanır; çıkışlar topraktan yalıtılmıştır, seri bağlanabilir.',
-  ground: 'Devrenin 0 V referans noktası; her devrede en az bir tane olmalı.',
+  ground: 'Devrenin 0 V referans noktası. İsteğe bağlıdır: yoksa her devre parçası için otomatik bir sıfır noktası seçilir.',
   resistor: 'Üzerinden geçen akımla orantılı bir gerilim düşümü oluşturur: V = I · R.',
   capacitor: 'Yük depolar; bir direnç üzerinden zamanla dolar ya da boşalır.',
+  inductor:
+    'Akımı manyetik alanında enerji olarak depolar ve akımın değişmesine karşı koyar: v = L · di/dt (Faraday ve Lenz yasaları). Sargısının küçük bir direnci vardır.',
   diode: 'Akımı yalnızca bir yönde, anottan katoda geçirir; ileri yönde yaklaşık 0,6 V düşürür. Föydeki 1N4001 olarak gelir.',
   zener: 'Ters yönde, kırılma (zener) geriliminde iletime geçen diyot; gerilimi sınırlamak ve kırpmak için kullanılır.',
   led: 'Işık yayan diyot; fazla akım geçerse yanar, bu yüzden seri bir ön direnç gerekir.',
@@ -349,6 +365,8 @@ function fieldLabel(type: DeviceType, key: string): string {
     internalResistance: 'İç direnç',
     resistance: 'Direnç',
     capacitance: 'Kapasite',
+    inductance: 'Endüktans',
+    dcResistance: 'Sargı direnci (DC)',
     initialVoltage: 'Başlangıç gerilimi',
     powerRating: 'Güç sınırı',
     kind: 'Tür',
@@ -428,6 +446,24 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'Anahtarı kapattıktan 0,1 s sonra voltmetre kaç volt gösterir? Önce hesapla; sonra hızı ×0,1’e çek, Oynat’a bas ve anahtara tıkla.',
     answer:
       'Yaklaşık 6,3 V: V = 10 V · (1 − e⁻¹), yani 10 V’un %63’ü. 5τ = 0,5 s sonra kondansatör neredeyse tamamen dolar (≈ 9,9 V). Anahtarı açınca kondansatör yükünü korur; yalnızca voltmetrenin 10 MΩ’luk iç direnci üzerinden çok yavaş boşalır.',
+  },
+  'rl-devresi': {
+    title: 'RL devresi',
+    description:
+      '10 V’luk pil, anahtar, 100 Ω’luk (1 W’lık) direnç, ampermetre ve 10 mH’lik bobin (sargı direnci 12 Ω) seri bağlı; voltmetre bobinin uç gerilimini ölçüyor. Zaman sabiti τ = L / (R + R_{L}) = 10 mH / 112 Ω ≈ 89 µs.',
+    question:
+      'Anahtarı kapatınca akım hemen mi yükselir, son akım kaç mA olur? Sonra anahtarı aç: bobinin uçlarında ne olur? Önce tahmin et; hızı ×0,001’e çek, Oynat’a bas ve anahtara tıkla.',
+    answer:
+      'Akım hemen yükselmez: bobin akımın değişmesine karşı koyar (v = L·di/dt; Faraday ve Lenz yasaları). İlk anda bütün gerilim bobindedir (voltmetre ≈ 10 V); akım τ ≈ 89 µs’lik bir üstelle 10 V / 112 Ω ≈ 89 mA’e çıkar ve bobinde yalnızca sargı direncinin payı kalır (≈ 1,07 V). Anahtarı açınca akımın yolu kesilir: bobin akımı sürdürmeye çalışır, uçlarında kilovoltlarca bir gerilim sıçraması olur (½LI² ≈ 40 µJ’lük enerji sargının küçük kapasitesine boşalır) ve Mesajlar’da uyarı çıkar. Gerçek devrede anahtarın kontaklarında kıvılcım görülür. Çözüm sonraki örnekte: serbest geçiş diyodu.',
+  },
+  'bobin-serbest-gecis': {
+    title: 'Bobin ve serbest geçiş diyotu',
+    description:
+      'RL devresindeki bobine ters paralel bir 1N4001 bağlı (katodu bobinin üst ucunda): serbest geçiş (flyback) diyodu. Anahtar kapalıyken diyot ters yönde kutuplanmıştır, akım geçirmez.',
+    question:
+      'Anahtarı açınca bobinin uçlarındaki gerilim ne kadar olur, akım nereden akar? Hızı ×0,001’e çek, Oynat’a bas, anahtarı kapatıp sonra aç.',
+    answer:
+      'Anahtar açılınca bobin akımı diyottan dolaşmaya devam eder: bobinin üst ucu yalnızca bir diyot gerilimi kadar (≈ −0,6 V) eksiye iner, kilovoltluk sıçrama olmaz ve uyarı çıkmaz. Akım, sargı direnci ve diyot üzerinden yaklaşık bir milisaniyede söner; ½LI² ≈ 40 µJ’lük enerji ısıya dönüşür. Röle ve motor sürücülerinde bobine bu yüzden ters paralel diyot bağlanır.',
   },
   'diyot-yonu': {
     title: 'Diyot yönü',
@@ -774,6 +810,11 @@ export const tr = {
     powerDelivered: 'Verdiği güç',
     internalLoss: 'İç dirençte kaybolan güç',
     energy: 'Depolanan enerji (½CV²)',
+    inductance: 'Endüktans',
+    coilEnergy: 'Depolanan enerji (½LI²)',
+    inductorRising: 'Akım artıyor: bobin bu değişime karşı koyar (Lenz), uçlarında v = L·di/dt kadar gerilim var.',
+    inductorFalling: 'Akım azalıyor: bobin depoladığı enerjiyi devreye geri veriyor (v = L·di/dt).',
+    inductorSteady: 'Akım değişmiyor: bobin, sargı direnci kadar bir dirençtir.',
     forwardVoltage: 'Gerilim (anot − katot)',
     brightness: 'Parlaklık',
     state: 'Durum',
@@ -1257,6 +1298,8 @@ export const tr = {
     notes: {
       battery: 'İç direnç, pilin verebileceği akımı sınırlar: kısa devrede I = V / R_{iç}.',
       capacitor: 'Başlangıç gerilimi, simülasyon başladığında (ve Durdur’dan sonra) kondansatörün + ucu ile − ucu arasındaki gerilimdir.',
+      inductor:
+        'Varsayılan değerler gerçek bir bobinden (Bourns RLB1314-103KL: 10 mH, sargı direnci 12 Ω, en fazla 100 mA). Sargı direncini 0 yaparsan ideal bobin olur.',
       diode: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer.',
       voltmeter:
         'Gerçek voltmetrelerin iç direnci sonludur. Ölçtüğün kaynağın iç direnci büyükse voltmetre gerçek değerden düşük okur (yükleme etkisi).',

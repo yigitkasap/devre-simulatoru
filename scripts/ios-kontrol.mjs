@@ -834,6 +834,32 @@ try {
     await ctx.close();
   }
 
+  // --- Bobin (Fizik 7): kütüphanede, RL örneğinde anahtar açılınca Lenz uyarısı -------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const bp = await ctx.newPage();
+    bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await bp.goto(URL0, { waitUntil: 'networkidle' });
+    const inLibrary = await bp.getByRole('button', { name: 'Bobin', exact: true }).count();
+    await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
+    await bp.getByRole('button', { name: 'RL devresi', exact: true }).click(); await bp.waitForTimeout(400);
+    await bp.getByRole('button', { name: 'Oynat', exact: true }).last().click(); await bp.waitForTimeout(400);
+    const box = await bp.locator('svg.schematic text', { hasText: /^S1$/ }).first().boundingBox();
+    const toggle = async () => { await bp.mouse.click(box.x + box.width / 2, box.y + box.height + 12); await bp.waitForTimeout(600); };
+    await toggle();
+    const closedText = (await bp.locator('svg.schematic text', { hasText: /mA$/ }).allTextContents()).join(' ');
+    await toggle();
+    await bp.getByRole('tab', { name: /Mesajlar/ }).click(); await bp.waitForTimeout(200);
+    const text = (await bp.getByRole('tabpanel').textContent()) ?? '';
+    check(
+      'masaüstü: kütüphanede Bobin; RL örneğinde akım ≈ 89 mA, anahtar açılınca Lenz uyarısı (Fizik 7)',
+      inLibrary >= 1 && closedText.includes('89,') && text.includes('Bobin akımı aniden kesildi') && text.includes('Lenz'),
+      `${inLibrary} kütüphane; ampermetre ${closedText}; ${text.slice(0, 50)}`,
+    );
+    await ctx.close();
+  }
+
   // --- Sıkışık masaüstü (1100 px): kütüphane şerit, açılır kart --------------------------
   const compact = await browser.newContext({ viewport: { width: 1100, height: 760 }, locale: 'tr-TR' });
   const cp = await compact.newPage();

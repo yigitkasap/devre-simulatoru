@@ -11,8 +11,9 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 
 ## Özellikler
 
-- **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç, kondansatör,
-  diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
+- **Parçalar:** pil (iç dirençli), AC kaynak (sinüs/kare/üçgen), toprak, direnç (güç sınırlı),
+  kondansatör (elektrolitik ya da seramik/film), bobin (sargı direnci ve sargı kapasitesiyle; akımı
+  kesilince Lenz uyarısı), diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
   N ve P kanallı MOSFET, anahtar, voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
@@ -237,7 +238,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 358 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 374 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -253,7 +254,9 @@ kablo yolu; `tests/phone.test.ts`), toprak isteğe bağlı (`tests/toprak.test.t
 akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`) ve zaman adımı
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
-ve "çıkmaz") ve ngspice ile çapraz doğrulama (`tests/spice/`: DC, geçici durum ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
+ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek) ve ngspice ile çapraz doğrulama
+(`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
 **Fizik denetimi** (`tests/fizik-denetimi.test.ts`): 71 kontrol, her biri analitik olarak hesaplanan
@@ -456,8 +459,9 @@ geçiyor. Aşamaların kararları aşağıda.
   0,9·oran^(−1/(p+1)) kadar küçülür (en az yarıya, en fazla onda bire); kabul edilen adımdan sonra
   aynı formülle büyür (en fazla 2 kat, en büyük adıma kadar). En küçük adım 1 ns, en büyük adım
   50 µs (ya da AC periyodunun 1/50'si) aynı kaldı. Geçmiş olmayan başlangıçta (simülasyonun ilk
-  adımı, devre değişince) ilk adım en büyük adımın binde biridir (50 ns) ve her adımda iki katına
-  çıkar; hata denetimi üç nokta birikince başlar.
+  adımı, devre değişince) ilk adım en büyük adımın on binde biridir (5 ns; Fizik 7'de 50 ns'den
+  indirildi) ve her adımda iki katına çıkar; hata denetimi üç nokta birikince başlar, o zamana
+  kadar adımlar geri Euler'dir.
 - *Kırılma noktaları:* kaynaklar bir sonraki süreksizliği verir (`nextBreakpoint`): kare dalganın
   iki kenarı, üçgenin köşeleri, simetri %50 değilse bükülmüş sinüsün kırıkları ve fonksiyon
   üretecinin TTL kenarları (yalnızca TTL ucu bir yere bağlıysa). Adım tam kenara denk getirilir;
@@ -481,11 +485,21 @@ geçiyor. Aşamaların kararları aşağıda.
   emetörde LED 20 000 → 20 047, 54 → 117 ms; baraj çubuk 20 000 → 20 000, 106 → 139 ms; baraj tek
   ışık 20 000 → 20 000, 139 → 184 ms. Adımlar diyotların iletime girip çıktığı anlarda toplanır
   (1N4001'in ters toparlanması µs ölçeğindedir; periyotta dört olay, olay başına 25–70 deneme).
-  Tarayıcıda (Edge, ×1 hız) bütün föy ve baraj örnekleri önce ve sonra gerçek zamanı tutuyor
-  (4 s'de simülasyon/gerçek zaman oranı 0,999–1,002), kare hızı değişmedi, gecikme uyarısı yok.
+  Tarayıcıda (Edge, ×1 hız) ölçüm sırasında bütün föy ve baraj örnekleri önce ve sonra gerçek
+  zamanı tutuyordu (4 s'de simülasyon/gerçek zaman oranı 0,999–1,002), gecikme uyarısı yoktu.
+- *Sonradan yapılan eşleştirilmiş ölçüm (Aşama 7'den sonra, makine daha yüklüyken; önce = Aşama 3
+  sürümü, sonra = son sürüm, aynı oturumda):* çift yönlü kırpıcı Node'da 382 → 1636 ms/sim-s, paralel
+  kırpıcı 305 → 983 ms/sim-s, BJT yükselteç 594 → 826 ms/sim-s. Tarayıcıda aynı yükte canlı site
+  (eski çözücü) çift yönlü kırpıcıda 85 fps ve gerçek zamanda; yeni çözücü 14 fps ve gerçek zamanın
+  %79'unda kalıyor ("gerçek zamana yetişemiyor" uyarısı çıkıyor). Öteki bütün örnekler gerçek zamanı
+  tutuyor (paralel kırpıcı 45 fps). Neden: iki 1N4001'in ters toparlanması (τ_T = 5,76 µs) SPICE
+  toleranslarında her diyot geçişinde 25–70 deneme istiyor (periyotta dört geçiş); adım sayısı 2,
+  Newton-Raphson yinelemesi ≈ 1,5 kat. Yamuk adımında Newton-Raphson'u son iki çözümden doğrusal
+  öngörüyle başlatmak yinelemeyi %17–25 azalttı (JFET yükselteçte süre %10 kısaldı); büyüme
+  güvenlik çarpanını değiştirmek kazandırmadı. Görev tanımı gereği bu durum raporlandı.
 - *Testler:* `tests/zaman-adimi.test.ts` (küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
   kare dalga kenarları, salınımsızlık, kullanılmayan TTL); adım sayısını sabit 50 µs'ye bağlayan
-  iki eski test "en az 2000, en fazla 2015" (başlangıçtaki ≈ 10 küçük adım) olarak güncellendi;
+  iki eski test "en az 2000, en fazla 2015" (başlangıçtaki ≈ 14 küçük adım) olarak güncellendi;
   fizik denetiminde örnekleme aralığı olarak çözücünün adımı yerine `maxTimeStep` kullanılıyor.
 
 **Fizik 5: ters gerilim, güç ve kutup sınırları.**
@@ -571,6 +585,54 @@ ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta
   yayımlandı; bağımlılığı yok). `npm audit`'in bildirdiği kritik açık bu paketle ilgili değil,
   Astro 6.4.8'in kendisinde (düzeltmesi Astro 7'ye geçiş istiyor; bu aşamanın kapsamı dışında).
 
+**Fizik 7: bobin, Faraday ve Lenz yasaları.**
+
+- *Parça:* "Bobin" (pasif parçalar, etiket öneki L). Özellikler: endüktans (varsayılan 10 mH) ve
+  sargı direnci (varsayılan 12 Ω). Varsayılanlar gerçek bir bobinden: **Bourns RLB1314-103KL**
+  radyal bobin, 10 mH ±%10, DC direnci en fazla 12 Ω, I_dc 100 mA, öz rezonans frekansı (SRF)
+  0,53 MHz (üretici veri sayfası değerleri; Farnell ve RS listeleri). 10 V / 100 Ω'luk RL devresinin
+  100 mA'i bu bobinin akım sınırıdır.
+- *Model* ([`inductor.ts`](src/sim/devices/inductor.ts)): uç 0 ── R_dc ── L ── uç 1, MNA'da akım
+  bilinmeyeniyle (dal satırı v_L − R_eş·i = sağ taraf). Yamukta R_eş = 2L/h, sağ taraf
+  −R_eş·i(n) − v(n); geri Euler'de R_eş = L/h; doğru akımda kısa devre. Aşama 4'ün integrasyonu
+  ve LTE denetimi (bobin akımı bir durum değişkenidir, akım toleransıyla). Sembol dört sarım
+  (yarım daire), çizgi kalınlığı öbür sembollerle aynı. İnceleme panelinde endüktans, akım, uç
+  gerilimi ve ½LI²; not, akımın arttığını ya da azaldığını L'nin kendi geriliminin işaretinden
+  söyler.
+- *Lenz yasası ve açılan anahtar (görev tanımından ayrılan yer):* tanım örnek olarak açık anahtara
+  kaçak direnci ve kapasite koymayı öneriyor; ama bu, Fizik 2'deki "açık devrede akım tam 0"
+  kuralını bozardı (açık anahtarlı devrede ampermetre 0 göstermezdi). Bunun yerine gerçek
+  bobinin kendi **sargı kapasitesi** modellenir: C_p = 1/((2π·SRF)²·L) ≈ 9,0 pF (RLB1314-103KL'nin
+  SRF'sinden; her endüktans için aynı alınır), uçlar arasında. Anahtar açılınca bobin akımı
+  C_p'ye akar; gerilim enerji korunumuyla ≈ I·√(L/C_p)'ye çıkar (89 mA'de ≈ 3 kV; gerçekte bu
+  gerilimde kontaklar arasında ark oluşur, ark modellenmez) ve SRF'de salınarak söner. Sonlu,
+  NaN yok; açık anahtardan akım yine tam 0. C_p parazit ve serttir (100 Ω'da τ ≈ 1 ns): yamuk
+  kuralı onda sönmeyen bir akım salınımı bırakıyordu, bu yüzden geri Euler ile çözülür
+  (osiloskobun 25 pF'ı gibi); geri Euler'in sönümü ilk tepeyi ≈ %10 düşürür (2,70 kV; ideal
+  2,98 kV) ve salınımı birkaç periyotta söndürür (gerçek bobinin SRF'deki çekirdek kayıplarına
+  benzer). Anahtar açılınca başlayan hızlı salınımı baştan izleyebilmek için başlangıç adımı en
+  büyük adımın on binde birine (5 ns) indirildi ve hata denetimi devreye girene kadar (geçmişte
+  üç nokta) geri Euler kullanılır (yamuk kuralı denetimsiz başlangıç adımlarında diyot ekleminde
+  ≈ %8'lik bir aşma yapıyordu).
+- *Uyarı:* "Bobin akımı aniden kesildi: yüksek gerilim sıçraması (Lenz yasası)…". Bobin, devre
+  değiştiği anda (ör. anahtar açıldı) akım taşıyorduysa kurulur ve o andan sonraki en büyük uç
+  gerilimini tutar; bu, devredeki kaynakların ve kondansatörlerin başlangıç gerilimlerinin iki
+  katını (en az 20 V) aşarsa uyarı çıkar ve devre yeniden değişene kadar kalır. Böylece seri
+  RLC rezonansındaki yüksek gerilim ya da LC salınımı uyarı vermez. Serbest geçiş diyodu bağlıysa
+  akım diyottan dolaşır, sıçrama bir diyot gerilimiyle (≈ −0,6 V) sınırlanır, uyarı çıkmaz.
+- *Testler* (`tests/bobin.test.ts`, analitik değerlerle): RL dolma (10 V, 100 Ω, 10 mH) i(τ) =
+  63,2 mA, i(5τ) %1 içinde; kararlı durumda ½LI² = 50 µJ; 50 Hz'te X_L = 3,1416 Ω ve etkin akım
+  %1 içinde; bobinde gerilim akımdan 90° önde (1° içinde); LC (10 µF 10 V'ta, 10 mH ideal)
+  periyot 1,987 ms (%0,5), tepe akım 0,316 A (%1), enerji bir periyotta en fazla %1 kayıp (yamuk
+  kuralı enerjiyi korur); seri RLC'de akım f₀ = 503,3 Hz'te V/R ve komşu frekanslarda küçük;
+  açılan anahtar: sıçrama sonlu, ideal değerin %85–100'ü, NaN yok, uyarı var; serbest geçiş
+  diyoduyla tepe 1 V'un altında, uyarı yok; iki örneğin cevap metnindeki sayılar. ngspice
+  karşılaştırmasına RL dolma (%0,007) ve LC salınımı (iki periyotta %0,36: yamuk kuralının
+  50 µs'lik adımdaki küçük faz kayması) eklendi.
+- *Örnekler:* "RL devresi" (10 V, anahtar, 100 Ω / 1 W, ideal ampermetre, 10 mH bobin, bobine
+  voltmetre; τ = L/(R + R_L) ≈ 89 µs, son akım ≈ 89 mA) ve "Bobin ve serbest geçiş diyotu" (aynı
+  devre, bobine ters paralel 1N4001).
+
 ### Editör
 
 - **Bağlantı kuralları:** Aynı noktadaki pinler ve kablo köşeleri bağlıdır. Bir kablonun ucu
@@ -631,7 +693,7 @@ ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 137 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 138 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
@@ -973,7 +1035,8 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   (telefonda alt sayfada). Gruplar ve sıraları
   [`src/examples/index.ts`](src/examples/index.ts) içindedir; iOS kuralı gereği pencere açıkken
   tuvalin `touch-action` değeri kaldırılır (pencere parmakla kaydırılabilsin).
-- **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC"),
+- **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC",
+  "RL devresi", "Bobin ve serbest geçiş diyotu"),
   Laboratuvar cihazları ("Toprak tuzağı") ve Fizik 2. sınıf Elektronik Laboratuvarı föyünün
   dokuz deneyi (föy 3. aşama; eski genel laboratuvar örneklerinin yerine), en sonda "Proje · Baraj
   su seviyesi uyarısı" (iki devre; bkz. baraj bölümleri). Föy örneklerinde

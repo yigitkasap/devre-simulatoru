@@ -33,6 +33,7 @@ import {
   CAPACITOR_DEFAULTS,
   CAPACITOR_KINDS,
   CAPACITOR_LEGACY_KIND,
+  INDUCTOR_DEFAULTS,
   LED_COLORS,
   LED_DEFAULTS,
   OSCILLOSCOPE_DEFAULTS,
@@ -278,6 +279,20 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     polarized: true,
     legacyProps: { kind: CAPACITOR_LEGACY_KIND },
   },
+  inductor: {
+    type: 'inductor',
+    category: 'passive',
+    labelPrefix: 'L',
+    pins: TWO_PINS,
+    bounds: { x: -4, y: -1.1, w: 8, h: 2.2 },
+    defaultProps: { ...INDUCTOR_DEFAULTS },
+    propDefs: [
+      { kind: 'number', key: 'inductance', unit: 'H', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'dcResistance', unit: 'Ω', min: { value: 0, exclusive: false } },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
   diode: {
     type: 'diode',
     category: 'semiconductors',
@@ -451,7 +466,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
 /** Kütüphane panelindeki sıra. */
 export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: readonly DeviceType[] }> = [
   { id: 'sources', types: ['battery', 'acsource', 'ground'] },
-  { id: 'passive', types: ['resistor', 'capacitor'] },
+  { id: 'passive', types: ['resistor', 'capacitor', 'inductor'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'switches', types: ['switch'] },

@@ -9,6 +9,7 @@
 //     TF, CJC, VJC, MJC.
 //   - MOSFET: LEVEL 1, W = L, KP = 2β (bizde I_D = β·(V_GS − V_T)²), VTO, LAMBDA; gövde source'a
 //     bağlı.
+//   - Bobin: sargı direnci + L + uçlar arasındaki sargı kapasitesi (bizdeki yapı).
 // Sıcaklık 300 K (bizim VT'miz): TEMP = TNOM = 26,85 °C. ngspice her eklemin paralelinde GMIN =
 // 10⁻¹² S kullanır (bizdeki gibi).
 
@@ -20,6 +21,7 @@ import { BJT_PARAMS, BjtDevice } from '../../src/sim/devices/bjt';
 import { CapacitorDevice } from '../../src/sim/devices/capacitor';
 import type { Device } from '../../src/sim/devices/device';
 import { DIODE_MODEL_PARAMS, DiodeDevice } from '../../src/sim/devices/diode';
+import { INDUCTOR_WINDING_CAPACITANCE, InductorDevice } from '../../src/sim/devices/inductor';
 import { LED_MODELS, LedDevice } from '../../src/sim/devices/led';
 import { ResistorDevice } from '../../src/sim/devices/resistor';
 import { ZenerDevice } from '../../src/sim/devices/zener';
@@ -66,6 +68,12 @@ export function toSpice(netlist: Netlist, options: { acMagnitude?: boolean } = {
       lines.push(`R${id} ${n(device, 0)} ${n(device, 1)} ${num(device.resistance)}`);
     } else if (device instanceof CapacitorDevice) {
       lines.push(`C${id} ${n(device, 0)} ${n(device, 1)} ${num(device.capacitance)} IC=${num(device.voltage)}`);
+    } else if (device instanceof InductorDevice) {
+      // uç 0 ── R_dc ── iç düğüm ── L ── uç 1; sargı kapasitesi uçlar arasında.
+      const start = device.dcResistance > 0 ? n(device, 2) : n(device, 0);
+      if (device.dcResistance > 0) lines.push(`R${id}_dc ${n(device, 0)} ${start} ${num(device.dcResistance)}`);
+      lines.push(`L${id} ${start} ${n(device, 1)} ${num(device.inductance)} IC=${num(device.current)}`);
+      lines.push(`C${id}_p ${n(device, 0)} ${n(device, 1)} ${num(INDUCTOR_WINDING_CAPACITANCE)} IC=0`);
     } else if (device instanceof BatteryDevice) {
       // (−) ── ideal kaynak ── iç düğüm ── R_iç ── (+)
       if (device.internalResistance > 0) {

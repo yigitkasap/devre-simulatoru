@@ -161,6 +161,16 @@ suite('Fizik 6: ngspice ile geçici durum karşılaştırması (.tran, en fazla 
     await compareTran('Yük paylaşımı C2', n, 'b', null, range(0.1e-3, 5e-3, 0.1e-3), { tmax: 1e-6, uic: true });
   });
 
+  it('RL dolma (10 V, 100 Ω, 10 mH; τ = 100 µs): direncin gerilimi (akım × 100 Ω)', async () => {
+    const n = circuit().battery('B', 'a', 'g', 10).ground('G', 'g').resistor('R', 'a', 'x', 100).add('inductor', 'L', ['x', 'g'], { inductance: 10e-3, dcResistance: 0 }).build();
+    await compareTran('RL dolma', n, 'a', 'x', range(5e-6, 500e-6, 5e-6), { tmax: 1e-7, uic: true });
+  });
+
+  it('LC salınımı (10 µF 10 V’ta, 10 mH ideal; T ≈ 1,987 ms): kondansatör gerilimi', async () => {
+    const n = circuit().ground('G', 'g').capacitor('C', 'a', 'g', 10e-6, 10).add('inductor', 'L', ['a', 'g'], { inductance: 10e-3, dcResistance: 0 }).build();
+    await compareTran('LC salınımı', n, 'a', null, range(20e-6, 4e-3, 20e-6), { tmax: 1e-7, uic: true });
+  });
+
   it('Yarım dalga doğrultucu (50 Hz, 10 V tepe, 1N4001, 1 kΩ)', async () => {
     const n = circuit().acsource('S', 'a', 'g', { waveform: 'sine', amplitude: 10, frequency: 50, offset: 0, internalResistance: 0 }).ground('G', 'g')
       .add('diode', 'D', ['a', 'k'], { model: '1N4001' }).resistor('R', 'k', 'g', 1000).build();

@@ -182,6 +182,21 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: m.current > 1e-9 ? t.charging : m.current < -1e-9 ? t.discharging : t.steady,
       };
     }
+    case 'inductor': {
+      const L = numProp(p, 'inductance', 10e-3);
+      // L'nin kendi gerilimi (uç geriliminden sargı direncinin payı çıkınca): işareti akımın arttığını ya da azaldığını söyler.
+      const coil = m.voltage - numProp(p, 'dcResistance', 12) * m.current;
+      return {
+        title,
+        rows: [
+          { label: t.inductance, value: formatSI(L, 'H', { trim: true }) },
+          { label: t.current, value: a(I) },
+          { label: t.terminalVoltage, value: v(m.voltage) },
+          { label: t.coilEnergy, value: formatSI(0.5 * L * I * I, 'J') },
+        ],
+        note: Math.abs(coil) < 1e-6 + 1e-3 * Math.abs(m.voltage) ? t.inductorSteady : coil * m.current > 0 ? t.inductorRising : t.inductorFalling,
+      };
+    }
     case 'diode':
     case 'led': {
       const rows: ReadoutRow[] = [

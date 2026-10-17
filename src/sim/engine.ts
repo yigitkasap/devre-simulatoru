@@ -30,7 +30,9 @@ import { hasErrors, type Diagnostic } from './diagnostics';
 import {
   AcSourceDevice,
   BatteryDevice,
+  CapacitorDevice,
   DEVICE_MODELS,
+  InductorDevice,
   LedDevice,
   type Device,
   type DeviceStatus,
@@ -410,9 +412,28 @@ export class CircuitSimulator {
         result.push({ severity: 'warning', code: warning.code, elementIds: [device.id], netKeys: [], params: { ...warning.params } });
       }
     }
+    // Bobinin akımı aniden kesildi (Lenz): uç gerilimi devredeki kaynakların ve kondansatörlerin
+    // başlangıç gerilimlerinin iki katını (en az 20 V) aşıyor.
+    const reference = this.referenceVoltage();
+    for (const device of this.circuit.devices) {
+      if (!(device instanceof InductorDevice)) continue;
+      const voltage = device.spikeVoltage();
+      if (voltage > Math.max(20, 2 * reference)) {
+        result.push({ severity: 'warning', code: 'inductor-spike', elementIds: [device.id], netKeys: [], params: { voltage } });
+      }
+    }
     const earth = this.groundReturn();
     if (earth) result.push(earth);
     return result;
+  }
+
+  /** Devrede kaynakların tepe gerilimi ya da kondansatörlerin başlangıç gerilimi (hangisi büyükse). */
+  private referenceVoltage(): number {
+    let max = this.maxSourceVoltage();
+    for (const device of this.circuit.devices) {
+      if (device instanceof CapacitorDevice) max = Math.max(max, Math.abs(Number(device.props.initialVoltage ?? 0)));
+    }
+    return max;
   }
 
   /**
@@ -678,7 +699,9 @@ export class CircuitSimulator {
       attempts++;
       const ctx: StepContext = {
         h,
-        trap: !this.eulerNext,
+        // Yamuk kuralı yalnızca hata denetimi yapılabildiğinde (geçmişte üç nokta varken): denetimsiz
+        // başlangıç adımlarında sert bir kipte (ör. diyot eklemi) sönmeyen salınım bırakabilir.
+        trap: !this.eulerNext && (this.lteStates.length === 0 || this.historyCount >= 3),
         sourceScale: 1,
         time: end,
         window: this.window,
@@ -1064,6 +1087,17 @@ export class CircuitSimulator {
 
     // Newton-Raphson: x(k+1), x(k) etrafında doğrusallaştırılmış sistemin çözümüdür.
     this.xIter.set(this.x);
+    // Yamuk adımında başlangıç noktası son iki çözümden doğrusal öngörü (SPICE'taki öngörücü): eğri
+    // boyunca ilerleyen bir çözümde yineleme sayısı azalır. Süreksizlikten sonraki geri Euler adımında
+    // öngörü eski eğilimi taşıdığı için kullanılmaz.
+    if (ctx.trap && this.historyCount >= 2) {
+      const t0 = this.historyTimes[0]!;
+      const f = (ctx.time - t0) / (t0 - this.historyTimes[1]!);
+      const x0 = this.history[0]!;
+      const x1 = this.history[1]!;
+      for (let i = 0; i < n; i++) this.xIter[i] = x0[i]! + f * (x0[i]! - x1[i]!);
+      for (const device of nonlinear) device.updateIterate(this.xIter);
+    }
     for (let iteration = 0; iteration < NR_MAX_ITERATIONS; iteration++) {
       this.iterSys.copyFrom(this.stepSys);
       for (const device of nonlinear) device.stampNonlinear(this.iterSys, ctx);

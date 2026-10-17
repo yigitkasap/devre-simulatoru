@@ -202,7 +202,7 @@ describe('8. RC dolma', () => {
     expect(sim.isTransient).toBe(true);
     const result = sim.runUntil(0.1);
     expect(result.ok).toBe(true);
-    // En büyük adım 50 µs (2000 adım); başlangıçta adım 50 ns'den büyür (≈ 10 adım daha).
+    // En büyük adım 50 µs (2000 adım); başlangıçta adım 5 ns'den büyür (≈ 14 adım daha).
     expect(result.steps).toBeGreaterThanOrEqual(2000);
     expect(result.steps).toBeLessThanOrEqual(2015);
     expect(sim.time).toBeCloseTo(0.1, 9);

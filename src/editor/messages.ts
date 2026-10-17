@@ -64,6 +64,7 @@ export interface EarthTrap {
 const SHORTABLE: ReadonlySet<DeviceType> = new Set<DeviceType>([
   'resistor',
   'capacitor',
+  'inductor',
   'diode',
   'zener',
   'led',

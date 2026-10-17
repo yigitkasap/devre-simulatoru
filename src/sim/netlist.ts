@@ -13,6 +13,7 @@ export type DeviceType =
   | 'ground'
   | 'resistor'
   | 'capacitor'
+  | 'inductor'
   | 'diode'
   | 'zener'
   | 'led'

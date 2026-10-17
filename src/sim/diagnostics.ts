@@ -31,6 +31,8 @@ export type DiagnosticCode =
   | 'resistor-overpower'
   /** Elektrolitik kondansatör üreticinin izin verdiğinden (1 V) fazla ters gerilim görüyor. */
   | 'capacitor-reverse'
+  /** Bobinin akımı aniden kesildi: uçlarında kaynaklardan çok büyük bir gerilim sıçraması (Lenz). */
+  | 'inductor-spike'
   /** Newton-Raphson en küçük zaman adımında da yakınsamadı. */
   | 'nr-failed'
   /** LU ayrıştırmasında sıfır pivot (tekil matris). */

@@ -15,6 +15,7 @@ import { diodeModel } from './diode';
 import { njfetModel, nmosModel, pjfetModel, pmosModel } from './fet';
 import { funcgenModel } from './funcgen';
 import { groundModel } from './ground';
+import { inductorModel } from './inductor';
 import { ledModel } from './led';
 import { oscilloscopeModel } from './oscilloscope';
 import { resistorModel } from './resistor';
@@ -31,6 +32,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   ground: groundModel,
   resistor: resistorModel,
   capacitor: capacitorModel,
+  inductor: inductorModel,
   diode: diodeModel,
   zener: zenerModel,
   led: ledModel,
@@ -94,6 +96,7 @@ export {
 } from './fet';
 export { ZENER_DEFAULTS, ZENER_TEST_CURRENT, ZenerDevice } from './zener';
 export { CapacitorDevice, CAPACITOR_DEFAULTS, CAPACITOR_KINDS, CAPACITOR_LEGACY_KIND, type CapacitorKind } from './capacitor';
+export { InductorDevice, INDUCTOR_DEFAULTS, INDUCTOR_SRF, INDUCTOR_WINDING_CAPACITANCE } from './inductor';
 export {
   DiodeDevice,
   DIODE_DEFAULTS,

@@ -145,6 +145,17 @@ function Resistor({ style, powerRatio }: { style: ResistorStyle; powerRatio?: nu
   );
 }
 
+/** Bobin: dört sarım (yarım daire), uçlar dirençteki gibi ±24 px'ten başlar. */
+function Inductor() {
+  return (
+    <g>
+      <Lead from={-40} to={-24} />
+      <Lead from={24} to={40} />
+      <path d="M-24,0 a6,6 0 0 1 12,0 a6,6 0 0 1 12,0 a6,6 0 0 1 12,0 a6,6 0 0 1 12,0" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+    </g>
+  );
+}
+
 /** Kondansatör: elektrolitikte + ucu işaretli (kutuplu), seramik/filmde işaretsiz. */
 function Capacitor({ polarized }: { polarized: boolean }) {
   return (
@@ -637,6 +648,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Resistor style={resistorStyle} {...(live?.powerRatio !== undefined ? { powerRatio: live.powerRatio } : {})} />;
     case 'capacitor':
       return <Capacitor polarized={partProp('capacitor', props, 'kind') === 'electrolytic'} />;
+    case 'inductor':
+      return <Inductor />;
     case 'diode':
       return <DiodeBody fill="currentColor" />;
     case 'led':

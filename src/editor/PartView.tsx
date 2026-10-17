@@ -37,6 +37,11 @@ export function partValueText(part: Part): string {
       return formatSI(numProp(p, 'resistance', 0), 'Ω', { trim: true, digits: 4 });
     case 'capacitor':
       return formatSI(numProp(p, 'capacitance', 0), 'F', { trim: true, digits: 4 });
+    case 'inductor': {
+      const L = formatSI(numProp(p, 'inductance', 0), 'H', { trim: true, digits: 4 });
+      const r = numProp(p, 'dcResistance', 0);
+      return r > 0 ? `${L} · ${formatSI(r, 'Ω', { trim: true, digits: 3 })}` : L;
+    }
     case 'led':
       return tr.devices.ledColors[strProp(p, 'color', LED_COLORS, 'red')] ?? '';
     case 'zener':

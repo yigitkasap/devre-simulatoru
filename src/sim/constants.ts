@@ -35,10 +35,12 @@ export const LTE_TRTOL = 7;
 export const MAX_STEP_GROWTH = 2;
 /**
  * Geçmişi olmayan bir başlangıçta (simülasyonun ilk adımı, devre değişince) ilk adım: en büyük
- * adımın binde biri. LTE tahmini için en az iki-üç kabul edilmiş nokta gerekir; adım oradan
- * itibaren her adımda en fazla iki katına çıkar (50 µs'ye ≈ 10 adımda ulaşır).
+ * adımın on binde biri (50 µs'de 5 ns). LTE tahmini için en az iki-üç kabul edilmiş nokta gerekir;
+ * adım oradan itibaren her adımda en fazla iki katına çıkar (50 µs'ye ≈ 14 adımda ulaşır). Küçük
+ * başlamak, anahtar açılınca bobinin sargı kapasitesiyle yaptığı hızlı salınımı (≈ 0,5 MHz)
+ * baştan doğru izlemek için gerekir.
  */
-export const START_STEP_FRACTION = 1e-3;
+export const START_STEP_FRACTION = 1e-4;
 
 /** Newton-Raphson: en fazla iterasyon sayısı. */
 export const NR_MAX_ITERATIONS = 100;
