@@ -796,6 +796,44 @@ try {
   check('masaüstü: toprak tuzağı mesajına tıklayınca toprak hattı vurgulanır', earthGlow >= 1, `${earthGlow} vurgu`);
   await trapCtx.close();
 
+  // --- Gerçek dünya sınırları (Fizik 5): ısınan direnç, ters LED, ters elektrolitik ------------
+  {
+    const limits = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
+      { id: 'p2', type: 'resistor', label: 'R1', x: 12, y: -6, rotation: 0, props: { resistance: 10 } },
+      { id: 'p3', type: 'resistor', label: 'R2', x: 24, y: 0, rotation: 90, props: { resistance: 100 } },
+      { id: 'p4', type: 'led', label: 'D1', x: 36, y: 0, rotation: 270, props: { color: 'red' } },
+      { id: 'p5', type: 'capacitor', label: 'C1', x: 48, y: 0, rotation: 270, props: { capacitance: 1e-5, initialVoltage: 0, kind: 'electrolytic' } },
+      { id: 'p6', type: 'capacitor', label: 'C2', x: 60, y: 0, rotation: 270, props: { capacitance: 1e-5, initialVoltage: 0, kind: 'film' } },
+      { id: 'p7', type: 'ground', label: 'G1', x: 0, y: 8, rotation: 0, props: {} },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [8, -6]] },
+      { id: 'w2', points: [[16, -6], [60, -6], [60, -4]] },
+      { id: 'w3', points: [[24, -6], [24, -4]] },
+      { id: 'w4', points: [[36, -6], [36, -4]] },
+      { id: 'w5', points: [[48, -6], [48, -4]] },
+      { id: 'w6', points: [[0, 4], [0, 8], [60, 8], [60, 4]] },
+      { id: 'w7', points: [[24, 4], [24, 8]] },
+      { id: 'w8', points: [[36, 4], [36, 8]] },
+      { id: 'w9', points: [[48, 4], [48, 8]] },
+    ] };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch { /* yok */ } }, JSON.stringify(limits));
+    const lp = await ctx.newPage();
+    lp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await lp.goto(URL0, { waitUntil: 'networkidle' });
+    await lp.getByRole('button', { name: 'Oynat' }).last().click(); await lp.waitForTimeout(800);
+    await lp.getByRole('tab', { name: /Mesajlar/ }).click(); await lp.waitForTimeout(200);
+    const text = (await lp.getByRole('tabpanel').textContent()) ?? '';
+    const hot = await lp.locator('svg.schematic polyline[stroke^="rgb("]').count();
+    check(
+      'masaüstü: ısınan direnç kızıl, ters LED ve ters elektrolitik için uyarı (Fizik 5)',
+      hot >= 1 && text.includes('Direnç ısınıyor') && text.includes('LED ters yönde') && text.includes('elektrolitik kondansatör ters yönde') && text.includes('3 uyarı'),
+      `${hot} kızıl gövde; ${text.slice(0, 60)}`,
+    );
+    await ctx.close();
+  }
+
   // --- Sıkışık masaüstü (1100 px): kütüphane şerit, açılır kart --------------------------
   const compact = await browser.newContext({ viewport: { width: 1100, height: 760 }, locale: 'tr-TR' });
   const cp = await compact.newPage();

@@ -5,7 +5,7 @@
     {"id": "p3", "type": "funcgen", "label": "FG1", "x": -2, "y": 6, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 0.5, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
     {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 0, "y": -12, "rotation": 0, "props": {"voltage1": 15, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
     {"id": "p2", "type": "ground", "label": "GND1", "x": 9, "y": -13, "rotation": 0, "props": {}},
-    {"id": "p4", "type": "capacitor", "label": "C1", "x": 8, "y": 4, "rotation": 0, "props": {"capacitance": 1e-06, "initialVoltage": 0}},
+    {"id": "p4", "type": "capacitor", "label": "C1", "x": 8, "y": 4, "rotation": 0, "props": {"capacitance": 1e-06, "initialVoltage": 0, "kind": "film"}},
     {"id": "p5", "type": "resistor", "label": "RG", "x": 14, "y": 8, "rotation": 90, "props": {"resistance": 1000000.0}},
     {"id": "p6", "type": "resistor", "label": "RD", "x": 28, "y": -6, "rotation": 90, "props": {"resistance": 2700.0}},
     {"id": "p7", "type": "njfet", "label": "J1", "x": 26, "y": 4, "rotation": 0, "props": {"model": "BF245A", "idss": 0.00352, "pinchOff": -1.74}},

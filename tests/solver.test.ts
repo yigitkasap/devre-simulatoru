@@ -253,7 +253,8 @@ describe('9. Kısa devre', () => {
       circuit().battery('B1', 'arti', 'gnd', 9, 1).ground('G1', 'gnd').resistor('R1', 'arti', 'gnd', 10),
     );
     expect(sim.status('B1').shortCircuit).toBe(false);
-    expect(sim.runtimeDiagnostics).toEqual([]);
+    // Kısa devre uyarısı yok. (10 Ω'a 6,7 W düştüğü için 1/4 W'lık dirençte güç uyarısı vardır: Fizik 5.)
+    expect(sim.runtimeDiagnostics.map((d) => d.code)).toEqual(['resistor-overpower']);
   });
 });
 

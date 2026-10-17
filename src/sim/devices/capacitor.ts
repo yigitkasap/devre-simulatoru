@@ -1,13 +1,26 @@
 import type { MnaSystem } from '../mna';
-import { numProp } from '../netlist';
-import { chargeScale, Device, type DeviceInit, type DeviceModel, type Measurement, type StepContext } from './device';
+import { numProp, strProp } from '../netlist';
+import { ELECTROLYTIC_MAX_REVERSE_VOLTAGE, WindowPeak } from '../ratings';
+import { chargeScale, Device, type DeviceInit, type DeviceModel, type Measurement, type RatingWarning, type StepContext } from './device';
 
-export const CAPACITOR_DEFAULTS = { capacitance: 100e-6, initialVoltage: 0 };
+/**
+ * Kondansatörün türü: elektrolitik (kutuplu, sembolde +) ya da seramik/film (kutupsuz). Yeni
+ * yerleştirilen kondansatör elektrolitiktir (varsayılan 100 µF, gerçekte bu değer elektrolitiktir);
+ * türü olmayan eski kayıtlar kutupsuz sayılır: eskiden ters gerilim uyarısı yoktu, eski devreler
+ * yeni uyarı vermesin.
+ */
+export const CAPACITOR_KINDS = ['electrolytic', 'film'] as const;
+export type CapacitorKind = (typeof CAPACITOR_KINDS)[number];
+export const CAPACITOR_DEFAULTS = { capacitance: 100e-6, initialVoltage: 0, kind: 'electrolytic' as CapacitorKind };
+export const CAPACITOR_LEGACY_KIND: CapacitorKind = 'film';
 
 /** Kondansatör. Pinler: [0] = + uç, [1] = − uç. */
 export class CapacitorDevice extends Device {
   readonly type = 'capacitor';
   readonly capacitance: number;
+  readonly kind: CapacitorKind;
+  /** Elektrolitikte ters gerilimin (− ucun + uçtan yüksekliği) periyot içindeki tepesi. */
+  private reverse = new WindowPeak();
   /** Bir önceki (kabul edilmiş) adımdaki gerilim v(n). */
   voltage: number;
   /** Son adımdaki akım i(n) (+ uçtan girip − uçtan çıkan); yamuk kuralı bunu da kullanır. */
@@ -17,6 +30,7 @@ export class CapacitorDevice extends Device {
     super(init);
     this.capacitance = Math.max(1e-15, numProp(init.props, 'capacitance', CAPACITOR_DEFAULTS.capacitance));
     this.voltage = numProp(init.props, 'initialVoltage', CAPACITOR_DEFAULTS.initialVoltage);
+    this.kind = strProp(init.props, 'kind', CAPACITOR_KINDS, CAPACITOR_LEGACY_KIND);
   }
 
   override get reactive(): boolean {
@@ -50,6 +64,16 @@ export class CapacitorDevice extends Device {
     const next = this.v(x, 0) - this.v(x, 1);
     this.current = ctx.h > 0 ? chargeScale(ctx) * this.capacitance * (next - this.voltage) - (ctx.trap ? this.current : 0) : 0;
     this.voltage = next;
+    this.reverse.add(Math.max(0, -next), ctx.h, ctx.window);
+  }
+
+  /** Elektrolitik kondansatörde ters gerilim üreticinin izin verdiğini (1 V) aşıyorsa uyarı. */
+  override ratingWarnings(x: Float64Array): readonly RatingWarning[] {
+    if (this.kind !== 'electrolytic') return [];
+    const voltage = this.reverse.value(Math.max(0, this.v(x, 1) - this.v(x, 0)));
+    return voltage > ELECTROLYTIC_MAX_REVERSE_VOLTAGE
+      ? [{ code: 'capacitor-reverse', params: { voltage, limit: ELECTROLYTIC_MAX_REVERSE_VOLTAGE } }]
+      : [];
   }
 
   override lteStates(): ReadonlyArray<readonly [number, number]> {
@@ -69,6 +93,7 @@ export class CapacitorDevice extends Device {
     if (prev instanceof CapacitorDevice) {
       this.voltage = prev.voltage;
       this.current = prev.current;
+      this.reverse.adopt(prev.reverse);
     }
   }
 }

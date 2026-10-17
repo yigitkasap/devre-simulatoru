@@ -1,6 +1,6 @@
 // Fizik denetimi (Ek A, commit 3d9bc92): her temel yasa için analitik olarak hesaplanan değer ile
-// çözücünün sonucu karşılaştırılır. Her kontrol bir testtir. Denetimde kalan kontroller `it.fails`
-// ile işaretlidir; yanlarında hangi aşamada düzeldikleri yazar (düzelince normal teste çevrilir).
+// çözücünün sonucu karşılaştırılır. Her kontrol bir testtir. Denetimde kalan 9 kontrol `it.fails` ile
+// işaretlenmişti; düzeldikleri aşama yanlarında yazar (Fizik 1–5) ve hepsi normal teste çevrildi.
 // `FIZIK_RAPOR=dosya.txt npx vitest run tests/fizik-denetimi.test.ts` bütün değerleri dosyaya yazar
 // (önce/sonra karşılaştırması için).
 
@@ -382,21 +382,21 @@ describe('E. Yarı iletkenler', () => {
       check(g, `LED (${color}): 20 mA'de ileri gerilim`, V(s, 'L'), vf, 1e-2, 'V');
     });
   }
-  // Aşama 5'te düzelir: LED'in ters gerilim sınırı.
-  it.fails('Ters kutuplu LED: 9 V ters gerilimde uyarı (Aşama 5)', () => {
+  // Aşama 5: LED'in ters gerilim sınırı (5 V).
+  it('Ters kutuplu LED: 9 V ters gerilimde uyarı', () => {
     const s = sim(circuit().battery('B', 'a', 'g', 9, 0).ground('G', 'g').resistor('R', 'a', 'b', 470).led('L', 'g', 'b').build());
     s.advance(0);
     flag(g, 'Ters kutuplu LED: 9 V ters gerilim (gerçek LED en fazla ≈ 5 V dayanır)', codes(s).includes('reverse-voltage'), 'uyarı', `uyarı: ${codes(s).join(',') || 'yok'}, LED gerilimi ${fmt(V(s, 'L'))} V`);
   });
-  // Aşama 5'te düzelir: direncin güç sınırı.
-  it.fails('Joule ısınması: 1/4 W dirence 0,81 W düşerse uyarı (Aşama 5)', () => {
+  // Aşama 5: direncin güç sınırı (varsayılan 1/4 W).
+  it('Joule ısınması: 1/4 W dirence 0,81 W düşerse uyarı', () => {
     const s = sim(circuit().battery('B', 'a', 'g', 9, 0).ground('G', 'g').resistor('R', 'a', 'g', 100).build());
     s.advance(0);
     flag(g, 'Joule ısınması: 1/4 W dirence 0,81 W düşerse uyarı', codes(s).includes('resistor-overpower'), 'uyarı', `P = ${fmt(P(s, 'R'))} W, uyarı: ${codes(s).join(',') || 'yok'}`);
   });
-  // Aşama 5'te düzelir: kutuplu (elektrolitik) kondansatörün ters gerilim sınırı.
-  it.fails('Kutuplu (+/−) kondansatöre ters gerilim uyarısı (Aşama 5)', () => {
-    const s = sim(circuit().battery('B', 'a', 'g', 9, 0).ground('G', 'g').resistor('R', 'a', 'c', 1000).capacitor('C', 'g', 'c', 100e-6).build());
+  // Aşama 5: kutuplu (elektrolitik) kondansatörün ters gerilim sınırı (1 V).
+  it('Kutuplu (+/−) kondansatöre ters gerilim uyarısı', () => {
+    const s = sim(circuit().battery('B', 'a', 'g', 9, 0).ground('G', 'g').resistor('R', 'a', 'c', 1000).add('capacitor', 'C', ['g', 'c'], { capacitance: 100e-6, kind: 'electrolytic' }).build());
     s.runUntil(1);
     flag(g, 'Kutuplu (+/−) kondansatöre ters gerilim uyarısı', codes(s).includes('capacitor-reverse'), 'uyarı', `kondansatör gerilimi ${fmt(V(s, 'C'))} V, uyarı: ${codes(s).join(',') || 'yok'}`);
   });

@@ -231,6 +231,40 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'Seri bir ön direnç ekle: R = (V_{kaynak} − V_{f}) / I. ' +
           `(Bu LED için V_{f} ≈ ${formatSI(p.forwardVoltage ?? 0, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`,
       };
+    case 'reverse-voltage': {
+      const voltage = formatSI(p.voltage ?? 0, 'V', { trim: true });
+      if (first !== undefined && ctx.type(first) === 'led') {
+        return {
+          title: 'LED’e ters gerilim',
+          detail:
+            `${firstLabel}: LED ters yönde ${voltage} görüyor; gerçek bir LED en fazla ` +
+            `${formatSI(p.limit ?? 5, 'V', { trim: true })}’a dayanır ve bozulabilir. LED’i çevir ya da ters gerilimi azalt.`,
+        };
+      }
+      return {
+        title: 'Diyoda ters gerilim',
+        detail:
+          `${firstLabel}: 1N4001 ters yönde ${voltage} görüyor; veri sayfasına göre en fazla ` +
+          `${formatSI(p.limit ?? 50, 'V', { trim: true })}’a (V_{RRM}) dayanır ve bozulabilir. Daha yüksek gerilimli bir diyot kullan ` +
+          '(aynı ailede 1N4004: 400 V).',
+      };
+    }
+    case 'resistor-overpower':
+      return {
+        title: 'Direnç ısınıyor',
+        detail:
+          `${firstLabel} direncinde ${formatSI(p.power ?? 0, 'W')} harcanıyor; direncin güç sınırı ` +
+          `${String(p.rating ?? 0).replace('.', ',')} W. Gerçek direnç aşırı ısınır, rengi kararır ve bozulabilir. ` +
+          'Güç sınırı daha büyük bir direnç seç ya da akımı azalt.',
+      };
+    case 'capacitor-reverse':
+      return {
+        title: 'Elektrolitik kondansatöre ters gerilim',
+        detail:
+          `${firstLabel}: elektrolitik kondansatör ters yönde ${formatSI(p.voltage ?? 0, 'V', { trim: true })} görüyor; üretici en fazla ` +
+          `${formatSI(p.limit ?? 1, 'V', { trim: true })}’a izin verir. Kondansatör ısınır, gaz yapar ve bozulabilir. + ucunu yüksek ` +
+          'gerilim tarafına çevir ya da seramik/film (kutupsuz) kondansatör kullan.',
+      };
     case 'nr-failed':
       return {
         title: 'Çözüm yakınsamadı',
@@ -316,6 +350,8 @@ function fieldLabel(type: DeviceType, key: string): string {
     resistance: 'Direnç',
     capacitance: 'Kapasite',
     initialVoltage: 'Başlangıç gerilimi',
+    powerRating: 'Güç sınırı',
+    kind: 'Tür',
     color: 'Renk',
     closed: 'Anahtar kapalı (akım geçirir)',
   };
@@ -325,6 +361,8 @@ function fieldLabel(type: DeviceType, key: string): string {
 /** Seçmeli özelliklerin seçenek adları. */
 const OPTION_LABELS: Record<string, Record<string, string>> = {
   color: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi' },
+  powerRating: { '0.125': '1/8 W (0,125 W)', '0.25': '1/4 W (0,25 W)', '0.5': '1/2 W (0,5 W)', '1': '1 W', '2': '2 W', '5': '5 W' },
+  kind: { electrolytic: 'Elektrolitik (kutuplu, +)', film: 'Seramik / film (kutupsuz)' },
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
   mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
   input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
@@ -377,7 +415,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   },
   'ampermetre-etkisi': {
     title: 'Ampermetrenin etkisi',
-    description: '12 V’luk ideal kaynak, 100 Ω’luk direnç ve seri bağlı, iç direnci 1 Ω olan bir ampermetre.',
+    description: '12 V’luk ideal kaynak, 100 Ω’luk (2 W’lık) direnç ve seri bağlı, iç direnci 1 Ω olan bir ampermetre.',
     question: 'Ampermetre kaç mA gösterir? Önce hesapla, sonra Oynat’a bas.',
     answer:
       'Ampermetre 120 mA yerine 118,8 mA gösterir: ampermetrenin iç direnci de akıma karşı koyar, I = 12 V / (100 Ω + R_{A}) = 12 V / 101 Ω. İdeal ampermetreye geçip farkı gör.',

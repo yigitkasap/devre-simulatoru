@@ -38,7 +38,9 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, İnceleme panelinde canlı V/I/P ve Ohm
   yasası notu, hata ve uyarı rozetleri, toprak isteğe bağlı (toprak yokken sıfır noktasında
   "0 V" işareti), toprak noktaları arasında kesikli "toprak hattı" (üstünde akım noktaları) ve
-  akım bu hattan dönünce mesaj, toprak tuzağı uyarısı, yanan LED için önerilen ön direnç.
+  akım bu hattan dönünce mesaj, toprak tuzağı uyarısı, yanan LED için önerilen ön direnç, veri
+  sayfası sınırları (LED ve 1N4001'in ters gerilimi, direncin güç sınırı ve ısınması, elektrolitik
+  kondansatörün ters gerilimi).
 - **Klavye ve erişilebilirlik:** "Tuvale atla" bağlantısı, tuvalde oklarla parçadan parçaya geçiş,
   kısayollar, görünür odak, ekran okuyucu için parça listesi ve seyreltilmiş canlı duyurular.
 - **Osiloskop:** iki kanal (A, B) ortak uca göre; DC/AC/GND kuplaj, A ve B, ADD (A + B; INV ile
@@ -227,7 +229,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 332 test çalıştırır (3'ü fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 346 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -242,7 +244,8 @@ cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım 
 kablo yolu; `tests/phone.test.ts`), toprak isteğe bağlı (`tests/toprak.test.ts`), açık devrede tam 0
 akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`) ve zaman adımı
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
-kare dalga kenarları). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
+kare dalga kenarları) ve gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
+ve "çıkmaz"). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
 **Fizik denetimi** (`tests/fizik-denetimi.test.ts`): 71 kontrol, her biri analitik olarak hesaplanan
@@ -310,11 +313,11 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
 ### Fizik denetimi ve düzeltmeler (2026-10)
 
 Çözücü 71 kontrolle denetlendi (commit 3d9bc92; `tests/fizik-denetimi.test.ts`). 62 kontrol doğru
-çıktı; 9 kontrol, sırasıyla düzeltilecek eksikleri gösteriyor ve testte `it.fails` ile işaretli:
-toprak zorunluluğu (Aşama 1), açık devrede gmin kaçak akımı (Aşama 2), iki toprak sembolü üzerinden
-görünmez kapanma (Aşama 3), küçük zaman sabitinde ve RC süzgeçte zaman adımı hatası (Aşama 4), LED
-ters gerilimi, direnç gücü ve kutuplu kondansatör sınırları (Aşama 5). Her aşamada düzelen kontroller
-normal teste çevrilir. Aşamaların kararları aşağıda.
+çıktı; 9 kontrol eksik gösterdi ve testte `it.fails` ile işaretlendi: toprak zorunluluğu (Aşama 1),
+açık devrede gmin kaçak akımı (Aşama 2), iki toprak sembolü üzerinden görünmez kapanma (Aşama 3),
+küçük zaman sabitinde ve RC süzgeçte zaman adımı hatası (Aşama 4), LED ters gerilimi, direnç gücü ve
+kutuplu kondansatör sınırları (Aşama 5). Hepsi düzeldi ve normal teste çevrildi: 71 kontrolün 71'i
+geçiyor. Aşamaların kararları aşağıda.
 
 **Fizik 1: toprak isteğe bağlı, her ada için otomatik sıfır noktası.**
 
@@ -477,6 +480,47 @@ normal teste çevrilir. Aşamaların kararları aşağıda.
   iki eski test "en az 2000, en fazla 2015" (başlangıçtaki ≈ 10 küçük adım) olarak güncellendi;
   fizik denetiminde örnekleme aralığı olarak çözücünün adımı yerine `maxTimeStep` kullanılıyor.
 
+**Fizik 5: ters gerilim, güç ve kutup sınırları.**
+
+Sınır aşılınca yalnızca uyarı verilir (Mesajlar sekmesi, parça vurgusu ve rozeti); bozulmanın ne
+zaman ve nasıl olacağına dair veri sayfalarında dayanak olmadığı için yanma ya da bozulma
+modellenmez. AC devrede ters gerilimin bir periyotluk tepesine, direnç gücünün bir periyotluk
+ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta yanıp sönmez). Değerler
+[`src/sim/ratings.ts`](src/sim/ratings.ts) içinde, kaynaklarıyla:
+
+| Sınır | Değer | Kaynak |
+|---|---|---|
+| LED ters gerilimi | 5 V (bütün renkler) | Kingbright 5 mm (T-1 3/4) LED'ler, L-53 serisi veri sayfası ve katalog: "Absolute Maximum Ratings — Reverse Voltage V_R = 5 V" |
+| 1N4001 ters gerilimi | V_RRM = 50 V | Vishay General Semiconductor 1N4001–1N4007 veri sayfası (1N4004: 400 V) |
+| Elektrolitik kondansatör ters gerilimi | 1 V | Nippon Chemi-Con, "Guidelines for Using Aluminum Electrolytic Capacitors": "Generally, an intermittent reverse voltage of 1 volt DC is allowed." Nichicon hiç ters gerilim uygulanmamasını, Cornell Dubilier en fazla 1,5 V'u söyler; en sıkı sayısal sınır seçildi. |
+| Direnç güç sınırı | varsayılan 1/4 W; seçenekler 1/8, 1/4, 1/2, 1, 2, 5 W | Föy ve README dirençlerin güç sınıfını vermiyor; öğrenci laboratuvarlarında en yaygın 1/4 W karbon film dirençler varsayıldı (görev tanımının önerisi). |
+
+- *LED:* uyarı metni "LED ters yönde X V görüyor; gerçek bir LED en fazla 5 V'a dayanır ve
+  bozulabilir." (görev tanımındaki gibi). *1N4001:* benzer metin, V_RRM ile. Genel (basit) diyot
+  modelinin bir veri sayfası yok: sınırı da yok. Zenerin ters yönü normal çalışmasıdır.
+- *Direnç:* `powerRating` özelliği (İnceleme panelinde "Güç sınırı"). Sınır aşılınca direnç
+  tuvalde ısınıyormuş gibi çizilir: sınırda turuncu, iki katında ve ötesinde kırmızı, çevresinde
+  hafif kızıllık. Eski kayıtlı devreler varsayılanı (1/4 W) kullanır.
+- *Kondansatör:* `kind` özelliği ("Tür"): elektrolitik (kutuplu, sembolde + işareti) ya da
+  seramik/film (kutupsuz, + işaretsiz). Yeni yerleştirilen kondansatör elektrolitiktir (varsayılan
+  100 µF; gerçekte bu değer elektrolitiktir). Türü kayıtlı olmayan eski devreler kutupsuz sayılır:
+  eskiden ters gerilim uyarısı yoktu, eski devreler yeni uyarı vermesin (sembolden + işareti
+  kalkar, davranış aynı). Kondansatör artık "ters çevrilebilir" bir parçadır (F; elektrolitikte
+  + ucunu çevirmek için).
+- *Örnekler:* kutbu hiç terslenmeyen kondansatörler elektrolitik (RC dolma, kare dalgalı RC,
+  yarım dalga filtreleri 1/22/470 µF, negatif kenetleyici, BJT yükseltecin 10 µF kuplajı,
+  katlayıcının C2'si, baraj devrelerinin 10 µF'ları). Pozitif kenetleyicinin kondansatörü
+  çizimde ters duruyordu (hep −4,25…0 V): çevrildi ve elektrolitik oldu (+ ucu yüksek gerilim
+  tarafında; gerilim artık +). Gerilimi sıfır çevresinde salınan ya da 1 V'tan fazla terslenen
+  kondansatörler kutupsuz: JFET yükseltecin 1 µF kuplajı, katlayıcının C1'i (başlangıçta −1,3 V).
+  "Ampermetrenin etkisi"ndeki 100 Ω'luk direnç 12 V'ta 1,44 W harcar: 2 W'lık yapıldı (açıklamada
+  da yazar). Testte bütün örnekler (anahtarlı durumlar ve dolu hazne dahil) sınır uyarısı vermez.
+- *Testler:* `tests/sinirlar.test.ts` (14): her uyarı için "çıkar" ve "çıkmaz", AC'de uyarının her
+  karede durması, AC'de ortalama güç (10 V tepe, 220 Ω: ortalama 0,227 W, tepe 0,45 W, uyarı yok),
+  eski kayıtların varsayılanları, örnekler. Bir eski test ("dış yük iç dirençten büyükse uyarı
+  yok") artık yalnızca kısa devre uyarısının olmadığını denetliyor: o devrede 10 Ω'a 6,7 W düşer ve
+  güç uyarısı fiziksel olarak doğrudur.
+
 ### Editör
 
 - **Bağlantı kuralları:** Aynı noktadaki pinler ve kablo köşeleri bağlıdır. Bir kablonun ucu
@@ -537,7 +581,7 @@ normal teste çevrilir. Aşamaların kararları aşağıda.
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 136 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 137 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.

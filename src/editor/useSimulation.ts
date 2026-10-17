@@ -202,6 +202,8 @@ export function useSimulation(
         const a = voltageOf(pinKey(part.id, 0));
         const b = voltageOf(pinKey(part.id, 1));
         live.set(part.id, { charge: (averaged && a !== null && b !== null ? a - b : m.voltage) / vmax });
+      } else if (part.type === 'resistor') {
+        if (status.powerRatio !== undefined) live.set(part.id, { powerRatio: status.powerRatio });
       } else if (part.type === 'dcsupply') {
         live.set(part.id, { currentLimited: status.currentLimited ?? [] });
       } else if (part.type === 'tank') {

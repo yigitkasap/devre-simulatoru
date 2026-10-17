@@ -403,6 +403,13 @@ export class CircuitSimulator {
         });
       }
     }
+    // Veri sayfası sınırları (Fizik 5): LED ve 1N4001'in ters gerilimi, direncin gücü,
+    // elektrolitik kondansatörün ters gerilimi.
+    for (const device of this.circuit.devices) {
+      for (const warning of device.ratingWarnings(this.x)) {
+        result.push({ severity: 'warning', code: warning.code, elementIds: [device.id], netKeys: [], params: { ...warning.params } });
+      }
+    }
     const earth = this.groundReturn();
     if (earth) result.push(earth);
     return result;

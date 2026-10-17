@@ -2,7 +2,7 @@
 // pinleri (−40, 0) ve (40, 0) noktalarındadır. Çizgiler `currentColor` ile çizilir, böylece
 // seçim ve vurgu rengi kapsayıcı grubun `color` değeriyle değişir.
 
-import { CATALOG } from '../model/catalog';
+import { CATALOG, partProp } from '../model/catalog';
 import { GRID } from '../model/types';
 import { WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
@@ -23,6 +23,8 @@ export interface LiveVisual {
   readonly currentLimited?: readonly boolean[];
   /** Su haznesi: su seviyesi (%). */
   readonly level?: number;
+  /** Direnç: harcanan gücün güç sınırına oranı (1'i aşınca ısınıyormuş gibi çizilir). */
+  readonly powerRatio?: number;
 }
 
 export interface SymbolProps {
@@ -97,30 +99,61 @@ function Ground() {
   );
 }
 
-function Resistor({ style }: { style: ResistorStyle }) {
+/**
+ * Güç sınırını aşan direncin rengi: sınırda turuncu, iki katında ve ötesinde kırmızı (ısınıyor).
+ * Sınırın altında null (normal çizim).
+ */
+export function heatColor(powerRatio: number | undefined): string | null {
+  if (powerRatio === undefined || !(powerRatio > 1)) return null;
+  const t = Math.min(1, powerRatio - 1);
+  // turuncu #f08c00 → kırmızı #e03131
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
+  return `rgb(${mix(0xf0, 0xe0)}, ${mix(0x8c, 0x31)}, ${mix(0x00, 0x31)})`;
+}
+
+function Resistor({ style, powerRatio }: { style: ResistorStyle; powerRatio?: number }) {
+  const heat = heatColor(powerRatio);
+  // Isınan direncin çevresinde yumuşak bir kızıllık; gövde turuncu-kırmızı.
+  const glow = heat ? <ellipse cx={0} cy={0} rx={26} ry={13} fill={heat} opacity={0.28} style={{ filter: 'blur(5px)' }} /> : null;
   if (style === 'iec') {
     return (
       <g>
+        {glow}
         <Lead from={-40} to={-22} />
         <Lead from={22} to={40} />
-        <rect x={-22} y={-7} width={44} height={14} style={PAPER} stroke="currentColor" strokeWidth={2} />
+        <rect
+          x={-22}
+          y={-7}
+          width={44}
+          height={14}
+          style={heat ? { fill: heat, fillOpacity: 0.35 } : PAPER}
+          stroke={heat ?? 'currentColor'}
+          strokeWidth={heat ? 2.6 : 2}
+        />
       </g>
     );
   }
   const zigzag = '-40,0 -24,0 -21,-7 -15,7 -9,-7 -3,7 3,-7 9,7 15,-7 21,7 24,0 40,0';
+  if (!heat) {
+    return <polyline points={zigzag} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />;
+  }
   return (
-    <polyline points={zigzag} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+    <g>
+      {glow}
+      <polyline points={zigzag} fill="none" stroke={heat} strokeWidth={2.6} strokeLinejoin="round" strokeLinecap="round" />
+    </g>
   );
 }
 
-function Capacitor() {
+/** Kondansatör: elektrolitikte + ucu işaretli (kutuplu), seramik/filmde işaretsiz. */
+function Capacitor({ polarized }: { polarized: boolean }) {
   return (
     <g>
       <Lead from={-40} to={-4} />
       <Lead from={4} to={40} />
       <line x1={-4} y1={-13} x2={-4} y2={13} stroke="currentColor" strokeWidth={2.6} />
       <line x1={4} y1={-13} x2={4} y2={13} stroke="currentColor" strokeWidth={2.6} />
-      <Plus x={-13} y={-10} />
+      {polarized && <Plus x={-13} y={-10} />}
     </g>
   );
 }
@@ -601,9 +634,9 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
     case 'ground':
       return <Ground />;
     case 'resistor':
-      return <Resistor style={resistorStyle} />;
+      return <Resistor style={resistorStyle} {...(live?.powerRatio !== undefined ? { powerRatio: live.powerRatio } : {})} />;
     case 'capacitor':
-      return <Capacitor />;
+      return <Capacitor polarized={partProp('capacitor', props, 'kind') === 'electrolytic'} />;
     case 'diode':
       return <DiodeBody fill="currentColor" />;
     case 'led':

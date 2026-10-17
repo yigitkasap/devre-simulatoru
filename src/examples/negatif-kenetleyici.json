@@ -3,7 +3,7 @@
   "parts": [
     {"id": "p5", "type": "oscilloscope", "label": "OSC1", "x": 48, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.0005, "voltsPerDivA": 5, "voltsPerDivB": 5, "positionA": 0, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
     {"id": "p1", "type": "funcgen", "label": "FG1", "x": 0, "y": 2, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 10, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
-    {"id": "p2", "type": "capacitor", "label": "C1", "x": 14, "y": -4, "rotation": 0, "props": {"capacitance": 2.2e-06, "initialVoltage": 0}},
+    {"id": "p2", "type": "capacitor", "label": "C1", "x": 14, "y": -4, "rotation": 0, "props": {"capacitance": 2.2e-06, "initialVoltage": 0, "kind": "electrolytic"}},
     {"id": "p3", "type": "diode", "label": "D1", "x": 24, "y": 0, "rotation": 90, "props": {"model": "1N4001"}},
     {"id": "p4", "type": "resistor", "label": "RL", "x": 32, "y": 0, "rotation": 90, "props": {"resistance": 10000.0}}
   ],

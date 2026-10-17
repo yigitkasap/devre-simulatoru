@@ -93,7 +93,7 @@ export {
   type NmosModelName,
 } from './fet';
 export { ZENER_DEFAULTS, ZENER_TEST_CURRENT, ZenerDevice } from './zener';
-export { CapacitorDevice, CAPACITOR_DEFAULTS } from './capacitor';
+export { CapacitorDevice, CAPACITOR_DEFAULTS, CAPACITOR_KINDS, CAPACITOR_LEGACY_KIND, type CapacitorKind } from './capacitor';
 export {
   DiodeDevice,
   DIODE_DEFAULTS,

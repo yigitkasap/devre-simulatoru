@@ -1,6 +1,7 @@
 import type { MnaSystem } from '../mna';
 import { strProp } from '../netlist';
-import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement } from './device';
+import { LED_MAX_REVERSE_VOLTAGE, WindowPeak } from '../ratings';
+import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type RatingWarning, type StepContext } from './device';
 import { Junction, saturationCurrentFor } from './junction';
 
 export const LED_COLORS = ['red', 'yellow', 'green', 'blue'] as const;
@@ -111,8 +112,23 @@ export class LedDevice extends Device {
     this.junction.restore();
   }
 
-  override accept(): void {
+  override accept(x: Float64Array, ctx: StepContext): void {
     this.junction.accept();
+    this.reverse.add(this.reverseVoltage(x), ctx.h, ctx.window);
+  }
+
+  /** Ters gerilimin periyot içindeki tepesi. */
+  private reverse = new WindowPeak();
+
+  /** Ters gerilim (katot − anot; ileri kutuplamada 0). */
+  private reverseVoltage(x: Float64Array): number {
+    return Math.max(0, this.v(x, 1) - this.v(x, 0));
+  }
+
+  /** Ters gerilim veri sayfasındaki 5 V'u aşarsa uyarı (yalnızca uyarı: bozulma modellenmez). */
+  override ratingWarnings(x: Float64Array): readonly RatingWarning[] {
+    const voltage = this.reverse.value(this.reverseVoltage(x));
+    return voltage > LED_MAX_REVERSE_VOLTAGE ? [{ code: 'reverse-voltage', params: { voltage, limit: LED_MAX_REVERSE_VOLTAGE } }] : [];
   }
 
   private currentAt(x: Float64Array): number {
@@ -149,6 +165,7 @@ export class LedDevice extends Device {
     if (prev instanceof LedDevice) {
       this.burned = prev.burned;
       this.burnCurrent = prev.burnCurrent;
+      this.reverse.adopt(prev.reverse);
       if (prev.color === this.color) this.junction.copyStateFrom(prev.junction);
     }
   }

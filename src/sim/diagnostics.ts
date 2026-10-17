@@ -25,6 +25,12 @@ export type DiagnosticCode =
   | 'short-circuit'
   /** LED'den mutlak en büyük değerinden fazla akım geçti ve LED yandı. */
   | 'led-burned'
+  /** LED ya da 1N4001 veri sayfasındaki en büyük ters gerilimden fazlasını görüyor (uyarı). */
+  | 'reverse-voltage'
+  /** Dirence güç sınırından fazla güç düşüyor (AC'de bir periyodun ortalaması). */
+  | 'resistor-overpower'
+  /** Elektrolitik kondansatör üreticinin izin verdiğinden (1 V) fazla ters gerilim görüyor. */
+  | 'capacitor-reverse'
   /** Newton-Raphson en küçük zaman adımında da yakınsamadı. */
   | 'nr-failed'
   /** LU ayrıştırmasında sıfır pivot (tekil matris). */

@@ -31,6 +31,8 @@ import {
   PMOSFET_DEFAULTS,
   ZENER_DEFAULTS,
   CAPACITOR_DEFAULTS,
+  CAPACITOR_KINDS,
+  CAPACITOR_LEGACY_KIND,
   LED_COLORS,
   LED_DEFAULTS,
   OSCILLOSCOPE_DEFAULTS,
@@ -42,6 +44,7 @@ import {
   VOLTMETER_DEFAULTS,
   WAVEFORMS,
 } from '../sim/devices';
+import { RESISTOR_POWER_RATINGS } from '../sim/ratings';
 import type { DeviceType, PropValue } from '../sim/netlist';
 import type { UnitSymbol } from '../sim/units';
 import type { Point } from './types';
@@ -251,7 +254,10 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     pins: TWO_PINS,
     bounds: { x: -4, y: -1.1, w: 8, h: 2.2 },
     defaultProps: { ...RESISTOR_DEFAULTS },
-    propDefs: [{ kind: 'number', key: 'resistance', unit: 'Ω', min: { value: 0, exclusive: true } }],
+    propDefs: [
+      { kind: 'number', key: 'resistance', unit: 'Ω', min: { value: 0, exclusive: true } },
+      { kind: 'select', key: 'powerRating', options: RESISTOR_POWER_RATINGS },
+    ],
     showLabel: true,
     polarized: false,
   },
@@ -264,10 +270,13 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     defaultProps: { ...CAPACITOR_DEFAULTS },
     propDefs: [
       { kind: 'number', key: 'capacitance', unit: 'F', min: { value: 0, exclusive: true } },
+      { kind: 'select', key: 'kind', options: CAPACITOR_KINDS },
       { kind: 'number', key: 'initialVoltage', unit: 'V' },
     ],
     showLabel: true,
-    polarized: false,
+    // Elektrolitik kondansatörün + ucu vardır: ters çevrilebilir (kutupsuzda çevirmek bir şey değiştirmez).
+    polarized: true,
+    legacyProps: { kind: CAPACITOR_LEGACY_KIND },
   },
   diode: {
     type: 'diode',

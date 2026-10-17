@@ -4,7 +4,7 @@
     { "id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": { "voltage": 10, "internalResistance": 0 } },
     { "id": "p2", "type": "switch", "label": "S1", "x": 8, "y": -8, "rotation": 0, "props": { "closed": false } },
     { "id": "p3", "type": "resistor", "label": "R1", "x": 20, "y": -8, "rotation": 0, "props": { "resistance": 1000 } },
-    { "id": "p4", "type": "capacitor", "label": "C1", "x": 28, "y": 0, "rotation": 90, "props": { "capacitance": 0.0001, "initialVoltage": 0 } },
+    {"id": "p4", "type": "capacitor", "label": "C1", "x": 28, "y": 0, "rotation": 90, "props": {"capacitance": 0.0001, "initialVoltage": 0, "kind": "electrolytic"}},
     { "id": "p5", "type": "voltmeter", "label": "V1", "x": 40, "y": 0, "rotation": 90, "props": { "resistance": 10000000, "ideal": false } },
     { "id": "p6", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {} }
   ],

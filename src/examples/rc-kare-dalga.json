@@ -3,7 +3,7 @@
   "parts": [
     { "id": "p1", "type": "acsource", "label": "AC1", "x": 0, "y": 0, "rotation": 90, "props": { "waveform": "square", "amplitude": 5, "frequency": 1, "offset": 5, "internalResistance": 0 } },
     { "id": "p2", "type": "resistor", "label": "R1", "x": 8, "y": -8, "rotation": 0, "props": { "resistance": 1000 } },
-    { "id": "p3", "type": "capacitor", "label": "C1", "x": 20, "y": 0, "rotation": 90, "props": { "capacitance": 0.0001, "initialVoltage": 0 } },
+    {"id": "p3", "type": "capacitor", "label": "C1", "x": 20, "y": 0, "rotation": 90, "props": {"capacitance": 0.0001, "initialVoltage": 0, "kind": "electrolytic"}},
     { "id": "p4", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {} },
     { "id": "p5", "type": "oscilloscope", "label": "OSC1", "x": 36, "y": 0, "rotation": 0, "props": { "timePerDiv": 0.2, "voltsPerDivA": 2, "voltsPerDivB": 2, "positionA": -3, "positionB": -3, "trigger": "A" } }
   ],

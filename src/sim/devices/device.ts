@@ -15,6 +15,7 @@
 // adımda ve süreksizliklerden (kare dalga kenarı, anahtar, değer değişimi) sonraki adımda geri
 // Euler (StepContext.trap = false). Ayrıntı ve gerekçe: README, "Fizik 4".
 
+import type { DiagnosticCode } from '../diagnostics';
 import { MnaSystem, nodeVoltage } from '../mna';
 import type { DeviceType, Props } from '../netlist';
 
@@ -78,6 +79,14 @@ export interface DeviceStatus {
   readonly level?: number;
   /** Su haznesi: ıslak problar (ortak, Seviye 1, 2, 3). */
   readonly wetProbes?: readonly boolean[];
+  /** Direnç: harcanan gücün (AC'de bir periyodun ortalaması) güç sınırına oranı. */
+  readonly powerRatio?: number;
+}
+
+/** Gerçek parçanın sınırı aşıldı (Fizik 5): uyarı kodu ve ayrıntıları (gerilim, güç, sınır). */
+export interface RatingWarning {
+  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse'>;
+  readonly params: Readonly<Record<string, number>>;
 }
 
 /** Transistörün çalışma bölgesi: BJT'de kesim/aktif/doyum, FET'te kesim/omik (doğrusal)/doyum. */
@@ -153,6 +162,14 @@ export abstract class Device {
   /** Akım sınırı aşıldıysa durumu değiştirir (ör. LED yanar) ve true döner. */
   checkLimits(_x: Float64Array): boolean {
     return false;
+  }
+
+  /**
+   * Veri sayfası sınırları aşıldı mı (ters gerilim, güç)? Yalnızca uyarıdır; bileşenin davranışı
+   * değişmez. AC devrede bir periyotluk pencerenin tepe ya da ortalama değerine bakılır.
+   */
+  ratingWarnings(_x: Float64Array): readonly RatingWarning[] {
+    return [];
   }
 
   /**

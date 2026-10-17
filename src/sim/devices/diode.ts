@@ -1,7 +1,8 @@
 import { THERMAL_VOLTAGE } from '../constants';
 import type { MnaSystem } from '../mna';
 import { strProp } from '../netlist';
-import { Device, type DeviceInit, type DeviceModel, type Measurement, type StepContext } from './device';
+import { DIODE_1N4001_VRRM, WindowPeak } from '../ratings';
+import { Device, type DeviceInit, type DeviceModel, type Measurement, type RatingWarning, type StepContext } from './device';
 import { Junction, saturationCurrentFor, type ChargeParams } from './junction';
 
 // Genel amaçlı silisyum diyot (eski model; "model" özelliği olmayan kayıtlı devreler). Is ve N,
@@ -86,8 +87,22 @@ export class DiodeDevice extends Device {
     this.junction.restore();
   }
 
-  override accept(_x: Float64Array, ctx: StepContext): void {
+  override accept(x: Float64Array, ctx: StepContext): void {
     this.junction.accept(ctx);
+    this.reverse.add(Math.max(0, this.v(x, 1) - this.v(x, 0)), ctx.h, ctx.window);
+  }
+
+  /** Ters gerilimin periyot içindeki tepesi (katot − anot). */
+  private reverse = new WindowPeak();
+
+  /**
+   * 1N4001'de ters gerilim VRRM'yi (50 V) aşarsa uyarı. Genel (basit) modelin bir veri sayfası
+   * yoktur: sınırı da yoktur.
+   */
+  override ratingWarnings(x: Float64Array): readonly RatingWarning[] {
+    if (this.model !== '1N4001') return [];
+    const voltage = this.reverse.value(Math.max(0, this.v(x, 1) - this.v(x, 0)));
+    return voltage > DIODE_1N4001_VRRM ? [{ code: 'reverse-voltage', params: { voltage, limit: DIODE_1N4001_VRRM } }] : [];
   }
 
   /** Yük modeli olan diyotta eklem gerilimi (yük onunla birlikte süreklidir). */
@@ -102,7 +117,10 @@ export class DiodeDevice extends Device {
   }
 
   override adoptState(prev: Device): void {
-    if (prev instanceof DiodeDevice && prev.model === this.model) this.junction.copyStateFrom(prev.junction);
+    if (prev instanceof DiodeDevice && prev.model === this.model) {
+      this.junction.copyStateFrom(prev.junction);
+      this.reverse.adopt(prev.reverse);
+    }
   }
 }
 
