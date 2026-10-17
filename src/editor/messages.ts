@@ -3,8 +3,7 @@
 // burada Türkçeleştirilir. Saf fonksiyonlar; arayüzden bağımsız test edilir.
 
 import { tr, type DiagnosticContext } from '../i18n/tr';
-import { pinPositions } from '../model/geometry';
-import type { CircuitDoc, Point } from '../model/types';
+import type { CircuitDoc } from '../model/types';
 import type { CompiledCircuit, Diagnostic } from '../sim';
 import { DEVICE_MODELS } from '../sim/devices';
 import type { DeviceType } from '../sim/netlist';
@@ -27,6 +26,8 @@ export interface MessageItem {
 }
 
 export function messageKey(d: Diagnostic): string {
+  // Toprak hattı mesajı tektir; listelediği toprak noktaları akımla değişebilir (seçim kaybolmasın).
+  if (d.code === 'ground-return') return d.code;
   return `${d.code}|${d.elementIds.join(',')}|${d.pin ?? ''}`;
 }
 
@@ -57,8 +58,6 @@ export interface EarthTrap {
   readonly instruments: readonly string[];
   /** Şebeke toprağı yüzünden iki ucu birleşen (kısa devre olan) parçalar. */
   readonly shorted: readonly string[];
-  /** Topraklı cihazların COM uçları (tuvalde şebeke toprağı çizgisi için). */
-  readonly comPoints: readonly Point[];
 }
 
 /** Şebeke toprağının bağlayabileceği iki uçlu parçalar (ölçü aletleri ve cihazlar hariç). */
@@ -78,11 +77,10 @@ const SHORTABLE: ReadonlySet<DeviceType> = new Set<DeviceType>([
  * üzerinden birleşir. Bu uçlar kablolarla farklı noktalara bağlıysa, iki ucu bu noktalara giden bir
  * parça kısa devre olur (köprü doğrultmaçta prob toprağını yükün − ucuna takmak gibi).
  */
-export function findEarthTrap(doc: CircuitDoc, compiled: CompiledCircuit): EarthTrap | null {
+export function findEarthTrap(compiled: CompiledCircuit): EarthTrap | null {
   const { wiring, netlist } = compiled;
   /** Kablo ağı kökü → o ağa bağlı topraklı cihazlar. */
   const earthed = new Map<string, string[]>();
-  const comPoints: Point[] = [];
   for (const el of netlist.elements) {
     if (el.type === 'ground') {
       for (const pin of el.pins) if (wiring.has(pin)) earthed.set(wiring.findKey(pin), earthed.get(wiring.findKey(pin)) ?? []);
@@ -94,9 +92,6 @@ export function findEarthTrap(doc: CircuitDoc, compiled: CompiledCircuit): Earth
     if (!pin || !wiring.has(pin)) continue;
     const root = wiring.findKey(pin);
     earthed.set(root, [...(earthed.get(root) ?? []), el.id]);
-    const part = doc.parts.find((p) => p.id === el.id);
-    const at = part ? pinPositions(part)[pinIndex] : undefined;
-    if (at) comPoints.push(at);
   }
   if (earthed.size < 2) return null;
   const shorted: string[] = [];
@@ -107,7 +102,7 @@ export function findEarthTrap(doc: CircuitDoc, compiled: CompiledCircuit): Earth
   }
   if (shorted.length === 0) return null;
   const instruments = [...earthed.values()].flat();
-  return { instruments, shorted, comPoints };
+  return { instruments, shorted };
 }
 
 export function earthTrapItem(trap: EarthTrap, doc: CircuitDoc): MessageItem {

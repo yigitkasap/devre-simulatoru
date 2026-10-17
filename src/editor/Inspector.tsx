@@ -42,7 +42,10 @@ export function Inspector({ width, collapsed, onExpand, tab: requested, onTab, i
   const TABS: readonly InspectorTab[] = devices ? ['inspect', 'example', 'devices', 'messages'] : DESK_TABS;
   const tab = TABS.includes(requested) ? requested : 'inspect';
   const errors = messages.items.filter((i) => i.severity === 'error').length;
-  const count = messages.items.length;
+  const warnings = messages.items.filter((i) => i.severity === 'warning').length;
+  const infos = messages.items.length - errors - warnings;
+  // Rozet yalnızca hata ve uyarıları sayar; bilgi bir sorun değildir.
+  const count = errors + warnings;
 
   if (collapsed) {
     return (
@@ -58,8 +61,8 @@ export function Inspector({ width, collapsed, onExpand, tab: requested, onTab, i
         </button>
         {TABS.map((t) => {
           const label =
-            t === 'messages' && count > 0
-              ? `${tr.inspector.tabs.messages}: ${tr.messages.counts(errors, count - errors)}`
+            t === 'messages' && count + infos > 0
+              ? `${tr.inspector.tabs.messages}: ${tr.messages.counts(errors, warnings, infos)}`
               : tr.inspector.tabs[t];
           return (
             <button

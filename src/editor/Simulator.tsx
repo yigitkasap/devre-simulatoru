@@ -333,7 +333,7 @@ export default function Simulator() {
   }, [doc]);
 
   /** Toprak tuzağı: topraklı cihazların COM'ları şebeke toprağıyla birleşip bir parçayı kısa devre ediyor. */
-  const earthTrap = useMemo(() => (compiled ? findEarthTrap(doc, compiled) : null), [doc, compiled]);
+  const earthTrap = useMemo(() => (compiled ? findEarthTrap(compiled) : null), [compiled]);
 
   const messages = useMemo<MessageItem[]>(() => {
     const list: Diagnostic[] = [...(compiled?.diagnostics ?? []), ...(sim.frame?.runtime ?? [])];
@@ -343,6 +343,8 @@ export default function Simulator() {
     for (const d of list) {
       const key = messageKey(d);
       if (seen.has(key)) continue;
+      // Toprak tuzağı mesajı aynı durumu (toprak hattından dönen akım) daha açık anlatır ve çözümü söyler.
+      if (d.code === 'ground-return' && earthTrap) continue;
       seen.add(key);
       items.push(itemFromDiagnostic(d, diagnosticContext));
     }
@@ -386,7 +388,8 @@ export default function Simulator() {
         if (nets.has(compiled.nets.findKey(key)) || nets.has(compiled.wiring.findKey(key))) wires.add(wire.id);
       }
     }
-    return { parts: new Set(d.elementIds), wires, severity: d.severity };
+    const earth = d.code === 'ground-return' || d.code === 'earth-trap';
+    return { parts: new Set(d.elementIds), wires, severity: d.severity, ...(earth ? { earth } : {}) };
   };
   const selectedItem = messages.find((m) => m.key === selectedMessage);
   const highlight = selectedItem ? highlightOf(selectedItem) : null;
@@ -463,7 +466,8 @@ export default function Simulator() {
     if (!compiled) return [];
     const points: Array<{ at: { x: number; y: number }; grounded: boolean }> = [];
     for (const ref of compiled.autoReferences) {
-      if (!ref.hasSource) continue;
+      // Boşta duran tek parça (ör. güç kaynağının kullanılmayan ikinci çıkışı) işaret almaz.
+      if (!ref.hasSource || ref.elementIds.length < 2) continue;
       const part = doc.parts.find((p) => p.id === ref.elementId);
       const at = part ? pinPositions(part)[ref.pin] : undefined;
       if (at) points.push({ at, grounded: compiled.hasGround });
@@ -474,7 +478,10 @@ export default function Simulator() {
   // --- İpucu şeridinde hata/uyarı özeti ---------------------------------------------------
   const errorCount = messages.filter((m) => m.severity === 'error').length;
   const warningCount = messages.filter((m) => m.severity === 'warning').length;
-  const runtimeIssues = messages.some((m) => (m.diagnostic && (sim.frame?.runtime ?? []).includes(m.diagnostic)) || m.code === 'earth-trap');
+  // Bilgi mesajları (ör. toprak hattından dönen akım) bir sorun değildir: şeritte sayılmaz.
+  const runtimeIssues = messages.some(
+    (m) => m.severity !== 'info' && ((m.diagnostic && (sim.frame?.runtime ?? []).includes(m.diagnostic)) || m.code === 'earth-trap'),
+  );
 
   /** Telefon: alt sayfayı panel olarak verilen sekmede açar. */
   const openPanel = (tab: PanelTab, size: SheetSize) => {
@@ -484,7 +491,11 @@ export default function Simulator() {
 
   // Simülasyon hatası ya da yeni bir çalışma uyarısı (kısa devre, yanan LED) gelince Mesajlar sekmesi öne
   // gelir (odak alınmaz); telefonda alt sayfa küçük açılır (P10). Simülasyon başlatılamadıysa hata seçilir.
-  const runtimeKeys = (sim.frame?.runtime ?? []).map(messageKey).join(';');
+  // Bilgiler ve toprak tuzağının yanında gizlenen toprak hattı mesajı sekmeyi değiştirmez.
+  const runtimeKeys = (sim.frame?.runtime ?? [])
+    .filter((d) => d.severity !== 'info' && !(d.code === 'ground-return' && earthTrap))
+    .map(messageKey)
+    .join(';');
   const previousRuntime = useRef('');
   const phoneRef = useRef(phone);
   phoneRef.current = phone;
@@ -879,7 +890,6 @@ export default function Simulator() {
       onExamples={() => setExamplesOpen(true)}
       issues={issues}
       issuePins={issuePins}
-      earthLine={earthTrap?.comPoints ?? null}
       nodeLabels={nodeLabels}
       zeroPoints={zeroPoints}
       onExplain={explain}

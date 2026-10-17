@@ -4,14 +4,18 @@
 // parçalarından geçen akımı bilmez. Bunu burada buluruz:
 //   - Kablo parçaları bir çizge (graph) oluşturur: köşeler noktalar, kenarlar parçalardır.
 //   - Her pin, bağlı olduğu noktaya bileşenden gelen akımı "enjekte" eder (Kirchhoff akım yasası).
-//   - Toprak sembolleri, kendi kablo adasındaki dengesizliği karşılar (akım toprağa akar).
+//   - Toprak noktaları (toprak sembolleri ve topraklı cihazların COM uçları) birbirine binanın toprak
+//     hattıyla bağlıdır. İki ya da daha fazla kablo adasında toprak noktası varsa bu adalar "toprak
+//     hattı" kenarlarıyla (en kısa ağaç, düz kesikli çizgi) birleştirilir: toprak hattından geçen akım
+//     da kablolardaki gibi bulunur ve canlandırılır.
+//   - Toprak sembolleri, adalarında kalan dengesizliği karşılar (KCL gereği ≈ 0).
 //   - Her adada bir kapsayan ağaç (spanning tree) kurulur; bir kenardan geçen akım, kenarın
 //     altındaki alt ağacın toplam enjeksiyonuna eşittir. Kablolar kendi aralarında döngü
 //     oluşturuyorsa döngüyü kapatan kenara akım verilmez (dağılım belirsizdir, görünüm için yeterli).
 
 import { DEVICE_MODELS } from '../sim/devices';
 import { CATALOG } from './catalog';
-import { onSegmentInterior, pinPositions, pointKey } from './geometry';
+import { onSegmentInterior, partBounds, pinPositions, pointKey } from './geometry';
 import type { CircuitDoc, Point } from './types';
 
 export interface FlowSegment {
@@ -20,6 +24,8 @@ export interface FlowSegment {
   readonly wireId: string;
   readonly a: Point;
   readonly b: Point;
+  /** Toprak hattı (binanın toprağı): toprak noktalarını birleştiren, şemada kablo olmayan bağlantı. */
+  readonly earth?: boolean;
 }
 
 interface PinAttachment {
@@ -89,15 +95,73 @@ export function buildFlowGraph(doc: CircuitDoc): FlowGraph {
     }
   }
 
-  // Pinler yalnızca bir kablo köşesine denk geliyorsa çizgeye bağlanır.
+  // Toprak noktaları: toprak sembolünün ucu (çizimde sembolün ortası) ve topraklı cihazların COM ucu.
+  // Kabloya bağlı olmasalar da çizgede bir köşeleri olur (toprak hattının ucu).
+  const earthPoints: Array<{ vertex: number; tip: Point }> = [];
+  for (const part of doc.parts) {
+    const com = earthPin(part);
+    if (part.type !== 'ground' && com === null) continue;
+    const pos = pinPositions(part)[part.type === 'ground' ? 0 : com!];
+    if (!pos) continue;
+    const box = partBounds(part);
+    const tip = part.type === 'ground' ? { x: box.x + box.w / 2, y: box.y + box.h / 2 } : pos;
+    earthPoints.push({ vertex: vertex(pos), tip });
+  }
+
+  // Pinler yalnızca bir kablo köşesine (ya da toprak noktasına) denk geliyorsa çizgeye bağlanır.
   const pins: PinAttachment[] = [];
   for (const part of doc.parts) {
     pinPositions(part).forEach((pos, pin) => {
       const index = vertexIndex.get(pointKey(pos));
-      // Toprak sembolü ve şebeke toprağına bağlı cihaz uçları (COM): akımı bilinmez, adanın dengesini karşılar.
-      const ground = part.type === 'ground' || earthPin(part) === pin;
+      // Toprak sembolünün akımı bilinmez: adasının dengesini karşılar. Topraklı cihazın COM ucu
+      // sıradan bir uçtur (cihazın akımı), yalnızca toprak hattının ucudur.
+      const ground = part.type === 'ground';
       if (index !== undefined) pins.push({ partId: part.id, pin, vertex: index, ground });
     });
+  }
+
+  // Toprak hattı: toprak noktası olan her kablo adasından bir temsilci; temsilciler en kısa ağaçla
+  // (Prim, düz çizgi uzunluğu) birleştirilir. Kablolar hep dik açılı olduğu için düz (eğik olabilen)
+  // kesikli çizgi kabloyla karışmaz; en kısa ağaç en az çizgiyle bütün noktaları bağlar.
+  const n0 = vertexIndex.size;
+  const wireIsland = new Int32Array(n0).map((_, i) => i);
+  const findIsland = (v: number): number => {
+    while (wireIsland[v] !== v) {
+      wireIsland[v] = wireIsland[wireIsland[v]!]!;
+      v = wireIsland[v]!;
+    }
+    return v;
+  };
+  for (const [u, v] of segmentEnds) wireIsland[findIsland(u)] = findIsland(v);
+  const representatives: Array<{ vertex: number; tip: Point }> = [];
+  const seenIsland = new Set<number>();
+  for (const point of earthPoints) {
+    const island = findIsland(point.vertex);
+    if (seenIsland.has(island)) continue;
+    seenIsland.add(island);
+    representatives.push(point);
+  }
+  if (representatives.length >= 2) {
+    const inTree = [0];
+    const rest = new Set(representatives.map((_, i) => i).slice(1));
+    let k = 0;
+    while (rest.size > 0) {
+      let best: { from: number; to: number; d: number } | null = null;
+      for (const i of inTree) {
+        for (const j of rest) {
+          const a = representatives[i]!.tip;
+          const b = representatives[j]!.tip;
+          const d = Math.hypot(a.x - b.x, a.y - b.y);
+          if (!best || d < best.d) best = { from: i, to: j, d };
+        }
+      }
+      const from = representatives[best!.from]!;
+      const to = representatives[best!.to]!;
+      segments.push({ key: `earth:${k++}`, wireId: '', a: from.tip, b: to.tip, earth: true });
+      segmentEnds.push([from.vertex, to.vertex]);
+      inTree.push(best!.to);
+      rest.delete(best!.to);
+    }
   }
 
   // Kapsayan orman (genişlik öncelikli arama)

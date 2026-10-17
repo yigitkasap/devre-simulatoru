@@ -193,6 +193,20 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'Ampermetre seri bağlanır; iç direnci çok küçük olduğu için paralel bağlanınca kısa devre olur.',
       };
     }
+    case 'ground-return': {
+      // Toprak sembolü kendi adıyla, topraklı cihaz "OSC1 osiloskobunun COM ucu" biçiminde.
+      const names = d.elementIds.map((id) => {
+        const type = ctx.type(id);
+        return type && type !== 'ground' ? `${ctx.label(id)} ${DEVICE_GENITIVE[type]} COM ucu` : ctx.label(id);
+      });
+      const joined = names.length === 2 ? `${names[0]} ile ${names[1]}` : list(names);
+      return {
+        title: 'Akım toprak hattı üzerinden dönüyor',
+        detail:
+          `Akım toprak hattı üzerinden dönüyor: ${joined} binanın toprak hattıyla birbirine bağlıdır. ` +
+          `Şemada aralarında kablo olmasa da toprak hattından ${formatSI(p.current ?? 0, 'A')} geçiyor.`,
+      };
+    }
     case 'short-circuit': {
       const r = p.internalResistance ?? 0;
       const ac = first !== undefined && ctx.type(first) === 'acsource';
@@ -1174,7 +1188,7 @@ export const tr = {
     detailIsland: 'Bu devre parçası toprağa bağlı değil. Gerilimleri bu noktaya göre gösteriliyor; akımlar bundan etkilenmez.',
     aria: 'Sıfır noktası (0 V): açıklamayı göster',
   },
-  earthLine: 'şebeke toprağı (cihazlarda)',
+  earthLine: 'toprak hattı',
   hints: {
     // Tuvalin altındaki ipucu şeridi: **kalın**, [[tuş]].
     simulating:
@@ -1494,8 +1508,9 @@ export const tr = {
       junctionText: 'Üç ya da daha fazla kablonun birleştiği nokta.',
       selection: 'Seçim',
       selectionText: 'Seçili parça kesikli mavi çerçeveyle gösterilir.',
-      earth: 'Şebeke toprağı',
-      earthText: 'Topraklı cihazların COM uçları şebeke toprağıyla birleşir.',
+      earth: 'Toprak hattı',
+      earthText:
+        'Toprak sembolleri ve topraklı cihazların COM uçları binanın toprak hattıyla birbirine bağlıdır. Aralarında kablo yoksa bu bağlantı kesikli çizgiyle gösterilir.',
     },
     labTips: [
       ['Önce Oto', 'Osiloskopta Oto, zaman/bölme, volt/bölme ve simülasyon hızını birlikte ayarlar.'],

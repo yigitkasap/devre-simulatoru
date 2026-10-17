@@ -16,6 +16,11 @@ export type DiagnosticCode =
   | 'floating-island'
   /** Ampermetre doğrudan bir pilin iki ucuna bağlanmış. */
   | 'ammeter-parallel'
+  /**
+   * Akım toprak hattı üzerinden dönüyor: aralarında kablo olmayan iki toprak noktası (toprak sembolü
+   * ya da topraklı cihazın COM'u) binanın toprak hattıyla birbirine bağlı ve devrenin akımı oradan geçiyor.
+   */
+  | 'ground-return'
   /** Pilden, iç direncine göre çok büyük akım çekiliyor. */
   | 'short-circuit'
   /** LED'den mutlak en büyük değerinden fazla akım geçti ve LED yandı. */

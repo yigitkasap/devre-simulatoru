@@ -136,6 +136,8 @@ export interface Highlight {
   readonly severity: 'error' | 'warning' | 'info';
   /** Yanıp sönen uçlar (ızgara koordinatı). */
   readonly pins?: readonly Point[];
+  /** Toprak hattı da vurgulansın (akım toprak hattından dönüyor). */
+  readonly earth?: boolean;
 }
 
 export interface CanvasProps {
@@ -182,7 +184,6 @@ export interface CanvasProps {
   /** Uyarısı olan uçlar (boşta uç): büyütülmüş halka. */
   readonly issuePins?: readonly Point[];
   /** Toprak tuzağında topraklı cihazların COM uçları: aralarında şebeke toprağı çizgisi (M06b). */
-  readonly earthLine?: readonly Point[] | null;
   /** Ayarlar → "Düğüm gerilimlerini yaz": her düğümün yanında gerilim etiketi (ızgara noktası, metin). */
   readonly nodeLabels?: readonly { readonly at: Point; readonly text: string }[];
   /** Toprak yokken (ya da toprağa bağlı olmayan parçada) seçilen sıfır noktaları: "0 V" işareti. */
@@ -303,7 +304,6 @@ export function Canvas({
   onExamples,
   issues,
   issuePins,
-  earthLine,
   nodeLabels,
   zeroPoints,
   onExplain,
@@ -1444,9 +1444,9 @@ export function Canvas({
     if (blocked(false) && !blocked(true)) displayFlips.add(part.id);
   }
 
-  const highlightTone = highlight?.severity === 'error' || highlight?.severity === 'warning' ? highlight.severity : null;
+  const highlightTone = highlight?.severity === 'error' || highlight?.severity === 'warning' ? highlight.severity : 'selected';
   const toneOf = (id: string): PartTone =>
-    highlight && highlightTone && highlight.parts.has(id)
+    highlight && highlight.parts.has(id)
       ? highlightTone
       : selectedParts.has(id)
         ? 'selected'
@@ -1454,21 +1454,19 @@ export function Canvas({
           ? 'hover'
           : (issues?.get(id) ?? 'normal');
 
-  // Şebeke toprağı çizgisi: COM uçlarından devrenin altına inip birleşen kesikli yeşil çizgi.
-  const earthPath = (() => {
-    if (!earthLine || earthLine.length < 2) return null;
-    let bottom = -Infinity;
-    for (const part of doc.parts) {
-      const b = partBounds(part);
-      bottom = Math.max(bottom, b.y + b.h);
+  // Toprak hattı: toprak noktalarını (toprak sembolleri, topraklı COM uçları) birleştiren, hafifçe
+  // sarkan kesikli eğriler (bkz. flow.ts, earthCurve). Etiket en uzun parçanın ortasında, bir kez.
+  const earthSegments = flowGraph.segments.filter((s) => s.earth).map((s) => ({ ...s, curve: earthCurve(s.a, s.b) }));
+  const earthLabel = (() => {
+    let best: { x: number; y: number; length: number } | null = null;
+    for (const s of earthSegments) {
+      const length = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y);
+      // Etiket eğrinin hemen dışında: üstünden geçen akım noktaları onu örtmesin.
+      const at = { x: s.curve.mid.x + s.curve.normal.x * 1.6, y: s.curve.mid.y + s.curve.normal.y * 1.6 };
+      if (!best || length > best.length) best = { x: at.x * GRID, y: at.y * GRID, length };
     }
-    for (const p of earthLine) bottom = Math.max(bottom, p.y);
-    const yb = (bottom + 3) * GRID;
-    const xs = earthLine.map((p) => p.x * GRID);
-    const left = Math.min(...xs);
-    const right = Math.max(...xs);
-    const d = [...earthLine.map((p) => `M${p.x * GRID} ${p.y * GRID}V${yb}`), `M${left} ${yb}H${right}`].join('');
-    return { d, yb, mid: (left + right) / 2 };
+    // Kısa bir çizginin üstüne etiket sığmaz (çizgiyi örter).
+    return best && best.length >= 6 ? best : null;
   })();
 
   return (
@@ -1586,20 +1584,39 @@ export function Canvas({
             />
           ))}
 
-          {earthPath && (
-            <g pointerEvents="none" aria-hidden="true">
-              <path d={earthPath.d} fill="none" stroke="var(--color-earth)" strokeWidth={1.5} strokeDasharray="4 3" />
-              <path
-                d={`M${earthPath.mid} ${earthPath.yb}v4M${earthPath.mid - 6} ${earthPath.yb + 4}h12M${earthPath.mid - 3.5} ${earthPath.yb + 7.5}h7M${earthPath.mid - 1.5} ${earthPath.yb + 11}h3`}
-                fill="none"
-                stroke="var(--color-earth)"
-                strokeWidth={1.6}
-                strokeLinecap="round"
-              />
-              <rect x={earthPath.mid + 14} y={earthPath.yb - 7} width={118} height={14} rx={7} fill="var(--color-ok-soft)" />
-              <text x={earthPath.mid + 73} y={earthPath.yb + 3.5} textAnchor="middle" fontSize={8.5} fontWeight={500} fill="var(--color-ok-ink)">
-                {tr.earthLine}
-              </text>
+          {earthSegments.length > 0 && (
+            <g className="earth-line" pointerEvents="none" aria-hidden="true">
+              {highlight?.earth &&
+                earthSegments.map((s) => (
+                  <path
+                    key={`hl-${s.key}`}
+                    d={s.curve.d}
+                    fill="none"
+                    stroke={highlight.severity === 'warning' ? '#e8a317' : 'var(--color-earth)'}
+                    strokeOpacity={0.35}
+                    strokeWidth={10}
+                    strokeLinecap="round"
+                  />
+                ))}
+              {earthSegments.map((s) => (
+                <path
+                  key={s.key}
+                  d={s.curve.d}
+                  fill="none"
+                  stroke="var(--color-earth)"
+                  strokeWidth={highlight?.earth ? 2.2 : 1.5}
+                  strokeDasharray="6 4"
+                  strokeLinecap="round"
+                />
+              ))}
+              {earthLabel && !lod && (
+                <g transform={`translate(${earthLabel.x} ${earthLabel.y})`}>
+                  <rect x={-31} y={-7} width={62} height={14} rx={7} fill="var(--color-ok-soft)" stroke="var(--color-earth)" strokeWidth={0.8} />
+                  <text y={3.2} textAnchor="middle" fontSize={8.5} fontWeight={500} fill="var(--color-ok-ink)">
+                    {tr.earthLine}
+                  </text>
+                </g>
+              )}
             </g>
           )}
           {/* Bağla kipinde parçalar soluklaşır, uçlar öne çıkar (P03). */}
@@ -2285,6 +2302,47 @@ const DOT_SPACING = 16;
  * Bir doğru parçası boyunca noktalar: uzunluğu 0 olan, yuvarlak uçlu çizgi desenleri. Koyu kenar
  * için aynı desen bir alt katmanda 2 px daha kalın çizilir.
  */
+/**
+ * Toprak hattı parçasının çizimi: a'dan b'ye aşağı doğru (dikey parçada sağa) hafifçe sarkan eğri.
+ * Kablolar hep dik açılı olduğu için eğri onlarla karışmaz, aynı hizadaki kablonun üstüne binmez.
+ * Ortadaki sarkma uzunluğun %15'i, 1 ile 3 ızgara birimi arasında. `mid`: eğrinin orta noktası,
+ * `normal`: sarkma yönündeki birim vektör.
+ */
+function earthCurve(a: Point, b: Point): { d: string; mid: Point; normal: Point } {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  const straight = `M${a.x * GRID} ${a.y * GRID}L${b.x * GRID} ${b.y * GRID}`;
+  if (length === 0) return { d: straight, mid: a, normal: { x: 0, y: 1 } };
+  let nx = -dy / length;
+  let ny = dx / length;
+  if (ny < 0 || (ny === 0 && nx < 0)) {
+    nx = -nx;
+    ny = -ny;
+  }
+  const sag = Math.min(3, Math.max(1, length * 0.15));
+  const mid = { x: (a.x + b.x) / 2 + nx * sag, y: (a.y + b.y) / 2 + ny * sag };
+  // İkinci dereceden Bézier: kontrol noktası, eğrinin ortası sarkma kadar insin diye iki kat uzakta.
+  const c = { x: (a.x + b.x) / 2 + 2 * nx * sag, y: (a.y + b.y) / 2 + 2 * ny * sag };
+  return { d: `M${a.x * GRID} ${a.y * GRID}Q${c.x * GRID} ${c.y * GRID} ${b.x * GRID} ${b.y * GRID}`, mid, normal: { x: nx, y: ny } };
+}
+
+/** Toprak hattı eğrisi üzerinde akım noktaları (dotLine'ın eğri karşılığı). */
+function dotCurve(key: string, d: string, phase: number, width: number, edge = false) {
+  return (
+    <path
+      key={key}
+      d={d}
+      fill="none"
+      stroke={edge ? CURRENT_DOT_EDGE : CURRENT_DOT_COLOR}
+      strokeWidth={edge ? width + 2 : width}
+      strokeLinecap="round"
+      strokeDasharray={`0 ${DOT_SPACING}`}
+      strokeDashoffset={-(phase % DOT_SPACING)}
+    />
+  );
+}
+
 function dotLine(key: string, a: Point, b: Point, phase: number, width: number, edge = false) {
   return (
     <line
@@ -2312,6 +2370,12 @@ function CurrentDots({ doc, graph, frame }: { doc: CircuitDoc; graph: FlowGraph;
     if (Math.abs(current) < MIN_ANIMATED_CURRENT) continue;
     const segment = graph.segments[i]!;
     const phase = frame.segmentPhases[i] ?? 0;
+    if (segment.earth) {
+      const { d } = earthCurve(segment.a, segment.b);
+      edges.push(dotCurve(`e-${segment.key}`, d, phase, 4, true));
+      lines.push(dotCurve(segment.key, d, phase, 4));
+      continue;
+    }
     edges.push(dotLine(`e-${segment.key}`, segment.a, segment.b, phase, 4, true));
     lines.push(dotLine(segment.key, segment.a, segment.b, phase, 4));
   }

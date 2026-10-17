@@ -35,7 +35,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   rengi (klasik ya da renk körlüğüne uygun ölçek), düğüm gerilimi etiketleri, LED parlaklığı ve
   yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, İnceleme panelinde canlı V/I/P ve Ohm
   yasası notu, hata ve uyarı rozetleri, toprak isteğe bağlı (toprak yokken sıfır noktasında
-  "0 V" işareti), toprak tuzağı uyarısı, yanan LED için önerilen ön direnç.
+  "0 V" işareti), toprak noktaları arasında kesikli "toprak hattı" (üstünde akım noktaları) ve
+  akım bu hattan dönünce mesaj, toprak tuzağı uyarısı, yanan LED için önerilen ön direnç.
 - **Klavye ve erişilebilirlik:** "Tuvale atla" bağlantısı, tuvalde oklarla parçadan parçaya geçiş,
   kısayollar, görünür odak, ekran okuyucu için parça listesi ve seyreltilmiş canlı duyurular.
 - **Osiloskop:** iki kanal (A, B) ortak uca göre; DC/AC/GND kuplaj, A ve B, ADD (A + B; INV ile
@@ -224,7 +225,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 313 test çalıştırır (7'si fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 323 test çalıştırır (6'sı fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -236,7 +237,8 @@ BC107, BF245A, IRF510: veri sayfası noktaları, ters toparlanma, frekansla kaza
 ölçüm; `tests/instruments.test.ts`), bütün hazır örneklerin
 cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım bağlantısı, mesajlar
 (toprak tuzağı, ön direnç önerisi), renk ölçekleri ve telefon yardımcıları (ekler, zincirle ekleme,
-kablo yolu; `tests/phone.test.ts`). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
+kablo yolu; `tests/phone.test.ts`), toprak isteğe bağlı (`tests/toprak.test.ts`), açık devrede tam 0
+akım (`tests/acik-devre.test.ts`) ve toprak hattı (`tests/toprak-hatti.test.ts`). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
 **Fizik denetimi** (`tests/fizik-denetimi.test.ts`): 71 kontrol, her biri analitik olarak hesaplanan
@@ -332,8 +334,8 @@ normal teste çevrilir. Aşamaların kararları aşağıda.
   gösteriliyor." Hiçbir şeye bağlı olmayan toprak sembolü (`ground-unconnected`) hata değil
   uyarıdır. Tanılamalara `info` önem düzeyi eklendi (tuvalde rozet almaz, sayaçlara girmez).
 - *Arayüz:* otomatik seçilen sıfır noktasında, toprak sembolüyle karışmasın diye mavi bir "0 V"
-  etiketi ve pinde halka (yalnızca kaynak içeren adalarda; tek başına duran parçada işaret
-  kalabalık yapar). Etiket ekran ölçüsündedir (yakınlaştırmayla küçülmez); dokunmatikte hedefi
+  etiketi ve pinde halka (yalnızca kaynak içeren ve en az iki parçalı adalarda; tek başına duran
+  parçada, ör. güç kaynağının kullanılmayan ikinci çıkışında, işaret kalabalık yapar). Etiket ekran ölçüsündedir (yakınlaştırmayla küçülmez); dokunmatikte hedefi
   44 px. Dokununca ya da tıklayınca kısa açıklama açılır. Eski "devrede toprak yok" afişi ve tek
   tıkla toprak ekleme kaldırıldı.
 
@@ -367,6 +369,51 @@ normal teste çevrilir. Aşamaların kararları aşağıda.
   (ekranda "0,000 A"); köprüde KCL artığı 4,7·10⁻⁹ → 2,7·10⁻¹⁶, enerji korunumu 3,7·10⁻⁹ →
   2,1·10⁻¹⁶; BJT devresinde KCL 8,5·10⁻⁸ → 2,3·10⁻¹⁵. Föy, baraj ve transistörlü örneklerde yakınsama
   sorunu çıkmadı (bütün testler geçiyor).
+
+**Fizik 3: görünür toprak hattı ve toprak üzerinden dönen akım.**
+
+- *Karar:* toprak sembolleri ve topraklı cihazların (osiloskop, fonksiyon üreteci) COM uçları
+  birbirine bağlı sayılmaya devam eder (Proteus ve SPICE gibi); gerçekte de binanın toprak hattıyla
+  bağlıdırlar. Eksik olan bu bağlantının görünmemesiydi.
+- *Toprak noktası:* toprak sembolü ya da topraklı COM içeren kablo adası (aynı kabloya bağlı iki
+  toprak sembolü tek noktadır). Her noktadan toprak hattına geçen akım, o adadaki bileşen uçlarının
+  akımlarından KCL ile bulunur (`engine.ts`, `groundLineCurrents`); `flow.ts` aynı akımı kablo
+  adalarındaki dengesizlikten bulur ve canlandırır. Osiloskobun kendi giriş akımı (1 MΩ ‖ 25 pF,
+  birkaç µA) sayılmaz: cihazın ölçüm akımıdır; sayılsaydı doğru bağlanmış her topraklı prob mesaj
+  verirdi.
+- *Çizim ve yol seçimi:* iki ya da daha fazla toprak noktası varsa her kablo adasından bir temsilci
+  (toprak sembolünün ortası ya da COM ucu) seçilir ve temsilciler **en kısa kapsayan ağaçla** (Prim,
+  düz uzaklık) birleştirilir: n nokta için n − 1 çizgi, en az mürekkep; şema kalabalıklaşmaz. Her
+  parça kesikli ve aşağı doğru hafifçe sarkan bir eğridir (sarkma uzunluğun %15'i, 1–3 ızgara
+  birimi). Kablolar hep dik açılı olduğu için eğri kabloyla karışmaz ve aynı hizadaki bir kablonun
+  üstüne binmez (düz çizgi toprak tuzağı örneğinde kablonun üstüne biniyordu). Renk toprak yeşili,
+  1,5 px (vurguda 2,2 px), parçaların altında; "toprak hattı" etiketi en uzun parçanın ortasında,
+  eğrinin hemen dışında, bir kez (telefonda uzaklaştırınca gizlenir). Hattaki akım kablolardaki
+  gibi akım noktalarıyla canlandırılır. Tek toprak noktası varsa ne çizgi ne mesaj var (KCL gereği
+  hattan akım geçmez). Eski "şebeke toprağı (cihazlarda)" çizgisinin (COM uçlarından devrenin altına
+  inen) yerini aldı.
+- *Mesaj ve eşik:* bir noktadan hatta geçen akım 1 µA'i, en büyük kaynak akımının %1'ini ve
+  osiloskop girişlerinden geçen akımın iki katını aşarsa: "Akım toprak hattı üzerinden dönüyor: G1
+  ile G2 binanın toprak hattıyla birbirine bağlıdır. Şemada aralarında kablo olmasa da toprak
+  hattından … geçiyor." Topraklı cihazda cihazın adı kullanılır ("OSC1 osiloskobunun COM ucu").
+  1 µA, föy devrelerindeki anlamlı akımların (en küçüğü µA'ler mertebesindeki baz akımları)
+  altında, sayısal artıkların (10⁻¹⁵ A) çok üstündedir; %1 oranı büyük akımlı devrelerde önemsiz
+  sızıntıları ayıklar. AC devrede tepe değer bir periyot boyunca tutulur (sıfır geçişinde mesaj
+  yanıp sönmez). Mesaja tıklayınca ilgili toprak noktaları ve toprak hattı vurgulanır.
+- *Önem düzeyi (görev tanımından ayrılan yer):* tanım bu durumda "uyarı" istiyor; ama föyün
+  yükselteç, kırpıcı ve anahtar devreleri ortak toprağı ayrı toprak sembolleriyle çizer (ders
+  kitaplarındaki gibi) ve devre akımı (0,56–10,6 mA) bu sembollerin arasından döner. Hepsinde uyarı
+  çıkması gereksiz olurdu. Bu yüzden yalnızca toprak sembolleri arasında dönen akım **bilgi**dir
+  (Mesajlar'da görünür, toprak hattı çizilir; rozet, sayaç ve kendiliğinden sekme değişimi yok).
+  Topraklı bir cihazın COM ucu (toprak sembolü olmadan) akım taşıyorsa **uyarı**dır: gerçek toprak
+  döngüsü (Ek A F'de R2 kısa devre olur). Toprak tuzağı mesajı varsa aynı durumu çözümüyle anlattığı
+  için toprak hattı mesajı ayrıca gösterilmez.
+- *Örneklerde:* toprak tuzağında uyarı (toprak tuzağı mesajı). Bilgi: paralel kırpıcı 0,56 mA, çift
+  kırpıcı 0,76 mA, JFET karakteristiği 4,14 mA, JFET yükselteç 4,77 mA, BJT yükselteç 1,53 mA,
+  MOSFET yükselteç 0,75 mA, BJT anahtar 10,6 mA, emetör yüklü anahtar 2,56 mA; baraj örnekleri su
+  yükselip LED'ler yanınca. Köprü doğrultmaçta (doğru bağlanmış topraklı prob) ve öteki
+  örneklerde mesaj yok. Bilgi sorun olmadığı için Mesajlar sekmesinin rozeti ve ipucu şeridi
+  yalnızca hata ve uyarıları sayar.
 
 ### Editör
 
@@ -428,7 +475,7 @@ normal teste çevrilir. Aşamaların kararları aşağıda.
     değişiklikten sonra `npm run dev` (ya da `npm run build && npm run preview`) açıkken
     `npm run ios-kontrol` çalıştırılır (`scripts/ios-kontrol.mjs`; yayındaki siteyi denemek için
     adresi ver: `npm run ios-kontrol -- https://yigitkasap.github.io/devre-simulatoru/`). Chromium'un
-    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 134 madde
+    iPhone öykünmesiyle telefon (390×844, 375×667, yatay 844×390), tablet ve masaüstünde 136 madde
     dener ve bir madde kalırsa hata koduyla çıkar. Öykünme yukarıdaki dokunma alanı hatasını
     göremiyordu; bu yüzden listenin ilk bölümü bu kuralların yerinde durduğunu doğrudan denetler.
     `playwright-core` bu projeye kurulu değildir; yolu `PLAYWRIGHT_CORE` ortam değişkeniyle verilir.
@@ -533,7 +580,7 @@ kaynağı) esas alındı.
 
 - **Şebeke toprağı:** Bir cihaz modeli `earthPin` ile bir ucunu (COM) şebeke toprağına
   bağlayabilir: derleyici bu ucu devrenin toprak düğümüne birleştirir. Topraklı bir cihaz varsa
-  devrede toprak sembolü gerekmez; akım çizgesinde bu uç toprak gibi davranır. Bu sayede
+  devrede toprak sembolü gerekmez; akım çizgesinde bu uç toprak hattının bir ucudur (Fizik 3). Bu sayede
   laboratuvardaki **toprak tuzağı** gerçekten oluşur: köprü doğrultmaçta prob toprağını yükün
   eksi ucuna takmak, üretecin COM'u ile birleşip bir diyodu kısa devre eder ve ekranda yarım
   dalga görülür. Doğru ölçüm iki kanal + B INV + ADD (A − B) ya da topraksız (yalıtılmış)

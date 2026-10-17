@@ -14,11 +14,10 @@ const label = (doc: CircuitDoc, id: string) => doc.parts.find((p) => p.id === id
 describe('toprak tuzağı', () => {
   it('köprüde prob toprağı yükün − ucundaysa bir diyot kısa devre olur', () => {
     const doc = exampleDoc('toprak-tuzagi')!;
-    const trap = findEarthTrap(doc, compile(doc));
+    const trap = findEarthTrap(compile(doc));
     expect(trap).not.toBeNull();
     expect(trap!.shorted.map((id) => label(doc, id))).toEqual(['D4']);
     expect(trap!.instruments.map((id) => label(doc, id)).sort()).toEqual(['FG1', 'OSC1']);
-    expect(trap!.comPoints).toHaveLength(2);
     const item = earthTrapItem(trap!, doc);
     expect(item.title).toBe('Toprak tuzağı');
     expect(item.detail).toContain('D4 kısa devre oldu');
@@ -29,12 +28,12 @@ describe('toprak tuzağı', () => {
     const doc = exampleDoc('toprak-tuzagi')!;
     const scope = doc.parts.find((p) => p.type === 'oscilloscope')!;
     const isolated = updatePart(doc, scope.id, { props: { ...scope.props, earthed: false } });
-    expect(findEarthTrap(isolated, compile(isolated))).toBeNull();
+    expect(findEarthTrap(compile(isolated))).toBeNull();
   });
 
   it('topraklı tek cihazlı devrede tuzak yok', () => {
     const doc = exampleDoc('yarim-dalga')!;
-    expect(findEarthTrap(doc, compile(doc))).toBeNull();
+    expect(findEarthTrap(compile(doc))).toBeNull();
   });
 });
 

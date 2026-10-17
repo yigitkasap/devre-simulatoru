@@ -24,6 +24,7 @@ import { hasErrors, type Diagnostic } from './diagnostics';
 import {
   AcSourceDevice,
   BatteryDevice,
+  DEVICE_MODELS,
   LedDevice,
   type Device,
   type DeviceStatus,
@@ -62,6 +63,9 @@ const SOURCE_STEPS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
  * dalga ve doğru tepe değerleri için yeterli; 1 kHz'i gerçek zamanda izlemek saniyede 50 000 adım.
  */
 const STEPS_PER_PERIOD = 50;
+/** Toprak hattı akımı uyarısının eşiği: en az 1 µA ve en büyük kaynak akımının %1'i. */
+const GROUND_RETURN_MIN = 1e-6;
+const GROUND_RETURN_FRACTION = 0.01;
 /** Kare ortalamaları için periyot başına alınan örnek (her adımda değil; hesap yükünü azaltır). */
 const AVERAGE_SAMPLES_PER_PERIOD = 25;
 
@@ -120,6 +124,27 @@ export class CircuitSimulator {
    * kenarlar. Çözümün yuvarlama artığı (≈ 1e-15 A) yerine tam 0 gösterilir (bkz. findZeroPins).
    */
   private zeroPins = new Map<string, readonly boolean[]>();
+  /**
+   * Toprak noktaları: toprak sembolü ya da topraklı cihaz COM'u içeren kablo adaları (toprak
+   * birleştirmesinden önce). Her noktadan toprak hattına geçen akım, o adadaki bileşen uçlarının
+   * akımlarından KCL ile bulunur. `pins`: adadaki uçlar (bileşen sırası, uç).
+   */
+  private groundPoints: Array<{ readonly ids: string[]; readonly pins: Array<readonly [number, number]> }> = [];
+  /**
+   * AC devrede tepe değerler (işaretli): toprak noktası akımları ve en büyük kaynak akımı. Bir AC
+   * periyodu (window) boyunca tutulur, sonra bir öncekine kaydırılır; gösterilen değer ikisinin
+   * büyüğüdür (kare süresinden bağımsız, sıfır geçişinde yanıp sönmez).
+   */
+  private earthPeaks = new Float64Array(0);
+  private earthPrev = new Float64Array(0);
+  private sourcePeak = 0;
+  private sourcePrev = 0;
+  /** Osiloskop girişlerinden geçen akımların toplamı (tepe). */
+  private scopePeak = 0;
+  private scopePrev = 0;
+  private peakClock = 0;
+  /** Tepe değerler için en az bir örnek alındı mı (alınmadıysa anlık değer kullanılır). */
+  private peaksReady = false;
 
   constructor(netlist: Netlist, options: Partial<SimulatorOptions> = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -158,6 +183,83 @@ export class CircuitSimulator {
     this.deviceIndex = new Map(this.circuit.devices.map((d, i) => [d.id, i]));
     this.pinSums = this.circuit.devices.map((d) => new Float64Array(d.pinCurrents(this.x).length));
     this.intervalTime = 0;
+    this.groundPoints = this.findGroundPoints();
+    this.earthPeaks = new Float64Array(this.groundPoints.length);
+    this.earthPrev = new Float64Array(this.groundPoints.length);
+    this.sourcePeak = 0;
+    this.sourcePrev = 0;
+    this.scopePeak = 0;
+    this.scopePrev = 0;
+    this.peakClock = 0;
+    this.peaksReady = false;
+  }
+
+  /** Toprak sembolü ya da topraklı COM içeren kablo adaları ve o adalardaki bileşen uçları. */
+  private findGroundPoints(): Array<{ ids: string[]; pins: Array<readonly [number, number]> }> {
+    const { netlist, wiring } = this.circuit;
+    const points = new Map<string, { ids: string[]; pins: Array<readonly [number, number]> }>();
+    for (const el of netlist.elements) {
+      const com = DEVICE_MODELS[el.type].earthPin?.(el.props) ?? null;
+      for (const [k, pin] of el.pins.entries()) {
+        if (el.type !== 'ground' && k !== com) continue;
+        const root = wiring.findKey(pin);
+        const point = points.get(root) ?? { ids: [], pins: [] };
+        if (!point.ids.includes(el.id)) point.ids.push(el.id);
+        points.set(root, point);
+      }
+    }
+    // Osiloskobun giriş akımı (1 MΩ ‖ 25 pF, birkaç µA) cihazın kendi ölçüm akımıdır: toprak hattından
+    // dönse de devrenin akımı sayılmaz (yoksa doğru bağlanmış her topraklı prob uyarı verirdi).
+    netlist.elements.forEach((el, i) => {
+      if (el.type === 'ground' || el.type === 'oscilloscope') return;
+      el.pins.forEach((pin, k) => points.get(wiring.findKey(pin))?.pins.push([i, k]));
+    });
+    return [...points.values()];
+  }
+
+  /** Bir toprak noktasından toprak hattına geçen anlık akım (adadaki uçlara giren akımların tersi). */
+  private earthCurrent(point: { readonly pins: Array<readonly [number, number]> }): number {
+    let sum = 0;
+    for (const [i, k] of point.pins) {
+      const device = this.circuit.devices[i]!;
+      sum += this.maskPins(device.id, device.pinCurrents(this.x))[k] ?? 0;
+    }
+    return -sum;
+  }
+
+  /** Kaynakların (pil, AC kaynak, fonksiyon üreteci, güç kaynağı) en büyük uç akımı. */
+  private sourceCurrent(): number {
+    let max = 0;
+    for (const device of this.circuit.devices) {
+      if (device.type !== 'battery' && device.type !== 'acsource' && device.type !== 'funcgen' && device.type !== 'dcsupply') continue;
+      for (const c of this.maskPins(device.id, device.pinCurrents(this.x))) max = Math.max(max, Math.abs(c));
+    }
+    return max;
+  }
+
+  /** Osiloskop girişlerinden (A ve B) geçen akımların toplamı: toprak hattından dönen ölçüm akımı. */
+  private scopeCurrent(): number {
+    let sum = 0;
+    for (const device of this.circuit.devices) {
+      if (device.type !== 'oscilloscope') continue;
+      const c = this.maskPins(device.id, device.pinCurrents(this.x));
+      sum += Math.abs(c[0] ?? 0) + Math.abs(c[1] ?? 0);
+    }
+    return sum;
+  }
+
+  /**
+   * Toprak noktalarından toprak hattına geçen akımlar (A, işaretli): AC devrede son aralığın tepe
+   * değerleri (sıfır geçişinde uyarı yanıp sönmesin), değilse anlık değerler.
+   */
+  groundLineCurrents(): Array<{ readonly ids: readonly string[]; readonly current: number }> {
+    const peaks = this.hasAcSources && this.peaksReady;
+    return this.groundPoints.map((point, j) => {
+      if (!peaks) return { ids: point.ids, current: this.earthCurrent(point) };
+      const a = this.earthPeaks[j]!;
+      const b = this.earthPrev[j]!;
+      return { ids: point.ids, current: Math.abs(a) >= Math.abs(b) ? a : b };
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -245,7 +347,45 @@ export class CircuitSimulator {
         });
       }
     }
+    const earth = this.groundReturn();
+    if (earth) result.push(earth);
     return result;
+  }
+
+  /**
+   * Akım toprak hattı üzerinden dönüyorsa uyarı. İki ya da daha fazla toprak noktası varsa ve
+   * birinden toprak hattına geçen akım eşiği aşıyorsa. Eşik: 1 µA ya da en büyük kaynak akımının
+   * %1'i (hangisi büyükse). Topraklı osiloskobun 1 MΩ'luk girişinden geçen birkaç µA'lik akım da
+   * toprak hattından döner; bu bir sorun değildir ve kaynak akımının yanında çok küçüktür.
+   */
+  private groundReturn(): Diagnostic | null {
+    if (this.groundPoints.length < 2) return null;
+    const currents = this.groundLineCurrents();
+    const peaks = this.hasAcSources && this.peaksReady;
+    const source = peaks ? Math.max(this.sourcePeak, this.sourcePrev) : this.sourceCurrent();
+    const scope = peaks ? Math.max(this.scopePeak, this.scopePrev) : this.scopeCurrent();
+    // Osiloskobun giriş akımı da (prob → COM → toprak hattı → başka bir topraklı nokta) buradan döner;
+    // onun iki katının altındaki akım bir bağlantı sorunu değildir.
+    const threshold = Math.max(GROUND_RETURN_MIN, GROUND_RETURN_FRACTION * source, 2 * scope);
+    const significant = currents.filter((c) => Math.abs(c.current) > threshold);
+    if (significant.length === 0) return null;
+    const max = Math.max(...currents.map((c) => Math.abs(c.current)));
+    // Akımın döndüğü öteki nokta(lar) da (eşiğin altında kalsa bile en büyük ikinci) listeye girer.
+    const ordered = [...currents].sort((a, b) => Math.abs(b.current) - Math.abs(a.current));
+    const involved = new Set([...significant, ...ordered.slice(0, 2)]);
+    const elementIds = currents.filter((c) => involved.has(c)).flatMap((c) => c.ids);
+    // Kablo adasında toprak sembolü olan nokta şemanın ortak toprak gösterimidir (föydeki devreler de
+    // ayrı toprak sembolleriyle çizilir): toprak hattı çizilir, bilgi verilir. Akım, toprak sembolü
+    // olmayan, yalnızca topraklı bir cihazın COM'undan oluşan bir noktadan geçiyorsa gerçekten
+    // binanın toprak hattından (cihazın kasasından) döner: uyarı (toprak tuzağı).
+    const instrumentOnly = significant.some((c) => c.ids.every((id) => this.circuit.deviceById.get(id)?.type !== 'ground'));
+    return {
+      severity: instrumentOnly ? 'warning' : 'info',
+      code: 'ground-return',
+      elementIds,
+      netKeys: [],
+      params: { current: max },
+    };
   }
 
   get diagnostics(): Diagnostic[] {
@@ -465,6 +605,25 @@ export class CircuitSimulator {
     this.sampleClock = 0;
     this.intervalTime += weight;
     for (let i = 0; i < this.x.length; i++) this.xSum[i]! += this.x[i]! * weight;
+    if (this.groundPoints.length >= 2) {
+      this.groundPoints.forEach((point, j) => {
+        const c = this.earthCurrent(point);
+        if (Math.abs(c) > Math.abs(this.earthPeaks[j]!)) this.earthPeaks[j] = c;
+      });
+      this.sourcePeak = Math.max(this.sourcePeak, this.sourceCurrent());
+      this.scopePeak = Math.max(this.scopePeak, this.scopeCurrent());
+      this.peaksReady = true;
+      this.peakClock += weight;
+      if (this.peakClock >= this.window) {
+        this.earthPrev.set(this.earthPeaks);
+        this.earthPeaks.fill(0);
+        this.sourcePrev = this.sourcePeak;
+        this.sourcePeak = 0;
+        this.scopePrev = this.scopePeak;
+        this.scopePeak = 0;
+        this.peakClock = 0;
+      }
+    }
     const devices = this.circuit.devices;
     for (let i = 0; i < devices.length; i++) {
       const currents = devices[i]!.pinCurrents(this.x);

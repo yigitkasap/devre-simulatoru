@@ -192,11 +192,11 @@ describe('B. Açık devre, anahtar, kısa devre, toprak', () => {
     const r = s.advance(0);
     flag(g, 'Topraksız kapalı devre çalışmalı (pil + direnç + LED)', r.ok && I(s, 'R') > 1e-3, 'çalışır, ≈ 15 mA', r.ok ? `${fmt(I(s, 'R') * 1e3)} mA` : `çalışmıyor: ${r.error?.code}`);
   });
-  // Aşama 3'te düzelir: toprak hattı üzerinden dönen akım uyarısı.
-  it.fails('Devre yalnızca iki toprak sembolü üzerinden kapanıyor: kullanıcı uyarılmalı (Aşama 3)', () => {
+  // Aşama 3: toprak hattı üzerinden dönen akım mesajı (yalnızca toprak sembolleri: bilgi).
+  it('Devre yalnızca iki toprak sembolü üzerinden kapanıyor: kullanıcı uyarılmalı', () => {
     const s = sim(circuit().battery('B', 'a', 'x', 9, 0).ground('G1', 'x').resistor('R', 'a', 'b', 470).led('L', 'b', 'y').ground('G2', 'y').build());
     s.advance(0);
-    const diag = codes(s).join(',') || 'yok';
+    const diag = s.diagnostics.map((d) => `${d.code} (${d.severity})`).join(',') || 'yok';
     flag(g, 'Devre yalnızca iki toprak sembolü üzerinden kapanıyor: kullanıcı uyarılmalı', codes(s).includes('ground-return'), 'uyarı', `akım ${fmt(I(s, 'R') * 1e3)} mA, uyarı: ${diag}`);
   });
   it('Yüzer ada: topraksız ikinci devrede akım 5 mA', () => {

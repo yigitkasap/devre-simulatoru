@@ -392,6 +392,33 @@ try {
     await ctx.close();
   }
 
+  // --- İki toprak sembolü (telefon): kesikli toprak hattı ve hattaki akım noktaları (Fizik 3) ---
+  {
+    const twoGround = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
+      { id: 'p2', type: 'resistor', label: 'R1', x: 12, y: -6, rotation: 0, props: { resistance: 470 } },
+      { id: 'p3', type: 'led', label: 'D1', x: 24, y: 0, rotation: 90, props: { color: 'red' } },
+      { id: 'p4', type: 'ground', label: 'G1', x: 0, y: 8, rotation: 0, props: {} },
+      { id: 'p5', type: 'ground', label: 'G2', x: 24, y: 8, rotation: 0, props: {} },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [8, -6]] },
+      { id: 'w2', points: [[16, -6], [24, -6], [24, -4]] },
+      { id: 'w3', points: [[0, 4], [0, 8]] },
+      { id: 'w4', points: [[24, 4], [24, 8]] },
+    ] };
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, JSON.stringify(twoGround));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const before = await page.locator('svg.schematic g.earth-line path').count();
+    await page.getByRole('button', { name: 'Oynat' }).last().tap(); await page.waitForTimeout(800);
+    const dots = await page.locator('svg.schematic path[stroke-dasharray^="0 "]').count();
+    const label = await page.locator('svg.schematic g.earth-line text', { hasText: 'toprak hattı' }).count();
+    check('telefonda iki toprak sembolü arasında kesikli toprak hattı, çalışırken üstünde akım noktaları', before === 1 && label === 1 && dots >= 2 && (await mode(page)).includes('Ölç'), `${before} hat, ${label} etiket, ${dots} nokta yolu`);
+    await ctx.close();
+  }
+
   // --- Yatay telefon (L01, L02) ----------------------------------------------------------
   {
     const { page, cdp } = await phone(844, 390);
@@ -755,10 +782,18 @@ try {
   await tp.goto(URL0, { waitUntil: 'networkidle' });
   await tp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await tp.waitForTimeout(200);
   await tp.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }).click(); await tp.waitForTimeout(400);
-  const earthLabel = await tp.locator('svg.schematic text', { hasText: 'şebeke toprağı' }).count();
+  const earthLines = await tp.locator('svg.schematic g.earth-line path').count();
+  const earthLabel = await tp.locator('svg.schematic g.earth-line text', { hasText: 'toprak hattı' }).count();
   await tp.getByRole('tab', { name: /Mesajlar/ }).click(); await tp.waitForTimeout(150);
   const trapText = (await tp.getByRole('tabpanel').textContent()) ?? '';
-  check('masaüstü: toprak tuzağında uyarı ve şebeke toprağı çizgisi', earthLabel === 1 && trapText.includes('Toprak tuzağı') && trapText.includes('D4 kısa devre oldu'), trapText.slice(0, 50));
+  check(
+    'masaüstü: toprak tuzağında uyarı ve kesikli toprak hattı (tek mesaj)',
+    earthLines >= 1 && earthLabel <= 1 && trapText.includes('Toprak tuzağı') && trapText.includes('D4 kısa devre oldu') && !trapText.includes('toprak hattı üzerinden dönüyor'),
+    `${earthLines} çizgi, ${earthLabel} etiket; ${trapText.slice(0, 50)}`,
+  );
+  await tp.getByRole('tabpanel').getByText('Toprak tuzağı', { exact: true }).first().click(); await tp.waitForTimeout(200);
+  const earthGlow = await tp.locator('svg.schematic g.earth-line path[stroke-opacity="0.35"]').count();
+  check('masaüstü: toprak tuzağı mesajına tıklayınca toprak hattı vurgulanır', earthGlow >= 1, `${earthGlow} vurgu`);
   await trapCtx.close();
 
   // --- Sıkışık masaüstü (1100 px): kütüphane şerit, açılır kart --------------------------
