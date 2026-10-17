@@ -321,7 +321,7 @@ export function useSimulation(
       const dtReal = Math.min(MAX_FRAME_SECONDS, Math.max(0, (now - last) / 1000));
       last = now;
       const simDt = dtReal * speedRef.current;
-      const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.timeStep) * 4 + 8);
+      const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.maxTimeStep) * 8 + 64);
       const result = sim.advance(simDt, maxSteps);
       // Adım sınırına takıldıysa istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
       lagSamples = (lagSamples * 0.9) + (result.steps >= maxSteps ? 0.1 : 0);

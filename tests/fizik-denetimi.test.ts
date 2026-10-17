@@ -224,7 +224,7 @@ describe('C. Kondansatör', () => {
   });
   const energy = once(() => {
     const s = sim(circuit().battery('B', 'a', 'g', 10, 0).ground('G', 'g').resistor('R', 'a', 'c', 1000).capacitor('C', 'c', 'g', 100e-6).build());
-    const h = s.timeStep;
+    const h = s.maxTimeStep; // örnekleme aralığı (çözücünün adımı uyarlanır)
     let eR = 0;
     let eB = 0;
     for (let k = 1; k <= Math.round(1.0 / h); k++) {
@@ -272,10 +272,10 @@ describe('C. Kondansatör', () => {
     s.runUntil(50e-6);
     return { atTau, at5Tau: V(s, 'C'), step };
   });
-  // Aşama 4'te düzelir: LTE denetimli uyarlanır adım.
-  it.fails('Küçük τ (10 µs): v(τ) = 6,32 V (Aşama 4)', () =>
+  // Aşama 4: LTE denetimli uyarlanır adım ve yamuk kuralı.
+  it('Küçük τ (10 µs): v(τ) = 6,32 V', () =>
     check(g, 'Küçük τ (10 µs): v(τ) = 6,32 V', smallTau().atTau, 10 * (1 - Math.exp(-1)), 2e-2, 'V', `zaman adımı ${fmt(smallTau().step * 1e6)} µs`));
-  it.fails('Küçük τ (10 µs): v(5τ) = 9,93 V (Aşama 4)', () =>
+  it('Küçük τ (10 µs): v(5τ) = 9,93 V', () =>
     check(g, 'Küçük τ (10 µs): v(5τ) = 9,93 V', smallTau().at5Tau, 10 * (1 - Math.exp(-5)), 2e-2, 'V'));
   it('İlk an: akım ε/R (kondansatör kısa devre gibi)', () => {
     const s = sim(circuit().battery('B', 'a', 'g', 10, 0).ground('G', 'g').resistor('R', 'a', 'c', 1000).capacitor('C', 'c', 'g', 100e-6).build());
@@ -300,7 +300,7 @@ describe('D. Alternatif akım', () => {
   it('Ortalama güç P = Vrms²/R = 12,5 mW', () => {
     const s = sim(circuit().acsource('S', 'a', 'g', ac(50, 5)).ground('G', 'g').resistor('R', 'a', 'g', 1000).build());
     s.runUntil(0.1);
-    const h = s.timeStep;
+    const h = s.maxTimeStep;
     let e = 0;
     let t = 0;
     for (let k = 1; k <= Math.round(0.02 / h); k++) {
@@ -318,7 +318,7 @@ describe('D. Alternatif akım', () => {
     s.advance(0.02);
     const irms = s.status('AM').reading!;
     // Faz: kilitlemeli (lock-in) karşılaştırma, bir periyot boyunca.
-    const h = s.timeStep;
+    const h = s.maxTimeStep;
     let si = 0;
     let ci = 0;
     let sv = 0;
@@ -345,8 +345,8 @@ describe('D. Alternatif akım', () => {
     check(g, 'Kapasitif reaktans: Irms = Vrms/Xc (Xc = 318 Ω)', capacitive().irms * 1e3, (5 / Math.SQRT2 / capacitive().xc) * 1e3, 1e-2, 'mA'));
   it('Faz: kondansatörde akım gerilimden 90° önde', () =>
     check(g, 'Faz: kondansatörde akım gerilimden 90° önde', capacitive().phase, 90, 2e-2, '°', `adım ${fmt(capacitive().h * 1e3)} ms`));
-  // Aşama 4'te düzelir: ikinci dereceden integrasyon.
-  it.fails('RC süzgeç: fc noktasında |H| = 1/√2 (Aşama 4)', () => {
+  // Aşama 4: ikinci dereceden integrasyon (yamuk kuralı).
+  it('RC süzgeç: fc noktasında |H| = 1/√2', () => {
     const s = sim(circuit().acsource('S', 'a', 'g', ac(1000, 1)).ground('G', 'g').resistor('R', 'a', 'o', 1000).capacitor('C', 'o', 'g', 1.5915494e-7).voltmeter('VO', 'o', 'g', 'ideal', 'ac').build());
     s.advance(0.02);
     s.advance(0.001);

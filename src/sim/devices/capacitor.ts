@@ -1,6 +1,6 @@
 import type { MnaSystem } from '../mna';
 import { numProp } from '../netlist';
-import { Device, type DeviceInit, type DeviceModel, type Measurement, type StepContext } from './device';
+import { chargeScale, Device, type DeviceInit, type DeviceModel, type Measurement, type StepContext } from './device';
 
 export const CAPACITOR_DEFAULTS = { capacitance: 100e-6, initialVoltage: 0 };
 
@@ -10,7 +10,7 @@ export class CapacitorDevice extends Device {
   readonly capacitance: number;
   /** Bir önceki (kabul edilmiş) adımdaki gerilim v(n). */
   voltage: number;
-  /** Son adımdaki akım (+ uçtan girip − uçtan çıkan). */
+  /** Son adımdaki akım i(n) (+ uçtan girip − uçtan çıkan); yamuk kuralı bunu da kullanır. */
   current = 0;
 
   constructor(init: DeviceInit) {
@@ -29,25 +29,31 @@ export class CapacitorDevice extends Device {
   }
 
   /**
-   * Geri Euler eşdeğer modeli: i = C·dv/dt ≈ C·(v(n+1) − v(n))/h
-   *   ⇒ i = geq·v(n+1) − Ieq,  geq = C/h,  Ieq = geq·v(n)
-   * geq, + ve − uçlar arasına iletkenlik olarak eklenir (bu kısım aynı h için sabittir).
+   * Eşdeğer model (i = C·dv/dt):
+   *   yamuk:      (i(n+1) + i(n))/2 = C·(v(n+1) − v(n))/h
+   *               ⇒ i(n+1) = geq·v(n+1) − Ieq,  geq = 2C/h,  Ieq = geq·v(n) + i(n)
+   *   geri Euler: i(n+1) = C·(v(n+1) − v(n))/h  ⇒ geq = C/h,  Ieq = geq·v(n)
+   * geq, + ve − uçlar arasına iletkenlik olarak eklenir (bu kısım aynı h ve yöntem için sabittir).
    */
   override stampStatic(sys: MnaSystem, ctx: StepContext): void {
-    if (ctx.h > 0) sys.conductance(this.nodes[0]!, this.nodes[1]!, this.capacitance / ctx.h);
+    if (ctx.h > 0) sys.conductance(this.nodes[0]!, this.nodes[1]!, chargeScale(ctx) * this.capacitance);
   }
 
-  /** Ieq = geq·v(n), kondansatörün + düğümüne giren bir akım kaynağı olarak eklenir. */
+  /** Ieq, kondansatörün + düğümüne giren bir akım kaynağı olarak eklenir. */
   override stampStep(sys: MnaSystem, ctx: StepContext): void {
     if (ctx.h <= 0) return;
-    const ieq = (this.capacitance / ctx.h) * this.voltage;
+    const ieq = chargeScale(ctx) * this.capacitance * this.voltage + (ctx.trap ? this.current : 0);
     sys.currentSource(this.nodes[1]!, this.nodes[0]!, ieq);
   }
 
   override accept(x: Float64Array, ctx: StepContext): void {
     const next = this.v(x, 0) - this.v(x, 1);
-    this.current = ctx.h > 0 ? (this.capacitance / ctx.h) * (next - this.voltage) : 0;
+    this.current = ctx.h > 0 ? chargeScale(ctx) * this.capacitance * (next - this.voltage) - (ctx.trap ? this.current : 0) : 0;
     this.voltage = next;
+  }
+
+  override lteStates(): ReadonlyArray<readonly [number, number]> {
+    return [[this.nodes[0]!, this.nodes[1]!]];
   }
 
   measure(): Measurement {

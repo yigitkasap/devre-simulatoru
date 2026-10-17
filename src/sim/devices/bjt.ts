@@ -116,7 +116,7 @@ export class BjtDevice extends Device {
   /** NPN modeli (PNP'de yalnızca eski model vardır). */
   readonly model: NpnModelName | null;
   private readonly charges: BjtCharges | null;
-  /** B-E ve B-C eklem yüklerinin geri Euler durumu. */
+  /** B-E ve B-C eklem yüklerinin integrasyon durumu. */
   private readonly chargeBe = new ChargeState();
   private readonly chargeBc = new ChargeState();
   /** Newton-Raphson'un doğrusallaştırma noktası (model gerilimleri V_BE, V_BC). */
@@ -155,8 +155,8 @@ export class BjtDevice extends Device {
       // Eklem yüklerinin akımları: B-E yükü bazdan emetöre, B-C yükü bazdan kollektöre akar.
       const be = junctionCharge(this.vbe, this.charges.be);
       const bc = junctionCharge(this.vbc, this.charges.bc);
-      const ibe = this.chargeBe.companion(be.q, be.c, ctx.h);
-      const ibc = this.chargeBc.companion(bc.q, bc.c, ctx.h);
+      const ibe = this.chargeBe.companion(be.q, be.c, ctx);
+      const ibc = this.chargeBc.companion(bc.q, bc.c, ctx);
       collector = { current: collector.current - ibc.i, du: collector.du, dw: collector.dw - ibc.g };
       base = { current: base.current + ibe.i + ibc.i, du: base.du + ibe.g, dw: base.dw + ibc.g };
     }
@@ -198,9 +198,19 @@ export class BjtDevice extends Device {
   override accept(_x: Float64Array, ctx: StepContext): void {
     this.accepted = { vbe: this.vbe, vbc: this.vbc };
     if (this.charges) {
-      this.chargeBe.accept(junctionCharge(this.vbe, this.charges.be).q, ctx.h);
-      this.chargeBc.accept(junctionCharge(this.vbc, this.charges.bc).q, ctx.h);
+      this.chargeBe.accept(junctionCharge(this.vbe, this.charges.be).q, ctx);
+      this.chargeBc.accept(junctionCharge(this.vbc, this.charges.bc).q, ctx);
     }
+  }
+
+  /** Yük modeli olan transistörde B-E ve B-C eklem gerilimleri. */
+  override lteStates(): ReadonlyArray<readonly [number, number]> {
+    if (!this.charges) return [];
+    const [c, b, e] = this.nodes as [number, number, number];
+    return [
+      [b, e],
+      [b, c],
+    ];
   }
 
   /** Kollektöre, baza ve emetöre giren gerçek akımlar (yük modelinde son adımın yük akımları dahil). */

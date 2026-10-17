@@ -176,7 +176,7 @@ abstract class FetDevice extends Device {
   /** Seçilen parça modeli (P kanallılarda yalnızca eski model vardır: null). */
   readonly model: string | null;
   protected readonly dynamics: FetDynamics;
-  /** Kapasitelerin geri Euler durumu: G-S, G-D, D-S. */
+  /** Kapasitelerin integrasyon durumu: G-S, G-D, D-S. */
   private readonly charges = [new ChargeState(), new ChargeState(), new ChargeState()] as const;
   protected vgs = 0;
   protected vds = 0;
@@ -247,9 +247,9 @@ abstract class FetDevice extends Device {
     this.linear = t;
     if (this.hasCharges && ctx.h > 0) {
       const [gs, gd, ds] = this.chargesAt(this.vgs, this.vds);
-      const igs = this.charges[0].companion(gs.q, gs.c, ctx.h);
-      const igd = this.charges[1].companion(gd.q, gd.c, ctx.h);
-      const ids = this.charges[2].companion(ds.q, ds.c, ctx.h);
+      const igs = this.charges[0].companion(gs.q, gs.c, ctx);
+      const igd = this.charges[1].companion(gd.q, gd.c, ctx);
+      const ids = this.charges[2].companion(ds.q, ds.c, ctx);
       t = addCapacitiveCurrents(t, igs, igd, ids);
     }
     stampThreeTerminal(sys, this.nodes, this.sign, CU, CW, t, this.vgs, this.vds);
@@ -284,8 +284,19 @@ abstract class FetDevice extends Device {
     this.accepted = { vgs: this.vgs, vds: this.vds };
     if (this.hasCharges) {
       const q = this.chargesAt(this.vgs, this.vds);
-      this.charges.forEach((state, k) => state.accept(q[k]!.q, ctx.h));
+      this.charges.forEach((state, k) => state.accept(q[k]!.q, ctx));
     }
+  }
+
+  /** Kapasitesi olan eklemlerin gerilimleri: G-S, G-D, D-S. */
+  override lteStates(): ReadonlyArray<readonly [number, number]> {
+    const d = this.dynamics;
+    const [drain, gate, source] = this.nodes as [number, number, number];
+    const states: Array<readonly [number, number]> = [];
+    if (d.cgs) states.push([gate, source]);
+    if (d.cgd) states.push([gate, drain]);
+    if (d.cds) states.push([drain, source]);
+    return states;
   }
 
   /** Uçlara giren akımlar (yük modelinde son adımın kapasite akımları dahil). */

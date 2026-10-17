@@ -5,6 +5,16 @@
 
 import { GMIN, NR_ABSTOL, NR_RELTOL, THERMAL_VOLTAGE } from '../constants';
 import type { MnaSystem } from '../mna';
+import { chargeScale } from './device';
+
+/** Zaman adımı ve integrasyon yöntemi (StepContext'in yük modelinin kullandığı kısmı). */
+export interface Integration {
+  readonly h: number;
+  readonly trap: boolean;
+}
+
+/** Doğru akım çözümü: yük akımı yok. */
+const DC: Integration = { h: 0, trap: false };
 
 /** exp() taşmasını önlemek için üs sınırı; bunun ötesinde eğri doğrusal sürdürülür. */
 const MAX_EXP_ARG = 80;
@@ -41,8 +51,9 @@ export function limitJunction(vnew: number, vold: number, nvt: number, vcrit: nu
 //   V < FC·VJ:  Q = CJ0·VJ/(1 − M)·(1 − (1 − V/VJ)^(1−M)),   C = CJ0·(1 − V/VJ)^(−M)
 //   V ≥ FC·VJ:  C, V'ye göre doğrusal uzatılır (FC = 0,5); Q bunun integralidir.
 //   Difüzyon yükü Q_d = τ_T·I_D (ileri yönde depolanan azınlık taşıyıcıları; ters toparlanma).
-// Zaman adımında geri Euler ile i = (Q(v) − Q_önceki)/h, iletkenliği C(v)/h olur. Doğru akım
-// çözümünde (h = 0) yük akımı yoktur: kondansatörsüz devreler eskisi gibi tek çözümle kalır.
+// Zaman adımında yamuk kuralıyla i = 2(Q(v) − Q_önceki)/h − i_önceki, iletkenliği 2C(v)/h olur
+// (geri Euler adımında i = (Q(v) − Q_önceki)/h, C(v)/h). Doğru akım çözümünde (h = 0) yük akımı
+// yoktur: kondansatörsüz devreler eskisi gibi tek çözümle kalır.
 
 const DEPLETION_FC = 0.5;
 
@@ -80,7 +91,7 @@ export interface ChargeParams extends DepletionParams {
 }
 
 /**
- * Yük depolayan bir dalın geri Euler durumu: son kabul edilen adımdaki yük ve akım.
+ * Yük depolayan bir dalın integrasyon durumu: son kabul edilen adımdaki yük ve akım.
  * companion(), (q, c) noktasında doğrusallaştırılmış akımı ve iletkenliği verir.
  */
 export class ChargeState {
@@ -89,12 +100,15 @@ export class ChargeState {
   /** Son kabul edilen adımdaki yük akımı dQ/dt (A). */
   current = 0;
 
-  companion(q: number, c: number, h: number): { i: number; g: number } {
-    return h > 0 ? { i: (q - this.q0) / h, g: c / h } : { i: 0, g: 0 };
+  /** Adımın sonundaki yük akımı (yamukta önceki akım da girer) ve iletkenliği. */
+  companion(q: number, c: number, ctx: Integration): { i: number; g: number } {
+    if (ctx.h <= 0) return { i: 0, g: 0 };
+    const k = chargeScale(ctx);
+    return { i: k * (q - this.q0) - (ctx.trap ? this.current : 0), g: k * c };
   }
 
-  accept(q: number, h: number): void {
-    this.current = h > 0 ? (q - this.q0) / h : 0;
+  accept(q: number, ctx: Integration): void {
+    this.current = ctx.h > 0 ? chargeScale(ctx) * (q - this.q0) - (ctx.trap ? this.current : 0) : 0;
     this.q0 = q;
   }
 
@@ -163,16 +177,16 @@ export class Junction {
    *   Ieq = Id − gd·vd
    * Böylece eklem, a–c arasında bir gd iletkenliği ve ona paralel, a'dan c'ye akan
    * Ieq akım kaynağı olur. Zaman adımında (h > 0) yük modeli varsa yük akımı da aynı biçimde
-   * eklenir: i = (Q(vd) − Q_önceki)/h, iletkenlik C(vd)/h.
+   * eklenir (ChargeState.companion).
    */
-  stamp(sys: MnaSystem, anode: number, cathode: number, h = 0): void {
+  stamp(sys: MnaSystem, anode: number, cathode: number, ctx: Integration = DC): void {
     let gd = this.conductance(this.vd);
     let id = this.current(this.vd);
     this.linConductance = gd;
     this.linCurrent = id;
-    if (this.charge && h > 0) {
+    if (this.charge && ctx.h > 0) {
       const { q, c } = this.chargeAt(this.vd);
-      const { i, g } = this.chargeState.companion(q, c, h);
+      const { i, g } = this.chargeState.companion(q, c, ctx);
       gd += g;
       id += i;
     }
@@ -196,10 +210,10 @@ export class Junction {
     return !limited && Math.abs(actual - predicted) <= tolerance;
   }
 
-  /** Adım kabul edildi; h, adımın süresidir (doğru akım çözümünde 0). */
-  accept(h = 0): void {
+  /** Adım kabul edildi (doğru akım çözümünde h = 0). */
+  accept(ctx: Integration = DC): void {
     this.vdAccepted = this.vd;
-    if (this.charge) this.chargeState.accept(this.chargeAt(this.vd).q, h);
+    if (this.charge) this.chargeState.accept(this.chargeAt(this.vd).q, ctx);
   }
 
   restore(): void {

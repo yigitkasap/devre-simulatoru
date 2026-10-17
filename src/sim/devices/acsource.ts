@@ -1,7 +1,7 @@
 import { IDEAL_SOURCE_SHORT_RESISTANCE } from '../constants';
 import type { MnaSystem } from '../mna';
 import { numProp, strProp } from '../netlist';
-import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type StepContext } from './device';
+import { Device, nextPhaseTime, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type StepContext } from './device';
 
 export type Waveform = 'sine' | 'square' | 'triangle';
 export const WAVEFORMS: readonly Waveform[] = ['sine', 'square', 'triangle'];
@@ -39,6 +39,11 @@ export function waveAtPhase(waveform: Waveform, phase: number): number {
     case 'triangle':
       return phase < 0.25 ? 4 * phase : phase < 0.75 ? 2 - 4 * phase : 4 * phase - 4;
   }
+}
+
+/** Dalganın süreksizlikleri (periyot kesri): kare dalganın kenarları, üçgenin köşeleri. */
+export function waveBreakpoints(waveform: Waveform): readonly number[] {
+  return waveform === 'square' ? [0, 0.5] : waveform === 'triangle' ? [0.25, 0.75] : [];
 }
 
 /** Kaymasız dalganın etkin değerinin tepe değerine oranı: sinüs 1/√2, kare 1, üçgen 1/√3. */
@@ -128,7 +133,11 @@ export class AcSourceDevice extends Device {
   }
 
   override stampStep(sys: MnaSystem, ctx: StepContext): void {
-    sys.addRhs(this.branch, this.emf(ctx.time) * ctx.sourceScale);
+    sys.addRhs(this.branch, this.emf(ctx.sourceTime ?? ctx.time) * ctx.sourceScale);
+  }
+
+  override nextBreakpoint(after: number): number {
+    return nextPhaseTime(after, this.frequency, waveBreakpoints(this.waveform));
   }
 
   override idealVoltageBranches(): Array<readonly [number, number]> {

@@ -30,7 +30,9 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 - **İlk açılış ve yardım:** hoş geldin penceresi, 4 adımlı kısa tur, Yardım penceresi (klavye
   kısayolları, fare ve dokunma, simgeler ve renkler, laboratuvar ipuçları).
 - **Simülasyon:** Oynat / Duraklat / Durdur, ×10⁻⁶ … ×1 hız (MHz'lik sinyaller için), çalışırken
-  değer değiştirme ve anahtara tıklama.
+  değer değiştirme ve anahtara tıklama. Kondansatör ve eklem yükleri ikinci dereceden (yamuk
+  kuralı) ve yerel kesme hatası denetimli, uyarlanır zaman adımıyla çözülür; kare dalga kenarları
+  adımın tam üstüne denk gelir.
 - **Eğitsel görünüm:** akım noktaları (geleneksel akım ya da elektron akışı), gerilime göre kablo
   rengi (klasik ya da renk körlüğüne uygun ölçek), düğüm gerilimi etiketleri, LED parlaklığı ve
   yanması, kondansatör dolma çubuğu, ölçü aleti ekranları, İnceleme panelinde canlı V/I/P ve Ohm
@@ -225,7 +227,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 323 test çalıştırır (6'sı fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 332 test çalıştırır (3'ü fizik denetiminde bilinen ve sonraki aşamalarda düzelecek eksikler; `it.fails`): görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -238,7 +240,9 @@ BC107, BF245A, IRF510: veri sayfası noktaları, ters toparlanma, frekansla kaza
 cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım bağlantısı, mesajlar
 (toprak tuzağı, ön direnç önerisi), renk ölçekleri ve telefon yardımcıları (ekler, zincirle ekleme,
 kablo yolu; `tests/phone.test.ts`), toprak isteğe bağlı (`tests/toprak.test.ts`), açık devrede tam 0
-akım (`tests/acik-devre.test.ts`) ve toprak hattı (`tests/toprak-hatti.test.ts`). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
+akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`) ve zaman adımı
+doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
+kare dalga kenarları). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
 **Fizik denetimi** (`tests/fizik-denetimi.test.ts`): 71 kontrol, her biri analitik olarak hesaplanan
@@ -295,8 +299,9 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   akımının doğrusal tahmine yakınlığı da kontrol edilir.
 - **DC yedeği:** Kondansatörsüz devrede zaman adımı küçültülemeyeceği için NR yakınsamazsa
   kaynak adımlama (%10, %20 … %100) denenir.
-- **Zaman ilerletme:** Kare süresi h'nin katı değilse kalan süre bir sonraki kareye aktarılır;
-  böylece LU ayrıştırması her karede yeniden yapılmaz ve simülasyon zamanı kaymaz.
+- **Zaman ilerletme:** Adım uyarlanır (ayrıntı aşağıda, "Fizik 4"). Kare süresine sığmayan
+  adım bir sonraki kareye aktarılır; simülasyon zamanı kaymaz. Testlerdeki `runUntil` son adımı
+  istenen ana tam denk getirir.
 - **Toprak isteğe bağlı:** ayrıntı aşağıda, "Fizik 1". Toprak varken toprağa bağlı olmayan devre
   parçaları kendi sıfır noktasını alır; Mesajlar'da bilgi olarak gösterilir.
 - **Değer girişi:** Görevdeki önekler dışında `K` (kilo) ve `4k7` yazımı da kabul edilir.
@@ -414,6 +419,63 @@ normal teste çevrilir. Aşamaların kararları aşağıda.
   yükselip LED'ler yanınca. Köprü doğrultmaçta (doğru bağlanmış topraklı prob) ve öteki
   örneklerde mesaj yok. Bilgi sorun olmadığı için Mesajlar sekmesinin rozeti ve ipucu şeridi
   yalnızca hata ve uyarıları sayar.
+
+**Fizik 4: zaman adımı doğruluğu (yamuk kuralı, LTE denetimli uyarlanır adım).**
+
+- *Sorun:* geri Euler (birinci dereceden) ve sabit adım (50 µs ya da AC periyodunun 1/50'si).
+  τ = 10 µs'lik RC'de v(τ) 0 V çıkıyordu (ilk adım τ'yu atlıyordu), v(5τ) 8,33 V; RC süzgeçte
+  |H| 0,6861 (beklenen 0,7071), kondansatörde faz 89,55°.
+- *Yöntem: yamuk (trapez) kuralı.* SPICE'ın varsayılanı; Gear-2'ye (BDF2) göre hata katsayısı
+  küçük (h³/12 ile 2h³/9) ve kayıpsızdır: LC devresinde enerjiyi korur. Gear-2 periyotta 40 adımda
+  (10 mH, 10 µF ve 50 µs adım) enerjinin %1,1'ini sayısal olarak söndürür; bobin aşamasındaki %1
+  koşulunu tutmazdı. Yamuk kuralının bilinen kusuru, süreksizlikten sonra sönmeyen salınımdır
+  (sert bir kipte çarpan −1'e yaklaşır). Bu yüzden ilk adım ve her süreksizlikten (kare dalga ve
+  TTL kenarı, üçgenin köşesi, anahtar ya da değer değişimi, LED'in yanması, Newton-Raphson'un
+  yakınsamaması) sonraki adım geri Euler'dir; geri Euler sert kipleri bir adımda söndürür.
+  Kondansatör: i(n+1) = 2C/h·(v(n+1) − v(n)) − i(n); eklem yükleri aynı biçimde
+  (`ChargeState`). Osiloskobun 25 pF'lık giriş kapasitesi ölçü aletinin kendi yüküdür; sert
+  (50 Ω'luk üreteçte τ ≈ 1 ns) olduğu için geri Euler ile çözülür ve hata denetimine girmez.
+- *Yerel kesme hatası (LTE):* durum değişkenleri kondansatör gerilimleri ve yük modeli olan
+  eklemlerin gerilimleridir (bobin akımı da girecek); bunlar süreksizlikte de süreklidir, kaynak
+  düğümleri gibi sıçrayan büyüklükler hata ölçüsüne girmez. Tahmin öngörücü-düzeltici
+  (Milne) yöntemiyle: son kabul edilmiş p + 1 noktadan geçen polinom yeni ana uzatılır (yamukta
+  p = 2) ve çözümle farkı LTE'ye çevrilir: LTE ≈ |x − x_öngörücü|·C_d/(C_d + C_ö) (eşit adımda
+  yamukta 1/13, geri Euler'de 1/3). Tolerans SPICE'tadır: |LTE| ≤ TRTOL·(RELTOL·|x| + VNTOL),
+  RELTOL = 10⁻³, VNTOL = 1 µV, TRTOL = 7. Oran 1'i aşarsa adım reddedilir ve
+  0,9·oran^(−1/(p+1)) kadar küçülür (en az yarıya, en fazla onda bire); kabul edilen adımdan sonra
+  aynı formülle büyür (en fazla 2 kat, en büyük adıma kadar). En küçük adım 1 ns, en büyük adım
+  50 µs (ya da AC periyodunun 1/50'si) aynı kaldı. Geçmiş olmayan başlangıçta (simülasyonun ilk
+  adımı, devre değişince) ilk adım en büyük adımın binde biridir (50 ns) ve her adımda iki katına
+  çıkar; hata denetimi üç nokta birikince başlar.
+- *Kırılma noktaları:* kaynaklar bir sonraki süreksizliği verir (`nextBreakpoint`): kare dalganın
+  iki kenarı, üçgenin köşeleri, simetri %50 değilse bükülmüş sinüsün kırıkları ve fonksiyon
+  üretecinin TTL kenarları (yalnızca TTL ucu bir yere bağlıysa). Adım tam kenara denk getirilir;
+  o adımda kaynak kenarın hemen öncesindeki değerle çözülür (sol limit), kenar bir sonraki geri
+  Euler adımının başında olur. Kenardan sonra öngörücü eski eğilimi taşıdığından hata büyük
+  çıkar ve adım hızlı geçiş çözülene kadar küçülür; yavaş devrede (τ ≫ adım) küçülmez.
+- *TRTOL seçimi:* TRTOL = 1 ile doğruluk biraz daha iyi (küçük τ'da %0,12) ama kırpıcılarda adım
+  sayısı 3,6 katına çıkıyordu; TRTOL = 7 ile hedefler rahatça tutuyor: τ = 10 µs'de v(τ) 6,3427 V
+  (%0,34), v(5τ) %0,13; RC süzgeçte |H| %0,001 (kilitlemeli ölçüm; AC voltmetre 0,7066, %0,07), faz −44,999°; kondansatörde faz 90,000°; üreteçle
+  kare dalgada (τ = 10,5 µs) v(τ) salınımın %0,12'si kadar sapıyor. Ek A'nın C ve D bölümleri
+  geçmeye devam ediyor.
+- *Hız (önce → sonra; Node, 60 Hz karelerle 1 s simülasyon; simülasyon saniyesi başına adım ve
+  süre):* RC dolma 20 000 → 20 000 adım, 11 → 23 ms; kare dalgalı RC 20 000 → 20 002, 14 → 40 ms;
+  toprak tuzağı 50 000 → 49 999, 179 → 222 ms; 1N4001 X-Y 50 000 → 69 041, 115 → 255 ms; zener
+  50 000 → 49 999, 124 → 139 ms; LED 50 000 → 49 999, 95 → 125 ms; yarım dalga 20 000 → 20 156,
+  49 → 77 ms; köprü 20 000 → 20 301, 61 → 95 ms; negatif kenetleyici 50 000 → 71 944, 102 → 283 ms;
+  pozitif kenetleyici 50 000 → 72 673, 103 → 271 ms; katlayıcı 50 000 → 51 007, 160 → 216 ms;
+  paralel kırpıcı 50 000 → 76 666, 247 → 544 ms; çift kırpıcı 50 000 → 99 715, 320 → 847 ms;
+  JFET yükselteç 50 000 → 50 000, 319 → 422 ms; BJT yükselteç 50 000 → 50 000, 327 → 380 ms;
+  MOSFET yükselteç 50 000 → 50 000, 318 → 388 ms; BJT anahtar 20 000 → 20 154, 61 → 138 ms;
+  emetörde LED 20 000 → 20 047, 54 → 117 ms; baraj çubuk 20 000 → 20 000, 106 → 139 ms; baraj tek
+  ışık 20 000 → 20 000, 139 → 184 ms. Adımlar diyotların iletime girip çıktığı anlarda toplanır
+  (1N4001'in ters toparlanması µs ölçeğindedir; periyotta dört olay, olay başına 25–70 deneme).
+  Tarayıcıda (Edge, ×1 hız) bütün föy ve baraj örnekleri önce ve sonra gerçek zamanı tutuyor
+  (4 s'de simülasyon/gerçek zaman oranı 0,999–1,002), kare hızı değişmedi, gecikme uyarısı yok.
+- *Testler:* `tests/zaman-adimi.test.ts` (küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
+  kare dalga kenarları, salınımsızlık, kullanılmayan TTL); adım sayısını sabit 50 µs'ye bağlayan
+  iki eski test "en az 2000, en fazla 2015" (başlangıçtaki ≈ 10 küçük adım) olarak güncellendi;
+  fizik denetiminde örnekleme aralığı olarak çözücünün adımı yerine `maxTimeStep` kullanılıyor.
 
 ### Editör
 
@@ -543,7 +605,8 @@ normal teste çevrilir. Aşamaların kararları aşağıda.
   sabittir, yalnızca sağ taraf her adımda değişir; doğrusal devrelerde LU yine bir kez yapılır.
   Frekans en fazla 2 MHz'tir.
 - **Zaman adımı:** AC kaynaklı devre kondansatörsüz de olsa adım adım çözülür; en büyük adım
-  50 µs ile en kısa periyodun 1/50'sinden küçük olanıdır (1 kHz'te 20 µs, 1 MHz'te 20 ns).
+  50 µs ile en kısa periyodun 1/50'sinden küçük olanıdır (1 kHz'te 20 µs, 1 MHz'te 20 ns). Bu bir
+  üst sınırdır; kondansatörlü ve yük modelli devrelerde adım bunun altında uyarlanır (Fizik 4).
   Periyot başına 50 adım düzgün bir dalga ve doğru tepe değerleri için yeterlidir; 1 kHz'i
   gerçek zamanda izlemek saniyede 50 000 adım ister (dört diyotlu köprüde motor ≈ 180 000
   adım/s atabiliyor). Kare ortalamaları (renkler, noktalar) her adımda değil, periyot başına
@@ -757,8 +820,9 @@ parametreler sonra yine değiştirilebilir (öğrencinin ölçtüğü β ya da I
 | IRF510 | Yaygın MODPEX kartı (V_T, k); Vishay veri sayfası (kapasiteler, 25 V) | V_T = 3,83 V, k = 1,24 A/V², λ = 0,003 (varsayım) | C_GS = 165 pF; C_GD 25 V'ta 15 pF, C_DS 25 V'ta 66 pF (eklem biçiminde) |
 
 - **Yük depolama:** SPICE'taki gibi boşluk yükü Q = C_j0·V_J/(1 − M)·(1 − (1 − V/V_J)^(1−M))
-  (V > V_J/2'de doğrusal uzatma) ve difüzyon yükü Q = τ·I. Zaman adımında geri Euler ile
-  i = (Q(v) − Q_önceki)/h, iletkenliği C(v)/h; bu katkı `stampNonlinear(sys, ctx)` içinde
+  (V > V_J/2'de doğrusal uzatma) ve difüzyon yükü Q = τ·I. Zaman adımında yamuk kuralıyla
+  i = 2(Q(v) − Q_önceki)/h − i_önceki, iletkenliği 2C(v)/h (ilk adımda ve süreksizliklerden sonra
+  geri Euler: i = (Q(v) − Q_önceki)/h; Fizik 4); bu katkı `stampNonlinear(sys, ctx)` içinde
   Newton-Raphson'a girer ([`junction.ts`](src/sim/devices/junction.ts) → `ChargeState`).
   Doğru akım çözümünde (h = 0) yük akımı yoktur: kondansatörsüz devreler eskisi gibi tek
   çözümle kalır. Ölçülen akımlar son adımın yük akımlarını da içerir.

@@ -10,6 +10,10 @@
 //   5. accept        — adım kabul edilince durumu kaydet (kondansatör gerilimi vb.).
 //   6. observe       — adım kabul edildikten sonra ölçüm kaydı (osiloskop). Kondansatörsüz ve AC
 //                      kaynaksız (zamandan bağımsız) devrede her ilerletmede bir kez çağrılır.
+//
+// İntegrasyon: kondansatör, bobin ve eklem yükleri yamuk (trapez) kuralıyla integre edilir; ilk
+// adımda ve süreksizliklerden (kare dalga kenarı, anahtar, değer değişimi) sonraki adımda geri
+// Euler (StepContext.trap = false). Ayrıntı ve gerekçe: README, "Fizik 4".
 
 import { MnaSystem, nodeVoltage } from '../mna';
 import type { DeviceType, Props } from '../netlist';
@@ -17,10 +21,20 @@ import type { DeviceType, Props } from '../netlist';
 export interface StepContext {
   /** Zaman adımı h (s). Kondansatörsüz devrelerde (DC çözüm) 0. */
   readonly h: number;
+  /**
+   * Yamuk kuralı mı (ikinci dereceden)? false: geri Euler (birinci dereceden; ilk adım ve
+   * süreksizliklerden sonraki adım). DC çözümde anlamsız.
+   */
+  readonly trap: boolean;
   /** Bağımsız kaynakların ölçeği (0..1). Yalnızca "kaynak adımlama" yedeğinde 1'den küçüktür. */
   readonly sourceScale: number;
-  /** Çözülen anın simülasyon zamanı (s): geri Euler'de adımın sonu, DC çözümde şu an. */
+  /** Çözülen anın simülasyon zamanı (s): adımın sonu, DC çözümde şu an. */
   readonly time: number;
+  /**
+   * Kaynakların değerlendirildiği an. Adım bir kırılma noktasında (kare dalga kenarı) bitiyorsa
+   * kenarın hemen öncesi (sol limit): kenar bir sonraki adımın başında olur. Verilmezse `time`.
+   */
+  readonly sourceTime?: number;
   /**
    * Ölçü aletlerinin ortalama/etkin değer penceresi (s): devredeki AC kaynakların en uzun
    * periyodu. AC kaynak yoksa 0 (ölçü aletleri anlık değeri gösterir).
@@ -142,6 +156,29 @@ export abstract class Device {
   }
 
   /**
+   * Yerel kesme hatası (LTE) denetlenen durum değişkenleri: her biri x[a] − x[b] (bilinmeyen
+   * indeksleri; −1 = toprak). Kondansatör ve eklem gerilimleri, bobin akımı. Bunlar süreksizlikte
+   * de süreklidir; kaynak düğümleri gibi sıçrayabilen büyüklükler buraya girmez.
+   */
+  lteStates(): ReadonlyArray<readonly [number, number]> {
+    return [];
+  }
+
+  /**
+   * `after` anından (kesin olarak) sonraki ilk süreksizlik: kare dalganın kenarı, üçgenin köşesi.
+   * Zaman adımı tam bu ana denk getirilir, ardından geri Euler adımı atılır. Yoksa sonsuz.
+   */
+  nextBreakpoint(_after: number): number {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  /**
+   * Hangi uçların devrede başka bir şeye bağlı olduğu (derlemeden sonra bir kez). Kullanılmayan
+   * çıkışın (ör. fonksiyon üretecinin TTL'si) kenarları kırılma noktası sayılmasın diye.
+   */
+  connectPins(_connected: readonly boolean[]): void {}
+
+  /**
    * İletken yollar: bu bileşenin içinden akımın akabildiği düğüm grupları (pinler ve iç düğümler;
    * −1 = toprak). Bir gruptaki düğümler bu bileşen üzerinden birbirine bağlıdır. Motor, referansa
    * hiçbir iletken yolu olmayan düğümlere gmin ekler (engine.ts). `transient`: geçici çözüm (h > 0);
@@ -199,6 +236,34 @@ export abstract class Device {
     const voltage = this.v(x, 0) - this.v(x, 1);
     return { voltage, current, power: voltage * current };
   }
+}
+
+/**
+ * Kapasitif bir dalın (i = dq/dt) zaman adımındaki eşdeğerinin katsayısı k:
+ *   geri Euler:  i(n+1) = k·(q(n+1) − q(n)),           k = 1/h
+ *   yamuk:       i(n+1) = k·(q(n+1) − q(n)) − i(n),    k = 2/h
+ * Doğrusallaştırılmış iletkenlik k·C'dir.
+ */
+export function chargeScale(ctx: { readonly h: number; readonly trap: boolean }): number {
+  return ctx.h > 0 ? (ctx.trap ? 2 : 1) / ctx.h : 0;
+}
+
+/**
+ * Bir kaynağın kırılma noktaları periyodun sabit kesirlerindeyse (`phases`, 0 ≤ p < 1) `after`
+ * anından sonraki ilki. `after` bir kırılma noktasının üstündeyse (yuvarlama payıyla) o atlanır.
+ */
+export function nextPhaseTime(after: number, frequency: number, phases: readonly number[]): number {
+  if (phases.length === 0) return Number.POSITIVE_INFINITY;
+  const cycles = after * frequency;
+  const base = Math.floor(cycles);
+  const slack = 1e-9 * Math.max(1, Math.abs(cycles));
+  let best = Number.POSITIVE_INFINITY;
+  for (const p of phases) {
+    let c = base + p;
+    while (c <= cycles + slack) c += 1;
+    best = Math.min(best, c);
+  }
+  return best / frequency;
 }
 
 export interface DeviceModel {

@@ -75,7 +75,7 @@ export class DiodeDevice extends Device {
    * modelinde zaman adımı boyunca depolanan yükün akımı da eklenir.
    */
   override stampNonlinear(sys: MnaSystem, ctx: StepContext): void {
-    this.junction.stamp(sys, this.nodes[0]!, this.nodes[1]!, ctx.h);
+    this.junction.stamp(sys, this.nodes[0]!, this.nodes[1]!, ctx);
   }
 
   override updateIterate(x: Float64Array): boolean {
@@ -87,7 +87,12 @@ export class DiodeDevice extends Device {
   }
 
   override accept(_x: Float64Array, ctx: StepContext): void {
-    this.junction.accept(ctx.h);
+    this.junction.accept(ctx);
+  }
+
+  /** Yük modeli olan diyotta eklem gerilimi (yük onunla birlikte süreklidir). */
+  override lteStates(): ReadonlyArray<readonly [number, number]> {
+    return this.junction.charge ? [[this.nodes[0]!, this.nodes[1]!]] : [];
   }
 
   /** Akım: eklem akımı ile (yük modelinde) kapasitif ve ters toparlanma akımının toplamı. */

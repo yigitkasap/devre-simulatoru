@@ -79,7 +79,9 @@ describe('Newton-Raphson sağlamlığı', () => {
     const result = sim.runUntil(1);
     const elapsed = performance.now() - start;
     expect(result.ok).toBe(true);
-    expect(result.steps).toBe(20000);
+    // En büyük adım 50 µs (20 000 adım); başlangıçta adım küçükten büyür (≈ 10 adım daha).
+    expect(result.steps).toBeGreaterThanOrEqual(20000);
+    expect(result.steps).toBeLessThanOrEqual(20015);
     expect(elapsed).toBeLessThan(3000);
   });
 });

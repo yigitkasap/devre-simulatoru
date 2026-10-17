@@ -14,8 +14,31 @@ export const GMIN = 1e-12;
 export const DEFAULT_TIME_STEP = 50e-6;
 /** Newton-Raphson yakınsamazsa zaman adımı en fazla bu değere kadar yarıya indirilir: 1 ns. */
 export const MIN_TIME_STEP = 1e-9;
-/** Bu kadar art arda başarılı adımdan sonra küçülmüş zaman adımı iki katına çıkarılır. */
+/**
+ * Bu kadar art arda başarılı adımdan sonra küçülmüş zaman adımı iki katına çıkarılır (LTE ile
+ * denetlenen durum değişkeni olmayan devrelerde; ör. yalnızca AC kaynak, direnç ve diyot).
+ */
 export const STEP_GROWTH_AFTER = 8;
+
+/**
+ * Yerel kesme hatası (LTE) toleransı: her durum değişkeni (kondansatör gerilimi, eklem gerilimi,
+ * bobin akımı) için adım başına |LTE| ≤ LTE_TRTOL·(LTE_RELTOL·|x| + mutlak tolerans). SPICE'ın
+ * RELTOL'u (1e-3), gerilimler için VNTOL'u (1 µV) ve TRTOL'u (7; LTE tahmininin gerçek hatayı
+ * abartma payı). Akımlar için 1 nA (SPICE'ın ABSTOL'u 1 pA'dir; eğitim devrelerindeki mA'lik bobin
+ * akımlarında 1 nA yeterince küçük). Bu değerlerle küçük τ'da hata %0,34, RC süzgeçte %0,001.
+ */
+export const LTE_RELTOL = 1e-3;
+export const LTE_VNTOL = 1e-6;
+export const LTE_ABSTOL_CURRENT = 1e-9;
+export const LTE_TRTOL = 7;
+/** Bir adımda zaman adımı en fazla bu kadar büyür (SPICE'taki gibi 2 kat). */
+export const MAX_STEP_GROWTH = 2;
+/**
+ * Geçmişi olmayan bir başlangıçta (simülasyonun ilk adımı, devre değişince) ilk adım: en büyük
+ * adımın binde biri. LTE tahmini için en az iki-üç kabul edilmiş nokta gerekir; adım oradan
+ * itibaren her adımda en fazla iki katına çıkar (50 µs'ye ≈ 10 adımda ulaşır).
+ */
+export const START_STEP_FRACTION = 1e-3;
 
 /** Newton-Raphson: en fazla iterasyon sayısı. */
 export const NR_MAX_ITERATIONS = 100;

@@ -1,7 +1,7 @@
 import type { MnaSystem } from '../mna';
 import { boolProp, numProp, strProp, type Props } from '../netlist';
 import { WAVEFORMS, waveAtPhase, type Waveform } from './acsource';
-import { Device, type DeviceInit, type DeviceModel, type Measurement, type StepContext } from './device';
+import { Device, nextPhaseTime, type DeviceInit, type DeviceModel, type Measurement, type StepContext } from './device';
 
 /**
  * Laboratuvar fonksiyon üreteci (GW Instek GFG-8015G benzeri; veri sayfası: 0,2 Hz – 2 MHz,
@@ -65,10 +65,33 @@ export function funcgenSettings(props: Props) {
 export class FuncgenDevice extends Device {
   readonly type = 'funcgen';
   readonly settings: ReturnType<typeof funcgenSettings>;
+  /** Kırılma noktalarının periyot kesirleri (çıkış ve kullanılıyorsa TTL). */
+  private breakpoints: readonly number[] = [];
 
   constructor(init: DeviceInit) {
     super(init);
     this.settings = funcgenSettings(init.props);
+    this.connectPins([true, true, true]);
+  }
+
+  /**
+   * Çıkışın süreksizlikleri (simetri ayarıyla bükülmüş fazda): kare dalganın kenarları (faz 0 ve
+   * simetri), üçgenin köşeleri, simetri %50 değilse sinüsün kırıkları. TTL'nin kenarları (0 ve
+   * simetri) yalnızca TTL ucu bir yere bağlıysa.
+   */
+  override connectPins(connected: readonly boolean[]): void {
+    const { waveform, duty } = this.settings;
+    const phases = new Set<number>();
+    if (connected[0]) {
+      if (waveform === 'square' || (waveform === 'sine' && duty !== 0.5)) [0, duty].forEach((p) => phases.add(p));
+      if (waveform === 'triangle') [0.5 * duty, duty + 0.5 * (1 - duty)].forEach((p) => phases.add(p));
+    }
+    if (connected[1]) [0, duty].forEach((p) => phases.add(p));
+    this.breakpoints = [...phases];
+  }
+
+  override nextBreakpoint(after: number): number {
+    return nextPhaseTime(after, this.settings.frequency, this.breakpoints);
   }
 
   override get timeVarying(): boolean {
@@ -128,8 +151,9 @@ export class FuncgenDevice extends Device {
   }
 
   override stampStep(sys: MnaSystem, ctx: StepContext): void {
-    sys.addRhs(this.branches[0]!, this.emf(ctx.time) * ctx.sourceScale);
-    sys.addRhs(this.branches[1]!, this.ttl(ctx.time) * ctx.sourceScale);
+    const t = ctx.sourceTime ?? ctx.time;
+    sys.addRhs(this.branches[0]!, this.emf(t) * ctx.sourceScale);
+    sys.addRhs(this.branches[1]!, this.ttl(t) * ctx.sourceScale);
   }
 
   /** OUT ucundan dış devreye verilen akım. */

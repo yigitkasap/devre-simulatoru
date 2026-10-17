@@ -13,11 +13,17 @@ import { compileNetlist, devicesTouching, netKeysOfNode, type CompiledCircuit } 
 import {
   DEFAULT_TIME_STEP,
   GMIN,
+  LTE_ABSTOL_CURRENT,
+  LTE_RELTOL,
+  LTE_TRTOL,
+  LTE_VNTOL,
+  MAX_STEP_GROWTH,
   MIN_TIME_STEP,
   NR_ABSTOL,
   NR_MAX_ITERATIONS,
   NR_RELTOL,
   NR_VNTOL,
+  START_STEP_FRACTION,
   STEP_GROWTH_AFTER,
 } from './constants';
 import { hasErrors, type Diagnostic } from './diagnostics';
@@ -116,6 +122,26 @@ export class CircuitSimulator {
   /** Henüz adımlanmamış simülasyon zamanı. */
   private pending = 0;
   private successStreak = 0;
+  /**
+   * Kabul edilen son üç çözüm (en yenisi başta) ve zamanları: LTE tahmininde öngörücü (predictor)
+   * bu noktalardan geçen polinomdur. Devre değişince sıfırlanır.
+   */
+  private history: Float64Array[] = [];
+  private historyTimes = [0, 0, 0];
+  private historyCount = 0;
+  /** Bir sonraki adım geri Euler ile mi (başlangıç, süreksizlik, yakınsama sorunu)? */
+  private eulerNext = true;
+  /** LTE ile denetlenen durum değişkenleri: bileşenlerin lteStates()'i. */
+  private lteStates: Array<readonly [number, number]> = [];
+  /** Kırılma noktası verebilen bileşenler (zamanla değişen kaynaklar). */
+  private breakpointDevices: readonly Device[] = [];
+  /** Son adım denemesinin LTE oranı (|LTE|/tolerans; tahmin yapılamadıysa null). */
+  private lteRatioLast: number | null = null;
+  /** Son adımda bir bileşenin durumu değişti mi (LED yandı): süreksizlik. */
+  private limitEvent = false;
+  /** gmin düğümleri ve akımı tam 0 olan uçlar hangi sürüm ve çözüm türü için hesaplandı. */
+  private topologyKey = '';
+  private floating: number[] = [];
   /** Son NR denemesinde yakınsamayan bileşenler. */
   private nonConverged: string[] = [];
   private burnedThisCall: string[] = [];
@@ -159,6 +185,7 @@ export class CircuitSimulator {
     this.staticSys = new MnaSystem(n);
     this.stepSys = new MnaSystem(n);
     this.iterSys = new MnaSystem(n);
+    this.history = [new Float64Array(n), new Float64Array(n), new Float64Array(n)];
     this.configure();
   }
 
@@ -179,7 +206,14 @@ export class CircuitSimulator {
       : this.options.timeStep;
     this.sampleSpacing = Number.isFinite(shortest) ? shortest / AVERAGE_SAMPLES_PER_PERIOD : 0;
     this.nonlinearDevices = this.circuit.devices.filter((d) => d.nonlinear);
-    if (this.h > this.maxStep) this.h = this.maxStep;
+    this.connectPins();
+    this.lteStates = this.circuit.devices.flatMap((d) => d.lteStates());
+    this.breakpointDevices = this.circuit.devices.filter((d) => d.timeVarying);
+    // Geçmiş yok: ilk adım geri Euler ve küçük; LTE tahmini birkaç adım sonra devreye girer.
+    this.historyCount = 0;
+    this.eulerNext = true;
+    this.successStreak = 0;
+    this.h = this.lteStates.length > 0 ? this.startStep() : this.maxStep;
     this.deviceIndex = new Map(this.circuit.devices.map((d, i) => [d.id, i]));
     this.pinSums = this.circuit.devices.map((d) => new Float64Array(d.pinCurrents(this.x).length));
     this.intervalTime = 0;
@@ -192,6 +226,24 @@ export class CircuitSimulator {
     this.scopePrev = 0;
     this.peakClock = 0;
     this.peaksReady = false;
+  }
+
+  /** Geçmişi olmayan başlangıçtaki adım: en büyük adımın binde biri (en az 1 ns). */
+  private startStep(): number {
+    return Math.min(this.maxStep, Math.max(this.options.minTimeStep, this.maxStep * START_STEP_FRACTION));
+  }
+
+  /** Bileşenlere hangi uçlarının devrede başka bir uca (ya da toprağa) bağlı olduğunu bildirir. */
+  private connectPins(): void {
+    const uses = new Map<number, number>();
+    this.circuit.devices.forEach((device, i) => {
+      const pins = this.circuit.netlist.elements[i]!.pins.length;
+      for (let k = 0; k < pins; k++) uses.set(device.nodes[k]!, (uses.get(device.nodes[k]!) ?? 0) + 1);
+    });
+    this.circuit.devices.forEach((device, i) => {
+      const pins = this.circuit.netlist.elements[i]!.pins.length;
+      device.connectPins(device.nodes.slice(0, pins).map((node) => node === GROUND || (uses.get(node) ?? 0) >= 2));
+    });
   }
 
   /** Toprak sembolü ya da topraklı COM içeren kablo adaları ve o adalardaki bileşen uçları. */
@@ -285,17 +337,21 @@ export class CircuitSimulator {
       this.staticSys = new MnaSystem(n);
       this.stepSys = new MnaSystem(n);
       this.iterSys = new MnaSystem(n);
+      this.history = [new Float64Array(n), new Float64Array(n), new Float64Array(n)];
       this.luWork = undefined;
     }
     this.configure();
     this.invalidate();
   }
 
+  /** Matris katkıları değişti (değer, LED yanması, onarım): süreksizlik, sonraki adım geri Euler. */
   private invalidate(): void {
     this.version++;
     this.nonlinearDevices = this.circuit.devices.filter((d) => d.nonlinear);
     this.staticKey = '';
+    this.topologyKey = '';
     this.luCache = null;
+    this.eulerNext = true;
   }
 
   /** Topoloji kontrollerinin sonuçları. */
@@ -407,8 +463,14 @@ export class CircuitSimulator {
     return this.window > 0;
   }
 
+  /** Şu anki (bir sonraki denemede kullanılacak) zaman adımı (s). */
   get timeStep(): number {
     return this.h;
+  }
+
+  /** Bu devrede zaman adımının üst sınırı (s): 50 µs ya da en kısa AC periyodunun 1/50'si. */
+  get maxTimeStep(): number {
+    return this.maxStep;
   }
 
   device(id: string): Device | undefined {
@@ -530,53 +592,202 @@ export class CircuitSimulator {
         if (!error) this.observe();
         return this.result(0, error);
       }
-      return this.advanceTransient(dt, maxSteps);
+      return this.advanceTransient(dt, maxSteps, this.exact);
     } catch (e) {
       if (e instanceof SingularMatrixError) return this.result(0, this.singularDiagnostic(e.column));
       throw e;
     }
   }
 
-  /** Belirli bir simülasyon zamanına kadar ilerletir (testler için). */
+  /** runUntil: son adım istenen ana tam denk getirilir. */
+  private exact = false;
+
+  /** Belirli bir simülasyon zamanına kadar ilerletir; son adım tam o ana denk gelir (testler için). */
   runUntil(time: number): AdvanceResult {
-    return this.advance(Math.max(0, time - this.time - this.pending));
+    this.exact = true;
+    try {
+      return this.advance(Math.max(0, time - this.time - this.pending));
+    } finally {
+      this.exact = false;
+    }
   }
 
   private result(steps: number, error: Diagnostic | null): AdvanceResult {
     return { ok: error === null, steps, burned: this.burnedThisCall, ...(error ? { error } : {}) };
   }
 
-  private advanceTransient(dt: number, maxSteps: number): AdvanceResult {
+  /**
+   * Geçici çözüm: uyarlanır zaman adımıyla ilerletir (README, "Fizik 4").
+   *   - Adım, bir sonraki kırılma noktasına (kare dalga kenarı, üçgenin köşesi) taşmaz; tam üstüne
+   *     denk gelir ve o adımda kaynaklar kenarın hemen öncesindeki değeriyle çözülür. Ardından gelen
+   *     adım geri Euler'dir (yamuk kuralı süreksizlikte salınım yapabilir).
+   *   - Her adımdan sonra durum değişkenlerinin yerel kesme hatası tahmin edilir (lteRatio). Hata
+   *     toleransı aşarsa adım reddedilir ve küçültülür; küçükse sonraki adım büyür (en fazla 2 kat,
+   *     en büyük adıma kadar).
+   *   - Newton-Raphson yakınsamazsa adım yarıya iner ve geri Euler'e dönülür.
+   * @param exact son adımı istenen süreye tam denk getir (runUntil).
+   */
+  private advanceTransient(dt: number, maxSteps: number, exact: boolean): AdvanceResult {
     this.pending += dt;
+    const target = this.time + this.pending;
+    const minStep = this.options.minTimeStep;
     let steps = 0;
-    while (this.pending >= this.h * (1 - 1e-9)) {
-      if (steps >= maxSteps) {
+    let attempts = 0;
+    for (;;) {
+      const tiny = Math.max(1e-15, Math.abs(this.time) * 1e-13);
+      const proposed = Math.min(this.h, this.maxStep);
+      let end = this.time + proposed;
+      let landing = false;
+      /** Adım kırılma noktasına ya da hedefe denk gelsin diye kısaltıldı mı? */
+      let truncated = false;
+      const breakpoint = this.nextBreakpoint();
+      if (breakpoint <= end + tiny) {
+        end = breakpoint;
+        landing = true;
+        truncated = true;
+      }
+      if (exact) {
+        if (target - this.time <= tiny) break;
+        if (target < end - tiny) {
+          end = target;
+          landing = false;
+          truncated = true;
+        }
+      } else if (this.pending < (end - this.time) * (1 - 1e-9)) {
+        break;
+      }
+      if (steps >= maxSteps || attempts >= 4 * maxSteps + 64) {
         this.pending = 0;
         break;
       }
-      const ctx: StepContext = { h: this.h, sourceScale: 1, time: this.time + this.h, window: this.window };
-      if (this.step(ctx)) {
-        this.time += this.h;
-        this.pending -= this.h;
-        steps++;
-        this.observe();
-        this.accumulate(ctx.h);
+      const h = end - this.time;
+      if (h <= minStep * 1e-3) {
+        // Kırılma noktası (ya da hedef) yuvarlama payı kadar ötede: adım atmaya değmez.
+        this.pending -= h;
+        this.time = end;
+        if (landing) this.eulerNext = true;
+        continue;
+      }
+      attempts++;
+      const ctx: StepContext = {
+        h,
+        trap: !this.eulerNext,
+        sourceScale: 1,
+        time: end,
+        window: this.window,
+        ...(landing ? { sourceTime: end - h * 1e-3 } : {}),
+      };
+      // En küçük adımda (ya da daha kısa, kırılma noktasına denk getirilmiş adımda) hata denetlenmez:
+      // daha küçültülemez. Karar önerilen adımla verilir (end − time farkının yuvarlaması 1 ns'yi aşabilir).
+      const outcome = this.step(ctx, proposed > minStep * (1 + 1e-6) && h > minStep * 0.5);
+      if (outcome === 'failed') {
+        this.h = h / 2;
+        this.eulerNext = true;
+        this.successStreak = 0;
+        if (this.h < minStep) {
+          this.h = this.lteStates.length > 0 ? this.startStep() : this.maxStep;
+          return this.result(steps, this.nrFailedDiagnostic());
+        }
+        continue;
+      }
+      const order = ctx.trap ? 2 : 1;
+      const ratio = this.lteRatioLast;
+      if (outcome === 'rejected') {
+        // Hata payı aşıldı: adım, tahmini hataya göre küçültülür (en az yarıya, en fazla onda bire).
+        this.h = Math.max(minStep, h * Math.min(0.5, Math.max(0.1, 0.9 * ratio! ** (-1 / (order + 1)))));
+        continue;
+      }
+      this.time = end;
+      this.pending -= h;
+      steps++;
+      this.observe();
+      this.accumulate(h);
+      this.pushHistory();
+      this.eulerNext = landing || this.limitEvent;
+      if (this.lteStates.length === 0) {
+        // Durum değişkeni yok (ör. AC kaynak, direnç, diyot): en büyük adım; yakınsama için
+        // küçülmüşse art arda başarılı adımlardan sonra büyür.
         this.successStreak++;
         if (this.h < this.maxStep && this.successStreak >= STEP_GROWTH_AFTER) {
           this.h = Math.min(this.maxStep, this.h * 2);
           this.successStreak = 0;
         }
+      } else if (truncated) {
+        // Adım kırılma noktasına ya da hedefe denk gelsin diye kısaltıldı: önerilen adım korunur.
+        // (Kısaltma, end − time farkıyla değil bayrakla izlenir: o farkın yuvarlama hatası küçük
+        // adımlarda 1e-9'u aşar.)
+        this.h = proposed;
       } else {
-        this.h /= 2;
-        this.successStreak = 0;
-        if (this.h < this.options.minTimeStep) {
-          this.h = this.maxStep;
-          return this.result(steps, this.nrFailedDiagnostic());
-        }
+        const growth = ratio === null ? MAX_STEP_GROWTH : Math.min(MAX_STEP_GROWTH, 0.9 * Math.max(ratio, 1e-12) ** (-1 / (order + 1)));
+        this.h = Math.min(this.maxStep, Math.max(minStep, h * growth));
       }
     }
-    if (this.pending < 0) this.pending = 0;
+    if (this.pending < 0 || exact) this.pending = 0;
     return this.result(steps, null);
+  }
+
+  /** Bir sonraki kırılma noktası (şu andan kesin olarak sonra); yoksa sonsuz. */
+  private nextBreakpoint(): number {
+    let next = Number.POSITIVE_INFINITY;
+    for (const device of this.breakpointDevices) next = Math.min(next, device.nextBreakpoint(this.time));
+    return next;
+  }
+
+  /** Kabul edilen çözümü geçmişe ekler (en yenisi başta). */
+  private pushHistory(): void {
+    const oldest = this.history[2]!;
+    this.history[2] = this.history[1]!;
+    this.history[1] = this.history[0]!;
+    this.history[0] = oldest;
+    oldest.set(this.x);
+    this.historyTimes[2] = this.historyTimes[1]!;
+    this.historyTimes[1] = this.historyTimes[0]!;
+    this.historyTimes[0] = this.time;
+    this.historyCount = Math.min(3, this.historyCount + 1);
+  }
+
+  /**
+   * Yerel kesme hatasının toleransa oranı (en kötü durum değişkeni). Öngörücü-düzeltici tahmini
+   * (Milne yöntemi): öngörücü, son p + 1 kabul edilmiş noktadan geçen p. dereceden polinomun yeni
+   * ana uzatılmasıdır (p: yöntemin derecesi; yamukta 2, geri Euler'de 1). İkisinin hatası aynı
+   * x^(p+1) türeviyle orantılıdır:
+   *   düzeltici (çözüm):  yamuk h³/12·x''',  geri Euler h²/2·x''
+   *   öngörücü:           x^(p+1)/(p+1)! · Π (t − t_j)
+   * Böylece LTE ≈ |x_düzeltici − x_öngörücü| · C_d / (C_d + C_ö). Eşit adımda yamukta 1/13, geri
+   * Euler'de 1/3. Kırılma noktasından sonra geçmiş eski eğilimi taşır; tahmin büyük çıkar ve adım
+   * küçülür (hızlı geçiş çözülene kadar). Yeterli geçmiş yoksa null.
+   */
+  private lteRatio(ctx: StepContext): number | null {
+    const states = this.lteStates;
+    if (states.length === 0) return null;
+    const p = ctx.trap ? 2 : 1;
+    if (this.historyCount < p + 1) return null;
+    const t = this.time + ctx.h;
+    const ts = this.historyTimes;
+    const weights: number[] = [];
+    let spread = 1;
+    for (let j = 0; j <= p; j++) {
+      let w = 1;
+      for (let k = 0; k <= p; k++) if (k !== j) w *= (t - ts[k]!) / (ts[j]! - ts[k]!);
+      weights.push(w);
+      spread *= t - ts[j]!;
+    }
+    const predictor = spread / (p === 2 ? 6 : 2);
+    const corrector = p === 2 ? ctx.h ** 3 / 12 : ctx.h ** 2 / 2;
+    const factor = corrector / (corrector + predictor);
+    const nodes = this.circuit.nodeUnknowns;
+    const diff = (x: Float64Array, a: number, b: number) => (a === GROUND ? 0 : x[a]!) - (b === GROUND ? 0 : x[b]!);
+    let worst = 0;
+    for (const [a, b] of states) {
+      const corrected = diff(this.xNew, a, b);
+      let predicted = 0;
+      for (let j = 0; j <= p; j++) predicted += weights[j]! * diff(this.history[j]!, a, b);
+      const previous = diff(this.history[0]!, a, b);
+      const absolute = a >= nodes && a !== GROUND ? LTE_ABSTOL_CURRENT : LTE_VNTOL;
+      const tolerance = LTE_RELTOL * Math.max(Math.abs(corrected), Math.abs(previous)) + absolute;
+      worst = Math.max(worst, (factor * Math.abs(corrected - predicted)) / tolerance);
+    }
+    return worst / LTE_TRTOL;
   }
 
   /** Yeni bir ilerletme aralığı (animasyon karesi): ortalamalar sıfırlanır. */
@@ -636,11 +847,12 @@ export class CircuitSimulator {
    * Tek bir zaman adımı (ya da DC çözüm). LED yanarsa aynı adım LED açık devre olarak
    * yeniden çözülür. Başarılıysa durum kaydedilir.
    */
-  private step(ctx: StepContext): boolean {
+  private step(ctx: StepContext, checkError = false): 'ok' | 'failed' | 'rejected' {
+    this.limitEvent = false;
     for (let attempt = 0; attempt <= this.circuit.devices.length; attempt++) {
       if (!this.solve(ctx)) {
         this.restoreIterates();
-        return false;
+        return 'failed';
       }
       let changed = false;
       for (const device of this.circuit.devices) {
@@ -650,23 +862,31 @@ export class CircuitSimulator {
         }
       }
       if (!changed) break;
+      this.limitEvent = true;
       this.invalidate();
       this.restoreIterates();
     }
+    // Yerel kesme hatası: tolerans aşıldıysa adım reddedilir (bir bileşenin durumu değiştiyse ya da
+    // adım zaten en küçükse — checkError = false — kabul edilir).
+    this.lteRatioLast = checkError ? this.lteRatio(ctx) : null;
+    if (checkError && !this.limitEvent && this.lteRatioLast !== null && this.lteRatioLast > 1) {
+      this.restoreIterates();
+      return 'rejected';
+    }
     for (const device of this.circuit.devices) device.accept(this.xNew, ctx);
     this.x.set(this.xNew);
-    return true;
+    return 'ok';
   }
 
   /** DC çözüm; yakınsamazsa kaynak adımlama dener. Hata varsa tanılamayı döndürür. */
   private solveDC(): Diagnostic | null {
-    const ctx: StepContext = { h: 0, sourceScale: 1, time: this.time, window: 0 };
-    if (!this.step(ctx)) {
+    const ctx: StepContext = { h: 0, trap: false, sourceScale: 1, time: this.time, window: 0 };
+    if (this.step(ctx) !== 'ok') {
       // Kaynak adımlama: kaynakları %10'dan başlayarak artır, her çözümü bir sonrakinin
       // başlangıç noktası yap.
       for (const scale of SOURCE_STEPS) {
         const scaled: StepContext = { ...ctx, sourceScale: scale };
-        if (!this.step(scaled)) return this.nrFailedDiagnostic();
+        if (this.step(scaled) !== 'ok') return this.nrFailedDiagnostic();
       }
     }
     this.solvedVersion = this.version;
@@ -677,14 +897,24 @@ export class CircuitSimulator {
     for (const device of this.circuit.devices) device.restoreIterate();
   }
 
-  /** Adım boyunca sabit katkıları (gmin dahil) hazırlar; aynı h ve sürüm için önbellekten döner. */
+  /**
+   * Adım boyunca sabit katkıları (gmin dahil) hazırlar; aynı h, yöntem ve sürüm için önbellekten
+   * döner. gmin düğümleri ve akımı tam 0 olan uçlar yalnızca devre ya da çözüm türü (doğru akım /
+   * geçici) değişince yeniden bulunur.
+   */
   private prepareStatic(ctx: StepContext): string {
-    const key = `${this.version}|${ctx.h}|${ctx.sourceScale}`;
+    const key = `${this.version}|${ctx.h}|${ctx.sourceScale}|${ctx.trap}`;
     if (key === this.staticKey) return key;
+    const transient = ctx.h > 0;
+    const topology = `${this.version}|${transient}`;
+    if (topology !== this.topologyKey) {
+      this.floating = this.floatingNodes(transient);
+      this.zeroPins = this.findZeroPins(transient);
+      this.topologyKey = topology;
+    }
     const sys = this.staticSys;
     sys.clear();
-    for (const node of this.floatingNodes(ctx.h > 0)) sys.add(node, node, GMIN);
-    this.zeroPins = this.findZeroPins(ctx.h > 0);
+    for (const node of this.floating) sys.add(node, node, GMIN);
     for (const device of this.circuit.devices) device.stampStatic(sys, ctx);
     this.staticKey = key;
     return key;
