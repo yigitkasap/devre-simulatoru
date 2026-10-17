@@ -497,6 +497,14 @@ geçiyor. Aşamaların kararları aşağıda.
   Newton-Raphson yinelemesi ≈ 1,5 kat. Yamuk adımında Newton-Raphson'u son iki çözümden doğrusal
   öngörüyle başlatmak yinelemeyi %17–25 azalttı (JFET yükselteçte süre %10 kısaldı); büyüme
   güvenlik çarpanını değiştirmek kazandırmadı. Görev tanımı gereği bu durum raporlandı.
+- *Sonra hızlandırma (kullanıcı onayıyla):* CPU profilinde zamanın ≈ %10'u statik matrisin önbellek
+  anahtarını her denemede metin olarak kurmaya gidiyordu; anahtar sayısal karşılaştırmaya çevrildi
+  (LU önbelleği hazırlık sıra numarasıyla). Yakınsamayan her Newton yinelemesinde yalnızca hata
+  mesajı için kurulan dizi, döngü bitince bir kez kuruluyor; adım bağlamı nesnesi yayma (spread)
+  olmadan oluşturuluyor. Adım sayıları ve sonuçlar aynı; Node'da çift yönlü kırpıcı 1080 → 709,
+  paralel kırpıcı 579 → 406, BJT yükselteç 366 → 258 ms/sim-s. Tarayıcıda (aynı yükte) çift yönlü
+  kırpıcı gerçek zamanı tutuyor (0,999; 83 fps, eski çözücü 85 fps), paralel kırpıcı 180 fps. Kalan
+  sürenin büyüğü yoğun LU ayrıştırması ve model hesapları (üstel, akım sınırlayıcının tanh'ı).
 - *Testler:* `tests/zaman-adimi.test.ts` (küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
   kare dalga kenarları, salınımsızlık, kullanılmayan TTL); adım sayısını sabit 50 µs'ye bağlayan
   iki eski test "en az 2000, en fazla 2015" (başlangıçtaki ≈ 14 küçük adım) olarak güncellendi;

@@ -89,8 +89,16 @@ export class CircuitSimulator {
   private staticSys: MnaSystem;
   private stepSys: MnaSystem;
   private iterSys: MnaSystem;
-  private staticKey = '';
-  private luCache: { key: string; factor: LUFactorization } | null = null;
+  /**
+   * Statik katkıların hangi sürüm, adım, kaynak ölçeği ve yöntem için hazırlandığı (her denemede
+   * metin anahtarı kurmak pahalıydı) ve her hazırlıkta artan sıra numarası (LU önbelleğinin anahtarı).
+   */
+  private staticVersion = -1;
+  private staticH = Number.NaN;
+  private staticScale = Number.NaN;
+  private staticTrap = false;
+  private staticSerial = 0;
+  private luCache: { serial: number; factor: LUFactorization } | null = null;
   private luWork: LUFactorization | undefined;
 
   /** Matris katkılarını değiştiren her olayda artar (değer değişikliği, LED yanması...). */
@@ -142,7 +150,8 @@ export class CircuitSimulator {
   /** Son adımda bir bileşenin durumu değişti mi (LED yandı): süreksizlik. */
   private limitEvent = false;
   /** gmin düğümleri ve akımı tam 0 olan uçlar hangi sürüm ve çözüm türü için hesaplandı. */
-  private topologyKey = '';
+  private topologyVersion = -1;
+  private topologyTransient = false;
   private floating: number[] = [];
   /** Son NR denemesinde yakınsamayan bileşenler. */
   private nonConverged: string[] = [];
@@ -350,8 +359,8 @@ export class CircuitSimulator {
   private invalidate(): void {
     this.version++;
     this.nonlinearDevices = this.circuit.devices.filter((d) => d.nonlinear);
-    this.staticKey = '';
-    this.topologyKey = '';
+    this.staticVersion = -1;
+    this.topologyVersion = -1;
     this.luCache = null;
     this.eulerNext = true;
   }
@@ -697,16 +706,12 @@ export class CircuitSimulator {
         continue;
       }
       attempts++;
-      const ctx: StepContext = {
-        h,
-        // Yamuk kuralı yalnızca hata denetimi yapılabildiğinde (geçmişte üç nokta varken): denetimsiz
-        // başlangıç adımlarında sert bir kipte (ör. diyot eklemi) sönmeyen salınım bırakabilir.
-        trap: !this.eulerNext && (this.lteStates.length === 0 || this.historyCount >= 3),
-        sourceScale: 1,
-        time: end,
-        window: this.window,
-        ...(landing ? { sourceTime: end - h * 1e-3 } : {}),
-      };
+      // Yamuk kuralı yalnızca hata denetimi yapılabildiğinde (geçmişte üç nokta varken): denetimsiz
+      // başlangıç adımlarında sert bir kipte (ör. diyot eklemi) sönmeyen salınım bırakabilir.
+      const trap = !this.eulerNext && (this.lteStates.length === 0 || this.historyCount >= 3);
+      const ctx: StepContext = landing
+        ? { h, trap, sourceScale: 1, time: end, window: this.window, sourceTime: end - h * 1e-3 }
+        : { h, trap, sourceScale: 1, time: end, window: this.window };
       // En küçük adımda (ya da daha kısa, kırılma noktasına denk getirilmiş adımda) hata denetlenmez:
       // daha küçültülemez. Karar önerilen adımla verilir (end − time farkının yuvarlaması 1 ns'yi aşabilir).
       const outcome = this.step(ctx, proposed > minStep * (1 + 1e-6) && h > minStep * 0.5);
@@ -932,22 +937,31 @@ export class CircuitSimulator {
    * döner. gmin düğümleri ve akımı tam 0 olan uçlar yalnızca devre ya da çözüm türü (doğru akım /
    * geçici) değişince yeniden bulunur.
    */
-  private prepareStatic(ctx: StepContext): string {
-    const key = `${this.version}|${ctx.h}|${ctx.sourceScale}|${ctx.trap}`;
-    if (key === this.staticKey) return key;
+  private prepareStatic(ctx: StepContext): number {
+    if (
+      this.staticVersion === this.version &&
+      this.staticH === ctx.h &&
+      this.staticScale === ctx.sourceScale &&
+      this.staticTrap === ctx.trap
+    ) {
+      return this.staticSerial;
+    }
     const transient = ctx.h > 0;
-    const topology = `${this.version}|${transient}`;
-    if (topology !== this.topologyKey) {
+    if (this.topologyVersion !== this.version || this.topologyTransient !== transient) {
       this.floating = this.floatingNodes(transient);
       this.zeroPins = this.findZeroPins(transient);
-      this.topologyKey = topology;
+      this.topologyVersion = this.version;
+      this.topologyTransient = transient;
     }
     const sys = this.staticSys;
     sys.clear();
     for (const node of this.floating) sys.add(node, node, GMIN);
     for (const device of this.circuit.devices) device.stampStatic(sys, ctx);
-    this.staticKey = key;
-    return key;
+    this.staticVersion = this.version;
+    this.staticH = ctx.h;
+    this.staticScale = ctx.sourceScale;
+    this.staticTrap = ctx.trap;
+    return ++this.staticSerial;
   }
 
   /**
@@ -1070,15 +1084,15 @@ export class CircuitSimulator {
 
   /** Bir adımı (gerekirse Newton-Raphson ile) çözer; sonuç xNew'dadır. */
   private solve(ctx: StepContext): boolean {
-    const key = this.prepareStatic(ctx);
+    const serial = this.prepareStatic(ctx);
     const n = this.circuit.size;
     this.stepSys.copyFrom(this.staticSys);
     for (const device of this.circuit.devices) device.stampStep(this.stepSys, ctx);
 
     const nonlinear = this.nonlinearDevices;
     if (nonlinear.length === 0) {
-      if (this.luCache?.key !== key) {
-        this.luCache = { key, factor: luFactor(this.staticSys.A, n) };
+      if (this.luCache?.serial !== serial) {
+        this.luCache = { serial, factor: luFactor(this.staticSys.A, n) };
       }
       luSolve(this.luCache.factor, this.stepSys.z, this.xNew);
       this.checkFinite(this.xNew);
@@ -1098,6 +1112,7 @@ export class CircuitSimulator {
       for (let i = 0; i < n; i++) this.xIter[i] = x0[i]! + f * (x0[i]! - x1[i]!);
       for (const device of nonlinear) device.updateIterate(this.xIter);
     }
+    let unconverged: string[] = [];
     for (let iteration = 0; iteration < NR_MAX_ITERATIONS; iteration++) {
       this.iterSys.copyFrom(this.stepSys);
       for (const device of nonlinear) device.stampNonlinear(this.iterSys, ctx);
@@ -1105,7 +1120,7 @@ export class CircuitSimulator {
       luSolve(this.luWork, this.iterSys.z, this.xNew);
       this.checkFinite(this.xNew);
 
-      const unconverged: string[] = [];
+      unconverged = [];
       for (const device of nonlinear) {
         if (!device.updateIterate(this.xNew)) unconverged.push(device.id);
       }
@@ -1119,8 +1134,9 @@ export class CircuitSimulator {
         if (ctx.h === 0) this.polish(nonlinear, ctx, n);
         return true;
       }
-      this.nonConverged = unconverged.length > 0 ? unconverged : nonlinear.map((d) => d.id);
     }
+    // Yakınsamadı: sorumlu bileşenler (hata mesajı için; her yinelemede kurmak gereksiz).
+    this.nonConverged = unconverged.length > 0 ? unconverged : nonlinear.map((d) => d.id);
     return false;
   }
 
