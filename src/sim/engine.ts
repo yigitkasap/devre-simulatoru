@@ -34,6 +34,7 @@ import {
   CapacitorDevice,
   DEVICE_MODELS,
   InductorDevice,
+  LampDevice,
   LedDevice,
   MotorDevice,
   RelayDevice,
@@ -406,6 +407,15 @@ export class CircuitSimulator {
             voltage: device.peakVoltage,
             internalResistance: device.internalResistance,
           },
+        });
+      }
+      if (device instanceof LampDevice && device.burned) {
+        result.push({
+          severity: 'warning',
+          code: 'lamp-burned',
+          elementIds: [device.id],
+          netKeys: [],
+          params: { temperature: device.burnTemperature, ratedVoltage: device.params.ratedVoltage },
         });
       }
       if (device instanceof LedDevice && device.burned) {

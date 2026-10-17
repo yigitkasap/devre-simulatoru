@@ -1973,7 +1973,7 @@ export function Canvas({
       {menu && (() => {
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
-        const burned = part.type === 'led' && frame?.statuses.get(part.id)?.burned === true;
+        const burned = frame?.statuses.get(part.id)?.burned === true;
         const items: MenuItem[] = [
           { label: phone ? tr.phone.value : tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
           { label: tr.contextMenu.rotate, shortcut: 'R', onSelect: () => onRotate([part.id]) },

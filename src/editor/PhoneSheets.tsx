@@ -6,6 +6,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type Ref } from 'react';
 import { tr } from '../i18n/tr';
 import { CATALOG, CATEGORIES, withProp, type Category, type NumberPropDef, type PropDef } from '../model/catalog';
+import { PropSlider } from './PropSlider';
 import type { CircuitDoc, Part } from '../model/types';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { DeviceType, PropValue } from '../sim/netlist';
@@ -388,6 +389,7 @@ export function TouchNumberField({
           +
         </button>
       </div>
+      {def.slider && !disabled && <PropSlider def={def} value={value} label={label} touch onSlide={(v, done) => done && onCommit(v)} />}
       {error && <FieldError id={`${id}-e`} error={error} kept={tr.inspector.invalidKept(formatSI(value, def.unit, { trim: true, digits: 4 }))} />}
       {live && !error && (
         <span className="flex items-center gap-1.5 text-label text-ok">

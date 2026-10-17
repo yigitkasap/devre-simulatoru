@@ -214,6 +214,8 @@ export function useSimulation(
         if (status.powerRatio !== undefined) live.set(part.id, { powerRatio: status.powerRatio });
       } else if (part.type === 'relay') {
         live.set(part.id, { energized: status.energized ?? false, field: current });
+      } else if (part.type === 'lamp') {
+        live.set(part.id, { glow: status.glow ?? 0, burned: status.burned ?? false, ...(status.temperature !== undefined ? { temperature: status.temperature } : {}) });
       } else if (part.type === 'inductor') {
         live.set(part.id, { field: current });
       } else if (part.type === 'transformer') {

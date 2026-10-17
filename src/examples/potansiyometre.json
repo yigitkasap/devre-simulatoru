@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 9, "internalResistance": 0}},
+    {"id": "p2", "type": "potentiometer", "label": "P1", "x": 34, "y": 0, "rotation": 270, "props": {"resistance": 10000.0, "position": 50}},
+    {"id": "p3", "type": "voltmeter", "label": "V1", "x": 24, "y": 4, "rotation": 90, "props": {"resistance": 10000000.0, "ideal": false}},
+    {"id": "p4", "type": "resistor", "label": "R1", "x": 14, "y": 0, "rotation": 180, "props": {"resistance": 4700.0}},
+    {"id": "p5", "type": "led", "label": "LED1", "x": 6, "y": 4, "rotation": 90, "props": {"color": "green"}},
+    {"id": "p6", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -8], [34, -8], [34, -4]]},
+    {"id": "w2", "points": [[34, 4], [34, 8]]},
+    {"id": "w3", "points": [[0, 4], [0, 8], [6, 8]]},
+    {"id": "w4", "points": [[6, 8], [24, 8]]},
+    {"id": "w5", "points": [[24, 8], [34, 8]]},
+    {"id": "w6", "points": [[31, 0], [24, 0]]},
+    {"id": "w7", "points": [[24, 0], [18, 0]]},
+    {"id": "w8", "points": [[10, 0], [6, 0]]}
+  ]
+}

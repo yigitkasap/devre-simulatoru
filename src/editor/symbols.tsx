@@ -30,6 +30,9 @@ export interface LiveVisual {
   readonly powerRatio?: number;
   /** Röle: palet çekili mi? */
   readonly energized?: boolean;
+  /** Akkor lamba: ışık akısının anma değerine oranı ve filaman sıcaklığı (K). */
+  readonly glow?: number;
+  readonly temperature?: number;
   /** DC motor: milin (görsel olarak yavaşlatılmış) dönme açısı (radyan). */
   readonly angle?: number;
   /**
@@ -153,6 +156,78 @@ function Resistor({ style, powerRatio }: { style: ResistorStyle; powerRatio?: nu
     <g>
       {glow}
       <polyline points={zigzag} fill="none" stroke={heat} strokeWidth={2.6} strokeLinejoin="round" strokeLinecap="round" />
+    </g>
+  );
+}
+
+/**
+ * Potansiyometre: direnç ve sürgü oku. Sürgü ucu (0, −30); ok gövdeye konuma göre değer
+ * (%0: 1. uç tarafı, %100: 3. uç tarafı).
+ */
+function Potentiometer({ style, position }: { style: ResistorStyle; position: number }) {
+  const x = -20 + 40 * Math.min(1, Math.max(0, position / 100));
+  return (
+    <g>
+      <Resistor style={style} />
+      <path d={`M0,-30V-20H${x}V-12`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <path d={`M${x - 4},-15L${x},-9L${x + 4},-15Z`} fill="currentColor" stroke="currentColor" strokeWidth={1.2} strokeLinejoin="round" />
+    </g>
+  );
+}
+
+/** LDR: direnç ve ona doğru gelen iki ışık oku; ok rengi aydınlıkla koyulaşır. */
+function Ldr({ style, illuminance }: { style: ResistorStyle; illuminance: number }) {
+  const light = Math.min(1, Math.max(0, Math.log10(Math.max(illuminance, 0.1) / 0.1) / 6));
+  const color = `rgba(214, 150, 0, ${0.35 + 0.65 * light})`;
+  const arrow = (x: number) => (
+    <g key={x}>
+      <line x1={x - 9} y1={-26} x2={x - 1} y2={-13} stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+      <path d={`M${x + 0.5},-10.5L${x - 5.2},-14.6L${x - 0.6},-17.4Z`} fill={color} stroke={color} strokeWidth={0.8} strokeLinejoin="round" />
+    </g>
+  );
+  return (
+    <g>
+      <Resistor style={style} />
+      {arrow(-4)}
+      {arrow(8)}
+    </g>
+  );
+}
+
+/** NTC: direnç, üzerinden geçen eğik çizgi (ucunda yatay kısa çizgi) ve "−t°". */
+function Ntc({ style, rotation }: { style: ResistorStyle; rotation: Rotation }) {
+  return (
+    <g>
+      <Resistor style={style} />
+      <path d="M-24,14H-16L16,-16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+      <DeviceText x={21} y={-17} rotation={rotation} size={8} anchor="start">
+        −t°
+      </DeviceText>
+    </g>
+  );
+}
+
+/** Filamanın akkor rengi (yaklaşık kara cisim): 900 K koyu kırmızı, 1500 K turuncu, 2500 K sarımsı beyaz. */
+function filamentColor(T: number): string {
+  const f = Math.min(1, Math.max(0, (T - 800) / 1900));
+  const g = Math.round(40 + 190 * f);
+  const b = Math.round(20 + 140 * Math.max(0, f - 0.4) / 0.6);
+  return `rgb(255, ${g}, ${b})`;
+}
+
+/** Akkor lamba (IEC: daire içinde çarpı); filaman ısınınca akkor renginde parlar, yanınca karadır. */
+function Lamp({ live }: { live: LiveVisual | undefined }) {
+  const glow = live?.burned ? 0 : Math.min(1.5, live?.glow ?? 0);
+  const color = filamentColor(live?.temperature ?? 293);
+  const visible = Math.min(1, Math.sqrt(glow));
+  return (
+    <g>
+      {visible > 0.02 && <circle cx={0} cy={0} r={15 + 14 * visible} fill={color} opacity={0.15 + 0.45 * visible} style={{ filter: 'blur(6px)' }} />}
+      <Lead from={-40} to={-13} />
+      <Lead from={13} to={40} />
+      <circle cx={0} cy={0} r={13} style={visible > 0.02 ? { fill: color, fillOpacity: 0.25 + 0.6 * visible } : PAPER} stroke="currentColor" strokeWidth={2} />
+      <path d="M-9.2,-9.2L9.2,9.2M9.2,-9.2L-9.2,9.2" stroke={live?.burned ? '#4a4a4a' : 'currentColor'} strokeWidth={2} strokeLinecap="round" />
+      {live?.burned && <BurnMark />}
     </g>
   );
 }
@@ -835,6 +910,14 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Relay energized={live?.energized ?? false} rotation={rotation} />;
     case 'motor':
       return <Motor angle={live?.angle ?? 0} rotation={rotation} />;
+    case 'potentiometer':
+      return <Potentiometer style={resistorStyle} position={numProp(props, 'position', 50)} />;
+    case 'ldr':
+      return <Ldr style={resistorStyle} illuminance={numProp(props, 'illuminance', 100)} />;
+    case 'ntc':
+      return <Ntc style={resistorStyle} rotation={rotation} />;
+    case 'lamp':
+      return <Lamp live={live} />;
     case 'voltmeter':
       return <Meter letter="V" rotation={rotation} />;
     case 'ammeter':

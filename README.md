@@ -15,7 +15,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   kondansatör (elektrolitik ya da seramik/film), bobin (sargı direnci ve sargı kapasitesiyle; akımı
   kesilince Lenz uyarısı), transformatör (karşılıklı indüktans, galvanik yalıtım), diyot, zener diyot, LED (kırmızı/sarı/yeşil/mavi), NPN ve PNP transistör, N ve P kanallı JFET,
   N ve P kanallı MOSFET, anahtar, röle (elektromıknatıs, çekme/bırakma histerezisi), DC motor
-  (zıt EMK, yük torku, jeneratör olarak çalışma), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
+  (zıt EMK, yük torku, jeneratör olarak çalışma), potansiyometre (kaydırıcıyla canlı), LDR, NTC
+  termistör (öz ısınmalı), akkor lamba (filaman ısınması, ilk an akımı, aşırı gerilimde kopma), voltmetre, ampermetre (DC/AC kipi), su haznesi (dört problu
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
   kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
@@ -52,8 +53,9 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   A − B) ve X-Y kipi, B'yi ters çevirme (INV), gerçek giriş (1 MΩ ‖ 25 pF) ya da ideal giriş,
   volt/bölme, zaman/bölme (0,1 µs … 1 s), kanal konumu, otomatik tetikleme, "Oto" ayar (hızı da
   ayarlar); ekranın altında tepe-tepe, etkin değer ve frekans.
-- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 13 grupta 38 hazır devre: temel devreler,
-  laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör, röle, DC motor), Elektronik Laboratuvarı föyünün dokuz deneyi
+- **Örnekler:** üst çubuktaki "Örnekler" penceresinde 14 grupta 42 hazır devre: temel devreler,
+  laboratuvar cihazları (köprüde toprak tuzağı), elektromanyetizma (transformatör, röle, DC motor),
+  ayarlı parçalar ve sensörler (potansiyometre, LDR, NTC, akkor lamba), Elektronik Laboratuvarı föyünün dokuz deneyi
   (diyot karakteristikleri, doğrultucular, kenetleyici ve katlayıcı, kırpıcılar, FET
   karakteristikleri, JFET/BJT/MOSFET yükselteçleri, transistörün anahtar olarak kullanılması) ve
   baraj su seviyesi uyarısı projesi. Her birinin yanında devrenin ne işe yaradığı (dayandığı fizik
@@ -243,7 +245,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 457 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 481 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -262,7 +264,7 @@ akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`)
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
 kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
 ve "çıkmaz"), bobin (`tests/bobin.test.ts`: RL dolma, enerji, reaktans, faz, LC salınımı, seri RLC
-rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
+rezonansı, açılan anahtar ve serbest geçiş diyodu, iki örnek), transformatör (`tests/transformator.test.ts`), röle (`tests/role.test.ts`), DC motor (`tests/motor.test.ts`), sensörler ve lamba (`tests/sensorler.test.ts`), manyetik alan gösterimi (`tests/manyetik.test.ts`) ve ngspice ile çapraz doğrulama
 (`tests/spice/`: DC, geçici durum — RL ve LC dahil — ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
@@ -795,6 +797,45 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   okları; yönü ve büyüklüğü birincile indirgenmiş mıknatıslanma akımından (i₁ + i₂ / n).
 - *Testler* (`tests/manyetik.test.ts`, 3 test): sağa akan akımın üstünde ⊙, altında ⊗, akım ters
   dönünce yer değiştirir; aşağı akan akımda ⊙ sağda (−ŷ × x̂ = +ẑ); yoğunluk akımla artar.
+
+### Yeni parçalar 5: potansiyometre, LDR, NTC, akkor lamba (2026-10-17)
+
+- *Kaydırıcı:* sayısal özelliğin altında kaydırıcı (`NumberPropDef.slider`; [`PropSlider.tsx`](src/editor/PropSlider.tsx)):
+  potansiyometrenin konumu (%0–100), LDR'nin aydınlığı (0,1–100 000 lüks, logaritmik), NTC'nin
+  sıcaklığı (−40…125 °C). Masaüstünde sürüklerken değer canlı uygulanır ve geçmişe yazılmaz
+  (düzenleyicinin `preview` eylemi); bırakınca sürüklemeden önceki belge geçmişe eklenir (tek geri
+  alma adımı). Telefonda bırakınca uygulanır.
+- *Potansiyometre* (pasif parçalar, P; üç uç: 1. uç, sürgü, 3. uç): **Bourns PTV09A** 10 kΩ doğrusal
+  (±%20, artık direnç en fazla %1, 0,05 W). R₁₂ = R_a + (R − 2R_a)·p, R₂₃ = R − R₁₂. Sembolde ok
+  gövdeye konuma göre değer. Güç sınırı izin her bölümüne boyu oranında (en az %10) dağıtılır;
+  aşılınca direncinki gibi uyarı (kendi metniyle).
+- *LDR* (sensörler): **GL5528** (Senba GL55 veri sayfası): 10 lükste 10–20 kΩ (15 kΩ), karanlıkta
+  en az 1 MΩ, γ = 0,6: R = R₁₀·(E/10 lx)^(−γ), karanlık direnciyle paralel. Tepki süresi (20/30 ms)
+  modellenmez. Sembolde ışık okları aydınlıkla koyulaşır.
+- *NTC termistör* (sensörler): **Vishay NTCLE100E3103** (10 kΩ, B₂₅/₈₅ = 3977 K); direnç
+  üreticinin bu malzeme için verdiği R(T)/R₂₅ = exp(A + B/T + C/T² + D/T³) eğrisinden (veri sayfası
+  tablosunu −40…100 °C'ta %0,2 içinde tutturur). Öz ısınma: δ = 7 mW/K, ısıl zaman sabiti 15 s.
+  Isıl düğüm ortamın üstündeki ısınmadır: ortam sıcaklığı değişince termistör hemen uyar (gerçekte
+  havada ≈ 15 s; simülasyonda beklememek için).
+- *Akkor lamba* (çıkış elemanları, LP): 12 V 0,1 A minyatür lamba. Filaman sıcaklığı MNA'da bir iç
+  düğüm (ısıl devre benzetmesi; [`thermal.ts`](src/sim/devices/thermal.ts)): C·dT/dt + P_kayıp(T) =
+  V²/R(T), elektrikle birlikte Newton-Raphson ile; NTC aynı çözümü kullanır. Veri sayfaları soğuk
+  direnci ve ısıl zaman sabitini vermediği için tungstenden türetildi: ρ ∝ T^1,215 (Desai ve diğ.
+  1984), anma sıcaklığı 2500 K (uzun ömürlü vakumlu lamba) → soğukken 8,9 Ω, sıcakken 120 Ω (13,5
+  kat); ışınımla kayıp k·(T⁴ − T₀⁴); ısı sığası filamanın kütlesinden (anma değerlerini verecek tel:
+  ≈ 16 µm, 35 mm; salım oranı 0,3, 0,15 J/(g·K)) ≈ 2,1·10⁻⁵ J/K, ısıl zaman sabiti ≈ 11 ms. Işık ∝
+  (T/T_n)^8,9 (Φ ∝ V^3,4); sembolde akkor rengiyle parlar. 3695 K'de filaman erir: lamba yanar
+  (açık devre, `lamp-burned`, Onar ile düzelir). LED'e özel "Onar" yerleri genelleştirildi.
+- *Testler* (`tests/sensorler.test.ts`, 16 test): potansiyometrenin yüksüz ve yüklü bölücüsü, güç
+  uyarısı; LDR'nin 10 lüks, γ ve karanlık direnci; NTC eğrisinin veri sayfası tablosu (−40, 0, 50,
+  100 °C) ve B değeri, bölücüde ortam değişimi, öz ısınmanın zaman sabiti; lambanın anma akımı ve
+  sıcaklığı, soğuk direnci, ilk an akımı (≈ 1,35 A), enerji korunumu (pil = ışınım + C·ΔT, %0,5),
+  6 V'ta akım (V ∝ T^2,6), 36 V'ta kopma, 18 V'ta kopmama; dört örneğin metnindeki sayılar.
+- *Örnekler* (yeni grup "Ayarlı parçalar ve sensörler"): "Potansiyometre: ayarlı gerilim bölücü"
+  (9 V; sürgüde voltmetre ve 4,7 kΩ + LED; yükleme: %50'de 4,5 V yerine 3,57 V), "LDR ile gece
+  lambası" (100 kΩ + LDR bölücüsü, BC107; ≈ 40 lüksün altında yanar), "NTC ile termometre" (5 V,
+  10 kΩ; −20 °C'ta 0,47 V … 100 °C'ta 4,68 V), "Akkor lamba: ilk an akımı" (1 Ω ölçme direnci ve
+  osiloskop; ≈ 1,21 A'den ≈ 6 ms'de 0,2 A'in altına).
 
 ### Editör
 

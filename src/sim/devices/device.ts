@@ -90,6 +90,15 @@ export interface DeviceStatus {
   };
   /** Röle: palet çekili mi (NA kontağı kapalı)? */
   readonly energized?: boolean;
+  /** Potansiyometre: sürgünün 3. uca göre gerilimi ve iki bölümün direnci. */
+  readonly wiper?: { readonly voltage: number; readonly r12: number; readonly r23: number };
+  /** LDR, NTC, lamba: şu anki direnç (Ω). */
+  readonly resistance?: number;
+  /** NTC, lamba: sıcaklık (K); NTC'de ortam sıcaklığı da. */
+  readonly temperature?: number;
+  readonly ambient?: number;
+  /** Lamba: ışık akısının anma değerine oranı. */
+  readonly glow?: number;
   /** Röle: kapalı kontaktan (C'den kapalı uca) geçen akım. */
   readonly contactCurrent?: number;
   /** Röle: sargının uç gerilimi ve akımı. */

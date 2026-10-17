@@ -12,7 +12,7 @@ import { SITE_NAME } from '../config';
 import type { Diagnostic } from '../sim/diagnostics';
 import type { ExampleGroupId, ExampleId } from '../examples';
 import type { DeviceType } from '../sim/netlist';
-import { formatSI } from '../sim/units';
+import { formatNumber, formatSI } from '../sim/units';
 import { ek, toDative } from './ek';
 
 export interface DiagnosticContext {
@@ -44,6 +44,10 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   switch: 'Anahtar',
   relay: 'Röle',
   motor: 'DC motor',
+  potentiometer: 'Potansiyometre',
+  ldr: 'LDR (fotodirenç)',
+  ntc: 'NTC termistör',
+  lamp: 'Akkor lamba',
   voltmeter: 'Voltmetre',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
@@ -73,6 +77,10 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   switch: 'anahtarının',
   relay: 'rölesinin',
   motor: 'motorunun',
+  potentiometer: 'potansiyometresinin',
+  ldr: 'LDR’sinin',
+  ntc: 'termistörünün',
+  lamp: 'lambasının',
   voltmeter: 'voltmetresinin',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
@@ -100,6 +108,10 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   pmos: ['drain (D) ucu', 'gate (G) ucu', 'source (S) ucu'],
   switch: ['1. ucu', '2. ucu'],
   motor: ['+ ucu', '− ucu'],
+  potentiometer: ['1. ucu', 'orta ucu (sürgü)', '3. ucu'],
+  ldr: ['1. ucu', '2. ucu'],
+  ntc: ['1. ucu', '2. ucu'],
+  lamp: ['1. ucu', '2. ucu'],
   relay: ['sargısının 1. ucu', 'sargısının 2. ucu', 'kontağının ortak ucu (C)', 'normalde açık kontak ucu (NA)', 'normalde kapalı kontak ucu (NK)'],
   voltmeter: ['+ ucu', '− ucu'],
   ammeter: ['+ ucu', '− ucu'],
@@ -131,6 +143,10 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   switch: ['1', '2'],
   relay: ['1', '2', 'C', 'NA', 'NK'],
   motor: ['+', '−'],
+  potentiometer: ['1', 'S', '3'],
+  ldr: ['1', '2'],
+  ntc: ['1', '2'],
+  lamp: ['1', '2'],
   voltmeter: ['+', '−'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
@@ -160,6 +176,10 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   switch: ['1. uç', '2. uç'],
   relay: ['sargı 1', 'sargı 2', 'C', 'NA', 'NK'],
   motor: ['+ uç', '− uç'],
+  potentiometer: ['1. uç', 'sürgü', '3. uç'],
+  ldr: ['1. uç', '2. uç'],
+  ntc: ['1. uç', '2. uç'],
+  lamp: ['1. uç', '2. uç'],
   voltmeter: ['+ uç', '− uç'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
@@ -270,12 +290,29 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
       };
     }
     case 'resistor-overpower':
+      if (first !== undefined && ctx.type(first) === 'potentiometer') {
+        return {
+          title: 'Potansiyometre ısınıyor',
+          detail:
+            `${firstLabel} potansiyometresinin direnç izinin bir bölümünde ${formatSI(p.power ?? 0, 'W')} harcanıyor; o bölümün payına düşen sınır ` +
+            `${formatSI(p.rating ?? 0, 'W')} (bütün iz en fazla 0,05 W). Küçük potansiyometreler akım sınırlamak için değil, gerilim ` +
+            'bölmek için yapılır: aşırı ısınan karbon iz yanar. Büyük akım geçen yerlerde sabit bir direnç kullan.',
+        };
+      }
       return {
         title: 'Direnç ısınıyor',
         detail:
           `${firstLabel} direncinde ${formatSI(p.power ?? 0, 'W')} harcanıyor; direncin güç sınırı ` +
           `${String(p.rating ?? 0).replace('.', ',')} W. Gerçek direnç aşırı ısınır, rengi kararır ve bozulabilir. ` +
           'Güç sınırı daha büyük bir direnç seç ya da akımı azalt.',
+      };
+    case 'lamp-burned':
+      return {
+        title: 'Lamba yandı',
+        detail:
+          `${firstLabel} lambasının filamanı ${formatNumber(p.temperature ?? 3695, 0)} K’e ısındı ve tungstenin erime sıcaklığını (3695 K) aştı: tel ` +
+          `koptu, lamba açık devre oldu. Lambanın anma gerilimi ${formatSI(p.ratedVoltage ?? 12, 'V', { trim: true })}; çok daha yüksek bir gerilim ` +
+          'filamanı saniyeden kısa sürede eritir. Gerilimi düşür ya da daha yüksek gerilimli bir lamba seç.',
       };
     case 'motor-overload':
       return {
@@ -376,6 +413,14 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   nmos: 'Kapısı yalıtılmış alan etkili transistör; VGS eşik gerilimini (VT) aşınca iletime geçer. Anahtar ve yükselteç olarak kullanılır. Föydeki IRF510 olarak gelir.',
   pmos: 'P kanallı MOSFET: kapı kaynaktan yeterince düşük olunca (VGS < VT < 0) iletime geçer.',
   switch: 'Devreyi açar ya da kapatır; simülasyon sırasında üzerine tıklayarak değiştirilir.',
+  potentiometer:
+    'Ayarlı direnç: üç ucu vardır, orta uç (sürgü) direnç üzerinde kayar. 1. uç ile 3. uç arasındaki direnç sabittir; sürgü onu ikiye böler. Uçlarına gerilim verilince sürgüden ayarlanabilir bir gerilim alınır (gerilim bölücü). Simülasyon sırasında kaydırıcıyla çevrilir.',
+  ldr:
+    'Işığa duyarlı direnç (kadmiyum sülfür): ışık arttıkça direnci azalır. Karanlıkta ≈ 1 MΩ, oda ışığında birkaç kΩ, güneş altında yüz ohm mertebesindedir. Aydınlık simülasyon sırasında kaydırıcıyla değiştirilir.',
+  ntc:
+    'Sıcaklığa duyarlı direnç (negatif sıcaklık katsayılı): sıcaklık arttıkça direnci üstel olarak azalır; 25 °C’ta 10 kΩ, 100 °C’ta ≈ 680 Ω. Sıcaklık simülasyon sırasında kaydırıcıyla değiştirilir.',
+  lamp:
+    'Tungsten telden (filaman) akım geçince tel ≈ 2500 K’e ısınır ve ışık verir. Metallerin direnci sıcaklıkla arttığı için soğuk filamanın direnci sıcağının ≈ 13’te biridir: lamba yakıldığı an çok büyük bir akım çeker. Gerilimi fazla gelirse filaman erir.',
   motor:
     'Elektrik enerjisini dönme hareketine çevirir: mıknatısın alanındaki akım taşıyan sargıya kuvvet etkir (F = I·L·B). Dönen sargıda hızla orantılı bir zıt EMK indüklenir (Lenz) ve akımı sınırlar; bu yüzden motor dururken çok, boşta dönerken az akım çeker. Dışarıdan çevrilince jeneratör olur.',
   relay:
@@ -397,6 +442,15 @@ function fieldLabel(type: DeviceType, key: string): string {
   if (type === 'funcgen' && key === 'offset') return 'DC offset (açık devre)';
   if (type === 'tank' && key === 'mode') return 'Su akışı';
   if (type === 'relay' && key === 'inductance') return 'Sargı endüktansı (palet açıkken)';
+  if (type === 'potentiometer' && key === 'resistance') return 'Toplam direnç (1–3 arası)';
+  if (type === 'potentiometer' && key === 'position') return 'Sürgünün konumu (1. uçtan)';
+  if (type === 'ldr' && key === 'illuminance') return 'Aydınlık (lüks)';
+  if (type === 'ldr' && key === 'lightResistance') return '10 lüksteki direnç';
+  if (type === 'ldr' && key === 'gamma') return 'γ (log R₁₀ / R₁₀₀)';
+  if (type === 'ntc' && key === 'temperature') return 'Ortam sıcaklığı (°C)';
+  if (type === 'ntc' && key === 'resistance25') return '25 °C’taki direnç';
+  if (type === 'lamp' && key === 'ratedVoltage') return 'Anma gerilimi';
+  if (type === 'lamp' && key === 'ratedPower') return 'Anma gücü';
   if (type === 'motor') {
     const motor: Record<string, string> = {
       loadTorque: 'Yük torku (mN·m)',
@@ -657,6 +711,42 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'DC motorun dönme yönünün akımın yönüyle değiştiğini gösterir. S1 ve S4 kapalıyken akım motordan soldan sağa geçer ve motor ileri döner (≈ 8160 dev/dk). S2 ve S3 kapalıyken akım ters yönde geçer: mıknatısın alanındaki sargıya etkiyen kuvvet (F = I·L × B) de ters döner ve motor geri döner (−8160 dev/dk). Motor ileri dönerken yönü değiştirmek, pilin gerilimine zıt EMK’yı da ekler: akım bir an ≈ 11 A’e çıkar (kalkış akımının iki katı). Aynı kolun iki anahtarını (S1 ile S3 ya da S2 ile S4) birlikte kapatmak pili kısa devre eder: Mesajlar’da uyarı çıkar.',
     everyday:
       'Oyuncak arabalar, elektrikli cam ve koltuk motorları, robotlar ve 3B yazıcılar motorlarının yönünü H köprüsüyle değiştirir; anahtarların işini dört transistör yapar (L298N, DRV8833 gibi sürücü entegreleri). Bu entegreler aynı koldaki iki transistörün birlikte iletmesini özellikle engeller.',
+  },
+  potansiyometre: {
+    title: 'Potansiyometre: ayarlı gerilim bölücü',
+    description:
+      '9 V’luk pil, 10 kΩ’luk bir potansiyometrenin (Bourns PTV09A tipi) iki ucuna bağlı: 1. ucu toprakta, 3. ucu + 9 V’ta. Sürgüden 4,7 kΩ’luk direnç ve yeşil LED besleniyor; voltmetre sürgünün gerilimini ölçüyor. Oynat’a bas, potansiyometreyi seç ve kaydırıcıyı çevir.',
+    purpose:
+      'Potansiyometre bir gerilim bölücüdür: sürgü direnci ikiye böler ve sürgünün gerilimi konumla artar (%0’da 0,09 V, %100’de 8,8 V; uçlardaki %1’lik artık direnç yüzünden tam 0 ve 9 V olmaz). Sürgüden akım çekilmeseydi gerilim konumla doğru orantılı olurdu (%50’de 4,5 V); LED kolu akım çektiği için sürgünün gerilimi düşer: %50’de 3,57 V (yükleme). LED sürgünün gerilimi ≈ 1,9 V’u geçince yanar ve parlaklığı konumla artar (%100’de 1,45 mA).',
+    everyday:
+      'Eski radyoların ses düğmesi, ışık dimmerlerinin ayar düğmesi, oyun kumandalarının analog çubukları ve arabaların gaz pedalı konum algılayıcısı potansiyometredir. Ses ayarında kulağın logaritmik duyarlılığı için logaritmik (A tipi) potansiyometre kullanılır.',
+  },
+  'ldr-gece-lambasi': {
+    title: 'LDR ile gece lambası',
+    description:
+      '9 V’luk pil; 100 kΩ’luk direnç ile LDR (GL5528) bir gerilim bölücü kuruyor, ortası BC107’nin bazına bağlı. Kollektörde 1 kΩ ve sarı LED var. Oynat’a bas, LDR’yi seç ve aydınlığı azalt (100 lüksten 1 lükse).',
+    purpose:
+      'Işıkla değişen bir direncin bir transistörü anahtarlamasını gösterir. Aydınlıkta LDR’nin direnci küçüktür (100 lükste ≈ 3,8 kΩ): bazın gerilimi ≈ 0,33 V’ta kalır, transistör keser, LED söner. Karardıkça LDR’nin direnci artar (10 lükste 15 kΩ, karanlıkta 1 MΩ), baz gerilimi ≈ 0,65 V’a ulaşınca transistör iletir: ≈ 40 lüksün altında LED yanmaya başlar, 20 lükste ≈ 3,3 mA, 10 lükste ve daha karanlıkta ≈ 6,9 mA’le tam parlar.',
+    everyday:
+      'Sokak lambaları, bahçedeki güneş enerjili lambalar ve prize takılan gece lambaları akşam kendiliğinden yanar; telefonların ekran parlaklığı ortam ışığına göre ayarlanır. Eski fotoğraf makinelerinin ışık ölçerleri de CdS hücreleriyle çalışırdı.',
+  },
+  'ntc-termometre': {
+    title: 'NTC ile termometre',
+    description:
+      '5 V’luk pil; NTC termistör (Vishay NTCLE100E3, 25 °C’ta 10 kΩ) üstte, 10 kΩ’luk direnç altta. Voltmetre alttaki direncin gerilimini ölçüyor. Oynat’a bas, NTC’yi seç ve sıcaklığı değiştir.',
+    purpose:
+      'Sıcaklığın bir gerilime çevrilmesini gösterir. Isındıkça NTC’nin direnci üstel olarak azalır, bölücünün çıkışı artar: −20 °C’ta 0,47 V, 0 °C’ta 1,17 V, 25 °C’ta 2,50 V, 50 °C’ta 3,67 V, 75 °C’ta 4,35 V, 100 °C’ta 4,68 V. Eşit sıcaklık adımları eşit gerilim adımı vermez: en duyarlı bölge, NTC’nin direncinin sabit dirence eşit olduğu 25 °C civarıdır. Bir mikrodenetleyici bu gerilimi ölçüp sıcaklığa çevirir.',
+    everyday:
+      'Kombi, buzdolabı, çamaşır makinesi ve klimaların sıcaklık algılayıcıları, dijital ateş ölçerler, telefon ve dizüstü bilgisayar bataryalarının sıcaklık koruması NTC kullanır. Arabaların motor soğutma suyu göstergesi de bir NTC’dir.',
+  },
+  'lamba-ani-akim': {
+    title: 'Akkor lamba: ilk an akımı',
+    description:
+      '12 V’luk pil, S1 anahtarı, 12 V 0,1 A’lik bir akkor lamba ve akımı ölçmek için 1 Ω’luk bir direnç. Osiloskop (A kanalı, 2 ms/bölme, 0,2 V/bölme) bu direncin gerilimini, yani lambanın akımını gösteriyor (1 V = 1 A). Hızı ×0,01’e indir, Oynat’a bas ve S1’i kapat: darbe ekranda yavaşça çizilir.',
+    purpose:
+      'Metallerin direncinin sıcaklıkla arttığını gösterir. Soğuk tungsten filamanın direnci ≈ 8,9 Ω’dur: anahtar kapandığı an ≈ 1,21 A geçer (anma akımının 12 katı). Filaman ısındıkça direnci artar; akım ≈ 6 ms’de 0,2 A’in altına iner ve filaman ≈ 2490 K’de, akım 0,1 A’de dengelenir (sıcakken ≈ 120 Ω). Lamba en çok yakıldığı anda zorlanır: ampuller çoğunlukla açıldıkları anda patlar.',
+    everyday:
+      'Akkor ampuller ve halojen lambalar, ısıtıcı teller ve tost makinesinin rezistansı da sıcaklıkla direnci artan metallerdir. Büyük lamba gruplarını süren devreler ilk an akımına göre boyutlandırılır; tiyatro dimmerleri lambaları yavaşça açar.',
   },
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
@@ -985,6 +1075,23 @@ export const tr = {
     primary: 'Birincil (P)',
     secondary: 'İkincil (S)',
     powerInOut: 'Giriş / çıkış gücü',
+    potPosition: 'Sürgünün konumu',
+    potHalves: 'Direnç 1–S / S–3',
+    potWiper: 'Sürgünün gerilimi (3. uca göre)',
+    potNote: 'Sürgü direnci ikiye böler: gerilim bölücü. Sürgüden akım çekilmiyorsa V_{S3} = V_{13} · R_{S3} / R_{13}; sürgüye yük bağlanınca gerilim bu değerin altına düşer.',
+    ldrIlluminance: 'Aydınlık',
+    ldrNote:
+      'Işık, kadmiyum sülfürdeki elektronları serbest bırakır (fotoiletkenlik): ışık arttıkça taşıyıcı sayısı artar, direnç azalır. R = R₁₀ · (E / 10 lx)^{−γ}.',
+    resistanceNow: 'Direnç',
+    temperature: 'Sıcaklık',
+    selfHeating: 'Öz ısınma',
+    ntcNote:
+      'Sıcaklık arttıkça yarı iletken seramikte daha çok yük taşıyıcı serbest kalır ve direnç üstel olarak azalır: R ≈ R₂₅ · e^{B·(1/T − 1/T₂₅)}, B = 3977 K.',
+    filament: 'Filaman sıcaklığı',
+    lampLight: 'Işık (anma değerine göre)',
+    lampNote: (cold: string) =>
+      `Tungstenin direnci sıcaklıkla artar: soğukken ${cold}. Yakıldığı an akım büyüktür, filaman ısındıkça direnç artar ve akım anma değerine iner. Isınan filaman ışınımla soğur; ışık sıcaklıkla çok hızlı artar.`,
+    lampBurnedNote: 'Filaman eridi ve koptu: lamba açık devredir. Durdur’a bas ya da sağ tıklayıp “Onar”ı seç.',
     motorSpeed: 'Hız',
     motorRpm: (rpm: string) => `${rpm} dev/dk`,
     motorEmf: 'Zıt EMK (e = k·ω)',
@@ -1127,6 +1234,7 @@ export const tr = {
       temel: 'Temel devreler',
       aletler: 'Laboratuvar cihazları',
       elektromanyetizma: 'Elektromanyetizma',
+      sensorler: 'Ayarlı parçalar ve sensörler',
       'diyot-karakteristigi': 'Deney 1 · Diyot karakteristikleri',
       dogrultucu: 'Deney 2 · Doğrultucular',
       kenetleyici: 'Deney 3 · Kenetleyici ve gerilim katlayıcı',
@@ -1499,6 +1607,14 @@ export const tr = {
       transformer:
         'Varsayılan değerler gerçek bir transformatörden (RS PRO 504-464: 230 V → 12 V, sargı başına 1,5 VA; birincil 1167 Ω, ikincil 14,8 Ω, yüksüz giriş akımı ≈ 30 mA). Sarım oranı N₁ / N₂ = 16: 230 V’ta yüksüz ≈ 14,4 V, tam yükte (125 mA) ≈ 12 V. Oranı 1’den küçük yaparsan gerilim yükseltilir.',
       diode: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer.',
+      potentiometer:
+        'Varsayılan değerler gerçek bir potansiyometreden (Bourns PTV09A, 10 kΩ doğrusal): toleransı ±%20, uçlarda en fazla %1 artık direnç, en fazla 0,05 W. Sürgüden akım çekilmiyorsa sürgünün gerilimi konumla doğru orantılıdır; sürgüye bir yük bağlanınca gerilim düşer (yükleme).',
+      ldr:
+        'Varsayılan değerler gerçek bir LDR’den (GL5528): 10 lükste 10–20 kΩ (burada 15 kΩ), karanlıkta en az 1 MΩ, γ = 0,6: R = R₁₀ · (E / 10 lx)^{−γ}. Aydınlık örnekleri: gece ≈ 1 lx, oda ≈ 100–300 lx, bulutlu gün ≈ 10 000 lx, güneş ≈ 100 000 lx. Gerçek LDR ışık değişimine 20–30 ms’de uyar; burada anında.',
+      ntc:
+        'Varsayılan değerler gerçek bir termistörden (Vishay NTCLE100E3103: 10 kΩ, B₂₅/₈₅ = 3977 K); direnç üreticinin R(T) eğrisinden (0 °C’ta 32,6 kΩ, 50 °C’ta 3,61 kΩ, 100 °C’ta 677 Ω). İçinden geçen akım onu ısıtır (öz ısınma: 7 mW/K, ısıl zaman sabiti 15 s); ortam sıcaklığı değişince hemen ona uyar.',
+      lamp:
+        'Varsayılan: 12 V, 0,1 A (1,2 W) minyatür lamba. Sıcakken 120 Ω, soğukken ≈ 8,9 Ω (tungstenin direnci ≈ T^{1,2} ile artar); yakıldığı an ≈ 1,35 A çeker, filaman ≈ 10 ms’de ısınır. Işık gerilimle çok hızlı artar (≈ V^{3,4}). Filaman 3695 K’de erir: anma geriliminin ≈ 2,5 katında lamba yanar.',
       motor:
         'Varsayılan değerler gerçek bir motordan (maxon A-max 26, 12 V, 11 W): sargı 2,07 Ω ve 0,227 mH, tork sabiti 13,9 mN·m/A (zıt EMK 13,9 mV/(rad/s)), rotor ataleti 13,6 g·cm², boşta 57 mA (sürtünme 0,79 mN·m). 12 V’ta boşta ≈ 8160 dev/dk, kalkış akımı ≈ 5,8 A, durma torku ≈ 80 mN·m. Yük torku mile bağlanan yükü temsil eder (her mN·m hızı ≈ 102 dev/dk düşürür); sürekli çalışmada en fazla ≈ 14 mN·m (1,08 A).',
       relay:
@@ -1548,6 +1664,7 @@ export const tr = {
     } as Record<string, string>,
     meterModeNote:
       'AC kaynaklı devrede DC kipi bir periyottaki ortalamayı, AC kipi etkin değeri (√(ortalama v²)) gösterir; gösterge her periyotta bir güncellenir.',
+    luxShort: (lux: string) => `${lux} lx`,
     motorNoLoad: 'boşta',
     motorLoadShort: (load: string) => `yük ${load} mN·m`,
     acSpec: (rms: string, period: string) =>

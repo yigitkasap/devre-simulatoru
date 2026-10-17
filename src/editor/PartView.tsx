@@ -46,6 +46,14 @@ export function partValueText(part: Part): string {
       return `${formatNumber(numProp(p, 'turnsRatio', 16), 2)} : 1`;
     case 'relay':
       return formatSI(numProp(p, 'coilResistance', 275), 'Ω', { trim: true, digits: 4 });
+    case 'potentiometer':
+      return `${formatSI(numProp(p, 'resistance', 10e3), 'Ω', { trim: true, digits: 4 })} · %${formatNumber(numProp(p, 'position', 50), 0)}`;
+    case 'ldr':
+      return tr.properties.luxShort(formatNumber(numProp(p, 'illuminance', 100), numProp(p, 'illuminance', 100) < 10 ? 1 : 0));
+    case 'ntc':
+      return `${formatSI(numProp(p, 'resistance25', 10e3), 'Ω', { trim: true, digits: 4 })} · ${formatNumber(numProp(p, 'temperature', 25), 0)} °C`;
+    case 'lamp':
+      return `${formatSI(numProp(p, 'ratedVoltage', 12), 'V', { trim: true, digits: 3 })} · ${formatSI(numProp(p, 'ratedPower', 1.2), 'W', { trim: true, digits: 3 })}`;
     case 'motor': {
       const load = numProp(p, 'loadTorque', 0);
       return load > 0 ? tr.properties.motorLoadShort(formatNumber(load, 3)) : tr.properties.motorNoLoad;

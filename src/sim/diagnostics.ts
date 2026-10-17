@@ -31,6 +31,8 @@ export type DiagnosticCode =
   | 'resistor-overpower'
   /** Elektrolitik kondansatör üreticinin izin verdiğinden (1 V) fazla ters gerilim görüyor. */
   | 'capacitor-reverse'
+  /** Akkor lambanın filamanı erime sıcaklığını aştı ve koptu (açık devre). */
+  | 'lamp-burned'
   /** Motor zorlanıyor: sargının ortalama bakır kaybı sürekli çalışma sınırını aşıyor (uyarı). */
   | 'motor-overload'
   /** Bobinin akımı aniden kesildi: uçlarında kaynaklardan çok büyük bir gerilim sıçraması (Lenz). */

@@ -433,6 +433,7 @@ export default function Simulator() {
   /** Mesajın düzeltme düğmeleri: yanan LED için Onar ve (tek seri direnç varsa) önerilen ön direnç. */
   const messageActions = (item: MessageItem): MessageAction[] => {
     const d = item.diagnostic;
+    if (d?.code === 'lamp-burned') return [{ label: tr.messages.repair, primary: true, run: () => sim.repair(d.elementIds[0]!) }];
     if (d?.code !== 'led-burned') return [];
     const ledId = d.elementIds[0]!;
     const actions: MessageAction[] = [{ label: tr.messages.repair, primary: true, run: () => sim.repair(ledId) }];
@@ -552,6 +553,16 @@ export default function Simulator() {
   };
   const updatePartFromPanel = (partId: string, patch: PartPatch) => {
     dispatch({ type: 'commit', doc: updatePart(doc, partId, patch) });
+  };
+  /** Kaydırıcı: sürüklerken önizleme (geçmişe yazılmaz), bırakınca sürüklemeden önceki belge geçmişe. */
+  const slideBefore = useRef<CircuitDoc | null>(null);
+  const slidePartFromPanel = (partId: string, patch: PartPatch, done: boolean) => {
+    if (!slideBefore.current) slideBefore.current = doc;
+    dispatch({ type: 'preview', doc: updatePart(doc, partId, patch) });
+    if (done) {
+      dispatch({ type: 'end-preview', before: slideBefore.current });
+      slideBefore.current = null;
+    }
   };
   const idleHint = canvasStatus.hint.kind === 'select' || canvasStatus.hint.kind === 'empty' || canvasStatus.hint.kind === 'simulating';
   const summary = tr.messages.summary(errorCount, warningCount);
@@ -810,6 +821,7 @@ export default function Simulator() {
     settings,
     focusRequest,
     onUpdatePart: updatePartFromPanel,
+    onSlidePart: slidePartFromPanel,
     onRotate: rotateSelection,
     onFlip: flipSelection,
     onDelete: deleteSelection,

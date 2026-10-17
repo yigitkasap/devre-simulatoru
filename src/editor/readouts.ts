@@ -16,6 +16,7 @@ import {
 } from '../sim/devices';
 import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
 import { relaySettings } from '../sim/devices/relay';
+import { lampParameters } from '../sim/devices/sensors';
 import { tankSettings } from '../sim/devices/tank';
 import { SWITCH_ON_RESISTANCE } from '../sim/constants';
 import { boolProp, numProp, strProp, type Props } from '../sim/netlist';
@@ -199,6 +200,63 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
           { label: t.powerInOut, value: `${formatSI(w1!.voltage * w1!.current, 'W', { digits: 3 })} / ${formatSI(w2!.voltage * w2!.current, 'W', { digits: 3 })}` },
         ],
         note: t.transformerNote,
+      };
+    }
+    case 'potentiometer': {
+      const wiper = status.wiper ?? { voltage: 0, r12: 0, r23: 0 };
+      return {
+        title,
+        rows: [
+          { label: t.potPosition, value: `%${formatNumber(numProp(p, 'position', 50), 0)}` },
+          { label: t.potHalves, value: `${ohm(wiper.r12)} / ${ohm(wiper.r23)}` },
+          { label: t.potWiper, value: v(wiper.voltage) },
+          { label: t.current, value: a(m.current) },
+        ],
+        note: t.potNote,
+      };
+    }
+    case 'ldr': {
+      const lux = numProp(p, 'illuminance', 100);
+      return {
+        title,
+        rows: [
+          { label: t.ldrIlluminance, value: tr.properties.luxShort(formatNumber(lux, lux < 10 ? 1 : 0)) },
+          { label: t.resistanceNow, value: ohm(status.resistance ?? 0) },
+          { label: t.voltage, value: v(V) },
+          { label: t.current, value: a(I) },
+        ],
+        note: t.ldrNote,
+      };
+    }
+    case 'ntc': {
+      const T = (status.temperature ?? 298.15) - 273.15;
+      const rise = (status.temperature ?? 0) - (status.ambient ?? status.temperature ?? 0);
+      return {
+        title,
+        rows: [
+          { label: t.temperature, value: `${formatNumber(T, 1)} °C` },
+          { label: t.resistanceNow, value: ohm(status.resistance ?? 0) },
+          { label: t.voltage, value: v(V) },
+          { label: t.current, value: a(I) },
+          { label: t.selfHeating, value: `+${formatNumber(rise, rise < 0.1 ? 3 : 2)} K` },
+        ],
+        note: t.ntcNote,
+      };
+    }
+    case 'lamp': {
+      if (status.burned) return { title, rows: [{ label: t.state, value: t.burned }], note: t.lampBurnedNote };
+      const lamp = lampParameters(p);
+      return {
+        title,
+        rows: [
+          { label: t.filament, value: `${formatNumber(status.temperature ?? 293, 0)} K` },
+          { label: t.resistanceNow, value: ohm(status.resistance ?? lamp.cold) },
+          { label: t.voltage, value: v(V) },
+          { label: t.current, value: a(I) },
+          { label: t.power, value: w(P) },
+          { label: t.lampLight, value: `%${formatNumber(Math.min(999, (status.glow ?? 0) * 100), 0)}` },
+        ],
+        note: t.lampNote(ohm(lamp.cold)),
       };
     }
     case 'motor': {

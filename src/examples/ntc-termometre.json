@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 5, "internalResistance": 0}},
+    {"id": "p2", "type": "ntc", "label": "NTC1", "x": 12, "y": -5, "rotation": 90, "props": {"temperature": 25, "resistance25": 10000.0}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 12, "y": 5, "rotation": 90, "props": {"resistance": 10000.0}},
+    {"id": "p4", "type": "voltmeter", "label": "V1", "x": 22, "y": 5, "rotation": 90, "props": {"resistance": 10000000.0, "ideal": false}},
+    {"id": "p5", "type": "ground", "label": "GND1", "x": 0, "y": 9, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -9], [12, -9]]},
+    {"id": "w2", "points": [[12, -1], [12, 0], [12, 1]]},
+    {"id": "w3", "points": [[12, 0], [22, 0], [22, 1]]},
+    {"id": "w4", "points": [[0, 4], [0, 9], [12, 9]]},
+    {"id": "w5", "points": [[12, 9], [22, 9]]}
+  ]
+}

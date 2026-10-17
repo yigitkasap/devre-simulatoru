@@ -13,6 +13,7 @@ import { HintText } from './HintStrip';
 import { Icon, type IconName } from './icons';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, validateLabel, validateNumber, valuePresets } from './propertyForm';
+import { PropSlider } from './PropSlider';
 import { meterText, partReadout, type ReadoutRow } from './readouts';
 import { plainText, Rich } from './Rich';
 import type { Settings } from './settings';
@@ -36,6 +37,8 @@ export interface InspectTabProps {
   /** Bu sayı artınca seçili parçanın ilk değer alanına odaklanılır (çift tık, Enter). */
   readonly focusRequest: number;
   readonly onUpdatePart: (partId: string, patch: PartPatch) => void;
+  /** Kaydırıcı: sürüklerken canlı (geçmişe yazmadan), bırakınca tek geri alma adımı. */
+  readonly onSlidePart?: (partId: string, patch: PartPatch, done: boolean) => void;
   readonly onRotate: (partIds: readonly string[]) => void;
   readonly onFlip: (partIds: readonly string[]) => void;
   readonly onDelete: () => void;
@@ -179,6 +182,7 @@ function PartDetails({
   settings,
   focusRequest,
   onUpdatePart,
+  onSlidePart,
   onRotate,
   onFlip,
   onDelete,
@@ -233,6 +237,11 @@ function PartDetails({
       live={active && prop === firstNumber}
       inputRef={prop === firstNumber ? firstFieldRef : undefined}
       onCommit={(value) => onUpdatePart(part.id, { props: withProp(part.type, part.props, prop.key, value) })}
+      onSlide={(value, done) =>
+        onSlidePart
+          ? onSlidePart(part.id, { props: withProp(part.type, part.props, prop.key, value) }, done)
+          : done && onUpdatePart(part.id, { props: withProp(part.type, part.props, prop.key, value) })
+      }
     />
   ));
 
@@ -522,6 +531,7 @@ function PropField({
   live,
   inputRef,
   onCommit,
+  onSlide,
 }: {
   part: Part;
   prop: PropDef;
@@ -530,6 +540,7 @@ function PropField({
   live: boolean;
   inputRef: Ref<HTMLInputElement> | undefined;
   onCommit: (value: PropValue) => void;
+  onSlide: (value: number, done: boolean) => void;
 }) {
   const label = tr.properties.fieldLabel(part.type, prop.key);
   const value = values[prop.key];
@@ -545,6 +556,7 @@ function PropField({
         presets={valuePresets(part.type, prop.key)}
         inputRef={inputRef}
         onCommit={onCommit}
+        onSlide={onSlide}
       />
     );
   }
@@ -598,6 +610,7 @@ function NumberField({
   presets,
   inputRef,
   onCommit,
+  onSlide,
 }: {
   label: string;
   def: NumberPropDef;
@@ -607,6 +620,7 @@ function NumberField({
   presets: readonly number[];
   inputRef: Ref<HTMLInputElement> | undefined;
   onCommit: (value: number) => void;
+  onSlide: (value: number, done: boolean) => void;
 }) {
   const id = useId();
   const field = useCommitField(
@@ -651,6 +665,7 @@ function NumberField({
           </span>
         )}
       </div>
+      {def.slider && !disabled && <PropSlider def={def} value={value} label={label} touch={false} onSlide={onSlide} />}
       {error && <FieldError id={`${id}-e`} error={error} kept={kept} />}
       {live && !error && (
         <span className="flex items-center gap-1.5 text-label text-ok">

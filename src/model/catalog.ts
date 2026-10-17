@@ -34,6 +34,10 @@ import {
   CAPACITOR_KINDS,
   CAPACITOR_LEGACY_KIND,
   INDUCTOR_DEFAULTS,
+  LAMP_DEFAULTS,
+  LDR_DEFAULTS,
+  NTC_DEFAULTS,
+  POT_DEFAULTS,
   MOTOR_DEFAULTS,
   RELAY_DEFAULTS,
   TRANSFORMER_DEFAULTS,
@@ -67,6 +71,8 @@ export interface NumberPropDef {
   readonly max?: number;
   /** Bu boolean özellik true iken alan devre dışıdır (ör. ideal voltmetrede iç direnç). */
   readonly disabledWhen?: string;
+  /** Alanın altında kaydırıcı (potansiyometre, aydınlık, sıcaklık); `log`: logaritmik ölçek. */
+  readonly slider?: { readonly min: number; readonly max: number; readonly step?: number; readonly log?: boolean };
 }
 
 export interface BooleanPropDef {
@@ -297,6 +303,25 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  potentiometer: {
+    type: 'potentiometer',
+    category: 'passive',
+    labelPrefix: 'P',
+    // Uçlar: 1. uç solda, sürgü üstte, 3. uç sağda.
+    pins: [
+      { x: -4, y: 0 },
+      { x: 0, y: -3 },
+      { x: 4, y: 0 },
+    ],
+    bounds: { x: -4, y: -3, w: 8, h: 4.1 },
+    defaultProps: { ...POT_DEFAULTS },
+    propDefs: [
+      { kind: 'number', key: 'position', unit: '%', min: { value: 0, exclusive: false }, max: 100, slider: { min: 0, max: 100, step: 1 } },
+      { kind: 'number', key: 'resistance', unit: 'Ω', min: { value: 0, exclusive: true } },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
   transformer: {
     type: 'transformer',
     category: 'passive',
@@ -451,6 +476,51 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  ldr: {
+    type: 'ldr',
+    category: 'sensors',
+    labelPrefix: 'LDR',
+    pins: TWO_PINS,
+    bounds: { x: -4, y: -2.8, w: 8, h: 3.9 },
+    defaultProps: { ...LDR_DEFAULTS },
+    // Aydınlık lüks (lx) cinsinden.
+    propDefs: [
+      { kind: 'number', key: 'illuminance', unit: '', min: { value: 0, exclusive: false }, slider: { min: 0.1, max: 100000, log: true } },
+      { kind: 'number', key: 'lightResistance', unit: 'Ω', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'gamma', unit: '', min: { value: 0, exclusive: false }, max: 2 },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
+  ntc: {
+    type: 'ntc',
+    category: 'sensors',
+    labelPrefix: 'NTC',
+    pins: TWO_PINS,
+    bounds: { x: -4, y: -2.2, w: 8, h: 3.3 },
+    defaultProps: { ...NTC_DEFAULTS },
+    // Sıcaklık °C cinsinden.
+    propDefs: [
+      { kind: 'number', key: 'temperature', unit: '', min: { value: -55, exclusive: false }, max: 150, slider: { min: -40, max: 125, step: 1 } },
+      { kind: 'number', key: 'resistance25', unit: 'Ω', min: { value: 0, exclusive: true } },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
+  lamp: {
+    type: 'lamp',
+    category: 'outputs',
+    labelPrefix: 'LP',
+    pins: TWO_PINS,
+    bounds: { x: -4, y: -1.8, w: 8, h: 3.6 },
+    defaultProps: { ...LAMP_DEFAULTS },
+    propDefs: [
+      { kind: 'number', key: 'ratedVoltage', unit: 'V', min: { value: 0, exclusive: true } },
+      { kind: 'number', key: 'ratedPower', unit: 'W', min: { value: 0, exclusive: true } },
+    ],
+    showLabel: true,
+    polarized: false,
+  },
   tank: {
     type: 'tank',
     category: 'sensors',
@@ -536,12 +606,12 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
 /** Kütüphane panelindeki sıra. */
 export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: readonly DeviceType[] }> = [
   { id: 'sources', types: ['battery', 'acsource', 'ground'] },
-  { id: 'passive', types: ['resistor', 'capacitor', 'inductor', 'transformer'] },
+  { id: 'passive', types: ['resistor', 'potentiometer', 'capacitor', 'inductor', 'transformer'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'switches', types: ['switch', 'relay'] },
-  { id: 'outputs', types: ['motor'] },
-  { id: 'sensors', types: ['tank'] },
+  { id: 'outputs', types: ['lamp', 'motor'] },
+  { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },
   { id: 'meters', types: ['voltmeter', 'ammeter'] },
   { id: 'instruments', types: ['funcgen', 'dcsupply', 'oscilloscope'] },
 ];

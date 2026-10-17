@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p5", "type": "oscilloscope", "label": "OSC1", "x": 35, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.002, "voltsPerDivA": 0.2, "voltsPerDivB": 5, "positionA": -2, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 12, "internalResistance": 0}},
+    {"id": "p2", "type": "switch", "label": "S1", "x": 6, "y": -8, "rotation": 0, "props": {"closed": false}},
+    {"id": "p3", "type": "lamp", "label": "LP1", "x": 16, "y": -8, "rotation": 0, "props": {"ratedVoltage": 12, "ratedPower": 1.2}},
+    {"id": "p4", "type": "resistor", "label": "RS", "x": 24, "y": 0, "rotation": 90, "props": {"resistance": 1, "powerRating": "2"}},
+    {"id": "p6", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -8], [2, -8]]},
+    {"id": "w2", "points": [[10, -8], [12, -8]]},
+    {"id": "w3", "points": [[20, -8], [24, -8], [24, -4]]},
+    {"id": "w4", "points": [[24, 4], [24, 8]]},
+    {"id": "w5", "points": [[0, 4], [0, 8], [28, 8], [28, 2], [30, 2]]},
+    {"id": "w6", "points": [[24, -6], [28, -6], [28, -2], [30, -2]]}
+  ]
+}
