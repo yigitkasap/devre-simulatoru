@@ -13,6 +13,7 @@
     "check": "astro check",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:spice": "vitest run tests/spice",
     "ios-kontrol": "node scripts/ios-kontrol.mjs"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "@astrojs/check": "^0.9.10",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "eecircuit-engine": "1.8.0",
     "typescript": "^6.0.3",
     "vitest": "^5.0.3"
   },

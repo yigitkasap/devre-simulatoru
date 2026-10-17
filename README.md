@@ -66,13 +66,21 @@ Node.js 22.12 ya da üstü gerekir.
 ```bash
 npm install        # bağımlılıkları kur
 npm run dev        # geliştirme sunucusu: http://localhost:4321/devre-simulatoru/
-npm test           # testler (Vitest): çözücü, birimler, model, örnekler
+npm test           # testler (Vitest): çözücü, birimler, model, örnekler, ngspice karşılaştırması
+npm run test:spice # yalnızca ngspice ile çapraz doğrulama (tests/spice; aşağıya bak)
 npm run build      # tür denetimi (astro check) + statik derleme → dist/
 npm run preview    # derlenmiş siteyi yerelde aç: http://localhost:4321/devre-simulatoru/
 npm run ios-kontrol  # iOS/dokunmatik kontrol listesi (dev sunucusu açıkken; aşağıya bak)
 ```
 
 Adresteki `/devre-simulatoru/`, GitHub Pages için ayarlanan `base` değeridir (aşağıya bak).
+
+**ngspice (yalnızca testler):** `npm run test:spice` aynı devreleri bizim çözücümüzle ve ngspice
+ile çözüp karşılaştırır. ngspice, `npm install` ile gelen `eecircuit-engine` geliştirme
+bağımlılığıdır (ngspice'ın WebAssembly derlemesi, MIT; sürüm 1.8.0'a sabit): ayrıca bir şey
+kurmak gerekmez, siteye girmez. Paket kurulu değilse karşılaştırmalar atlanır (`describe.skip`)
+ve nedeni test çıktısında yazar; öbür testler etkilenmez. `SPICE_RAPOR=dosya.txt npm run
+test:spice` her karşılaştırmayı dosyaya yazar.
 
 ## Yayın
 
@@ -229,7 +237,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 346 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 358 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -244,8 +252,8 @@ cevapları (`tests/examples.test.ts`, `tests/examples-lab.test.ts`), paylaşım 
 kablo yolu; `tests/phone.test.ts`), toprak isteğe bağlı (`tests/toprak.test.ts`), açık devrede tam 0
 akım (`tests/acik-devre.test.ts`), toprak hattı (`tests/toprak-hatti.test.ts`) ve zaman adımı
 doğruluğu (`tests/zaman-adimi.test.ts`: küçük τ, RC süzgeçte genlik ve faz, kondansatörde faz,
-kare dalga kenarları) ve gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
-ve "çıkmaz"). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
+kare dalga kenarları), gerçek dünya sınırları (`tests/sinirlar.test.ts`: her uyarı için "çıkar"
+ve "çıkmaz") ve ngspice ile çapraz doğrulama (`tests/spice/`: DC, geçici durum ve AC). Arayüz kontrol listesi ayrıca `npm run ios-kontrol` ile çalışır
 (aşağıya bak).
 
 **Fizik denetimi** (`tests/fizik-denetimi.test.ts`): 71 kontrol, her biri analitik olarak hesaplanan
@@ -520,6 +528,48 @@ ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta
   eski kayıtların varsayılanları, örnekler. Bir eski test ("dış yük iç dirençten büyükse uyarı
   yok") artık yalnızca kısa devre uyarısının olmadığını denetliyor: o devrede 10 Ω'a 6,7 W düşer ve
   güç uyarısı fiziksel olarak doğrudur.
+
+**Fizik 6: ngspice ile çapraz doğrulama (yalnızca testlerde).**
+
+- *Çalıştırma yolu:* geliştirme bilgisayarında ngspice komut satırı sürümü kurulu değildi
+  (`where ngspice` boş; Program Files'ta yok). İkinci yol olarak ngspice'ın WebAssembly derlemesi
+  `eecircuit-engine` 1.8.0 Node'da (Vitest içinde) çalıştırılır; tek örnek başlatılır (≈ 0,3 s),
+  devreler sırayla çözülür. Bu derleme netlist'te ASCII olmayan bir karakter görünce takılıyor:
+  metin ngspice'a ASCII'ye çevrilerek verilir (yalnızca başlık satırlarında Türkçe harf vardı).
+- *Dönüştürücü* (`tests/spice/netlist.ts`): `Netlist` → SPICE. Parametreler modelimizden aynen
+  alınır: diyotta IS, N (1N4001'de CJO, VJ, M, TT, FC = 0,5 de); LED, seri dirençli diyot (IS, N,
+  RS); zener, bizdeki yapıyla aynı (1 Ω + ileri diyot + ters "kırılma" diyodu); BJT, Gummel-Poon
+  (IS, BF, BR, VAF; IKF, ISE, ISC, VAR olmadan bizim Early'li Ebers-Moll taşıma modelimizin aynı
+  denklemleri); MOSFET, LEVEL 1 (KP = 2β, VTO, LAMBDA, W = L, gövde source'ta). Sıcaklık 300 K
+  (TEMP = TNOM = 26,85 °C; ngspice'ın varsayılanı 27 °C, VT'de %0,05 fark yaratırdı). ngspice'ın
+  kendi toleransı karşılaştırmayı bozmasın diye `.op`'ta RELTOL = 10⁻⁶, `.tran`'da 10⁻⁵ ve küçük
+  en büyük adım kullanılır.
+- *Sonuçlar* (en büyük fark; sınır DC %0,1, geçici ve AC %1):
+
+  | Devre | Karşılaştırılan | ngspice | Bizim | Fark |
+  |---|---|---|---|---|
+  | Wheatstone köprüsü | V(B), V(C), I(R5) | 6,580645 V; 5,935484 V; 129,0323 µA | aynı | %0,0000 |
+  | Süperpozisyon | V(m) | 6,818182 V | 6,818182 V | %0,0000 |
+  | Diyot 1N4001 (5 V, 1 kΩ) | V_D, I | 0,5577133 V; 4,442287 mA | 0,5577134 V; 4,442287 mA | %0,0000 |
+  | Diyot genel | V_D, I | 0,6490825 V; 4,350918 mA | 0,6490827 V; 4,350917 mA | %0,0000 |
+  | LED kırmızı / sarı / yeşil / mavi (9 V, 470 Ω) | V_LED | 1,822411 / 2,064875 / 2,159019 / 3,206578 V | 1,822412 / 2,064876 / 2,159020 / 3,206579 V | %0,0000 |
+  | Zener 5,1 V (12 V, 330 Ω) | V_Z | 5,106436 V | 5,106438 V | %0,0000 |
+  | BJT aktif (R_B = 430 kΩ) | V_B, V_C, I_C | 0,6672881 V; 4,866789 V; 4,133211 mA | 0,6672883 V; 4,866789 V; 4,133211 mA | %0,0000 |
+  | BJT doyum (R_B = 10 kΩ) | V_B, V_CE(sat) | 0,7035564 V; 25,26656 mV | 0,7035566 V; 25,26657 mV | %0,0000 |
+  | MOSFET IRF510 doyum / omik | V_D | 8,326879 V / 41,95908 mV | aynı | %0,0000 |
+  | RC τ = 0,1 s | v_C (25 nokta, 0,5 s) | t = 40 ms: 3,296799 V | 3,296800 V | %0,0000 |
+  | RC τ = 10 µs | v_C (60 nokta, 60 µs) | t = 12 µs: 6,988058 V | 6,990686 V | %0,026 |
+  | Yük paylaşımı (100 µF 10 V, 10 Ω, 100 µF) | v_C1, v_C2 (5 ms) | t = 0,5 ms: 6,839398 / 3,160602 V | 6,838003 / 3,161997 V | %0,028 |
+  | Yarım dalga (50 Hz, 10 V, 1N4001, 1 kΩ) | 160 nokta; tepe; ortalama | tepe 9,403207 V; ortalama 2,907909 V | 9,403207 V; 2,907900 V | %0,007 |
+  | RC süzgeç, f_c = 1 kHz | \|H\|, faz | 0,7071178; −44,99911° | 0,7071105; −44,99918° | %0,001 |
+
+  Geçici durumda fark, dalganın ölçeğine (en büyük |değer|) oranlanır: sıfırdan geçen dalgada
+  noktasal oran anlamsızdır. Hiçbir karşılaştırma toleransı aşmadı; analitik hakemliğe gerek
+  kalmadı (RC'de ikisi de e^(−t/τ)'ya %0,03 içinde). AC'de bizim değerimiz zaman uzayında, oturmuş
+  dalga üzerinde kilitlemeli ölçümle bulunur (bizde ayrı bir küçük sinyal analizi yok).
+- *Eklenen bağımlılık:* `eecircuit-engine` 1.8.0 (`devDependencies`, sürüm sabit; 2026-09-05'te
+  yayımlandı; bağımlılığı yok). `npm audit`'in bildirdiği kritik açık bu paketle ilgili değil,
+  Astro 6.4.8'in kendisinde (düzeltmesi Astro 7'ye geçiş istiyor; bu aşamanın kapsamı dışında).
 
 ### Editör
 
