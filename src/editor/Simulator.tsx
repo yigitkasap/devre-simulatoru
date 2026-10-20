@@ -193,11 +193,9 @@ export default function Simulator() {
   const singlePart = selectedParts.length === 1 && selection.wires.length === 0 ? selectedParts[0]! : null;
 
   // --- Kütüphane (masaüstü) -----------------------------------------------------------------
-  // Ölç düzeninde (açık bir örnek yoksa) kütüphane şeride, İnceleme paneli 48 px'e iner. Örnek açıkken
-  // açıklaması Örnek sekmesinde okunduğu için paneller açık kalır, yalnızca raf büyür.
-  const measureCollapse = measureLayout && !phone && activeExample === null;
-  const libraryMode: LibraryMode = layout.kind === 'compact' || libraryPref === 'rail' || measureCollapse ? 'rail' : 'full';
-  const showFlyout = layout.kind === 'compact' && flyoutOpen && !measureCollapse;
+  // Ölç düzeninde kütüphane ve İnceleme paneli olduğu gibi kalır; yalnızca raf büyür.
+  const libraryMode: LibraryMode = layout.kind === 'compact' || libraryPref === 'rail' ? 'rail' : 'full';
+  const showFlyout = layout.kind === 'compact' && flyoutOpen;
   const setLibraryPrefSaved = (pref: 'open' | 'rail') => {
     setLibraryPref(pref);
     saveLibraryPref(pref);
@@ -455,7 +453,6 @@ export default function Simulator() {
   const explain = (partId: string) => {
     const item = messages.find((m) => m.code === 'led-burned' && m.elementIds.includes(partId));
     setInspectorTab('messages');
-    setMeasureLayout(false);
     if (phone) openPanel('messages', 'half');
     if (item) setSelectedMessage(item.key);
   };
@@ -572,7 +569,7 @@ export default function Simulator() {
       : sim.status !== 'stopped' && runtimeIssues && idleHint
         ? { kind: 'issues', text: tr.messages.stripRuntime(summary), tone: errorCount > 0 ? 'error' : 'warn' }
         : measureLayout && idleHint
-          ? { kind: 'measure', example: activeExample !== null }
+          ? { kind: 'measure' }
           : activeExample && !examplePlayed && idleHint && canvasStatus.hint.kind !== 'simulating'
             ? { kind: 'example' }
             : canvasStatus.hint;
@@ -647,7 +644,7 @@ export default function Simulator() {
   const rackMax = Math.max(RACK_MIN_HEIGHT, Math.min(columnHeight * 0.6, columnHeight - CANVAS_MIN_HEIGHT - 28 - 52));
   const clampRack = (h: number) => Math.round(Math.max(RACK_MIN_HEIGHT, Math.min(rackMax, h)));
   const rackHeight = clampRack(measureLayout ? (rackHeights.olc ?? rackMax) : rackHeights.kur);
-  // Ölç düzenine giriş (Oynat) ve çıkış (Durdur, parça sürükleme, şeritteki düğmeler).
+  // Ölç düzenine giriş (Oynat) ve çıkış (Durdur, parça sürükleme).
   const previousRunStatus = useRef(sim.status);
   useEffect(() => {
     const before = previousRunStatus.current;
@@ -707,10 +704,8 @@ export default function Simulator() {
     onClose: closeFlyout,
     onCollapse: () => setLibraryPrefSaved('rail'),
     onExpand: (search: boolean) => {
-      // Ölç düzeninde şeritteki düğme Kur düzenine döndürür.
-      if (measureCollapse) setMeasureLayout(false);
       if (layout.kind === 'compact') setFlyoutOpen(true);
-      else if (!measureCollapse) setLibraryPrefSaved('open');
+      else setLibraryPrefSaved('open');
       if (search) setFocusSearch((n) => n + 1);
     },
     focusSearch,
@@ -933,7 +928,6 @@ export default function Simulator() {
       const next = n ? inspectorTabs[Number(n) - 1] : undefined;
       if (next && !phone) {
         e.preventDefault();
-        setMeasureLayout(false);
         if (focus.on) focus.showPanel('right', true);
         setInspectorTab(next);
         window.setTimeout(() => document.getElementById(`inspector-tab-${next}`)?.focus(), 0);
@@ -1710,11 +1704,8 @@ export default function Simulator() {
         {focus.panels.right && (
           <Inspector
             width={layout.inspectorWidth}
-            collapsed={measureCollapse}
-            onExpand={(tab) => {
-              setMeasureLayout(false);
-              setInspectorTab(tab);
-            }}
+            collapsed={false}
+            onExpand={setInspectorTab}
             tab={inspectorTab}
             onTab={setInspectorTab}
             inspect={inspectProps}

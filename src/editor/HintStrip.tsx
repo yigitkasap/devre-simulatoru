@@ -46,7 +46,7 @@ const TONES: Record<Tone, string> = {
 export type StripHint =
   | CanvasHint
   | { readonly kind: 'example' }
-  | { readonly kind: 'measure'; readonly example: boolean }
+  | { readonly kind: 'measure' }
   /** Hata/uyarı özeti (M07a, M07b). */
   | { readonly kind: 'issues'; readonly text: string; readonly tone: 'error' | 'warn' };
 
@@ -69,7 +69,7 @@ function hintText(hint: StripHint): { text: string; tone: Tone; right?: string }
     case 'issues':
       return { text: hint.text, tone: hint.tone };
     case 'measure':
-      return { text: hint.example ? tr.rack.measureHintExample : tr.rack.measureHint, tone: 'neutral' };
+      return { text: tr.rack.measureHint, tone: 'neutral' };
     default:
       return { text: tr.hints.select, tone: 'neutral', right: tr.hints.allShortcuts };
   }

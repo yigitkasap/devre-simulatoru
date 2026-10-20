@@ -722,11 +722,12 @@ try {
   await rp.getByRole('button', { name: 'Örneği kapat' }).click(); await rp.waitForTimeout(150);
   await rp.getByRole('button', { name: 'Oynat' }).first().click(); await rp.waitForTimeout(700);
   const panelStrip = await rp.getByRole('navigation', { name: 'İnceleme paneli (daraltılmış)' }).count();
+  const panelTabs = await rp.getByRole('tablist', { name: 'İnceleme paneli' }).count();
   const railOpen = await rp.getByRole('button', { name: 'Parça kütüphanesini aç' }).count();
   const measureBox = await rack.boundingBox();
-  check('masaüstü: Oynat’tan sonra Ölç düzeni (paneller şeritte, raf büyük)', panelStrip === 1 && railOpen === 1 && measureBox.height > rackBox.height + 40, `raf ${Math.round(rackBox.height)} → ${Math.round(measureBox.height)}`);
+  check('masaüstü: Oynat’tan sonra Ölç düzeni (kütüphane ve İnceleme paneli açık kalıyor, raf büyük)', panelStrip === 0 && panelTabs === 1 && railOpen === 0 && measureBox.height > rackBox.height + 40, `raf ${Math.round(rackBox.height)} → ${Math.round(measureBox.height)}`);
   if ((await rp.getByRole('tab', { name: /OSC1/ }).count()) > 0) { await rp.getByRole('tab', { name: /OSC1/ }).click(); await rp.waitForTimeout(150); }
-  await rp.getByRole('button', { name: 'Oto' }).click(); await rp.waitForTimeout(300);
+  await rp.getByRole('button', { name: 'Oto', exact: true }).click(); await rp.waitForTimeout(300);
   const autoToast = (await rp.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
   check('masaüstü: Oto neyin değiştiğini bildiriyor', autoToast);
   await rp.getByRole('button', { name: 'Durdur', exact: true }).click(); await rp.waitForTimeout(300);

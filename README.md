@@ -1348,8 +1348,8 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   masaüstü. Dokunmatik ve kısa (< 500 px) ekranda genişlik 900 px'i aşsa da telefon düzeni.
 - **Devrenin adı:** açık örneğin adı, yoksa "Devrem" (boş devrede "Yeni devre"); yalnızca arayüzde,
   JSON'a ve bağlantıya girmez.
-- **Ölç düzeni (masaüstü):** Oynat'tan sonra rafta cihaz varsa kütüphane ve İnceleme paneli şeride
-  iner, raf büyür; örnek açıkken paneller açık kalır.
+- **Ölç düzeni (masaüstü):** Oynat'tan sonra rafta cihaz varsa raf büyür; kütüphane ve İnceleme
+  paneli olduğu gibi açık kalır (Oynat panelleri kapatmaz).
 - **Osiloskop kipleri:** modeldeki üç kip (A ve B, A + B, X-Y); tasarımdaki tek kanal kipleri yok.
 - **Hatalar:** yanan LED ve kısa devre arayüzde hata olarak gösterilir; "R1'i … yap" önerisi
   yalnızca LED'e tek direnç seri bağlıysa (arada ampermetre olabilir) çıkar. Önerilen değer

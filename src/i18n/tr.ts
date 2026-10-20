@@ -1498,9 +1498,7 @@ export const tr = {
     currentLimit: 'Akım sınırı',
     ccNote: (set: string, actual: string) => `Akım sınırında: çıkış ${set} yerine ${actual} veriyor.`,
     notConnected: 'Bağlı değil · çıkışlar topraktan yalıtılmış',
-    measureHint:
-      '**Ölç düzeni:** kütüphane ve inceleme paneli şeride indi, raf büyüdü. Kur düzenine dönmek için bir parça sürükle ya da şeritteki düğmeye bas.',
-    measureHintExample: '**Ölç düzeni:** raf büyüdü. Kur düzenine dönmek için bir parça sürükle ya da Durdur’a bas.',
+    measureHint: '**Ölç düzeni:** raf büyüdü. Kur düzenine dönmek için bir parça sürükle ya da Durdur’a bas.',
     settingsInRack: 'Bu cihazın bütün ayarları cihaz rafındaki ön panelinde.',
     showInRack: 'Rafta göster',
     autoDone: (parts: string) => `Oto: ${parts}`,
