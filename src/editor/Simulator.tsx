@@ -19,6 +19,7 @@ import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { loadSavedDoc, useAutosave } from './autosave';
 import { BottomSheet, SheetBody, SheetHeader, type SheetSize } from './BottomSheet';
+import { BenchView, ViewToggle, useViewMode } from './BenchView';
 import { Canvas, type CanvasHandle, type CanvasStatus, type ConnectStart, type Highlight, type PhoneCanvas } from './Canvas';
 import { DeviceRack, type RackLayout } from './DeviceRack';
 import { ExamplesDialog } from './ExamplesDialog';
@@ -180,6 +181,7 @@ export default function Simulator() {
   const [tour, setTour] = useState<{ step: TourStep; parts: number; wires: number } | null>(null);
   const touch = useCoarsePointer();
   const canvasRef = useRef<CanvasHandle>(null);
+  const [viewMode, setViewMode] = useViewMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { doc, selection, tool } = state;
@@ -842,7 +844,9 @@ export default function Simulator() {
     setSheet({ kind: 'devices', size: 'full' });
   };
 
-  const canvas = (
+  const overlayOpen =
+    showFlyout || Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || (tablet && (sheet?.kind === 'parts' || speedOpen));
+  const schematic = (
     <Canvas
       ref={canvasRef}
       doc={doc}
@@ -885,9 +889,7 @@ export default function Simulator() {
             }
           : null
       }
-      overlayOpen={
-        showFlyout || Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || (tablet && (sheet?.kind === 'parts' || speedOpen))
-      }
+      overlayOpen={overlayOpen}
       onStatusChange={setCanvasStatus}
       onPartPlaced={rememberPart}
       onExamples={() => setExamplesOpen(true)}
@@ -897,6 +899,36 @@ export default function Simulator() {
       zeroPoints={zeroPoints}
       onExplain={explain}
     />
+  );
+  // Şema | 3B: devre şemada kurulur; 3B tezgâhta aynı devre masada (izlenir, anahtar ve
+  // potansiyometreyle oynanır).
+  const canvas = (
+    <>
+      {viewMode === 'bench' ? (
+        <BenchView
+          doc={doc}
+          frame={sim.frame}
+          active={sim.status !== 'stopped'}
+          selection={selection.parts}
+          overlayOpen={overlayOpen}
+          touch={touchUi}
+          callbacks={{
+            onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
+            onToggle: (id) => {
+              const part = doc.parts.find((p) => p.id === id);
+              if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
+            },
+            onKnob: (id, position, done) => {
+              const part = doc.parts.find((p) => p.id === id);
+              if (part) slidePartFromPanel(id, { props: { ...part.props, position } }, done);
+            },
+          }}
+        />
+      ) : (
+        schematic
+      )}
+      <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} />
+    </>
   );
 
   const fileInput = (

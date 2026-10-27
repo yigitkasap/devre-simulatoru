@@ -1645,6 +1645,17 @@ export const tr = {
     autoDone: (parts: string) => `Oto: ${parts}`,
     autoSpeed: (speed: string) => `hız ${speed}`,
   },
+  bench: {
+    viewGroup: 'Görünüm',
+    schematic: 'Şema',
+    bench: '3B',
+    label: '3B tezgâh: devrenin parçaları ve kabloları masanın üstünde',
+    loading: '3B tezgâh yükleniyor…',
+    fit: 'Sığdır',
+    top: 'Üstten',
+    hintMouse: 'Sürükle: döndür · sağ tık sürükle: kaydır · tekerlek: yakınlaştır · parçaya tıkla: seç · Oynat’tayken anahtara tıkla, potansiyometreyi sürükle',
+    hintTouch: 'Bir parmak: döndür · iki parmak: yakınlaştır ve kaydır · parçaya dokun: seç · Oynat’tayken anahtara dokun',
+  },
   arduino: {
     serial: 'Seri ekran',
     serialEmpty: 'Program henüz bir şey yazmadı (Serial.print).',
