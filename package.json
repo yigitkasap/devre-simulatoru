@@ -17,7 +17,9 @@
     "ios-kontrol": "node scripts/ios-kontrol.mjs",
     "tarama:motor": "vitest run --config scripts/tarama/vitest.config.ts scripts/tarama/motor.tarama.ts",
     "tarama:site": "node scripts/tarama/site-tarama.mjs",
-    "arduino:derle": "node scripts/arduino/derle.mjs"
+    "arduino:derle": "node scripts/arduino/derle.mjs",
+    "tarama:performans:motor": "vitest run --config scripts/tarama/vitest.config.ts scripts/tarama/performans-motor.tarama.ts",
+    "tarama:performans:site": "node scripts/tarama/performans-site.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.7",

@@ -927,7 +927,7 @@ export default function Simulator() {
       ) : (
         schematic
       )}
-      <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} />
+      <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} phone={phone} />
     </>
   );
 

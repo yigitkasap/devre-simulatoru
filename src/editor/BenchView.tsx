@@ -34,13 +34,17 @@ export function useViewMode(): [ViewMode, (mode: ViewMode) => void] {
   ];
 }
 
-export function ViewToggle({ mode, onChange, touch }: { mode: ViewMode; onChange: (mode: ViewMode) => void; touch: boolean }) {
+/**
+ * Görünüm düğmesi. Masaüstü ve tablette tuvalin sol üstünde; telefonda sol altta (sol üst köşe
+ * tuvalin boş alanıdır: dokunup kaydırmak için kullanılır).
+ */
+export function ViewToggle({ mode, onChange, touch, phone = false }: { mode: ViewMode; onChange: (mode: ViewMode) => void; touch: boolean; phone?: boolean }) {
   const size = touch ? 'h-11 min-w-14 px-3.5 text-sm' : 'h-9 min-w-12 px-3 text-small';
   return (
     <div
       role="group"
       aria-label={tr.bench.viewGroup}
-      className="pointer-events-auto absolute top-3 left-3 z-10 flex rounded-lg border border-line-2 bg-panel p-0.5 shadow-sm"
+      className={`pointer-events-auto absolute left-3 z-10 flex rounded-lg border border-line-2 bg-panel p-0.5 shadow-sm ${phone ? 'bottom-3' : 'top-3'}`}
     >
       {(['schematic', 'bench'] as const).map((m) => (
         <button
