@@ -975,6 +975,11 @@ try {
     const pcbSize = await pcbButton.evaluate((el) => Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height));
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), pcbButton.tap()]);
     check('3B: rehberdeki "KiCad dosyalarını indir" düğmesi ≥ 44 px ve zip indiriyor', pcbSize >= 44 && download !== null && download.suggestedFilename().endsWith('-kicad.zip'), `${Math.round(pcbSize)} px, ${download?.suggestedFilename() ?? 'indirme yok'}`);
+    // Yollar çizilince üretim (Gerber) zip'i.
+    await guide.getByText(/bağlantının hepsi çizildi/).waitFor({ timeout: 10000 }).catch(() => {});
+    const fabButton = guide.getByRole('button', { name: 'Üretim dosyalarını indir (Gerber, .zip)' });
+    const [fab] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), fabButton.tap()]);
+    check('3B: kartın yolları çiziliyor, "Üretim dosyalarını indir (Gerber)" zip indiriyor', fab !== null && fab.suggestedFilename().endsWith('-uretim.zip'), fab?.suggestedFilename() ?? 'indirme yok');
     await guide.getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
     check('3B: lehim rehberi açılıyor, içi parmakla kayıyor, sayfa kaymıyor, düğmeler ≥ 44 px, Kapat kapatıyor',
       guideButtons.every((s) => s >= 44) && scrolledInside > 50 && pageScroll === 0 && (await page.getByRole('dialog', { name: /Lehim rehberi/ }).count()) === 0,

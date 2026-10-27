@@ -1646,35 +1646,47 @@ export const tr = {
     autoSpeed: (speed: string) => `hız ${speed}`,
   },
   pcb: {
-    title: 'PCB olarak üret (KiCad)',
+    title: 'Baskı devre (PCB) olarak üret',
     text:
-      'Aynı yerleşimden bir baskı devre (PCB) tasarımı: parçalar breadboard’daki sırasıyla, gövdeleri çakışmayacak kadar aralıklı (breadboard’un 2,54 mm’lik delik ızgarası gerçek parçaların bacak aralığıyla aynıdır), karttan dışarı giden bağlantılar kenarda vidalı klemens ya da pin başlık, entegrelere 100 nF dekuplaj kondansatörü. Zip’i KiCad 7 ya da üstüyle aç, yolları çiz (elle ya da Freerouting ile), tasarım kurallarını denetle ve Gerber dosyalarını üreticiye gönder. Ayrıntılar zip’teki OKU.txt’de.',
+      'Aynı devreden iki katmanlı bir baskı devre kartı: parçalar breadboard’daki sırasıyla, gövdeleri çakışmayacak kadar aralıklı (breadboard’un 2,54 mm’lik delik ızgarası gerçek parçaların bacak aralığıyla aynıdır); karttan dışarı giden bağlantılar kenarda vidalı klemens ya da pin başlık; entegrelere 100 nF dekuplaj kondansatörü. Bakır yollar otomatik çizilir (üst yüz kırmızı, alt yüz mavi) ve tasarım kuralları denetlenir.',
+    routing: 'Yollar çiziliyor…',
+    routed: (connections: number, vias: number) => `Yollar: ${connections} bağlantının hepsi çizildi${vias > 0 ? `, ${vias} via` : ''}. Tasarım kuralları temiz (aralık 0,25 mm, kenar 0,5 mm).`,
+    unrouted: (count: number, connections: number) =>
+      `${connections} bağlantıdan ${count} tanesi çizilemedi: üretim dosyası verilmez. KiCad dosyalarını indirip eksik yolları KiCad’de çiz (ince çizgiler gösterir).`,
+    drcFailed: (first: string) => `Tasarım kuralı denetiminde hata var (${first}); üretim dosyası verilmez. KiCad dosyalarını indirip KiCad’de düzelt.`,
+    fabrication: 'Üretim dosyalarını indir (Gerber, .zip)',
     download: 'KiCad dosyalarını indir (.zip)',
+    order:
+      'Üretim zip’i doğrudan üreticiye yüklenir (Gerber RS-274X + Excellon delik dosyası). Siparişte: 2 katman, 1,6 mm FR-4, 1 oz bakır, yüzey kurşunsuz HASL; en ince yol 0,3 mm, en küçük delik 0,4 mm. Üretici kartın çizimini gösterir: onaylamadan önce bak. Gümrük (Şubat 2026’dan beri): AB dışından posta/hızlı kargo gönderilerinde 30 € muafiyeti yok, vergi ≈ %60; Türkiye’deki üreticilerden teklif almak da bir seçenek. Malzeme listesi KiCad zip’inde.',
+    previewLabel: 'Baskı devre kartının üstten görünüşü: pedler, üst ve alt yüzdeki bakır yollar, serigrafi',
     size: (mm: string) => `Kart boyutu: ${mm}`,
     mains:
       'Bu devrede şebekeye (230 V) bağlanan bir transformatör var: şebeke gerilimli kartlar ayrı güvenlik kuralları (yalıtım aralığı, sertifika) ister ve aktarılmaz. Transformatörü çıkarıp devreyi hazır bir AC ya da DC adaptörün düşük gerilim çıkışından besle.',
     addedDecoupling: (ref: string, ic: string) => `${ref}: ${ic} için 100 nF dekuplaj kondansatörü (simülatörde yok; gerçek kartta besleme ucuna yakın olmalı)`,
     addedConnector: (ref: string, label: string, type: string) => `${ref}: ${label} (${type}) için bağlantı`,
     ammeterBridge: '; ampermetre seri bağlıdır: ölçüm yapmazken iki pini bir jumper başlığıyla köprüle, yoksa devre açık kalır',
-    readme: (title: string, size: string, added: readonly string[]) =>
+    readme: (title: string, size: string, added: readonly string[], unrouted: number) =>
       [
         `${title} · Devre Simülatörü'nden aktarılan PCB tasarımı`,
         '',
         `Kart boyutu: ${size} (2 katman, 1,6 mm FR-4). Kılıflar dosyanın içinde; her birinin açıklamasında eşdeğer standart KiCad kılıfının adı var.`,
+        unrouted === 0
+          ? 'Bakır yollar çizili (sitenin otomatik yol çizicisi); tasarım kuralları sitede denetlendi.'
+          : `Bakır yolların çoğu çizili; ${unrouted} bağlantı çizilemedi: KiCad’de ince çizgiyle (ratsnest) görünür, elle tamamla.`,
         '',
         'Eklenen parçalar:',
         ...added.map((a) => `  - ${a}`),
         '',
         'Adımlar:',
         '  1. KiCad 7 ya da üstünü kur (https://www.kicad.org). Klasördeki .kicad_pro dosyasını aç, PCB düzenleyiciye geç.',
-        '  2. Parçalar breadboard’daki sırasıyla durur (gövdeleri çakışanlar en yakın boş yere kaydırıldı); ince çizgiler (ratsnest) birleşecek pedleri gösterir.',
-        '     Yolları kısaltmak için parçaları M tuşuyla taşıyabilirsin; bağlantılar parçayla birlikte gider.',
-        '  3. Yolları çiz: Route > Interactive Router (X tuşu) ya da Freerouting eklentisi (Tools > Plugin and Content Manager).',
+        '  2. Parçalar breadboard’daki sırasıyla durur (gövdeleri çakışanlar en yakın boş yere kaydırıldı).',
+        '     Parçayı taşımak istersen (M tuşu) önce yollarını sil; bağlantılar (ağlar) parçayla birlikte gider.',
+        '  3. Eksik ya da yeniden çizilecek yollar: Route > Interactive Router (X tuşu) ya da Freerouting eklentisi (Tools > Plugin and Content Manager).',
         '     Ağ sınıfları hazır: GND ve VCC 0,8 mm, öbür yollar 0,3 mm; aralık 0,25 mm.',
         '  4. İstersen alt yüze bir GND dolgusu ekle (Place > Add Filled Zone, B.Cu, GND).',
         '  5. Inspect > Design Rules Checker: hata kalmasın (bağlanmamış ağ dahil).',
         '  6. File > Fabrication Outputs > Gerbers: F.Cu, B.Cu, F.Mask, B.Mask, F.Silkscreen, Edge.Cuts; ardından Generate Drill Files (Excellon).',
-        '     Çıkan dosyaları zip’leyip üreticiye yükle (2 katman, 1,6 mm, kurşunsuz HASL).',
+        '     Çıkan dosyaları zip’leyip üreticiye yükle (2 katman, 1,6 mm, kurşunsuz HASL). Kartı değiştirmediysen sitedeki "Üretim dosyalarını indir" aynı dosyaları verir.',
         '  7. Gümrük (Şubat 2026’dan beri): AB dışından posta/hızlı kargo gönderilerinde 30 € muafiyeti yok, vergi ≈ %60 (ürün + kargo). Türkiye’deki üreticilerden teklif almak da bir seçenek.',
         '',
         'Şema dosyası yoktur: değişiklik gerekirse devreyi simülatörde değiştirip yeniden aktar.',

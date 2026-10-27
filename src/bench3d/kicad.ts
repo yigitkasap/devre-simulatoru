@@ -3,9 +3,8 @@
 // Yerleşim breadboard yerleşiminden çıkar: breadboard'un 2,54 mm'lik delik ızgarası gerçek kılıfların
 // bacak aralığıyla aynıdır (direnç 10,16 mm = 4 delik, LED 2,54 mm, TO-92 2,54 mm, DIP-8 sıraları
 // 7,62 mm = e–f satırları). Gövdeleri çakışan parçalar en yakın boş yere kaydırılır. Breadboard'un
-// şeritleri ve jumper'ları PCB'de yoktur: aynı ağın pedleri KiCad'de ince çizgiyle (ratsnest)
-// gösterilir, yollar KiCad'de çizilir. Karttan dışarı giden
-// bağlantılar (pil, Arduino, cihazlar, lamba, motor...) kart kenarında vidalı klemens ya da pin
+// şeritleri ve jumper'ları PCB'de yoktur: bakır yolları router.ts çizer (çizilemeyen bağlantı
+// kalırsa KiCad'de ince çizgiyle, ratsnest, görünür). Karttan dışarı giden bağlantılar (pil, Arduino, cihazlar, lamba, motor...) kart kenarında vidalı klemens ya da pin
 // başlık olur. 555 ve 741'e 100 nF dekuplaj kondansatörü eklenir. Şebekeli devre aktarılmaz.
 //
 // Çıktı KiCad 7 biçimindedir (sürüm 20221018); KiCad 8 ve 9 açıp yükseltir. Kılıflar dosyanın
@@ -18,6 +17,7 @@ import { pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import { strProp, type DeviceType } from '../sim/netlist';
 import { holeXZ, planBreadboard, type BreadboardPlan, type Hole } from './breadboard';
+import { RULES, routePcb, type Routing } from './router';
 import { makeZip } from './zip';
 
 const PITCH = 2.54;
@@ -376,15 +376,21 @@ export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard
     .map(([partId, pins]) => ({ part: byId.get(partId)!, pins: pins.sort((a, b) => a.pin - b.pin), x: pins.reduce((s, p) => s + targetX(p.net), 0) / pins.length }))
     .sort((a, b) => a.x - b.x);
   let cursor = Math.min(...boxes.map((b) => b.x0), 0);
+  const gridX = footprints[0]?.pads[0]?.x ?? 0;
+  const gridY = footprints[0]?.pads[0]?.y ?? 0;
   let nextJ = 1;
   for (const c of connectors) {
     const screw = SCREW.has(c.part.type);
     const pitch = screw ? 5.08 : 2.54;
     // Pedlerin altındaki adlarla birlikte parçaların üstünde kalır.
-    const y = top - (screw ? 6.5 : 4.2);
-    const x0 = Math.max(cursor + pitch / 2, c.x - ((c.pins.length - 1) * pitch) / 2);
+    const y = gridY + Math.floor((top - (screw ? 6.5 : 4.2) - gridY) / PITCH) * PITCH;
+    // Kartın 2,54 mm ızgarasında (yollar ızgaradan pedlere kısa uçla değil, doğrudan girsin).
+    const x0 = gridX + Math.ceil((Math.max(cursor + pitch / 2, c.x - ((c.pins.length - 1) * pitch) / 2) - gridX) / PITCH) * PITCH;
     const ref = `J${nextJ++}`;
     const pinNames = tr.devices.pinShort[c.part.type];
+    const labels = c.pins.map((p) => pinNames[p.pin] ?? String(p.pin + 1));
+    // 1 mm'lik serigrafi yazısında harf başına ≈ 1 mm: pedler arasına sığmayan adlar sırayla alta ve üste.
+    const stagger = !screw || labels.some((l) => l.length - 0.4 > pitch - 0.5);
     const pads: PcbPad[] = c.pins.map((p, i) => ({
       number: String(i + 1),
       x: x0 + i * pitch,
@@ -393,9 +399,8 @@ export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard
       shape: i === 0 ? 'rect' : 'circle',
       size: screw ? 2.6 : 1.7,
       drill: screw ? 1.3 : 1.0,
-      label: pinNames[p.pin] ?? String(p.pin + 1),
-      // Pin başlıkta (2,54 mm) adlar sırayla alta ve üste: yan yana sığmazlar.
-      labelDy: screw ? 5 : i % 2 === 0 ? 2.4 : -2.4,
+      label: labels[i],
+      labelDy: (screw ? 5 : 2.4) * (stagger && i % 2 === 1 ? -1.04 : 1),
     }));
     const x1 = x0 + (c.pins.length - 1) * pitch;
     footprints.push({
@@ -448,6 +453,19 @@ export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard
   return { ok: true, design: { footprints: moved, nets, outline, added } };
 }
 
+/** Parça adının serigrafideki yeri: kılıfın üstünde, ortada (KiCad'deki ve Gerber'deki). */
+export function refAnchor(f: PcbFootprint): { x: number; y: number } {
+  const ys = [
+    ...f.pads.map((p) => p.y),
+    ...f.silk.flatMap((s) => [s[1], s[3]]),
+    ...f.circles.map((c) => c[1] - c[2]),
+    // Üste yazılan pin adlarının da üstünde.
+    ...f.pads.filter((p) => p.label && (p.labelDy ?? 0) < 0).map((p) => p.y + p.labelDy! - 0.4),
+  ];
+  const xs = [...f.pads.map((p) => p.x), ...f.silk.flatMap((s) => [s[0], s[2]])];
+  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: Math.min(...ys) - 1.5 };
+}
+
 // --- KiCad dosyaları --------------------------------------------------------------------------------------
 
 const q = (s: string) => `"${s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -462,11 +480,10 @@ function uuids(): () => string {
   };
 }
 
-export function kicadPcb(design: PcbDesign, title: string): string {
+export function kicadPcb(design: PcbDesign, title: string, routing?: Routing): string {
   const id = uuids();
   const code = (net: string | null) => (net === null ? 0 : design.nets.indexOf(net) + 1);
   const font = '(effects (font (size 1 1) (thickness 0.15)))';
-  const small = '(effects (font (size 0.8 0.8) (thickness 0.12)))';
   const lines: string[] = [];
   lines.push('(kicad_pcb (version 20221018) (generator devre_simulatoru)');
   lines.push('  (general (thickness 1.6))');
@@ -502,16 +519,14 @@ export function kicadPcb(design: PcbDesign, title: string): string {
     const ox = f.pads[0]?.x ?? 0;
     const oy = f.pads[0]?.y ?? 0;
     const rel = (x: number, y: number) => `${n(x - ox)} ${n(y - oy)}`;
-    const ys = [...f.pads.map((p) => p.y), ...f.silk.flatMap((s) => [s[1], s[3]]), ...f.circles.map((c) => c[1] - c[2])];
-    const xs = [...f.pads.map((p) => p.x), ...f.silk.flatMap((s) => [s[0], s[2]])];
-    const labelX = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : ox;
+    const label = refAnchor(f);
     lines.push(`  (footprint ${q(f.name)} (layer "F.Cu")`);
     lines.push(`    (tstamp ${id()})`);
     lines.push(`    (at ${n(ox)} ${n(oy)})`);
     lines.push(`    (descr ${q(`Eşdeğer: ${f.equivalent}`)})`);
     lines.push(f.pads.some((p) => p.npth) ? '    (attr exclude_from_pos_files exclude_from_bom)' : '    (attr through_hole)');
-    lines.push(`    (fp_text reference ${q(f.ref)} (at ${rel(labelX, Math.min(...ys, oy) - 1.5)}) (layer "F.SilkS") ${font} (tstamp ${id()}))`);
-    lines.push(`    (fp_text value ${q(f.value)} (at ${rel(labelX, Math.max(...f.pads.map((p) => p.y)) + 2.5)}) (layer "F.Fab") ${font} (tstamp ${id()}))`);
+    lines.push(`    (fp_text reference ${q(f.ref)} (at ${rel(label.x, label.y)}) (layer "F.SilkS") ${font} (tstamp ${id()}))`);
+    lines.push(`    (fp_text value ${q(f.value)} (at ${rel(label.x, Math.max(...f.pads.map((p) => p.y)) + 2.5)}) (layer "F.Fab") ${font} (tstamp ${id()}))`);
     for (const [x0, y0, x1, y1] of f.silk) {
       lines.push(`    (fp_line (start ${rel(x0, y0)}) (end ${rel(x1, y1)}) (stroke (width 0.12) (type solid)) (layer "F.SilkS") (tstamp ${id()}))`);
     }
@@ -519,12 +534,18 @@ export function kicadPcb(design: PcbDesign, title: string): string {
       lines.push(`    (fp_circle (center ${rel(x, y)}) (end ${rel(x + r, y)}) (stroke (width 0.12) (type solid)) (fill none) (layer "F.SilkS") (tstamp ${id()}))`);
     }
     for (const p of f.pads) {
-      if (p.label) lines.push(`    (fp_text user ${q(p.label)} (at ${rel(p.x, p.y + (p.labelDy ?? 2.4))}) (layer "F.SilkS") ${small} (tstamp ${id()}))`);
+      if (p.label) lines.push(`    (fp_text user ${q(p.label)} (at ${rel(p.x, p.y + (p.labelDy ?? 2.4))}) (layer "F.SilkS") ${font} (tstamp ${id()}))`);
       const kind = p.npth ? 'np_thru_hole' : 'thru_hole';
       const net = p.net === null ? '' : ` (net ${code(p.net)} ${q(p.net)})`;
       lines.push(`    (pad ${q(p.number)} ${kind} ${p.shape} (at ${rel(p.x, p.y)}) (size ${n(p.size)} ${n(p.size)}) (drill ${n(p.drill)}) (layers "*.Cu" "*.Mask")${net} (tstamp ${id()}))`);
     }
     lines.push('  )');
+  }
+  for (const t of routing?.tracks ?? []) {
+    lines.push(`  (segment (start ${n(t.x0)} ${n(t.y0)}) (end ${n(t.x1)} ${n(t.y1)}) (width ${n(t.width)}) (layer ${t.layer === 0 ? '"F.Cu"' : '"B.Cu"'}) (net ${code(t.net)}) (tstamp ${id()}))`);
+  }
+  for (const v of routing?.vias ?? []) {
+    lines.push(`  (via (at ${n(v.x)} ${n(v.y)}) (size ${n(RULES.via)}) (drill ${n(RULES.viaDrill)}) (layers "F.Cu" "B.Cu") (net ${code(v.net)}) (tstamp ${id()}))`);
   }
   const o = design.outline;
   lines.push(`  (gr_rect (start ${n(o.x0)} ${n(o.y0)}) (end ${n(o.x1)} ${n(o.y1)}) (stroke (width 0.1) (type default)) (fill none) (layer "Edge.Cuts") (tstamp ${id()}))`);
@@ -560,7 +581,7 @@ export function kicadProject(file: string): string {
       },
       meta: { filename: file, version: 1 },
       net_settings: {
-        classes: [netclass('Default', 0.3, 0.25), netclass('Guc', 0.8, 0.3)],
+        classes: [netclass('Default', RULES.signal, RULES.clearance), netclass('Guc', RULES.power, RULES.clearance)],
         meta: { version: 3 },
         netclass_patterns: [
           { netclass: 'Guc', pattern: 'GND' },
@@ -606,17 +627,25 @@ export function slug(title: string): string {
   );
 }
 
-/** İndirilecek zip: KiCad projesi, PCB, malzeme listesi ve Türkçe talimat. */
-export function kicadZip(doc: CircuitDoc, title: string): { ok: true; name: string; data: Uint8Array; design: PcbDesign } | { ok: false; reason: string } {
-  const result = designPcb(doc);
-  if (!result.ok) return result;
+/** İndirilecek zip: KiCad projesi, PCB (yollarıyla), malzeme listesi ve Türkçe talimat. */
+export function kicadZip(
+  doc: CircuitDoc,
+  title: string,
+  routed?: { design: PcbDesign; routing: Routing },
+): { ok: true; name: string; data: Uint8Array; design: PcbDesign } | { ok: false; reason: string } {
+  let design = routed?.design;
+  if (!design) {
+    const result = designPcb(doc);
+    if (!result.ok) return result;
+    design = result.design;
+  }
+  const routing = routed?.routing ?? routePcb(design);
   const base = slug(title);
-  const { design } = result;
   const data = makeZip([
     { name: `${base}/${base}.kicad_pro`, text: kicadProject(`${base}.kicad_pro`) },
-    { name: `${base}/${base}.kicad_pcb`, text: kicadPcb(design, title) },
+    { name: `${base}/${base}.kicad_pcb`, text: kicadPcb(design, title, routing) },
     { name: `${base}/malzeme-listesi.csv`, text: bomCsv(design) },
-    { name: `${base}/OKU.txt`, text: tr.pcb.readme(title, boardSize(design), design.added) },
+    { name: `${base}/OKU.txt`, text: tr.pcb.readme(title, boardSize(design), design.added, routing.unrouted.length) },
   ]);
   return { ok: true, name: `${base}-kicad.zip`, data, design };
 }

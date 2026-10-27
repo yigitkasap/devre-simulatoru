@@ -1733,5 +1733,32 @@ baskı devre tasarımı olarak indirir: `devre-<tarih>-kicad.zip` içinde `.kica
   pedi; pedler kartın içinde; farklı ağların pedleri arasında ≥ 0,25 mm; gövdeler çakışmaz; zip
   CRC'si doğru, aynı devre aynı bayt). ios-kontrol'de telefonda indirme maddesi.
 
+### PCB: otomatik yollar ve üretim dosyaları (2026-10-28)
+
+Lehim rehberinin sonundaki bölüm ("Baskı devre (PCB) olarak üret", `src/editor/PcbPanel.tsx`)
+kartın üstten görünüşünü (pedler, üst yüz kırmızı, alt yüz mavi yollar, serigrafi) gösterir ve iki
+zip verir: üreticiye doğrudan yüklenen **üretim zip'i** (`devre-<tarih>-uretim.zip`) ve yolları
+çizilmiş **KiCad projesi**.
+
+- Yol çizici `src/bench3d/router.ts`: 0,635 mm ızgarada A* (45°'lik yollar; üst yüzde yatay, alt
+  yüzde dikey tercih; via yalnızca gerektiğinde). THT pedleri iki yüzde de bakır olduğundan yol
+  pede bir yüzden girip öbüründen çıkabilir. Ağlar en kısa ağaç (Prim) sırasıyla; önce güç ağları,
+  sonra kısadan uzuna; çizilemeyen ağlar öne alınıp hepsi yeniden çizilir (en çok 6 tur). Yollar
+  sinyal 0,3 mm, GND/VCC 0,8 mm (sığmazsa 0,5 mm); via 0,8/0,4 mm.
+- Tasarım kuralı denetimi (`checkPcb`) kesin geometriyle: farklı ağlar arası ≥ 0,25 mm, kart kenarı
+  ve montaj deliği ≥ 0,5 mm, her ağ tek bakır adası. Çizilemeyen bağlantı ya da kural hatası
+  varsa üretim zip'i verilmez (KiCad zip'i verilir).
+- Üretim dosyaları `src/bench3d/gerber.ts`: Gerber RS-274X (X2 öznitelikleri, 4.6 mm) üst/alt
+  bakır, üst/alt lehim maskesi (via'lar kapalı), üst serigrafi (`strokeFont.ts` çizgi yazı tipi,
+  1 mm), kart kenarı; Excellon kaplamalı (ped + via) ve kaplamasız (montaj) delik dosyaları. Adlar
+  KiCad'in Protel uzantılı adları (`-F_Cu.gtl` …), üreticiler katmanı addan tanır.
+- Bağımsız denetim: dosyalar açık kaynak `pcb-stackup` / `whats-that-gerber` ile (projeye eklenmeden)
+  okundu; sekiz katman da doğru tanındı, kart iki yüzden doğru çizildi.
+- Örneklerin hepsinde (61) bütün bağlantılar çizilir; en büyüğü (baraj tek ışık, 39 bağlantı) ≈ 60 ms.
+- Testler: `tests/router.test.ts` (her örnekte çizilemeyen yok, DRC temiz, tek ada, aynı kart aynı
+  yollar), `tests/gerber.test.ts` (küçük Gerber/Excellon okuyucusuyla: sözdizimi, açıklıklar, her ped
+  ve via bir kez, yollar katmanındaki kadar çizgi, delikler pedlerle aynı yerde ve çapta). ios-kontrol'de
+  telefonda Gerber indirme maddesi.
+
 PCB araştırması ve sonraki aşamalar: `docs/pcb/arastirma.md`.
 
