@@ -10,7 +10,7 @@ import {
   type StepContext,
   type TransistorRegion,
 } from './device';
-import { ChargeState, criticalVoltage, depletionCharge, limitJunction, safeExp, type DepletionParams } from './junction';
+import { ChargeState, criticalVoltage, depletionCharge, Junction, limitJunction, safeExp, safeExpSlope, type DepletionParams } from './junction';
 import { limitStep, stampThreeTerminal, type TerminalLinearization } from './threeTerminal';
 
 // Alan etkili transistörler (JFET ve kanal oluşturmalı MOSFET), kare yasası (Shichman-Hodges):
@@ -65,7 +65,7 @@ export const NJFET_PRESETS: Readonly<Record<NjfetModelName, { idss: number; pinc
  *   C_rss = 15 pF  ⇒  C_GS = 165 pF (sabit), C_GD 25 V'ta 15 pF, C_DS 25 V'ta 66 pF. C_GD ve
  *   C_DS (gövde diyodunun kapasitesi), düşük V_DS'te güç MOSFET'lerindeki gibi büyür (eklem
  *   kapasitesi biçiminde: C_GD0 = 107 pF, V_J = 0,5 V; C_DS0 = 375 pF, V_J = 0,8 V; M = 0,5).
- *   Gövde diyodunun doğru akım davranışı ve iç dirençler (≈ 0,5 Ω) modellenmez.
+ *   Gövde diyodu iletir (IS = 1e-14 A, ≈ 0,8 V); iç dirençler (≈ 0,5 Ω) modellenmez.
  * "2N7000" seçeneği eski (kapasitesiz) modeldir; "model" özelliği olmayan kayıtlar onu kullanır.
  */
 export const NMOS_MODELS = ['IRF510', '2N7000'] as const;
@@ -394,8 +394,8 @@ export class JfetDevice extends FetDevice {
     const egd = safeExp(vgd / THERMAL_VOLTAGE);
     const igs = is * (egs - 1) + GMIN * vgs;
     const igd = is * (egd - 1) + GMIN * vgd;
-    const ggs = (is / THERMAL_VOLTAGE) * egs + GMIN;
-    const ggd = (is / THERMAL_VOLTAGE) * egd + GMIN;
+    const ggs = (is / THERMAL_VOLTAGE) * safeExpSlope(vgs / THERMAL_VOLTAGE) + GMIN;
+    const ggd = (is / THERMAL_VOLTAGE) * safeExpSlope(vgd / THERMAL_VOLTAGE) + GMIN;
     return [
       { current: ch.id - igd, du: ch.dvgs - ggd, dw: ch.dvds + ggd },
       { current: igs + igd, du: ggs + ggd, dw: -ggd },
@@ -413,7 +413,11 @@ export class JfetDevice extends FetDevice {
 }
 
 /** Kanal oluşturmalı (enhancement) MOSFET. Kapı yalıtılmıştır; gövde source'a bağlı kabul edilir. */
+/** MOSFET gövde diyodunun doyma akımı (ngspice MOS1 varsayılanı). */
+const BODY_DIODE_SATURATION = 1e-14;
+
 export class MosfetDevice extends FetDevice {
+  private readonly body = new Junction(BODY_DIODE_SATURATION, 1);
   readonly type: 'nmos' | 'pmos';
   readonly threshold: number;
   readonly k: number;
@@ -431,13 +435,26 @@ export class MosfetDevice extends FetDevice {
     this.k = k;
   }
 
+  /**
+   * Kanal ve gövde diyodu (gövde source'a bağlı: anot source, katot drain; P kanalda tersi, model
+   * koordinatlarında aynı). V_DS < 0'da diyot ≈ −0,8 V'ta iletir (ngspice MOS1, IS = 1e-14 A).
+   */
   protected terminals(vgs: number, vds: number): TerminalLinearization[] {
     const ch = channelCurrent(vgs, vds, this.vt, this.beta, this.dynamics.lambda);
+    const ib = this.body.current(-vds);
+    const gb = this.body.conductance(-vds);
     return [
-      { current: ch.id, du: ch.dvgs, dw: ch.dvds },
+      { current: ch.id - ib, du: ch.dvgs, dw: ch.dvds + gb },
       { current: 0, du: 0, dw: 0 },
-      { current: -ch.id, du: -ch.dvgs, dw: -ch.dvds },
+      { current: -ch.id + ib, du: -ch.dvgs, dw: -ch.dvds - gb },
     ];
+  }
+
+  /** Gövde diyodu: V_SD'nin adımı eklem gibi (pnjlim) sınırlanır. */
+  protected override limit(raw: { vgs: number; vds: number }): { vgs: number; vds: number; limited: boolean } {
+    const base = super.limit(raw);
+    const b = limitJunction(-base.vds, -this.vds, this.body.nvt, this.body.vcrit);
+    return b.limited ? { vgs: base.vgs, vds: -b.v, limited: true } : base;
   }
 }
 

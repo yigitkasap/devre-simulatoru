@@ -1355,11 +1355,14 @@ export const tr = {
       active: 'Aktif',
       saturation: 'Doyum',
       ohmic: 'Omik (doğrusal)',
+      reverse: 'Ters aktif',
     } as Record<string, string>,
     bjtNotes: {
       cutoff: 'Kesim: B-E eklemi iletimde değil; transistör açık bir anahtar gibi, I_{C} ≈ 0.',
       active: 'Aktif bölge: I_{C} ≈ β · I_{B}; transistör yükselteç gibi çalışır.',
       saturation: 'Doyum: transistör kapalı bir anahtar gibi; I_{C} artık β · I_{B}’den küçüktür ve dış devre belirler.',
+      reverse:
+        'Ters aktif: B-E değil B-C eklemi iletimde; kollektör ile emetör yer değiştirmiş gibi çalışır ve kazanç çok düşüktür (β_{R} ≈ 8). Transistör ters bağlanmış olabilir.',
     } as Record<string, string>,
     fetNotes: {
       cutoff: 'Kesim: kanal kapalı, I_{D} ≈ 0.',
@@ -1683,7 +1686,7 @@ export const tr = {
       columns: { level: 'Seviye', probe: 'Prob', transistor: 'Transistör', led: 'LED' },
       wet: 'ıslak',
       dry: 'kuru',
-      regions: { cutoff: 'kesim', active: 'aktif', saturation: 'doyum' },
+      regions: { cutoff: 'kesim', active: 'aktif', saturation: 'doyum', ohmic: 'omik', reverse: 'ters aktif' },
       led: { on: 'yanıyor', off: 'sönük', dim: 'çok zayıf', fading: 'sönüyor' },
       silenced: (q: string) => `${q} susturuyor`,
       discharging: (c: string) => `${c} boşalıyor`,

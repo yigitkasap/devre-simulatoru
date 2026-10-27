@@ -24,6 +24,15 @@ export function safeExp(arg: number): number {
   return arg <= MAX_EXP_ARG ? Math.exp(arg) : EXP_AT_MAX * (1 + arg - MAX_EXP_ARG);
 }
 
+/**
+ * safeExp'in türevi d/d(arg): sınırın ötesinde doğrusal sürdürmenin eğimi (EXP_AT_MAX). İletkenlik
+ * ve kapasite bununla hesaplanır; safeExp'le hesaplansaydı akımın gerçek türevinden (1 + arg − 80)
+ * kat büyük çıkar, Newton yavaş yakınsardı.
+ */
+export function safeExpSlope(arg: number): number {
+  return arg <= MAX_EXP_ARG ? Math.exp(arg) : EXP_AT_MAX;
+}
+
 /** Vcrit = N·VT·ln(N·VT/(√2·Is)): bunun üstünde eklem gerilimi adımı sınırlanır. */
 export function criticalVoltage(nvt: number, saturationCurrent: number): number {
   return nvt * Math.log(nvt / (Math.SQRT2 * saturationCurrent));
@@ -151,7 +160,7 @@ export class Junction {
     const e = safeExp(vd / this.nvt);
     return {
       q: dep.q + tt * this.saturationCurrent * (e - 1),
-      c: dep.c + (tt * this.saturationCurrent * e) / this.nvt,
+      c: dep.c + (tt * this.saturationCurrent * safeExpSlope(vd / this.nvt)) / this.nvt,
     };
   }
 
@@ -167,7 +176,7 @@ export class Junction {
 
   /** Küçük sinyal iletkenliği dId/dVd (paralel gmin dahil). */
   conductance(vd: number): number {
-    return (this.saturationCurrent / this.nvt) * safeExp(vd / this.nvt) + GMIN;
+    return (this.saturationCurrent / this.nvt) * safeExpSlope(vd / this.nvt) + GMIN;
   }
 
   /**

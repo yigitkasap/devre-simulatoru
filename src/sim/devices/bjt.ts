@@ -10,7 +10,7 @@ import {
   type StepContext,
   type TransistorRegion,
 } from './device';
-import { ChargeState, criticalVoltage, depletionCharge, limitJunction, safeExp, type ChargeParams } from './junction';
+import { ChargeState, criticalVoltage, depletionCharge, limitJunction, safeExp, safeExpSlope, type ChargeParams } from './junction';
 import { stampThreeTerminal, type TerminalLinearization } from './threeTerminal';
 
 /**
@@ -76,8 +76,8 @@ export function evaluateBjt(vbe: number, vbc: number, beta: number): BjtEvaluati
   const er = safeExp(vbc / VT);
   const iF = is * (ef - 1);
   const iR = is * (er - 1);
-  const gF = (is / VT) * ef;
-  const gR = (is / VT) * er;
+  const gF = (is / VT) * safeExpSlope(vbe / VT);
+  const gR = (is / VT) * safeExpSlope(vbc / VT);
   // Early çarpanı; doyumda V_BC > 0 iken çok küçülmesin.
   const k = Math.max(0.05, 1 - vbc / va);
   const kSlope = 1 - vbc / va > 0.05 ? -1 / va : 0;
@@ -105,7 +105,7 @@ function junctionCharge(v: number, p: ChargeParams): { q: number; c: number } {
   if (p.tt <= 0) return dep;
   const is = BJT_PARAMS.saturationCurrent;
   const e = safeExp(v / VT);
-  return { q: dep.q + p.tt * is * (e - 1), c: dep.c + (p.tt * is * e) / VT };
+  return { q: dep.q + p.tt * is * (e - 1), c: dep.c + (p.tt * is * safeExpSlope(v / VT)) / VT };
 }
 
 /** Bipolar transistör. Pinler: [0] = kollektör (C), [1] = baz (B), [2] = emetör (E). */
@@ -236,10 +236,13 @@ export class BjtDevice extends Device {
     return { voltage: vce, current: ic, power: vce * ic + vbe * ib };
   }
 
-  /** Çalışma bölgesi: B-E eklemi iletimde değilse kesim, B-C eklemi de iletimdeyse doyum. */
+  /**
+   * Çalışma bölgesi: B-E eklemi iletimde değilse kesim (yalnızca B-C eklemi iletiyorsa ters aktif:
+   * kollektör ile emetör yer değiştirmiş, β_R ≈ 8), B-C eklemi de iletimdeyse doyum.
+   */
   region(x: Float64Array): TransistorRegion {
     const { vbe, vbc } = this.controls(x);
-    if (vbe < 0.5) return 'cutoff';
+    if (vbe < 0.5) return vbc >= 0.5 ? 'reverse' : 'cutoff';
     return vbc > 0.4 ? 'saturation' : 'active';
   }
 

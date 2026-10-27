@@ -248,7 +248,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 526 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 545 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -1151,8 +1151,9 @@ doğrulanır.
   Is = 10⁻¹⁴ A'lik diyotlardır (kapı ileri kutuplanırsa akım çeker). Kanal simetriktir.
 - **MOSFET (2N7000 benzeri, kanal oluşturmalı):** I_D = k·(V_GS − V_T)²·(1 + λV_DS) doyumda,
   k·(2(V_GS − V_T)V_DS − V_DS²)·(1 + λV_DS) omik bölgede; V_T = 2,1 V, k = 50 mA/V²
-  (V_GS = 4,5 V'ta I_D(on) ≈ 0,29 A, veri sayfası en az 75 mA), λ = 0,01 V⁻¹. Kapı yalıtılmıştır;
-  gövde diyodu modellenmez.
+  (V_GS = 4,5 V'ta I_D(on) ≈ 0,29 A, veri sayfası en az 75 mA), λ = 0,01 V⁻¹. Kapı yalıtılmıştır.
+  Gövde diyodu (gövde source'a bağlı; IS = 10⁻¹⁴ A, ngspice MOS1 varsayılanı) V_DS < 0'da
+  ≈ −0,8 V'ta iletir; adımı eklem gibi (pnjlim) sınırlanır.
 - **Newton-Raphson:** Üç uçlu bileşenler uçlarına giren akımları iki kontrol geriliminin
   (V_BE, V_BC ya da V_GS, V_DS) fonksiyonu olarak verir ve bunların Jacobian'ıyla doğrusallaştırılır
   ([`sim/devices/threeTerminal.ts`](src/sim/devices/threeTerminal.ts)). FET'lerde V_GS adımı 1 V,
@@ -1335,7 +1336,7 @@ parametreler sonra yine değiştirilebilir (öğrencinin ölçtüğü β ya da I
   (R_S transistörü akım kaynağı gibi yaptığından C_DS'in etkisi neredeyse yoktur).
 - **İhmal edilenler:** 1N4001'in seri direnci (≈ 0,05 Ω; föy devrelerinde akım 10 mA'i
   geçmez) ve ters kırılması (50 V); BF245A kartının 9 Ω'luk drain/source dirençleri; IRF510'un
-  iç dirençleri (≈ 0,5 Ω) ve gövde diyodunun doğru akım davranışı. Bunlar için parçaya iç düğüm
+  iç dirençleri (≈ 0,5 Ω). Bunlar için parçaya iç düğüm
   eklemek gerekir; föydeki akımlarda fark ölçüm belirsizliğinin çok altında.
 
 ### Yeniden tasarım (2026-10)
@@ -1473,3 +1474,31 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
 Bu projenin kodu sıfırdan yazıldı. Falstad CircuitJS1 (GPL) ve PhET Circuit Construction Kit
 (GPL) kaynak kodlarından hiçbir şey kopyalanmadı ya da uyarlanmadı. Sitede başka bir simülatörün
 adı, logosu ya da ekran görüntüsü kullanılmaz.
+
+### ngspice karşılaştırması (2026-10-27)
+
+ngspice'ın kaynak kodu (açık kaynak, 2026-10-26 sürümü) motorla ve aygıt modelleriyle satır satır
+karşılaştırıldı; bulunan hatalar düzeltildi (testler: `tests/ngspice-karsilastirma.test.ts`,
+`tests/scope-yakalama.test.ts`, `tests/canli-olcum.test.ts`):
+
+- **MOSFET gövde diyodu** yoktu (`mos1load.c`'de bulk diyotları hep var): V_DS < 0'da kanal
+  açılıyordu (IRF510, −5 V / 10 Ω: −4,1 V ve 90 mA yerine şimdi −0,81 V ve 0,42 A).
+- **Ters aktif BJT** "kesim" görünüyordu; artık "Ters aktif" bölgesi var.
+- **exp sınırının ötesinde iletkenlik** (üs > 80) akımın türevinden (1 + üs − 80) kat büyüktü
+  (`safeExpSlope`); sonuç aynı, Newton daha hızlı yakınsar.
+- **Osiloskop, küçük zaman/bölmede** (≤ 100 µs/b) tetiklenemiyor, birkaç noktadan düz çizgi
+  çiziyor ve her adımda 2000 kovayı yeniden yazdığı için kare hızını düşürüyordu. Kayıt artık
+  tetik sinyalini her ölçümde izler; tetik kenarı motorun olay mekanizmasıyla adımın içinde
+  bulunur ve bir ekran ince adımlarla (ekranın 1/250'si) yakalanır. Arayüz kaydı karede bir
+  yeniden kurar. Frekans tetik kesimlerinden ölçülür.
+- **Canlı ölçümler** kare anındaki anlık değerdi; AC'de ve salınan devrelerde okunamıyordu.
+  Motor gösterilen parçaların ölçüm ve durum yapraklarını her adımda tümler (`sim/watch.ts`);
+  arayüz 0,4 s'lik pencerelerde salınan değeri "≈" ile etkin değer ya da ortalama olarak, gidip
+  gelen durumu "Yüksek ⇄ Düşük" olarak gösterir (`editor/liveReadout.ts`). NaN ve sonsuz değer
+  "hesaplanamıyor" yazar.
+
+Doğrulanmış ama henüz uygulanmamış farklar: eklem yükünün hata denetimi gerilim yerine yükle
+yapılmalı (ngspice `cktterr.c`; 1N4001 ters toparlanma yükü ≈ %10 düşük), kırılma noktasından
+sonra adım kısaltılmalı (`dctran.c`; reddedilen adımlar 2,4 → 0,7/kenar), reddedilen adım
+öngörülen boyuta küçültülmeli (yarıya değil); BJT'de IKF/ISE gibi Gummel-Poon terimleri yok
+(yüksek akımda β düşmüyor); DC çalışma noktasında gmin adımlama yok.

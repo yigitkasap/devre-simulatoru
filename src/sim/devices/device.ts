@@ -148,7 +148,7 @@ export interface RatingWarning {
 }
 
 /** Transistörün çalışma bölgesi: BJT'de kesim/aktif/doyum, FET'te kesim/omik (doğrusal)/doyum. */
-export type TransistorRegion = 'cutoff' | 'active' | 'saturation' | 'ohmic';
+export type TransistorRegion = 'cutoff' | 'active' | 'saturation' | 'ohmic' | 'reverse';
 
 export interface DeviceInit {
   readonly id: string;
