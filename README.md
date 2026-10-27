@@ -26,7 +26,8 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   11 örnek program önceden derlenir (Blink, düğme, sayaç, trafik ışığı, PWM, potansiyometre, LDR,
   NTC termometre, PWM süzgeci, melodi, röle). Pinler devreye gerçek elektriksel modelle bağlıdır
   (25 Ω çıkış, 35 kΩ çekme, Schmitt eşikleri, 10 bit ADC); Seri ekran ve kod İnceleme panelinde.
-- **3B tezgâh:** "Şema | 3B" ile aynı devre bir masada; bütün parçaların ve Arduino'nun gerçek
+- **3B tezgâh:** "Şema | 3B" ile aynı devre bir masada, parçalar breadboard'a takılı (yerleşim
+  şemadan otomatik: şeritler, raylar, jumper'lar); bütün parçaların ve Arduino'nun gerçek
   ölçülere yakın 3B modelleri, ağ renkli atlama kabloları; LED, lamba, motor, cihaz ekranları ve
   osiloskop izleri simülasyonla canlı; anahtar ve potansiyometre 3B'de de kullanılır.
 - **Laboratuvar cihazları:** fonksiyon üreteci (GFG-8015G benzeri: 0,2 Hz – 2 MHz, 50 Ω, offset,
@@ -1622,8 +1623,8 @@ ve pinleri devre çözümüne bağlıdır.
 - **Canlı:** LED/lamba ışıması ve parıltı, motor pervanesi, röle modülü LED'i, hoparlör/buzzer
   titreşimi, sigortanın teli, su seviyesi, multimetre/güç kaynağı/üreteç ekranları ve osiloskop
   izleri (tuval dokusu, en çok saniyede 10 kez), Arduino ON/L/TX.
-- **Etkileşim:** yörünge kamerası (sürükle döndür, sağ tık/iki parmak kaydır, tekerlek/kıstırma
-  yakınlaştır); tıkla seç; Oynat'tayken anahtar ve potansiyometre. Sığdır ve Üstten; kullanıcı
+- **Etkileşim:** yörünge kamerası (fareyle sol tuş kaydırır, orta ve sağ tuş döndürür, tekerlek
+  yakınlaştırır; dokunmatikte bir parmak döndürür, iki parmak kaydırır ve yakınlaştırır); tıkla seç; Oynat'tayken anahtar ve potansiyometre. Sığdır ve Üstten; kullanıcı
   kamerayı oynatmadıysa alan değişince (cihaz rafı) yeniden sığdırılır.
 - **Performans:** yalnızca değişince çizilir; değişmeyen alt nesneler malzemeye göre birleştirilir
   (vitrinde 35 parça türü: 238 çizim çağrısı, 27 700 üçgen, kare 2,7 ms). three yalnızca 3B
@@ -1656,3 +1657,30 @@ ve pinleri devre çözümüne bağlıdır.
 Kalan bulgular: ilk açılış JS'i 277 KB (sınır 250 KB; Arduino ve 3B'den önce de tahminen ≈ 263 KB'tı).
 Sonraki adım örnek devrelerin (10 KB) ve örnek metinlerinin (24 KB) tembel yüklenmesi. Çift yönlü
 kırpıcı (89 000 adım/s) bu işten önce de sınırdaydı (önceki taramada 476 ms).
+
+### Breadboard (2026-10-28)
+
+3B tezgâhta parçalar breadboard'a takılı durur. Yerleşim şemadan otomatik çıkarılır
+(`src/bench3d/breadboard.ts`, three'siz saf hesap):
+
+- **Breadboard:** sütunların üst (a–e) ve alt (f–j) yarıları beşer delikli şeritlerdir; üstte ve
+  altta + (kırmızı) ve − (mavi) raylar. Devre 28 sütuna sığarsa yarım boy (30 sütun, 400 delik), yoksa
+  tam boy (63 sütun, 830 delik); o da yetmezse ikinci bir breadboard.
+- **Breadboard'a takılanlar:** direnç, diyot, zener, sigorta, anahtar (iki bacak aynı satırda);
+  kondansatör, bobin, LED, LDR, NTC, buzzer (dik); transistörler ve potansiyometre (üç ardışık
+  sütun); 741 ve 555 (DIP-8, orta kanalın üstünde, 1. bacak sol altta).
+- **Masadakiler:** Arduino, pil ve AC kaynak solda; cihazlar (güç kaynağı, üreteç, osiloskop,
+  multimetreler) arkada, jakları breadboard'a dönük; lamba, motor, hoparlör, röle modülü,
+  transformatör, hazne önde. Uçlarından breadboard'a dupont uçlu kablolar. Toprak sembolü fiziksel
+  bir parça değildir (− rayı).
+- **Ağlar:** her ağın bir ya da birkaç şeridi olur, şeritler jumper'larla birleştirilir. Toprak ağı
+  − rayına, ana besleme (Arduino 5V, pil +, güç kaynağı +) + rayına bağlanır. Parçalar şemadaki
+  soldan sağa sırasıyla yerleşir; ardışık iki parçanın ortak ağı varsa aynı şeridi paylaşır
+  (direnç → LED zinciri jumper'sız). Bir şeride en çok 3 bacak; kalan delikler jumper'lara.
+- **Doğrulama** (`tests/breadboard.test.ts`, 62 örnek): breadboard'daki şerit, ray ve jumper
+  bağlantıları şemayla aynı devreyi kurar: her ağın bütün pinleri tek elektriksel düğümde, iki ağ
+  hiçbir yerde birleşmiyor (kısa devre yok), bir deliğe tek bacak. Tek bir jumper silinince 57 örnek
+  kalıyor (test bağlantıları gerçekten denetliyor).
+- **Kamera:** parçalara, kablolara ve breadboard'un kullanılan bölümüne sığdırılır (yarım boyda
+  kartın tamamı).
+

@@ -99,9 +99,26 @@ export function wirePath(points: readonly Vector3[], r: number, material: Materi
   return g;
 }
 
-/** Bir parçanın pinlerinin tezgâhtaki yerel konumları (şema pinleri × SPREAD, masada). */
+let anchorOverride: readonly Vector3[] | null = null;
+
+/**
+ * Bir parçanın bacaklarının bittiği yerel konumlar: breadboard'a takılırken deliklerin konumu
+ * (withAnchors), masada şema pinleri × SPREAD.
+ */
 export function pinAnchors(type: DeviceType): Vector3[] {
+  if (anchorOverride) return anchorOverride.map((a) => a.clone());
   return CATALOG[type].pins.map((p) => new Vector3(p.x * SPREAD, LEAD_Y, p.y * SPREAD));
+}
+
+/** `build` içinde pinAnchors verilen konumları döndürür (breadboard delikleri, yerel koordinat). */
+export function withAnchors<T>(anchors: readonly Vector3[] | null, build: () => T): T {
+  const previous = anchorOverride;
+  anchorOverride = anchors;
+  try {
+    return build();
+  } finally {
+    anchorOverride = previous;
+  }
 }
 
 /**
@@ -120,13 +137,15 @@ export function lead(from: Vector3, anchor: Vector3, r = 0.14, material: Materia
   return wirePath(pts, r, material, 6);
 }
 
-/** Dikey bacak: gövdenin altından masaya iner, sonra masada pine gider. */
+/**
+ * Dikey bacak: gövdenin altından iner, ucun biraz üstünde uca doğru kıvrılır (masada pine, breadboard'da
+ * deliğe).
+ */
 export function legDown(from: Vector3, anchor: Vector3, r = 0.14, material: Material = M.tin()): Group {
-  const foot = new Vector3(from.x, LEAD_Y + 0.25, from.z);
-  const pts = [from, foot];
-  if (Math.hypot(anchor.x - from.x, anchor.z - from.z) > 0.05) pts.push(new Vector3(from.x, LEAD_Y, from.z), anchor);
-  else pts.push(anchor);
-  return wirePath(pts, r, material, 6);
+  const offset = Math.hypot(anchor.x - from.x, anchor.z - from.z);
+  if (offset <= 0.05) return wirePath([from, anchor], r, material, 6);
+  const knee = Math.max(anchor.y + 0.25, Math.min(from.y, anchor.y + 0.6 + 0.3 * offset));
+  return wirePath([from, new Vector3(from.x, knee, from.z), new Vector3(anchor.x, knee - 0.25, anchor.z), anchor], r, material, 6);
 }
 
 // --- Yazı dokuları --------------------------------------------------------------------------------

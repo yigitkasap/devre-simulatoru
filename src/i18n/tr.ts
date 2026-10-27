@@ -1653,7 +1653,7 @@ export const tr = {
     loading: '3B tezgâh yükleniyor…',
     fit: 'Sığdır',
     top: 'Üstten',
-    hintMouse: 'Sürükle: döndür · sağ tık sürükle: kaydır · tekerlek: yakınlaştır · parçaya tıkla: seç · Oynat’tayken anahtara tıkla, potansiyometreyi sürükle',
+    hintMouse: 'Sol tuşla sürükle: kaydır · orta (ya da sağ) tuşla sürükle: döndür · tekerlek: yakınlaştır · parçaya tıkla: seç · Oynat’tayken anahtara tıkla, potansiyometreyi sürükle',
     hintTouch: 'Bir parmak: döndür · iki parmak: yakınlaştır ve kaydır · parçaya dokun: seç · Oynat’tayken anahtara dokun',
   },
   arduino: {

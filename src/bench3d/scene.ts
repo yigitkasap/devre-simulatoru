@@ -8,10 +8,10 @@ import {
   CanvasTexture,
   Color,
   CubicBezierCurve3,
-  CylinderGeometry,
   DirectionalLight,
   Group,
   HemisphereLight,
+  MOUSE,
   Material,
   Mesh,
   MeshBasicMaterial,
@@ -34,9 +34,10 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { SimFrame } from '../editor/useSimulation';
-import { pinPositions } from '../model/geometry';
 import type { CircuitDoc, Part } from '../model/types';
-import { M, SPREAD, mat, mergeStatic, mesh } from './kit';
+import { BB, boardWidth, boardZ, holeXZ, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
+import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
+import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
 import { buildPartModel } from './registry';
 
@@ -62,6 +63,12 @@ interface Placed {
   readonly shadow: Mesh;
   /** Kabloların bağlandığı uçlar (dünya koordinatı). */
   readonly anchors: Vector3[];
+}
+
+/** Deliğin dünya koordinatı (`y`: ağzı BB.height, bacağın bittiği yer BB.height − HOLE_DEPTH). */
+function holeAt(h: Hole, cols: number, y: number): Vector3 {
+  const { x, z } = holeXZ(h, cols);
+  return new Vector3(x, y, z);
 }
 
 function partKey(part: Part): string {
@@ -134,6 +141,11 @@ export class BenchScene {
   private readonly pmrem: PMREMGenerator;
   private readonly parts = new Map<string, Placed>();
   private readonly cables = new Group();
+  private readonly boards = new Group();
+  /** Son kurulan yerleşimin imzası (değişmediyse sahne yeniden kurulmaz). */
+  private layoutKey = '';
+  /** Kadrajda kalması gereken breadboard bölümü: yarım boy kartın tamamı, tam boyda kullanılan sütunlar. */
+  private boardView = new Box3();
   private readonly partsGroup = new Group();
   private readonly shadowTexture = radialTexture('rgba(20,30,40,0.38)', 'rgba(20,30,40,0)');
   private readonly ringMaterial = new MeshBasicMaterial({ color: '#1f6feb', transparent: true, opacity: 0.32, depthWrite: false });
@@ -188,12 +200,15 @@ export class BenchScene {
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.position.y = 0.03;
     this.ring.visible = false;
-    this.scene.add(this.ring, this.partsGroup, this.cables);
+    this.scene.add(this.ring, this.boards, this.partsGroup, this.cables);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.12;
     this.controls.screenSpacePanning = true;
+    // Fare: sol tuş kaydırır, orta tuş döndürür (kullanıcı isteği); orta tuşu olmayan dokunmatik
+    // yüzeyler için sağ tuş da döndürür. Tekerlek yakınlaştırır. Tıklama (sürüklemeden) seçer.
+    this.controls.mouseButtons = { LEFT: MOUSE.PAN, MIDDLE: MOUSE.ROTATE, RIGHT: MOUSE.ROTATE };
     this.controls.maxPolarAngle = Math.PI * 0.47;
     this.controls.minDistance = 8;
     this.controls.maxDistance = 900;
@@ -204,6 +219,9 @@ export class BenchScene {
     canvas.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('pointercancel', this.onPointerUp);
+    // Orta tuş: tarayıcının otomatik kaydırması (Windows) döndürmeyi bozmasın.
+    canvas.addEventListener('mousedown', (e) => e.button === 1 && e.preventDefault());
+    canvas.addEventListener('auxclick', (e) => e.button === 1 && e.preventDefault());
     // iOS: dokunuş sayfayı kaydırmasın, yakınlaştırmasın.
     const prevent = (e: TouchEvent) => e.preventDefault();
     canvas.addEventListener('touchstart', prevent, { passive: false });
@@ -235,32 +253,27 @@ export class BenchScene {
   // --- Devre --------------------------------------------------------------------------------------
 
   setDoc(doc: CircuitDoc): void {
-    const seen = new Set<string>();
-    let changed = false;
-    for (const part of doc.parts) {
-      seen.add(part.id);
-      const key = partKey(part);
-      const old = this.parts.get(part.id);
-      if (old && old.key === key) {
-        old.part = part;
-        continue;
+    const plan = planBreadboard(doc);
+    const key = JSON.stringify([
+      doc.parts.map(partKey),
+      [...plan.onBoard.values()],
+      [...plan.table.values()],
+      plan.jumpers,
+      plan.leads,
+    ]);
+    if (key === this.layoutKey) {
+      for (const part of doc.parts) {
+        const placed = this.parts.get(part.id);
+        if (placed) placed.part = part;
       }
-      if (old) this.removePart(old);
-      this.parts.set(part.id, this.placePart(part, key));
-      changed = true;
-    }
-    for (const [id, placed] of this.parts) {
-      if (!seen.has(id)) {
-        this.removePart(placed);
-        this.parts.delete(id);
-        changed = true;
-      }
-    }
-    this.buildCables(doc);
-    if (changed || !this.fitted) {
+    } else {
+      this.layoutKey = key;
+      this.rebuild(doc, plan);
       if (!this.fitted && doc.parts.length > 0) {
         this.fit();
         this.fitted = true;
+      } else if (this.fitted && !this.userMoved) {
+        this.fit(this.lastFitTop);
       }
     }
     this.applyFrame();
@@ -268,30 +281,129 @@ export class BenchScene {
     this.dirty = true;
   }
 
-  private placePart(part: Part, key: string): Placed {
+  /** Breadboard'lar, parçalar, jumper'lar ve kablolar baştan kurulur. */
+  private rebuild(doc: CircuitDoc, plan: BreadboardPlan): void {
+    for (const placed of this.parts.values()) this.removePart(placed);
+    this.parts.clear();
+    for (const child of [...this.boards.children, ...this.cables.children]) {
+      child.removeFromParent();
+      disposeObject(child);
+    }
+    const usedX = [
+      ...[...plan.onBoard.values()].flatMap((p) => [...p.holes, ...(p.extraHoles ?? [])]),
+      ...plan.leads.map((l) => l.hole),
+      ...plan.jumpers.flatMap((j) => [j.a, j.b]),
+    ].map((h) => holeXZ(h, plan.cols).x);
+    const halfWidth = boardWidth(plan.cols) / 2;
+    const full = plan.cols >= BB.cols && usedX.length > 0;
+    this.boardView = new Box3(
+      new Vector3(full ? Math.max(-halfWidth, Math.min(...usedX) - 4) : -halfWidth, 0, -BB.depth / 2),
+      new Vector3(full ? Math.min(halfWidth, Math.max(...usedX) + 4) : halfWidth, BB.height, boardZ(plan.boards - 1) + BB.depth / 2),
+    );
+    for (let b = 0; b < plan.boards; b++) {
+      const board = breadboardMesh(plan.cols);
+      board.position.z = boardZ(b);
+      this.boards.add(board);
+      const shadow = new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ map: this.shadowTexture, transparent: true, depthWrite: false }));
+      shadow.rotation.x = -Math.PI / 2;
+      shadow.position.set(0, 0.02, boardZ(b));
+      shadow.scale.set(boardWidth(plan.cols) * 1.25, BB.depth * 1.6, 1);
+      shadow.userData.ownsMaterial = true;
+      this.boards.add(shadow);
+    }
+    for (const part of doc.parts) {
+      const onBoard = plan.onBoard.get(part.id);
+      const table = plan.table.get(part.id);
+      if (onBoard) this.parts.set(part.id, this.placeOnBoard(part, onBoard, plan.cols));
+      else if (table) this.parts.set(part.id, this.placeOnTable(part, table));
+    }
+    // Renkler: ağ başına (toprak siyah, besleme kırmızı, öbürleri sırayla).
+    const colors = new Map<string, string>();
+    let next = 0;
+    const colorOf = (net: string) => {
+      let c = colors.get(net);
+      if (!c) {
+        const role = plan.roles.get(net);
+        c = role === 'ground' ? '#1b1c1f' : role === 'supply' ? '#d22f27' : CABLE_COLORS[next++ % CABLE_COLORS.length]!;
+        colors.set(net, c);
+      }
+      return c;
+    };
+    const holeTop = (h: Hole) => holeAt(h, plan.cols, BB.height);
+    for (const j of plan.jumpers) this.cables.add(jumperMesh(holeTop(j.a), holeTop(j.b), colorOf(j.net)));
+    const plug = new BoxGeometry(0.75, 1.5, 0.75);
+    const plugMat = mat('#1b1c1f', 0.6);
+    for (const lead of plan.leads) {
+      const placed = this.parts.get(lead.partId);
+      const from = placed?.anchors[lead.pin];
+      if (!from) continue;
+      const to = holeTop(lead.hole);
+      const color = colorOf(lead.net);
+      const a1 = from.clone().add(new Vector3(0, 1.4, 0));
+      const b1 = to.clone().add(new Vector3(0, 1.5, 0));
+      const dist = a1.distanceTo(b1);
+      const lift = Math.min(14, 2 + 0.2 * dist);
+      const curve = new CubicBezierCurve3(a1, a1.clone().add(new Vector3(0, lift, 0)), b1.clone().add(new Vector3(0, lift, 0)), b1);
+      this.cables.add(new Mesh(new TubeGeometry(curve, Math.max(12, Math.round(dist * 1.5)), 0.28, 8, false), mat(color, 0.55)));
+      this.cables.add(mesh(plug, plugMat, from.x, from.y + 0.75, from.z));
+      this.cables.add(mesh(plug, plugMat, to.x, to.y + 0.75, to.z));
+      this.cables.add(rod(new Vector3(to.x, to.y - HOLE_DEPTH, to.z), to, 0.1, M.tin(), 6));
+    }
+    this.dirty = true;
+  }
+
+  /** Breadboard'a takılan parça: gövde deliklerin arasında, bacaklar deliklere. */
+  private placeOnBoard(part: Part, at: BoardPart, cols: number): Placed {
+    const holeIn = (h: Hole) => holeAt(h, cols, BB.height - HOLE_DEPTH);
+    const holes = at.holes.map(holeIn);
+    const extra = (at.extraHoles ?? []).map(holeIn);
+    const group = new Group();
+    const all = [...holes, ...extra];
+    const center = all.reduce((c, h) => c.add(h), new Vector3()).multiplyScalar(1 / all.length);
+    if (at.mount === 'axial' || at.mount === 'radial') {
+      const [a, b] = holes as [Vector3, Vector3];
+      group.position.set((a.x + b.x) / 2, BB.height, (a.z + b.z) / 2);
+      group.rotation.y = Math.atan2(-(b.z - a.z), b.x - a.x);
+    } else if (at.mount === 'to92') {
+      // Yerel z ekseni sütunlar boyunca: düz (yazılı) yüz izleyiciye bakar.
+      group.position.set(holes[1]!.x, BB.height, holes[1]!.z);
+      group.rotation.y = Math.PI / 2;
+    } else {
+      group.position.set(center.x, BB.height, center.z);
+    }
+    group.updateMatrixWorld(true);
+    const local = (v: Vector3) => group.worldToLocal(v.clone());
+    const model = buildPartModel(part, holes.map(local), extra.map(local));
+    return this.finishPlacement(part, model, group, holes, BB.height);
+  }
+
+  /** Masadaki parça: plandaki yerde; bacakları/uçları kendi modelinde. */
+  private placeOnTable(part: Part, at: TablePart): Placed {
     const model = buildPartModel(part);
     const group = new Group();
+    group.position.set(at.x, 0, at.z);
+    group.rotation.y = (at.rotation * Math.PI) / 180;
+    group.updateMatrixWorld(true);
+    const anchors = model.anchors.map((a) => a.clone().applyMatrix4(group.matrixWorld));
+    return this.finishPlacement(part, model, group, anchors, 0);
+  }
+
+  private finishPlacement(part: Part, model: PartModel, group: Group, anchors: Vector3[], base: number): Placed {
     group.add(model.root);
-    group.position.set(part.x * SPREAD, 0, part.y * SPREAD);
-    group.rotation.y = (-part.rotation * Math.PI) / 180;
     group.userData.partId = part.id;
     mergeStatic(model.root);
     this.partsGroup.add(group);
     group.updateMatrixWorld(true);
-    const anchors = model.anchors.map((a) => a.clone().applyMatrix4(group.matrixWorld));
     // Gölge: gövdenin kapladığı alanın altında yumuşak leke.
     const box = new Box3().setFromObject(model.root);
     const size = box.getSize(new Vector3());
     const center = box.getCenter(new Vector3());
-    const shadow = new Mesh(
-      new PlaneGeometry(1, 1),
-      new MeshBasicMaterial({ map: this.shadowTexture, transparent: true, depthWrite: false }),
-    );
+    const shadow = new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ map: this.shadowTexture, transparent: true, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2;
-    shadow.position.set(center.x, 0.02, center.z);
-    shadow.scale.set(size.x * 1.35 + 2, size.z * 1.35 + 2, 1);
+    shadow.position.set(center.x, base + 0.03, center.z);
+    shadow.scale.set(size.x * 1.2 + 1, size.z * 1.2 + 1, 1);
     this.scene.add(shadow);
-    return { key, part, model, group, shadow, anchors };
+    return { key: partKey(part), part, model, group, shadow, anchors };
   }
 
   private removePart(placed: Placed): void {
@@ -301,92 +413,6 @@ export class BenchScene {
     placed.shadow.geometry.dispose();
     placed.model.dispose?.();
     disposeObject(placed.group);
-  }
-
-  /** Kablolar: her kablo uçtan uca bir atlama kablosu; pin olmayan uçlarda bir bağlantı klemensi. */
-  private buildCables(doc: CircuitDoc): void {
-    for (const child of [...this.cables.children]) {
-      child.removeFromParent();
-      disposeObject(child);
-    }
-    const at = (p: { x: number; y: number }) => `${p.x},${p.y}`;
-    const pins = new Map<string, { part: Placed; pin: number }>();
-    for (const placed of this.parts.values()) {
-      pinPositions(placed.part).forEach((p, pin) => pins.set(at(p), { part: placed, pin }));
-    }
-    // Ağlar: kablo uçları ve pinler (birleşim-bulma).
-    const parent = new Map<string, string>();
-    const find = (k: string): string => {
-      let r = k;
-      while (parent.get(r) !== undefined && parent.get(r) !== r) r = parent.get(r)!;
-      parent.set(k, r);
-      return r;
-    };
-    const union = (a: string, b: string) => parent.set(find(a), find(b));
-    for (const w of doc.wires) {
-      const a = at(w.points[0]!);
-      const b = at(w.points[w.points.length - 1]!);
-      if (!parent.has(a)) parent.set(a, a);
-      if (!parent.has(b)) parent.set(b, b);
-      union(a, b);
-    }
-    const netColor = new Map<string, string>();
-    const role = (k: string): 'ground' | 'supply' | null => {
-      const pin = pins.get(k);
-      if (!pin) return null;
-      const t = pin.part.part.type;
-      if (t === 'ground' || (t === 'arduino' && (pin.pin === 2 || pin.pin === 21))) return 'ground';
-      if ((t === 'battery' && pin.pin === 1) || (t === 'dcsupply' && pin.pin % 2 === 1)) return 'ground';
-      if ((t === 'arduino' && pin.pin <= 1) || (t === 'battery' && pin.pin === 0) || (t === 'dcsupply' && pin.pin % 2 === 0)) return 'supply';
-      return null;
-    };
-    const roles = new Map<string, 'ground' | 'supply'>();
-    for (const k of parent.keys()) {
-      const r = role(k);
-      if (r && roles.get(find(k)) !== 'ground') roles.set(find(k), r);
-    }
-    let next = 0;
-    const colorOf = (k: string) => {
-      const root = find(k);
-      let c = netColor.get(root);
-      if (!c) {
-        const r = roles.get(root);
-        c = r === 'ground' ? '#1b1c1f' : r === 'supply' ? '#d22f27' : CABLE_COLORS[next++ % CABLE_COLORS.length]!;
-        netColor.set(root, c);
-      }
-      return c;
-    };
-    const junctions = new Map<string, Vector3>();
-    const endpoint = (p: { x: number; y: number }): Vector3 => {
-      const pin = pins.get(at(p));
-      if (pin) return pin.part.anchors[pin.pin]!.clone();
-      let j = junctions.get(at(p));
-      if (!j) {
-        j = new Vector3(p.x * SPREAD, 1.9, p.y * SPREAD);
-        junctions.set(at(p), j);
-      }
-      return j.clone();
-    };
-    const plug = new BoxGeometry(0.75, 1.5, 0.75);
-    const plugMat = mat('#1b1c1f', 0.6);
-    for (const w of doc.wires) {
-      const a = endpoint(w.points[0]!);
-      const b = endpoint(w.points[w.points.length - 1]!);
-      const color = colorOf(at(w.points[0]!));
-      const dist = a.distanceTo(b);
-      const lift = Math.min(16, 2.5 + 0.22 * dist);
-      const a1 = a.clone().add(new Vector3(0, 1.4, 0));
-      const b1 = b.clone().add(new Vector3(0, 1.4, 0));
-      const curve = new CubicBezierCurve3(a1, a1.clone().add(new Vector3(0, lift, 0)), b1.clone().add(new Vector3(0, lift, 0)), b1);
-      const tube = new Mesh(new TubeGeometry(curve, Math.max(12, Math.round(dist * 1.5)), 0.3, 8, false), mat(color, 0.55));
-      this.cables.add(tube);
-      for (const p of [a, b]) this.cables.add(mesh(plug, plugMat, p.x, p.y + 0.75, p.z));
-    }
-    const post = new CylinderGeometry(0.55, 0.7, 1.9, 14);
-    for (const j of junctions.values()) {
-      this.cables.add(mesh(post, M.gold(), j.x, 0.95, j.z));
-    }
-    this.dirty = true;
   }
 
   // --- Canlı değerler -----------------------------------------------------------------------------
@@ -430,7 +456,7 @@ export class BenchScene {
     const placed = this.selection.length === 1 ? this.parts.get(this.selection[0]!) : undefined;
     this.ring.visible = Boolean(placed);
     if (placed) {
-      this.ring.position.set(placed.shadow.position.x, 0.03, placed.shadow.position.z);
+      this.ring.position.set(placed.shadow.position.x, placed.shadow.position.y + 0.01, placed.shadow.position.z);
       this.ring.scale.set(placed.shadow.scale.x * 0.8, placed.shadow.scale.y * 0.8, 1);
     }
     this.dirty = true;
@@ -438,13 +464,15 @@ export class BenchScene {
 
   // --- Kamera ---------------------------------------------------------------------------------------
 
-  /** Bütün devre görünsün: önden ve yukarıdan (55°) bakış. */
+  /** Bütün devre görünsün: önden ve yukarıdan (52°) bakış. */
   fit(top = false): void {
     this.lastFitTop = top;
     this.userMoved = false;
     const box = new Box3();
+    // Parçalara, kablolara ve breadboard'un kullanılan bölümüne sığdırılır.
     for (const placed of this.parts.values()) box.expandByObject(placed.group);
     for (const c of this.cables.children) box.expandByObject(c);
+    if (!this.boardView.isEmpty()) box.union(this.boardView);
     if (box.isEmpty()) box.set(new Vector3(-20, 0, -20), new Vector3(20, 5, 20));
     const center = box.getCenter(new Vector3());
     const size = box.getSize(new Vector3());
@@ -546,6 +574,7 @@ export class BenchScene {
     for (const placed of this.parts.values()) this.removePart(placed);
     this.parts.clear();
     disposeObject(this.cables);
+    disposeObject(this.boards);
     disposeObject(this.table);
     (this.table.material as MeshStandardMaterial).map?.dispose();
     (this.table.material as Material).dispose();

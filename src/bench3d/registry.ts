@@ -1,6 +1,9 @@
-// Parça türü → 3B model.
+// Parça türü → 3B model. Breadboard'a takılan parçalarda bacaklar verilen deliklere (yerel) gider.
 
+import type { Vector3 } from 'three';
 import type { Part } from '../model/types';
+import { dipChipModel } from './breadboardModel';
+import { withAnchors } from './kit';
 import { arduinoModel } from './arduinoModel';
 import { dcsupplyModel, funcgenModel, meterModel, oscilloscopeModel, tankModel } from './instruments';
 import type { PartModel } from './model';
@@ -29,7 +32,16 @@ import {
   zenerModel,
 } from './parts';
 
-export function buildPartModel(part: Part): PartModel {
+/**
+ * `holes`: breadboard'a takılıyorsa bacakların bittiği yerel konumlar (pin sırasıyla); `extra`: DIP'in
+ * boş bacakları. Verilmezse parça masada, bacakları şema pinleri × SPREAD'de.
+ */
+export function buildPartModel(part: Part, holes: readonly Vector3[] | null = null, extra: readonly Vector3[] = []): PartModel {
+  if (holes && (part.type === 'opamp' || part.type === 'timer555')) return dipChipModel(part.type, holes, extra);
+  return withAnchors(holes, () => build(part));
+}
+
+function build(part: Part): PartModel {
   const p = part.props;
   switch (part.type) {
     case 'resistor':
