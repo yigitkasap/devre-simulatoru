@@ -1059,8 +1059,10 @@ try {
     await bp.getByRole('button', { name: 'Seviye 1', exact: true }).click();
     await waitLevel(bp, 50, 9000);
     await bp.getByRole('link', { name: /Simülatörde aç/ }).click();
-    await bp.waitForURL((u) => !u.pathname.includes('/baraj')); await bp.waitForTimeout(800);
-    const opened = await doc(bp);
+    await bp.waitForURL((u) => !u.pathname.includes('/baraj'));
+    // Canlıda simülatör paketi yüklenip devreyi kaydetmesi ≈ 1,4 s sürebilir: sabit bekleme yerine yokla.
+    let opened = null;
+    for (let k = 0; k < 20 && !opened?.parts?.some((q) => q.type === 'tank'); k++) opened = await doc(bp);
     const tankPart = opened?.parts.find((q) => q.type === 'tank');
     check('baraj (masaüstü): "Simülatörde aç" devreyi o anki seviyeyle simülatörde açıyor', tankPart !== undefined && Math.abs(tankPart.props.level - 50) < 1 && opened.parts.filter((q) => q.type === 'led').length === 3, `${opened?.parts.length ?? 0} parça, %${tankPart?.props.level}`);
     await bCtx.close();
