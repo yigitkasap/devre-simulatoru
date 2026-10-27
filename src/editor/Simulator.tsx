@@ -975,7 +975,7 @@ export default function Simulator() {
         e.preventDefault();
         document.getElementById('tuval')?.focus();
       }}
-      className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:min-h-11"
     >
       {tr.a11y.skip}
     </a>

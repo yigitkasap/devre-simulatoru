@@ -96,7 +96,13 @@ export function dotSpeed(current: number): number {
 }
 
 /** Bir karede atılabilecek en fazla zaman adımı (yavaş bilgisayarda donmayı önler). */
-const MAX_STEPS_PER_FRAME = 6000;
+const MAX_STEPS_PER_FRAME = 20000;
+/**
+ * Kare başına hesap süresi (ms): bütçe adım sayısıyla değil süreyle sınırlanır. Küçük adım isteyen
+ * devre (yüksek frekanslı LC) bilgisayar yetiştirebildiği sürece "yetişemiyor" uyarısı almaz;
+ * 60 Hz'lik karenin geri kalanı çizime kalır.
+ */
+const FRAME_COMPUTE_MS = 10;
 /** Gerçek zamanlı kare süresinin üst sınırı: sekme arka planda kalınca büyük sıçramaları önler. */
 const MAX_FRAME_SECONDS = 0.1;
 /**
@@ -401,11 +407,10 @@ export function useSimulation(
       const dtReal = Math.min(MAX_FRAME_SECONDS, Math.max(0, (now - last) / 1000));
       last = now;
       const simDt = dtReal * speedRef.current;
-      const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.maxTimeStep) * 8 + 64);
       sim.watch(watchedRef.current);
-      const result = sim.advance(simDt, maxSteps);
-      // Adım sınırına takıldıysa istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
-      lagSamples = (lagSamples * 0.9) + (result.steps >= maxSteps ? 0.1 : 0);
+      const result = sim.advance(simDt, MAX_STEPS_PER_FRAME, now + FRAME_COMPUTE_MS);
+      // Bütçe bittiyse istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
+      lagSamples = (lagSamples * 0.9) + (result.truncated ? 0.1 : 0);
       if (!result.ok) {
         setStatus('paused');
         if (result.error) setNotice({ kind: 'error', diagnostic: result.error });

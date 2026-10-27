@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:spice": "vitest run tests/spice",
-    "ios-kontrol": "node scripts/ios-kontrol.mjs"
+    "ios-kontrol": "node scripts/ios-kontrol.mjs",
+    "tarama:motor": "vitest run --config scripts/tarama/vitest.config.ts scripts/tarama/motor.tarama.ts",
+    "tarama:site": "node scripts/tarama/site-tarama.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^5.0.7",

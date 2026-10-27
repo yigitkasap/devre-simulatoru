@@ -66,6 +66,8 @@ export interface AdvanceResult {
   readonly error?: Diagnostic;
   /** Bu çağrıda yanan LED'lerin kimlikleri. */
   readonly burned: readonly string[];
+  /** Adım ya da süre bütçesi bitti, istenen sürenin bir kısmı atlandı (gerçek zamana yetişemedi). */
+  readonly truncated?: boolean;
 }
 
 const DEFAULT_OPTIONS: SimulatorOptions = { timeStep: DEFAULT_TIME_STEP, minTimeStep: MIN_TIME_STEP };
@@ -78,6 +80,8 @@ const SOURCE_STEPS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
  * dalga ve doğru tepe değerleri için yeterli; 1 kHz'i gerçek zamanda izlemek saniyede 50 000 adım.
  */
 const STEPS_PER_PERIOD = 50;
+/** Hata oranının ret eşiği: öngörülen adım 0,9·h'den küçükse (ngspice ckttrunc.c). */
+const rejectRatio = (order: number) => 0.9 ** -(order + 1);
 /** Toprak hattı akımı uyarısının eşiği: en az 1 µA ve en büyük kaynak akımının %1'i. */
 const GROUND_RETURN_MIN = 1e-6;
 const GROUND_RETURN_FRACTION = 0.01;
@@ -647,7 +651,9 @@ export class CircuitSimulator {
    * @param maxSteps Bu çağrıda en fazla kaç adım atılacağı (yavaş bilgisayarda donmayı önler);
    *                 aşılırsa kalan süre atlanır.
    */
-  advance(dt: number, maxSteps = Number.POSITIVE_INFINITY): AdvanceResult {
+  advance(dt: number, maxSteps = Number.POSITIVE_INFINITY, deadline = Number.POSITIVE_INFINITY): AdvanceResult {
+    this.deadline = deadline;
+    this.truncated = false;
     this.burnedThisCall = [];
     if (!this.canRun) {
       const error = this.circuit.diagnostics.find((d) => d.severity === 'error');
@@ -681,8 +687,12 @@ export class CircuitSimulator {
     }
   }
 
+  /** advance() çağrısının süre sınırı (performance.now() cinsinden) ve bütçenin bitip bitmediği. */
+  private deadline = Number.POSITIVE_INFINITY;
+  private truncated = false;
+
   private result(steps: number, error: Diagnostic | null): AdvanceResult {
-    return { ok: error === null, steps, burned: this.burnedThisCall, ...(error ? { error } : {}) };
+    return { ok: error === null, steps, burned: this.burnedThisCall, ...(this.truncated ? { truncated: true } : {}), ...(error ? { error } : {}) };
   }
 
   /**
@@ -731,8 +741,10 @@ export class CircuitSimulator {
       } else if (this.pending < (end - this.time) * (1 - 1e-9)) {
         break;
       }
-      if (steps >= maxSteps || attempts >= 4 * maxSteps + 64) {
+      // Bütçe: adım sayısı ya da (arayüzde) kare başına hesap süresi. Saat her 32 denemede bir okunur.
+      if (steps >= maxSteps || attempts >= 4 * maxSteps + 64 || ((attempts & 31) === 31 && performance.now() > this.deadline)) {
         this.pending = 0;
+        this.truncated = true;
         break;
       }
       const h = end - this.time;
@@ -753,6 +765,7 @@ export class CircuitSimulator {
       // En küçük adımda (ya da daha kısa, kırılma noktasına denk getirilmiş adımda) hata denetlenmez:
       // daha küçültülemez. Karar önerilen adımla verilir (end − time farkının yuvarlaması 1 ns'yi aşabilir).
       const outcome = this.step(ctx, proposed > minStep * (1 + 1e-6) && h > minStep * 0.5);
+      if (outcome !== 'ok') this.counters[outcome === 'event' ? 'events' : outcome]++;
       if (outcome === 'failed') {
         this.h = h / 2;
         this.eulerNext = true;
@@ -771,13 +784,14 @@ export class CircuitSimulator {
       const order = ctx.trap ? 2 : 1;
       const ratio = this.lteRatioLast;
       if (outcome === 'rejected') {
-        // Hata payı aşıldı: adım, tahmini hataya göre küçültülür (en az yarıya, en fazla onda bire).
-        this.h = Math.max(minStep, h * Math.min(0.5, Math.max(0.1, 0.9 * ratio! ** (-1 / (order + 1)))));
+        // Hata payı aşıldı: adım öngörülen boyuta küçültülür (ngspice gibi; en fazla onda bire).
+        this.h = Math.max(minStep, h * Math.min(0.9, Math.max(0.1, 0.9 * ratio! ** (-1 / (order + 1)))));
         continue;
       }
       this.time = end;
       this.pending -= h;
       steps++;
+      this.counters.accepted++;
       this.observe();
       this.accumulate(h);
       this.sampleWatched(h);
@@ -909,6 +923,13 @@ export class CircuitSimulator {
     }
   }
 
+  /**
+   * Çalışma sayaçları (başlangıçtan beri): kabul edilen, hata payı yüzünden reddedilen, Newton'u
+   * yakınsamayan ve bir olay (eşik) yüzünden kısaltılan adımlar; doğrusal çözüm sayısı. Tarama ve
+   * profil betikleri için; simülasyonu etkilemez.
+   */
+  readonly counters = { accepted: 0, rejected: 0, failed: 0, events: 0, solves: 0 };
+
   /** Kabul edilen çözüm, kayıt tutan bileşenlere (osiloskop) iletilir. */
   private observe(): void {
     for (const device of this.circuit.devices) device.observe(this.x, this.time);
@@ -1009,7 +1030,9 @@ export class CircuitSimulator {
     // Yerel kesme hatası: tolerans aşıldıysa adım reddedilir (bir bileşenin durumu değiştiyse ya da
     // adım zaten en küçükse — checkError = false — kabul edilir).
     this.lteRatioLast = checkError ? this.lteRatio(ctx) : null;
-    if (checkError && !this.limitEvent && this.lteRatioLast !== null && this.lteRatioLast > 1) {
+    // ngspice (ckttrunc.c, dctran.c) gibi: öngörülen yeni adım bu adımın %90'ından küçükse ret;
+    // yani hata oranı (1/0,9)^(k+1)'e (1. dereceden 1,23, 2. dereceden 1,37) kadar kabul edilir.
+    if (checkError && !this.limitEvent && this.lteRatioLast !== null && this.lteRatioLast > rejectRatio(ctx.trap ? 2 : 1)) {
       this.restoreIterates();
       return 'rejected';
     }
@@ -1219,6 +1242,7 @@ export class CircuitSimulator {
     }
     let unconverged: string[] = [];
     for (let iteration = 0; iteration < NR_MAX_ITERATIONS; iteration++) {
+      this.counters.solves++;
       this.iterSys.copyFrom(this.stepSys);
       for (const device of nonlinear) device.stampNonlinear(this.iterSys, ctx);
       this.luWork = luFactor(this.iterSys.A, n, this.luWork);
