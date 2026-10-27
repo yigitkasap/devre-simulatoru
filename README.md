@@ -248,7 +248,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 545 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 559 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -1502,3 +1502,47 @@ yapılmalı (ngspice `cktterr.c`; 1N4001 ters toparlanma yükü ≈ %10 düşük
 sonra adım kısaltılmalı (`dctran.c`; reddedilen adımlar 2,4 → 0,7/kenar), reddedilen adım
 öngörülen boyuta küçültülmeli (yarıya değil); BJT'de IKF/ISE gibi Gummel-Poon terimleri yok
 (yüksek akımda β düşmüyor); DC çalışma noktasında gmin adımlama yok.
+
+### Hata taraması ve optimizasyon (2026-10-27)
+
+İki tarama betiği (olağan testlerle çalışmaz; uzun sürer, rapor yazar):
+
+- `npm run tarama:motor` (`scripts/tarama/motor.tarama.ts`): 51 örneğin her biri arayüz gibi kare
+  kare 2 s çalıştırılır; sonra her parçanın her sayısal özelliği uçlara (kaydırıcı aralığı ya da
+  değerin 1/1000'i ve 1000 katı) çekilip devre yeniden çalıştırılır (626 çalıştırma). Aranan:
+  istisna, Newton'un yakınsamaması, NaN/∞, "hesaplanamıyor" yazan bilgi kutusu, çalışma anı
+  uyarısı, gerçek zamana yetişemeyen kare; örnek başına iş yükü (motor sayaçları: kabul, ret,
+  Newton yinelemesi, olay). `TARAMA_HIZLI=1` yalnızca profil, `TARAMA_ORNEK=a,b` seçili örnekler.
+- `npm run tarama:site -- <adres> <klasör>` (`scripts/tarama/site-tarama.mjs`): iki sayfa
+  masaüstü ve telefonda; 51 örnek oynatılıp her parçası seçilir. Konsol/sayfa hatası, başarısız
+  istek, sayfa kayması ve yatay taşma, adsız denetim, telefonda 44 px'ten küçük dokunma alanı,
+  bilgi kutusunda NaN/∞/"—"/"hesaplanamıyor", tetiklenmeyen osiloskop, kare hızı.
+- `scripts/tarama/kiyas.ts`: optimizasyonun öncesi/sonrası (paketlenip Node'da, tarayıcı yükü
+  olmadan; eski sürüm `git worktree` ile).
+
+**Bulunan ve düzeltilen hatalar:** uç değerlerde 21 Newton çöküşü (hepsi ilk adımda). Güç
+kaynağının tanh akım sınırlayıcısı CV ile CC arasında döngüye giriyordu (tanh değişimi
+yinelemede 0,5 ile sınırlı); op-amp'ın iki tanh katı doyumda ±1600 V'luk ikili döngüye giriyordu
+(doğrusallaştırma noktası kısaltılır; ters dönen salınım penceresi rayların ortasında birleşir).
+Kalan 2 çöküş gerçekçi olmayan değerlerde (325 kV şebeke, 5 kV buzzer beslemesi). Site
+taramasında hata yok (atlama bağlantıları odakta 44 px yapıldı).
+
+**Optimizasyon** (51 örnek, 3 s, kare kare; simülasyon saniyesi başına hesap süresi):
+
+| | önce | sonra |
+|---|---|---|
+| toplam (51 örnek) | 7220 ms | 4827 ms (−%33) |
+| hoparlör | 1405 ms | 62 ms |
+| 555 ile ses | 1060 ms | 152 ms |
+| buzzer ve sıcaklık | 248 ms | 41 ms |
+| çift yönlü kırpıcı | 618 ms | 476 ms |
+| gerçek zamana yetişemeyen örnek | 2 | 0 |
+
+- Ses örnek tamponu her adımda baştan kırpılıyordu (O(n²)); toplu kırpma.
+- Ret eşiği ve küçültme ngspice gibi (`ckttrunc.c`): öngörülen adım 0,9·h'den küçükse ret,
+  reddedilen adım öngörülen boyuta (yarıya değil).
+- LU ayrıştırması seyrek (pivot satırının sıfır olmayan sütunları; sonuç aynı).
+- Topoloji (asılı düğümler, köprü uçları) iletken grupların imzası değişmedikçe yeniden
+  hesaplanmaz (555'in her olayında Tarjan yapılıyordu).
+- Arayüzde kare bütçesi adım sayısıyla değil hesap süresiyle (10 ms): küçük adım isteyen devre,
+  bilgisayar yetiştirdikçe "yetişemiyor" uyarısı almaz.

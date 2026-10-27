@@ -14,9 +14,13 @@ export interface SoundSample {
 /** Ses örneklerinin tutulduğu en fazla sayı (arayüz okumazsa bellek büyümesin: ≈ 1 s'lik adım). */
 const MAX_SOUND_SAMPLES = 40000;
 
+/**
+ * Örneği ekler. Sınır aşılınca baştan toplu kırpılır (sınırın 1,5 katında bir kez): her örnekte
+ * kırpmak, ses okunmadığında (tarama, testler) her adımda 40 000 öğeyi kaydırırdı (O(n²)).
+ */
 function pushSample(buffer: SoundSample[], t: number, v: number): void {
   buffer.push({ t, v });
-  if (buffer.length > MAX_SOUND_SAMPLES) buffer.splice(0, buffer.length - MAX_SOUND_SAMPLES);
+  if (buffer.length > MAX_SOUND_SAMPLES * 1.5) buffer.splice(0, buffer.length - MAX_SOUND_SAMPLES);
 }
 
 // --- Hoparlör ------------------------------------------------------------------------------

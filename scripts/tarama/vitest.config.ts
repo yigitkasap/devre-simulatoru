@@ -6,6 +6,6 @@ export default defineConfig({
   test: {
     include: ['scripts/tarama/**/*.tarama.ts'],
     environment: 'node',
-    testTimeout: 30 * 60 * 1000,
+    testTimeout: 3 * 60 * 60 * 1000,
   },
 });

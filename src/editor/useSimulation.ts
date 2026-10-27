@@ -95,12 +95,12 @@ export function dotSpeed(current: number): number {
   return Math.min(150, Math.max(4, 8 + 22 * Math.log10(abs / 1e-6)));
 }
 
-/** Bir karede atılabilecek en fazla zaman adımı (yavaş bilgisayarda donmayı önler). */
-const MAX_STEPS_PER_FRAME = 20000;
+/** Bir karede atılabilecek zaman adımı bütçesi (yavaş bilgisayarda donmayı önler). */
+const MAX_STEPS_PER_FRAME = 6000;
 /**
- * Kare başına hesap süresi (ms): bütçe adım sayısıyla değil süreyle sınırlanır. Küçük adım isteyen
- * devre (yüksek frekanslı LC) bilgisayar yetiştirebildiği sürece "yetişemiyor" uyarısı almaz;
- * 60 Hz'lik karenin geri kalanı çizime kalır.
+ * Kare başına hesap süresi (ms): adım bütçesi dolduktan sonra da bu süre kaldıkça adım atılır
+ * (en çok 4 katı). Küçük adım isteyen devre (yüksek frekanslı LC) bilgisayar yetiştirebildiği
+ * sürece "yetişemiyor" uyarısı almaz; 60 Hz'lik karenin geri kalanı çizime kalır.
  */
 const FRAME_COMPUTE_MS = 10;
 /** Gerçek zamanlı kare süresinin üst sınırı: sekme arka planda kalınca büyük sıçramaları önler. */
@@ -408,7 +408,9 @@ export function useSimulation(
       last = now;
       const simDt = dtReal * speedRef.current;
       sim.watch(watchedRef.current);
-      const result = sim.advance(simDt, MAX_STEPS_PER_FRAME, now + FRAME_COMPUTE_MS);
+      // Süre sınırı çağrı anından (rAF zaman damgası karenin başı: önceki karenin çizimi o süreyi yemiş olabilir).
+      const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.maxTimeStep) * 8 + 64);
+      const result = sim.advance(simDt, maxSteps, performance.now() + FRAME_COMPUTE_MS);
       // Bütçe bittiyse istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
       lagSamples = (lagSamples * 0.9) + (result.truncated ? 0.1 : 0);
       if (!result.ok) {

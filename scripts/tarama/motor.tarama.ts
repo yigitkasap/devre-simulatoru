@@ -69,11 +69,12 @@ function nonFinite(sim: CircuitSimulator, id: string): string[] {
 }
 
 /** Kare kare çalıştırır; bulguları ekler, iş yükünü döndürür. */
-function run(example: ExampleId, doc: CircuitDoc, seconds: number, findings: Finding[], label: string) {
+function run(example: ExampleId, doc: CircuitDoc, seconds: number, findings: Finding[], label: string, watchAll = true) {
   const sim = new CircuitSimulator(buildConnectivity(doc).netlist);
   const ids = doc.parts.filter((p) => p.type !== 'ground').map((p) => p.id);
   // Profil kipinde izleme yok (arayüz yalnızca seçili parçayı izler; hepsini izlemek süreyi şişirir).
-  if (!process.env.TARAMA_HIZLI) sim.watch(ids);
+  // Uç değer çalıştırmalarında da izleme yok (taramayı ≈ 5 kat uzatır; bilgi kutusu son değerden).
+  if (watchAll && !process.env.TARAMA_HIZLI) sim.watch(ids);
   const windows = new Map(ids.map((id) => [id, new LiveWindow()]));
   let lagging = 0;
   let frames = 0;
@@ -164,7 +165,7 @@ it('motor taraması', async () => {
         for (const v of extremes(def, value)) {
           const changed = updatePart(doc, part.id, { props: { ...part.props, [def.key]: v } as Part['props'] });
           stressRuns++;
-          run(id, changed, 0.15, findings, `${part.label}.${def.key}=${v}`);
+          run(id, changed, 0.15, findings, `${part.label}.${def.key}=${v}`, false);
         }
       }
     }

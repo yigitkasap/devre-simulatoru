@@ -741,8 +741,12 @@ export class CircuitSimulator {
       } else if (this.pending < (end - this.time) * (1 - 1e-9)) {
         break;
       }
-      // Bütçe: adım sayısı ya da (arayüzde) kare başına hesap süresi. Saat her 32 denemede bir okunur.
-      if (steps >= maxSteps || attempts >= 4 * maxSteps + 64 || ((attempts & 31) === 31 && performance.now() > this.deadline)) {
+      // Bütçe: adım sayısı. Süre sınırı verildiyse (arayüz) sayı bütçesi dolduktan sonra da süre
+      // kaldıkça sürer (en çok 4 katına kadar): küçük adım isteyen devre bilgisayar yetiştirdikçe kesilmez,
+      // bütçe içindeki bir anlık yavaşlama (GC) da uyarı doğurmaz.
+      const overCount = steps >= maxSteps;
+      const outOfTime = this.deadline === Number.POSITIVE_INFINITY || steps >= 4 * maxSteps || performance.now() > this.deadline;
+      if ((overCount && outOfTime) || attempts >= 16 * maxSteps + 64) {
         this.pending = 0;
         this.truncated = true;
         break;
@@ -1065,6 +1069,21 @@ export class CircuitSimulator {
    * döner. gmin düğümleri ve akımı tam 0 olan uçlar yalnızca devre ya da çözüm türü (doğru akım /
    * geçici) değişince yeniden bulunur.
    */
+  /** Son hesaplanan topolojinin imzası (bileşenlerin iletken ve olası grupları). */
+  private topologyKey = '';
+
+  private topologySignature(transient: boolean): string {
+    let key = transient ? 't' : 'd';
+    for (const device of this.circuit.devices) {
+      key += device.id + ':';
+      for (const group of device.conductiveGroups(transient)) key += group.join(',') + ';';
+      key += '|';
+      for (const group of device.possibleGroups(transient)) key += group.join(',') + ';';
+      key += '/';
+    }
+    return key;
+  }
+
   private prepareStatic(ctx: StepContext): number {
     if (
       this.staticVersion === this.version &&
@@ -1076,8 +1095,15 @@ export class CircuitSimulator {
     }
     const transient = ctx.h > 0;
     if (this.topologyVersion !== this.version || this.topologyTransient !== transient) {
-      this.floating = this.floatingNodes(transient);
-      this.zeroPins = this.findZeroPins(transient);
+      // Bileşenin durumu (555'in çıkışı, rölenin kontağı) her değiştiğinde sürüm artar; topoloji ise
+      // yalnızca iletken gruplar değişince değişir. İmza aynıysa köprü araması atlanır (555'li devrede
+      // her olayda Tarjan + birleşim-bulma yapılıyordu).
+      const key = this.topologySignature(transient);
+      if (key !== this.topologyKey) {
+        this.floating = this.floatingNodes(transient);
+        this.zeroPins = this.findZeroPins(transient);
+        this.topologyKey = key;
+      }
       this.topologyVersion = this.version;
       this.topologyTransient = transient;
     }
