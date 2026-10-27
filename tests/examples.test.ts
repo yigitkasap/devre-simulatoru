@@ -42,6 +42,8 @@ describe('Örnekler', () => {
       const allowed = new Set([
         ...doc.parts.filter((p) => p.type === 'oscilloscope').flatMap((p) => [`${p.id}#0`, `${p.id}#1`]),
         ...doc.parts.filter((p) => p.type === 'relay').flatMap((p) => [`${p.id}#3`, `${p.id}#4`]),
+        // Arduino'nun kullanılmayan pinleri (GND'lerden birinin bağlı olduğunu topoloji denetler).
+        ...doc.parts.filter((p) => p.type === 'arduino').flatMap((p) => Array.from({ length: 22 }, (_, k) => `${p.id}#${k}`)),
         ...doc.parts.filter((p) => p.type === 'funcgen').flatMap((p) => [`${p.id}#0`, `${p.id}#1`]),
         ...doc.parts
           .filter((p) => p.type === 'dcsupply')

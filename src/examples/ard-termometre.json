@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "arduino", "label": "ARD1", "x": 0, "y": 0, "rotation": 0, "props": {"program": "termometre"}},
+    {"id": "p2", "type": "resistor", "label": "R1", "x": -12, "y": -11, "rotation": 0, "props": {"resistance": 10000.0}},
+    {"id": "p3", "type": "ntc", "label": "NTC1", "x": -20, "y": -7, "rotation": 90, "props": {"temperature": 25}},
+    {"id": "p4", "type": "ground", "label": "GND1", "x": -9, "y": -4, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[-6, -11], [-8, -11]]},
+    {"id": "w2", "points": [[-16, -11], [-20, -11]]},
+    {"id": "w3", "points": [[-20, -3], [-12, -3], [-12, -7], [-9, -7]]},
+    {"id": "w4", "points": [[-6, -7], [-9, -7]]},
+    {"id": "w5", "points": [[-9, -7], [-9, -4]]},
+    {"id": "w6", "points": [[-6, -1], [-22, -1], [-22, -11], [-20, -11]]}
+  ]
+}

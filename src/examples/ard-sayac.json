@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "arduino", "label": "ARD1", "x": 0, "y": 0, "rotation": 0, "props": {"program": "sayac"}},
+    {"id": "p2", "type": "switch", "label": "S1", "x": 12, "y": 13, "rotation": 0, "props": {"closed": false}},
+    {"id": "p3", "type": "ground", "label": "GND1", "x": -9, "y": -4, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[6, 13], [8, 13]]},
+    {"id": "w2", "points": [[16, 13], [20, 13], [20, -15], [8, -15], [8, -11], [6, -11]]},
+    {"id": "w3", "points": [[-6, -7], [-9, -7], [-9, -4]]}
+  ]
+}

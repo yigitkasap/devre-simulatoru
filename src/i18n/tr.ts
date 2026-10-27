@@ -124,7 +124,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   ldr: ['1. ucu', '2. ucu'],
   ntc: ['1. ucu', '2. ucu'],
   lamp: ['1. ucu', '2. ucu'],
-  arduino: ['5V ucu', '3V3 ucu', 'GND ucu', 'A0 analog girişi', 'A1 analog girişi', 'A2 analog girişi', 'A3 analog girişi', 'A4 analog girişi', 'A5 analog girişi', 'D2 pini', 'D3 pini (PWM ~)', 'D4 pini', 'D5 pini (PWM ~)', 'D6 pini (PWM ~)', 'D7 pini', 'D8 pini', 'D9 pini (PWM ~)', 'D10 pini (PWM ~)', 'D11 pini (PWM ~)', 'D12 pini', 'D13 pini (kart üstü L LED’i)'],
+  arduino: ['5V ucu', '3V3 ucu', 'GND ucu (güç başlığı)', 'A0 analog girişi', 'A1 analog girişi', 'A2 analog girişi', 'A3 analog girişi', 'A4 analog girişi', 'A5 analog girişi', 'D2 pini', 'D3 pini (PWM ~)', 'D4 pini', 'D5 pini (PWM ~)', 'D6 pini (PWM ~)', 'D7 pini', 'D8 pini', 'D9 pini (PWM ~)', 'D10 pini (PWM ~)', 'D11 pini (PWM ~)', 'D12 pini', 'D13 pini (kart üstü L LED’i)', 'GND ucu (dijital başlık)'],
   timer555: ['GND ucu (1)', 'TRIG (tetik) ucu (2)', 'OUT (çıkış) ucu (3)', 'RESET ucu (4)', 'CONT (kontrol) ucu (5)', 'THRES (eşik) ucu (6)', 'DISCH (deşarj) ucu (7)', 'VCC ucu (8)'],
   opamp: ['eviren girişi (−)', 'evirmeyen girişi (+)', 'çıkışı', 'pozitif besleme ucu (V+)', 'negatif besleme ucu (V−)'],
   speaker: ['1. ucu', '2. ucu'],
@@ -166,7 +166,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   ntc: ['1', '2'],
   lamp: ['1', '2'],
   opamp: ['−', '+', 'OUT', 'V+', 'V−'],
-  arduino: ['5V', '3V3', 'GND', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11', 'D12', 'D13'],
+  arduino: ['5V', '3V3', 'GND', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11', 'D12', 'D13', 'GND'],
   timer555: ['GND', 'TRG', 'OUT', 'RST', 'CV', 'THR', 'DIS', 'VCC'],
   speaker: ['1', '2'],
   buzzer: ['+', '−'],
@@ -205,7 +205,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   ntc: ['1. uç', '2. uç'],
   lamp: ['1. uç', '2. uç'],
   opamp: ['− giriş', '+ giriş', 'çıkış', 'V+', 'V−'],
-  arduino: ['5V', '3V3', 'GND', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11', 'D12', 'D13'],
+  arduino: ['5V', '3V3', 'GND', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11', 'D12', 'D13', 'GND'],
   timer555: ['GND', 'TRIG', 'OUT', 'RESET', 'CONT', 'THRES', 'DISCH', 'VCC'],
   speaker: ['1. uç', '2. uç'],
   buzzer: ['+ uç', '− uç'],
@@ -626,6 +626,105 @@ export interface ExampleTexts {
 const CROSSING = 'Dolu nokta olmayan kablo kesişmeleri bağlı değildir.';
 
 const EXAMPLES: Record<ExampleId, ExampleTexts> = {
+  'ard-blink': {
+    title: 'Arduino: yanıp sönen LED',
+    description:
+      'Arduino Uno’nun D13 pini 220 Ω’luk dirençle kırmızı bir LED’i sürüyor; LED’in katodu dijital pinlerin yanındaki GND’ye bağlı. Kartın “Yanıp sönen LED (Blink)” programı çalışıyor: Oynat’a bas, kodu Arduino panelinde gör.',
+    purpose:
+      'Bir mikrodenetleyicinin en temel işi: digitalWrite(13, HIGH) pini 5 V’a, LOW 0 V’a bağlar; delay(500) işlemciyi yarım saniye bekletir. Pin, ≈ 25 Ω’luk iç direnciyle bir gerilim kaynağı gibidir: LED yanarken akım (5 V − 1,8 V) / (220 Ω + 25 Ω) ≈ 13 mA. Kartın üstündeki L LED’i de D13’ü izler. Program işlemcide gerçek zamanlamayla çalışır: kenarlar 1 s arayla gelir.',
+    everyday:
+      'Cihazlardaki durum ışıkları, bisiklet arka lambaları, uyarı flaşörleri: hepsinde bir zamanlayıcı ya da küçük bir mikrodenetleyici bir LED’i belirli aralıklarla açıp kapatır.',
+  },
+  'ard-dugme': {
+    title: 'Arduino: düğmeyle LED',
+    description:
+      'D2 pinine bir düğme (anahtar) bağlı, düğmenin öbür ucu GND’de; D13’te 220 Ω’luk dirençle bir LED var. Program D2’yi INPUT_PULLUP kipinde okuyor. Anahtara tıklayıp kapat: LED yanar.',
+    purpose:
+      'Dijital giriş ve çekme direnci: INPUT_PULLUP, pini kartın içindeki ≈ 35 kΩ’luk bir dirençle 5 V’a bağlar. Düğme açıkken pin 5 V’tur (HIGH); basılınca pin GND’ye bağlanır (LOW) ve dirençten 5 V / 35 kΩ ≈ 0,14 mA geçer. Çekme direnci olmasaydı açık düğmede pin boşta kalır, okunan değer rastgele değişirdi. Program basılıyken LED’i yakar (≈ 13 mA).',
+    everyday:
+      'Kumandaların, klavyelerin, asansör ve zil düğmelerinin hepsi bir pini GND’ye çeken anahtarlardır; mikrodenetleyici pinin LOW’a inişini basış olarak okur.',
+  },
+  'ard-sayac': {
+    title: 'Arduino: düğme sayacı (Seri ekran)',
+    description:
+      'D2’de GND’ye bağlanan bir düğme var. Program her basışı sayar ve sayıyı Seri ekrana yazar. Oynat’a bas, anahtarı kapatıp aç; Arduino panelindeki Seri ekranda “Basış sayısı” artar.',
+    purpose:
+      'Kenar algılama: program pinin yalnızca HIGH’dan LOW’a geçtiği anı (düşen kenar) sayar; düğme basılı kaldıkça sayı artmaz. Seri ekran, Arduino’nun USB üzerinden bilgisayara yazdığı metindir (Serial.println, 9600 baud): kodun içini görmenin en kolay yolu. Gerçek düğmeler basılırken birkaç ms titreşir (zıplama); burada anahtar idealdir, bu yüzden 5 ms’lik bekleme yeterlidir.',
+    everyday:
+      'Turnike ve kapı sayaçları, adımsayarlar, üretim bandındaki parça sayaçları bir sensörün kenarlarını sayar.',
+  },
+  'ard-trafik-isigi': {
+    title: 'Arduino: trafik ışığı',
+    description:
+      'Kırmızı (D12), sarı (D11) ve yeşil (D10) LED’ler, her biri 220 Ω’luk dirençle bağlı; katotlar üstteki ortak hatla GND’ye dönüyor. Program ışıkları sırayla yakar: kırmızı 3 s, kırmızı + sarı 1 s, yeşil 3 s, sarı 1 s.',
+    purpose:
+      'Bir durum makinesi: program dört durumu sırayla dolaşır ve her durumda üç pini birden ayarlar. LED renkleri farklı ileri gerilimlere sahiptir, bu yüzden aynı dirençle akımlar biraz farklıdır: kırmızı (≈ 1,8 V) 13,0 mA, sarı (≈ 2,0 V) 12,1 mA, yeşil (≈ 2,1 V) 11,7 mA. Her LED ayrı direnç ister: LED’ler tek dirençle paralel bağlanırsa akımı ileri gerilimi en küçük olan kapar.',
+    everyday:
+      'Gerçek trafik ışıkları, yaya geçitleri ve demiryolu bariyerleri aynı mantıkla çalışır; bekleme süreleri trafiğe göre ayarlanır.',
+  },
+  'ard-fade': {
+    title: 'Arduino: nefes alan LED (PWM)',
+    description:
+      'D9’daki LED’in parlaklığını program analogWrite ile yavaşça artırıp azaltıyor. LED 220 Ω’luk dirençle bağlı. Oynat’a bas ve LED’i izle; D9’a bir osiloskop bağlarsan pindeki kare dalgayı görürsün.',
+    purpose:
+      'PWM (darbe genişlik modülasyonu): Arduino gerçek bir analog gerilim üretemez; analogWrite(9, n) pini 490 Hz’lik bir kare dalgayla açıp kapatır ve n/255 oranında açık tutar. LED saniyede 490 kez yanıp söner; göz bunu ayıramaz ve ortalama akımı parlaklık olarak görür. D3, D5, D6, D9, D10 ve D11 PWM verebilir (~ işaretli pinler).',
+    everyday:
+      'Telefon ve dizüstü ekranlarının arka ışığı, LED ampullerin kısılması, bilgisayar fanlarının ve küçük motorların hız ayarı PWM ile yapılır.',
+  },
+  'ard-potansiyometre': {
+    title: 'Arduino: potansiyometreyle parlaklık',
+    description:
+      '10 kΩ’luk potansiyometrenin uçları 5V’a ve GND’ye, sürgüsü A0’a bağlı. Program A0’ı okur, değeri Seri ekrana yazar ve D9’daki LED’in PWM değerini ayarlar. Potansiyometrenin sürgüsünü kaydır.',
+    purpose:
+      'Analog giriş: analogRead, A0’daki 0–5 V’u 10 bitlik bir sayıya (0–1023) çevirir; bir adım 5 V / 1024 ≈ 4,9 mV’tur. Sürgü ortadayken (%50) 2,50 V → 511; %20’de 1,03 V → 210. map() bu sayıyı PWM’in 0–255 aralığına ölçekler (511 → 127). Potansiyometre bir gerilim bölücüdür: A0 çok küçük akım çektiği için sürgünün gerilimi konumla doğru orantılıdır.',
+    everyday:
+      'Ses düğmeleri, ışık dimmerleri, oyun kollarının eksenleri, 3B yazıcı ve robotlardaki açı algılayıcıları gerilimi bir ADC’yle okunan potansiyometrelerdir.',
+  },
+  'ard-gece-lambasi': {
+    title: 'Arduino: gece lambası (LDR)',
+    description:
+      'LDR (üstte, 5V’a) ile 10 kΩ’luk direnç (altta, GND’ye) bir gerilim bölücü kuruyor; orta nokta A0’da. A0’da okunan değer 300’ün altına inince program D13’teki LED’i yakar. LDR’nin aydınlığını kaydırıcıyla azalt.',
+    purpose:
+      'Sensör + karar: oda ışığında (100 lx) LDR ≈ 3,8 kΩ, A0 ≈ 3,6 V → 744: lamba sönük. Aydınlık 10 lx’e inince LDR büyür, okunan değer 413’e düşer; gece (1 lx) LDR ≈ 60 kΩ, A0 ≈ 0,75 V → 154 < 300: LED yanar. Eşiği koddaki THRESHOLD belirler; karar eşik çevresinde gidip gelmesin diye gerçek ürünlerde iki ayrı eşik (histerezis) kullanılır.',
+    everyday:
+      'Sokak lambaları, otomatik far sistemleri, telefonların ekran parlaklığı ve gece lambaları ışık algılayıcısıyla kendini açıp kapatır.',
+  },
+  'ard-termometre': {
+    title: 'Arduino: termometre (NTC)',
+    description:
+      '10 kΩ’luk direnç (üstte, 5V’a) ile 10 kΩ’luk NTC termistör (altta, GND’ye) bir gerilim bölücü; orta nokta A0’da. Program NTC’nin direncini hesaplar, sıcaklığa çevirir ve Seri ekrana yazar. NTC’nin sıcaklığını kaydırıcıyla değiştir.',
+    purpose:
+      'Ölçümü sayıdan fiziğe çevirmek: önce bölücü formülüyle direnç bulunur, R = 10 kΩ · n / (1023 − n); sonra B parametresi denklemiyle sıcaklık, 1/T = 1/T₂₅ + ln(R / R₂₅) / B (B = 3977 K). 25 °C’ta 9,98 kΩ → 25,0 °C, 60 °C’ta 2,49 kΩ → 59,7 °C; 0 °C’ta 0,7 °C okunur. Fark, B denkleminin üreticinin gerçek R(T) eğrisine ancak yaklaşmasındandır: daha doğru ölçüm için Steinhart-Hart denklemi ya da üreticinin tablosu kullanılır.',
+    everyday:
+      'Dijital ateş ölçerler, buzdolabı ve klimaların sıcaklık algılayıcıları, 3B yazıcıların ve şarj aletlerinin sıcaklık korumaları NTC ile ölçer.',
+  },
+  'ard-pwm-filtre': {
+    title: 'Arduino: PWM’den doğru gerilim',
+    description:
+      'D9’un PWM çıkışı 10 kΩ’luk direnç ve 10 µF’lık kondansatörden oluşan bir alçak geçiren süzgece bağlı; voltmetre kondansatörün gerilimini ölçüyor. Program doluluk oranını her 3 saniyede bir değiştirir (64, 128, 192, 255, 0) ve beklenen gerilimi Seri ekrana yazar.',
+    purpose:
+      'Süzgeç PWM’i ortalamasına çevirir: zaman sabiti τ = R·C = 0,1 s, PWM periyodunun (2 ms) 50 katı; kondansatör her periyotta çok az dolup boşalır. Doluluk 64/255’te voltmetre 1,253 V, 128/255’te 2,512 V gösterir: V ≈ 5 V · n / 255. Kalan dalgalanma birkaç on mV’tur; τ büyütülürse azalır ama gerilim yeni değere daha yavaş oturur.',
+    everyday:
+      'Ucuz ses ve gerilim çıkışları, motor sürücülerinin referansları ve birçok elektronik cihazdaki “dijitalden analoğa” dönüşüm PWM ve bir RC süzgeciyle yapılır.',
+  },
+  'ard-melodi': {
+    title: 'Arduino: melodi (tone)',
+    description:
+      'D8, 150 Ω’luk dirençle bir hoparlöre bağlı. Program tone() ile notaları sırayla çalar (Twinkle Twinkle Little Star). Sesi duymak için simülasyon hızı ×1 olmalı.',
+    purpose:
+      'tone(8, f) pinden f frekanslı bir kare dalga verir: La (A4) 440 Hz, Do (C4) 262 Hz. Hoparlörün bobini her kenarda zarı iter ve çeker. 150 Ω’luk direnç pin akımını sınırlar: 5 V / (150 Ω + 25 Ω + 7,2 Ω) ≈ 27 mA, pinin 40 mA sınırının altında. Direnç olmadan 8 Ω’luk hoparlör pinden ≈ 150 mA çekerdi ve pini bozardı; güçlü ses için bir transistör ya da ses yükselteci kullanılır.',
+    everyday:
+      'Mikrodalga fırınların, çamaşır makinelerinin, oyuncakların ve alarm saatlerinin bip sesleri ve basit melodileri bir mikrodenetleyicinin kare dalgasıdır.',
+  },
+  'ard-role': {
+    title: 'Arduino: röleyle lamba',
+    description:
+      'D7, 1 kΩ’luk dirençle bir BC547B transistörünün bazına bağlı. Transistör 12 V’luk rölenin sargısını açıp kapatıyor; sargıya ters paralel bir 1N4001 diyodu bağlı. Rölenin kontağı 12 V’luk lambayı yakar. Program röleyi 2 s çekili, 2 s bırakık tutar.',
+    purpose:
+      'Arduino’nun pini 5 V ve en çok 40 mA verir; rölenin 12 V’luk sargısı 43,5 mA ister. Transistör anahtar olarak çalışır: pin 4,2 mA’lik baz akımı verir, transistör doyuma girer ve sargıyı 12 V’a bağlar. Röle kontağı ise lambayı Arduino’dan tamamen ayrı bir devrede anahtarlar. Sargının akımı kesildiğinde manyetik enerjisi yüksek bir gerilim sıçraması yapar (Lenz yasası); diyot bu akıma yol vererek transistörü korur.',
+    everyday:
+      'Akıllı prizler, otomatik sulama sistemleri, ev otomasyonu ve garaj kapısı açıcıları, küçük bir denetleyicinin büyük yükleri (lamba, pompa, motor) röleyle anahtarlamasıdır.',
+  },
   'led-on-direnc': {
     title: 'LED ve ön direnç',
     description:
@@ -1250,8 +1349,8 @@ export const tr = {
     timerDischarge: 'Deşarj anahtarı',
     timerNote:
       'TRIG 1/3·V_CC’nin altına inince çıkış yüksek olur ve deşarj anahtarı açılır; THRES 2/3·V_CC’yi geçince çıkış düşer ve anahtar kapanarak DISCH’i toprağa bağlar. Kondansatörün dolma ve boşalma süresi (τ = R·C) zamanlamayı belirler.',
-    arduinoProgram: 'Program',
-    arduinoBoard: 'USB (5V ucu)',
+    arduinoUsbCurrent: 'USB’den çekilen akım',
+    arduinoBoard: '5V ucu',
     arduinoSerial: 'Seri ekran',
     arduinoIdle: 'Program yok',
     arduinoModes: ['giriş', 'giriş (çekme)', 'DÜŞÜK', 'YÜKSEK'] as const,
@@ -1453,6 +1552,7 @@ export const tr = {
       sensorler: 'Ayarlı parçalar ve sensörler',
       ses: 'Ses ve koruma',
       entegreler: 'Entegreler',
+      arduino: 'Arduino',
       'diyot-karakteristigi': 'Deney 1 · Diyot karakteristikleri',
       dogrultucu: 'Deney 2 · Doğrultucular',
       kenetleyici: 'Deney 3 · Kenetleyici ve gerilim katlayıcı',
@@ -1544,6 +1644,16 @@ export const tr = {
     showInRack: 'Rafta göster',
     autoDone: (parts: string) => `Oto: ${parts}`,
     autoSpeed: (speed: string) => `hız ${speed}`,
+  },
+  arduino: {
+    serial: 'Seri ekran',
+    serialEmpty: 'Program henüz bir şey yazmadı (Serial.print).',
+    serialStopped: 'Oynat’a basınca programın Serial.print çıktısı burada görünür.',
+    code: 'Kod',
+    flash: (bytes: string) => `${bytes} bayt`,
+    noProgram: 'Program seçilmedi.',
+    precompiled:
+      'Bu örnek program önceden derlendi (avr-gcc, Arduino AVR çekirdeği) ve işlemcide komut komut çalışıyor. Programı yukarıdaki Program listesinden değiştirebilirsin; kodu değiştirmek şimdilik mümkün değil.',
   },
   inspector: {
     label: 'İnceleme paneli',

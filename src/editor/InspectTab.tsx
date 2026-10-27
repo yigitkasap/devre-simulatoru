@@ -21,6 +21,7 @@ import type { Settings } from './settings';
 import type { Selection } from './state';
 import { SymbolIcon } from './symbols';
 import { useThrottledText } from './a11y';
+import { ArduinoSection } from './ArduinoPanel';
 import { useTouchUi } from './touchUi';
 import type { SimFrame, SimStatus } from './useSimulation';
 
@@ -278,6 +279,8 @@ function PartDetails({
       </header>
 
       <LiveSection part={part} frame={frame} status={status} />
+
+      {part.type === 'arduino' && <ArduinoSection part={part} frame={frame} status={status} />}
 
       <section className="flex flex-col gap-3" aria-label={tr.inspector.properties}>
         <SectionTitle>{tr.inspector.properties}</SectionTitle>

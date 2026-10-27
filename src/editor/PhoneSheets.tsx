@@ -12,6 +12,7 @@ import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { DeviceType, PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
 import { HintText } from './HintStrip';
+import { ArduinoSection } from './ArduinoPanel';
 import { FieldError, fieldTone, splitUnit, useCommitField, type PartPatch } from './InspectTab';
 import { Icon } from './icons';
 import { partValueText } from './PartView';
@@ -663,6 +664,7 @@ export function PartSheetBody({ part, doc, settings, expanded: expandedState, on
               />
             ))}
             {primaryHint && <span className="text-[12.5px] leading-[1.45] text-muted">{primaryHint}</span>}
+            {part.type === 'arduino' && <ArduinoSection part={part} frame={null} status="stopped" compact />}
             {note && (
               <p className="rounded-[10px] bg-panel-2 px-3 py-2.5 text-[13px] leading-relaxed text-ink-2">
                 <Rich text={note} />
@@ -766,6 +768,7 @@ export function MeasureSheetBody({ part, doc, frame, status, settings, expanded:
             );
           })}
         </div>
+        {part.type === 'arduino' && <ArduinoSection part={part} frame={frame} status={status} compact />}
         {device && (
           <button
             type="button"

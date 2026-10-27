@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "arduino", "label": "ARD1", "x": 0, "y": 0, "rotation": 0, "props": {"program": "pwm-filtre"}},
+    {"id": "p2", "type": "resistor", "label": "R1", "x": 12, "y": -1, "rotation": 0, "props": {"resistance": 10000.0}},
+    {"id": "p3", "type": "capacitor", "label": "C1", "x": 20, "y": 3, "rotation": 90, "props": {"capacitance": 1e-05, "initialVoltage": 0, "kind": "electrolytic"}},
+    {"id": "p4", "type": "voltmeter", "label": "V1", "x": 28, "y": 3, "rotation": 90, "props": {"resistance": 10000000.0, "ideal": false, "mode": "dc"}},
+    {"id": "p5", "type": "ground", "label": "GND1", "x": -9, "y": -4, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[6, -1], [8, -1]]},
+    {"id": "w2", "points": [[16, -1], [20, -1]]},
+    {"id": "w3", "points": [[20, -1], [28, -1]]},
+    {"id": "w4", "points": [[20, 7], [28, 7]]},
+    {"id": "w5", "points": [[28, 7], [32, 7], [32, -15], [8, -15], [8, -11], [6, -11]]},
+    {"id": "w6", "points": [[-6, -7], [-9, -7], [-9, -4]]}
+  ]
+}

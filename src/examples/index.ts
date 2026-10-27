@@ -6,6 +6,17 @@
 import { parseDoc } from '../model/serialize';
 import type { CircuitDoc } from '../model/types';
 import ampermetreEtkisi from './ampermetre-etkisi.json';
+import ardBlink from './ard-blink.json';
+import ardDugme from './ard-dugme.json';
+import ardSayac from './ard-sayac.json';
+import ardTrafikIsigi from './ard-trafik-isigi.json';
+import ardFade from './ard-fade.json';
+import ardPotansiyometre from './ard-potansiyometre.json';
+import ardGeceLambasi from './ard-gece-lambasi.json';
+import ardTermometre from './ard-termometre.json';
+import ardPwmFiltre from './ard-pwm-filtre.json';
+import ardMelodi from './ard-melodi.json';
+import ardRole from './ard-role.json';
 import barajCubuk from './baraj-cubuk.json';
 import barajTekIsik from './baraj-tek-isik.json';
 import bobinSerbestGecis from './bobin-serbest-gecis.json';
@@ -82,6 +93,8 @@ export const EXAMPLE_GROUPS = [
   { id: 'sensorler', ids: ['potansiyometre', 'ldr-gece-lambasi', 'ntc-termometre', 'lamba-ani-akim'] },
   { id: 'ses', ids: ['hoparlor', 'buzzer-sicaklik', 'sigorta'] },
   { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici', '555-astabil', '555-monostabil', '555-ses'] },
+  // Arduino Uno: önceden derlenmiş örnek programlar (src/arduino/sketches).
+  { id: 'arduino', ids: ['ard-blink', 'ard-dugme', 'ard-sayac', 'ard-trafik-isigi', 'ard-fade', 'ard-potansiyometre', 'ard-gece-lambasi', 'ard-termometre', 'ard-pwm-filtre', 'ard-melodi', 'ard-role'] },
   { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
   { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
   { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
@@ -153,6 +166,17 @@ const DATA: Record<ExampleId, unknown> = {
   'bjt-anahtar-emetor': bjtAnahtarEmetor,
   'baraj-cubuk': barajCubuk,
   'baraj-tek-isik': barajTekIsik,
+  'ard-blink': ardBlink,
+  'ard-dugme': ardDugme,
+  'ard-sayac': ardSayac,
+  'ard-trafik-isigi': ardTrafikIsigi,
+  'ard-fade': ardFade,
+  'ard-potansiyometre': ardPotansiyometre,
+  'ard-gece-lambasi': ardGeceLambasi,
+  'ard-termometre': ardTermometre,
+  'ard-pwm-filtre': ardPwmFiltre,
+  'ard-melodi': ardMelodi,
+  'ard-role': ardRole,
 };
 
 /** Örneğin devresi; JSON bozuksa null (testler bunu yakalar). */

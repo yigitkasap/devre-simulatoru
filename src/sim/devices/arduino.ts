@@ -7,8 +7,9 @@ import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Meas
  * Arduino Uno R3 (ATmega328P, 16 MHz). İşlemci avr8js ile komut komut koşar; seçilen örnek
  * program (props.program) önceden derlenmiştir (src/arduino/sketches, npm run arduino:derle).
  *
- * Pinler: [0] 5V, [1] 3V3, [2] GND, [3–8] A0–A5, [9–20] D2–D13. D0/D1 USB seri bağlantısınındır
- * (Seri ekran), devreye çıkarılmaz. Değerler ATmega328P veri sayfasından (DS40002061A, 5 V, 25 °C,
+ * Pinler: [0] 5V, [1] 3V3, [2] GND, [3–8] A0–A5, [9–20] D2–D13, [21] GND (dijital pinlerin
+ * yanındaki ikinci GND; kart üstünde birinciye bağlı). D0/D1 USB seri bağlantısınındır (Seri ekran),
+ * devreye çıkarılmaz. Değerler ATmega328P veri sayfasından (DS40002061A, 5 V, 25 °C,
  * tipik eğriler) ve Uno R3 şemasından:
  *   - Çıkış: 0 ya da 5 V arkasında 25 Ω (20 mA'de V_OH ≈ 4,5 V, V_OL ≈ 0,5 V). Mutlak sınır 40 mA.
  *   - Giriş: yüksek empedans; INPUT_PULLUP'ta 5 V'a 35 kΩ (veri sayfası 20–50 kΩ). Schmitt
@@ -16,6 +17,7 @@ import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Meas
  *   - ADC: 10 bit, referans AVCC = 5 V; gerilim dönüşümün başladığı anda örneklenir.
  *   - 5V: USB'den, sigorta ve hat dahil 0,2 Ω; 3V3: LP2985 düzenleyicisi, 1 Ω, 150 mA.
  *   - Kart üstü L LED'i D13'ü bir tamponla izler (D13'e yük olmaz).
+ *   - İki GND ucu arasında kartın toprak düzlemi: 10 mΩ.
  *
  * Zamanlama (devre ile işlemcinin eşgüdümü): işlemci analog çözümün en fazla LOOKAHEAD önünde
  * koşar. Bir çıkış değişince (digitalWrite, PWM kenarı) durur; değişim anı bir kırılma noktasıdır,
@@ -48,7 +50,9 @@ const ADC_SLACK = 4e-6;
 /** Devreye çıkan pinler (D2–D13, A0–A5) ve Arduino numaraları (A0 = 14). */
 export const ARDUINO_IO = [14, 15, 16, 17, 18, 19, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13] as const;
 const FIRST_IO = 3;
-const PIN = { v5: 0, v33: 1, gnd: 2 } as const;
+const PIN = { v5: 0, v33: 1, gnd: 2, gnd2: 21 } as const;
+/** İki GND ucu arasındaki toprak düzleminin direnci (Ω). */
+const GROUND_PLANE = 0.01;
 
 export function arduinoPinLabel(io: number): string {
   return io >= 14 ? `A${io - 14}` : `D${io}`;
@@ -232,6 +236,7 @@ export class ArduinoDevice extends Device {
     sys.currentSource(gnd, this.nodes[PIN.v5]!, a.supply / a.supplyResistance);
     sys.conductance(this.nodes[PIN.v33]!, gnd, 1 / a.regulatorResistance);
     sys.currentSource(gnd, this.nodes[PIN.v33]!, a.regulator / a.regulatorResistance);
+    sys.conductance(this.nodes[PIN.gnd2]!, gnd, 1 / GROUND_PLANE);
     for (let i = 0; i < ARDUINO_IO.length; i++) {
       const node = this.nodes[FIRST_IO + i]!;
       const mode = this.applied[i]!;
@@ -278,7 +283,7 @@ export class ArduinoDevice extends Device {
   }
 
   override conductiveGroups(): ReadonlyArray<readonly number[]> {
-    const group = [this.nodes[PIN.v5]!, this.nodes[PIN.v33]!, this.nodes[PIN.gnd]!];
+    const group = [this.nodes[PIN.v5]!, this.nodes[PIN.v33]!, this.nodes[PIN.gnd]!, this.nodes[PIN.gnd2]!];
     for (let i = 0; i < ARDUINO_IO.length; i++) if (this.applied[i] !== PinMode.Input) group.push(this.nodes[FIRST_IO + i]!);
     return [group];
   }
@@ -316,6 +321,9 @@ export class ArduinoDevice extends Device {
     const { usb, regulator } = this.supplyCurrents(x);
     const currents = [-usb, -regulator, 0];
     for (let i = 0; i < ARDUINO_IO.length; i++) currents.push(-this.pinOutput(x, i));
+    // İkinci GND'den giren akım toprak düzleminden birinciye geçer; kalan KCL'den birinciden.
+    const plane = (this.v(x, PIN.gnd2) - this.v(x, PIN.gnd)) / GROUND_PLANE;
+    currents.push(plane);
     currents[PIN.gnd] = -currents.reduce((s, c) => s + c, 0);
     return currents;
   }
@@ -375,7 +383,7 @@ export class ArduinoDevice extends Device {
 
 export const arduinoModel: DeviceModel = {
   type: 'arduino',
-  pinCount: 3 + ARDUINO_IO.length,
+  pinCount: 4 + ARDUINO_IO.length,
   internalNodes: 0,
   branchCount: 0,
   referencePins: () => [PIN.gnd],

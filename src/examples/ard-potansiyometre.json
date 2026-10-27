@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "arduino", "label": "ARD1", "x": 0, "y": 0, "rotation": 0, "props": {"program": "potansiyometre"}},
+    {"id": "p2", "type": "potentiometer", "label": "P1", "x": -14, "y": -9, "rotation": 270, "props": {"resistance": 10000.0, "position": 50}},
+    {"id": "p3", "type": "ground", "label": "GND1", "x": -9, "y": -4, "rotation": 0, "props": {}},
+    {"id": "p4", "type": "resistor", "label": "R1", "x": 12, "y": -1, "rotation": 0, "props": {"resistance": 220}},
+    {"id": "p5", "type": "led", "label": "LED1", "x": 20, "y": -5, "rotation": 270, "props": {"color": "red"}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[-6, -11], [-10, -11], [-10, -13], [-14, -13]]},
+    {"id": "w2", "points": [[-14, -5], [-12, -5], [-12, -7], [-9, -7]]},
+    {"id": "w3", "points": [[-6, -7], [-9, -7]]},
+    {"id": "w4", "points": [[-9, -7], [-9, -4]]},
+    {"id": "w5", "points": [[-17, -9], [-19, -9], [-19, -1], [-6, -1]]},
+    {"id": "w6", "points": [[6, -1], [8, -1]]},
+    {"id": "w7", "points": [[16, -1], [20, -1]]},
+    {"id": "w8", "points": [[20, -9], [20, -15], [8, -15], [8, -11], [6, -11]]}
+  ]
+}

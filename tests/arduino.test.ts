@@ -3,11 +3,14 @@
 import { describe, expect, it } from 'vitest';
 import { CircuitSimulator, type DeviceStatus } from '../src/sim';
 import { ARDUINO, ARDUINO_IO } from '../src/sim/devices/arduino';
+import { exampleDoc, type ExampleId } from '../src/examples';
+import { buildConnectivity } from '../src/model/connectivity';
+import { updatePart } from '../src/model/docOps';
 import { circuit } from './helpers';
 
 /** Arduino pin listesi: verilmeyenler kendi boş ağına bağlanır. */
 function uno(id: string, nets: Partial<Record<string, string>>): string[] {
-  const names = ['5V', '3V3', 'GND', ...ARDUINO_IO.map((io) => (io >= 14 ? `A${io - 14}` : `D${io}`))];
+  const names = ['5V', '3V3', 'GND', ...ARDUINO_IO.map((io) => (io >= 14 ? `A${io - 14}` : `D${io}`)), 'GND2'];
   return names.map((name) => nets[name] ?? `${id}_${name}_boş`);
 }
 
@@ -147,5 +150,56 @@ describe('Arduino Uno', () => {
     // 5 V / (47 + 25 Ω) ≈ 69 mA; pin 5 · 47/72 ≈ 3,3 V'a düşer.
     expect(sim.measure('R')!.current).toBeCloseTo(5 / 72, 4);
     expect(sim.runtimeDiagnostics.some((d) => d.code === 'pin-overcurrent')).toBe(true);
+  });
+});
+
+// İşlemci saniyede 16 milyon çevrim koşar: birkaç saniyelik örnekler uzun sürer.
+describe('Arduino örnekleri: metinlerdeki sayılar', { timeout: 120_000 }, () => {
+  const run = (id: ExampleId, t: number, change?: [string, Record<string, number | boolean>]) => {
+    let doc = exampleDoc(id)!;
+    if (change) {
+      const part = doc.parts.find((p) => p.label === change[0])!;
+      doc = updatePart(doc, part.id, { props: { ...part.props, ...change[1] } });
+    }
+    const sim = new CircuitSimulator(buildConnectivity(doc).netlist);
+    expect(sim.runUntil(t).ok, id).toBe(true);
+    const idOf = (label: string) => doc.parts.find((p) => p.label === label)!.id;
+    return { sim, idOf, serial: () => sim.status(idOf('ARD1')).arduino!.serial };
+  };
+
+  it('Blink ≈ 13 mA; trafik ışığı 13,0 / 12,1 / 11,7 mA', () => {
+    const b = run('ard-blink', 0.25);
+    expect(b.sim.measure(b.idOf('LED1'))!.current * 1e3).toBeCloseTo(13.0, 1);
+    const red = run('ard-trafik-isigi', 2);
+    expect(red.sim.measure(red.idOf('LED1'))!.current * 1e3).toBeCloseTo(13.0, 1);
+    const yellow = run('ard-trafik-isigi', 3.5);
+    expect(yellow.sim.measure(yellow.idOf('LED2'))!.current * 1e3).toBeCloseTo(12.1, 1);
+    const green = run('ard-trafik-isigi', 5);
+    expect(green.sim.measure(green.idOf('LED3'))!.current * 1e3).toBeCloseTo(11.7, 1);
+  });
+
+  it('Potansiyometre %50 → 511 (PWM 127), %20 → 210; gece lambası 744 / 413 / 154', () => {
+    expect(run('ard-potansiyometre', 0.5).serial()).toContain('A0 = 511  (2.50 V)  PWM = 127');
+    expect(run('ard-potansiyometre', 0.5, ['P1', { position: 20 }]).serial()).toContain('A0 = 210');
+    expect(run('ard-gece-lambasi', 0.6).serial()).toContain('Işık: 744');
+    expect(run('ard-gece-lambasi', 0.6, ['LDR1', { illuminance: 10 }]).serial()).toContain('Işık: 413');
+    const dark = run('ard-gece-lambasi', 0.6, ['LDR1', { illuminance: 1 }]);
+    expect(dark.serial()).toContain('Işık: 154');
+    expect(dark.sim.measure(dark.idOf('LED1'))!.current).toBeGreaterThan(10e-3);
+  });
+
+  it('Termometre 25,0 / 59,7 / 0,7 °C; PWM süzgeci 1,253 / 2,512 V; röle sargısı 43,5 mA', () => {
+    expect(run('ard-termometre', 1.2).serial()).toContain('Sıcaklık: 25.0 °C');
+    expect(run('ard-termometre', 1.2, ['NTC1', { temperature: 60 }]).serial()).toContain('Sıcaklık: 59.7 °C');
+    expect(run('ard-termometre', 1.2, ['NTC1', { temperature: 0 }]).serial()).toContain('Sıcaklık: 0.7 °C');
+    const pwm = run('ard-pwm-filtre', 2.9);
+    expect(pwm.sim.status(pwm.idOf('V1')).reading!).toBeCloseTo(1.253, 2);
+    const pwm2 = run('ard-pwm-filtre', 5.9);
+    expect(pwm2.sim.status(pwm2.idOf('V1')).reading!).toBeCloseTo(2.512, 2);
+    const relay = run('ard-role', 1);
+    expect(relay.sim.status(relay.idOf('K1')).coil!.current * 1e3).toBeCloseTo(43.5, 0);
+    expect(relay.sim.status(relay.idOf('LP1')).glow!).toBeGreaterThan(0.9);
+    const off = run('ard-role', 3);
+    expect(off.sim.status(off.idOf('K1')).energized).toBe(false);
   });
 });

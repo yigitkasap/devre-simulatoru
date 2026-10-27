@@ -300,7 +300,10 @@ const ARDUINO_PWM = new Set([3, 5, 6, 9, 10, 11]);
 function Arduino({ rotation, ledL, ledTx }: { rotation: Rotation; ledL: boolean; ledTx: boolean }) {
   const left = ['5V', '3V3', 'GND'].map((name, k) => ({ name, y: -110 + 20 * k }));
   const analog = [0, 1, 2, 3, 4, 5].map((k) => ({ name: `A${k}`, y: -10 + 20 * k }));
-  const digital = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((d) => ({ name: `${ARDUINO_PWM.has(d) ? '~' : ''}D${d}`, y: 150 - 20 * d }));
+  const digital = [
+    ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((d) => ({ name: `${ARDUINO_PWM.has(d) ? '~' : ''}D${d}`, y: 170 - 20 * d })),
+    { name: 'GND', y: -110 },
+  ];
   const stubs = [...left, ...analog].map((p) => `M-60,${p.y}H-50`).join('') + digital.map((p) => `M50,${p.y}H60`).join('');
   const label = (x: number, y: number, text: string, anchor: 'start' | 'end') => (
     <DeviceText key={`${x}${text}`} x={x} y={y + 2.2} rotation={rotation} size={6.5} anchor={anchor} weight={600} color="var(--color-muted)">
@@ -318,7 +321,7 @@ function Arduino({ rotation, ledL, ledTx }: { rotation: Rotation; ledL: boolean;
   return (
     <g>
       <path d={stubs} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
-      <rect x={-50} y={-125} width={100} height={250} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <rect x={-50} y={-125} width={100} height={270} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
       {[...left, ...analog].map((p) => label(-46, p.y, p.name, 'start'))}
       {digital.map((p) => label(46, p.y, p.name, 'end'))}
       <DeviceText x={0} y={-36} rotation={rotation} size={8.5}>

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "arduino", "label": "ARD1", "x": 0, "y": 0, "rotation": 0, "props": {"program": "trafik-isigi"}},
+    {"id": "p2", "type": "resistor", "label": "R1", "x": 12, "y": -7, "rotation": 0, "props": {"resistance": 220}},
+    {"id": "p3", "type": "led", "label": "LED1", "x": 20, "y": -11, "rotation": 270, "props": {"color": "red"}},
+    {"id": "p4", "type": "resistor", "label": "R2", "x": 26, "y": -5, "rotation": 0, "props": {"resistance": 220}},
+    {"id": "p5", "type": "led", "label": "LED2", "x": 34, "y": -9, "rotation": 270, "props": {"color": "yellow"}},
+    {"id": "p6", "type": "resistor", "label": "R3", "x": 40, "y": -3, "rotation": 0, "props": {"resistance": 220}},
+    {"id": "p7", "type": "led", "label": "LED3", "x": 48, "y": -7, "rotation": 270, "props": {"color": "green"}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": -9, "y": -4, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[6, -7], [8, -7]]},
+    {"id": "w2", "points": [[16, -7], [20, -7]]},
+    {"id": "w3", "points": [[6, -5], [22, -5]]},
+    {"id": "w4", "points": [[30, -5], [34, -5]]},
+    {"id": "w5", "points": [[6, -3], [36, -3]]},
+    {"id": "w6", "points": [[44, -3], [48, -3]]},
+    {"id": "w7", "points": [[20, -15], [20, -19]]},
+    {"id": "w8", "points": [[34, -13], [34, -19]]},
+    {"id": "w9", "points": [[48, -11], [48, -19]]},
+    {"id": "w10", "points": [[48, -19], [34, -19]]},
+    {"id": "w11", "points": [[34, -19], [20, -19]]},
+    {"id": "w12", "points": [[20, -19], [8, -19], [8, -11], [6, -11]]},
+    {"id": "w13", "points": [[-6, -7], [-9, -7], [-9, -4]]}
+  ]
+}

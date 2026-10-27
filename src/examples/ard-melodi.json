@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "arduino", "label": "ARD1", "x": 0, "y": 0, "rotation": 0, "props": {"program": "melodi"}},
+    {"id": "p2", "type": "resistor", "label": "R1", "x": 12, "y": 1, "rotation": 0, "props": {"resistance": 150}},
+    {"id": "p3", "type": "speaker", "label": "HP1", "x": 20, "y": 5, "rotation": 90, "props": {}},
+    {"id": "p4", "type": "ground", "label": "GND1", "x": -9, "y": -4, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[6, 1], [8, 1]]},
+    {"id": "w2", "points": [[16, 1], [20, 1]]},
+    {"id": "w3", "points": [[20, 9], [26, 9], [26, -15], [8, -15], [8, -11], [6, -11]]},
+    {"id": "w4", "points": [[-6, -7], [-9, -7], [-9, -4]]}
+  ]
+}

@@ -553,16 +553,17 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     type: 'arduino',
     category: 'ics',
     labelPrefix: 'ARD',
-    // Sırası çözücünün pin sırası: 5V, 3V3, GND, A0–A5, D2–D13. Solda güç ve analog girişler, sağda
-    // dijital pinler (üstte D13); pinler iki birim arayla.
+    // Sırası çözücünün pin sırası: 5V, 3V3, GND, A0–A5, D2–D13, GND. Solda güç ve analog girişler;
+    // sağda gerçek karttaki dijital başlık gibi üstte GND, altında D13 … D2. Pinler iki birim arayla.
     pins: [
       { x: -6, y: -11 },
       { x: -6, y: -9 },
       { x: -6, y: -7 },
       ...[0, 1, 2, 3, 4, 5].map((k) => ({ x: -6, y: -1 + 2 * k })),
-      ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((d) => ({ x: 6, y: 15 - 2 * d })),
+      ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((d) => ({ x: 6, y: 17 - 2 * d })),
+      { x: 6, y: -11 },
     ],
-    bounds: { x: -6, y: -13, w: 12, h: 26 },
+    bounds: { x: -6, y: -13, w: 12, h: 28 },
     defaultProps: { program: ARDUINO_DEFAULT_PROGRAM },
     propDefs: [{ kind: 'select', key: 'program', options: ARDUINO_PROGRAM_IDS }],
     showLabel: true,

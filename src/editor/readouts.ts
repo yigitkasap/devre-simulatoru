@@ -217,9 +217,10 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
     }
     case 'arduino': {
       const ard = status.arduino;
+      // Program adı özelliklerde ve kod bölümünde; canlı satırlar yalnızca ölçümler.
       const rows: ReadoutRow[] = [
-        { label: t.arduinoProgram, value: tr.properties.optionLabel('program', String(p.program ?? '')) },
-        { label: t.arduinoBoard, value: `${v(m.voltage)} · ${a(m.current)}` },
+        { label: t.arduinoUsbCurrent, value: a(m.current) },
+        { label: t.arduinoBoard, value: v(m.voltage) },
       ];
       if (!ard?.running) return { title, rows: [...rows, { label: t.state, value: t.arduinoIdle }] };
       // Kullanılan pinler: çıkışlar, çekme dirençli girişler ve gerilim gelen analog girişler.

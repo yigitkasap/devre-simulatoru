@@ -1,6 +1,6 @@
 // PWM'den doğru gerilim: D9'un 490 Hz'lik PWM'i 10 kΩ ve 10 µF'lık bir alçak geçiren süzgeçten
 // geçince kondansatörde neredeyse düz bir gerilim kalır: V ≈ 5 V · doluluk / 255.
-// Doluluk her 3 saniyede bir değişir; osiloskopta A = pin, B = kondansatör.
+// Doluluk her 3 saniyede bir değişir; voltmetre kondansatörün gerilimini gösterir.
 const int PWM_PIN = 9;
 const int duties[] = { 64, 128, 192, 255, 0 };
 

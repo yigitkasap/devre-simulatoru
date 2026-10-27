@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "arduino", "label": "ARD1", "x": 0, "y": 0, "rotation": 0, "props": {"program": "gece-lambasi"}},
+    {"id": "p2", "type": "ldr", "label": "LDR1", "x": -12, "y": -11, "rotation": 0, "props": {"illuminance": 100}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": -20, "y": -7, "rotation": 90, "props": {"resistance": 10000.0}},
+    {"id": "p4", "type": "ground", "label": "GND1", "x": -9, "y": -4, "rotation": 0, "props": {}},
+    {"id": "p5", "type": "resistor", "label": "R2", "x": 12, "y": -9, "rotation": 0, "props": {"resistance": 220}},
+    {"id": "p6", "type": "led", "label": "LED1", "x": 20, "y": -13, "rotation": 270, "props": {"color": "red"}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[-6, -11], [-8, -11]]},
+    {"id": "w2", "points": [[-16, -11], [-20, -11]]},
+    {"id": "w3", "points": [[-20, -3], [-12, -3], [-12, -7], [-9, -7]]},
+    {"id": "w4", "points": [[-6, -7], [-9, -7]]},
+    {"id": "w5", "points": [[-9, -7], [-9, -4]]},
+    {"id": "w6", "points": [[-6, -1], [-22, -1], [-22, -11], [-20, -11]]},
+    {"id": "w7", "points": [[6, -9], [8, -9]]},
+    {"id": "w8", "points": [[16, -9], [20, -9]]},
+    {"id": "w9", "points": [[20, -17], [8, -17], [8, -11], [6, -11]]}
+  ]
+}

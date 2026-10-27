@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "arduino", "label": "ARD1", "x": 0, "y": 0, "rotation": 0, "props": {"program": "blink"}},
+    {"id": "p2", "type": "resistor", "label": "R1", "x": 12, "y": -9, "rotation": 0, "props": {"resistance": 220}},
+    {"id": "p3", "type": "led", "label": "LED1", "x": 20, "y": -13, "rotation": 270, "props": {"color": "red"}},
+    {"id": "p4", "type": "ground", "label": "GND1", "x": -9, "y": -4, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[6, -9], [8, -9]]},
+    {"id": "w2", "points": [[16, -9], [20, -9]]},
+    {"id": "w3", "points": [[20, -17], [8, -17], [8, -11], [6, -11]]},
+    {"id": "w4", "points": [[-6, -7], [-9, -7], [-9, -4]]}
+  ]
+}
