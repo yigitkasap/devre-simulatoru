@@ -4,10 +4,58 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { BB, boardWidth, boardZ, colX, holeXZ, netColors, planBreadboard, railHoles, railX, railZ, stripRowZ, type BreadboardPlan, type Hole } from '../bench3d/breadboard';
 import { buildSolderGuide } from '../bench3d/guide';
+import { boardSize, designPcb, kicadZip } from '../bench3d/kicad';
 import { tr } from '../i18n/tr';
 import type { CircuitDoc } from '../model/types';
 
 const t = tr.solderGuide;
+
+/** KiCad zip'ini indirir; ad JSON indirmesindeki gibi (devre-2026-10-28-kicad.zip). */
+function downloadKicad(doc: CircuitDoc) {
+  const zip = kicadZip(doc, `${tr.file.fileName}-${new Date().toISOString().slice(0, 10)}`);
+  if (!zip.ok) return;
+  const url = URL.createObjectURL(new Blob([zip.data as BlobPart], { type: 'application/zip' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = zip.name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function PcbSection({ doc, button }: { doc: CircuitDoc; button: string }) {
+  const result = useMemo(() => designPcb(doc), [doc]);
+  return (
+    <section className="mt-5 rounded-lg border border-line p-3 print:hidden" aria-labelledby="pcb-baslik">
+      <h3 id="pcb-baslik" className="mb-1 text-heading font-semibold">
+        {tr.pcb.title}
+      </h3>
+      {result.ok ? (
+        <>
+          <p className="text-small text-ink-2">{tr.pcb.text}</p>
+          <p className="mt-2 text-small">
+            {tr.pcb.size(boardSize(result.design))}
+          </p>
+          {result.design.added.length > 0 && (
+            <ul className="mt-1 flex list-disc flex-col gap-1 pl-6 text-small text-ink-2">
+              {result.design.added.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          )}
+          <button type="button" onClick={() => downloadKicad(doc)} className={`mt-3 rounded-md bg-accent font-medium text-white ${button}`}>
+            {tr.pcb.download}
+          </button>
+        </>
+      ) : (
+        <p className="rounded-md border border-warn-line bg-warn-soft px-3 py-2 text-small text-warn" role="note">
+          {result.reason}
+        </p>
+      )}
+    </section>
+  );
+}
 
 function BoardDiagram({ doc, plan }: { doc: CircuitDoc; plan: BreadboardPlan }) {
   const w = boardWidth(plan.cols);
@@ -171,6 +219,7 @@ export function SolderGuideDialog({ doc, onClose, touch }: { doc: CircuitDoc; on
               <li key={c}>{c}</li>
             ))}
           </ul>
+          <PcbSection doc={doc} button={button} />
         </div>
       </div>
     </div>

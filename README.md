@@ -1703,5 +1703,35 @@ numaraları, a–j satırları ve raylar) aktarılır.
 - Testler: `tests/guide.test.ts` (62 örnekte her parça, jumper ve tel tek adım; delik adları
   geçerli; renk kodu). ios-kontrol'de telefon maddesi (pencere içinde kayar, sayfa kaymaz).
 
+### PCB olarak üretim: KiCad aktarımı (2026-10-28)
+
+Lehim rehberinin sonundaki "PCB olarak üret (KiCad)" bölümü (`src/bench3d/kicad.ts`) devreyi bir
+baskı devre tasarımı olarak indirir: `devre-<tarih>-kicad.zip` içinde `.kicad_pro`, `.kicad_pcb`
+(KiCad 7 biçimi, sürüm 20221018; KiCad 8 ve 9 açıp yükseltir), `malzeme-listesi.csv` ve Türkçe
+`OKU.txt` (yol çizme, tasarım kuralı denetimi, Gerber, gümrük notu).
+
+- Yerleşim breadboard yerleşiminden çıkar: delik ızgarası (2,54 mm) gerçek kılıfların bacak
+  aralığıyla aynıdır (direnç 10,16 mm, LED 2,54 mm, DIP-8 sıraları 7,62 mm). Breadboard'da yan
+  yana satırlara düşen gövdeler kartta çakışacağından her kılıf, büyükten küçüğe, en yakın boş yere
+  (2,54 mm ızgarada) kaydırılır; kılıflar arasında en az 0,8 mm kalır.
+- Kılıflar dosyanın içindedir (kitaplığa bağımlı değil); açıklamalarında eşdeğer standart KiCad
+  kılıfı yazar. Ped numaraları o kılıfla aynıdır (diyot ve LED'de 1 = katot, entegrede bacak no.),
+  kılıf standart olanla değiştirilirse ağlar yerinde kalır.
+- Karttan dışarı giden bağlantılar (pil, kaynak, lamba, motor, hoparlör, röle, hazne: 5,08 mm
+  vidalı klemens; Arduino, ölçü aletleri, fonksiyon üreteci: 2,54 mm pin başlık) kartın üst
+  kenarında, pin adları serigrafide. Ampermetre seri olduğundan ölçüm yokken köprü takılmalıdır
+  (OKU.txt'de yazar).
+- 555'e (8–1) ve 741'e (7 ve 4 → GND) 100 nF dekuplaj kondansatörü eklenir. Ağ adları GND, VCC ve
+  `Net-(R1-Pad2)`; proje dosyasında güç ağları 0,8 mm (IPC-2221'e göre 1 oz bakırda ≈ 2 A),
+  öbürleri 0,3 mm yol, 0,25 mm aralık. Dört M3 montaj deliği, kenar payı 6 mm.
+- Yollar çizilmez (otomatik yönlendirme yok): KiCad'de elle ya da Freerouting ile.
+- Şebekeli devre (transformatör) aktarılmaz.
+- Zip yazıcı bağımlılıksız (`src/bench3d/zip.ts`, sıkıştırmasız, CRC-32). Lehim rehberi penceresi
+  ve aktarım tembel yüklenir (ilk yüklenen JS büyümez).
+- Testler: `tests/kicad.test.ts` (her örnekte dosya küçük bir S-ifadesi okuyucusuyla okunur; ağ
+  kodları ardışık; her pinin pedi breadboard yerleşimindeki ağda; dışarı giden her tel bir bağlantı
+  pedi; pedler kartın içinde; farklı ağların pedleri arasında ≥ 0,25 mm; gövdeler çakışmaz; zip
+  CRC'si doğru, aynı devre aynı bayt). ios-kontrol'de telefonda indirme maddesi.
+
 PCB araştırması ve sonraki aşamalar: `docs/pcb/arastirma.md`.
 

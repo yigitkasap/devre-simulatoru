@@ -961,6 +961,7 @@ try {
     // Lehim rehberi: pencere içinde kayar, sayfa kaymaz, düğmeler 44 px, Kapat kapatır.
     await page.getByRole('button', { name: 'Lehim rehberi' }).tap(); await page.waitForTimeout(500);
     const guide = page.getByRole('dialog', { name: /Lehim rehberi/ });
+    await guide.waitFor(); // tembel yüklenir
     const guideButtons = await guide.getByRole('button').evaluateAll((els) => els.map((el) => Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height)));
     const scroller = guide.locator('div.overflow-y-auto');
     const sbox = await scroller.boundingBox();
@@ -968,6 +969,12 @@ try {
     const scrolledInside = await scroller.evaluate((el) => el.scrollTop);
     const pageScroll = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop);
     await shot(page, 'ios-3b-rehber.png');
+    // PCB (KiCad): rehberin sonundaki düğme zip indirir.
+    const pcbButton = guide.getByRole('button', { name: 'KiCad dosyalarını indir (.zip)' });
+    await pcbButton.scrollIntoViewIfNeeded();
+    const pcbSize = await pcbButton.evaluate((el) => Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height));
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), pcbButton.tap()]);
+    check('3B: rehberdeki "KiCad dosyalarını indir" düğmesi ≥ 44 px ve zip indiriyor', pcbSize >= 44 && download !== null && download.suggestedFilename().endsWith('-kicad.zip'), `${Math.round(pcbSize)} px, ${download?.suggestedFilename() ?? 'indirme yok'}`);
     await guide.getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
     check('3B: lehim rehberi açılıyor, içi parmakla kayıyor, sayfa kaymıyor, düğmeler ≥ 44 px, Kapat kapatıyor',
       guideButtons.every((s) => s >= 44) && scrolledInside > 50 && pageScroll === 0 && (await page.getByRole('dialog', { name: /Lehim rehberi/ }).count()) === 0,

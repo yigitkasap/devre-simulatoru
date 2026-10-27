@@ -4,10 +4,11 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import type { BenchCallbacks } from '../bench3d/scene';
 import { tr } from '../i18n/tr';
 import type { CircuitDoc } from '../model/types';
-import { SolderGuideDialog } from './SolderGuide';
 import type { SimFrame } from './useSimulation';
 
 const Bench3D = lazy(() => import('../bench3d/Bench3D'));
+// Lehim rehberi ve KiCad aktarımı: yalnızca açılınca yüklenir.
+const SolderGuideDialog = lazy(() => import('./SolderGuide').then((m) => ({ default: m.SolderGuideDialog })));
 
 export type ViewMode = 'schematic' | 'bench';
 
@@ -130,7 +131,11 @@ export function BenchView(props: BenchViewProps) {
           {tr.bench.top}
         </button>
       </div>
-      {guideOpen && <SolderGuideDialog doc={props.doc} touch={props.touch} onClose={() => setGuideOpen(false)} />}
+      {guideOpen && (
+        <Suspense fallback={null}>
+          <SolderGuideDialog doc={props.doc} touch={props.touch} onClose={() => setGuideOpen(false)} />
+        </Suspense>
+      )}
       {roomy && (
         <p className="pointer-events-none absolute right-3 bottom-3 left-3 z-10 text-center text-label text-ink-2 [text-shadow:0_1px_0_#fff]">
           {props.touch ? tr.bench.hintTouch : tr.bench.hintMouse}
