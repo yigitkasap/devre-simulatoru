@@ -958,6 +958,20 @@ try {
     const scrolled = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop);
     check('3B: tek parmakla sürükleyince kamera dönüyor, sayfa kaymıyor', Boolean(before) && before !== after && scrolled === 0, `${before} → ${after}`);
     await shot(page, 'ios-3b.png');
+    // Lehim rehberi: pencere içinde kayar, sayfa kaymaz, düğmeler 44 px, Kapat kapatır.
+    await page.getByRole('button', { name: 'Lehim rehberi' }).tap(); await page.waitForTimeout(500);
+    const guide = page.getByRole('dialog', { name: /Lehim rehberi/ });
+    const guideButtons = await guide.getByRole('button').evaluateAll((els) => els.map((el) => Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height)));
+    const scroller = guide.locator('div.overflow-y-auto');
+    const sbox = await scroller.boundingBox();
+    await drag(page, cdp, { x: sbox.x + sbox.width / 2, y: sbox.y + sbox.height * 0.8 }, { x: sbox.x + sbox.width / 2, y: sbox.y + sbox.height * 0.2 });
+    const scrolledInside = await scroller.evaluate((el) => el.scrollTop);
+    const pageScroll = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop);
+    await shot(page, 'ios-3b-rehber.png');
+    await guide.getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
+    check('3B: lehim rehberi açılıyor, içi parmakla kayıyor, sayfa kaymıyor, düğmeler ≥ 44 px, Kapat kapatıyor',
+      guideButtons.every((s) => s >= 44) && scrolledInside > 50 && pageScroll === 0 && (await page.getByRole('dialog', { name: /Lehim rehberi/ }).count()) === 0,
+      `kaydırma ${Math.round(scrolledInside)} px, düğmeler ${guideButtons.map((s) => Math.round(s)).join(', ')}`);
     await group.getByRole('button', { name: 'Şema' }).tap(); await page.waitForTimeout(500);
     check('3B: Şema’ya dönünce tuval geri geliyor, 3B sahnesi kapanıyor', (await page.locator('svg.schematic').count()) === 1 && (await page.evaluate(() => window.__tezgah === undefined)));
     await page.context().close();

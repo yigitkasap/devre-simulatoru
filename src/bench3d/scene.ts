@@ -35,7 +35,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { SimFrame } from '../editor/useSimulation';
 import type { CircuitDoc, Part } from '../model/types';
-import { BB, boardWidth, boardZ, holeXZ, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
+import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
@@ -52,8 +52,6 @@ export interface BenchCallbacks {
 /** Modeli değiştirmeyen, canlı değişen özellikler (model yeniden kurulmaz, update() uygular). */
 const LIVE_PROPS = new Set(['closed', 'position', 'illuminance', 'temperature', 'level', 'mode', 'loadTorque', 'amplitude', 'frequency', 'waveform', 'offset']);
 
-/** Kablo renkleri (ağ başına); toprak siyah, besleme kırmızı. */
-const CABLE_COLORS = ['#f08a24', '#f2c230', '#2f9e5b', '#2f6fd6', '#8e5bd1', '#e9ecef', '#18a3a8', '#d64b8a'];
 
 interface Placed {
   readonly key: string;
@@ -317,18 +315,8 @@ export class BenchScene {
       if (onBoard) this.parts.set(part.id, this.placeOnBoard(part, onBoard, plan.cols));
       else if (table) this.parts.set(part.id, this.placeOnTable(part, table));
     }
-    // Renkler: ağ başına (toprak siyah, besleme kırmızı, öbürleri sırayla).
-    const colors = new Map<string, string>();
-    let next = 0;
-    const colorOf = (net: string) => {
-      let c = colors.get(net);
-      if (!c) {
-        const role = plan.roles.get(net);
-        c = role === 'ground' ? '#1b1c1f' : role === 'supply' ? '#d22f27' : CABLE_COLORS[next++ % CABLE_COLORS.length]!;
-        colors.set(net, c);
-      }
-      return c;
-    };
+    // Renkler: ağ başına (toprak siyah, besleme kırmızı, öbürleri sırayla; lehim rehberiyle aynı).
+    const colorOf = netColors(plan);
     const holeTop = (h: Hole) => holeAt(h, plan.cols, BB.height);
     for (const j of plan.jumpers) this.cables.add(jumperMesh(holeTop(j.a), holeTop(j.b), colorOf(j.net)));
     const plug = new BoxGeometry(0.75, 1.5, 0.75);

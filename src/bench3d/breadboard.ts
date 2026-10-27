@@ -156,6 +156,23 @@ const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rota
   tank: { side: 'front', w: 11.5, d: 11, rotation: 0 },
 };
 
+/** Kablo ve jumper renkleri (ağ başına): toprak siyah, besleme kırmızı, öbürleri sırayla. */
+const NET_COLORS = ['#f08a24', '#f2c230', '#2f9e5b', '#2f6fd6', '#8e5bd1', '#e9ecef', '#18a3a8', '#d64b8a'];
+
+export function netColors(plan: BreadboardPlan): (net: string) => string {
+  const colors = new Map<string, string>();
+  let next = 0;
+  return (net) => {
+    let c = colors.get(net);
+    if (!c) {
+      const role = plan.roles.get(net);
+      c = role === 'ground' ? '#1b1c1f' : role === 'supply' ? '#d22f27' : NET_COLORS[next++ % NET_COLORS.length]!;
+      colors.set(net, c);
+    }
+    return c;
+  };
+}
+
 export function isOnBoard(type: DeviceType): boolean {
   return MOUNTS[type] !== undefined;
 }
@@ -224,6 +241,8 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
   }
   const groundPins = netlist.elements.filter((e) => e.type === 'ground').flatMap((e) => e.pins);
   for (let i = 1; i < groundPins.length; i++) union(groundPins[0]!, groundPins[i]!);
+  // Arduino'nun iki GND ucu kartın içinde aynı bakırdır: breadboard'da tek ağ.
+  for (const el of netlist.elements) if (el.type === 'arduino') union(el.pins[2]!, el.pins[21]!);
 
   const netOf = new Map<string, string>();
   const members = new Map<string, number>();
@@ -458,9 +477,13 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
     if (!place) continue;
     const side = TABLE[part.type]!.side;
     const pinCount = netlist.elements.find((e) => e.id === part.id)!.pins.length;
+    const led = new Set<string>();
     for (let pin = 0; pin < pinCount; pin++) {
       if (!connected(part, pin)) continue;
       const n = net(part, pin);
+      // Arduino'nun iki GND'si aynı ağ: tek kablo yeter.
+      if (part.type === 'arduino' && (pin === 2 || pin === 21) && led.has(n)) continue;
+      led.add(n);
       const role = roles.get(n);
       const topSide = side !== 'front';
       const board = side === 'front' ? boards - 1 : 0;

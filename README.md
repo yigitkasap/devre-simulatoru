@@ -1684,3 +1684,24 @@ kırpıcı (89 000 adım/s) bu işten önce de sınırdaydı (önceki taramada 4
 - **Kamera:** parçalara, kablolara ve breadboard'un kullanılan bölümüne sığdırılır (yarım boyda
   kartın tamamı).
 
+### Lehim rehberi (2026-10-28)
+
+3B tezgâhta "Lehim rehberi" (`src/bench3d/guide.ts`, `src/editor/SolderGuide.tsx`): breadboard
+yerleşimi, breadboard düzenindeki bir delikli plakete (ör. Adafruit Perma-Proto: aynı sütun
+numaraları, a–j satırları ve raylar) aktarılır.
+
+- Üstten şema (delikler, parçalar, ağ renkli jumper'lar, dışarı giden tellerin delikleri).
+- Malzeme listesi: direnç renk kodu (4 halka), LED rengi, kondansatör türü, transistör modeli,
+  DIP-8 soket, jumper teli sayısı.
+- Takma sırası: alçaktan yükseğe (jumper, direnç ve diyot, soket, transistör, kondansatör, LED,
+  potansiyometre, dışarı giden teller). Yön notları: LED anodu, diyot bandı, elektrolitiğin −
+  bacağı, entegrenin çentiği ve 1. bacağı, transistörün soldan sağa bacakları (BC547B, BC557B ve
+  2N7000'de düz yüzün yönü; öbürlerinde veri sayfasına bakılması).
+- Uyarılar: şebeke (transformatör, AC kaynak) karta bağlanmaz; ölçü aletleri lehimlenmez.
+- Yazdırılabilir (yalnızca rehber basılır). Arduino'nun iki GND ucu kartın içinde aynı bakır olduğu
+  için yerleşimde tek ağ sayılır.
+- Testler: `tests/guide.test.ts` (62 örnekte her parça, jumper ve tel tek adım; delik adları
+  geçerli; renk kodu). ios-kontrol'de telefon maddesi (pencere içinde kayar, sayfa kaymaz).
+
+PCB araştırması ve sonraki aşamalar: `docs/pcb/arastirma.md`.
+

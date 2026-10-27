@@ -4,6 +4,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import type { BenchCallbacks } from '../bench3d/scene';
 import { tr } from '../i18n/tr';
 import type { CircuitDoc } from '../model/types';
+import { SolderGuideDialog } from './SolderGuide';
 import type { SimFrame } from './useSimulation';
 
 const Bench3D = lazy(() => import('../bench3d/Bench3D'));
@@ -73,6 +74,7 @@ export interface BenchViewProps {
 
 export function BenchView(props: BenchViewProps) {
   const [fit, setFit] = useState({ n: 0, top: false });
+  const [guideOpen, setGuideOpen] = useState(false);
   const button = props.touch ? 'h-11 px-3.5 text-sm' : 'h-9 px-3 text-small';
   // Alan kısaysa (cihaz rafı açık, telefon) ipucu sahneyi örtmesin.
   const host = useRef<HTMLDivElement>(null);
@@ -98,12 +100,21 @@ export function BenchView(props: BenchViewProps) {
           frame={props.frame}
           active={props.active}
           selection={props.selection}
-          overlayOpen={props.overlayOpen}
+          overlayOpen={props.overlayOpen || guideOpen}
           fitRequest={fit}
           callbacks={props.callbacks}
         />
       </Suspense>
       <div className="pointer-events-none absolute top-3 right-3 z-10 flex gap-1.5">
+        {props.doc.parts.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            className={`pointer-events-auto rounded-md border border-line-2 bg-panel font-medium text-ink shadow-sm hover:bg-panel-2 ${button}`}
+          >
+            {tr.solderGuide.open}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setFit((f) => ({ n: f.n + 1, top: false }))}
@@ -119,6 +130,7 @@ export function BenchView(props: BenchViewProps) {
           {tr.bench.top}
         </button>
       </div>
+      {guideOpen && <SolderGuideDialog doc={props.doc} touch={props.touch} onClose={() => setGuideOpen(false)} />}
       {roomy && (
         <p className="pointer-events-none absolute right-3 bottom-3 left-3 z-10 text-center text-label text-ink-2 [text-shadow:0_1px_0_#fff]">
           {props.touch ? tr.bench.hintTouch : tr.bench.hintMouse}

@@ -383,3 +383,23 @@ button {
     animation: none;
   }
 }
+
+/* Lehim rehberi yazdırılırken yalnızca rehber görünür (sayfanın geri kalanı gizli). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #lehim-rehberi,
+  #lehim-rehberi * {
+    visibility: visible;
+  }
+  #lehim-rehberi {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    box-shadow: none;
+  }
+}
+

@@ -1645,6 +1645,25 @@ export const tr = {
     autoDone: (parts: string) => `Oto: ${parts}`,
     autoSpeed: (speed: string) => `hız ${speed}`,
   },
+  solderGuide: {
+    open: 'Lehim rehberi',
+    title: 'Lehim rehberi: delikli plakete aktarma',
+    intro:
+      'Breadboard’daki yerleşimin aynısı, breadboard düzeninde bir delikli plakete (ör. Adafruit Perma-Proto) lehimlenir: sütun numaraları, a–j satırları ve raylar aynıdır. Parçaları aşağıdaki sırayla tak: önce alçak olanlar (jumper’lar, dirençler), en son uzun olanlar ve dışarı giden teller. Her parçayı takınca bacaklarını alttan lehimle ve fazlasını kes.',
+    board: 'Kart',
+    materials: 'Malzeme listesi',
+    steps: 'Takma sırası',
+    checksTitle: 'Bitince denetle',
+    checks: [
+      'Lehim köprüsü yok: komşu şeritler birbirine değmiyor (büyüteçle bak).',
+      'Besleme (+) ile toprak (−) arasında kısa devre yok: multimetre direnç kipinde birkaç kΩ’dan büyük gösterir.',
+      'LED’lerin, diyotların, elektrolitik kondansatörlerin ve transistörlerin yönü rehberdeki gibi; entegre sokete çentiği sola gelecek biçimde takılı.',
+      'İlk açılışta akım sınırlı bir kaynak (ör. 50 mA) ya da seri bir direnç kullan; gerilimleri simülatördeki değerlerle karşılaştır.',
+    ],
+    diagramLabel: 'Delikli plaketin üstten görünüşü: parçalar, jumper’lar ve dışarı giden tellerin delikleri',
+    print: 'Yazdır',
+    close: 'Kapat',
+  },
   bench: {
     viewGroup: 'Görünüm',
     schematic: 'Şema',
