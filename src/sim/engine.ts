@@ -157,6 +157,8 @@ export class CircuitSimulator {
   private limitEvent = false;
   /** Durumu eşikle değişen bileşenler (röle) ve son reddedilen adımda eşiğin aşıldığı kesir. */
   private switchingDevices: readonly Device[] = [];
+  /** Adımı kendi durumuna göre sınırlayan bileşenler (osiloskop). */
+  private stepLimitDevices: readonly Device[] = [];
   private eventFractionLast = 1;
   /** gmin düğümleri ve akımı tam 0 olan uçlar hangi sürüm ve çözüm türü için hesaplandı. */
   private topologyVersion = -1;
@@ -227,6 +229,7 @@ export class CircuitSimulator {
     this.sampleSpacing = Number.isFinite(shortest) ? shortest / AVERAGE_SAMPLES_PER_PERIOD : 0;
     this.nonlinearDevices = this.circuit.devices.filter((d) => d.nonlinear);
     this.switchingDevices = this.circuit.devices.filter((d) => d.switching);
+    this.stepLimitDevices = this.circuit.devices.filter((d) => d.limitsStep);
     this.connectPins();
     this.lteStates = this.circuit.devices.flatMap((d) => d.lteStates());
     this.breakpointDevices = this.circuit.devices.filter((d) => d.timeVarying);
@@ -700,7 +703,11 @@ export class CircuitSimulator {
     let attempts = 0;
     for (;;) {
       const tiny = Math.max(1e-15, Math.abs(this.time) * 1e-13);
-      const proposed = Math.min(this.h, this.maxStep);
+      let limit = Number.POSITIVE_INFINITY;
+      for (const device of this.stepLimitDevices) limit = Math.min(limit, device.stepLimit);
+      /** Adım bir bileşenin (ekran yakalayan osiloskobun) sınırıyla kısaltıldı mı? */
+      const limited = limit < Math.min(this.h, this.maxStep);
+      const proposed = limited ? Math.max(minStep, limit) : Math.min(this.h, this.maxStep);
       let end = this.time + proposed;
       let landing = false;
       /** Adım kırılma noktasına ya da hedefe denk gelsin diye kısaltıldı mı? */
@@ -780,6 +787,8 @@ export class CircuitSimulator {
           this.h = Math.min(this.maxStep, this.h * 2);
           this.successStreak = 0;
         }
+      } else if (limited && !truncated) {
+        // Bileşenin geçici sınırı: olağan adım (this.h) korunur, sınır kalkınca ona dönülür.
       } else if (truncated) {
         // Adım kırılma noktasına ya da hedefe denk gelsin diye kısaltıldı: önerilen adım korunur.
         // (Kısaltma, end − time farkıyla değil bayrakla izlenir: o farkın yuvarlama hatası küçük

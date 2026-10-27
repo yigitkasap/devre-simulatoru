@@ -1,6 +1,6 @@
 import type { MnaSystem } from '../mna';
 import { boolProp, numProp, strProp, type Props } from '../netlist';
-import { ScopeRecorder } from '../scope';
+import { ScopeRecorder, type TriggerConfig } from '../scope';
 import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type StepContext } from './device';
 
 export type ScopeTrigger = 'A' | 'B';
@@ -110,6 +110,49 @@ export class OscilloscopeDevice extends Device {
     this.settings = scopeSettings(init.props);
     this.timePerDiv = Math.max(1e-8, this.settings.timePerDiv);
     this.recorder = new ScopeRecorder(this.timePerDiv);
+    this.recorder.setTrigger(this.triggerConfig());
+  }
+
+  /** Kanalların devrede bir şeye bağlı olup olmadığı (tetik, bağlı kanala düşer). */
+  private channelConnected: [boolean, boolean] = [true, true];
+
+  /** Tetik kaynağı: seçili kanal (bağlı değilse öbürü), ADD kipinde A + B; X-Y kipinde tetik yok. */
+  private triggerConfig(): TriggerConfig {
+    const s = this.settings;
+    const [a, b] = this.channelConnected;
+    const source = s.mode === 'add' ? 'sum' : s.trigger === 'B' ? (b || !a ? 'B' : 'A') : a || !b ? 'A' : 'B';
+    return { enabled: s.mode !== 'xy', source, invertB: s.invertB };
+  }
+
+  override connectPins(connected: readonly boolean[]): void {
+    this.channelConnected = [connected[0] ?? true, connected[1] ?? true];
+    this.recorder.setTrigger(this.triggerConfig());
+  }
+
+  /** Tetik kenarı motorun olayıdır: adım, kenarın hemen sonrasına kısaltılır (titremesiz ekran). */
+  override get switching(): boolean {
+    return this.settings.mode !== 'xy';
+  }
+
+  /** Aday çözümde tetik kenarı varsa adımın içindeki kesri (AC kuplaj süzgeci yaklaşık uygulanır). */
+  override eventFraction(x: Float64Array): number | null {
+    const raw = this.raw(x);
+    const shown = ([0, 1] as const).map((c) => {
+      const coupling = this.settings.coupling[c];
+      if (coupling === 'gnd') return 0;
+      const prev = this.filter[c];
+      return coupling === 'dc' || prev === null ? raw[c] : prev.y + raw[c] - prev.x;
+    });
+    return this.recorder.triggerFraction(shown[0]!, shown[1]!);
+  }
+
+  override get limitsStep(): boolean {
+    return true;
+  }
+
+  /** Ekran yakalanırken adım, ekranın 1/CAPTURE_STEPS'iyle sınırlı. */
+  override get stepLimit(): number {
+    return this.recorder.stepLimit;
   }
 
   /** Gerçek girişle yüklenen kanallar (GND kuplajında giriş kesiktir). */
@@ -219,6 +262,8 @@ export class OscilloscopeDevice extends Device {
   override adoptState(prev: Device): void {
     if (!(prev instanceof OscilloscopeDevice)) return;
     if (prev.timePerDiv === this.timePerDiv) this.recorder = prev.recorder;
+    this.channelConnected = prev.channelConnected;
+    this.recorder.setTrigger(this.triggerConfig());
     this.capVoltage = prev.capVoltage;
     this.lastTime = prev.lastTime;
     this.shown = prev.shown;

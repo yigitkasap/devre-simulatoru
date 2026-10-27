@@ -259,6 +259,9 @@ export function useSimulation(
         if (device instanceof OscilloscopeDevice) {
           const connected = [0, 1].map((pin) => !conn.unconnectedPins.has(pinKey(part.id, pin))) as [boolean, boolean];
           scopes.set(part.id, buildScopeView(device.recorder, scopeSettings(part.props), connected));
+          // Ekran karede bir kez yakalanır: gösterildikten sonra kayıt bir sonraki tetiğe kurulur.
+          device.recorder.perFrame = true;
+          device.recorder.rearm();
         }
       }
     }

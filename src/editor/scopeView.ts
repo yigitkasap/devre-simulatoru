@@ -9,6 +9,10 @@
 // ((en küçük + en büyük) / 2) bulunur; sinyalin bu seviyeyi yukarı doğru kestiği en son an,
 // ardından tam bir ekranlık kayıt varsa ekranın sol kenarı olur. Böylece periyodik bir sinyal
 // ekranda durur. Kesim yoksa (DC ya da çok yavaş sinyal) ekran en son kaydı kaydırarak gösterir.
+//
+// Ekran sinyalin periyodundan kısaysa (geçmişte kesim yok) ya da geçmiş, motorun adımlarına göre
+// ekranı çizmeye yetmeyecek kadar seyrekse, kaydın tetikli yakalaması (sim/scope.ts) gösterilir:
+// tetik anından başlayan, ince adımlarla çözülmüş bir ekran.
 
 import type { ScopeSettings } from '../sim/devices/oscilloscope';
 import { TIME_PER_DIV_STEPS, VOLTS_PER_DIV_STEPS } from '../sim/devices/oscilloscope';
@@ -131,6 +135,8 @@ function channelView(
   voltsPerDiv: number,
   position: number,
   draw: boolean,
+  /** Kaydın tetik izlemesinden gelen frekans (geçmişte iki kesim yoksa kullanılır). */
+  fallbackFrequency: number | null = null,
 ): ScopeChannelView {
   const end = Math.min(rec.end, start + SCOPE_BUCKETS);
   if (end <= start) return { connected: true, path: '', stats: null };
@@ -183,7 +189,7 @@ function channelView(
       peakToPeak: hi - lo,
       mean: sum / n,
       rms: Math.sqrt(sumSquares / n),
-      frequency: frequencyOf(rec, data),
+      frequency: frequencyOf(rec, data) ?? fallbackFrequency,
     },
   };
 }
@@ -199,6 +205,16 @@ function xyPath(rec: ScopeRecorder, a: ChannelData, b: ChannelData, settings: Sc
     parts.push(`${parts.length === 0 ? 'M' : 'L'}${toX(a.last(s)).toFixed(1)},${toY(b.last(s)).toFixed(1)}`);
   }
   return parts.join(' ');
+}
+
+/**
+ * Gösterilecek tetikli yakalama: geçmişte tetik bulunamadıysa ya da geçmiş ekranı çizmeye
+ * yetmeyecek kadar seyrekse (adım ekrana göre büyük) son yakalama; yoksa null.
+ */
+function capturedTrace(rec: ScopeRecorder, historyTriggered: boolean): ScopeRecorder | null {
+  if (historyTriggered && !rec.coarse) return null;
+  const trace = rec.trace();
+  return trace && trace.end - trace.start >= SCOPE_BUCKETS ? trace : null;
 }
 
 const EMPTY_CHANNEL: ScopeChannelView = { connected: false, path: '', stats: null };
@@ -229,21 +245,48 @@ export function buildScopeView(
       max: (s) => a.max(s) + b.max(s),
       last: (s) => a.last(s) + b.last(s),
     };
-    const { start, triggered } = windowStart(rec, sum);
+    const history = windowStart(rec, sum);
+    const trace = capturedTrace(rec, history.triggered);
+    const frequency = rec.triggerFrequency();
+    if (trace) {
+      const [ta, tb] = [channelData(trace, 0, false), channelData(trace, 1, settings.invertB)];
+      const traceSum: ChannelData = {
+        min: (s) => ta.min(s) + tb.min(s),
+        max: (s) => ta.max(s) + tb.max(s),
+        last: (s) => ta.last(s) + tb.last(s),
+      };
+      return {
+        channels: [channelView(trace, traceSum, trace.start, settings.voltsPerDiv[0], settings.position[0], true, frequency), EMPTY_CHANNEL],
+        triggered: true,
+        xyPath: '',
+      };
+    }
     return {
-      channels: [channelView(rec, sum, start, settings.voltsPerDiv[0], settings.position[0], true), EMPTY_CHANNEL],
-      triggered,
+      channels: [channelView(rec, sum, history.start, settings.voltsPerDiv[0], settings.position[0], true, frequency), EMPTY_CHANNEL],
+      triggered: history.triggered,
       xyPath: '',
     };
   }
   const preferred: Channel = settings.trigger === 'B' ? 1 : 0;
   const triggerChannel: Channel | null = connected[preferred] ? preferred : connected[1 - preferred] ? ((1 - preferred) as Channel) : null;
-  const { start, triggered } = windowStart(rec, triggerChannel === null ? null : data[triggerChannel]);
+  const history = windowStart(rec, triggerChannel === null ? null : data[triggerChannel]);
+  const trace = triggerChannel === null ? null : capturedTrace(rec, history.triggered);
+  const source = trace ?? rec;
+  const start = trace ? trace.start : history.start;
+  const sourceData = trace ? ([channelData(trace, 0, false), channelData(trace, 1, settings.invertB)] as const) : data;
   const view = (channel: Channel) =>
     connected[channel]
-      ? channelView(rec, data[channel], start, settings.voltsPerDiv[channel], settings.position[channel], true)
+      ? channelView(
+          source,
+          sourceData[channel],
+          start,
+          settings.voltsPerDiv[channel],
+          settings.position[channel],
+          true,
+          channel === triggerChannel ? rec.triggerFrequency() : null,
+        )
       : EMPTY_CHANNEL;
-  return { channels: [view(0), view(1)], triggered, xyPath: '' };
+  return { channels: [view(0), view(1)], triggered: trace !== null || history.triggered, xyPath: '' };
 }
 
 /** Değeri karşılayan en küçük adım (1-2-5 dizisi); hiçbiri yetmezse en büyüğü. */
@@ -275,7 +318,7 @@ export function autoSettings(
   // hâlâ eski sinyal vardır.
   const frequency =
     fallback.frequency ??
-    (hasData ? frequencyOf(rec, channelData(rec, triggerChannel, triggerChannel === 1 && settings.invertB)) : null);
+    (hasData ? (frequencyOf(rec, channelData(rec, triggerChannel, triggerChannel === 1 && settings.invertB)) ?? rec.triggerFrequency()) : null);
   if (frequency !== null && frequency > 0) {
     patch.timePerDiv = stepAtLeast(TIME_PER_DIV_STEPS, 2.5 / frequency / SCOPE_DIVISIONS_X);
   }

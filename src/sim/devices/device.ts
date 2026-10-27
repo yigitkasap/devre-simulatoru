@@ -222,6 +222,16 @@ export abstract class Device {
     return false;
   }
 
+  /** Zaman adımını kendi durumuna göre sınırlayan bileşen mi (ekran yakalayan osiloskop)? */
+  get limitsStep(): boolean {
+    return false;
+  }
+
+  /** Şu anki adım üst sınırı (s); limitsStep olan bileşenlerde her adımdan önce sorulur. */
+  get stepLimit(): number {
+    return Number.POSITIVE_INFINITY;
+  }
+
   /** Durumu bir eşiğin aşılmasıyla değişen bileşen mi (röle)? */
   get switching(): boolean {
     return false;
