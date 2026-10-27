@@ -240,9 +240,9 @@ export abstract class Device {
   /**
    * Bu adımın çözümünde bir eşik aşılıyorsa, geçişin adımın hangi kesrinde olduğu (son kabul edilen
    * adımdan doğrusal aradeğerle, 0..1); aşılmıyorsa null. Motor adımı geçişin hemen sonrasına
-   * kısaltır (EVENT_RESOLUTION), sonra switchState çağrılır.
+   * kısaltır (EVENT_RESOLUTION), sonra switchState çağrılır. `h`: denenen adımın süresi.
    */
-  eventFraction(_x: Float64Array): number | null {
+  eventFraction(_x: Float64Array, _h = 0): number | null {
     return null;
   }
 

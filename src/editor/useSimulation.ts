@@ -306,6 +306,8 @@ export function useSimulation(
       // Yeni simülasyon: LED'ler onarılmış, kondansatörler başlangıç geriliminde başlar.
       sim = new CircuitSimulator(latest.current.connectivity.netlist);
       simRef.current = sim;
+      // Osiloskoplar ekranı karede bir yakalar (buildFrame'de yeniden kurulur).
+      for (const device of sim.devices) if (device instanceof OscilloscopeDevice) device.recorder.perFrame = true;
       startedStructure.current = latest.current.structure;
     }
     if (!sim.canRun) {

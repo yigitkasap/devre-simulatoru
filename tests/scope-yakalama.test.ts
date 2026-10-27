@@ -22,6 +22,7 @@ function sine(timePerDiv: number, extra: Record<string, string | number | boolea
       .build(),
   );
   const scope = () => sim.device('O1') as OscilloscopeDevice;
+  scope().recorder.perFrame = true;
   /** Arayüz gibi: kare başına bir ilerletme, ekran, yeniden kurma. */
   const frame = (dt = 1 / 60) => {
     const result = sim.advance(dt, 6000);
@@ -72,6 +73,36 @@ describe('Osiloskop: tetikli yakalama (kısa ekran)', () => {
     expect(Math.max(...starts) - Math.min(...starts)).toBeLessThan(0.5);
     // Olağan adım ≈ periyot/50 (45 µs): 1/60 s ≈ 370 adım; yakalama ≈ 250 adım ekler.
     expect(most).toBeLessThan(1200);
+  });
+
+  it('kare dalga: kenarda tetik adımı sınırsız bölmez (karede birkaç yüz adım)', () => {
+    const props = { timePerDiv: 10e-6, voltsPerDivA: 5 };
+    const sim = new CircuitSimulator(
+      circuit()
+        .acsource('AC1', 'a', 'gnd', { amplitude: PEAK, frequency: 1000, waveform: 'square' })
+        .ground('G1', 'gnd')
+        .resistor('R1', 'a', 'b', 1000)
+        .capacitor('C1', 'b', 'gnd', 10e-9)
+        .oscilloscope('O1', 'b', 'nc', 'gnd', props)
+        .build(),
+    );
+    const rec = () => (sim.device('O1') as OscilloscopeDevice).recorder;
+    rec().perFrame = true;
+    let most = 0;
+    for (let i = 0; i < 20; i++) {
+      most = Math.max(most, sim.advance(1 / 60, 6000).steps);
+      rec().perFrame = true;
+      rec().rearm();
+    }
+    // Osiloskopsuz ≈ 1300 adım (RC'nin τ = 10 µs'si kenarlarda küçük adım ister); yakalama ≈ 250 ekler.
+    expect(most).toBeLessThan(1800);
+    expect(buildScopeView(rec(), scopeSettings(props), [true, false]).triggered).toBe(true);
+  });
+
+  it('ağır çekimde her kare en az bir adım atar (iz sıçramaz)', () => {
+    const { sim } = sine(10e-6);
+    sim.advance(0.01);
+    for (let i = 0; i < 20; i++) expect(sim.advance(5e-6).steps).toBeGreaterThanOrEqual(1);
   });
 
   it('sinyal durunca yakalama eskir: ekran kayan kayda döner', () => {

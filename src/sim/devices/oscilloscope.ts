@@ -134,8 +134,12 @@ export class OscilloscopeDevice extends Device {
     return this.settings.mode !== 'xy';
   }
 
-  /** Aday çözümde tetik kenarı varsa adımın içindeki kesri (AC kuplaj süzgeci yaklaşık uygulanır). */
-  override eventFraction(x: Float64Array): number | null {
+  /**
+   * Aday çözümde tetik kenarı varsa adımın içindeki kesri (AC kuplaj süzgeci yaklaşık uygulanır).
+   * Kenar adımın sonuna bir kovadan yakınsa adım kısaltılmaz: kayıt kesimi aradeğerle bulur. (Kare
+   * dalganın sıçramasında aradeğer kesimi hep adımın ortasına koyar; sınırsız yarılanmasın.)
+   */
+  override eventFraction(x: Float64Array, h = 0): number | null {
     const raw = this.raw(x);
     const shown = ([0, 1] as const).map((c) => {
       const coupling = this.settings.coupling[c];
@@ -143,7 +147,8 @@ export class OscilloscopeDevice extends Device {
       const prev = this.filter[c];
       return coupling === 'dc' || prev === null ? raw[c] : prev.y + raw[c] - prev.x;
     });
-    return this.recorder.triggerFraction(shown[0]!, shown[1]!);
+    const f = this.recorder.triggerFraction(shown[0]!, shown[1]!);
+    return f === null || (1 - f) * h <= this.recorder.bucketTime ? null : f;
   }
 
   override get limitsStep(): boolean {
@@ -262,6 +267,7 @@ export class OscilloscopeDevice extends Device {
   override adoptState(prev: Device): void {
     if (!(prev instanceof OscilloscopeDevice)) return;
     if (prev.timePerDiv === this.timePerDiv) this.recorder = prev.recorder;
+    else this.recorder.perFrame = prev.recorder.perFrame;
     this.channelConnected = prev.channelConnected;
     this.recorder.setTrigger(this.triggerConfig());
     this.capVoltage = prev.capVoltage;

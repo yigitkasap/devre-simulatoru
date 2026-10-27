@@ -703,7 +703,9 @@ export class CircuitSimulator {
     let attempts = 0;
     for (;;) {
       const tiny = Math.max(1e-15, Math.abs(this.time) * 1e-13);
-      let limit = Number.POSITIVE_INFINITY;
+      // Arayüzün ilerletmesinde (exact değil) adım, istenen süreyi aşmaz: ağır çekimde her kare
+      // en az bir adım atar, osiloskobun izi sıçramaz.
+      let limit = exact ? Number.POSITIVE_INFINITY : Math.max(minStep, dt);
       for (const device of this.stepLimitDevices) limit = Math.min(limit, device.stepLimit);
       /** Adım bir bileşenin (ekran yakalayan osiloskobun) sınırıyla kısaltıldı mı? */
       const limited = limit < Math.min(this.h, this.maxStep);
@@ -939,7 +941,7 @@ export class CircuitSimulator {
       if (attempt === 0 && ctx.h > EVENT_RESOLUTION && this.switchingDevices.length > 0) {
         let fraction = Number.POSITIVE_INFINITY;
         for (const device of this.switchingDevices) {
-          const f = device.eventFraction(this.xNew);
+          const f = device.eventFraction(this.xNew, ctx.h);
           if (f !== null) fraction = Math.min(fraction, Math.max(0, f));
         }
         if (fraction < Number.POSITIVE_INFINITY && (1 - fraction) * ctx.h > EVENT_RESOLUTION) {
