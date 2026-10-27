@@ -29,7 +29,14 @@ export const BJT_DEFAULTS = { beta: 200 };
  * BC107'de eklem yükleri de vardır (NXP BC547B SPICE kartından):
  *   B-E: C_je = 13,6 pF, V_je = 0,65 V, M_je = 0,33;  τ_F = 0,44 ns  (f_T ≈ 300 MHz; veri sayfası ≥ 150 MHz)
  *   B-C: C_jc = 3,7 pF,  V_jc = 0,40 V, M_jc = 0,30  (10 V'ta ≈ 1,4 pF; veri sayfası C_ob ≤ 4,5 pF)
+ *   FC = 0,9579 (karttan; boşluk kapasitesinin doğrusal uzatıldığı yer).
  * Bu kapasiteler yükseltecin kazancını yüksek frekansta düşürür (Miller etkisi).
+ * BC107'nin doğru akım modeli de kartın Gummel-Poon modelidir (ngspice bjtload.c; GUMMEL_POON):
+ * düşük akımda B-E sızıntısı (ISE, NE) β'yı düşürür, yüksek akımda yüksek enjeksiyon (IKF) da
+ * düşürür; ters Early gerilimi (VAR) ve emisyon katsayıları (NF, NR) da vardır. β özelliği kartın
+ * ideal BF'sidir: 2 mA'de etkin h_FE ≈ β, 100 mA'de ≈ %30 düşük. Seri dirençler (RB = 1 Ω,
+ * RE = 0,47 Ω, RC = 0,85 Ω) iç düğüm gerektirir; föydeki akımlarda etkileri ölçüm belirsizliğinin
+ * altında olduğu için modellenmez.
  * "BC547B" seçeneği eski (yüksüz) modeldir; "model" özelliği olmayan kayıtlar onu kullanır.
  */
 export const NPN_MODELS = ['BC107', 'BC547B'] as const;
@@ -44,9 +51,30 @@ interface BjtCharges {
 
 const NPN_CHARGES: Readonly<Record<NpnModelName, BjtCharges | null>> = {
   BC107: {
-    be: { cj0: 13.58e-12, vj: 0.65, m: 0.3279, tt: 0.4391e-9 },
-    bc: { cj0: 3.728e-12, vj: 0.3997, m: 0.2955, tt: 0 },
+    be: { cj0: 13.58e-12, vj: 0.65, m: 0.3279, tt: 0.4391e-9, fc: 0.9579 },
+    bc: { cj0: 3.728e-12, vj: 0.3997, m: 0.2955, tt: 0, fc: 0.9579 },
   },
+  BC547B: null,
+};
+
+/** Gummel-Poon kartının doğru akım parametreleri (NXP BC547B; BF yerine β özelliği). */
+export interface GummelPoon {
+  readonly is: number;
+  readonly nf: number;
+  readonly nr: number;
+  readonly ise: number;
+  readonly ne: number;
+  readonly isc: number;
+  readonly nc: number;
+  readonly br: number;
+  readonly ikf: number;
+  readonly ikr: number;
+  readonly vaf: number;
+  readonly var: number;
+}
+
+export const GUMMEL_POON: Readonly<Record<NpnModelName, GummelPoon | null>> = {
+  BC107: { is: 2.39e-14, nf: 1.008, nr: 1.004, ise: 3.545e-15, ne: 1.541, isc: 6.272e-14, nc: 1.243, br: 7.946, ikf: 0.1357, ikr: 0.1144, vaf: 63.2, var: 25.9 },
   BC547B: null,
 };
 
@@ -96,16 +124,59 @@ export function evaluateBjt(vbe: number, vbc: number, beta: number): BjtEvaluati
   };
 }
 
+/** Bir eklem diyodunun akımı ve iletkenliği: I = Is·(e^{v/(N·VT)} − 1). */
+function diodeTerm(is: number, v: number, nvt: number): { i: number; g: number } {
+  if (is <= 0) return { i: 0, g: 0 };
+  return { i: is * (safeExp(v / nvt) - 1), g: (is / nvt) * safeExpSlope(v / nvt) };
+}
+
+/**
+ * Gummel-Poon modeli (ngspice bjtload.c ile aynı denklemler, seri dirençsiz):
+ *   I_F = IS·(e^{V_BE/(NF·VT)} − 1),  I_R = IS·(e^{V_BC/(NR·VT)} − 1)
+ *   q1 = 1/(1 − V_BC/VAF − V_BE/VAR),  q2 = I_F/IKF + I_R/IKR,  q_b = q1·(1 + √(1 + 4·q2))/2
+ *   I_C = (I_F − I_R)/q_b − I_R/BR − I_SC,   I_B = I_F/BF + I_SE + I_R/BR + I_SC
+ *   I_SE = ISE·(e^{V_BE/(NE·VT)} − 1),  I_SC = ISC·(e^{V_BC/(NC·VT)} − 1)
+ * Yalnızca VAF verilip IKF, VAR sonsuzken Ebers-Moll + Early (evaluateBjt) ile aynıdır.
+ */
+export function evaluateGummelPoon(vbe: number, vbc: number, bf: number, p: GummelPoon): BjtEvaluation {
+  const f = diodeTerm(p.is, vbe, p.nf * VT);
+  const r = diodeTerm(p.is, vbc, p.nr * VT);
+  const se = diodeTerm(p.ise, vbe, p.ne * VT);
+  const sc = diodeTerm(p.isc, vbc, p.nc * VT);
+  // q1: Early etkisi (ileri ve ters); doyumda payda çok küçülmesin (evaluateBjt'deki gibi).
+  const denominator = 1 - vbc / p.vaf - vbe / p.var;
+  const early = denominator > 0.05;
+  const q1 = 1 / (early ? denominator : 0.05);
+  const q2 = f.i / p.ikf + r.i / p.ikr;
+  const sq = Math.sqrt(Math.max(0, 1 + 4 * q2));
+  const qb = (q1 * (1 + sq)) / 2;
+  const dqbdve = q1 * ((early ? qb / p.var : 0) + (sq > 0 ? f.g / p.ikf / sq : 0));
+  const dqbdvc = q1 * ((early ? qb / p.vaf : 0) + (sq > 0 ? r.g / p.ikr / sq : 0));
+  const transport = (f.i - r.i) / qb;
+  return {
+    collector: {
+      current: transport - r.i / p.br - sc.i - GMIN * vbc,
+      du: f.g / qb - (transport * dqbdve) / qb,
+      dw: -r.g / qb - (transport * dqbdvc) / qb - r.g / p.br - sc.g - GMIN,
+    },
+    base: {
+      current: f.i / bf + se.i + r.i / p.br + sc.i + GMIN * (vbe + vbc),
+      du: f.g / bf + se.g + GMIN,
+      dw: r.g / p.br + sc.g + GMIN,
+    },
+  };
+}
+
 /**
  * Eklem yükü (boşluk + difüzyon): Q = Q_boşluk(v) + τ·Is·(e^{v/VT} − 1). Taşıma akımındaki
  * Early çarpanı ihmal edilir (SPICE'ın τ_F·I_F'si gibi).
  */
-function junctionCharge(v: number, p: ChargeParams): { q: number; c: number } {
+function junctionCharge(v: number, p: ChargeParams, nvt = VT): { q: number; c: number } {
   const dep = depletionCharge(v, p);
   if (p.tt <= 0) return dep;
   const is = BJT_PARAMS.saturationCurrent;
-  const e = safeExp(v / VT);
-  return { q: dep.q + p.tt * is * (e - 1), c: dep.c + (p.tt * is * safeExpSlope(v / VT)) / VT };
+  const e = safeExp(v / nvt);
+  return { q: dep.q + p.tt * is * (e - 1), c: dep.c + (p.tt * is * safeExpSlope(v / nvt)) / nvt };
 }
 
 /** Bipolar transistör. Pinler: [0] = kollektör (C), [1] = baz (B), [2] = emetör (E). */
@@ -116,6 +187,22 @@ export class BjtDevice extends Device {
   /** NPN modeli (PNP'de yalnızca eski model vardır). */
   readonly model: NpnModelName | null;
   private readonly charges: BjtCharges | null;
+  /** Gummel-Poon kartı (BC107); yoksa Ebers-Moll + Early (eski BC547B ve PNP). */
+  readonly gp: GummelPoon | null;
+
+  /** Uç akımları ve türevleri: kart varsa Gummel-Poon, yoksa Ebers-Moll + Early. */
+  private evaluate(vbe: number, vbc: number): BjtEvaluation {
+    return this.gp ? evaluateGummelPoon(vbe, vbc, this.beta, this.gp) : evaluateBjt(vbe, vbc, this.beta);
+  }
+
+  /** Eklemlerin N·VT'si (difüzyon yükü için). */
+  private get nvtF(): number {
+    return (this.gp?.nf ?? 1) * VT;
+  }
+
+  private get nvtR(): number {
+    return (this.gp?.nr ?? 1) * VT;
+  }
   /** B-E ve B-C eklem yüklerinin integrasyon durumu. */
   private readonly chargeBe = new ChargeState();
   private readonly chargeBc = new ChargeState();
@@ -132,6 +219,7 @@ export class BjtDevice extends Device {
     this.beta = Math.max(1, numProp(init.props, 'beta', BJT_DEFAULTS.beta));
     this.model = type === 'npn' ? strProp(init.props, 'model', NPN_MODELS, NPN_LEGACY_MODEL) : null;
     this.charges = this.model ? NPN_CHARGES[this.model] : null;
+    this.gp = this.model ? GUMMEL_POON[this.model] : null;
   }
 
   override get nonlinear(): boolean {
@@ -147,14 +235,14 @@ export class BjtDevice extends Device {
   }
 
   override stampNonlinear(sys: MnaSystem, ctx: StepContext): void {
-    const e = evaluateBjt(this.vbe, this.vbc, this.beta);
+    const e = this.evaluate(this.vbe, this.vbc);
     this.linear = e;
     let collector = e.collector;
     let base = e.base;
     if (this.charges && ctx.h > 0) {
       // Eklem yüklerinin akımları: B-E yükü bazdan emetöre, B-C yükü bazdan kollektöre akar.
-      const be = junctionCharge(this.vbe, this.charges.be);
-      const bc = junctionCharge(this.vbc, this.charges.bc);
+      const be = junctionCharge(this.vbe, this.charges.be, this.nvtF);
+      const bc = junctionCharge(this.vbc, this.charges.bc, this.nvtR);
       const ibe = this.chargeBe.companion(be.q, be.c, ctx);
       const ibc = this.chargeBc.companion(bc.q, bc.c, ctx);
       collector = { current: collector.current - ibc.i, du: collector.du, dw: collector.dw - ibc.g };
@@ -175,7 +263,7 @@ export class BjtDevice extends Device {
     let converged = !be.limited && !bc.limited;
     if (converged && this.linear) {
       // Akım yakınsaması: doğrusal tahmin ile gerçek eğri arasındaki fark.
-      const actual = evaluateBjt(raw.vbe, raw.vbc, this.beta);
+      const actual = this.evaluate(raw.vbe, raw.vbc);
       const dvbe = raw.vbe - this.vbe;
       const dvbc = raw.vbc - this.vbc;
       for (const key of ['collector', 'base'] as const) {
@@ -198,8 +286,8 @@ export class BjtDevice extends Device {
   override accept(_x: Float64Array, ctx: StepContext): void {
     this.accepted = { vbe: this.vbe, vbc: this.vbc };
     if (this.charges) {
-      this.chargeBe.accept(junctionCharge(this.vbe, this.charges.be).q, ctx);
-      this.chargeBc.accept(junctionCharge(this.vbc, this.charges.bc).q, ctx);
+      this.chargeBe.accept(junctionCharge(this.vbe, this.charges.be, this.nvtF).q, ctx);
+      this.chargeBc.accept(junctionCharge(this.vbc, this.charges.bc, this.nvtR).q, ctx);
     }
   }
 
@@ -216,7 +304,7 @@ export class BjtDevice extends Device {
   /** Kollektöre, baza ve emetöre giren gerçek akımlar (yük modelinde son adımın yük akımları dahil). */
   override pinCurrents(x: Float64Array): number[] {
     const { vbe, vbc } = this.controls(x);
-    const e = evaluateBjt(vbe, vbc, this.beta);
+    const e = this.evaluate(vbe, vbc);
     let ic = e.collector.current;
     let ib = e.base.current;
     if (this.charges) {

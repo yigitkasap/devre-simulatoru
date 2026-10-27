@@ -29,6 +29,11 @@ export interface StepContext {
   readonly trap: boolean;
   /** Bağımsız kaynakların ölçeği (0..1). Yalnızca "kaynak adımlama" yedeğinde 1'den küçüktür. */
   readonly sourceScale: number;
+  /**
+   * Her düğümden toprağa eklenen iletkenlik (S): yalnızca DC çözümün "gmin adımlama" yedeğinde
+   * (ngspice cktop.c dynamic_gmin) sıfırdan büyüktür.
+   */
+  readonly gshunt?: number;
   /** Çözülen anın simülasyon zamanı (s): adımın sonu, DC çözümde şu an. */
   readonly time: number;
   /**

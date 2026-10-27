@@ -138,14 +138,17 @@ export function toSpice(netlist: Netlist, options: { acMagnitude?: boolean } = {
       lines.push(`D${id}_b ${n(device, 1)} ${n(device, 2)} ${brk}`);
     } else if (device instanceof BjtDevice) {
       const name = `Q_${device.type}_${device.model ?? 'eski'}_${device.beta}`;
-      const params: Record<string, number> = {
-        IS: BJT_PARAMS.saturationCurrent,
-        BF: device.beta,
-        BR: BJT_PARAMS.reverseBeta,
-        VAF: BJT_PARAMS.earlyVoltage,
-        NF: 1,
-        NR: 1,
-      };
+      const gp = device.gp;
+      const params: Record<string, number> = gp
+        ? { IS: gp.is, BF: device.beta, BR: gp.br, VAF: gp.vaf, VAR: gp.var, NF: gp.nf, NR: gp.nr, ISE: gp.ise, NE: gp.ne, ISC: gp.isc, NC: gp.nc, IKF: gp.ikf, IKR: gp.ikr }
+        : {
+            IS: BJT_PARAMS.saturationCurrent,
+            BF: device.beta,
+            BR: BJT_PARAMS.reverseBeta,
+            VAF: BJT_PARAMS.earlyVoltage,
+            NF: 1,
+            NR: 1,
+          };
       models.set(name, `.model ${name} ${device.type === 'npn' ? 'NPN' : 'PNP'}(${Object.entries(params).map(([k, v]) => `${k}=${num(v)}`).join(' ')})`);
       lines.push(`Q${id} ${n(device, 0)} ${n(device, 1)} ${n(device, 2)} ${name}`);
     } else if (device.type === 'nmos') {

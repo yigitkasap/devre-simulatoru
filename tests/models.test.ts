@@ -124,11 +124,14 @@ describe('BC107', () => {
     return (out.max - out.min) / 2 / 1e-3;
   }
 
-  it('1 kHz’te eski modelle aynı kazanç (≈ 67); Miller etkisiyle 100 kHz’te ≈ 49, 1 MHz’te ≈ 8; eski modelde düşmez', () => {
+  it('1 kHz’te ≈ 63 (eski modelden ≈ %5 düşük: Gummel-Poon kartının ters Early gerilimi); Miller etkisiyle 100 kHz’te ≈ 49, 1 MHz’te ≈ 8; eski modelde düşmez', () => {
     const low = gain('BC107', 1e3);
-    expect(low).toBeGreaterThan(64);
-    expect(low).toBeLessThan(69);
-    expect(Math.abs(low / gain('BC547B', 1e3) - 1)).toBeLessThan(0.01);
+    expect(low).toBeGreaterThan(61);
+    expect(low).toBeLessThan(66);
+    // VAR = 25,9 V ileri taşıma akımını V_BE/VAR ≈ %2,5 azaltır; g_m ve kazanç onunla düşer.
+    const ratio = low / gain('BC547B', 1e3);
+    expect(ratio).toBeGreaterThan(0.92);
+    expect(ratio).toBeLessThan(0.98);
     const mid = gain('BC107', 1e5) / low;
     expect(mid).toBeGreaterThan(0.65);
     expect(mid).toBeLessThan(0.8);
@@ -145,9 +148,10 @@ describe('BC107', () => {
         .battery('VB', 'bb', 'gnd', 10)
         .resistor('RB', 'bb', 'b', (10 - 0.65) / 10e-6),
     );
-    // I_B = 10 µA, β = 200 ve Early etkisi (V_CE = 4,35 V, V_A = 63 V): I_C ≈ 2,14 mA.
-    expect(sim.pinCurrents('Q')![0]!).toBeGreaterThan(2.1e-3);
-    expect(sim.pinCurrents('Q')![0]!).toBeLessThan(2.2e-3);
+    // I_B = 10 µA, β = 200; Gummel-Poon: Early (V_CE = 4,35 V, VAF = 63 V) artırır, ters Early
+    // (V_BE / VAR, VAR = 25,9 V) ve B-E sızıntısı (ISE) azaltır: I_C ≈ 2,05 mA.
+    expect(sim.pinCurrents('Q')![0]!).toBeGreaterThan(2.0e-3);
+    expect(sim.pinCurrents('Q')![0]!).toBeLessThan(2.1e-3);
     const vbe = sim.voltageAt('b')!;
     expect(vbe).toBeGreaterThan(0.55);
     expect(vbe).toBeLessThan(0.7);

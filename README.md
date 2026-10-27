@@ -248,7 +248,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 559 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 567 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -572,8 +572,8 @@ ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta
 - *Dönüştürücü* (`tests/spice/netlist.ts`): `Netlist` → SPICE. Parametreler modelimizden aynen
   alınır: diyotta IS, N (1N4001'de CJO, VJ, M, TT, FC = 0,5 de); LED, seri dirençli diyot (IS, N,
   RS); zener, bizdeki yapıyla aynı (1 Ω + ileri diyot + ters "kırılma" diyodu); BJT, Gummel-Poon
-  (IS, BF, BR, VAF; IKF, ISE, ISC, VAR olmadan bizim Early'li Ebers-Moll taşıma modelimizin aynı
-  denklemleri); MOSFET, LEVEL 1 (KP = 2β, VTO, LAMBDA, W = L, gövde source'ta). Sıcaklık 300 K
+  (eski modellerde IS, BF, BR, VAF: Early'li Ebers-Moll taşıma modelimizin aynı denklemleri; BC107'de
+  kartın tamamı: ISE, NE, ISC, NC, IKF, IKR, VAR, NF, NR); MOSFET, LEVEL 1 (KP = 2β, VTO, LAMBDA, W = L, gövde source'ta). Sıcaklık 300 K
   (TEMP = TNOM = 26,85 °C; ngspice'ın varsayılanı 27 °C, VT'de %0,05 fark yaratırdı). ngspice'ın
   kendi toleransı karşılaştırmayı bozmasın diye `.op`'ta RELTOL = 10⁻⁶, `.tran`'da 10⁻⁵ ve küçük
   en büyük adım kullanılır.
@@ -870,7 +870,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   buzzerin 5 V'ta 30 mA ve 85 dB'i, 2,5 V'ta sessizliği, ters bağlantıda akımsızlığı; sigortanın
   atma süreleri (ısıl denklemle %3 içinde) ve 1,5 A'de atmaması, Onar; üç örneğin sayıları.
 - *Örnekler* (yeni grup "Ses ve koruma"): "Hoparlör: elektrikten ses" (fonksiyon üreteci 440 Hz;
-  ≈ 79 dB, rezonansta ≈ 83 dB, 100 Hz'te ≈ 57 dB), "Sıcaklık alarmı: NTC ve buzzer" (≈ 53 °C'ın
+  ≈ 79 dB, rezonansta ≈ 83 dB, 100 Hz'te ≈ 57 dB), "Sıcaklık alarmı: NTC ve buzzer" (≈ 54 °C'ın
   üstünde öter), "Sigorta: kısa devrede devreyi açar" (12 V akü, 6 W lamba; kısa devrede ≈ 76 A,
   0,17 ms'de atar; lambanın ≈ 5,7 A'lik ilk an akımı attırmaz).
 
@@ -1141,7 +1141,7 @@ doğrulanır.
   biçimde seçilir (düşük gerilimli zenerlerin yumuşak dizi), Is'i 20 mA'de uçlar arası gerilim
   tam V_Z olacak biçimde hesaplanır (LED'lerdeki 20 mA kuralı gibi). 20 mA'deki dinamik direnç
   ≈ 7 Ω (veri sayfası Z_ZT ≤ 7 Ω).
-- **BJT (BC547B / BC557B benzeri):** Ebers-Moll taşıma modeli, Early etkisiyle:
+- **BJT (BC547B / BC557B benzeri; BC107 için Gummel-Poon, aşağıdaki ngspice bölümü):** Ebers-Moll taşıma modeli, Early etkisiyle:
   I_CT = (I_F − I_R)·(1 − V_BC/V_A), I_C = I_CT − I_R/β_R, I_B = I_F/β_F + I_R/β_R.
   Is = 2,39·10⁻¹⁴ A, β_R = 7,9, V_A = 63 V (NXP BC547B SPICE modeli); β_F varsayılanı 200
   (veri sayfası 200–450). PNP aynı denklemlerin ters işaretlisidir. İki eklemin gerilim adımı
@@ -1330,8 +1330,8 @@ parametreler sonra yine değiştirilebilir (öğrencinin ölçtüğü β ya da I
   çözümle kalır. Ölçülen akımlar son adımın yük akımlarını da içerir.
 - **Sonuçları (testler: `tests/models.test.ts`):** 1N4001'de ±5 V kare dalga ters dönünce
   ≈ 3 µs boyunca ≈ −5,4 mA ters akım akar (genel modelde hiç akmaz); 1 MHz'te diyot doğrultmaz.
-  BC107'li ortak emetörlü yükselteçte (10 kΩ'dan sürülen baz) kazanç 1 kHz'te eski modelle
-  aynı, 100 kHz'te ≈ %25, 1 MHz'te ≈ %90 düşer (Miller etkisi). IRF510'lu kaynak dirençli
+  BC107'li ortak emetörlü yükselteçte (10 kΩ'dan sürülen baz) kazanç 1 kHz'te ≈ 63 (Gummel-Poon
+  kartıyla eski modelden ≈ %5 düşük), 100 kHz'te ≈ %25, 1 MHz'te ≈ %90 düşer (Miller etkisi). IRF510'lu kaynak dirençli
   yükselteçte (R_D = 10 kΩ, R_S = 1 kΩ) kazanç 1 kHz'te ≈ 9,8; C_GD yüzünden kutup ≈ 420 kHz
   (R_S transistörü akım kaynağı gibi yaptığından C_DS'in etkisi neredeyse yoktur).
 - **İhmal edilenler:** 1N4001'in seri direnci (≈ 0,05 Ω; föy devrelerinde akım 10 mA'i
@@ -1497,11 +1497,30 @@ karşılaştırıldı; bulunan hatalar düzeltildi (testler: `tests/ngspice-kars
   gelen durumu "Yüksek ⇄ Düşük" olarak gösterir (`editor/liveReadout.ts`). NaN ve sonsuz değer
   "hesaplanamıyor" yazar.
 
-Doğrulanmış ama henüz uygulanmamış farklar: eklem yükünün hata denetimi gerilim yerine yükle
-yapılmalı (ngspice `cktterr.c`; 1N4001 ters toparlanma yükü ≈ %10 düşük), kırılma noktasından
-sonra adım kısaltılmalı (`dctran.c`; reddedilen adımlar 2,4 → 0,7/kenar), reddedilen adım
-öngörülen boyuta küçültülmeli (yarıya değil); BJT'de IKF/ISE gibi Gummel-Poon terimleri yok
-(yüksek akımda β düşmüyor); DC çalışma noktasında gmin adımlama yok.
+Kalan dört fark da ele alındı (2026-10-27; testler `tests/ngspice-karsilastirma.test.ts`,
+`tests/gummel-poon.test.ts`, `tests/dc-homotopi.test.ts`; kıyas `scripts/tarama/qrr.tarama.ts`):
+
+- **Kırılma noktasından sonra adım** (`dctran.c`): kenara denk gelen adımdan sonraki ilk adım
+  0,1·min(önceki adım, sonraki kenara kalan süre); kenardan önceki son iki adım eşitlenir.
+  1N4001, ±5 V 10 kHz kare: ters toparlanma yükü −%7,2 yerine −%3,1 (sıkı toleranslı ngspice'a
+  göre; varsayılan ayarlı ngspice'ın kendi tümleme noktalarıyla aynı ölçüt +%138), RC'de
+  reddedilen adım 93 → 0.
+- **Eklem yükünün hata denetimi** (`cktterr.c`): uygulandı ve ölçüldü, **benimsenmedi**. Kare
+  dalgada ters toparlanma yükünü −%3,1'den −%0,5'e getiriyor, sinüste fark yok (≈ %6; ngspice
+  varsayılanı %9,4); örneklerde doğruluk değişmiyor (katlayıcı, kenetleyici zaten %0,01–0,06)
+  ama toplam süre %6,6, gerilim katlayıcıda adım sayısı 2 kat artıyor. Örneklerde hızlı kare
+  dalgayla sürülen 1N4001 olmadığı için gerilim tabanlı denetim kaldı.
+- **BJT Gummel-Poon** (`bjtload.c`): BC107 kartın tam doğru akım modeliyle (ISE/NE, ISC/NC,
+  IKF/IKR, VAR, NF/NR; FC = 0,9579). 2 mA'de h_FE ≈ β, 100 mA'de ≈ %30 düşük; ters Early
+  gerilimi taşıma akımını ≈ %2,5 azaltır. BC107 yükselteç örneği: I_C 1,1 → 1,05 mA, kazanç
+  215 → 204, 1 MHz'te 150 → 127 (FC ileri kutuplu C_je'yi büyütür). ngspice çapraz testi artık
+  BC107'yi tam kartla karşılaştırır. Eski BC547B ve PNP modeli değişmedi (kayıtlar aynı sonucu
+  verir). Seri dirençler (RB, RE, RC) iç düğüm gerektirdiği için yok.
+- **DC çalışma noktası** (`cktop.c`): doğrudan Newton yakınsamazsa dinamik gmin adımlama (her
+  düğüme 1e-3 S'ten gmin'e, başarısız adımda geri dönüp çarpanı küçülterek), o da olmazsa
+  uyarlanır kaynak adımlama (%10'dan, başarısızlıkta artış yarıya). Bilinen zor devrelerin
+  (mandal, 20 LED / 100 V, Darlington / 1000 V, diyot köprüsü / 1000 V) hepsi düz Newton'la da
+  yakınsıyor; yollar güvenlik ağıdır ve tek başına aynı çözümü bulduğu sınanır.
 
 ### Hata taraması ve optimizasyon (2026-10-27)
 

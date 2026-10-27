@@ -2,6 +2,8 @@
 //   - MOSFET'in gövde diyodu yoktu: V_DS < 0'da kanal açılıyordu (mos1load.c'de bulk diyotları hep var).
 //   - Ters aktif BJT "kesim" görünüyordu.
 //   - exp sınırının (arg > 80) ötesinde iletkenlik akımın türevinden büyük damgalanıyordu.
+//   - Kırılma noktasından (kare dalga kenarı) sonra adım kısaltılmıyordu (dctran.c): 1N4001'in ters
+//     toparlanma yükü −%7,2 eksik çıkıyordu.
 
 import { describe, expect, it } from 'vitest';
 import { CircuitSimulator } from '../src/sim';
@@ -66,5 +68,30 @@ describe('ngspice karşılaştırması: model düzeltmeleri', () => {
       const fd = (d.current(vd + h) - d.current(vd - h)) / (2 * h);
       expect(Math.abs(d.conductance(vd) - fd) / fd).toBeLessThan(1e-4);
     }
+  });
+
+  it('kare dalga kenarından sonra küçük adım: 1N4001 ters toparlanma yükü ince adımlı çözümün %5’i içinde', () => {
+    const run = (timeStep?: number) => {
+      const b = circuit()
+        .acsource('V', 'a', 'g', { waveform: 'square', amplitude: 5, frequency: 10000 })
+        .ground('G', 'g')
+        .add('diode', 'D', ['a', 'b'], { model: '1N4001' })
+        .resistor('R', 'b', 'g', 1000);
+      const sim = new CircuitSimulator(b.build(), timeStep ? { timeStep, minTimeStep: 1e-12 } : {});
+      const r = sim.device('R')!;
+      const pts: Array<[number, number]> = [];
+      const orig = r.observe.bind(r);
+      r.observe = (x: Float64Array, t: number) => {
+        orig(x, t);
+        if (t >= 10e-4) pts.push([t, r.measure(x).current]);
+      };
+      sim.runUntil(11e-4);
+      let q = 0;
+      for (let k = 1; k < pts.length; k++) q -= ((Math.min(0, pts[k - 1]![1]) + Math.min(0, pts[k]![1])) / 2) * (pts[k]![0] - pts[k - 1]![0]);
+      return q;
+    };
+    const reference = run(20e-9);
+    expect(reference).toBeGreaterThan(18e-9);
+    expect(Math.abs(run() / reference - 1)).toBeLessThan(0.05);
   });
 });

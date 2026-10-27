@@ -814,7 +814,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     description:
       '5 V’luk pil; NTC termistör (25 °C’ta 10 kΩ) üstte, 560 Ω altta, ortası BC107’nin bazında. Aktif buzzer (CMI-1295IC) + 5 V ile kollektör arasında. Hız ×1’deyken Oynat’a bas, NTC’yi seç ve sıcaklığı 25 °C’tan 60 °C’a çıkar.',
     purpose:
-      'Bir sensörün bir uyarıcıyı sürmesini gösterir. Isındıkça NTC’nin direnci azalır ve bazın gerilimi artar: 25 °C’ta 0,27 V (transistör keser, buzzer sessiz); ≈ 50 °C’ta 0,65 V’a yaklaşınca transistör iletmeye başlar. Buzzerin içindeki osilatör ≈ 3 V’ta çalışır: ≈ 53 °C’ın üstünde öter, 55 °C’ta neredeyse tam gerilimde (4,8 V, 28 mA, ≈ 85 dB). Buzzerin sesini tarayıcıda duyarsın.',
+      'Bir sensörün bir uyarıcıyı sürmesini gösterir. Isındıkça NTC’nin direnci azalır ve bazın gerilimi artar: 25 °C’ta 0,27 V (transistör keser, buzzer sessiz); ≈ 50 °C’ta 0,65 V’a yaklaşınca transistör iletmeye başlar. Buzzerin içindeki osilatör ≈ 3 V’ta çalışır: ≈ 54 °C’ın üstünde öter, 56 °C’ta neredeyse tam gerilimde (4,8 V, 28 mA, ≈ 85 dB). Buzzerin sesini tarayıcıda duyarsın.',
     everyday:
       'Fırınların, ütülerin ve 3B yazıcıların aşırı ısınma uyarıları, ısı algılayıcılı yangın dedektörleri ve arabalardaki motor sıcaklığı uyarısı bu yapıdadır. Gerçek devrelerde eşik bir karşılaştırıcıyla (işlemsel yükselteç) daha keskin yapılır.',
   },
@@ -999,7 +999,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     title: 'BC107 ile ortak emetörlü yükselteç',
     description: `Föydeki tasarımın bir çözümü: V_{CC} = 12 V, R_{B} = 2,2 MΩ (sabit baz akımı), R_{C} = 5,6 kΩ, β = 200. Üreteç 1 kHz sinüs, −20 dB zayıflatıcıyla 20 mV tepe-tepe; girişte 10 µF’lık kuplaj kondansatörü var. Osiloskobun A kanalı girişi (baz; AC, 5 mV/bölme), B kanalı çıkışı (kollektör; AC, 1 V/bölme) gösteriyor. A’nın kablosu V_{CC} hattını keserek geçer (bu devrede bir kesişme kaçınılmazdır): ${CROSSING}`,
     purpose:
-      'Küçük bir sinyali iki yüz kattan fazla büyütür. I_{B} = (12 V − 0,63 V) / 2,2 MΩ ≈ 5,2 µA ve I_{C} ≈ β · I_{B} ≈ 1,1 mA; V_{CE} ≈ 5,9 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −215: A_{v} ≈ −g_{m} · R_{C}, g_{m} = I_{C} / V_{T} ≈ 42 mS; çıkış ters fazlıdır. 1 MHz’te kazanç ≈ 150’ye düşer (kollektör-baz kapasitesi ve osiloskobun 25 pF’lık girişi). Girişi 100 mV tepe-tepeye çıkar: çıkış doyumla (≈ 0,1 V) ve kesimle (≈ 11,6 V) kırpılır. β’yı değiştirince çalışma noktası kayar: sabit baz akımlı öngerilim β’ya bağlıdır.',
+      'Küçük bir sinyali iki yüz kattan fazla büyütür. I_{B} = (12 V − 0,63 V) / 2,2 MΩ ≈ 5,2 µA ve I_{C} ≈ β · I_{B} ≈ 1,05 mA; V_{CE} ≈ 6,1 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −204: A_{v} ≈ −g_{m} · R_{C}, g_{m} = I_{C} / V_{T} ≈ 40 mS; çıkış ters fazlıdır. 1 MHz’te kazanç ≈ 127’ye düşer (kollektör-baz kapasitesi ve osiloskobun 25 pF’lık girişi). Girişi 100 mV tepe-tepeye çıkar: çıkış doyumla (≈ 0,1 V) ve kesimle (≈ 11,6 V) kırpılır. β’yı değiştirince çalışma noktası kayar: sabit baz akımlı öngerilim β’ya bağlıdır.',
     everyday:
       'Ortak emetörlü yükselteç radyoların, işitme cihazlarının, mikrofon ön yükselteçlerinin ve sensör devrelerinin temel yapı taşıdır; işlemsel yükselteç entegrelerinin içinde de aynı kat vardır.',
   },

@@ -208,14 +208,15 @@ describe('Deney 6–8: yükselteçler', () => {
     expect(big.min).toBeLessThan(1.5);
   });
 
-  it('BJT (BC107, R_B = 2,2 MΩ, R_C = 5,6 kΩ): I_C ≈ 1,1 mA, V_CE ≈ 5,9 V, kazanç ≈ 215; 1 MHz’te ≈ 150', () => {
+  it('BJT (BC107, R_B = 2,2 MΩ, R_C = 5,6 kΩ): I_C ≈ 1,05 mA, V_CE ≈ 6,1 V, kazanç ≈ 204; 1 MHz’te ≈ 127', () => {
+    // Gummel-Poon kartı (ters Early gerilimi VAR, FC = 0,96): eski Ebers-Moll modelinde 1,1 mA, 215, 150.
     const doc = load('bjt-yukseltec');
     const { sim, gain } = amplifier(doc, 'Q1');
-    between(gain, 205, 225);
-    between(sim.pinCurrents(idOf(doc, 'Q1'))![0]!, 1.04e-3, 1.13e-3);
-    between(sim.measure(idOf(doc, 'Q1'))!.voltage, 5.6, 6.2);
+    between(gain, 196, 212);
+    between(sim.pinCurrents(idOf(doc, 'Q1'))![0]!, 1.0e-3, 1.09e-3);
+    between(sim.measure(idOf(doc, 'Q1'))!.voltage, 5.8, 6.4);
     expect(sim.status(idOf(doc, 'Q1')).region).toBe('active');
-    between(amplifier(doc, 'Q1', 1e6, 300e-6).gain, 140, 165);
+    between(amplifier(doc, 'Q1', 1e6, 300e-6).gain, 115, 140);
   });
 
   it('MOSFET (IRF510, R_D = 10 kΩ, R_S = 1 kΩ, offset 4,55 V): I_D ≈ 0,70 mA, kazanç ≈ 9,7, ters faz', () => {

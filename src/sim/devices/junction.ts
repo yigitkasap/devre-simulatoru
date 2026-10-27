@@ -58,7 +58,7 @@ export function limitJunction(vnew: number, vold: number, nvt: number, vcrit: nu
 // Yük depolama (SPICE'taki gibi): boşluk (depletion) kapasitesi ve difüzyon yükü.
 //
 //   V < FC·VJ:  Q = CJ0·VJ/(1 − M)·(1 − (1 − V/VJ)^(1−M)),   C = CJ0·(1 − V/VJ)^(−M)
-//   V ≥ FC·VJ:  C, V'ye göre doğrusal uzatılır (FC = 0,5); Q bunun integralidir.
+//   V ≥ FC·VJ:  C, V'ye göre doğrusal uzatılır (FC varsayılan 0,5, karttan); Q bunun integralidir.
 //   Difüzyon yükü Q_d = τ_T·I_D (ileri yönde depolanan azınlık taşıyıcıları; ters toparlanma).
 // Zaman adımında yamuk kuralıyla i = 2(Q(v) − Q_önceki)/h − i_önceki, iletkenliği 2C(v)/h olur
 // (geri Euler adımında i = (Q(v) − Q_önceki)/h, C(v)/h). Doğru akım çözümünde (h = 0) yük akımı
@@ -73,20 +73,23 @@ export interface DepletionParams {
   readonly vj: number;
   /** Derecelenme katsayısı. */
   readonly m: number;
+  /** İleri yönde kapasitenin doğrusal uzatıldığı oran (SPICE FC; verilmezse 0,5). */
+  readonly fc?: number;
 }
 
 /** Boşluk yükü ve kapasitesi; v, eklemin ileri yöndeki gerilimidir (ters kutuplanmada negatif). */
 export function depletionCharge(v: number, p: DepletionParams): { q: number; c: number } {
   if (p.cj0 <= 0) return { q: 0, c: 0 };
-  const vf = DEPLETION_FC * p.vj;
+  const fc = p.fc ?? DEPLETION_FC;
+  const vf = fc * p.vj;
   if (v < vf) {
     const arg = 1 - v / p.vj;
     const s = arg ** -p.m;
     return { q: (p.cj0 * p.vj * (1 - arg * s)) / (1 - p.m), c: p.cj0 * s };
   }
-  const f1 = (p.vj * (1 - (1 - DEPLETION_FC) ** (1 - p.m))) / (1 - p.m);
-  const f2 = (1 - DEPLETION_FC) ** (1 + p.m);
-  const f3 = 1 - DEPLETION_FC * (1 + p.m);
+  const f1 = (p.vj * (1 - (1 - fc) ** (1 - p.m))) / (1 - p.m);
+  const f2 = (1 - fc) ** (1 + p.m);
+  const f3 = 1 - fc * (1 + p.m);
   return {
     q: p.cj0 * f1 + (p.cj0 / f2) * (f3 * (v - vf) + (p.m / (2 * p.vj)) * (v * v - vf * vf)),
     c: (p.cj0 / f2) * (f3 + (p.m * v) / p.vj),

@@ -56,6 +56,12 @@ export interface SimulatorOptions {
   readonly timeStep: number;
   /** En küçük zaman adımı (s). */
   readonly minTimeStep: number;
+  /**
+   * DC çözüm yolu: 'auto' doğrudan Newton, yakınsamazsa gmin adımlama, o da olmazsa kaynak adımlama
+   * (ngspice cktop.c); 'none' yalnızca Newton; 'gmin' / 'source' doğrudan o yol (testler için).
+   * Verilmezse 'auto'.
+   */
+  readonly homotopy?: 'auto' | 'none' | 'gmin' | 'source';
 }
 
 export interface AdvanceResult {
@@ -73,7 +79,12 @@ export interface AdvanceResult {
 const DEFAULT_OPTIONS: SimulatorOptions = { timeStep: DEFAULT_TIME_STEP, minTimeStep: MIN_TIME_STEP };
 
 /** Kaynak adımlama yedeğinde kullanılan ölçekler (DC çözüm yakınsamazsa). */
-const SOURCE_STEPS = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1];
+/** gmin adımlamanın başlangıç iletkenliği ve en büyük azaltma çarpanı (ngspice: 1e-2, GMINFACTOR 10). */
+const GMIN_STEP_START = 1e-2;
+const GMIN_STEP_FACTOR = 10;
+/** Kaynak adımlamanın ilk artışı ve en küçük artışı (ngspice gillespie_src gibi uyarlanır). */
+const SOURCE_STEP_START = 0.1;
+const SOURCE_STEP_MIN = 1e-3;
 
 /**
  * AC kaynaklı devrede en büyük zaman adımı: en kısa periyodun 1/50'si. Osiloskopta düzgün bir
@@ -108,6 +119,7 @@ export class CircuitSimulator {
   private staticH = Number.NaN;
   private staticScale = Number.NaN;
   private staticTrap = false;
+  private staticGshunt = 0;
   private staticSerial = 0;
   private luCache: { serial: number; factor: LUFactorization } | null = null;
   private luWork: LUFactorization | undefined;
@@ -730,6 +742,11 @@ export class CircuitSimulator {
         end = breakpoint;
         landing = true;
         truncated = true;
+      } else if (this.lteStates.length > 0 && breakpoint < this.time + 1.9 * proposed) {
+        // Kırılma noktasından önceki son iki adım eşitlenir (ngspice dctran.c): yoksa ikincisi çok
+        // ince kalır ve kenardan hemen önce gereksiz bir küçük adım atılır.
+        end = this.time + (breakpoint - this.time) / 2;
+        truncated = true;
       }
       if (exact) {
         if (target - this.time <= tiny) break;
@@ -811,6 +828,12 @@ export class CircuitSimulator {
         }
       } else if (limited && !truncated) {
         // Bileşenin geçici sınırı: olağan adım (this.h) korunur, sınır kalkınca ona dönülür.
+      } else if (landing) {
+        // Kırılma noktasından (kare dalga kenarı) sonraki ilk adım: 0,1·min(önceki adım, sonraki
+        // kırılma noktasına kalan süre) (ngspice dctran.c). Kenardaki hızlı değişim (diyodun ters
+        // toparlanması) küçük adımla başlar: 1N4001'de ters toparlanma yükü −%7,2 yerine −%0,5.
+        const gap = this.nextBreakpoint() - this.time;
+        this.h = Math.max(2 * minStep, 0.1 * Math.min(proposed, gap));
       } else if (truncated) {
         // Adım kırılma noktasına ya da hedefe denk gelsin diye kısaltıldı: önerilen adım korunur.
         // (Kısaltma, end − time farkıyla değil bayrakla izlenir: o farkın yuvarlama hatası küçük
@@ -1048,16 +1071,62 @@ export class CircuitSimulator {
   /** DC çözüm; yakınsamazsa kaynak adımlama dener. Hata varsa tanılamayı döndürür. */
   private solveDC(): Diagnostic | null {
     const ctx: StepContext = { h: 0, trap: false, sourceScale: 1, time: this.time, window: 0 };
-    if (this.step(ctx) !== 'ok') {
-      // Kaynak adımlama: kaynakları %10'dan başlayarak artır, her çözümü bir sonrakinin
-      // başlangıç noktası yap.
-      for (const scale of SOURCE_STEPS) {
-        const scaled: StepContext = { ...ctx, sourceScale: scale };
-        if (this.step(scaled) !== 'ok') return this.nrFailedDiagnostic();
-      }
+    // ngspice cktop.c sırası: doğrudan Newton, olmazsa gmin adımlama, o da olmazsa kaynak adımlama.
+    const homotopy = this.options.homotopy ?? 'auto';
+    const rescued = () =>
+      (homotopy === 'auto' || homotopy === 'gmin' ? this.gminStepping(ctx) : false) ||
+      (homotopy === 'auto' || homotopy === 'source' ? this.sourceStepping(ctx) : false);
+    const solved = homotopy === 'gmin' || homotopy === 'source' ? rescued() : this.step(ctx) === 'ok' || rescued();
+    if (!solved) {
+      return this.nrFailedDiagnostic();
     }
     this.solvedVersion = this.version;
     return null;
+  }
+
+  /**
+   * gmin adımlama (ngspice dynamic_gmin): her düğümden toprağa 1e-3 S ile başlanır; her başarılı
+   * çözüm bir sonrakinin başlangıcıdır ve iletkenlik çarpanla (en çok 10) azaltılır. Bir adım
+   * yakınsamazsa son başarılı noktaya dönülür ve çarpan küçültülür. gmin'e inince ek iletkenliksiz
+   * son çözüm yapılır.
+   */
+  private gminStepping(ctx: StepContext): boolean {
+    let factor = GMIN_STEP_FACTOR;
+    let previous = GMIN_STEP_START;
+    let gshunt = previous / factor;
+    for (let attempt = 0; attempt < 200; attempt++) {
+      if (this.step({ ...ctx, gshunt }) === 'ok') {
+        if (gshunt <= GMIN) return this.step(ctx) === 'ok';
+        factor = Math.min(GMIN_STEP_FACTOR, factor * Math.sqrt(factor));
+        previous = gshunt;
+        gshunt = gshunt < factor * GMIN ? GMIN : gshunt / factor;
+      } else {
+        if (factor < 1.00005) return false;
+        factor = Math.sqrt(Math.sqrt(factor));
+        gshunt = previous / factor;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Kaynak adımlama (ngspice gillespie_src gibi uyarlanır): kaynaklar %10'luk artışla açılır; bir
+   * adım yakınsamazsa son başarılı ölçeğe dönülüp artış yarıya iner, başarılı adımdan sonra büyür.
+   */
+  private sourceStepping(ctx: StepContext): boolean {
+    let scale = 0;
+    let increment = SOURCE_STEP_START;
+    for (let attempt = 0; attempt < 500 && scale < 1; attempt++) {
+      const next = Math.min(1, scale + increment);
+      if (this.step({ ...ctx, sourceScale: next }) === 'ok') {
+        scale = next;
+        increment = Math.min(0.5, increment * 1.5);
+      } else {
+        increment /= 2;
+        if (increment < SOURCE_STEP_MIN) return false;
+      }
+    }
+    return scale >= 1;
   }
 
   private restoreIterates(): void {
@@ -1089,7 +1158,8 @@ export class CircuitSimulator {
       this.staticVersion === this.version &&
       this.staticH === ctx.h &&
       this.staticScale === ctx.sourceScale &&
-      this.staticTrap === ctx.trap
+      this.staticTrap === ctx.trap &&
+      this.staticGshunt === (ctx.gshunt ?? 0)
     ) {
       return this.staticSerial;
     }
@@ -1110,11 +1180,14 @@ export class CircuitSimulator {
     const sys = this.staticSys;
     sys.clear();
     for (const node of this.floating) sys.add(node, node, GMIN);
+    const gshunt = ctx.gshunt ?? 0;
+    if (gshunt > 0) for (let node = 0; node < this.circuit.nodeUnknowns; node++) sys.add(node, node, gshunt);
     for (const device of this.circuit.devices) device.stampStatic(sys, ctx);
     this.staticVersion = this.version;
     this.staticH = ctx.h;
     this.staticScale = ctx.sourceScale;
     this.staticTrap = ctx.trap;
+    this.staticGshunt = gshunt;
     return ++this.staticSerial;
   }
 

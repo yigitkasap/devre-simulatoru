@@ -92,7 +92,7 @@ export {
 } from './funcgen';
 export { AmmeterDevice, AMMETER_DEFAULTS } from './ammeter';
 export { BatteryDevice, BATTERY_DEFAULTS } from './battery';
-export { BjtDevice, BJT_DEFAULTS, BJT_PARAMS, NPN_DEFAULTS, NPN_LEGACY_MODEL, NPN_MODELS, evaluateBjt, type NpnModelName } from './bjt';
+export { BjtDevice, BJT_DEFAULTS, BJT_PARAMS, GUMMEL_POON, NPN_DEFAULTS, NPN_LEGACY_MODEL, NPN_MODELS, evaluateBjt, evaluateGummelPoon, type GummelPoon, type NpnModelName } from './bjt';
 export {
   FET_LAMBDA,
   JFET_DEFAULTS,

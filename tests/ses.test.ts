@@ -179,7 +179,7 @@ describe('Ses ve koruma örnekleri: metindeki sayılar', () => {
     expect(e.sim.runtimeDiagnostics).toEqual([]);
   });
 
-  it('Sıcaklık alarmı: 25 °C’ta baz 0,27 V ve sessiz; 52 °C’ta sessiz, 53 °C’ta öter; 55 °C’ta 4,8 V ve 28 mA', () => {
+  it('Sıcaklık alarmı: 25 °C’ta baz 0,27 V ve sessiz; 53 °C’ta sessiz, 54 °C’ta öter; 56 °C’ta 4,8 V ve 28 mA', () => {
     const e = example('buzzer-sicaklik');
     expect(e.sim.diagnostics.filter((d) => d.severity !== 'info')).toEqual([]);
     const at = (temperature: number) => {
@@ -189,10 +189,10 @@ describe('Ses ve koruma örnekleri: metindeki sayılar', () => {
     };
     expect(at(25).sounding).toBe(false);
     expect(e.sim.measure(e.idOf('R1'))!.voltage).toBeCloseTo(0.27, 2);
-    expect(at(52).sounding).toBe(false);
-    expect(at(53).sounding).toBe(true);
-    at(55);
-    expect(e.sim.measure(e.idOf('BZ1'))!.voltage).toBeCloseTo(4.83, 1);
+    expect(at(53).sounding).toBe(false);
+    expect(at(54).sounding).toBe(true);
+    at(56);
+    expect(e.sim.measure(e.idOf('BZ1'))!.voltage).toBeCloseTo(4.78, 1);
     expect(e.sim.measure(e.idOf('BZ1'))!.current).toBeCloseTo(0.028, 3);
   });
 
