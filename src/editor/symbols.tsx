@@ -32,6 +32,9 @@ export interface LiveVisual {
   readonly energized?: boolean;
   /** 555: çıkış yüksek mi? */
   readonly high?: boolean;
+  /** Arduino: kart üstü L (D13) ve TX (seri gönderim) LED'leri yanıyor mu? */
+  readonly ledL?: boolean;
+  readonly ledTx?: boolean;
   /** Hoparlör ve buzzer: ses düzeyi (0..1; dalgaların koyuluğu). */
   readonly loudness?: number;
   /** Akkor lamba: ışık akısının anma değerine oranı ve filaman sıcaklığı (K). */
@@ -284,6 +287,48 @@ function Timer555({ rotation, high }: { rotation: Rotation; high: boolean }) {
         555
       </DeviceText>
       <circle cx={34} cy={-5} r={2.6} fill={high ? '#e8a317' : 'none'} stroke={high ? '#e8a317' : 'none'} />
+    </g>
+  );
+}
+
+/**
+ * Arduino Uno: kart dikdörtgeni; solda 5V, 3V3, GND ve A0–A5, sağda D13–D2 (PWM pinlerinde ~).
+ * Ortada kart adı ve programın çalıştığını gösteren L (D13) ve TX (seri) LED'leri.
+ */
+const ARDUINO_PWM = new Set([3, 5, 6, 9, 10, 11]);
+
+function Arduino({ rotation, ledL, ledTx }: { rotation: Rotation; ledL: boolean; ledTx: boolean }) {
+  const left = ['5V', '3V3', 'GND'].map((name, k) => ({ name, y: -110 + 20 * k }));
+  const analog = [0, 1, 2, 3, 4, 5].map((k) => ({ name: `A${k}`, y: -10 + 20 * k }));
+  const digital = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((d) => ({ name: `${ARDUINO_PWM.has(d) ? '~' : ''}D${d}`, y: 150 - 20 * d }));
+  const stubs = [...left, ...analog].map((p) => `M-60,${p.y}H-50`).join('') + digital.map((p) => `M50,${p.y}H60`).join('');
+  const label = (x: number, y: number, text: string, anchor: 'start' | 'end') => (
+    <DeviceText key={`${x}${text}`} x={x} y={y + 2.2} rotation={rotation} size={6.5} anchor={anchor} weight={600} color="var(--color-muted)">
+      {text}
+    </DeviceText>
+  );
+  const led = (y: number, on: boolean, color: string, name: string) => (
+    <g key={name}>
+      <rect x={-12} y={y - 3} width={8} height={6} rx={1} fill={on ? color : 'var(--color-paper)'} stroke={on ? color : 'currentColor'} strokeWidth={1} />
+      <DeviceText x={-1} y={y + 2.2} rotation={rotation} size={5.5} anchor="start" weight={600} color="var(--color-muted)">
+        {name}
+      </DeviceText>
+    </g>
+  );
+  return (
+    <g>
+      <path d={stubs} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+      <rect x={-50} y={-125} width={100} height={250} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      {[...left, ...analog].map((p) => label(-46, p.y, p.name, 'start'))}
+      {digital.map((p) => label(46, p.y, p.name, 'end'))}
+      <DeviceText x={0} y={-36} rotation={rotation} size={8.5}>
+        ARDUINO
+      </DeviceText>
+      <DeviceText x={0} y={-25} rotation={rotation} size={7} weight={600} color="var(--color-muted)">
+        UNO
+      </DeviceText>
+      {led(-8, ledL, '#e8a317', 'L')}
+      {led(4, ledTx, '#34a853', 'TX')}
     </g>
   );
 }
@@ -1035,6 +1080,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <OpAmp rotation={rotation} />;
     case 'timer555':
       return <Timer555 rotation={rotation} high={live?.high ?? false} />;
+    case 'arduino':
+      return <Arduino rotation={rotation} ledL={live?.ledL ?? false} ledTx={live?.ledTx ?? false} />;
     case 'speaker':
       return <Speaker level={live?.loudness ?? 0} />;
     case 'buzzer':

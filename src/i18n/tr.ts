@@ -49,6 +49,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ntc: 'NTC termistör',
   lamp: 'Akkor lamba',
   opamp: 'İşlemsel yükselteç',
+  arduino: 'Arduino Uno',
   timer555: '555 zamanlayıcı',
   speaker: 'Hoparlör',
   buzzer: 'Buzzer (aktif)',
@@ -87,6 +88,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ntc: 'termistörünün',
   lamp: 'lambasının',
   opamp: 'işlemsel yükseltecinin',
+  arduino: 'Arduino kartının',
   timer555: '555 zamanlayıcısının',
   speaker: 'hoparlörünün',
   buzzer: 'buzzerının',
@@ -122,6 +124,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   ldr: ['1. ucu', '2. ucu'],
   ntc: ['1. ucu', '2. ucu'],
   lamp: ['1. ucu', '2. ucu'],
+  arduino: ['5V ucu', '3V3 ucu', 'GND ucu', 'A0 analog girişi', 'A1 analog girişi', 'A2 analog girişi', 'A3 analog girişi', 'A4 analog girişi', 'A5 analog girişi', 'D2 pini', 'D3 pini (PWM ~)', 'D4 pini', 'D5 pini (PWM ~)', 'D6 pini (PWM ~)', 'D7 pini', 'D8 pini', 'D9 pini (PWM ~)', 'D10 pini (PWM ~)', 'D11 pini (PWM ~)', 'D12 pini', 'D13 pini (kart üstü L LED’i)'],
   timer555: ['GND ucu (1)', 'TRIG (tetik) ucu (2)', 'OUT (çıkış) ucu (3)', 'RESET ucu (4)', 'CONT (kontrol) ucu (5)', 'THRES (eşik) ucu (6)', 'DISCH (deşarj) ucu (7)', 'VCC ucu (8)'],
   opamp: ['eviren girişi (−)', 'evirmeyen girişi (+)', 'çıkışı', 'pozitif besleme ucu (V+)', 'negatif besleme ucu (V−)'],
   speaker: ['1. ucu', '2. ucu'],
@@ -163,6 +166,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   ntc: ['1', '2'],
   lamp: ['1', '2'],
   opamp: ['−', '+', 'OUT', 'V+', 'V−'],
+  arduino: ['5V', '3V3', 'GND', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11', 'D12', 'D13'],
   timer555: ['GND', 'TRG', 'OUT', 'RST', 'CV', 'THR', 'DIS', 'VCC'],
   speaker: ['1', '2'],
   buzzer: ['+', '−'],
@@ -201,6 +205,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   ntc: ['1. uç', '2. uç'],
   lamp: ['1. uç', '2. uç'],
   opamp: ['− giriş', '+ giriş', 'çıkış', 'V+', 'V−'],
+  arduino: ['5V', '3V3', 'GND', 'A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11', 'D12', 'D13'],
   timer555: ['GND', 'TRIG', 'OUT', 'RESET', 'CONT', 'THRES', 'DISCH', 'VCC'],
   speaker: ['1. uç', '2. uç'],
   buzzer: ['+ uç', '− uç'],
@@ -363,6 +368,16 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           `${formatSI(p.limit ?? 0, 'W')} (anma akımı). Motor yükü kaldıramıyor ya da dönmesi engellenmiş: zıt EMK küçük olduğu için akım ` +
           'büyük. Gerçek motorun sargısı ısınır ve yalıtımı yanabilir. Yük torkunu azalt.',
       };
+    case 'pin-overcurrent': {
+      const pin = p.pin ?? 13;
+      return {
+        title: 'Arduino pini aşırı yükleniyor',
+        detail:
+          `${firstLabel}: ${pin >= 14 ? `A${pin - 14}` : `D${pin}`} pininden ${formatSI(p.current ?? 0, 'A')} çekiliyor; ATmega328P'nin bir pini ` +
+          `en fazla ${formatSI(p.limit ?? 0.04, 'A', { trim: true })} verebilir (önerilen 20 mA). Pin ve işlemci bozulabilir. LED'e seri direnç ` +
+          'koy (5 V ve 20 mA için ≈ 220 Ω); motor, röle ya da lamba gibi büyük yükleri bir transistörle sür.',
+      };
+    }
     case 'inductor-spike':
       if (first !== undefined && ctx.type(first) === 'motor') {
         return {
@@ -460,6 +475,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Işığa duyarlı direnç (kadmiyum sülfür): ışık arttıkça direnci azalır. Karanlıkta ≈ 1 MΩ, oda ışığında birkaç kΩ, güneş altında yüz ohm mertebesindedir. Aydınlık simülasyon sırasında kaydırıcıyla değiştirilir.',
   ntc:
     'Sıcaklığa duyarlı direnç (negatif sıcaklık katsayılı): sıcaklık arttıkça direnci üstel olarak azalır; 25 °C’ta 10 kΩ, 100 °C’ta ≈ 680 Ω. Sıcaklık simülasyon sırasında kaydırıcıyla değiştirilir.',
+  arduino:
+    'ATmega328P işlemcili geliştirme kartı. Seçtiğin örnek program işlemcide komut komut çalışır (16 MHz): dijital pinler 0 ya da 5 V verir (digitalWrite) ya da gerilimi okur (digitalRead); A0–A5 girişleri 0–5 V’u 0–1023 arası bir sayıya çevirir (analogRead); ~ işaretli pinler (D3, D5, D6, D9, D10, D11) PWM kare dalgası verir (analogWrite). Kart USB’den 5 V ile beslenir; 5V ve 3V3 uçları devreyi besleyebilir. GND, devrenin ortak ucudur.',
   timer555:
     'İki karşılaştırıcı ve bir flip-flop: TRIG 1/3·V_CC’nin altına inince çıkış yüksek olur, THRES 2/3·V_CC’yi geçince düşük olur ve DISCH ucu toprağa bağlanır. Bir kondansatör ve dirençlerle kare dalga üreteci (astabil) ya da süre ölçen zamanlayıcı (monostabil) kurulur.',
   opamp:
@@ -556,6 +573,7 @@ function fieldLabel(type: DeviceType, key: string): string {
     powerRating: 'Güç sınırı',
     kind: 'Tür',
     color: 'Renk',
+    program: 'Program',
     closed: 'Anahtar kapalı (akım geçirir)',
   };
   return labels[key] ?? key;
@@ -569,6 +587,19 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
   mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
   input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
+  program: {
+    blink: 'Yanıp sönen LED (Blink)',
+    dugme: 'Düğmeyle LED',
+    sayac: 'Düğme sayacı (Seri ekran)',
+    'trafik-isigi': 'Trafik ışığı',
+    fade: 'Nefes alan LED (PWM)',
+    potansiyometre: 'Potansiyometreyle parlaklık',
+    'gece-lambasi': 'Gece lambası (LDR)',
+    termometre: 'Termometre (NTC)',
+    'pwm-filtre': 'PWM’den doğru gerilim',
+    melodi: 'Melodi (tone)',
+    role: 'Röleyle lamba',
+  },
   model: {
     genel: 'Genel (basit)',
     BC547B: 'BC547B (basit)',
@@ -1219,6 +1250,13 @@ export const tr = {
     timerDischarge: 'Deşarj anahtarı',
     timerNote:
       'TRIG 1/3·V_CC’nin altına inince çıkış yüksek olur ve deşarj anahtarı açılır; THRES 2/3·V_CC’yi geçince çıkış düşer ve anahtar kapanarak DISCH’i toprağa bağlar. Kondansatörün dolma ve boşalma süresi (τ = R·C) zamanlamayı belirler.',
+    arduinoProgram: 'Program',
+    arduinoBoard: 'USB (5V ucu)',
+    arduinoSerial: 'Seri ekran',
+    arduinoIdle: 'Program yok',
+    arduinoModes: ['giriş', 'giriş (çekme)', 'DÜŞÜK', 'YÜKSEK'] as const,
+    arduinoNote:
+      'Program işlemcide gerçek zamanlamayla çalışır: çıkış pini 0 ya da 5 V’u ≈ 25 Ω’luk iç dirençle verir, giriş pini gerilimi eşikle (2,6 V / 2,15 V) okur, analogRead A0–A5’in gerilimini 5 V’a göre 0–1023’e çevirir.',
     opampDifferential: 'Giriş farkı (v₊ − v₋)',
     opampOutput: 'Çıkış gerilimi',
     opampCurrent: 'Çıkış akımı',
@@ -1794,6 +1832,8 @@ export const tr = {
         'Varsayılan değerler gerçek bir LDR’den (GL5528): 10 lükste 10–20 kΩ (burada 15 kΩ), karanlıkta en az 1 MΩ, γ = 0,6: R = R₁₀ · (E / 10 lx)^{−γ}. Aydınlık örnekleri: gece ≈ 1 lx, oda ≈ 100–300 lx, bulutlu gün ≈ 10 000 lx, güneş ≈ 100 000 lx. Gerçek LDR ışık değişimine 20–30 ms’de uyar; burada anında.',
       ntc:
         'Varsayılan değerler gerçek bir termistörden (Vishay NTCLE100E3103: 10 kΩ, B₂₅/₈₅ = 3977 K); direnç üreticinin R(T) eğrisinden (0 °C’ta 32,6 kΩ, 50 °C’ta 3,61 kΩ, 100 °C’ta 677 Ω). İçinden geçen akım onu ısıtır (öz ısınma: 7 mW/K, ısıl zaman sabiti 15 s); ortam sıcaklığı değişince hemen ona uyar.',
+      arduino:
+        'Gerçek bir Uno’nun değerleri (ATmega328P veri sayfası, 5 V, 25 °C): çıkış pini ≈ 25 Ω (20 mA’de 4,5 V), bir pinden en fazla 40 mA (önerilen 20 mA), INPUT_PULLUP direnci ≈ 35 kΩ, giriş eşikleri 2,6 V (yükselen) ve 2,15 V (düşen), ADC 10 bit, referans 5 V. 5V ucu USB’den (500 mA sigorta), 3V3 ucu en fazla 150 mA verir. D0 ve D1 USB seri bağlantısı içindir (Seri ekran). Programlar önceden derlenmiştir: kodunu Arduino panelinde görürsün.',
       timer555:
         'Gerçek bir 555’in değerleri (TI NE555): eşikler 2/3 ve 1/3 V_CC (içeride üç 5 kΩ’luk bölücü), RESET 0,7 V, çıkış yüksekte V_CC − 1,7 V (100 mA), düşükte 0,1 V (10 mA), deşarj anahtarı 8 mA’de 0,15 V, besleme akımı 15 V’ta 10 mA. RESET’i kullanmıyorsan VCC’ye bağla; CONT’u 10 nF’la toprağa bağlamak gürültüyü azaltır.',
       opamp:

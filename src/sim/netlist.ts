@@ -26,6 +26,7 @@ export type DeviceType =
   | 'fuse'
   | 'opamp'
   | 'timer555'
+  | 'arduino'
   | 'diode'
   | 'zener'
   | 'led'

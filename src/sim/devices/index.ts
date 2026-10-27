@@ -5,6 +5,7 @@
 
 import type { DeviceType } from '../netlist';
 import { acSourceModel } from './acsource';
+import { arduinoModel } from './arduino';
 import { ammeterModel } from './ammeter';
 import { batteryModel } from './battery';
 import { npnModel, pnpModel } from './bjt';
@@ -52,6 +53,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   fuse: fuseModel,
   opamp: opampModel,
   timer555: timer555Model,
+  arduino: arduinoModel,
   diode: diodeModel,
   zener: zenerModel,
   led: ledModel,

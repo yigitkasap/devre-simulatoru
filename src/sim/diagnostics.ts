@@ -37,6 +37,8 @@ export type DiagnosticCode =
   | 'lamp-burned'
   /** Motor zorlanıyor: sargının ortalama bakır kaybı sürekli çalışma sınırını aşıyor (uyarı). */
   | 'motor-overload'
+  /** Arduino pininden mutlak en büyük akımdan (40 mA) fazlası çekiliyor (uyarı). */
+  | 'pin-overcurrent'
   /** Bobinin akımı aniden kesildi: uçlarında kaynaklardan çok büyük bir gerilim sıçraması (Lenz). */
   | 'inductor-spike'
   /** Newton-Raphson en küçük zaman adımında da yakınsamadı. */

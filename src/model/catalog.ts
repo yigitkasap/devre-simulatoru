@@ -1,6 +1,7 @@
 // Parça kataloğu: her bileşen türünün pinleri, kapladığı alan, varsayılan değerleri ve
 // özellik penceresindeki alanları. Türkçe adlar ve açıklamalar i18n/tr.ts içindedir.
 
+import { ARDUINO_DEFAULT_PROGRAM, ARDUINO_PROGRAM_IDS } from '../arduino/programs';
 import { METER_MODES } from '../sim/averager';
 import {
   AC_MAX_FREQUENCY,
@@ -548,6 +549,25 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  arduino: {
+    type: 'arduino',
+    category: 'ics',
+    labelPrefix: 'ARD',
+    // Sırası çözücünün pin sırası: 5V, 3V3, GND, A0–A5, D2–D13. Solda güç ve analog girişler, sağda
+    // dijital pinler (üstte D13); pinler iki birim arayla.
+    pins: [
+      { x: -6, y: -11 },
+      { x: -6, y: -9 },
+      { x: -6, y: -7 },
+      ...[0, 1, 2, 3, 4, 5].map((k) => ({ x: -6, y: -1 + 2 * k })),
+      ...[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((d) => ({ x: 6, y: 15 - 2 * d })),
+    ],
+    bounds: { x: -6, y: -13, w: 12, h: 26 },
+    defaultProps: { program: ARDUINO_DEFAULT_PROGRAM },
+    propDefs: [{ kind: 'select', key: 'program', options: ARDUINO_PROGRAM_IDS }],
+    showLabel: true,
+    polarized: false,
+  },
   speaker: {
     type: 'speaker',
     category: 'outputs',
@@ -683,7 +703,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'passive', types: ['resistor', 'potentiometer', 'capacitor', 'inductor', 'transformer'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
-  { id: 'ics', types: ['opamp', 'timer555'] },
+  { id: 'ics', types: ['opamp', 'timer555', 'arduino'] },
   { id: 'switches', types: ['switch', 'relay', 'fuse'] },
   { id: 'outputs', types: ['lamp', 'motor', 'speaker', 'buzzer'] },
   { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },

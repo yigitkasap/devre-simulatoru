@@ -215,6 +215,25 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: t.timerNote,
       };
     }
+    case 'arduino': {
+      const ard = status.arduino;
+      const rows: ReadoutRow[] = [
+        { label: t.arduinoProgram, value: tr.properties.optionLabel('program', String(p.program ?? '')) },
+        { label: t.arduinoBoard, value: `${v(m.voltage)} · ${a(m.current)}` },
+      ];
+      if (!ard?.running) return { title, rows: [...rows, { label: t.state, value: t.arduinoIdle }] };
+      // Kullanılan pinler: çıkışlar, çekme dirençli girişler ve gerilim gelen analog girişler.
+      for (const pin of ard.pins) {
+        const used = pin.mode !== 0 || (pin.pin >= 14 && Math.abs(pin.voltage) > 1e-3);
+        if (!used || rows.length >= 8) continue;
+        const name = pin.pin >= 14 ? `A${pin.pin - 14}` : `D${pin.pin}`;
+        const current = pin.mode >= 2 ? ` · ${a(pin.current)}` : '';
+        rows.push({ label: `${name}: ${t.arduinoModes[pin.mode] ?? ''}`, value: `${v(pin.voltage)}${current}` });
+      }
+      const line = ard.serial.trimEnd().split('\n').pop()?.trim();
+      if (line) rows.push({ label: t.arduinoSerial, value: line });
+      return { title, rows, note: t.arduinoNote };
+    }
     case 'opamp': {
       const o = status.opamp ?? { differential: 0, output: 0, current: 0, mode: 'linear' as const };
       return {

@@ -144,11 +144,24 @@ export interface DeviceStatus {
   readonly polarization?: number;
   /** Direnç: harcanan gücün (AC'de bir periyodun ortalaması) güç sınırına oranı. */
   readonly powerRatio?: number;
+  /**
+   * Arduino: program çalışıyor mu, her IO pininin kipi (0 giriş, 1 çekme dirençli giriş, 2 düşük,
+   * 3 yüksek çıkış), GND'ye göre gerilimi ve pinden dışarı verdiği akım; Seri ekran metni, kart
+   * üstü L ve TX LED'leri, işlemcinin zamanı (s).
+   */
+  readonly arduino?: {
+    readonly running: boolean;
+    readonly pins: ReadonlyArray<{ readonly pin: number; readonly mode: number; readonly voltage: number; readonly current: number }>;
+    readonly serial: string;
+    readonly ledL: boolean;
+    readonly ledTx: boolean;
+    readonly time: number;
+  };
 }
 
 /** Gerçek parçanın sınırı aşıldı (Fizik 5): uyarı kodu ve ayrıntıları (gerilim, güç, sınır). */
 export interface RatingWarning {
-  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse' | 'motor-overload'>;
+  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse' | 'motor-overload' | 'pin-overcurrent'>;
   readonly params: Readonly<Record<string, number>>;
 }
 

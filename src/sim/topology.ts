@@ -69,6 +69,8 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
       if (el.type === 'relay' && index >= 3) return;
       if (el.type === 'funcgen' && index < 2) return;
       if (el.type === 'dcsupply' && floating(index) && floating(index ^ 1)) return;
+      // Arduino'nun kullanılmayan pinleri normaldir; yalnızca GND bağlanmalıdır.
+      if (el.type === 'arduino' && index !== 2) return;
       const root = wiring.findKey(pin);
       if ((pinCount.get(root) ?? 0) <= 1) {
         diagnostics.push({

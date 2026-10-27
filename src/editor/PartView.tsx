@@ -56,6 +56,8 @@ export function partValueText(part: Part): string {
     case 'timer555':
       // Sembolün içinde "741" / "555" yazar.
       return '';
+    case 'arduino':
+      return tr.properties.optionLabel('program', String(p.program ?? ''));
     case 'speaker':
       return '8 Ω · 5 W';
     case 'buzzer':
