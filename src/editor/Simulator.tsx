@@ -186,7 +186,10 @@ export default function Simulator() {
   const saveState = useAutosave(doc);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
-  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound);
+  // Canlı ölçümleri gösterilen parçalar (seçim ve ölçü aletleri): motor bunların istatistiğini tutar.
+  const watchedKey = [...selection.parts.slice(0, 8), ...doc.parts.filter((p) => p.type === 'voltmeter' || p.type === 'ammeter').map((p) => p.id)].join(',');
+  const watched = useMemo(() => (watchedKey ? watchedKey.split(',') : []), [watchedKey]);
+  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound, watched);
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
   const canFlip = selectedParts.some((p) => CATALOG[p.type].polarized);

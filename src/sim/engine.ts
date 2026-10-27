@@ -49,6 +49,7 @@ import { luFactor, luSolve, SingularMatrixError, type LUFactorization } from './
 import { GROUND, MnaSystem } from './mna';
 import type { Netlist } from './netlist';
 import { UnionFind } from './unionFind';
+import { addLeaf, flatten, type KeyStats } from './watch';
 
 export interface SimulatorOptions {
   /** En büyük (ve başlangıç) zaman adımı (s). */
@@ -779,6 +780,7 @@ export class CircuitSimulator {
       steps++;
       this.observe();
       this.accumulate(h);
+      this.sampleWatched(h);
       this.pushHistory();
       this.eulerNext = landing || this.limitEvent;
       if (this.lteStates.length === 0) {
@@ -871,10 +873,40 @@ export class CircuitSimulator {
 
   /** Yeni bir ilerletme aralığı (animasyon karesi): ortalamalar sıfırlanır. */
   private beginInterval(): void {
+    this.watchData = new Map();
     this.intervalTime = 0;
     this.sampleClock = 0;
     this.xSum.fill(0);
     for (const sums of this.pinSums) sums.fill(0);
+  }
+
+  /** İstatistiği tutulan bileşenler (arayüzün gösterdikleri). */
+  private watched: readonly string[] = [];
+  /** Son advance() çağrısındaki adımların istatistikleri: bileşen → yaprak → istatistik. */
+  private watchData = new Map<string, Map<string, KeyStats>>();
+
+  /** Ölçüm ve durum istatistikleri tutulacak bileşenler (bir sonraki advance'ten itibaren). */
+  watch(ids: readonly string[]): void {
+    this.watched = ids.filter((id) => this.circuit.deviceById.has(id));
+  }
+
+  /**
+   * İzlenen bir bileşenin son advance() çağrısındaki adımlarının istatistikleri ("m.voltage",
+   * "s.timer.high" ...); adım atılmadıysa (DC devre, duraklatılmış) ya da izlenmiyorsa null.
+   */
+  watchedStats(id: string): ReadonlyMap<string, KeyStats> | null {
+    const stats = this.watchData.get(id);
+    return stats && stats.size > 0 ? stats : null;
+  }
+
+  private sampleWatched(h: number): void {
+    for (const id of this.watched) {
+      let stats = this.watchData.get(id);
+      if (!stats) this.watchData.set(id, (stats = new Map()));
+      const target = stats;
+      flatten('m', this.measure(id), (key, leaf) => addLeaf(target, key, leaf, h));
+      flatten('s', this.status(id), (key, leaf) => addLeaf(target, key, leaf, h));
+    }
   }
 
   /** Kabul edilen çözüm, kayıt tutan bileşenlere (osiloskop) iletilir. */

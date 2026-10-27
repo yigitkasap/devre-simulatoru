@@ -16,6 +16,7 @@ import { FieldError, fieldTone, splitUnit, useCommitField, type PartPatch } from
 import { Icon } from './icons';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, stepKind, stepValue, validateLabel, validateNumber, valuePresets } from './propertyForm';
+import { stableReadout } from './liveReadout';
 import { partReadout } from './readouts';
 import { useThrottledText } from './a11y';
 import { plainText, Rich } from './Rich';
@@ -719,7 +720,7 @@ export function MeasureSheetBody({ part, doc, frame, status, settings, expanded:
   const device = DEVICE_TYPES.has(part.type);
   const primary = device ? undefined : def.propDefs.find((p): p is NumberPropDef => p.kind === 'number');
   const m = frame?.measurements.get(part.id);
-  const readout = m && frame ? partReadout(part, m, frame.statuses.get(part.id)) : partReadout(part, ZERO);
+  const readout = (m && frame ? stableReadout(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null) : null) ?? partReadout(part, ZERO);
   const rows = readout?.rows ?? [];
   const running = status === 'running';
   const otherLabels = new Set(doc.parts.filter((p) => p.id !== part.id).map((p) => p.label));

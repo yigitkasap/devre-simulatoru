@@ -20,6 +20,7 @@ import {
 } from '../sim';
 import { SimAudio } from './audio';
 import { IonPhases } from './ions';
+import { LiveWindow, type LiveSummary } from './liveReadout';
 import { buildScopeView, type ScopeView } from './scopeView';
 import type { LiveVisual } from './symbols';
 
@@ -45,6 +46,8 @@ export interface SimFrame {
   readonly live: ReadonlyMap<string, LiveVisual>;
   readonly measurements: ReadonlyMap<string, Measurement>;
   readonly statuses: ReadonlyMap<string, DeviceStatus>;
+  /** İzlenen parçaların son ölçüm penceresi (salınan değerlerin kararlı gösterimi için). */
+  readonly summaries: ReadonlyMap<string, LiveSummary>;
   /** Simülasyon sırasında oluşan uyarılar (kısa devre, yanmış LED). */
   readonly runtime: readonly Diagnostic[];
   /** Kısa devre olan pillerin kimlikleri (kırmızı yanıp sönen çerçeve). */
@@ -111,7 +114,13 @@ export function useSimulation(
   electronFlow: boolean,
   /** Hoparlör ve buzzerin sesi çalınsın mı (Ayarlar). */
   sound = true,
+  /** Canlı ölçümleri gösterilen parçalar: her adımda istatistikleri tutulur. */
+  watched: readonly string[] = [],
 ): SimulationApi {
+  const watchedRef = useRef(watched);
+  watchedRef.current = watched;
+  /** İzlenen parçaların ölçüm pencereleri. */
+  const liveWindows = useRef(new Map<string, LiveWindow>());
   const simRef = useRef<CircuitSimulator | null>(null);
   const audio = useRef<SimAudio | null>(null);
   const soundRef = useRef(sound);
@@ -266,9 +275,20 @@ export function useSimulation(
       }
     }
 
+    const summaries = new Map<string, LiveSummary>();
+    const windows = liveWindows.current;
+    for (const id of [...windows.keys()]) if (!watchedRef.current.includes(id)) windows.delete(id);
+    for (const id of watchedRef.current) {
+      let w = windows.get(id);
+      if (!w) windows.set(id, (w = new LiveWindow()));
+      w.add(sim.watchedStats(id), dtReal);
+      if (w.summary) summaries.set(id, w.summary);
+    }
+
     return {
       time: sim.time,
       vmax,
+      summaries,
       wireVoltages,
       segmentFlows: flows,
       segmentPhases: Float64Array.from(ph.segments),
@@ -290,6 +310,7 @@ export function useSimulation(
     ledGlow.current = new Map();
     ionPhases.current = new Map();
     motorAngles.current = new Map();
+    liveWindows.current = new Map();
     audio.current?.reset();
     setStatus('stopped');
     setFrame(null);
@@ -381,6 +402,7 @@ export function useSimulation(
       last = now;
       const simDt = dtReal * speedRef.current;
       const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.maxTimeStep) * 8 + 64);
+      sim.watch(watchedRef.current);
       const result = sim.advance(simDt, maxSteps);
       // Adım sınırına takıldıysa istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
       lagSamples = (lagSamples * 0.9) + (result.steps >= maxSteps ? 0.1 : 0);

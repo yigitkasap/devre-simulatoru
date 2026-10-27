@@ -1523,6 +1523,9 @@ export const tr = {
     live: 'Canlı ölçüm',
     liveBadge: 'canlı',
     pausedBadge: 'duraklatıldı',
+    uncomputable: 'hesaplanamıyor',
+    varyingNote:
+      'Bazı değerler hızla değişiyor: ≈ işaretliler son 0,4 saniyenin etkin değeri (gerilim, akım) ya da ortalaması (güç ve öbürleri); ⇄ iki durum arasında gidip geliyor demek.',
     playHint: 'Oynat’a basınca değerler burada canlı görünür.',
     why: 'Neden bu değer?',
     properties: 'Özellikler',

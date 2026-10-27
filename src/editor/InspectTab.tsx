@@ -14,7 +14,8 @@ import { Icon, type IconName } from './icons';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, validateLabel, validateNumber, valuePresets } from './propertyForm';
 import { PropSlider } from './PropSlider';
-import { meterText, partReadout, type ReadoutRow } from './readouts';
+import { stableMeterText, stableReadout } from './liveReadout';
+import { partReadout, type ReadoutRow } from './readouts';
 import { plainText, Rich } from './Rich';
 import type { Settings } from './settings';
 import type { Selection } from './state';
@@ -153,7 +154,7 @@ function MeterStrip({ doc, frame, onSelectPart }: InspectTabProps) {
       <div className="flex flex-1 flex-wrap justify-end gap-x-3 gap-y-1.5">
       {meters.map((part) => {
         const m = frame.measurements.get(part.id);
-        const text = m ? (meterText(part, m, frame.statuses.get(part.id)) ?? '') : '';
+        const text = m ? (stableMeterText(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null) ?? '') : '';
         return (
           <button
             key={part.id}
@@ -338,7 +339,8 @@ const ZERO_MEASUREMENT = { voltage: 0, current: 0, power: 0 };
 
 function LiveSection({ part, frame, status }: { part: Part; frame: SimFrame | null; status: SimStatus }) {
   const m = frame?.measurements.get(part.id);
-  const readout = m && frame ? partReadout(part, m, frame.statuses.get(part.id)) : partReadout(part, ZERO_MEASUREMENT);
+  const live = m && frame ? stableReadout(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null) : null;
+  const readout = live ?? partReadout(part, ZERO_MEASUREMENT);
   // Ekran okuyucu canlı değerleri en çok saniyede bir duyar (N02).
   const spoken = useThrottledText(m && readout ? readout.rows.map((r) => `${plainText(r.label)} ${r.value}`).join(', ') : '');
   if (!readout) return null;
@@ -399,6 +401,11 @@ function LiveSection({ part, frame, status }: { part: Part; frame: SimFrame | nu
           </div>
         ))}
       </div>
+      {live?.varying && (
+        <p className="text-[12.5px] leading-normal text-ink-2">
+          {tr.inspector.varyingNote}
+        </p>
+      )}
       {readout.note && (
         <div className="flex flex-col gap-1 rounded-[10px] border border-info-line bg-info-soft px-3 py-2.5">
           <span className="text-label font-semibold text-info-ink">{tr.inspector.why}</span>

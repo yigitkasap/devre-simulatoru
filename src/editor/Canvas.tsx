@@ -53,7 +53,7 @@ import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
 import { routeAround } from './phoneTools';
-import { meterText } from './readouts';
+import { stableMeterText } from './liveReadout';
 import { HintText } from './HintStrip';
 import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
@@ -1632,7 +1632,7 @@ export function Canvas({
                 part={part}
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
-                meterText={measurement ? meterText(part, measurement, frame?.statuses.get(part.id)) : null}
+                meterText={measurement ? stableMeterText(part, measurement, frame?.statuses.get(part.id) ?? {}, frame?.summaries.get(part.id) ?? null) : null}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
                 hideValue={lod && !selectedParts.has(part.id)}

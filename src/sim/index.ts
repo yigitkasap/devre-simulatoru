@@ -2,6 +2,7 @@
 
 export { CircuitSimulator, type AdvanceResult, type SimulatorOptions } from './engine';
 export { METER_MODES, type MeterMode } from './averager';
+export { mergeStats, type KeyStats, type WatchKind } from './watch';
 export { SCOPE_BUCKETS, SCOPE_DIVISIONS_X, SCOPE_DIVISIONS_Y, ScopeRecorder } from './scope';
 export type { ScopeChannelData } from './scope';
 export { compileNetlist, type CompiledCircuit } from './compile';
