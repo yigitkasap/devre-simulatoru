@@ -102,7 +102,8 @@ function run(example: ExampleId, doc: CircuitDoc, seconds: number, findings: Fin
   const wallMs = performance.now() - start;
   for (const part of doc.parts) {
     if (part.type === 'ground') continue;
-    const bad = nonFinite(sim, part.id);
+    // Yanmış lamba/sigortanın direnci sonsuzdur (kopuk): bilgi kutusu yalnızca "Yandı" gösterir.
+    const bad = sim.status(part.id).burned ? [] : nonFinite(sim, part.id);
     if (bad.length > 0) add('nan', `${part.label}: ${bad.join(', ')}`);
     const m = sim.measure(part.id);
     if (!m) continue;

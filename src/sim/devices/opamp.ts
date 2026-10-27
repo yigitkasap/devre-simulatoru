@@ -47,6 +47,19 @@ function softplus(z: number, s: number): { v: number; d: number } {
   return { v: s * Math.log1p(e), d: e / (1 + e) };
 }
 
+/**
+ * Salınım penceresi [lo, hi] ve sınırların V+, V−'ye göre türevleri. Besleme, iki tavanın toplamından
+ * küçükse (ör. ±15 mV) pencere ters döner (hi < lo) ve iki yumuşak sınır kazancın işaretini
+ * çevirirdi; o durumda ikisi rayların ortasında birleşir: çıkış ortada kalır (gerçek 741 de çalışmaz).
+ */
+function swingWindow(vp: number, vn: number, inset: number) {
+  const hi = vp - inset;
+  const lo = vn + inset;
+  if (hi >= lo) return { hi, lo, hiP: 1, hiN: 0, loP: 0, loN: 1 };
+  const mid = (vp + vn) / 2;
+  return { hi: mid, lo: mid, hiP: 0.5, hiN: 0.5, loP: 0.5, loN: 0.5 };
+}
+
 /** Kazanç düğümüne giren akım ve türevleri (y, v_d, V+, V−'ye göre). */
 function gainStage(y: number, vd: number, vp: number, vn: number) {
   const u = OPAMP.gain * vd - y;
@@ -54,27 +67,25 @@ function gainStage(y: number, vd: number, vp: number, vn: number) {
   const t = Math.tanh(u / (s * TAU));
   const fu = s * t;
   const dfu = (1 - t * t) / TAU;
-  const hi = vp - OPAMP.headroom + WINDUP_MARGIN;
-  const lo = vn + OPAMP.headroom - WINDUP_MARGIN;
-  const over = softplus(y - hi, CORNER);
-  const under = softplus(lo - y, CORNER);
+  const w = swingWindow(vp, vn, OPAMP.headroom - WINDUP_MARGIN);
+  const over = softplus(y - w.hi, CORNER);
+  const under = softplus(w.lo - y, CORNER);
   const i = NODE_C * (fu - WINDUP_RATE * (over.v - under.v));
   return {
     i,
     dy: NODE_C * (-dfu - WINDUP_RATE * (over.d + under.d)),
     dvd: NODE_C * dfu * OPAMP.gain,
-    dvp: NODE_C * WINDUP_RATE * over.d,
-    dvn: NODE_C * WINDUP_RATE * under.d,
+    dvp: NODE_C * WINDUP_RATE * (over.d * w.hiP + under.d * w.loP),
+    dvn: NODE_C * WINDUP_RATE * (over.d * w.hiN + under.d * w.loN),
     slewing: Math.abs(t) > 0.9,
   };
 }
 
 /** Çıkış katının verdiği akım (çıkış düğümüne giren) ve türevleri. */
 function outputStage(y: number, vo: number, vp: number, vn: number) {
-  const hi = vp - OPAMP.headroom;
-  const lo = vn + OPAMP.headroom;
-  const a = softplus(y - hi, CORNER);
-  const b = softplus(lo - y, CORNER);
+  const w = swingWindow(vp, vn, OPAMP.headroom);
+  const a = softplus(y - w.hi, CORNER);
+  const b = softplus(w.lo - y, CORNER);
   const vc = y - a.v + b.v;
   const isc = OPAMP.shortCircuitCurrent;
   const ro = OPAMP.outputResistance;
@@ -84,12 +95,40 @@ function outputStage(y: number, vo: number, vp: number, vn: number) {
     i: isc * t,
     vc,
     dy: g * (1 - a.d - b.d),
-    dvp: g * a.d,
-    dvn: g * b.d,
+    dvp: g * (a.d * w.hiP + b.d * w.loP),
+    dvn: g * (a.d * w.hiN + b.d * w.loN),
     dvo: -g,
     saturation: a.d > 0.5 ? 'high' : b.d > 0.5 ? 'low' : null,
     limited: Math.abs(t) > 0.95,
   };
+}
+
+type OpAmpPoint = { readonly y: number; readonly vd: number; readonly vo: number; readonly vp: number; readonly vn: number };
+
+/** Bir Newton yinelemesinde iki tanh katının en fazla değişimi. */
+const MAX_TANH_STEP = 0.5;
+
+const lerpPoint = (a: OpAmpPoint, b: OpAmpPoint, t: number): OpAmpPoint => ({
+  y: a.y + (b.y - a.y) * t,
+  vd: a.vd + (b.vd - a.vd) * t,
+  vo: a.vo + (b.vo - a.vo) * t,
+  vp: a.vp + (b.vp - a.vp) * t,
+  vn: a.vn + (b.vn - a.vn) * t,
+});
+const gainTanh = (p: OpAmpPoint) => Math.tanh((OPAMP.gain * p.vd - p.y) / (OPAMP.slewRate * TAU));
+const outputTanh = (p: OpAmpPoint) => outputStage(p.y, p.vo, p.vp, p.vn).i / OPAMP.shortCircuitCurrent;
+
+/** a'dan b'ye adımın, iki katın tanh değişimini MAX_TANH_STEP'te tutan kesri (yarılayarak; 1 = tam adım). */
+function dampedFraction(a: OpAmpPoint, b: OpAmpPoint): number {
+  const g0 = gainTanh(a);
+  const o0 = outputTanh(a);
+  let t = 1;
+  for (let k = 0; k < 30; k++) {
+    const p = t === 1 ? b : lerpPoint(a, b, t);
+    if (Math.abs(gainTanh(p) - g0) <= MAX_TANH_STEP && Math.abs(outputTanh(p) - o0) <= MAX_TANH_STEP) return t;
+    t /= 2;
+  }
+  return t;
 }
 
 /** Çıkış akımının V+ ucundan çekilen kısmı (yumuşak pozitif kısım) ve türevi. */
@@ -175,8 +214,17 @@ export class OpAmpDevice extends Device {
   }
 
   override updateIterate(x: Float64Array): boolean {
-    const next = { y: this.v(x, 5), vd: this.v(x, 1) - this.v(x, 0), vo: this.v(x, 2), vp: this.v(x, 3), vn: this.v(x, 4) };
+    const raw = { y: this.v(x, 5), vd: this.v(x, 1) - this.v(x, 0), vo: this.v(x, 2), vp: this.v(x, 3), vn: this.v(x, 4) };
     const before = this.it;
+    // Doyumdaki iki tanh katı (eğim hızı ve kısa devre akımı) Newton'u döngüye sokabilir (ör. V+ 15 mV:
+    // çıkış her yinelemede ±1600 V). Diyotlardaki pnjlim gibi: yeni doğrusallaştırma noktası, iki katın
+    // tanh değeri en çok MAX_TANH_STEP değişecek kadar kısaltılır.
+    const alpha = dampedFraction(before, raw);
+    const next = alpha === 1 ? raw : lerpPoint(before, raw, alpha);
+    if (alpha < 1) {
+      this.it = next;
+      return false;
+    }
     // Kazanç düğümünün ve çıkış akımının doğrusal tahmini ile gerçek değeri yakınsa yakınsamıştır.
     const gs0 = gainStage(before.y, before.vd, before.vp, before.vn);
     const gs1 = gainStage(next.y, next.vd, next.vp, next.vn);

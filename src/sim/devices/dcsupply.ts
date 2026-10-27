@@ -21,6 +21,24 @@ export const DCSUPPLY_MAX_VOLTAGE = 30;
 const LIMITER_WIDTH = 0.01;
 /** Bir Newton-Raphson iterasyonunda sınırlayıcı geriliminin en fazla değişimi (V). */
 const MAX_LIMITER_STEP = 2;
+/** Bir iterasyonda tanh(v / genişlik)'in en fazla değişimi (doyumdan doyuma sıçramayı önler). */
+const MAX_TANH_STEP = 0.5;
+
+/**
+ * Sınırlayıcı geriliminin adımı (diyotlardaki pnjlim'in tanh karşılığı): doyumda iletkenlik ≈ 0
+ * olduğundan Newton sınırlayıcıyı sabit akım kaynağı sanır ve akım yön değiştirince karşı doyuma
+ * fırlar; CV ile CC arasında döngüye girebilir (ör. 30 V, 0,1 A sınırda diyotlu devre). tanh'in
+ * değişimi 0,5 ile sınırlanınca böyle bir adım geçiş bölgesine iner, orada türev anlamlıdır.
+ */
+function limitLimiter(raw: number, vold: number): { v: number; limited: boolean } {
+  const uOld = Math.tanh(vold / LIMITER_WIDTH);
+  const uNew = Math.tanh(raw / LIMITER_WIDTH);
+  if (Math.abs(uNew - uOld) > MAX_TANH_STEP) {
+    const u = uOld + Math.sign(uNew - uOld) * MAX_TANH_STEP;
+    return { v: LIMITER_WIDTH * Math.atanh(Math.max(-0.999999, Math.min(0.999999, u))), limited: true };
+  }
+  return limitStep(raw, vold, MAX_LIMITER_STEP);
+}
 
 export function dcsupplySettings(props: Props) {
   const d = DCSUPPLY_DEFAULTS;
@@ -105,7 +123,7 @@ export class DcSupplyDevice extends Device {
     for (let k = 0; k < 2; k++) {
       const lim = this.limiters[k]!;
       const raw = this.v(x, 4 + k) - this.v(x, 2 * k);
-      const step = limitStep(raw, lim.v, MAX_LIMITER_STEP);
+      const step = limitLimiter(raw, lim.v);
       const predicted = lim.linCurrent + lim.linConductance * (raw - lim.v);
       const actual = this.limiterCurrent(k, raw).i;
       const tolerance = NR_RELTOL * Math.max(Math.abs(actual), Math.abs(predicted)) + NR_ABSTOL;
