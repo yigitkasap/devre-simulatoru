@@ -940,6 +940,29 @@ try {
     await tCtx.close();
   }
 
+  // --- 3B tezgâh (telefon): Şema | 3B düğmesi, tek parmakla döndürme, sayfa kaymıyor -------------
+  {
+    const { page, cdp } = await phone();
+    await openExample(page, 'Arduino: yanıp sönen LED');
+    const group = page.getByRole('group', { name: 'Görünüm' });
+    const sizes = await group.getByRole('button').evaluateAll((els) => els.map((el) => { const r = el.getBoundingClientRect(); return Math.min(r.width, r.height); }));
+    const area = await page.locator('svg.schematic').boundingBox();
+    const toggle = await group.boundingBox();
+    check('3B: telefonda Şema | 3B düğmeleri en az 44 px ve tuvalin sol altında (sol üst boş kalır)', sizes.every((s) => s >= 44) && toggle.y > area.y + area.height / 2, sizes.map((s) => Math.round(s)).join(', '));
+    await group.getByRole('button', { name: '3B' }).tap(); await page.waitForTimeout(1500);
+    const before = await page.evaluate(() => window.__tezgah?.camera.position.toArray().map((v) => v.toFixed(2)).join(','));
+    const box = await page.locator('main canvas').boundingBox();
+    await drag(page, cdp, { x: box.x + box.width * 0.5, y: box.y + box.height * 0.35 }, { x: box.x + box.width * 0.8, y: box.y + box.height * 0.45 });
+    await page.waitForTimeout(400);
+    const after = await page.evaluate(() => window.__tezgah?.camera.position.toArray().map((v) => v.toFixed(2)).join(','));
+    const scrolled = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop);
+    check('3B: tek parmakla sürükleyince kamera dönüyor, sayfa kaymıyor', Boolean(before) && before !== after && scrolled === 0, `${before} → ${after}`);
+    await shot(page, 'ios-3b.png');
+    await group.getByRole('button', { name: 'Şema' }).tap(); await page.waitForTimeout(500);
+    check('3B: Şema’ya dönünce tuval geri geliyor, 3B sahnesi kapanıyor', (await page.locator('svg.schematic').count()) === 1 && (await page.evaluate(() => window.__tezgah === undefined)));
+    await page.context().close();
+  }
+
   // --- Baraj sayfası (/baraj/): ders düzeni (docs/tasarim/baraj) ------------------------------
   const BARAJ = `${URL0.replace(/\/?$/, '/')}baraj/`;
   const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);

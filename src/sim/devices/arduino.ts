@@ -1,5 +1,6 @@
-import { PROGRAMS } from '../../arduino/programs.gen';
-import { Atmega328, MCU_FREQUENCY, PinMode, decodeFirmware } from '../mcu';
+import type { Atmega328 } from '../arduino/mcu';
+import { MCU_FREQUENCY, PinMode } from '../arduino/pins';
+import { arduinoRuntime, loadArduinoRuntime } from '../arduino/runtime';
 import type { MnaSystem } from '../mna';
 import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type RatingWarning, type StepContext } from './device';
 
@@ -78,10 +79,10 @@ class Board {
 
   constructor(
     readonly program: string,
-    firmware: Uint16Array,
+    mcu: Atmega328,
     origin: number,
   ) {
-    this.mcu = new Atmega328(firmware);
+    this.mcu = mcu;
     this.origin = origin;
   }
 
@@ -132,9 +133,15 @@ export class ArduinoDevice extends Device {
 
   private ensureBoard(time: number): Board | null {
     if (this.board) return this.board;
-    const program = PROGRAMS[this.program];
-    if (!program) return null;
-    const board = new Board(this.program, decodeFirmware(program.firmware), time);
+    // İşlemci tembel yüklenir: yüklenene kadar kart çalışmıyor (pinler giriş) sayılır.
+    const runtime = arduinoRuntime();
+    if (!runtime) {
+      void loadArduinoRuntime();
+      return null;
+    }
+    const mcu = runtime.create(this.program);
+    if (!mcu) return null;
+    const board = new Board(this.program, mcu, time);
     this.attach(board);
     return board;
   }
@@ -358,7 +365,7 @@ export class ArduinoDevice extends Device {
         running: board !== null,
         pins: ARDUINO_IO.map((io, i) => ({
           pin: io,
-          mode: this.applied[i]! as PinMode,
+          mode: this.applied[i]!,
           voltage: this.v(x, FIRST_IO + i) - gnd,
           current: this.pinOutput(x, i),
         })),

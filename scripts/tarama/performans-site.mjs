@@ -55,7 +55,11 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, l
 await ctx.addInitScript(() => {
   try {
     localStorage.setItem('devre-simulatoru:hosgeldin', '1');
-    localStorage.removeItem('devre-simulatoru:gorunum');
+    // Görünüm yalnızca ilk açılışta şemaya döner (yeniden yüklemede seçilen görünüm kalır).
+    if (!sessionStorage.getItem('tarama')) {
+      localStorage.removeItem('devre-simulatoru:gorunum');
+      sessionStorage.setItem('tarama', '1');
+    }
   } catch {
     /* yok */
   }
@@ -111,9 +115,20 @@ async function view(mode) {
   await page.waitForTimeout(mode === 'bench' ? 1200 : 300);
   return [...scripts.keys()].filter((k) => !before.has(k));
 }
+/** Simülasyon çubuğundaki zaman (s); simülasyon çalışmıyorsa null. */
+async function simTime() {
+  const text = await page.getByRole('region', { name: 'Simülasyon' }).innerText().catch(() => '');
+  const m = /Zaman:\s*([\d.,]+)\s*(µs|ms|s)(?![a-zçğıöşü])/i.exec(text);
+  if (!m || !text.includes('Çalışıyor')) return null;
+  const scale = { µs: 1e-6, ms: 1e-3, s: 1 }[m[2]];
+  return Number(m[1].replace(/\./g, '').replace(',', '.')) * scale;
+}
+
 /** `seconds` boyunca kare sayısı, en uzun kare ve uzun görevler; isteğe bağlı sürükleme. */
 async function measure(label, seconds = 3, drag = false) {
   await page.evaluate(() => (window.__long = []));
+  const sim0 = await simTime();
+  const wall0 = Date.now();
   const box = await page.locator('main').first().boundingBox();
   const sampler = page.evaluate(
     (ms) =>
@@ -144,13 +159,25 @@ async function measure(label, seconds = 3, drag = false) {
     await page.mouse.up();
   }
   const r = await sampler;
+  const sim1 = await simTime();
+  const realtime = sim0 !== null && sim1 !== null ? (sim1 - sim0) / ((Date.now() - wall0) / 1000) : null;
   const long = await page.evaluate(() => window.__long);
   const scene = await page.evaluate(() => {
     const s = window.__tezgah;
     return s ? { ...s.info, renderMs: s.stats.renderMs } : null;
   });
-  const row = { label, fps: Number(r.fps.toFixed(1)), worstMs: Math.round(r.worst), p95Ms: Math.round(r.p95), longTasks: long.length, longestTaskMs: Math.round(Math.max(0, ...long)), scene };
+  const row = {
+    label,
+    fps: Number(r.fps.toFixed(1)),
+    worstMs: Math.round(r.worst),
+    p95Ms: Math.round(r.p95),
+    longTasks: long.length,
+    longestTaskMs: Math.round(Math.max(0, ...long)),
+    realtime: realtime === null ? null : Number(realtime.toFixed(2)),
+    scene,
+  };
   report.scenarios.push(row);
+  if (row.realtime !== null && row.realtime < 0.95) add('gerçek zaman', label, `simülasyon gerçek zamanın %${Math.round(row.realtime * 100)}'i hızında (×1'de en az %95 olmalı)`);
   if (row.fps < LIMIT.fps) add('kare hızı', label, `${row.fps} fps (sınır ${LIMIT.fps}); en uzun kare ${row.worstMs} ms`);
   if (row.longTasks > LIMIT.longTasks) add('uzun görev', label, `${row.longTasks} uzun görev (> 50 ms), en uzunu ${row.longestTaskMs} ms`);
   if (scene && scene.calls > LIMIT.drawCalls) add('3B', label, `${scene.calls} çizim çağrısı (sınır ${LIMIT.drawCalls})`);
@@ -205,9 +232,12 @@ const showcase = {
   })),
   wires: [],
 };
-await page.evaluate((doc) => localStorage.setItem('devre-simulatoru:devre', JSON.stringify(doc)), showcase);
+await page.evaluate((doc) => {
+  localStorage.setItem('devre-simulatoru:devre', JSON.stringify(doc));
+  localStorage.setItem('devre-simulatoru:gorunum', 'bench');
+}, showcase);
 await page.reload({ waitUntil: 'networkidle' });
-await page.waitForTimeout(1500);
+await page.waitForTimeout(2000);
 const showcaseRow = await measure('3B · vitrin (35 parça türü), döndürülüyor', 3, true);
 await page.screenshot({ path: path.join(OUT, 'vitrin.png') });
 report.showcase = showcaseRow;
@@ -261,9 +291,9 @@ const lines = [
   '',
   '## Senaryolar',
   '',
-  '| Senaryo | fps | en uzun kare | p95 | uzun görev | çizim çağrısı | üçgen | kare çizimi |',
-  '|---|---:|---:|---:|---:|---:|---:|---:|',
-  ...report.scenarios.map((s) => `| ${s.label} | ${s.fps} | ${s.worstMs} ms | ${s.p95Ms} ms | ${s.longTasks} (${s.longestTaskMs} ms) | ${s.scene?.calls ?? '—'} | ${s.scene?.triangles ?? '—'} | ${s.scene ? `${s.scene.renderMs.toFixed(2)} ms` : '—'} |`),
+  '| Senaryo | fps | gerçek zaman | en uzun kare | p95 | uzun görev | çizim çağrısı | üçgen | kare çizimi |',
+  '|---|---:|---:|---:|---:|---:|---:|---:|---:|',
+  ...report.scenarios.map((s) => `| ${s.label} | ${s.fps} | ${s.realtime === null ? '—' : `%${Math.round(s.realtime * 100)}`} | ${s.worstMs} ms | ${s.p95Ms} ms | ${s.longTasks} (${s.longestTaskMs} ms) | ${s.scene?.calls ?? '—'} | ${s.scene?.triangles ?? '—'} | ${s.scene ? `${s.scene.renderMs.toFixed(2)} ms` : '—'} |`),
   '',
   `## Bellek (Şema ↔ 3B ×8)`,
   '',

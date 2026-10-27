@@ -12,4 +12,5 @@ void setup() {
 void loop() {
   bool pressed = digitalRead(BUTTON_PIN) == LOW;
   digitalWrite(LED_PIN, pressed ? HIGH : LOW);
+  delay(10);  // saniyede 100 kez okumak yeter: insan 10 ms'lik gecikmeyi fark etmez
 }

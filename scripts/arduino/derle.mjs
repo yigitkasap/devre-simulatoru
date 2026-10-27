@@ -1,5 +1,5 @@
 // Arduino örnek kodlarını (src/arduino/sketches/*.ino) Uno (ATmega328P) için derler ve
-// src/arduino/programs.gen.ts'e yazar (her program: kaynak metni + flash görüntüsü, base64). Bu
+// src/arduino/programs.gen.ts (kod metni) ve src/sim/arduino/firmware.gen.ts'e (flash görüntüsü, base64) yazar. Bu
 // üretilmiş dosya depoya girer: site derlenirken derleyici gerekmez. Derleyici
 // @horang-corp/avr-gcc-wasm'ın WebAssembly araçlarıdır (cc1plus, avr-as, avr-ld, avr-objcopy);
 // Node'da çalışır, yerel derleyici gerekmez. Arduino çekirdeği ve kütüphaneler paketle önceden
@@ -15,6 +15,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const PKG = path.join(ROOT, 'node_modules/@horang-corp/avr-gcc-wasm');
 const SKETCHES = path.join(ROOT, 'src/arduino/sketches');
 const OUT = path.join(ROOT, 'src/arduino/programs.gen.ts');
+const FIRMWARE_OUT = path.join(ROOT, 'src/sim/arduino/firmware.gen.ts');
 const UNO_APP_FLASH_BYTES = 32256;
 
 const tool = async (name) => (await import(pathToFileURL(path.join(PKG, 'tools', `${name}.mjs`)).href)).default;
@@ -134,7 +135,37 @@ async function compile(source) {
       size = Math.max(size, at + 1);
     }
   }
-  return { image: image.subarray(0, size + (size & 1)), flash: size };
+  return { image: image.subarray(0, size + (size & 1)), flash: size, idle: symbolRange(elf, 'delay') };
+}
+
+/**
+ * ELF'in sembol tablosundan bir işlevin flash'taki aralığı (bayt adresi, [başlangıç, bitiş)); yoksa
+ * null. Öykünücü delay()'in bekleme döngüsünü bununla tanır (src/sim/mcu.ts, skipIdle).
+ */
+function symbolRange(elf, name) {
+  const view = new DataView(elf.buffer, elf.byteOffset, elf.byteLength);
+  const shoff = view.getUint32(0x20, true);
+  const shentsize = view.getUint16(0x2e, true);
+  const shnum = view.getUint16(0x30, true);
+  const section = (i) => {
+    const at = shoff + i * shentsize;
+    return { type: view.getUint32(at + 4, true), offset: view.getUint32(at + 16, true), size: view.getUint32(at + 20, true), link: view.getUint32(at + 24, true) };
+  };
+  for (let i = 0; i < shnum; i++) {
+    const symtab = section(i);
+    if (symtab.type !== 2) continue;
+    const strtab = section(symtab.link);
+    for (let at = symtab.offset; at < symtab.offset + symtab.size; at += 16) {
+      let n = strtab.offset + view.getUint32(at, true);
+      let text = '';
+      while (elf[n]) text += String.fromCharCode(elf[n++]);
+      if (text === name && (elf[at + 12] & 0xf) === 2) {
+        const value = view.getUint32(at + 4, true);
+        return [value, value + view.getUint32(at + 8, true)];
+      }
+    }
+  }
+  return null;
 }
 
 const files = (await readdir(SKETCHES)).filter((f) => f.endsWith('.ino')).sort();
@@ -145,8 +176,8 @@ for (const file of files) {
   const t0 = performance.now();
   const source = (await readFile(path.join(SKETCHES, file), 'utf8')).replace(/\r\n/g, '\n');
   try {
-    const { image, flash } = await compile(source);
-    programs.push({ name, source, firmware: Buffer.from(image).toString('base64'), flash });
+    const { image, flash, idle } = await compile(source);
+    programs.push({ name, source, firmware: Buffer.from(image).toString('base64'), flash, idle });
     console.log(`${name.padEnd(20)} ${String(flash).padStart(6)} bayt  ${Math.round(performance.now() - t0)} ms`);
   } catch (error) {
     failed++;
@@ -154,23 +185,39 @@ for (const file of files) {
   }
 }
 if (failed) process.exit(1);
-const body = programs
-  .map((p) => `  ${JSON.stringify(p.name)}: {\n    flash: ${p.flash},\n    source: ${JSON.stringify(p.source)},\n    firmware:\n      ${JSON.stringify(p.firmware)},\n  },`)
-  .join('\n');
-await writeFile(OUT, `// ÜRETİLMİŞ DOSYA, elle değiştirme. Kaynak: src/arduino/sketches/*.ino; üretici: npm run arduino:derle
+// İki dosya: kod metni ve boyutu (arayüz, ilk açılışta) ile ikili görüntü (işlemciyle birlikte
+// yalnızca devrede Arduino varken yüklenir).
+const HEADER = `// ÜRETİLMİŞ DOSYA, elle değiştirme. Kaynak: src/arduino/sketches/*.ino; üretici: npm run arduino:derle
 // (scripts/arduino/derle.mjs: avr-gcc WebAssembly, -Os, Arduino AVR çekirdeği 1.8.x).
-
-export interface CompiledProgram {
+`;
+const sources = programs
+  .map((p) => `  ${JSON.stringify(p.name)}: {\n    flash: ${p.flash},\n    source: ${JSON.stringify(p.source)},\n  },`)
+  .join('\n');
+await writeFile(OUT, `${HEADER}
+export interface ProgramInfo {
   /** Flash'ta kapladığı bayt. */
   readonly flash: number;
   /** Arduino kodu (.ino). */
   readonly source: string;
+}
+
+export const PROGRAMS: Readonly<Record<string, ProgramInfo>> = {
+${sources}
+};
+`);
+const images = programs
+  .map((p) => `  ${JSON.stringify(p.name)}: {\n    idle: ${JSON.stringify(p.idle)},\n    firmware:\n      ${JSON.stringify(p.firmware)},\n  },`)
+  .join('\n');
+await writeFile(FIRMWARE_OUT, `${HEADER}
+export interface Firmware {
+  /** delay() işlevinin flash'taki aralığı (bayt adresi); öykünücü bekleme döngüsünü atlar. */
+  readonly idle: readonly [number, number] | null;
   /** Flash görüntüsü (adres 0'dan), base64. */
   readonly firmware: string;
 }
 
-export const PROGRAMS: Readonly<Record<string, CompiledProgram>> = {
-${body}
+export const FIRMWARE: Readonly<Record<string, Firmware>> = {
+${images}
 };
 `);
-console.log(`${programs.length} program → ${path.relative(ROOT, OUT)}`);
+console.log(`${programs.length} program → ${path.relative(ROOT, OUT)}, ${path.relative(ROOT, FIRMWARE_OUT)}`);

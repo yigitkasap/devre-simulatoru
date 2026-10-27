@@ -15,6 +15,7 @@ import { docFromHash, shareUrl } from '../model/share';
 import { CATALOG } from '../model/catalog';
 import { emptyDoc, type CircuitDoc } from '../model/types';
 import { compileNetlist, scopeSettings, type CompiledCircuit, type Diagnostic } from '../sim';
+import { loadArduinoRuntime } from '../sim/arduino/runtime';
 import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { loadSavedDoc, useAutosave } from './autosave';
@@ -185,6 +186,11 @@ export default function Simulator() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { doc, selection, tool } = state;
+  // Arduino'nun işlemcisi (avr8js) ve programları ayrı bir parçadır: devrede Arduino varsa önceden yüklenir.
+  const hasArduino = doc.parts.some((p) => p.type === 'arduino');
+  useEffect(() => {
+    if (hasArduino) void loadArduinoRuntime();
+  }, [hasArduino]);
   const saveState = useAutosave(doc);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);

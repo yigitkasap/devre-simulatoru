@@ -8,7 +8,8 @@ import { it } from 'vitest';
 import { EXAMPLE_IDS, exampleDoc } from '../../src/examples';
 import { buildConnectivity } from '../../src/model/connectivity';
 import { CircuitSimulator } from '../../src/sim';
-import { Atmega328 } from '../../src/sim/mcu';
+import '../../src/sim/arduino/load';
+import { Atmega328 } from '../../src/sim/arduino/mcu';
 
 declare const process: { readonly env: Readonly<Record<string, string | undefined>> };
 

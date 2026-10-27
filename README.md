@@ -22,6 +22,13 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
   seviye sensörü; elle ya da Doldur/Boşalt ile). Diyot, NPN, N kanallı JFET
   ve N kanallı MOSFET'te föydeki parçaların modelleri (1N4001, BC107, BF245A, IRF510; eklem
   kapasiteleri ve ters toparlanma dahil) ya da eski basit modeller seçilir.
+- **Arduino Uno:** ATmega328P işlemcisi avr8js ile komut komut, gerçek zamanlamayla çalışır;
+  11 örnek program önceden derlenir (Blink, düğme, sayaç, trafik ışığı, PWM, potansiyometre, LDR,
+  NTC termometre, PWM süzgeci, melodi, röle). Pinler devreye gerçek elektriksel modelle bağlıdır
+  (25 Ω çıkış, 35 kΩ çekme, Schmitt eşikleri, 10 bit ADC); Seri ekran ve kod İnceleme panelinde.
+- **3B tezgâh:** "Şema | 3B" ile aynı devre bir masada; bütün parçaların ve Arduino'nun gerçek
+  ölçülere yakın 3B modelleri, ağ renkli atlama kabloları; LED, lamba, motor, cihaz ekranları ve
+  osiloskop izleri simülasyonla canlı; anahtar ve potansiyometre 3B'de de kullanılır.
 - **Laboratuvar cihazları:** fonksiyon üreteci (GFG-8015G benzeri: 0,2 Hz – 2 MHz, 50 Ω, offset,
   simetri, −20 dB, TTL çıkışı), iki çıkışlı akım sınırlamalı DC güç kaynağı (CV/CC), iki kanallı
   osiloskop. Üretecin ve osiloskobun COM ucu laboratuvardaki gibi şebeke toprağına bağlıdır.
@@ -82,6 +89,9 @@ npm run test:spice # yalnızca ngspice ile çapraz doğrulama (tests/spice; aşa
 npm run build      # tür denetimi (astro check) + statik derleme → dist/
 npm run preview    # derlenmiş siteyi yerelde aç: http://localhost:4321/devre-simulatoru/
 npm run ios-kontrol  # iOS/dokunmatik kontrol listesi (dev sunucusu açıkken; aşağıya bak)
+npm run arduino:derle  # Arduino örnek kodlarını derle (src/arduino/sketches → *.gen.ts; aşağıya bak)
+npm run tarama:performans:motor  # performans taraması (Node): örnek başına hesap süresi
+npm run tarama:performans:site -- <adres>  # performans ve hata taraması (tarayıcı) + rapor
 ```
 
 Adresteki `/devre-simulatoru/`, GitHub Pages için ayarlanan `base` değeridir (aşağıya bak).
@@ -248,7 +258,7 @@ kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 ## Testler
 
-`npm test` 567 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
+`npm test` 600 test çalıştırır: görev tanımının 8. bölümündeki tüm devreler (gerilim bölücü,
 voltmetre ve ampermetre etkisi, LED karakteristiği ve yanması, diyot, RC dolma, kısa devre,
 topoloji, birim ayrıştırma), sayısal sağlamlık, şema modeli, kablo akımları, V/I/P metinleri,
 AC kaynak (dalga biçimleri, doğrultmaç, kare dalgalı RC), ölçü aletlerinin DC/AC kipi,
@@ -1565,3 +1575,84 @@ taramasında hata yok (atlama bağlantıları odakta 44 px yapıldı).
   hesaplanmaz (555'in her olayında Tarjan yapılıyordu).
 - Arayüzde kare bütçesi adım sayısıyla değil hesap süresiyle (10 ms): küçük adım isteyen devre,
   bilgisayar yetiştirdikçe "yetişemiyor" uyarısı almaz.
+
+### Arduino Uno (2026-10-27)
+
+learn-arduino-red.vercel.app ve learnarduino.vercel.app/lab incelendi (kaynak kodu yayında değil,
+lisanssız; kod alınmadı). İkisinde de devre çözücü yok: her ders için elle yazılmış formüller
+(ör. LED akımı (5 − V_f) / R), kod paneli yalnızca satır vurgular. Burada işlemci gerçekten koşar
+ve pinleri devre çözümüne bağlıdır.
+
+- **Derleme** (`npm run arduino:derle`, `scripts/arduino/derle.mjs`): `src/arduino/sketches/*.ino`,
+  avr-gcc'nin WebAssembly derlemesiyle (`@horang-corp/avr-gcc-wasm`, geliştirme bağımlılığı; GCC
+  ve binutils GPL'dir, yalnızca bu makinede çalışır, siteye girmez) Arduino AVR çekirdeği 1.8.7'ye
+  karşı `-Os` ile derlenir. Çıktı iki üretilmiş dosya: `src/arduino/programs.gen.ts` (kod metni,
+  boyut) ve `src/sim/arduino/firmware.gen.ts` (flash görüntüsü, `delay()`'in adresi ELF'ten).
+  Site derlenirken derleyici gerekmez. Kullanıcı şimdilik kod yazamaz (sunucusuz site; ileride
+  tarayıcıda ya da Cloudflare'de derleme).
+- **İşlemci** (`src/sim/arduino/mcu.ts`): avr8js (Wokwi, MIT): zamanlayıcı 0/1/2, B/C/D portları,
+  ADC, USART. Tembel yüklenir (`runtime.ts`): ilk açılışta indirilmez, devrede Arduino varken önceden
+  yüklenir (28 KB gzip).
+- **Pin modeli** (`src/sim/devices/arduino.ts`, ATmega328P veri sayfası, 5 V): çıkış 0/5 V
+  arkasında 25 Ω (20 mA'de 4,5 V), giriş yüksek empedans, INPUT_PULLUP 35 kΩ, Schmitt eşikleri
+  2,6 / 2,15 V, ADC 10 bit (referans 5 V), 5V ucu 0,2 Ω (USB), 3V3 ucu 1 Ω; iki GND (kart üstünde
+  10 mΩ). Bir pinden 40 mA'den fazla çekilirse uyarı.
+- **Eşgüdüm:** işlemci analog çözümün en fazla 50 µs önünde koşar. Bir çıkış değişince durur;
+  değişim anı bir kırılma noktasıdır, analog adım tam o ana denk gelir. `analogRead`'de işlemci
+  dönüşümün başladığı anda bekler, gerilim o anda okunur. `digitalRead`'in gecikmesi en çok 50 µs.
+- **Boşta atlama:** `delay()`'in bekleme döngüsü (yalnızca `micros()` okur), zamanlayıcıların bir
+  sonraki olayına (taşma, karşılaştırma: kesme ya da PWM kenarı) ve seri port/ADC olayına kadar
+  ileri sarılır (en çok 1000 çevrim, iki `micros()` okuması arasında bir kez). Kesmeler ve PWM
+  kenarları tam zamanında kalır; `delay()` en çok 125 µs geç döner (500 ms'de %0,025). İşlemcinin
+  hesap payı simülasyon saniyesi başına 450–920 ms'den 70–166 ms'ye indi.
+- **Örnekler:** "Arduino" grubunda 11 devre; metinlerdeki sayılar simülasyondan ve testli
+  (`tests/arduino.test.ts`): Blink 13 mA, potansiyometre %50 → 511, gece lambası 744/413/154,
+  termometre 25,0/59,7/0,7 °C (0 °C'taki fark B denkleminin yaklaşıklığı), PWM süzgeci 1,253 /
+  2,512 V, röle sargısı 43,5 mA.
+
+### 3B tezgâh (2026-10-27)
+
+- **Görünüm:** tuvalin sol üstünde (telefonda sol altta) "Şema | 3B". Devre şemada kurulur; 3B
+  izlenir ve oynanır. Seçim iki görünümde ortaktır. Görünüm tarayıcıda hatırlanır (dosyaya girmez).
+- **Modeller** (`src/bench3d`): three ile kodla üretilir; dış model dosyası yok. Birim 2,54 mm;
+  parçalar gerçek ölçülere yakın (direnç 6,3 mm, renk halkaları değerden; LED 5 mm; TO-92; DIP-8
+  modül kartında; Arduino 68,6 × 53,3 mm, başlık sırası gerçek kart gibi). Parçanın yeri şemadaki
+  yerinin 1,5 katı (yer açılsın diye). Kablolar uçtan uca atlama kablosu; pin olmayan birleşme
+  noktasında klemens; ağ başına renk (toprak siyah, besleme kırmızı).
+- **Canlı:** LED/lamba ışıması ve parıltı, motor pervanesi, röle modülü LED'i, hoparlör/buzzer
+  titreşimi, sigortanın teli, su seviyesi, multimetre/güç kaynağı/üreteç ekranları ve osiloskop
+  izleri (tuval dokusu, en çok saniyede 10 kez), Arduino ON/L/TX.
+- **Etkileşim:** yörünge kamerası (sürükle döndür, sağ tık/iki parmak kaydır, tekerlek/kıstırma
+  yakınlaştır); tıkla seç; Oynat'tayken anahtar ve potansiyometre. Sığdır ve Üstten; kullanıcı
+  kamerayı oynatmadıysa alan değişince (cihaz rafı) yeniden sığdırılır.
+- **Performans:** yalnızca değişince çizilir; değişmeyen alt nesneler malzemeye göre birleştirilir
+  (vitrinde 35 parça türü: 238 çizim çağrısı, 27 700 üçgen, kare 2,7 ms). three yalnızca 3B
+  açılınca yüklenir (158 KB gzip). Şema ↔ 3B geçişinde sızıntı yok (geometri ve doku sayısı sabit).
+- **iOS:** tuvalde touchstart/touchmove preventDefault (pasif değil), touch-action none; çekmece
+  açıkken auto. ios-kontrol'de 3 madde (düğme 44 px ve sol altta, tek parmakla döndürme ve sayfa
+  kaymıyor, Şema'ya dönüş).
+
+### Performans ve hata taraması (2026-10-27)
+
+- `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,
+  arayüz gibi 1/60 s'lik dilimlerle; simülasyon saniyesi başına hesap süresi (3 tekrarın
+  ortancası), Arduino'da işlemci payı. Bulgu: bütçenin (500 ms, yani hesap gerçek zamanın yarısı)
+  üstü. Bu makinede ölçümler gürültülü: aynı tarama yük altında 2 kat yavaş çıkabiliyor.
+- `npm run tarama:performans:site -- <adres>` (`scripts/tarama/performans-site.mjs`): paketler
+  (ham, gzip; ilk açılışta indirilen JS; three'nin tembel yüklendiği), şema ve 3B'de kare hızı,
+  gerçek zamana yetişme oranı, uzun görevler, 3B çizim çağrısı/üçgen/kare süresi, 35 parçalık
+  vitrin, Şema ↔ 3B ×8 bellek sızıntısı, konsol hataları. Rapor: `tarama-performans/performans.md`.
+
+İlk rapor 15 bulgu, son rapor 3 bulgu:
+
+| | önce | sonra |
+|---|---|---|
+| Arduino örnekleri, hesap / simülasyon saniyesi | 630–1090 ms | 200–450 ms |
+| bunun işlemci payı | 450–920 ms | 70–166 ms |
+| Arduino'lu örnek, bütçeyi aşan | 11 | 0 |
+| ilk açılış JS (gzip) | 305 KB | 277 KB |
+| şema ve 3B, ×1'de gerçek zamana yetişme | ölçülmüyordu | %100 (bütün senaryolar) |
+
+Kalan bulgular: ilk açılış JS'i 277 KB (sınır 250 KB; Arduino ve 3B'den önce de tahminen ≈ 263 KB'tı).
+Sonraki adım örnek devrelerin (10 KB) ve örnek metinlerinin (24 KB) tembel yüklenmesi. Çift yönlü
+kırpıcı (89 000 adım/s) bu işten önce de sınırdaydı (önceki taramada 476 ms).

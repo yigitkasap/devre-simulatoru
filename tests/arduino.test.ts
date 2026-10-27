@@ -6,6 +6,7 @@ import { ARDUINO, ARDUINO_IO } from '../src/sim/devices/arduino';
 import { exampleDoc, type ExampleId } from '../src/examples';
 import { buildConnectivity } from '../src/model/connectivity';
 import { updatePart } from '../src/model/docOps';
+import '../src/sim/arduino/load';
 import { circuit } from './helpers';
 
 /** Arduino pin listesi: verilmeyenler kendi boş ağına bağlanır. */
@@ -44,7 +45,7 @@ describe('Arduino Uno', () => {
     expect(arduino(sim).ledL).toBe(false);
   });
 
-  it('Blink: kenar, işlemcinin pini değiştirdiği çevrime (62,5 ns) denk gelir; periyot 1 s', () => {
+  it('Blink: kenar, işlemcinin pini değiştirdiği ana denk gelir; periyot 1 s (± 0,3 ms)', () => {
     const net = circuit()
       .add('arduino', 'U', uno('U', { GND: 'g', D13: 'p' }), { program: 'blink' })
       .resistor('R', 'p', 'g', 1000)
@@ -69,9 +70,9 @@ describe('Arduino Uno', () => {
       last = v;
     }
     expect(rises.length).toBe(2);
-    // delay(500) iki kez + loop'un birkaç µs'si.
+    // delay(500) iki kez + loop'un birkaç µs'si; delay() boşta atlamayla en çok 125 µs geç döner.
     expect(rises[1]! - rises[0]!).toBeGreaterThan(1.0);
-    expect(rises[1]! - rises[0]!).toBeLessThan(1.0 + 50e-6);
+    expect(rises[1]! - rises[0]!).toBeLessThan(1.0 + 300e-6);
   });
 
   it('Düğme (INPUT_PULLUP): bırakıkken pin 5 V ve LED sönük; basınca pin 0 V, LED yanar', () => {
