@@ -51,7 +51,7 @@ export interface InspectTabProps {
 }
 
 /** Ayarları cihaz rafındaki ön panelinde olan parçalar. */
-const RACK_DEVICES: ReadonlySet<string> = new Set(['oscilloscope', 'funcgen', 'dcsupply', 'tank']);
+export const RACK_DEVICES: ReadonlySet<string> = new Set(['oscilloscope', 'funcgen', 'dcsupply', 'tank']);
 
 export function InspectTab(props: InspectTabProps) {
   const { doc, selection, frame } = props;
@@ -485,7 +485,7 @@ export function useCommitField<T>(
   return { text, setText, error, commit, revert };
 }
 
-function LabelField({
+export function LabelField({
   label,
   otherLabels,
   inputRef,
@@ -534,7 +534,7 @@ function LabelField({
   );
 }
 
-function PropField({
+export function PropField({
   part,
   prop,
   values,
@@ -709,7 +709,7 @@ function NumberField({
 
 // --- Kablo ve çoklu seçim -------------------------------------------------------------------
 
-function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: string }) {
+export function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: string }) {
   // Telefonda silme alt çubukta (Ölç kipinde yapı kilitli).
   const touch = useTouchUi();
   const voltage = frame?.wireVoltages.get(wireId);
@@ -752,7 +752,7 @@ function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: st
   );
 }
 
-function MultiSelection({ count, parts, onRotate, onFlip, onDelete }: InspectTabProps & { count: number; parts: readonly Part[] }) {
+export function MultiSelection({ count, parts, onRotate, onFlip, onDelete }: InspectTabProps & { count: number; parts: readonly Part[] }) {
   // Telefonda eylemler alt çubukta.
   const touch = useTouchUi();
   const canFlip = parts.some((p) => CATALOG[p.type].polarized);

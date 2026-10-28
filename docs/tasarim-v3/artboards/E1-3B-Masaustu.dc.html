@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>3B tezgâh · masaüstü</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1557c0}a:hover{color:#0f3f8c}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.dots{background-color:#fbfbf9;background-image:radial-gradient(#d3d7dc 1px,transparent 1.2px);background-size:12px 12px}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; overflow: hidden; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1d2733; background: #ffffff">
+
+  <header style="height: 60px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-bottom: 1px solid #dde1e6">
+    <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#1d2733"></rect><path d="M6 15c2.5-7 5-7 8 0s5.5 7 8 0" fill="none" stroke="#f05a28" stroke-width="2.4" stroke-linecap="round"></path></svg>
+    <button style="height: 40px; padding: 0 8px; display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600">LED ve ön direnç<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"></path></svg></button>
+    <button style="height: 40px; padding: 0 12px; border-radius: 8px; font-size: 14px; font-weight: 500">Örnekler</button>
+    <div style="flex: 1"></div>
+    <button aria-label="Geri al" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4L3 8l4 4"></path><path d="M3 8h9a4.5 4.5 0 0 1 0 9H8"></path></svg></button>
+    <button aria-label="Yardım" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7.5"></circle><path d="M7.8 7.8a2.3 2.3 0 0 1 4.4.9c0 1.6-2.2 1.9-2.2 3.3"></path><path d="M10 14.6v.1"></path></svg></button>
+    <div style="width: 1px; height: 28px; background: #dde1e6; margin: 0 6px"></div>
+    <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; padding-right: 4px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #1b7d44"></span><span style="font-family: 'IBM Plex Mono', monospace">2,54 s</span></span>
+    <button style="height: 40px; padding: 0 10px; border-radius: 10px; border: 1px solid #dde1e6; font-size: 13px">Hız <span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">×1</span></button>
+    <button style="height: 42px; padding: 0 16px 0 12px; border-radius: 10px; background: #1d2733; color: #ffffff; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px"><svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.5" height="12" fill="currentColor"></rect><rect x="11.5" y="4" width="3.5" height="12" fill="currentColor"></rect></svg>Duraklat</button>
+    <button aria-label="Durdur" style="width: 42px; height: 42px; border-radius: 10px; border: 1px solid #c4cad2; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="1.5" fill="currentColor"></rect></svg></button>
+  </header>
+
+  <div style="flex: 1; display: flex; min-height: 0">
+    <!-- 3B tezgâh -->
+    <main style="flex: 1; position: relative; overflow: hidden; background: #e7e9e5">
+      <svg width="940" height="840" viewBox="0 0 940 840" style="position: absolute; inset: 0" role="img" aria-label="3B tezgâh: devre tahtası üzerinde R1 direnci ve yanan kırmızı LED; solda 5 V pil, sağ önde ampermetre olarak bağlı el multimetresi; her parçanın üstünde adı ve canlı değeri yazan etiket; R1 seçili">
+        <defs>
+          <pattern id="mat" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#d6d9d3" stroke-width="1"></path></pattern>
+          <pattern id="holes" x="0" y="-2" width="12" height="12" patternUnits="userSpaceOnUse"><rect x="4" y="4" width="4" height="4" rx="0.8" fill="#4a4f57"></rect></pattern>
+          <radialGradient id="glow"><stop offset="0" stop-color="#ff6a4d" stop-opacity="0.55"></stop><stop offset="1" stop-color="#ff6a4d" stop-opacity="0"></stop></radialGradient>
+          <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="8"></feGaussianBlur></filter>
+        </defs>
+
+        <!-- Kesim altlığı -->
+        <g transform="matrix(0.866 0.5 -0.866 0.5 380 260)">
+          <rect x="-700" y="-700" width="2200" height="2200" fill="url(#mat)"></rect>
+        </g>
+
+        <!-- Tahta gölgesi ve tahta -->
+        <polygon points="120,432 536,672 796,522 380,282" fill="#000000" opacity="0.16" filter="url(#soft)"></polygon>
+        <polygon points="120.2,410 535.9,650 535.9,662 120.2,422" fill="#d6d4cc"></polygon>
+        <polygon points="535.9,650 795.7,500 795.7,512 535.9,662" fill="#c4c2ba"></polygon>
+        <g transform="matrix(0.866 0.5 -0.866 0.5 380 260)">
+          <rect x="0" y="0" width="480" height="300" rx="6" fill="#f5f4ef"></rect>
+          <path d="M14 8H466M14 260H466" stroke="#d64545" stroke-width="2"></path>
+          <path d="M14 36H466M14 288H466" stroke="#2b5fd9" stroke-width="2"></path>
+          <rect x="18" y="10" width="444" height="24" fill="url(#holes)"></rect>
+          <rect x="18" y="262" width="444" height="24" fill="url(#holes)"></rect>
+          <rect x="18" y="70" width="444" height="60" fill="url(#holes)"></rect>
+          <rect x="18" y="166" width="444" height="60" fill="url(#holes)"></rect>
+          <rect x="10" y="142" width="460" height="12" fill="#e6e4dc"></rect>
+          <rect x="138" y="62" width="96" height="28" rx="14" fill="#1f6feb" fill-opacity="0.1" stroke="#1f6feb" stroke-width="2.5"></rect>
+        </g>
+
+        <!-- Pil -->
+        <ellipse cx="136" cy="452" rx="58" ry="14" fill="#000000" opacity="0.14" filter="url(#soft)"></ellipse>
+        <path d="M94.2 411L156.6 447" stroke="#2b4c9b" stroke-width="28"></path>
+        <path d="M156.6 447L172.2 456" stroke="#c9a227" stroke-width="28"></path>
+        <ellipse cx="94.2" cy="411" rx="6" ry="14" transform="rotate(30 94.2 411)" fill="#1f3a7a"></ellipse>
+        <ellipse cx="172.2" cy="456" rx="6" ry="14" transform="rotate(30 172.2 456)" fill="#dcc15a"></ellipse>
+        <circle cx="176" cy="458" r="4" fill="#c0c4c8"></circle>
+        <text x="112" y="434" transform="rotate(30 112 434)" font-family="IBM Plex Sans, sans-serif" font-size="12" font-weight="700" fill="#ffffff">5 V</text>
+        <text x="160" y="447" transform="rotate(30 160 447)" font-family="IBM Plex Sans, sans-serif" font-size="13" font-weight="700" fill="#1d2733">+</text>
+
+        <!-- El multimetresi (ampermetre) -->
+        <ellipse cx="680" cy="660" rx="80" ry="22" fill="#000000" opacity="0.16" filter="url(#soft)"></ellipse>
+        <polygon points="605.2,626 674.4,666 674.4,680 605.2,640" fill="#2a3139"></polygon>
+        <polygon points="674.4,666 752.4,621 752.4,635 674.4,680" fill="#1d232a"></polygon>
+        <g transform="matrix(0.866 0.5 -0.866 0.5 380 246)">
+          <rect x="510" y="160" width="80" height="90" rx="8" fill="#39424d" stroke="#f08a24" stroke-width="3"></rect>
+          <rect x="519" y="168" width="62" height="26" rx="2" fill="#bccaa9"></rect>
+          <text x="524" y="187" font-family="IBM Plex Mono, monospace" font-size="15" font-weight="600" fill="#1d2733">9,70</text>
+          <text x="566" y="187" font-family="IBM Plex Mono, monospace" font-size="7" fill="#1d2733">mA</text>
+          <circle cx="550" cy="216" r="13" fill="#20262d" stroke="#8a939c" stroke-width="1.5"></circle>
+          <path d="M550 216L559 207" stroke="#f08a24" stroke-width="2.5" stroke-linecap="round"></path>
+          <text x="561" y="205" font-family="IBM Plex Mono, monospace" font-size="6" fill="#e5e8eb">mA</text>
+          <circle cx="530" cy="240" r="4.5" fill="#111418" stroke="#6b737c" stroke-width="1"></circle>
+          <circle cx="575" cy="240" r="4.5" fill="#111418" stroke="#d64545" stroke-width="1.5"></circle>
+        </g>
+
+        <!-- Kablolar: alçak kavis, ağın rengi -->
+        <g fill="none" stroke-linecap="round">
+          <path d="M89 408C70 450 190 500 224.1 450" stroke="#00000030" stroke-width="7"></path>
+          <path d="M89 408C70 450 190 500 224.1 450" stroke="#2a2f36" stroke-width="5"></path>
+          <path d="M631.1 631C600 600 470 590 423.3 565" stroke="#00000030" stroke-width="7"></path>
+          <path d="M631.1 631C600 600 470 590 423.3 565" stroke="#2a2f36" stroke-width="5"></path>
+          <path d="M177 459C215 400 360 330 423.3 385" stroke="#00000030" stroke-width="7"></path>
+          <path d="M177 459C215 400 360 330 423.3 385" stroke="#d64545" stroke-width="5"></path>
+          <path d="M670.1 653.5C660 560 540 430 496.9 427" stroke="#00000030" stroke-width="7"></path>
+          <path d="M670.1 653.5C660 560 540 430 496.9 427" stroke="#d64545" stroke-width="5"></path>
+        </g>
+        <g fill="#ffd43b" stroke="#7a5c00" stroke-width="1">
+          <circle cx="222.6" cy="414.9" r="3.5"></circle><circle cx="290.6" cy="379.3" r="3.5"></circle><circle cx="363.4" cy="365" r="3.5"></circle>
+          <circle cx="630.2" cy="553.7" r="3.5"></circle><circle cx="560.2" cy="467.7" r="3.5"></circle>
+        </g>
+
+        <!-- R1: renk bantlı direnç -->
+        <g fill="none" stroke="#a7adb4" stroke-width="2" stroke-linejoin="round">
+          <path d="M444.1 373V363L454.5 369"></path>
+          <path d="M506.2 409V399L496.1 393"></path>
+        </g>
+        <path d="M454.5 369L496.1 393" stroke="#8c7a55" stroke-width="16" stroke-linecap="round"></path>
+        <path d="M454.5 369L496.1 393" stroke="#e3cfa4" stroke-width="13" stroke-linecap="round"></path>
+        <g stroke-width="3.5">
+          <path d="M466.7 367.9L459.7 380.1" stroke="#e8792b"></path>
+          <path d="M473.6 371.9L466.6 384.1" stroke="#e8792b"></path>
+          <path d="M480.5 375.9L473.5 388.1" stroke="#7a4a22"></path>
+          <path d="M492.7 382.9L485.7 395.1" stroke="#c9a227"></path>
+        </g>
+
+        <!-- LED1 -->
+        <circle cx="470" cy="398" r="48" fill="url(#glow)"></circle>
+        <g stroke="#a7adb4" stroke-width="2"><path d="M464.9 433V416"></path><path d="M475.3 439V419"></path></g>
+        <ellipse cx="470" cy="418" rx="10.5" ry="5" fill="#b8281f"></ellipse>
+        <rect x="461" y="403" width="18" height="15" fill="#e5483b"></rect>
+        <path d="M461 403A9 9 0 0 1 479 403Z" fill="#ff7a68"></path>
+        <ellipse cx="466" cy="400" rx="2.5" ry="4" fill="#ffffff" opacity="0.6"></ellipse>
+
+        <!-- Etiketler: kameraya dönük -->
+        <g font-family="IBM Plex Sans, sans-serif">
+          <path d="M475 366L470 302" stroke="#1f6feb" stroke-width="1.5"></path>
+          <rect x="396" y="258" width="152" height="44" rx="9" fill="#1f6feb"></rect>
+          <text x="408" y="276" font-size="13" font-weight="600" fill="#ffffff">R1 · 330 Ω</text>
+          <text x="408" y="293" font-family="IBM Plex Mono, monospace" font-size="12" fill="#e6effd">3,20 V · 9,70 mA</text>
+
+          <path d="M480 396L548 360" stroke="#1d2733" stroke-width="1.2"></path>
+          <rect x="548" y="332" width="134" height="44" rx="9" fill="#1d2733"></rect>
+          <text x="560" y="350" font-size="13" font-weight="600" fill="#ffffff">LED1 · Kırmızı</text>
+          <text x="560" y="367" font-family="IBM Plex Mono, monospace" font-size="12" fill="#c9d1da">1,80 V · yanıyor</text>
+
+          <path d="M130 424L112 378" stroke="#1d2733" stroke-width="1.2"></path>
+          <rect x="54" y="334" width="104" height="44" rx="9" fill="#1d2733"></rect>
+          <text x="66" y="352" font-size="13" font-weight="600" fill="#ffffff">B1 · Pil</text>
+          <text x="66" y="369" font-family="IBM Plex Mono, monospace" font-size="12" fill="#c9d1da">5,00 V</text>
+
+          <path d="M690 606L742 570" stroke="#1d2733" stroke-width="1.2"></path>
+          <rect x="724" y="520" width="160" height="50" rx="9" fill="#1d2733"></rect>
+          <text x="736" y="538" font-size="13" font-weight="600" fill="#ffffff">A1 · Ampermetre</text>
+          <text x="736" y="560" font-family="IBM Plex Mono, monospace" font-size="17" font-weight="500" fill="#ffffff">9,70 mA</text>
+        </g>
+      </svg>
+
+      <!-- Üst sol: görünüm -->
+      <div style="position: absolute; left: 16px; top: 16px; display: flex; padding: 3px; background: #ffffff; border: 1px solid #dde1e6; border-radius: 10px">
+        <button aria-pressed="false" style="height: 36px; padding: 0 14px; border-radius: 7px; font-size: 14px">Şema</button>
+        <button aria-pressed="true" style="height: 36px; padding: 0 14px; border-radius: 7px; background: #1d2733; color: #ffffff; font-size: 14px; font-weight: 600">3B</button>
+      </div>
+
+      <!-- Üst sağ: 3B görünüm ayarları -->
+      <div style="position: absolute; right: 16px; top: 16px; display: flex; gap: 6px">
+        <button aria-pressed="true" style="height: 40px; padding: 0 12px; border-radius: 10px; background: #ffffff; border: 1px solid #c7dafb; color: #1557c0; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h9l4 5-4 5H3z"></path></svg>Etiketler</button>
+        <button aria-pressed="true" style="height: 40px; padding: 0 12px; border-radius: 10px; background: #ffffff; border: 1px solid #c7dafb; color: #1557c0; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px"><svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true"><circle cx="4" cy="5" r="3" fill="#ffd43b" stroke="#7a5c00"></circle><circle cx="11" cy="5" r="3" fill="#ffd43b" stroke="#7a5c00"></circle><circle cx="18" cy="5" r="3" fill="#ffd43b" stroke="#7a5c00"></circle></svg>Akım</button>
+        <button style="height: 40px; padding: 0 12px; border-radius: 10px; background: #ffffff; border: 1px solid #dde1e6; font-size: 13px; display: flex; align-items: center; gap: 6px">Kamera: <span style="font-weight: 600">Serbest</span><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"></path></svg></button>
+        <button aria-label="Sığdır" style="width: 40px; height: 40px; border-radius: 10px; background: #ffffff; border: 1px solid #dde1e6; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"></path></svg></button>
+      </div>
+
+      <!-- Alt sol: küçük şema, aynı seçim -->
+      <button aria-label="Şemaya dön" style="position: absolute; left: 16px; bottom: 16px; width: 230px; background: #ffffff; border: 1px solid #c4cad2; border-radius: 12px; box-shadow: 0 6px 18px rgba(29,39,51,0.12); overflow: hidden; text-align: left">
+        <span style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #dde1e6; font-size: 12px"><span style="font-weight: 600">Şema</span><span style="color: #1557c0">Büyüt</span></span>
+        <span class="dots" style="display: block; height: 116px; position: relative">
+          <svg width="210" height="104" viewBox="0 0 520 330" style="position: absolute; left: 10px; top: 6px" aria-hidden="true">
+            <g fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M80 152V60h80" stroke="#c93c2c"></path>
+              <path d="M250 60h62M348 60h92v90" stroke="#8fa52a"></path>
+              <path d="M440 182v98H80V168" stroke="#2f8a4c"></path>
+            </g>
+            <rect x="146" y="26" width="118" height="68" rx="10" fill="#e6effd" stroke="#1f6feb" stroke-width="5"></rect>
+            <g fill="none" stroke="#1d2733" stroke-width="5" stroke-linejoin="round">
+              <path d="M58 152h44"></path><path d="M68 168h24" stroke-width="9"></path>
+              <path d="M160 60h10l5-12 10 24 10-24 10 24 10-24 10 24 10-24 5 12h10" stroke="#1557c0"></path>
+              <circle cx="330" cy="60" r="18" fill="#ffffff"></circle>
+              <path d="M424 150h32l-16 32z" fill="#ff7a5c"></path>
+            </g>
+          </svg>
+        </span>
+      </button>
+
+      <div style="position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; padding: 3px; background: #ffffff; border: 1px solid #dde1e6; border-radius: 10px">
+        <button aria-label="Yakınlaştır" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 10h12M10 4v12"></path></svg></button>
+        <button aria-label="Uzaklaştır" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 10h12"></path></svg></button>
+      </div>
+    </main>
+
+    <!-- Defter: değişmez -->
+    <aside style="width: 500px; flex: none; display: flex; flex-direction: column; gap: 10px; padding: 16px; box-sizing: border-box; background: #f4f5f7; border-left: 1px solid #dde1e6; overflow: hidden">
+      <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 0 2px 2px">
+        <span style="font-size: 17px; font-weight: 600">Devredeki parçalar</span>
+        <span style="font-size: 13px; color: #5f6b7a">4 parça · sorun yok</span>
+      </div>
+      <button style="background: #ffffff; border: 1px solid #dde1e6; border-radius: 12px; padding: 0 14px; height: 60px; flex: none; display: flex; align-items: center; gap: 12px; text-align: left">
+        <svg width="34" height="18" viewBox="0 0 30 16" fill="none" stroke="#1d2733" stroke-width="1.5" aria-hidden="true"><path d="M0 8h12M18 8h12"></path><path d="M12 1v14"></path><path d="M18 4.5v7" stroke-width="3"></path></svg>
+        <span style="flex: 1; font-size: 15px; font-weight: 600">B1 <span style="font-weight: 400; color: #5f6b7a">· Pil 5 V</span></span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px">9,70 mA</span>
+      </button>
+      <div style="flex: none; background: #ffffff; border: 2px solid #1f6feb; border-radius: 12px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <svg width="34" height="18" viewBox="0 0 30 16" fill="none" stroke="#1557c0" stroke-width="1.5" aria-hidden="true"><path d="M0 8h6l2-5 3 10 3-10 3 10 3-10 2 5h8"></path></svg>
+          <span style="flex: 1; font-size: 15px; font-weight: 600">R1 <span style="font-weight: 400; color: #5f6b7a">· Direnç</span></span>
+          <button style="height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid #dde1e6; font-size: 12px; display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.5"></circle><path d="M13 13l4 4M7 9h4M9 7v4"></path></svg>3B'de yaklaş</button>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center">
+          <div style="width: 170px; height: 44px; display: flex; align-items: center; border: 1px solid #c4cad2; border-radius: 9px">
+            <button aria-label="Azalt" style="width: 42px; height: 42px">−</button>
+            <span style="flex: 1; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 16px">330 Ω</span>
+            <button aria-label="Artır" style="width: 42px; height: 42px">+</button>
+          </div>
+          <span style="display: flex; align-items: center; gap: 4px; font-size: 12px; color: #3d4957">Renk kodu
+            <span style="display: flex; gap: 2px; padding: 3px 6px; background: #e3cfa4; border-radius: 6px"><span style="width: 5px; height: 14px; background: #e8792b"></span><span style="width: 5px; height: 14px; background: #e8792b"></span><span style="width: 5px; height: 14px; background: #7a4a22"></span><span style="width: 5px; height: 14px; background: #c9a227; margin-left: 4px"></span></span>
+          </span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+          <span style="padding: 8px 10px; border-radius: 8px; background: #f6f7f9; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #5f6b7a">Gerilim</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 16px">3,20 V</span></span>
+          <span style="padding: 8px 10px; border-radius: 8px; background: #f6f7f9; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #5f6b7a">Akım</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 16px">9,70 mA</span></span>
+          <span style="padding: 8px 10px; border-radius: 8px; background: #f6f7f9; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #5f6b7a">Güç</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 16px">31,0 mW</span></span>
+        </div>
+      </div>
+      <button style="background: #ffffff; border: 1px solid #dde1e6; border-radius: 12px; padding: 0 14px; height: 60px; flex: none; display: flex; align-items: center; gap: 12px; text-align: left">
+        <svg width="34" height="18" viewBox="0 0 30 16" fill="none" stroke="#1d2733" stroke-width="1.5" aria-hidden="true"><path d="M0 8h8M22 8h8"></path><circle cx="15" cy="8" r="7"></circle></svg>
+        <span style="flex: 1; font-size: 15px; font-weight: 600">A1 <span style="font-weight: 400; color: #5f6b7a">· Ampermetre</span></span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 500">9,70 mA</span>
+      </button>
+      <button style="background: #ffffff; border: 1px solid #dde1e6; border-radius: 12px; padding: 0 14px; height: 60px; flex: none; display: flex; align-items: center; gap: 12px; text-align: left">
+        <svg width="34" height="18" viewBox="0 0 30 16" fill="none" stroke="#1d2733" stroke-width="1.5" aria-hidden="true"><path d="M0 8h10M20 8h10"></path><path d="M10 3l10 5-10 5z" fill="#ff7a5c"></path><path d="M20 3v10"></path></svg>
+        <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 600">LED1 <span style="font-weight: 400; color: #5f6b7a">· LED</span></span><span style="font-size: 13px; color: #3d4957">Kırmızı</span></span>
+        <span style="height: 26px; padding: 0 10px; border-radius: 13px; background: #fdecea; color: #a3241a; font-size: 12px; font-weight: 600; display: flex; align-items: center">Yanıyor</span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; text-align: right">1,80 V<br><span style="color: #5f6b7a">9,70 mA</span></span>
+      </button>
+    </aside>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -62,6 +62,7 @@ import { TabletBar, TabletPartsCard, TabletRail } from './TabletChrome';
 import { TabletTopBar, TopBar } from './TopBar';
 import { TouchUi } from './touchUi';
 import { useCoarsePointer } from './useCoarsePointer';
+import { Notebook } from './Notebook';
 import { useLayout } from './useLayout';
 import { useSimulation } from './useSimulation';
 
@@ -194,9 +195,20 @@ export default function Simulator() {
   const saveState = useAutosave(doc);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
-  // Canlı ölçümleri gösterilen parçalar (seçim ve ölçü aletleri): motor bunların istatistiğini tutar.
-  const watchedKey = [...selection.parts.slice(0, 8), ...doc.parts.filter((p) => p.type === 'voltmeter' || p.type === 'ammeter').map((p) => p.id)].join(',');
-  const watched = useMemo(() => (watchedKey ? watchedKey.split(',') : []), [watchedKey]);
+  // Canlı ölçümleri gösterilen parçalar (seçim ve ölçü aletleri): motor bunların istatistiğini tutar
+  // (salınan değerlerin kararlı gösterimi). İzleme pahalıdır (bütün parçalar izlenince büyük devrede
+  // kare hızı dörtte birine iner), bu yüzden defterin kapalı kartları için: zamanla değişen kaynağı
+  // olan devrede kaynaklar ve LED'ler de izlenir, öbür kartlar ölçüm yerine değerini gösterir; DC
+  // devrede değerler salınmaz, kapalı kartlar anlık değeri izlemeden gösterir.
+  const timeVarying = doc.parts.some((p) => TIME_VARYING.has(p.type));
+  const watchedKey = [
+    ...selection.parts.slice(0, 8),
+    ...doc.parts.filter((p) => p.type === 'voltmeter' || p.type === 'ammeter').map((p) => p.id),
+    ...(timeVarying && !phone ? doc.parts.filter((p) => CARD_WATCHED.has(p.type)).slice(0, 8).map((p) => p.id) : []),
+  ].join(',');
+  const watched = useMemo(() => (watchedKey ? [...new Set(watchedKey.split(','))] : []), [watchedKey]);
+  /** Defterde kapalı kartı ölçüm gösterebilen parçalar (DC devrede hepsi). */
+  const measuredParts = useMemo<ReadonlySet<string> | null>(() => (timeVarying ? new Set(watched) : null), [timeVarying, watched]);
   const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound, watched);
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
@@ -363,6 +375,13 @@ export default function Simulator() {
   }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc]);
 
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+
+  /** Defterdeki "1 uç boşta" rozetleri: devre denetiminin boşta uç uyarıları (cihazların isteğe bağlı uçları sayılmaz). */
+  const floatingParts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const d of compiled?.diagnostics ?? []) if (d.code === 'floating-pin' && d.elementIds[0]) counts.set(d.elementIds[0], (counts.get(d.elementIds[0]) ?? 0) + 1);
+    return counts;
+  }, [compiled]);
 
   /** Ayarlar → "Düğüm gerilimlerini yaz": her düğümün en uzun kablo parçasının ortasında gerilim. */
   const nodeLabels = useMemo(() => {
@@ -1750,6 +1769,14 @@ export default function Simulator() {
             tab={inspectorTab}
             onTab={setInspectorTab}
             inspect={inspectProps}
+            inspectBody={
+              <Notebook
+                {...inspectProps}
+                floating={floatingParts}
+                measured={measuredParts}
+                onClearSelection={() => dispatch({ type: 'select', selection: EMPTY_SELECTION })}
+              />
+            }
             example={exampleProps}
             messages={messagesProps}
             onKeyDown={backToCanvas}
@@ -1764,6 +1791,11 @@ export default function Simulator() {
     </div>
   );
 }
+
+/** Değerleri zamanla salınan kaynaklar (AC, kare dalga, PWM): defterin kapalı kartları için izleme gerekir. */
+const TIME_VARYING: ReadonlySet<string> = new Set(['acsource', 'funcgen', 'timer555', 'arduino', 'buzzer']);
+/** Zamanla değişen devrede kapalı kartı ölçüm gösteren (izlenen) parçalar. */
+const CARD_WATCHED: ReadonlySet<string> = new Set(['battery', 'dcsupply', 'acsource', 'funcgen', 'led']);
 
 /** Açılışta paylaşım bağlantısı ya da kayıtlı devre yoksa (gerçekten ilk ziyaret). */
 function initialIsFresh(): boolean {

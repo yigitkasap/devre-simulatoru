@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Baraj · telefon</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1557c0}a:hover{color:#0f3f8c}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1d2733; background: #ffffff">
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 6px 0 4px">
+    <a href="#" aria-label="Simülatöre dön" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #1d2733"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l-6 6 6 6"></path></svg></a>
+    <span style="flex: 1; font-size: 17px; font-weight: 600">Baraj uyarısı</span>
+    <button aria-label="Soru" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7.5"></circle><path d="M7.8 7.8a2.3 2.3 0 0 1 4.4.9c0 1.6-2.2 1.9-2.2 3.3"></path><path d="M10 14.6v.1"></path></svg></button>
+    <button aria-label="Diğer: Devre, Ayarlar, Başa al, Simülatörde aç" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.7" fill="currentColor"></circle><circle cx="10" cy="10" r="1.7" fill="currentColor"></circle><circle cx="16" cy="10" r="1.7" fill="currentColor"></circle></svg></button>
+  </header>
+  <div style="flex: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin: 0 12px 10px; padding: 3px; background: #f0f2f5; border-radius: 10px">
+    <button aria-pressed="true" style="height: 40px; border-radius: 8px; background: #ffffff; font-size: 15px; font-weight: 600; box-shadow: 0 1px 2px rgba(29,39,51,0.12)">Çubuk gösterge</button>
+    <button aria-pressed="false" style="height: 40px; border-radius: 8px; font-size: 15px; color: #3d4957">Tek ışık</button>
+  </div>
+
+  <!-- Sahne: telefon için dikey kesit -->
+  <div style="height: 360px; flex: none; position: relative; overflow: hidden">
+    <svg width="390" height="360" viewBox="0 0 390 360" style="position: absolute; inset: 0" role="img" aria-label="Baraj kesiti: su yüzde 50; Seviye 1 probu ıslak, yeşil lamba yanıyor">
+      <defs>
+        <linearGradient id="su3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#74b6ec"></stop><stop offset="1" stop-color="#3a7fc0"></stop></linearGradient>
+        <radialGradient id="yesil3"><stop offset="0" stop-color="#34d27a" stop-opacity="0.55"></stop><stop offset="1" stop-color="#34d27a" stop-opacity="0"></stop></radialGradient>
+      </defs>
+      <rect width="390" height="360" fill="#eaf1f6"></rect>
+      <polygon points="0,200 70,120 130,170 200,100 260,200" fill="#d6e0e8"></polygon>
+      <rect x="0" y="330" width="390" height="30" fill="#a8977c"></rect>
+      <rect x="0" y="330" width="390" height="5" fill="#8f7e64"></rect>
+      <path d="M0 210Q10 206 20 210T40 210T60 210T80 210T100 210T120 210T140 210T160 210T180 210T200 210V330H0Z" fill="url(#su3)"></path>
+      <g stroke="#1d2733" stroke-opacity="0.28" stroke-width="1.5" stroke-dasharray="5 5"><path d="M10 240H178M10 180H178M10 120H178"></path></g>
+      <polygon points="200,80 226,80 272,330 200,330" fill="#cfd4db" stroke="#aab1ba" stroke-width="1.5"></polygon>
+      <rect x="203" y="60" width="22" height="20" fill="#f3f4f6" stroke="#8a939c"></rect>
+      <polygon points="200,62 214,50 228,62" fill="#c0504d"></polygon>
+      <path d="M225 68H300" stroke="#3d4957" stroke-width="2"></path>
+      <g stroke="#3d4957" stroke-width="3.5" stroke-linecap="round"><path d="M182 120H212M182 180H212M182 240H212M182 318H212"></path></g>
+      <circle cx="178" cy="120" r="6" fill="#ffffff" stroke="#3d4957" stroke-width="2.5"></circle>
+      <circle cx="178" cy="180" r="6" fill="#ffffff" stroke="#3d4957" stroke-width="2.5"></circle>
+      <circle cx="178" cy="240" r="11" fill="#34d27a" fill-opacity="0.35"></circle>
+      <circle cx="178" cy="240" r="6" fill="#1b7d44" stroke="#ffffff" stroke-width="2.5"></circle>
+      <circle cx="178" cy="318" r="6" fill="#1d2733" stroke="#ffffff" stroke-width="2.5"></circle>
+      <g font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="700" text-anchor="middle">
+        <circle cx="230" cy="120" r="14" fill="#d92d20"></circle><text x="230" y="125" fill="#ffffff">3</text>
+        <circle cx="240" cy="180" r="14" fill="#e8b10f"></circle><text x="240" y="185" fill="#1d2733">2</text>
+        <circle cx="252" cy="240" r="14" fill="#1b7d44"></circle><text x="252" y="245" fill="#ffffff">1</text>
+      </g>
+      <text x="216" y="312" font-family="IBM Plex Sans, sans-serif" font-size="11" font-weight="600" fill="#1d2733">Ortak +9 V</text>
+      <rect x="331" y="250" width="12" height="82" fill="#3d4957"></rect>
+      <circle cx="337" cy="208" r="52" fill="url(#yesil3)"></circle>
+      <rect x="302" y="56" width="70" height="196" rx="14" fill="#1d2733"></rect>
+      <g font-family="IBM Plex Sans, sans-serif" font-size="17" font-weight="700" text-anchor="middle">
+        <circle cx="337" cy="96" r="24" fill="#2a333d" stroke="#d92d20" stroke-width="3" stroke-opacity="0.6"></circle><text x="337" y="102" fill="#d92d20" fill-opacity="0.7">3</text>
+        <circle cx="337" cy="154" r="24" fill="#2a333d" stroke="#e8b10f" stroke-width="3" stroke-opacity="0.6"></circle><text x="337" y="160" fill="#e8b10f" fill-opacity="0.7">2</text>
+        <circle cx="337" cy="212" r="24" fill="#34d27a" stroke="#1b7d44" stroke-width="3"></circle><text x="337" y="218" fill="#0e3d22">1</text>
+      </g>
+      <rect x="60" y="192" width="84" height="36" rx="18" fill="#ffffff" stroke="#1f6feb" stroke-width="2"></rect>
+      <text x="80" y="216" font-family="IBM Plex Mono, monospace" font-size="17" font-weight="600" fill="#1557c0">%50</text>
+    </svg>
+    <div role="status" style="position: absolute; left: 12px; top: 10px; display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 10px; background: #ffffff; border: 2px solid #b9dfc8; border-radius: 12px">
+      <span style="width: 14px; height: 14px; border-radius: 7px; background: #1b7d44; box-shadow: 0 0 0 4px #e8f5ed"></span>
+      <span style="font-size: 20px; font-weight: 700">Normal</span>
+    </div>
+  </div>
+
+  <!-- Ne oluyor? (telefonda tablo yerine) -->
+  <section style="flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 6px; background: #f6f7f9; border-top: 1px solid #dde1e6">
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 2px">
+      <span style="font-size: 14px; font-weight: 600">Ne oluyor?</span>
+      <button style="height: 32px; font-size: 13px; color: #1557c0; font-weight: 500">Devreyi gör ›</button>
+    </div>
+    <div style="height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 10px; background: #e8f5ed; border: 2px solid #1b7d44; font-size: 14px">
+      <span style="width: 24px; height: 24px; border-radius: 12px; background: #1b7d44; color: #ffffff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">1</span>
+      <span style="font-weight: 600">ıslak</span><span>→</span><span>Q1 doyum</span><span>→</span><span style="font-weight: 600; color: #14613a">yeşil yanıyor</span>
+    </div>
+    <div style="height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 10px; background: #ffffff; border: 1px solid #dde1e6; font-size: 14px; color: #3d4957">
+      <span style="width: 24px; height: 24px; border-radius: 12px; background: #e8b10f; color: #1d2733; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">2</span>
+      <span>kuru</span><span>→</span><span>Q2 kesim</span><span>→</span><span>sarı sönük</span>
+    </div>
+    <div style="height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border-radius: 10px; background: #ffffff; border: 1px solid #dde1e6; font-size: 14px; color: #3d4957">
+      <span style="width: 24px; height: 24px; border-radius: 12px; background: #d92d20; color: #ffffff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center">3</span>
+      <span>kuru</span><span>→</span><span>Q3 kesim</span><span>→</span><span>kırmızı sönük</span>
+    </div>
+  </section>
+
+  <!-- Kumanda -->
+  <footer style="flex: none; padding: 12px 16px 20px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #dde1e6">
+    <div style="position: relative; height: 62px">
+      <div style="position: absolute; left: 0; right: 0; top: 12px; height: 10px; border-radius: 5px; background: #dde1e6"></div>
+      <div style="position: absolute; left: 0; width: 50%; top: 12px; height: 10px; border-radius: 5px; background: #3a7fc0"></div>
+      <div role="slider" aria-label="Su seviyesi" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" tabindex="0" style="position: absolute; left: calc(50% - 16px); top: 1px; width: 32px; height: 32px; border-radius: 16px; background: #ffffff; border: 3px solid #1f6feb; box-sizing: border-box; box-shadow: 0 2px 6px rgba(29,39,51,0.2)"></div>
+      <button style="position: absolute; left: 0; top: 36px; height: 26px; padding: 0 6px; font-size: 12px; color: #3d4957">Kuru</button>
+      <button aria-label="Seviye 1" style="position: absolute; left: 37.5%; top: 34px; width: 28px; height: 28px; border-radius: 14px; background: #1b7d44; color: #ffffff; font-size: 13px; font-weight: 700; transform: translateX(-50%)">1</button>
+      <button aria-label="Seviye 2" style="position: absolute; left: 62.5%; top: 34px; width: 28px; height: 28px; border-radius: 14px; background: #e8b10f; font-size: 13px; font-weight: 700; transform: translateX(-50%)">2</button>
+      <button aria-label="Seviye 3" style="position: absolute; left: 87.5%; top: 34px; width: 28px; height: 28px; border-radius: 14px; background: #d92d20; color: #ffffff; font-size: 13px; font-weight: 700; transform: translateX(-50%)">3</button>
+    </div>
+    <div role="group" aria-label="Su akışı" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px; gap: 4px; background: #f0f2f5; border-radius: 14px">
+      <button style="height: 52px; border-radius: 11px; font-size: 15px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px"><svg width="12" height="12" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6h14l-7 10z" fill="currentColor"></path></svg>Boşalt</button>
+      <button aria-pressed="true" style="height: 52px; border-radius: 11px; background: #ffffff; font-size: 15px; font-weight: 600; box-shadow: 0 1px 3px rgba(29,39,51,0.15); display: flex; align-items: center; justify-content: center; gap: 6px"><svg width="11" height="11" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="2" fill="currentColor"></rect></svg>Durdur</button>
+      <button style="height: 52px; border-radius: 11px; font-size: 15px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 6px"><svg width="12" height="12" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 14h14L10 4z" fill="currentColor"></path></svg>Doldur</button>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -7,7 +7,7 @@
 //   ≥ 1440 px       masaüstü: kütüphane 256 px
 // Dokunmatik ekranda yükseklik 500 px'in altındaysa (yatay tutulan büyük telefon, 932 px gibi)
 // genişlik 900 px'i aşsa da telefon düzeni kullanılır.
-// İnceleme paneli ≥ 1440 px'te 336, altında 320 px.
+// Masaüstünde sağdaki defter 500 px, sıkışık masaüstünde 400 px (v3); tablette İnceleme paneli 320–340 px.
 // CSS tarafında aynı sınır `desk:` (≥ 900 px) önekidir (global.css → --breakpoint-desk).
 
 import { useEffect, useState } from 'react';
@@ -39,10 +39,10 @@ function layoutFor(width: number, height: number): Layout {
     return { kind: 'phone', landscape: short, libraryWidth: 256, inspectorWidth: 0 };
   }
   if (coarse) return { kind: 'tablet', landscape: false, libraryWidth: 340, inspectorWidth: width < 1100 ? 320 : 340 };
-  if (width < 1280) return { kind: 'compact', landscape: false, libraryWidth: 256, inspectorWidth: 320 };
+  if (width < 1280) return { kind: 'compact', landscape: false, libraryWidth: 256, inspectorWidth: 400 };
   return width < 1440
-    ? { kind: 'desktop', landscape: false, libraryWidth: 232, inspectorWidth: 320 }
-    : { kind: 'desktop', landscape: false, libraryWidth: 256, inspectorWidth: 336 };
+    ? { kind: 'desktop', landscape: false, libraryWidth: 232, inspectorWidth: 500 }
+    : { kind: 'desktop', landscape: false, libraryWidth: 256, inspectorWidth: 500 };
 }
 
 export function useLayout(): Layout {

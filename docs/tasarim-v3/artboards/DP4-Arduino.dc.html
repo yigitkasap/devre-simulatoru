@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Defter · telefon · Arduino</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1557c0}a:hover{color:#0f3f8c}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input{font:inherit}
+.dots{background-color:#fbfbf9;background-image:radial-gradient(#d3d7dc 1px,transparent 1.2px);background-size:12px 12px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; display: flex; flex-direction: column; overflow: hidden; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1d2733; background: #f4f5f7">
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; background: #ffffff; border-bottom: 1px solid #dde1e6">
+    <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#1d2733"></rect><path d="M6 15c2.5-7 5-7 8 0s5.5 7 8 0" fill="none" stroke="#f05a28" stroke-width="2.4" stroke-linecap="round"></path></svg>
+    <button style="flex: 1; min-width: 0; height: 44px; display: flex; flex-direction: column; justify-content: center; text-align: left; line-height: 1.2">
+      <span style="font-size: 15px; font-weight: 600">Arduino: termometre (NTC)</span><span style="font-size: 12px; color: #14613a">Çalışıyor · 6,51 s</span>
+    </button>
+    <button aria-label="Menü" style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.7" fill="currentColor"></circle><circle cx="10" cy="10" r="1.7" fill="currentColor"></circle><circle cx="16" cy="10" r="1.7" fill="currentColor"></circle></svg></button>
+  </header>
+
+  <button style="height: 64px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: #ffffff; border-bottom: 1px solid #dde1e6; text-align: left">
+    <span class="dots" style="width: 72px; height: 44px; border-radius: 8px; border: 1px solid #dde1e6; display: flex; align-items: center; justify-content: center">
+      <svg width="54" height="36" viewBox="0 0 520 340" aria-hidden="true"><g fill="none" stroke="#3d4957" stroke-width="14" stroke-linejoin="round"><rect x="300" y="20" width="150" height="300"></rect><rect x="105" y="62" width="30" height="46"></rect><rect x="105" y="160" width="30" height="46"></rect><path d="M300 50H120v12M120 108v52M120 130h180"></path></g></svg>
+    </span>
+    <span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 14px; font-weight: 600">Şema</span><span style="font-size: 12px; color: #5f6b7a">3 parça · sorun yok</span></span>
+    <span style="font-size: 14px; color: #1557c0; font-weight: 500">Aç</span>
+  </button>
+
+  <div style="flex: 1; overflow: hidden; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+    <div style="flex: none; background: #ffffff; border: 1px solid #dde1e6; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span style="flex: 1; font-size: 15px; font-weight: 600">NTC1 <span style="font-weight: 400; color: #5f6b7a">· NTC</span></span>
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px">25 °C</span>
+      </div>
+      <label style="display: flex; align-items: center; height: 44px">
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Sıcaklık</span>
+        <input type="range" min="-20" max="100" value="25" style="flex: 1; accent-color: #1f6feb">
+      </label>
+    </div>
+
+    <div style="flex: none; background: #ffffff; border: 2px solid #1f6feb; border-radius: 12px; padding: 12px 14px 6px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="flex: 1; font-size: 15px; font-weight: 600">ARD1 <span style="font-weight: 400; color: #5f6b7a">· Arduino Uno</span></span>
+      </div>
+      <button style="height: 48px; border: 1px solid #c4cad2; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font-size: 15px">Termometre (NTC)<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8l5 5 5-5"></path></svg></button>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+        <span style="padding: 8px 10px; border-radius: 8px; background: #f6f7f9; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #5f6b7a">A0 · Giriş</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px">2,50 V</span></span>
+        <span style="padding: 8px 10px; border-radius: 8px; background: #f6f7f9; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #5f6b7a">5V · Besleme</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px">0,25 mA</span></span>
+      </div>
+      <span style="font-size: 13px; font-weight: 600">Seri ekran</span>
+      <div style="height: 120px; border-radius: 8px; background: #10161d; padding: 10px 12px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; gap: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #c9d1da; overflow: hidden">
+        <span style="color: #7d8894">NTC: 10.00 kΩ   Sıcaklık: 25.0 °C</span>
+        <span style="color: #9aa5b1">NTC: 10.00 kΩ   Sıcaklık: 25.0 °C</span>
+        <span>NTC: 10.00 kΩ   Sıcaklık: 25.0 °C</span>
+        <span style="color: #ffffff">NTC: 10.00 kΩ   Sıcaklık: 25.0 °C</span>
+      </div>
+      <div style="display: flex; border-top: 1px solid #dde1e6">
+        <button style="flex: 1; height: 44px; font-size: 14px; font-weight: 500; text-align: left">Kodu göster ›</button>
+        <button style="height: 44px; font-size: 14px; color: #5f6b7a">Pinler (22) ›</button>
+      </div>
+    </div>
+  </div>
+
+  <button aria-label="Duraklat" style="position: absolute; right: 16px; bottom: 20px; width: 64px; height: 64px; border-radius: 32px; background: #1d2733; color: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(29,39,51,0.3)"><svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="4" width="3.5" height="12" fill="currentColor"></rect><rect x="11.5" y="4" width="3.5" height="12" fill="currentColor"></rect></svg></button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import { partValueText } from '../editor/PartView';
 import type { CircuitDoc, Part } from '../model/types';
 import { boolProp, numProp, strProp } from '../sim/netlist';
 import { LED_COLORS } from '../sim/devices/led';
+import { resistorColorCode } from './bands';
 import { holeXZ, railX, type BreadboardPlan, type Hole } from './breadboard';
 
 const ROWS = 'abcdefghij';
@@ -28,20 +29,7 @@ export function holeDistanceMm(a: Hole, b: Hole, plan: BreadboardPlan): number {
   return Math.hypot(pa.x - pb.x, pa.z - pb.z) * 2.54;
 }
 
-const BAND_NAMES = ['siyah', 'kahverengi', 'kırmızı', 'turuncu', 'sarı', 'yeşil', 'mavi', 'mor', 'gri', 'beyaz'];
-
-/** Direncin 4 halkalı renk kodu (iki basamak, çarpan, %5 altın). */
-export function resistorColorCode(ohms: number): string {
-  if (!(ohms > 0) || !Number.isFinite(ohms)) return '';
-  let exponent = Math.floor(Math.log10(ohms)) - 1;
-  let digits = Math.round(ohms / 10 ** exponent);
-  if (digits >= 100) {
-    digits = Math.round(digits / 10);
-    exponent += 1;
-  }
-  const multiplier = exponent === -1 ? 'altın' : exponent === -2 ? 'gümüş' : (BAND_NAMES[exponent] ?? '?');
-  return `${BAND_NAMES[Math.floor(digits / 10)]}–${BAND_NAMES[digits % 10]}–${multiplier}–altın`;
-}
+export { resistorColorCode } from './bands';
 
 /** Malzeme listesindeki bir satır. */
 export interface Material {

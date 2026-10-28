@@ -75,7 +75,7 @@ async function openExample(page, name) {
 }
 /** Üst şeritteki kip rozeti (Kur, Bağla, Ölç, Duraklatıldı). */
 const mode = async (page) => (await page.locator('header [role=status], aside [role=status]').first().textContent()) ?? '';
-const selectedCount = (page) => page.locator('svg.schematic rect[stroke-dasharray="4 3"]').count();
+const selectedCount = (page) => page.locator('svg.schematic rect[data-selected]').count();
 /** Bir nesneye doğrudan bağlı olay dinleyicileri (CDP). */
 async function listeners(cdp, expression) {
   const { result } = await cdp.send('Runtime.evaluate', { expression });
@@ -690,7 +690,7 @@ try {
   const statusText = (await dp.getByRole('region', { name: 'Simülasyon' }).getByRole('status').textContent()) ?? '';
   check('masaüstü: çalışırken alandan çıkınca değer uygulanıyor, simülasyon durmuyor', (await part(dp, 'R1')).props.resistance === 470 && statusText.includes('Çalışıyor'), statusText);
   const live = (await dp.getByRole('tabpanel').textContent()) ?? '';
-  check('masaüstü: İncele sekmesinde canlı ölçüm görünüyor', live.includes('canlı') && /Akım\s*[\d,]+\s*mA/.test(live), live.slice(0, 60));
+  check('masaüstü: defterde açık kartta canlı ölçüm görünüyor', live.includes('Canlı uygulanır') && /Akım\s*[\d,]+\s*mA/.test(live), live.slice(0, 60));
   await dp.getByRole('tab', { name: 'Örnek' }).click(); await dp.waitForTimeout(150);
   const after = (await dp.getByRole('tabpanel').textContent()) ?? '';
   const stripAfter = (await dp.locator('main + div').first().textContent()) ?? '';

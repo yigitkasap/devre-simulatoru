@@ -1,0 +1,676 @@
+// Defter (tasarım v3, docs/tasarim-v3): sağdaki panelde devredeki her parça bir kart.
+//
+// - Kapalı kart (60 px): sembol, ad · tür ve değer; çalışırken en önemli ölçüm (ölçü aletinde büyük).
+//   Kur kipinde boşta ucu olan parçada "1 uç boşta" rozeti.
+// - Açık kart (aynı anda tek; seçimle aynı şey): başlıkta döndür ve sil; değer ayarı (−/+ ve sık
+//   kullanılan değerler); çalışırken Gerilim, Akım, Güç; parçaya özel bölüm. Seyrek kullanılan
+//   ayarlar (ad, öbür özellikler, ters çevir) "Diğer ayarlar" altında katlı.
+// - Aynı türden 3 ya da daha fazla parça tek satırda; satır açılınca parçalar altında.
+// - Çalışırken değiştirilen ayarlar (potansiyometre konumu, LDR ışığı, NTC sıcaklığı) kapalı kartta
+//   da görünen bir kaydırıcıdır.
+// Şemada parçaya tıklamak kartını açar ve listeyi oraya kaydırır.
+
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { resistorBands, resistorColorCode } from '../bench3d/bands';
+import { tr } from '../i18n/tr';
+import { CATALOG, withProp, type NumberPropDef, type PropDef } from '../model/catalog';
+import type { Part } from '../model/types';
+import type { DeviceType, PropValue } from '../sim/netlist';
+import { formatEditable, formatSI } from '../sim/units';
+import { useThrottledText } from './a11y';
+import { ArduinoSection } from './ArduinoPanel';
+import { Icon, type IconName } from './icons';
+import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, useCommitField, WireDetails, type InspectTabProps, type PartPatch } from './InspectTab';
+import { stableMeterText, stableReadout } from './liveReadout';
+import { notebookEntries, type NotebookEntry } from './notebookOrder';
+import { partValueText } from './PartView';
+import { currentProp, partNote, presetLabel, stepValue, validateNumber, valuePresets } from './propertyForm';
+import { PropSlider } from './PropSlider';
+import type { ReadoutRow } from './readouts';
+import { plainText, Rich } from './Rich';
+import { SymbolIcon } from './symbols';
+import { useTouchUi } from './touchUi';
+import type { SimFrame } from './useSimulation';
+
+const t = tr.notebook;
+
+export interface NotebookProps extends InspectTabProps {
+  /** Boşta ucu olan parçalar ve boşta uç sayısı (devre denetiminin "boşta uç" uyarıları). */
+  readonly floating: ReadonlyMap<string, number>;
+  /** Açık kartı kapatır (seçimi bırakır). */
+  readonly onClearSelection: () => void;
+  /** Kapalı kartında ölçüm gösterilen parçalar; null: hepsi (DC devre, değerler salınmaz). */
+  readonly measured: ReadonlySet<string> | null;
+}
+
+const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
+const METERS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter']);
+
+function partValues(part: Part): Record<string, PropValue> {
+  const values: Record<string, PropValue> = {};
+  for (const prop of CATALOG[part.type].propDefs) {
+    const value = currentProp(part, prop.key);
+    if (value !== undefined) values[prop.key] = value;
+  }
+  return values;
+}
+
+/** Kartın ana ayarı: ilk sayı özelliği (kaydırıcılı olanlar hariç), yoksa ilk seçenek. */
+function primaryProp(part: Part): PropDef | undefined {
+  if (RACK_DEVICES.has(part.type)) return undefined;
+  const defs = CATALOG[part.type].propDefs;
+  return defs.find((p) => p.kind === 'number' && !p.slider) ?? defs.find((p) => p.kind === 'select');
+}
+
+/** Çalışırken değiştirilen, kapalı kartta da görünen kaydırıcılar. */
+const sliderProps = (part: Part) => CATALOG[part.type].propDefs.filter((p): p is NumberPropDef => p.kind === 'number' && p.slider !== undefined);
+
+function liveRows(part: Part, frame: SimFrame | null) {
+  const m = frame?.measurements.get(part.id);
+  if (!m || !frame) return null;
+  return stableReadout(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null);
+}
+
+/** Kapalı kartın sağındaki ölçüm: ölçü aletinde göstergesi, LED'de gerilim ve akım, kaynakta akım, öbürlerinde ilk satır. */
+function cardReading(part: Part, frame: SimFrame | null): { main: string; second?: string; big?: boolean } | null {
+  const m = frame?.measurements.get(part.id);
+  if (!m || !frame) return null;
+  if (METERS.has(part.type)) {
+    const text = stableMeterText(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null);
+    return text ? { main: text, big: true } : null;
+  }
+  const rows = liveRows(part, frame)?.rows;
+  if (!rows || rows.length === 0) return null;
+  if (part.type === 'led' && rows[1]) return { main: rows[0]!.value, second: rows[1].value };
+  if (SOURCES.has(part.type) && rows[1]) return { main: rows[1].value };
+  return { main: rows[0]!.value };
+}
+
+export function Notebook(props: NotebookProps) {
+  const { doc, selection, frame } = props;
+  const touch = useTouchUi();
+  const openId = selection.parts.length === 1 && selection.wires.length === 0 ? selection.parts[0]! : null;
+  const entries = useMemo(() => notebookEntries(doc.parts), [doc.parts]);
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<DeviceType>>(() => new Set());
+  const listRef = useRef<HTMLDivElement>(null);
+  const openType = openId ? doc.parts.find((p) => p.id === openId)?.type : undefined;
+  // Seçilen parça bir gruptaysa grup açılır.
+  useEffect(() => {
+    if (openType && entries.some((e) => e.kind === 'group' && e.type === openType)) setOpenGroups((s) => (s.has(openType) ? s : new Set([...s, openType])));
+  }, [openType, entries]);
+  // Seçilen kart görünür alana kaydırılır.
+  useEffect(() => {
+    if (!openId) return;
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-card="${CSS.escape(openId)}"]`);
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el?.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }, [openId]);
+
+  const others = selection.parts.length + selection.wires.length;
+  const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
+  // Kapalı kartlar seyrek karelerle ve sabit geri çağırmalarla bir kez kurulur: simülasyon her karede
+  // defteri yeniden çizer, ama kapalı kartların alt ağaçları yalnızca seyrek karede güncellenir.
+  const slow = useSlowFrame(frame);
+  const latest = useRef(props);
+  latest.current = props;
+  const callbacks = useMemo(
+    () => ({
+      onSelectPart: (id: string) => latest.current.onSelectPart(id),
+      onUpdatePart: (id: string, patch: PartPatch) => latest.current.onUpdatePart(id, patch),
+      onSlidePart: (id: string, patch: PartPatch, done: boolean) => {
+        const { onSlidePart, onUpdatePart } = latest.current;
+        if (onSlidePart) onSlidePart(id, patch, done);
+        else if (done) onUpdatePart(id, patch);
+      },
+    }),
+    [],
+  );
+  const { status, settings, floating, measured } = props;
+  const closed = useMemo(() => {
+    const map = new Map<string, ReactNode>();
+    for (const part of doc.parts) {
+      if (part.id !== openId) {
+        map.set(part.id, <PartCard key={part.id} {...latest.current} {...callbacks} part={part} open={false} frame={slow} status={status} settings={settings} floating={floating} measured={measured} />);
+      }
+    }
+    return map;
+  }, [doc.parts, openId, slow, status, settings, floating, measured, callbacks, touch]);
+  const card = (part: Part) => (part.id === openId ? <PartCard key={part.id} {...props} part={part} open /> : closed.get(part.id));
+
+  const renderEntry = (entry: NotebookEntry): ReactNode => {
+    if (entry.kind === 'part') return card(entry.part);
+    const open = openGroups.has(entry.type);
+    return (
+      <GroupRow
+        key={`g-${entry.type}`}
+        entry={entry}
+        open={open}
+        frame={slow}
+        status={status}
+        floating={floating}
+        settings={settings}
+        onToggle={() =>
+          setOpenGroups((s) => {
+            const next = new Set(s);
+            if (open) next.delete(entry.type);
+            else next.add(entry.type);
+            return next;
+          })
+        }
+      >
+        {entry.parts.map(card)}
+      </GroupRow>
+    );
+  };
+
+  return (
+    <div ref={listRef} className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-panel-2 ${touch ? 'p-3' : 'p-4'}`}>
+      <div className="flex items-baseline justify-between px-0.5 pb-0.5">
+        <h2 className="text-[17px] font-semibold">{t.title}</h2>
+        <span className="text-small text-muted">{t.count(doc.parts.length)}</span>
+      </div>
+      {openId === null && others > 0 && (
+        <div className="flex flex-col gap-4 rounded-lg border-2 border-accent bg-panel px-3.5 py-3">
+          {selection.parts.length === 0 && selection.wires.length === 1 ? (
+            <WireDetails wireId={selection.wires[0]!} {...props} />
+          ) : (
+            <MultiSelection count={others} parts={selectedParts} {...props} />
+          )}
+        </div>
+      )}
+      {doc.parts.length === 0 ? <p className="px-0.5 text-small text-muted">{t.empty}</p> : entries.map(renderEntry)}
+    </div>
+  );
+}
+
+/** Kapalı kartlar için seyrek kare: en çok 250 ms'de bir (ölçümler okunabilir hızda değişsin). */
+function useSlowFrame(frame: SimFrame | null): SimFrame | null {
+  const [slow, setSlow] = useState(frame);
+  const last = useRef(0);
+  useEffect(() => {
+    if (frame === null) {
+      setSlow(null);
+      return;
+    }
+    const now = performance.now();
+    if (now - last.current >= 250) {
+      last.current = now;
+      setSlow(frame);
+    }
+  }, [frame]);
+  return frame === null ? null : slow;
+}
+
+// --- Grup satırı ------------------------------------------------------------------------------
+
+function GroupRow({
+  entry,
+  open,
+  frame,
+  status,
+  floating,
+  settings,
+  onToggle,
+  children,
+}: {
+  entry: Extract<NotebookEntry, { kind: 'group' }>;
+  open: boolean;
+  frame: SimFrame | null;
+  status: NotebookProps['status'];
+  floating: ReadonlyMap<string, number>;
+  settings: NotebookProps['settings'];
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const id = useId();
+  const name = t.plural[entry.type];
+  const labels = entry.parts.map((p) => p.label).join(', ');
+  // Rozet: sorunlu üyelerin adları (yanmış ya da boşta ucu olan).
+  const flagged = entry.parts.filter((p) => frame?.statuses.get(p.id)?.burned === true || (status === 'stopped' && (floating.get(p.id) ?? 0) > 0));
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={id}
+        aria-label={t.groupToggle(name, entry.parts.length)}
+        className="flex h-14 shrink-0 items-center gap-3 rounded-lg border border-line bg-panel px-3.5 text-left hover:border-line-2"
+      >
+        <SymbolIcon type={entry.type} resistorStyle={settings.resistorStyle} className="max-h-[18px] w-[30px] shrink-0" />
+        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+          {name} <span className="font-normal text-muted">· {labels}</span>
+        </span>
+        {flagged.length > 0 && <Badge tone="warn">{flagged.map((p) => p.label).join(', ')}</Badge>}
+        <Icon name={open ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0" />
+      </button>
+      {open && (
+        <div id={id} className="flex flex-col gap-2 border-l-2 border-line pl-3">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Badge({ tone, children }: { tone: 'warn' | 'danger'; children: ReactNode }) {
+  return (
+    <span
+      className={`flex h-[26px] shrink-0 items-center rounded-full px-2.5 text-label font-semibold ${
+        tone === 'warn' ? 'border border-dashed border-warn bg-warn-soft text-warn' : 'border border-danger-line bg-danger-soft text-danger-ink'
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+// --- Parça kartı ------------------------------------------------------------------------------
+
+function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
+  const { part, open, frame, status, settings, floating: floatingMap, onSelectPart, onClearSelection, onSlidePart, onUpdatePart } = props;
+  const touch = useTouchUi();
+  const bodyId = useId();
+  const typeName = tr.devices.names[part.type];
+  const value = partValueText(part);
+  const reading = props.measured === null || props.measured.has(part.id) ? cardReading(part, frame) : null;
+  const burned = frame?.statuses.get(part.id)?.burned === true;
+  const lit = part.type === 'led' && !burned && (frame?.live.get(part.id)?.brightness ?? 0) > 0.05;
+  const floating = status === 'stopped' ? (floatingMap.get(part.id) ?? 0) : 0;
+  const sliders = sliderProps(part);
+  const values = partValues(part);
+  const slide = (prop: NumberPropDef) => (v: number, done: boolean) => {
+    const patch = { props: withProp(part.type, part.props, prop.key, v) };
+    if (onSlidePart) onSlidePart(part.id, patch, done);
+    else if (done) onUpdatePart(part.id, patch);
+  };
+  const sliderRows = sliders.map((prop) => {
+    const label = tr.properties.fieldLabel(part.type, prop.key);
+    const v = typeof values[prop.key] === 'number' ? (values[prop.key] as number) : 0;
+    return (
+      <div key={prop.key} className="flex items-center gap-3">
+        <span className="w-24 shrink-0 text-small">{label}</span>
+        <PropSlider def={prop} value={v} label={label} touch={touch} onSlide={slide(prop)} />
+        <span className="w-16 shrink-0 text-right font-mono text-sm tabular">{formatSI(v, prop.unit, { trim: true, digits: 3 })}</span>
+      </div>
+    );
+  });
+  const badges = (
+    <>
+      {floating > 0 && <Badge tone="warn">{t.floating(floating)}</Badge>}
+      {burned && <Badge tone="danger">{t.burned}</Badge>}
+      {lit && <Badge tone="danger">{t.lit}</Badge>}
+    </>
+  );
+
+  if (!open) {
+    return (
+      <div data-card={part.id} className="flex shrink-0 flex-col rounded-lg border border-line bg-panel hover:border-line-2">
+        <button
+          type="button"
+          onClick={() => onSelectPart(part.id)}
+          aria-expanded={false}
+          aria-label={`${t.openCard(part.label, typeName)}${reading ? `, ${reading.main}` : value ? `, ${value}` : ''}`}
+          className={`flex shrink-0 items-center gap-3 px-3.5 text-left ${touch ? 'min-h-[60px]' : 'h-[60px]'}`}
+        >
+          <SymbolIcon type={part.type} resistorStyle={settings.resistorStyle} className="max-h-[18px] w-[34px] shrink-0" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[15px] font-semibold">
+              {part.label} <span className="font-normal text-muted">· {typeName}{reading && value ? ` ${value}` : ''}</span>
+            </span>
+          </span>
+          {badges}
+          {reading ? (
+            <span className={`shrink-0 text-right font-mono tabular ${reading.big ? 'text-[20px] font-medium' : 'text-sm'}`}>
+              {reading.main}
+              {reading.second && (
+                <>
+                  <br />
+                  <span className="text-muted">{reading.second}</span>
+                </>
+              )}
+            </span>
+          ) : (
+            value && <span className={`shrink-0 text-[15px] ${/\d/.test(value) ? 'font-mono tabular' : 'text-ink-2'}`}>{value}</span>
+          )}
+        </button>
+        {sliderRows.length > 0 && <div className="flex flex-col gap-2 px-3.5 pb-3">{sliderRows}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <section data-card={part.id} aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 rounded-lg border-2 border-accent bg-panel px-3.5 pt-3 pb-3.5">
+      <OpenCardHeader {...props} badges={badges} onClose={onClearSelection} bodyId={bodyId} />
+      <div id={bodyId} className="flex flex-col gap-3">
+        <PrimaryControl {...props} values={values} />
+        {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
+        <LiveTiles part={part} frame={frame} />
+        {part.type === 'arduino' && <ArduinoSection part={part} frame={frame} status={status} />}
+        {RACK_DEVICES.has(part.type) && (
+          <div className="flex flex-col items-start gap-2 rounded-md bg-panel-2 px-3 py-2.5">
+            <span className="text-small text-ink-2">{tr.rack.settingsInRack}</span>
+            <button
+              type="button"
+              onClick={() => props.onShowInRack(part.id)}
+              className={`rounded-md border border-line-2 bg-panel px-3 text-small font-medium hover:bg-panel-2 ${touch ? 'h-11' : 'h-9'}`}
+            >
+              {tr.rack.showInRack}
+            </button>
+          </div>
+        )}
+        <MoreSettings {...props} values={values} />
+      </div>
+    </section>
+  );
+}
+
+function OpenCardHeader({
+  part,
+  settings,
+  status,
+  badges,
+  onRotate,
+  onDelete,
+  onRepair,
+  frame,
+  onClose,
+}: NotebookProps & { part: Part; badges: ReactNode; onClose: () => void; bodyId: string }) {
+  const touch = useTouchUi();
+  const burned = frame?.statuses.get(part.id)?.burned === true;
+  const size = touch ? 'h-11 w-11' : 'h-9 w-9';
+  const action = (icon: IconName, label: string, onClick: () => void, danger = false) => (
+    <button
+      key={label}
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`flex shrink-0 items-center justify-center rounded-md hover:bg-panel-2 ${size} ${danger ? 'text-danger' : 'text-ink'}`}
+    >
+      <Icon name={icon} />
+    </button>
+  );
+  return (
+    <div className="flex items-center gap-2">
+      <SymbolIcon type={part.type} resistorStyle={settings.resistorStyle} className="max-h-[18px] w-[34px] shrink-0 text-accent-ink" />
+      <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+        {part.label} <span className="font-normal text-muted">· {tr.devices.names[part.type]}</span>
+      </h3>
+      {badges}
+      {burned && status !== 'stopped' && action('saved', tr.inspector.repair, () => onRepair(part.id))}
+      {action('rotate', tr.toolbar.rotate, () => onRotate([part.id]))}
+      {action('trash', tr.toolbar.remove, onDelete, true)}
+      {action('chevronUp', t.collapse, onClose)}
+    </div>
+  );
+}
+
+/** Ana ayar: sayıda −/+ adımlayıcı ve sık kullanılan değerler, seçenekte çipler. */
+function PrimaryControl({ part, values, focusRequest, status, onUpdatePart }: NotebookProps & { part: Part; values: Record<string, PropValue> }) {
+  const prop = primaryProp(part);
+  if (!prop) return null;
+  const commit = (value: PropValue) => onUpdatePart(part.id, { props: withProp(part.type, part.props, prop.key, value) });
+  if (prop.kind === 'number') {
+    const value = typeof values[prop.key] === 'number' ? (values[prop.key] as number) : 0;
+    const disabled = Boolean(prop.disabledWhen && values[prop.disabledWhen] === true);
+    return (
+      <ValueStepper
+        label={tr.properties.fieldLabel(part.type, prop.key)}
+        def={prop}
+        value={value}
+        disabled={disabled}
+        live={status !== 'stopped'}
+        presets={valuePresets(part.type, prop.key)}
+        focusRequest={focusRequest}
+        extra={part.type === 'resistor' ? <ColorCode ohms={value} /> : null}
+        onCommit={commit}
+      />
+    );
+  }
+  return (
+    <PropField
+      part={part}
+      prop={prop}
+      values={values}
+      live={false}
+      inputRef={undefined}
+      onCommit={commit}
+      onSlide={() => {}}
+    />
+  );
+}
+
+function ValueStepper({
+  label,
+  def,
+  value,
+  disabled,
+  live,
+  presets,
+  focusRequest,
+  extra,
+  onCommit,
+}: {
+  label: string;
+  def: NumberPropDef;
+  value: number;
+  disabled: boolean;
+  live: boolean;
+  presets: readonly number[];
+  focusRequest: number;
+  extra: ReactNode;
+  onCommit: (value: number) => void;
+}) {
+  const touch = useTouchUi();
+  const id = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (focusRequest === 0) return;
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [focusRequest]);
+  const field = useCommitField(
+    formatEditable(value),
+    (text) => validateNumber(def, text),
+    (next) => {
+      if (next !== value) onCommit(next);
+      return formatEditable(next);
+    },
+  );
+  const error = disabled ? null : field.error;
+  const down = disabled ? null : stepValue(def, value, -1);
+  const up = disabled ? null : stepValue(def, value, 1);
+  const button = touch ? 'h-11 w-11' : 'h-10 w-10';
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="text-small font-medium">
+        {label}
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className={`flex items-center overflow-hidden rounded-[9px] border bg-panel ${touch ? 'h-12' : 'h-11'} ${fieldTone(Boolean(error))} ${disabled ? 'bg-panel-2' : ''}`}>
+          <button
+            type="button"
+            disabled={down === null}
+            onClick={() => down !== null && onCommit(down)}
+            aria-label={t.decrease(label)}
+            className={`flex shrink-0 items-center justify-center hover:bg-panel-2 disabled:text-stopped ${button}`}
+          >
+            <Icon name="minus" />
+          </button>
+          <input
+            id={id}
+            ref={inputRef}
+            value={field.text}
+            disabled={disabled}
+            inputMode="decimal"
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${id}-e` : undefined}
+            onChange={(e) => field.setText(e.target.value)}
+            onBlur={field.commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') field.commit();
+              if (e.key === 'Escape') field.revert();
+            }}
+            className={`h-full w-20 min-w-0 bg-transparent text-center font-mono font-medium tabular outline-none disabled:text-muted ${touch ? 'text-base' : 'text-[15px]'}`}
+          />
+          {def.unit && <span className="pr-1 font-mono text-sm text-muted">{def.unit}</span>}
+          <button
+            type="button"
+            disabled={up === null}
+            onClick={() => up !== null && onCommit(up)}
+            aria-label={t.increase(label)}
+            className={`flex shrink-0 items-center justify-center hover:bg-panel-2 disabled:text-stopped ${button}`}
+          >
+            <Icon name="plus" />
+          </button>
+        </div>
+        {extra}
+      </div>
+      {error && <FieldError id={`${id}-e`} error={error} kept={tr.inspector.invalidKept(formatSI(value, def.unit, { trim: true, digits: 4 }))} />}
+      {live && !error && (
+        <span className="flex items-center gap-1.5 text-label text-ok">
+          <i className="block h-2 w-2 rounded-full bg-ok" aria-hidden="true" />
+          {tr.inspector.liveApplied}
+        </span>
+      )}
+      {presets.length > 0 && !disabled && (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={tr.inspector.presets}>
+          {presets.map((preset) => {
+            const selected = Math.abs(preset - value) <= Math.abs(value) * 1e-9;
+            return (
+              <button
+                key={preset}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => !selected && onCommit(preset)}
+                className={`rounded-sm border px-2.5 font-mono text-small font-medium ${touch ? 'h-11' : 'h-8'} ${
+                  selected ? 'border-ink bg-ink text-white' : 'border-line-2 bg-panel text-ink hover:bg-panel-2'
+                }`}
+              >
+                {presetLabel(preset)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ColorCode({ ohms }: { ohms: number }) {
+  const bands = resistorBands(ohms);
+  return (
+    <span className="flex items-center gap-1.5 text-label text-ink-2" role="img" aria-label={t.colorCodeLabel(resistorColorCode(ohms))} title={resistorColorCode(ohms)}>
+      {t.colorCode}
+      <span className="flex gap-0.5 rounded-sm border border-line bg-panel-2 px-1.5 py-1" aria-hidden="true">
+        {bands.map((color, i) => (
+          <span key={i} className={`h-3.5 w-[5px] ${i === 3 ? 'ml-1' : ''}`} style={{ background: color }} />
+        ))}
+      </span>
+    </span>
+  );
+}
+
+/** Çalışırken Gerilim, Akım, Güç (ve türe özel öbür satırlar) karelerde; durmuşken yok. */
+function LiveTiles({ part, frame }: { part: Part; frame: SimFrame | null }) {
+  const live = liveRows(part, frame);
+  const spoken = useThrottledText(live ? live.rows.map((r) => `${plainText(r.label)} ${r.value}`).join(', ') : '');
+  if (!live || live.rows.length === 0) return null;
+  const formula = live.note?.includes('→') ?? false;
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="sr-only" aria-live="polite">
+        {spoken}
+      </p>
+      <div className="grid grid-cols-3 gap-2">
+        {live.rows.map((row: ReadoutRow) => (
+          <span key={row.label} className="flex min-w-0 flex-col gap-0.5 rounded-md bg-panel-2 px-2.5 py-2">
+            <span className="truncate text-[11px] text-muted">
+              <Rich text={row.label} />
+            </span>
+            <span className="truncate font-mono text-base tabular">{row.value}</span>
+          </span>
+        ))}
+      </div>
+      {live.varying && <p className="text-label leading-normal text-ink-2">{tr.inspector.varyingNote}</p>}
+      {live.note && (
+        <div className="flex flex-col gap-1 rounded-md border border-info-line bg-info-soft px-3 py-2">
+          <span className="text-label font-semibold text-info-ink">{tr.inspector.why}</span>
+          <span className={formula ? 'font-mono text-[13px] text-ink' : 'text-label leading-normal text-ink-2'}>
+            <Rich text={live.note} />
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Katlı: ad, öbür özellikler, ters çevir, parçanın ne yaptığı. */
+function MoreSettings({ part, doc, values, status, onUpdatePart, onFlip }: NotebookProps & { part: Part; values: Record<string, PropValue> }) {
+  const touch = useTouchUi();
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const def = CATALOG[part.type];
+  const primary = primaryProp(part);
+  const rest = RACK_DEVICES.has(part.type) ? [] : def.propDefs.filter((p) => p !== primary && !(p.kind === 'number' && p.slider));
+  const otherLabels = new Set(doc.parts.filter((p) => p.id !== part.id).map((p) => p.label));
+  const note = RACK_DEVICES.has(part.type) ? undefined : partNote(part.type, values);
+  const commit = (key: string) => (value: PropValue) => onUpdatePart(part.id, { props: withProp(part.type, part.props, key, value) });
+  return (
+    <div className="flex flex-col border-t border-line pt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={id}
+        className={`flex items-center gap-1.5 self-start text-small font-medium text-accent-ink ${touch ? 'h-11' : 'h-8'}`}
+      >
+        <Icon name={open ? 'chevronDown' : 'chevron'} className="h-4 w-4" />
+        {t.more}
+      </button>
+      {open && (
+        <div id={id} className="flex flex-col gap-3 pt-1">
+          <LabelField label={part.label} otherLabels={otherLabels} inputRef={undefined} onCommit={(label) => onUpdatePart(part.id, { label })} />
+          {rest.map((prop) => (
+            <PropField
+              key={prop.key}
+              part={part}
+              prop={prop}
+              values={values}
+              live={false}
+              inputRef={undefined}
+              onCommit={commit(prop.key)}
+              onSlide={(v, done) => done && commit(prop.key)(v)}
+            />
+          ))}
+          {def.polarized && (
+            <button
+              type="button"
+              onClick={() => onFlip([part.id])}
+              className={`flex items-center gap-1.5 self-start rounded-md border border-line-2 bg-panel px-3 text-small font-medium hover:bg-panel-2 ${touch ? 'h-11' : 'h-9'}`}
+            >
+              <Icon name="flip" />
+              {tr.toolbar.flip}
+            </button>
+          )}
+          {note && (
+            <p className="rounded-md bg-panel-2 px-3 py-2 text-label leading-relaxed text-ink-2">
+              <Rich text={note} />
+            </p>
+          )}
+          {status === 'stopped' && (
+            <div className="flex flex-col gap-1">
+              <span className="text-label font-semibold text-muted">{tr.inspector.whatItDoes}</span>
+              <p className="text-small leading-normal text-ink-2">
+                <Rich text={tr.devices.descriptions[part.type]} />
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

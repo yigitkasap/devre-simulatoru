@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Defter · telefon · Kur</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1557c0}a:hover{color:#0f3f8c}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.dots{background-color:#fbfbf9;background-image:radial-gradient(#d3d7dc 1px,transparent 1.2px);background-size:20px 20px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; display: flex; flex-direction: column; overflow: hidden; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1d2733; background: #f4f5f7">
+
+  <header style="height: 56px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; background: #ffffff; border-bottom: 1px solid #dde1e6">
+    <svg width="30" height="30" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#1d2733"></rect><path d="M6 15c2.5-7 5-7 8 0s5.5 7 8 0" fill="none" stroke="#f05a28" stroke-width="2.4" stroke-linecap="round"></path></svg>
+    <button style="flex: 1; min-width: 0; height: 44px; display: flex; flex-direction: column; justify-content: center; text-align: left; line-height: 1.2">
+      <span style="font-size: 15px; font-weight: 600">Yeni devre</span><span style="font-size: 12px; color: #5f6b7a">Kur · kaydedildi</span>
+    </button>
+    <button aria-label="Geri al" style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4L3 8l4 4"></path><path d="M3 8h9a4.5 4.5 0 0 1 0 9H8"></path></svg></button>
+    <button aria-label="Menü" style="width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="4" cy="10" r="1.7" fill="currentColor"></circle><circle cx="10" cy="10" r="1.7" fill="currentColor"></circle><circle cx="16" cy="10" r="1.7" fill="currentColor"></circle></svg></button>
+  </header>
+
+  <div class="dots" style="height: 270px; flex: none; position: relative; overflow: hidden; border-bottom: 1px solid #dde1e6">
+    <svg width="330" height="210" viewBox="0 0 520 330" style="position: absolute; left: 24px; top: 20px" role="img" aria-label="Kurulmakta olan devre; LED1'in anodu boşta">
+      <g fill="none" stroke="#9aa3ad" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M80 152V60h80M80 168v112h360v-80"></path>
+      </g>
+      <g fill="none" stroke="#1d2733" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M58 152h44"></path><path d="M68 168h24" stroke-width="6"></path>
+        <path d="M160 60h10l5-12 10 24 10-24 10 24 10-24 10 24 10-24 5 12h10"></path>
+        <path d="M424 150h32l-16 32z" fill="#fdecea"></path><path d="M424 182h32"></path><path d="M440 182v18"></path>
+        <path d="M440 150v-14"></path>
+      </g>
+      <circle cx="250" cy="60" r="7" fill="#ffffff" stroke="#f05a28" stroke-width="3"></circle>
+      <circle cx="440" cy="134" r="7" fill="#ffffff" stroke="#f05a28" stroke-width="3"></circle>
+      <g font-family="IBM Plex Mono, monospace" font-size="20" fill="#1d2733"><text x="20" y="160" font-weight="600">B1</text><text x="182" y="110" font-weight="600">R1</text><text x="468" y="230" font-weight="600">LED1</text></g>
+    </svg>
+    <div style="position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px">
+      <button style="height: 44px; padding: 0 14px; border-radius: 12px; background: #1f6feb; color: #ffffff; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="15" r="2"></circle><circle cx="15" cy="5" r="2"></circle><path d="M7 15h3a2 2 0 0 0 2-2V7a2 2 0 0 1 2-2"></path></svg>Kablo bağla</button>
+      <button aria-label="Şemayı tam ekran aç" style="width: 44px; height: 44px; border-radius: 12px; background: #ffffff; border: 1px solid #dde1e6; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"></path></svg></button>
+    </div>
+  </div>
+
+  <div style="flex: 1; overflow: hidden; padding: 12px; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 0 2px"><span style="font-size: 15px; font-weight: 600">Devredeki parçalar</span><span style="font-size: 13px; color: #5f6b7a">3</span></div>
+    <button style="background: #ffffff; border: 1px solid #dde1e6; border-radius: 12px; padding: 0 14px; height: 60px; flex: none; display: flex; align-items: center; gap: 12px; text-align: left">
+      <svg width="30" height="16" viewBox="0 0 30 16" fill="none" stroke="#1d2733" stroke-width="1.5" aria-hidden="true"><path d="M0 8h12M18 8h12"></path><path d="M12 1v14"></path><path d="M18 4.5v7" stroke-width="3"></path></svg>
+      <span style="flex: 1; font-size: 15px; font-weight: 600">B1 <span style="font-weight: 400; color: #5f6b7a">· Pil</span></span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px">5 V</span>
+    </button>
+    <button style="background: #ffffff; border: 1px solid #dde1e6; border-radius: 12px; padding: 0 14px; height: 60px; flex: none; display: flex; align-items: center; gap: 12px; text-align: left">
+      <svg width="30" height="16" viewBox="0 0 30 16" fill="none" stroke="#1d2733" stroke-width="1.5" aria-hidden="true"><path d="M0 8h6l2-5 3 10 3-10 3 10 3-10 2 5h8"></path></svg>
+      <span style="flex: 1; font-size: 15px; font-weight: 600">R1 <span style="font-weight: 400; color: #5f6b7a">· Direnç</span></span>
+      <span style="height: 24px; padding: 0 9px; border-radius: 12px; background: #fef6e7; border: 1px dashed #b54708; color: #8a3a06; font-size: 12px; font-weight: 600; display: flex; align-items: center">1 uç boşta</span>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px">330 Ω</span>
+    </button>
+    <button style="background: #ffffff; border: 1px solid #dde1e6; border-radius: 12px; padding: 0 14px; height: 60px; flex: none; display: flex; align-items: center; gap: 12px; text-align: left">
+      <svg width="30" height="16" viewBox="0 0 30 16" fill="none" stroke="#1d2733" stroke-width="1.5" aria-hidden="true"><path d="M0 8h10M20 8h10"></path><path d="M10 3l10 5-10 5z"></path><path d="M20 3v10"></path></svg>
+      <span style="flex: 1; font-size: 15px; font-weight: 600">LED1 <span style="font-weight: 400; color: #5f6b7a">· Kırmızı</span></span>
+      <span style="height: 24px; padding: 0 9px; border-radius: 12px; background: #fef6e7; border: 1px dashed #b54708; color: #8a3a06; font-size: 12px; font-weight: 600; display: flex; align-items: center">1 uç boşta</span>
+    </button>
+  </div>
+
+  <button style="position: absolute; left: 16px; bottom: 28px; height: 52px; padding: 0 18px; border-radius: 26px; background: #ffffff; border: 1px solid #c4cad2; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; box-shadow: 0 4px 12px rgba(29,39,51,0.1)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 10h12M10 4v12"></path></svg>Parça ekle</button>
+  <button aria-label="Oynat" style="position: absolute; right: 16px; bottom: 20px; width: 64px; height: 64px; border-radius: 32px; background: #1b7d44; color: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(27,125,68,0.3)"><svg width="24" height="24" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4l10 6-10 6z" fill="currentColor"></path></svg></button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

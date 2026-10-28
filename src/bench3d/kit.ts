@@ -195,22 +195,9 @@ export function labelPlate(text: string, w: number, h: number, opts: LabelOption
   return plate;
 }
 
-// --- Direnç renk halkaları ------------------------------------------------------------------------
+// --- Direnç renk halkaları (bands.ts) -------------------------------------------------------------
 
-const BAND_COLORS = ['#1a1a1a', '#7a4a2a', '#d0412f', '#e8892f', '#efc540', '#3f8f45', '#2f62b8', '#7e4fb4', '#8b8f95', '#f4f4f2'];
-
-/** 4 halkalı renk kodu (iki basamak, çarpan, %5 altın tolerans). */
-export function resistorBands(ohms: number): string[] {
-  if (!(ohms > 0) || !Number.isFinite(ohms)) return [BAND_COLORS[0]!, BAND_COLORS[0]!, BAND_COLORS[0]!, '#c9a54a'];
-  let exponent = Math.floor(Math.log10(ohms)) - 1;
-  let digits = Math.round(ohms / 10 ** exponent);
-  if (digits >= 100) {
-    digits = Math.round(digits / 10);
-    exponent += 1;
-  }
-  const multiplier = exponent < 0 ? (exponent === -1 ? '#c9a54a' : '#c0c4c8') : (BAND_COLORS[Math.min(9, exponent)] ?? BAND_COLORS[0]!);
-  return [BAND_COLORS[Math.floor(digits / 10)]!, BAND_COLORS[digits % 10]!, multiplier, '#c9a54a'];
-}
+export { resistorBands } from './bands';
 
 // --- Birleştirme -------------------------------------------------------------------------------------
 
