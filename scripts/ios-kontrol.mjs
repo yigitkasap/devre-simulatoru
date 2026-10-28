@@ -949,7 +949,9 @@ try {
     const area = await page.locator('svg.schematic').boundingBox();
     const toggle = await group.boundingBox();
     check('3B: telefonda Şema | 3B düğmeleri en az 44 px ve tuvalin sol altında (sol üst boş kalır)', sizes.every((s) => s >= 44) && toggle.y > area.y + area.height / 2, sizes.map((s) => Math.round(s)).join(', '));
-    await group.getByRole('button', { name: '3B' }).tap(); await page.waitForTimeout(1500);
+    await group.getByRole('button', { name: '3B' }).tap();
+    // 3B tembel yüklenir (canlıda ağdan): sahne hazır olana kadar bekle.
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(500);
     const before = await page.evaluate(() => window.__tezgah?.camera.position.toArray().map((v) => v.toFixed(2)).join(','));
     const box = await page.locator('main canvas').boundingBox();
     await drag(page, cdp, { x: box.x + box.width * 0.5, y: box.y + box.height * 0.35 }, { x: box.x + box.width * 0.8, y: box.y + box.height * 0.45 });
