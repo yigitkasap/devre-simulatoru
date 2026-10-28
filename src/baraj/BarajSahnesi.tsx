@@ -1,9 +1,11 @@
 // Baraj sahnesi: kesitten bakılan vadi, beton baraj, hazne ve problar, ölçü iskelesi, kontrol
 // kulübesi ve üç lambalı ışık kulesi. Su seviyesi ve lambalar simülasyondan gelir: lambalar
 // devredeki LED'lerin parlaklığını izler. Doldururken nehirden su gelir, boşaltırken dip savaktan
-// akar. Problar ve lambalar numaralıdır (Seviye 1 yeşil, 2 sarı, 3 kırmızı); ölçü iskelesinin solunda
-// seviye etiketi ve suyu sürükleyen tutamak (role="slider") durur. Tutamak, çizimle aynı görünüm
-// kutusundaki ayrı bir SVG katmanındadır (çizim role="img": içindeki öğeler ekran okuyucuya kapalı).
+// akar. Prob numarası lambanın numarası ve rengiyle aynıdır (1 yeşil, 2 sarı, 3 kırmızı; v3: "Seviye N"
+// yazıları yok); ıslak prob ucu yeşil halkalıdır. Yüzde ölçeği ve iyonlar isteğe bağlıdır ("Göster"
+// çipleri). Suyu sürükleyen tutamakta (role="slider") yalnızca yukarı-aşağı oku vardır; çizimle aynı
+// görünüm kutusundaki ayrı bir SVG katmanındadır (çizim role="img": içindeki öğeler ekran okuyucuya
+// kapalı). three.js sahnesi (BarajSahnesi3B) açılamazsa bu çizim kullanılır.
 //
 // Çizim 800 × 460'lık bir alanda; görünüm kutusu düzene göre kırpılır (geniş ekran, tablet, telefon,
 // yatay telefon), kutusuna sığar. Gökyüzü ve zemin kutunun dışına taşar (boş şerit kalmaz). Yazılar
@@ -27,7 +29,7 @@ export type SceneLayout = 'wide' | 'tablet' | 'phone' | 'landscape';
 const VIEW_BOXES: Readonly<Record<SceneLayout, readonly [number, number, number, number]>> = {
   wide: [120, 30, 670, 420],
   tablet: [150, -10, 650, 460],
-  phone: [240, 40, 552, 400],
+  phone: [300, 30, 460, 470],
   landscape: [262, 40, 530, 400],
 };
 
@@ -44,8 +46,10 @@ export interface BarajSahnesiProps {
   readonly layout: SceneLayout;
   /** Yazıların ekrandaki boyu (px). */
   readonly textPx: number;
-  /** Lambaların yanında "Seviye n" yazısı (telefonda yok: numara lambanın içinde). */
-  readonly lampLabels?: boolean;
+  /** Ölçü iskelesi ve yüzde yazıları ("Göster: Yüzde ölçeği"). */
+  readonly scale?: boolean;
+  /** Su yüzeyindeki tutamak (telefonda yok: seviye üstteki çubuktan). */
+  readonly handle?: boolean;
   /** Suda akımı taşıyan iyonlar (simülasyon çalışırken). */
   readonly ions?: IonView;
   /** Tutamak sürüklenirken önizleme seviyesi; bırakınca null. */
@@ -230,7 +234,7 @@ function IonLegend({ viewBox, fs }: { viewBox: readonly [number, number, number,
   );
 }
 
-export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx, lampLabels = true, ions, onPreview, onCommit, className = '' }: BarajSahnesiProps) {
+export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx, scale: showScale = false, handle = true, ions, onPreview, onCommit, className = '' }: BarajSahnesiProps) {
   const id = useId().replace(/:/g, '');
   const viewBox = VIEW_BOXES[layout];
   const { ref, scale } = useScale(viewBox);
@@ -290,14 +294,13 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
     onCommit(Math.min(100, Math.max(0, next)));
   };
 
-  // Etiket ve tutamak ölçüleri (yazı boyuna bağlı).
-  const tagFont = fs * 1.1;
+  // Tutamak ölçüleri (yazı boyuna bağlı): yalnızca ok, yüzde sahnenin sol üstündeki kartta.
   const tagText = tr.baraj.handleText(Math.round(level));
-  const tagH = fs * 1.85;
-  const tagW = tagText.length * 0.6 * tagFont + 1.15 * tagFont;
-  const tagX = STAFF_X - 7 - tagW;
-  const handleW = fs * 2.9;
-  const handleX = tagX - fs * 0.57 - handleW;
+  const tagH = fs * 2.2;
+  const tagW = 0;
+  const tagX = STAFF_X - 7;
+  const handleW = fs * 2.8;
+  const handleX = tagX - handleW;
   const tagTop = Math.min(BED_Y - tagH / 2, Math.max(FULL_Y - tagH / 2, surface - tagH / 2));
   const minHit = 44 / scale;
   const hitW = Math.max(minHit, tagX + tagW - handleX + 6);
@@ -388,7 +391,8 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
         opacity={filling ? 1 : 0.5}
       />
 
-      {/* Ölçü iskelesi */}
+      {/* Ölçü iskelesi ("Göster: Yüzde ölçeği") */}
+      {showScale && (
       <g>
         <rect x={STAFF_X} y={FULL_Y} width={12} height={BED_Y - FULL_Y} fill="#fdfdfd" stroke="#59636e" strokeWidth={1} />
         {Array.from({ length: 11 }, (_, i) => i * 10).map((p) => (
@@ -402,6 +406,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
           </g>
         ))}
       </g>
+      )}
 
       {/* Baraj gövdesi */}
       <path d={`M${FACE_X} ${CREST_Y}H524L610 420H${FACE_X}Z`} fill={`url(#${id}concrete)`} stroke="#7d858e" strokeWidth={2} strokeLinejoin="round" />
@@ -415,7 +420,8 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
         <path d="M606 396q24 4 30 30" fill="none" stroke="#5fb0ea" strokeWidth={6} strokeLinecap="round" strokeDasharray="10 7" className="baraj-akis" />
       )}
 
-      {/* Problar ve eşik çizgileri: numaralı rozet ve "Seviye n"; ortak prob "+" rozeti */}
+      {/* Problar ve eşik çizgileri: numaralı rozet (lambayla aynı numara ve renk); ortak prob "+" rozeti ve
+          adı; ıslak seviye probunun ucunda yeşil halka */}
       {TANK_PROBE_HEIGHTS.map((h, k) => {
         const y = levelY(h);
         const on = wet[k] === true;
@@ -427,6 +433,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
             <line x1={FACE_X + 14 + k * 4} x2={FACE_X + 14 + k * 4} y1={y} y2={CREST_Y - 6} stroke="#2c3846" strokeWidth={1.4} />
             {on && <circle cx={452} cy={y} r={9} fill="#9fe0ff" opacity={0.7} filter={`url(#${id}glow)`} />}
             <circle cx={452} cy={y} r={5} fill={on ? '#bff0ff' : '#9aa3ad'} stroke="#2c3846" strokeWidth={1.5} />
+            {on && k > 0 && <circle cx={452} cy={y} r={10} fill="none" stroke="#34d27a" strokeWidth={2.6} />}
             {colors ? (
               <>
                 <circle cx={badgeX} cy={y} r={badgeR} fill={colors.badge} stroke="#ffffff" strokeWidth={badgeR * 0.15} />
@@ -445,9 +452,11 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
                 />
               </>
             )}
-            <text x={badgeX + badgeR + fs * 0.38} y={y + fs * 0.38} fontSize={fs} fontWeight={600} fill="#1d2733" {...halo} style={sans}>
-              {k === 0 ? tr.baraj.common : tr.baraj.level(k)}
-            </text>
+            {k === 0 && (
+              <text x={badgeX + badgeR + fs * 0.38} y={y + fs * 0.38} fontSize={fs} fontWeight={600} fill="#1d2733" {...halo} style={sans}>
+                {tr.baraj.common}
+              </text>
+            )}
           </g>
         );
       })}
@@ -471,18 +480,14 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
             <text x={668} y={cy + 6} textAnchor="middle" fontSize={17} fontWeight={700} fill={lit && b > 0.3 ? numberInk : '#aeb6bf'} style={sans}>
               {n}
             </text>
-            {lampLabels && (
-              <text x={698} y={cy + fs * 0.38} fontSize={fs * 1.045} fontWeight={600} fill="#1d2733" {...halo} style={sans}>
-                {tr.baraj.level(n)}
-              </text>
-            )}
           </g>
         );
       })}
 
       {ions && level > TANK_PROBE_HEIGHTS[0] && <IonLegend viewBox={viewBox} fs={fs} />}
     </svg>
-    {/* Seviye etiketi ve sürükleme tutamağı (ayrı katman) */}
+    {/* Sürükleme tutamağı (ayrı katman) */}
+    {handle && (
     <svg
       viewBox={viewBox.join(' ')}
       className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
@@ -511,10 +516,6 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
         {focusRing && (
           <rect x={hitX - 2} y={hitY - 2} width={hitW + 4} height={hitH + 4} rx={hitH / 2} fill="none" stroke="#1f6feb" strokeWidth={3 / scale} />
         )}
-        <rect x={tagX} y={tagTop} width={tagW} height={tagH} rx={tagH / 2} fill={WATER} stroke="#ffffff" strokeWidth={tagH * 0.073} />
-        <text x={tagX + tagW / 2} y={tagTop + tagH / 2 + tagFont * 0.35} textAnchor="middle" fontSize={tagFont} fontWeight={600} fill="#ffffff" style={mono}>
-          {tagText}
-        </text>
         <rect x={handleX} y={tagTop} width={handleW} height={tagH} rx={tagH / 2} fill="#ffffff" stroke={WATER} strokeWidth={tagH * 0.094} />
         <path
           d={`M${hcx - tri} ${hcy - tri * 0.25}L${hcx} ${hcy - tri * 1.25}L${hcx + tri} ${hcy - tri * 0.25}ZM${hcx - tri} ${hcy + tri * 0.25}L${hcx} ${hcy + tri * 1.25}L${hcx + tri} ${hcy + tri * 0.25}Z`}
@@ -522,6 +523,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
         />
       </g>
     </svg>
+    )}
     </div>
   );
 }

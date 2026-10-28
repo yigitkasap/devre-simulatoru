@@ -1,16 +1,18 @@
-// Baraj su seviyesi uyarısı sayfası (/baraj), ders düzeni (tasarım: docs/tasarim/baraj, bağlayıcı belge
-// BN). Öğretmen yansıtırken tek elle yönetir; sınıf aynı anda barajı, devreyi ve durumu görür. Anlatım
-// metni yok: ekrandaki her şey ya bir ölçüm ya bir düğme.
+// Baraj su seviyesi uyarısı sayfası (/baraj). Derste projeksiyonda kullanılır: az metin, tek bakışta
+// anlaşılır (tasarım v3: docs/tasarim-v3 → B1–B6; önceki ders düzeni docs/tasarim/baraj).
 //
 // Tek kumanda: ayrı Oynat yok. Açılışta örnek yüklenir, tank Durdur'da (%20) ve simülasyon kendiliğinden
 // başlar; Su akışı tankın mode özelliğini değiştirir (useBarajKumanda). Devre değişince seviye, akış ve
 // ayarlar taşınır, simülasyon yeniden başlar. Simülasyon ana simülatörün motoruyla çalışır; değişiklikler
 // yalnızca bu sayfada kalır, "Simülatörde aç" o anki hâli paylaşım bağlantısıyla ana simülatöre taşır.
 //
-// Düzenler: masaüstü (≥ 1100 px) başlık + soru şeridi + iki kart (sahne ve Durum tablosu | devre şeması)
-// + kumanda şeridi; tablet aynı, kaydırıcısız; telefon dikey: sahne, Durum | Devre sekmeleri, altta
-// kumanda, Soru alt sayfada; telefon yatay: sahne solda, sekmeler sağda, kumanda tek satır. Tam ekranda
-// (projeksiyon) yazılar büyür. Sayfanın kendisi hiçbir düzende kaymaz; paneller kendi içinde kayar.
+// Düzen (v3): tek satır üst çubuk (solda "← Simülatör" ve başlık; ortada Çubuk gösterge | Tek ışık, ▼ ■ ▲
+// ve ince seviye çubuğu; sağda Devre, Soru, tema, ⋯). Varsayılan görünüm yalnızca sahnedir (B1); Devre
+// düğmesi sağda devre panelini açar (B2). Sahnenin sol üstünde doluluk kartı, sol altında "Göster"
+// çipleri (İyonlar, Yüzde ölçeği). Ayarlar, Başa al, Tam ekran ve Simülatörde aç ⋯ menüsünde. Alt
+// kumanda satırı ve Durum tablosu yok. Telefon (B3): üst çubuk, altında Çubuk gösterge | Tek ışık ve tek
+// satır kumanda; sahne ekranın altına kadar; sol altta "Devreyi gör ›" (devre tam ekran). Sayfanın
+// kendisi hiçbir düzende kaymaz; paneller kendi içinde kayar.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { exampleDoc } from '../examples';
@@ -28,24 +30,20 @@ import { Icon } from '../editor/icons';
 import { useSettings, type ThemeChoice } from '../editor/settings';
 import { useTheme } from '../editor/theme';
 import { ThemeMenu } from '../editor/TopBar';
-import { Logo } from '../editor/TopBar';
 import { useLayout } from '../editor/useLayout';
 import { useSimulation, type SimFrame } from '../editor/useSimulation';
 import { AyarlarKarti } from './AyarlarKarti';
 import { alertOf, BarajSahnesi, type Lamps, type SceneLayout } from './BarajSahnesi';
-import { DurumTablosu } from './DurumTablosu';
-import { Kumanda, type KumandaVariant } from './Kumanda';
 import { bandOf, durumRows, levelBands, START_LEVEL, stopAbove, stopBelow, type LevelNo, type Stop } from './seviye';
 import { BantLejanti, SeviyeBantlari } from './SeviyeBantlari';
-import { AlertIcon } from './simgeler';
 import { Soru } from './Soru';
+import { AkisDugmeleri, DolulukKarti, GosterCipleri, SeviyeCubugu } from './UstKumanda';
 import { useBarajKumanda } from './useBarajKumanda';
 
 type Variant = 'baraj-cubuk' | 'baraj-tek-isik';
 const VARIANTS: readonly Variant[] = ['baraj-cubuk', 'baraj-tek-isik'];
 
 const BASE = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
-const TABLE_KEY = 'devre-simulatoru:baraj-durum-gizli';
 const KEYS_KEY = 'devre-simulatoru:baraj-kisayollar-kapali';
 
 /** Tarayıcıda tutulan küçük tercih (yalnızca kolaylık; depolama yoksa varsayılan). */
@@ -168,24 +166,6 @@ function VariantSeg({ value, onChange, className, labelledBy, big }: { value: Va
   );
 }
 
-/** Sahnenin sol üstündeki uyarı rozeti: simge (biçim) ve metin. */
-function UyariRozeti({ kind, size }: { kind: ReturnType<typeof alertOf>; size: 'big' | 'desk' | 'phone' | 'landscape' }) {
-  const cls = {
-    big: 'h-11 gap-2 pr-[17px] pl-3 text-[17px]',
-    desk: 'h-10 gap-2 pr-[15px] pl-[11px] text-[15px]',
-    phone: 'h-9 gap-2 pr-3.5 pl-2.5 text-body',
-    landscape: 'h-[34px] gap-2 pr-[13px] pl-2.5 text-small',
-  }[size];
-  return (
-    <div className={`pointer-events-none absolute ${size === 'phone' || size === 'landscape' ? 'top-2 left-2' : 'top-3.5 left-3.5'}`}>
-      <div className={`inline-flex items-center rounded-full border border-line-2 bg-panel font-semibold whitespace-nowrap text-ink shadow-[0_2px_8px_rgba(29,39,51,.12)] ${cls}`}>
-        <AlertIcon kind={kind} size={size === 'big' ? 22 : 20} />
-        {tr.baraj.alert[kind]}
-      </div>
-    </div>
-  );
-}
-
 const paperStyle = {
   backgroundColor: 'var(--color-paper)',
   backgroundImage: 'radial-gradient(circle, #b3bac3 1.3px, transparent 1.6px), radial-gradient(circle, #d3d7dc 1px, transparent 1.3px)',
@@ -247,35 +227,28 @@ export default function BarajSayfasi() {
   const lamps: Lamps = { green: lamp('LED1'), yellow: lamp('LED2'), red: lamp('LED3') };
   const alert = alertOf(lamps);
   const band = bandOf(level);
-  const direction = running && s.mode === 'fill' && level < 100 ? 'rising' : running && s.mode === 'drain' && level > 0 ? 'falling' : 'steady';
   const falling = useLedTrend(sim.frame, doc);
   const rows = durumRows(doc, sim.frame, wet, falling);
   const bands = useMemo(() => levelBands(doc), [doc]);
   const working = (n: LevelNo) => rows.find((r) => r.level === n)?.working ?? false;
   const announcement = useAnnouncement(band, lamps);
 
-  // --- Soru, Durum, Ayarlar, sekmeler ----------------------------------------------------
+  // --- Soru, Ayarlar, Devre paneli, katmanlar ------------------------------------------------
   const [soruOpen, setSoruOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
-  const [tableHidden, setTableHidden] = useState(() => readFlag(TABLE_KEY));
   const [keysOff, setKeysOff] = useState(() => readFlag(KEYS_KEY));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const [tab, setTab] = useState<'durum' | 'devre'>('durum');
-  const settingsButton = useRef<HTMLButtonElement>(null);
-  const [settingsAnchor, setSettingsAnchor] = useState<HTMLButtonElement | null>(null);
-  const kumandaRef = useRef<HTMLDivElement>(null);
+  /** Devre paneli (B2; telefonda tam ekran). Varsayılan görünüm yalnızca sahne (B1). */
+  const [circuitOpen, setCircuitOpen] = useState(false);
+  /** Sahnenin isteğe bağlı katmanları ("Göster" çipleri): varsayılan kapalı. */
+  const [showIons, setShowIons] = useState(false);
+  const [showScale, setShowScale] = useState(false);
   const moreButton = useRef<HTMLButtonElement>(null);
   const closeSettings = useCallback(() => {
     setSettingsOpen(false);
-    (phone ? moreButton.current : settingsButton.current)?.focus();
-  }, [phone]);
-  const toggleTable = () => {
-    setTableHidden((h) => {
-      writeFlag(TABLE_KEY, !h);
-      return !h;
-    });
-  };
+    moreButton.current?.focus();
+  }, []);
   const toggleKeys = () => {
     setKeysOff((off) => {
       writeFlag(KEYS_KEY, !off);
@@ -345,13 +318,14 @@ export default function BarajSayfasi() {
         running={running}
         layout={sceneLayout}
         textPx={textPx}
-        lampLabels={!phone}
-        ions={preview === null ? sim.frame?.live.get(tank.id)?.ions : undefined}
+        scale={showScale}
+        handle={!phone}
+        ions={showIons && preview === null ? sim.frame?.live.get(tank.id)?.ions : undefined}
         onPreview={onPreview}
         onCommit={kumanda.commitLevel}
         className="h-full w-full"
       />
-      <UyariRozeti kind={alert} size={big ? 'big' : landscape ? 'landscape' : phone ? 'phone' : 'desk'} />
+      <DolulukKarti level={shown} alert={alert} size={phone ? 'phone' : big ? 'big' : 'desk'} />
     </>
   );
   const circuit = (minWidth?: number) => (
@@ -365,35 +339,9 @@ export default function BarajSayfasi() {
       {...(minWidth ? { minWidth } : {})}
     />
   );
-  const kumandaVariant: KumandaVariant = landscape ? 'landscape' : phone ? 'phone' : desktop ? 'desktop' : 'tablet';
-  const kumandaBar = (
-    <Kumanda
-      ref={kumandaRef}
-      variant={kumandaVariant}
-      big={big}
-      keys={!keysOff}
-      mode={s.mode}
-      level={shown}
-      direction={direction}
-      band={band}
-      onFlow={kumanda.setFlow}
-      onGoTo={kumanda.goTo}
-      onPreview={onPreview}
-      onCommit={kumanda.commitLevel}
-      onReset={kumanda.reset}
-      {...(phone
-        ? {}
-        : {
-            settings: {
-              open: settingsOpen,
-              onToggle: () => setSettingsOpen((o) => !o),
-              buttonRef: (el: HTMLButtonElement | null) => {
-                settingsButton.current = el;
-                setSettingsAnchor(el);
-              },
-            },
-          })}
-    />
+  const flow = <AkisDugmeleri mode={s.mode} onFlow={kumanda.setFlow} touch={phone || layout.kind === 'tablet'} />;
+  const levelBar = (className: string) => (
+    <SeviyeCubugu level={shown} onPreview={onPreview} onCommit={kumanda.commitLevel} onGoTo={kumanda.goTo} touch={phone || layout.kind === 'tablet'} className={className} />
   );
   const settingsCard = settingsOpen && (
     <AyarlarKarti
@@ -402,7 +350,7 @@ export default function BarajSayfasi() {
       onChange={changeTank}
       onClose={closeSettings}
       variant={phone ? 'sheet' : 'popover'}
-      anchor={phone ? moreButton.current : settingsAnchor}
+      anchor={moreButton.current}
       {...(desktop ? { shortcuts: { on: !keysOff, onToggle: toggleKeys } } : {})}
     />
   );
@@ -411,7 +359,7 @@ export default function BarajSayfasi() {
       href="#kumanda"
       onClick={(e) => {
         e.preventDefault();
-        kumandaRef.current?.focus();
+        document.querySelector<HTMLElement>('#kumanda [aria-checked=true]')?.focus();
       }}
       className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-on-ink focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:min-h-11"
     >
@@ -423,22 +371,19 @@ export default function BarajSayfasi() {
       {announcement}
     </div>
   );
-  const logoLink = (
-    <a href={BASE} aria-label={tr.baraj.back} title={tr.baraj.back} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-panel-2">
-      <Logo />
-    </a>
-  );
-  const soruButton = (
+  const soruButton = (iconOnly: boolean) => (
     <button
       type="button"
       aria-pressed={soruOpen}
+      aria-label={iconOnly ? tr.baraj.soru.button : undefined}
+      title={tr.baraj.soru.button}
       onClick={() => setSoruOpen((o) => !o)}
-      className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-md border px-3.5 ${big ? 'text-[16px]' : phone ? 'text-[15px]' : 'text-body'} ${
-        soruOpen ? 'border-accent bg-accent-soft font-semibold text-accent-ink' : 'border-line-2 bg-panel font-medium hover:bg-panel-2'
+      className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[10px] border ${iconOnly ? 'w-11' : 'px-3'} ${big ? 'text-[16px]' : 'text-body'} ${
+        soruOpen ? 'border-accent bg-accent-soft font-semibold text-accent-ink' : 'border-line bg-panel font-medium hover:bg-panel-2'
       }`}
     >
       <Icon name="help" className="h-[18px] w-[18px]" />
-      {tr.baraj.soru.button}
+      {!iconOnly && tr.baraj.soru.button}
     </button>
   );
   const soru = (sheet: boolean) =>
@@ -453,8 +398,25 @@ export default function BarajSayfasi() {
         big={big}
       />
     );
+  const moreButtonEl = (label: string) => (
+    <button
+      ref={moreButton}
+      type="button"
+      aria-label={label}
+      title={tr.baraj.more}
+      aria-haspopup="menu"
+      aria-expanded={moreOpen}
+      onClick={() => setMoreOpen((o) => !o)}
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] hover:bg-panel-2"
+    >
+      <Icon name="more" />
+    </button>
+  );
+  const fullscreenItem = fullscreen.supported
+    ? [{ kind: 'button' as const, label: fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen, onClick: fullscreen.toggle }]
+    : [];
 
-  // --- Telefon -----------------------------------------------------------------------------
+  // --- Telefon (B3) -------------------------------------------------------------------------
   if (phone) {
     const moreMenu = moreOpen && (
       <MoreMenu
@@ -463,208 +425,192 @@ export default function BarajSayfasi() {
         items={[
           { kind: 'link', label: tr.baraj.openShort, href: baseHref, onActivate: refreshHref },
           { kind: 'button', label: tr.baraj.ayarlar.title, onClick: () => setSettingsOpen(true) },
+          { kind: 'button', label: tr.baraj.kumanda.reset, onClick: kumanda.reset },
+          { kind: 'button', label: tr.baraj.showIonsMenu(showIons), onClick: () => setShowIons((on) => !on) },
+          { kind: 'button', label: tr.baraj.showScaleMenu(showScale), onClick: () => setShowScale((on) => !on) },
           // Tema: dokundukça Sistem → Açık → Koyu.
           {
             kind: 'button',
             label: tr.theme.button(appSettings.theme, theme),
             onClick: () => setTheme(appSettings.theme === 'system' ? 'light' : appSettings.theme === 'light' ? 'dark' : 'system'),
           },
-          ...(fullscreen.supported
-            ? [{ kind: 'button' as const, label: fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen, onClick: fullscreen.toggle }]
-            : []),
+          ...fullscreenItem,
         ]}
       />
     );
     const header = (
       <header
-        className={`relative flex h-[52px] shrink-0 items-center gap-1.5 bg-panel ${landscape ? 'gap-2 border-b border-line' : ''}`}
-        style={landscape ? { paddingLeft: 'max(4px, env(safe-area-inset-left))', paddingRight: 'max(6px, env(safe-area-inset-right))' } : { paddingLeft: 4, paddingRight: 6 }}
+        className="relative flex h-14 shrink-0 items-center gap-1 bg-panel"
+        style={{ paddingLeft: 'max(4px, env(safe-area-inset-left))', paddingRight: 'max(6px, env(safe-area-inset-right))' }}
       >
-        {logoLink}
-        <h1 className={`m-0 min-w-0 truncate font-semibold ${landscape ? 'text-[16px]' : 'flex-1 text-[17px]'}`}>{tr.baraj.shortTitle}</h1>
+        <a href={BASE} aria-label={tr.baraj.back} title={tr.baraj.back} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink hover:bg-panel-2">
+          <Icon name="chevron" className="h-5 w-5 rotate-180" />
+        </a>
+        <h1 className="m-0 min-w-0 flex-1 truncate text-[17px] font-semibold">{tr.baraj.shortTitle}</h1>
         {landscape && (
           <>
-            <span className="flex-1" />
-            <VariantSeg value={variant} onChange={switchVariant} className="h-[50px] w-[270px]" />
-            <span className="flex-1" />
+            <VariantSeg value={variant} onChange={switchVariant} className="h-[50px] w-[250px]" />
+            {flow}
+            {levelBar('w-[220px]')}
           </>
         )}
-        {soruButton}
-        <button
-          ref={moreButton}
-          type="button"
-          aria-label={tr.baraj.moreLabel(fullscreen.supported)}
-          title={tr.baraj.more}
-          aria-haspopup="menu"
-          aria-expanded={moreOpen}
-          onClick={() => setMoreOpen((o) => !o)}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-panel-2"
-        >
-          <Icon name="more" />
-        </button>
+        {soruButton(true)}
+        {moreButtonEl(tr.baraj.moreLabel(fullscreen.supported))}
         {moreMenu}
       </header>
     );
-    const tabs = (
-      <div role="tablist" aria-label={tr.baraj.tabsLabel} className="flex shrink-0 gap-0.5 border-b border-line px-2">
-        {(['durum', 'devre'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            id={`baraj-tab-${t}`}
-            aria-selected={tab === t}
-            aria-controls="baraj-panel"
-            onClick={() => setTab(t)}
-            className={`-mb-px h-11 border-b-2 px-4 text-[16px] font-semibold ${tab === t ? 'border-accent text-ink' : 'border-transparent text-muted'}`}
-          >
-            {tr.baraj.sekmeler[t]}
-          </button>
-        ))}
-      </div>
-    );
-    const panel = (
-      <div
-        role="tabpanel"
-        id="baraj-panel"
-        aria-labelledby={`baraj-tab-${tab}`}
-        className={`min-h-0 flex-1 ${tab === 'devre' ? '' : 'overflow-y-auto overscroll-contain'}`}
-        style={tab === 'devre' ? paperStyle : undefined}
-      >
-        {tab === 'durum' ? <DurumTablosu rows={rows} variant={landscape ? 'landscape' : 'phone'} /> : circuit(520)}
-      </div>
-    );
-    if (landscape) {
-      return (
-        <div className="app-root flex flex-col overflow-hidden bg-panel">
-          {skipLink}
-          {live}
-          {header}
-          <div className="flex min-h-0 flex-1 gap-2 bg-app" style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
-            <section aria-label={tr.baraj.sceneTitle} className="relative min-w-0 flex-[1.05] overflow-hidden bg-[#e9eef3]">
-              {scene}
-            </section>
-            <section aria-label={tr.baraj.sideTitle} className="relative flex min-w-0 flex-1 flex-col border-l border-line bg-panel">
-              {tabs}
-              {panel}
-              {soru(true)}
-              {settingsCard}
-            </section>
-          </div>
-          {kumandaBar}
-        </div>
-      );
-    }
     return (
       <div className="app-root flex flex-col overflow-hidden bg-panel" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         {skipLink}
         {live}
         {header}
-        <div className="shrink-0 border-b border-line bg-panel px-3 pt-1 pb-2">
-          <VariantSeg value={variant} onChange={switchVariant} className="h-[50px] w-full" big />
-        </div>
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          <section aria-label={tr.baraj.sceneTitle} className="relative shrink-0 overflow-hidden bg-[#e9eef3]" style={{ height: 'clamp(190px, 37dvh, 313px)' }}>
-            {scene}
-          </section>
-          <section aria-label={tr.baraj.sideTitle} className="relative flex min-h-0 flex-1 flex-col">
-            {tabs}
-            {panel}
-            {soru(true)}
-          </section>
+        {!landscape && (
+          <div className="flex shrink-0 flex-col gap-2 px-3 pb-2">
+            <VariantSeg value={variant} onChange={switchVariant} className="h-[50px] w-full" big />
+            <div className="flex items-center gap-3.5">
+              {flow}
+              {levelBar('min-w-0 flex-1')}
+            </div>
+          </div>
+        )}
+        <section aria-label={tr.baraj.sceneTitle} className="relative min-h-0 flex-1 overflow-hidden bg-[#e9eef3]" style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
+          {scene}
+          <button
+            type="button"
+            onClick={() => setCircuitOpen(true)}
+            aria-haspopup="dialog"
+            className="absolute left-3 z-10 h-11 rounded-full bg-panel/90 px-3.5 text-sm font-medium text-accent-ink shadow-sm"
+            style={{ bottom: 'calc(16px + env(safe-area-inset-bottom))' }}
+          >
+            {tr.baraj.seeCircuit}
+          </button>
+          {soru(true)}
           {settingsCard}
-        </div>
-        {kumandaBar}
+        </section>
+        {circuitOpen && (
+          <div role="dialog" aria-modal="true" aria-label={tr.baraj.devre.title} className="fixed inset-0 z-40 flex flex-col bg-panel" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+            <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line pr-2 pl-4">
+              <span className="text-[17px] font-semibold">{tr.baraj.devre.title}</span>
+              <span className="min-w-0 flex-1 truncate text-small text-muted">{tr.baraj.variants[variant]}</span>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setCircuitOpen(false)}
+                aria-label={tr.baraj.closeCircuit}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] hover:bg-panel-2"
+              >
+                <Icon name="close" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1" style={paperStyle}>
+              {circuit(520)}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // --- Masaüstü ve tablet ---------------------------------------------------------------------
+  // --- Masaüstü ve tablet (B1, B2) --------------------------------------------------------------
+  // Dar ekranda başlık görünmez (yalnızca ekran okuyucuya), Devre ve Soru yalnızca simge.
+  const roomy = width >= 1280;
+  const narrow = width < 1100;
+  const moreMenu = moreOpen && (
+    <MoreMenu
+      onClose={() => setMoreOpen(false)}
+      anchor={moreButton.current}
+      items={[
+        { kind: 'button', label: tr.baraj.ayarlar.title, onClick: () => setSettingsOpen(true) },
+        { kind: 'button', label: tr.baraj.kumanda.reset, onClick: kumanda.reset },
+        ...fullscreenItem,
+        { kind: 'link', label: tr.baraj.openShort, href: baseHref, onActivate: refreshHref },
+      ]}
+    />
+  );
   return (
     <div className="app-root flex flex-col overflow-hidden bg-app">
       {skipLink}
       {live}
-      <header className={`flex shrink-0 items-center gap-3 border-b border-line bg-panel pr-3 pl-2 ${big ? 'h-[52px]' : 'h-14'}`}>
-        {logoLink}
-        <h1 className={`m-0 font-semibold whitespace-nowrap ${big ? 'text-[19px]' : 'text-[18px]'}`}>{tr.baraj.title}</h1>
-        <span className="flex-1" />
-        <span id="baraj-devre-lbl" className={`font-semibold text-muted ${big ? 'text-[15px]' : 'text-small'}`}>
-          {tr.baraj.variant}
-        </span>
-        <VariantSeg
-          value={variant}
-          onChange={switchVariant}
-          className={`${layout.kind === 'tablet' ? 'h-[50px]' : 'h-10'} ${desktop ? 'w-[300px]' : 'w-[276px]'}`}
-          labelledBy="baraj-devre-lbl"
-          big={big}
-        />
-        <span className="flex-1" />
-        {soruButton}
-        <ThemeMenu choice={appSettings.theme} theme={theme} onChange={setTheme} touch />
-        {fullscreen.supported && (
+      <header className="relative grid h-14 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 border-b border-line bg-panel px-3">
+        <div className="flex min-w-0 items-center gap-1">
+          <a
+            href={BASE}
+            aria-label={narrow ? tr.baraj.back : undefined}
+            title={tr.baraj.back}
+            className={`flex h-10 shrink-0 items-center gap-1.5 rounded-lg text-sm text-ink no-underline hover:bg-panel-2 ${narrow ? 'w-11 justify-center' : 'px-2.5'}`}
+          >
+            <Icon name="chevron" className="h-[18px] w-[18px] rotate-180" />
+            {!narrow && tr.baraj.backShort}
+          </a>
+          <span className={`mx-1.5 h-6 w-px shrink-0 bg-line ${roomy ? '' : 'hidden'}`} aria-hidden="true" />
+          <h1 className={`m-0 min-w-0 truncate font-semibold ${big ? 'text-[19px]' : 'text-heading'} ${roomy ? '' : 'sr-only'}`}>{tr.baraj.title}</h1>
+        </div>
+        <div className="flex min-w-0 items-center justify-center gap-4">
+          <VariantSeg value={variant} onChange={switchVariant} className={`${layout.kind === 'tablet' ? 'h-11' : 'h-[42px]'} ${narrow ? 'w-[236px]' : 'w-[264px]'}`} big={big} />
+          <span className="h-6 w-px shrink-0 bg-line" aria-hidden="true" />
+          {flow}
+          {levelBar(roomy ? 'w-[280px]' : narrow ? 'w-[160px]' : 'w-[220px]')}
+        </div>
+        <div className="flex items-center justify-end gap-1.5">
           <button
             type="button"
-            onClick={fullscreen.toggle}
-            aria-label={fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
-            title={fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-line-2 bg-panel hover:bg-panel-2"
+            aria-pressed={circuitOpen}
+            aria-label={narrow ? tr.baraj.circuitButton : undefined}
+            title={tr.baraj.circuitButton}
+            onClick={() => setCircuitOpen((o) => !o)}
+            className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[10px] border ${narrow ? 'w-11' : 'px-3'} ${big ? 'text-[16px]' : 'text-body'} ${
+              circuitOpen ? 'border-accent bg-accent-soft font-semibold text-accent-ink' : 'border-line bg-panel font-medium hover:bg-panel-2'
+            }`}
           >
-            <Icon name={fullscreen.on ? 'fullscreenExit' : 'fullscreen'} />
+            <Icon name="measure" className="h-[18px] w-[18px]" />
+            {!narrow && tr.baraj.circuitButton}
           </button>
-        )}
-        <a
-          href={baseHref}
-          onPointerDown={refreshHref}
-          onFocus={refreshHref}
-          onClick={refreshHref}
-          className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-md border border-line-2 bg-panel px-3.5 font-medium text-ink no-underline hover:bg-panel-2 ${big ? 'text-[16px]' : 'text-body'}`}
-        >
-          {tr.baraj.openShort}
-          <Icon name="external" className="h-[18px] w-[18px]" />
-        </a>
+          {soruButton(narrow)}
+          <ThemeMenu choice={appSettings.theme} theme={theme} onChange={setTheme} touch />
+          {moreButtonEl(tr.baraj.moreDesk)}
+          {moreMenu}
+        </div>
       </header>
       {soru(false)}
-      <main className={`grid min-h-0 flex-1 ${big ? 'gap-2.5 p-2.5' : 'gap-3 p-3'}`} style={{ gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr)' }}>
-        <section aria-label={tr.baraj.sceneTitle} className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-[#e9eef3]">{scene}</div>
-          <div className="shrink-0 border-t border-line">
-            <div className={`flex h-10 items-center gap-2.5 pr-2.5 ${desktop ? 'pl-4' : 'pl-3.5'}`}>
-              <span className={`font-semibold ${big ? 'text-[17px]' : 'text-[15px]'}`}>{tr.baraj.durum.title}</span>
-              <span className={`text-muted ${big ? 'text-[16px]' : 'text-[12.5px]'}`}>{tr.baraj.durum.chain}</span>
+      <div className="relative flex min-h-0 flex-1">
+        <section aria-label={tr.baraj.sceneTitle} className="relative min-w-0 flex-1 overflow-hidden bg-[#e9eef3]">
+          {scene}
+          <GosterCipleri
+            ions={showIons}
+            scale={showScale}
+            onIons={() => setShowIons((on) => !on)}
+            onScale={() => setShowScale((on) => !on)}
+            touch={layout.kind === 'tablet'}
+          />
+        </section>
+        {circuitOpen && (
+          <aside aria-label={tr.baraj.devre.title} className="flex min-h-0 shrink-0 flex-col border-l border-line bg-panel" style={{ width: roomy ? 600 : '45%' }}>
+            <div className="flex h-12 shrink-0 items-center gap-3 border-b border-line pr-2 pl-4">
+              <span className={`font-semibold ${big ? 'text-[17px]' : 'text-[15px]'}`}>{tr.baraj.devre.title}</span>
+              <span className={`text-muted ${big ? 'text-[16px]' : 'text-small'}`}>{tr.baraj.variants[variant]}</span>
               <span className="flex-1" />
+              <BantLejanti />
               <button
                 type="button"
-                onClick={toggleTable}
-                aria-label={tableHidden ? tr.baraj.durum.showLabel : tr.baraj.durum.hideLabel}
-                aria-expanded={!tableHidden}
-                className={`inline-flex h-8 items-center rounded-md px-2.5 text-muted hover:bg-panel-2 ${big ? 'text-[16px]' : 'text-small'}`}
+                onClick={() => setCircuitOpen(false)}
+                aria-label={tr.baraj.closeCircuit}
+                title={tr.baraj.closeCircuit}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-panel-2"
               >
-                {tableHidden ? tr.baraj.durum.show : tr.baraj.durum.hide}
+                <Icon name="close" />
               </button>
             </div>
-            {!tableHidden && <DurumTablosu rows={rows} variant={desktop ? 'desktop' : 'tablet'} big={big} />}
-          </div>
-        </section>
-        <section aria-label={tr.baraj.devre.title} className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
-          <div className="flex h-11 shrink-0 items-center gap-3.5 border-b border-line px-4">
-            <span className={`font-semibold ${big ? 'text-[17px]' : 'text-[15px]'}`}>{tr.baraj.devre.title}</span>
-            <span className={`text-muted ${big ? 'text-[16px]' : 'text-small'}`}>{tr.baraj.variants[variant]}</span>
-            <span className="flex-1" />
-            <BantLejanti />
-          </div>
-          <div
-            tabIndex={0}
-            role="group"
-            aria-label={tr.baraj.circuitLabel(tr.baraj.variants[variant] ?? '')}
-            className="min-h-0 flex-1 p-2 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
-            style={paperStyle}
-          >
-            {circuit()}
-          </div>
-        </section>
-      </main>
-      <div className="relative shrink-0">
-        {kumandaBar}
+            <div
+              tabIndex={0}
+              role="group"
+              aria-label={tr.baraj.circuitLabel(tr.baraj.variants[variant] ?? '')}
+              className="min-h-0 flex-1 p-2 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
+              style={paperStyle}
+            >
+              {circuit()}
+            </div>
+          </aside>
+        )}
         {settingsCard}
       </div>
     </div>
@@ -675,7 +621,7 @@ type MenuItem =
   | { readonly kind: 'link'; readonly label: string; readonly href: string; readonly onActivate: (e: { currentTarget: HTMLAnchorElement }) => void }
   | { readonly kind: 'button'; readonly label: string; readonly onClick: () => void };
 
-/** Telefonda ⋯ menüsü: Simülatörde aç, Ayarlar, Tam ekran (destekleniyorsa). */
+/** ⋯ menüsü: masaüstünde Ayarlar, Başa al, Tam ekran, Simülatörde aç; telefonda ayrıca katmanlar ve tema. */
 function MoreMenu({ items, onClose, anchor }: { items: readonly MenuItem[]; onClose: () => void; anchor: HTMLElement | null }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {

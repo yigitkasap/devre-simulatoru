@@ -1317,6 +1317,33 @@ yok, ekrandaki her şey ya bir ölçüm ya bir düğme.
   sürükleme; yatay telefon; masaüstünde düzen ve bantlar, Ayarlar ve Esc, klavye, Soru şeridi, Durum
   Gizle, projeksiyon yazı boyu, Simülatörde aç).
 
+### Baraj sayfası v3 (2026-10-28, sürüyor)
+
+Tasarım `docs/tasarim-v3/` → "Baraj sayfası (B1–B6)". Simülasyon, sahne çizimi ve örnek devreler aynı;
+değişen sayfanın düzeni. Dört aşama: 1 düzen, 2 devre paneli (kat sekmeleri, tek kat çizimi, Tüm
+devre), 3 three.js sahnesi (SVG yedek kalır), 4 "İçini göster". Yukarıdaki ders düzeninin yerini alan
+kısımlar:
+
+1. **Düzen** (`BarajSayfasi.tsx`, `UstKumanda.tsx`): tek satır üst çubuk: solda "← Simülatör" ve
+   başlık; ortada Çubuk gösterge | Tek ışık, su akışı yalnızca simge (▼ ■ ▲; adları `aria-label` ve
+   `title`, ↓ / Boşluk / ↑ ipucuyla) ve ince seviye çubuğu (6 px iz, mavi dolu kısım, 22 px tutamak;
+   izin üstünde Seviye 1–3 noktaları %37,5 / %62,5 / %87,5, tıklanınca su o seviyeye gider); sağda
+   Devre, Soru, tema ve ⋯ (Ayarlar, Başa al, Tam ekran, Simülatörde aç). Dar ekranda başlık yalnızca
+   ekran okuyucuya, Devre ve Soru yalnızca simge. Varsayılan görünüm yalnızca sahne (B1); Devre sağda
+   600 px'lik paneli açar (B2; bu aşamada tam şema ve kat bantları). Alt kumanda satırı, Durum tablosu
+   (`Kumanda.tsx`, `DurumTablosu.tsx` silindi) ve yüzdeli seviye etiketi kalktı. Sahnenin sol üstünde
+   tek büyük değer: doluluk (eş genişlikli yazı); çerçeve ve işaret durumun rengini taşır, işaretin
+   biçimi de durumu söyler (renk tek başına anlam taşımasın diye eski uyarı simgeleri; çizimde düz
+   nokta), durum metni `aria-label`'da. Sol altta "Göster: İyonlar · Yüzde ölçeği" çipleri (ikisi de
+   varsayılan kapalı; iyon açıklaması yalnızca iyonlar açıkken). Sahnede "Seviye N" yazıları yok
+   (prob ve lamba aynı numara ve renk), ıslak prob ucu yeşil halkalı, su yüzeyindeki tutamakta yalnızca
+   ok. Telefon (B3): üst çubuk (geri, başlık, Soru, ⋯: Simülatörde aç, Ayarlar, Başa al, İyonlar, Yüzde
+   ölçeği, tema, Tam ekran), altında Çubuk gösterge | Tek ışık ve tek satır kumanda; sahne ekranın
+   altına kadar, sol altta "Devreyi gör ›" (devre tam ekran); su yüzeyi tutamağı yok. Yatay telefonda
+   devre seçimi ve kumanda üst çubukta. Ayarlar kartı ⋯ menüsünün altında açılır. Kumanda mantığı
+   (`useBarajKumanda`) ve klavye kısayolları aynı. ios-kontrol'ün baraj maddeleri yeni düzene göre
+   yazıldı (174 madde).
+
 ### Föy parça modelleri (föy için 2. aşama)
 
 Diyot, NPN, N kanallı JFET ve N kanallı MOSFET'te İnceleme panelinde bir **Model** seçimi var.

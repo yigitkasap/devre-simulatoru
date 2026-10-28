@@ -180,11 +180,9 @@ export function AyarlarKarti({ waterResistance, fillTime, onChange, onClose, sho
       ref={ref}
       role="dialog"
       aria-label={tr.baraj.ayarlar.title}
-      className="absolute right-3 z-30 flex w-[372px] flex-col gap-3.5 rounded-[14px] border border-line-2 bg-panel px-4 pt-2.5 pb-3.5 shadow-[0_14px_36px_rgba(29,39,51,.24)]"
-      style={{ bottom: 'calc(100% + 10px)' }}
+      className="absolute top-2 right-3 z-30 flex w-[372px] flex-col gap-3.5 rounded-[14px] border border-line-2 bg-panel px-4 pt-2.5 pb-3.5 shadow-[0_14px_36px_rgba(29,39,51,.24)]"
     >
       {body}
-      <span aria-hidden="true" className="absolute right-[52px] -bottom-2 h-3.5 w-3.5 rotate-45 border-r border-b border-line-2 bg-panel" />
     </div>
   );
 }
