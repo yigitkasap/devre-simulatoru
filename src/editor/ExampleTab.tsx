@@ -1,5 +1,5 @@
-// İnceleme paneli → Örnek sekmesi (tasarım: M05a, M05b). Devrenin kurulumu, ne işe yaradığı (dayandığı
-// fizik yasasıyla) ve günlük hayatta nerede kullanıldığı; altta önceki/sonraki örnek.
+// Defterin örnek kartının içeriği (tasarım: M05a, M05b; v3): devrenin kurulumu, ne işe yaradığı
+// (dayandığı fizik yasasıyla) ve günlük hayatta nerede kullanıldığı; altta önceki/sonraki örnek.
 
 import type { ReactNode } from 'react';
 import { EXAMPLE_GROUPS, EXAMPLE_IDS, type ExampleId } from '../examples';
@@ -7,13 +7,6 @@ import { tr } from '../i18n/tr';
 import { Icon } from './icons';
 import { Rich } from './Rich';
 import { useTouchUi } from './touchUi';
-
-export interface ExampleTabProps {
-  readonly id: ExampleId | null;
-  readonly onOpen: (id: ExampleId) => void;
-  readonly onClose: () => void;
-  readonly onBrowse: () => void;
-}
 
 export function groupOf(id: ExampleId): string {
   const group = EXAMPLE_GROUPS.find((g) => (g.ids as readonly ExampleId[]).includes(id));
@@ -30,40 +23,6 @@ function Section({ title, icon, children }: { title: string; icon: ReactNode; ch
       </h3>
       <p className="text-sm leading-[1.55]">{children}</p>
     </section>
-  );
-}
-
-export function ExampleTab({ id, onOpen, onClose, onBrowse }: ExampleTabProps) {
-  // Telefonda dokunma hedefleri 44 px.
-  const touch = useTouchUi();
-  const h9 = touch ? 'h-11' : 'h-9';
-  if (!id) {
-    return (
-      <div className="flex flex-col items-start gap-3 px-5 pt-5">
-        <b className="text-heading font-semibold">{tr.examples.noneTitle}</b>
-        <p className="text-small text-muted">{tr.examples.noneText}</p>
-        <button
-          type="button"
-          onClick={onBrowse}
-          className={`flex ${h9} items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 text-sm font-medium hover:bg-panel-2`}
-        >
-          <Icon name="book" />
-          {tr.examples.browse}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain pb-5 ${touch ? 'px-4 pt-2' : 'px-5 pt-4'}`}>
-      <div className="flex flex-col gap-1.5">
-        <span className="self-start rounded-xs bg-accent-soft px-2 py-0.5 text-label font-semibold text-accent-ink">
-          {tr.examples.tabBadge(groupOf(id))}
-        </span>
-        <h2 className="text-title leading-tight font-semibold">{tr.examples.texts[id].title}</h2>
-      </div>
-      <ExampleDetails id={id} onOpen={onOpen} onClose={onClose} />
-    </div>
   );
 }
 

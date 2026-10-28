@@ -126,6 +126,24 @@ export function DeviceControls({ part, devices }: { part: Part; devices: DeviceH
   }
 }
 
+/** Dokunmatik osiloskop satırının sağındaki düğme: dokundukça bir sonraki seçeneğe geçer (DP3: DC, "A ve B"). */
+function CycleButton<T extends string>({ label, options, value, onChange }: { label: string; options: ReadonlyArray<{ value: T; text: string }>; value: T; onChange: (value: T) => void }) {
+  const index = Math.max(0, options.findIndex((o) => o.value === value));
+  const current = options[index]!;
+  const next = options[(index + 1) % options.length]!;
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(next.value)}
+      aria-label={`${label}: ${current.text}`}
+      title={`${label}: ${current.text} → ${next.text}`}
+      className="h-[46px] w-[72px] shrink-0 rounded-[10px] border border-line-2 bg-panel px-1 text-small font-semibold whitespace-nowrap active:bg-app"
+    >
+      {current.text}
+    </button>
+  );
+}
+
 function ScopeControls({
   part,
   view,
@@ -147,59 +165,84 @@ function ScopeControls({
   const [advanced, setAdvanced] = useState(false);
   const advancedId = useId();
   const head = 'flex items-center gap-1.5 text-label font-semibold';
+  const couplings = (['ac', 'gnd', 'dc'] as const).filter((c) => SCOPE_COUPLINGS.includes(c)).map((c) => ({ value: c, text: tr.scope.couplings[c] ?? c }));
+  const modes = SCOPE_MODES.map((m) => ({ value: m, text: tr.rack.modes[m] ?? m }));
+  const channelStepper = (name: string, index: 0 | 1) => {
+    const volts = s.voltsPerDiv[index];
+    return (
+      <Stepper
+        touch={touch}
+        label={`${name} ${tr.scope.voltsPerDiv.toLocaleLowerCase('tr-TR')}`}
+        text={voltsLabel(volts)}
+        canDown={volts > VOLTS_PER_DIV_STEPS[0]!}
+        canUp={volts < VOLTS_PER_DIV_STEPS[VOLTS_PER_DIV_STEPS.length - 1]!}
+        onStep={(d) => onChange({ [`voltsPerDiv${name}`]: stepIn(VOLTS_PER_DIV_STEPS, volts, d) })}
+      />
+    );
+  };
+  const timeStepper = (
+    <Stepper
+      touch={touch}
+      label={tr.scope.timePerDiv}
+      text={timeLabel(s.timePerDiv)}
+      disabled={xy}
+      canDown={s.timePerDiv > TIME_PER_DIV_STEPS[0]!}
+      canUp={s.timePerDiv < TIME_PER_DIV_STEPS[TIME_PER_DIV_STEPS.length - 1]!}
+      onStep={(d) => onChange({ timePerDiv: stepIn(TIME_PER_DIV_STEPS, s.timePerDiv, d) })}
+    />
+  );
   return (
     <div className="flex flex-col gap-2.5">
       <Screen part={part} view={view} settings={s} height={168} width="100%" onChange={onChange} />
       <StatsLines view={view} settings={s} connected={connected} />
-      <div className="grid grid-cols-3 gap-2.5">
-        {CHANNELS.map((name, index) => {
-          const volts = s.voltsPerDiv[index as 0 | 1];
-          return (
+      {touch ? (
+        // Dokunmatikte (telefon, tablet; DP3) her ayar bir satır: ad, adımlayıcı ve sırayla değişen düğme.
+        <div className="flex flex-col gap-2">
+          {CHANNELS.map((name, index) => (
+            <div key={name} className="flex items-center gap-2">
+              <span className={`${head} w-[74px] shrink-0`}>
+                <ChannelBadge name={name} color={SCOPE_COLORS[index]!} />
+                {xy ? (index === 0 ? 'X' : 'Y') : tr.scope.channel(name)}
+              </span>
+              <div className="min-w-0 flex-1">{channelStepper(name, index as 0 | 1)}</div>
+              <CycleButton
+                label={`${name} ${tr.scope.coupling.toLocaleLowerCase('tr-TR')}`}
+                options={couplings}
+                value={s.coupling[index as 0 | 1]}
+                onChange={(c) => onChange({ [`coupling${name}`]: c })}
+              />
+            </div>
+          ))}
+          <div className="flex items-center gap-2">
+            <span className={`${head} w-[74px] shrink-0`}>{tr.sim.time}</span>
+            <div className="min-w-0 flex-1">{timeStepper}</div>
+            <CycleButton label={tr.scope.mode} options={modes} value={s.mode} onChange={(mode) => onChange({ mode })} />
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2.5">
+          {CHANNELS.map((name, index) => (
             <div key={name} className="flex min-w-0 flex-col gap-1.5">
               <span className={head}>
                 <ChannelBadge name={name} color={SCOPE_COLORS[index]!} />
                 {xy ? (index === 0 ? tr.rack.xyAxisA : tr.rack.xyAxisB) : tr.scope.channel(name)}
               </span>
-              <Stepper
-                touch={touch}
-                label={`${name} ${tr.scope.voltsPerDiv.toLocaleLowerCase('tr-TR')}`}
-                text={voltsLabel(volts)}
-                canDown={volts > VOLTS_PER_DIV_STEPS[0]!}
-                canUp={volts < VOLTS_PER_DIV_STEPS[VOLTS_PER_DIV_STEPS.length - 1]!}
-                onStep={(d) => onChange({ [`voltsPerDiv${name}`]: stepIn(VOLTS_PER_DIV_STEPS, volts, d) })}
-              />
+              {channelStepper(name, index as 0 | 1)}
               <Segmented<ScopeCoupling>
-                touch={touch}
                 label={`${name} ${tr.scope.coupling.toLocaleLowerCase('tr-TR')}`}
-                options={(['ac', 'gnd', 'dc'] as const)
-                  .filter((c) => SCOPE_COUPLINGS.includes(c))
-                  .map((c) => ({ value: c, text: tr.scope.couplings[c] ?? c }))}
+                options={couplings}
                 value={s.coupling[index as 0 | 1]}
                 onChange={(c) => onChange({ [`coupling${name}`]: c })}
               />
             </div>
-          );
-        })}
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <span className={head}>{tr.scope.timePerDiv}</span>
-          <Stepper
-            touch={touch}
-            label={tr.scope.timePerDiv}
-            text={timeLabel(s.timePerDiv)}
-            disabled={xy}
-            canDown={s.timePerDiv > TIME_PER_DIV_STEPS[0]!}
-            canUp={s.timePerDiv < TIME_PER_DIV_STEPS[TIME_PER_DIV_STEPS.length - 1]!}
-            onStep={(d) => onChange({ timePerDiv: stepIn(TIME_PER_DIV_STEPS, s.timePerDiv, d) })}
-          />
-          <Segmented<ScopeMode>
-            touch={touch}
-            label={tr.scope.mode}
-            options={SCOPE_MODES.map((m) => ({ value: m, text: tr.rack.modes[m] ?? m }))}
-            value={s.mode}
-            onChange={(mode) => onChange({ mode })}
-          />
+          ))}
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className={head}>{tr.scope.timePerDiv}</span>
+            {timeStepper}
+            <Segmented<ScopeMode> label={tr.scope.mode} options={modes} value={s.mode} onChange={(mode) => onChange({ mode })} />
+          </div>
         </div>
-      </div>
+      )}
       <button
         type="button"
         onClick={() => setAdvanced((a) => !a)}
@@ -208,7 +251,7 @@ function ScopeControls({
         className={`flex items-center gap-1.5 self-start text-small font-medium text-accent-ink ${touch ? 'h-11' : 'h-8'}`}
       >
         <Icon name={advanced ? 'chevronDown' : 'chevron'} className="h-4 w-4" />
-        {tr.notebook.scopeAdvanced}
+        {touch ? tr.notebook.scopeAdvancedShort : tr.notebook.scopeAdvanced}
       </button>
       {advanced && (
         <div id={advancedId} className="flex flex-col gap-3 rounded-md bg-panel-2 p-3">

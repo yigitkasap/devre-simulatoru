@@ -173,7 +173,7 @@ export function ArduinoCardBody({
           ))}
         </select>
       </div>
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className={`grid gap-1.5 ${touch ? 'grid-cols-2' : 'grid-cols-3'}`}>
         {tiles.map(tile)}
         {others.length > 0 && (
           <button

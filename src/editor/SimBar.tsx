@@ -1,33 +1,11 @@
-// Simülasyon çubuğu (tasarım: C-SimCubugu): Oynat / Duraklat / Durdur, durum, simülasyon zamanı, hız
-// ve akım yönü seçeneği; sağda bilgi ya da hata satırı. Yalnızca masaüstünde (telefonda alt çubuk).
+// Simülasyon hızı ve durumu (v3'te üst çubukta; telefonda durum satırının sayfasında): hazır hızlar,
+// ince ayar, "Osiloskoba göre" ve hızın yazımı (×1, ×0,5, ×2·10⁻⁵); durum işareti.
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
-import { tr, type DiagnosticContext } from '../i18n/tr';
+import { useId, type KeyboardEvent as ReactKeyboardEvent, type RefObject } from 'react';
+import { tr } from '../i18n/tr';
 import { formatNumber, formatSI } from '../sim/units';
 import { HintText } from './HintStrip';
-import { Icon, type IconName } from './icons';
-import { Rich, plainText } from './Rich';
-import type { SimNotice, SimStatus } from './useSimulation';
-
-export interface SimBarProps {
-  readonly status: SimStatus;
-  readonly time: number;
-  readonly speed: number;
-  readonly notice: SimNotice;
-  /** Simülasyon istenen hıza yetişemiyor. */
-  readonly lagging: boolean;
-  readonly electronFlow: boolean;
-  readonly diagnosticContext: DiagnosticContext;
-  /** "Osiloskoba göre" hızı (bir ekran taraması ≈ 0,2 s); devrede osiloskop yoksa null. */
-  readonly scopeSpeed: number | null;
-  readonly onPlay: () => void;
-  readonly onPause: () => void;
-  readonly onStop: () => void;
-  readonly onSpeed: (speed: number) => void;
-  readonly onElectronFlow: (on: boolean) => void;
-  /** "Simülasyon başlamadı" yanında tek tıkla düzeltme (toprak yok → toprak ekle). */
-  readonly fix?: { readonly label: string; readonly run: () => void } | null;
-}
+import type { SimStatus } from './useSimulation';
 
 /**
  * Hız logaritmiktir: ×10⁻⁶ … ×1. Yüksek frekanslı sinyaller (fonksiyon üreteci 2 MHz'e kadar)
@@ -59,124 +37,6 @@ export function speedNote(speed: number): string {
 
 const near = (a: number, b: number) => Math.abs(Math.log10(a / b)) < 0.013;
 
-export function SimBar(props: SimBarProps) {
-  const { status, notice } = props;
-  const [speedOpen, setSpeedOpen] = useState(false);
-  const active = status !== 'stopped';
-  const running = status === 'running';
-
-  let message: { text: string; tone: 'error' | 'info'; action?: { label: string; run: () => void } } | null = null;
-  if (notice?.kind === 'error') {
-    const { detail } = tr.diagnostics.describe(notice.diagnostic, props.diagnosticContext);
-    message = { text: `${tr.sim.cannotRun} ${detail}`, tone: 'error', ...(props.fix ? { action: props.fix } : {}) };
-  } else if (notice?.kind === 'stopped-by-edit') {
-    message = { text: tr.sim.stoppedByEdit, tone: 'info' };
-  } else if (active && props.lagging) {
-    message = { text: tr.sim.lagging, tone: 'error', action: { label: tr.toast.adjustSpeed, run: () => setSpeedOpen(true) } };
-  } else if (active) {
-    message = { text: props.electronFlow ? tr.sim.electronNote : tr.sim.conventionalNote, tone: 'info' };
-  }
-
-  return (
-    // Çubuğun genişliğine göre (container query): sütun daraldıkça önce hız açıklaması, sonra düğme ve
-    // durum yazıları simgeye iner (yazı ekran okuyucuya kalır); çok darda ileti ikinci satıra iner.
-    // Yükseklik sabittir (52 px; darda iki satır, 88 px): ileti gelip gidince tuval boy değiştirmez.
-    <div role="region" aria-label={tr.sim.region} className="@container shrink-0 border-t border-line bg-panel">
-      <div className="flex h-[52px] items-center gap-2.5 px-3 text-sm @max-[780px]:gap-2 @max-[640px]:h-[88px] @max-[640px]:flex-wrap @max-[640px]:content-center @max-[640px]:gap-y-1 @max-[640px]:px-2 @max-[640px]:py-1.5">
-        <div className="flex items-center gap-2.5 @max-[640px]:gap-1.5">
-          <button
-            type="button"
-            data-tour="play"
-            onClick={running ? undefined : props.onPlay}
-            aria-pressed={running}
-            className={`flex h-9 items-center gap-1.5 rounded-md border pr-3.5 pl-3 font-semibold text-white ${
-              running ? 'border-ok-ink bg-ok-ink' : 'border-ok bg-ok hover:brightness-110'
-            }`}
-          >
-            <Icon name="play" />
-            {tr.sim.play}
-          </button>
-          <SimButton icon="pause" label={tr.sim.pause} onClick={props.onPause} disabled={!running} />
-          <SimButton icon="stop" label={tr.sim.stop} title={tr.sim.stopTitle} onClick={props.onStop} disabled={!active} />
-        </div>
-        <span className="mx-1 h-6 w-px bg-line @max-[640px]:hidden" aria-hidden="true" />
-
-        <span role="status" className="flex min-w-[118px] items-center gap-2 font-semibold @max-[960px]:min-w-0">
-          <StatusMark status={status} />
-          <span className="@max-[780px]:sr-only">{tr.sim.status[status]}</span>
-        </span>
-        <span className="text-small whitespace-nowrap text-muted">
-          {tr.sim.time}:{' '}
-          <span className="inline-block min-w-[8ch] font-mono font-semibold text-ink tabular">{formatSI(active ? props.time : 0, 's', { digits: 4 })}</span>
-        </span>
-
-        <SpeedControl speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} open={speedOpen} setOpen={setSpeedOpen} />
-
-        <label className="flex cursor-pointer items-center gap-2 px-1 text-small whitespace-nowrap">
-          <input
-            type="checkbox"
-            checked={props.electronFlow}
-            onChange={(e) => props.onElectronFlow(e.target.checked)}
-            className="h-[18px] w-[18px] accent-accent"
-          />
-          {tr.sim.electronFlow}
-        </label>
-
-        {message && (
-          <p
-            className={`flex h-8 min-w-0 flex-1 items-center justify-end gap-2 text-small @max-[640px]:basis-full @max-[640px]:justify-start ${
-              message.tone === 'error' ? 'text-danger' : 'text-muted'
-            }`}
-            role={message.tone === 'error' ? 'alert' : undefined}
-            title={plainText(message.text)}
-          >
-            <Icon name="info" className="h-5 w-5 shrink-0" />
-            <span className="truncate whitespace-nowrap">
-              <Rich text={message.text} />
-            </span>
-            {message.action && (
-              <button
-                type="button"
-                onClick={message.action.run}
-                className="h-8 shrink-0 rounded-md border border-danger-line bg-panel px-2.5 font-medium text-ink hover:bg-panel-2"
-              >
-                {message.action.label}
-              </button>
-            )}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SimButton({
-  icon,
-  label,
-  title,
-  onClick,
-  disabled,
-}: {
-  icon: IconName;
-  label: string;
-  title?: string;
-  onClick: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title ?? label}
-      className="flex h-9 items-center gap-1.5 rounded-md border border-line-2 bg-panel px-3 font-medium text-ink enabled:hover:bg-panel-2 disabled:text-stopped @max-[880px]:w-10 @max-[880px]:justify-center @max-[880px]:px-0"
-    >
-      <Icon name={icon} />
-      <span className="@max-[880px]:sr-only">{label}</span>
-    </button>
-  );
-}
-
 /** Durum işareti: renk tek başına okunmasın diye biçimi de değişir (daire · iki çubuk · kare). */
 export function StatusMark({ status }: { status: SimStatus }) {
   if (status === 'running') return <i className="block h-2.5 w-2.5 rounded-full bg-ok" aria-hidden="true" />;
@@ -188,72 +48,6 @@ export function StatusMark({ status }: { status: SimStatus }) {
       </svg>
     );
   return <i className="block h-2.5 w-2.5 bg-stopped" aria-hidden="true" />;
-}
-
-/** Hız düğmesi ve hazır seçenekli pencere (tasarım: DS-Bilesen → Hız denetimi). */
-function SpeedControl({
-  speed,
-  scopeSpeed,
-  onSpeed,
-  open,
-  setOpen,
-}: {
-  speed: number;
-  scopeSpeed: number | null;
-  onSpeed: (speed: number) => void;
-  open: boolean;
-  setOpen: (open: boolean | ((open: boolean) => boolean)) => void;
-}) {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const groupRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPointer = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    window.addEventListener('pointerdown', onPointer);
-    window.addEventListener('keydown', onKey);
-    // Açılınca seçili seçeneğe (yoksa ilkine) odaklan.
-    const radios = groupRef.current?.querySelectorAll<HTMLElement>('[role=radio]');
-    (groupRef.current?.querySelector<HTMLElement>('[aria-checked=true]') ?? radios?.[0])?.focus();
-    return () => {
-      window.removeEventListener('pointerdown', onPointer);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        title={tr.sim.speedTitle}
-        className={`flex h-9 items-center gap-2 rounded-md border border-line-2 px-2.5 font-medium whitespace-nowrap ${
-          open ? 'bg-accent-soft' : 'bg-panel hover:bg-panel-2'
-        }`}
-      >
-        <Icon name="speed" />
-        {tr.sim.speed}
-        {/* Sabit genişlik: hız değiştikçe düğme ve yanındaki öğeler kaymasın. */}
-        <span className="inline-block w-[7ch] text-left font-mono text-small font-semibold">{speedLabel(speed)}</span>
-        <span className="inline-block w-[13ch] truncate text-left text-small font-normal text-muted @max-[960px]:hidden">{speedNote(speed)}</span>
-        <Icon name="chevronUp" className="h-4 w-4" />
-      </button>
-      {open && (
-        <div
-          role="dialog"
-          aria-label={tr.sim.speedDialog}
-          className="absolute bottom-full left-0 z-[60] mb-2 w-[300px] rounded-lg border border-line bg-panel p-1.5 shadow-md"
-        >
-          <SpeedOptions speed={speed} scopeSpeed={scopeSpeed} onSpeed={onSpeed} groupRef={groupRef} />
-        </div>
-      )}
-    </div>
-  );
 }
 
 /**

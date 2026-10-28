@@ -1812,4 +1812,30 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
    canlı değerleri (5V / 3V3 besleme, şemada bağlı D ve A pinleri: kip, gerilim, çıkışta akım), öbür
    pinler "Diğer pinler · N pin" altında; seri ekran (koyu zemin, eş genişlikli yazı, son satır
    parlak, en alta kayar, kodda `Serial.begin` varsa baud, Temizle); "Kod · salt okunur, önceden
-   derlendi" satırı renklendirilmiş kodu açar. Tablet ve telefon eski Arduino bölümünü kullanır.
+   derlendi" satırı renklendirilmiş kodu açar. Dokunmatikte pin kutuları iki sütun (DP4).
+7. **Telefon düzeni ve kablo bağlama** (`src/editor/PhoneShell.tsx`, DP1–DP4): 56 px üst çubuk
+   (logo; devrenin adı ve altında durum satırı "Kur · kaydedildi" / "Çalışıyor · 2,58 s"; Kur
+   kipinde Geri al; ⋯). Altında yaklaşık 270 px şema kutusu (kısa ekranda alanın % 42'si, en az
+   132 px); sağ altında "Kablo bağla" (Kur kipinde, devrede parça varken) ve tam ekran. Altında
+   dokunmatik defter (ekleme satırı yok); iki yüzen düğme: sol altta "Parça ekle" (alt sayfada
+   arama, kategoriler, zincirle ekle; çalışırken gizli), sağ altta 64 px Oynat / Duraklat.
+   Defterden bir kart açılınca şema 64 px'lik şeride küçülür ("Şema · 8 parça · 1 uyarı · Aç";
+   küçük şema çizimi devrenin kendisinden), kart kapanınca ya da şeride dokununca geri gelir;
+   şemada dokunulan parçanın kartı açılır ama şema yerinde kalır. Sorun kartları telefonda tek
+   satır ("Toprak tuzağı: … Oku"); yeni bir çalışma uyarısı açık gelir. Kablo bağla (ya da Kur
+   kipinde bir uca dokunmak) tam ekran bağlama görünümünü açar (DP2): "← Kablo bağla · Bitti",
+   adım numaralı mavi durum satırı ("R1’in 1. ucu seçildi. Şimdi bağlanacak uca dokun…"), etiketli
+   44 px uç hedefleri (başlangıç ucunun adı üstünde), altta Geri al ve Seçimi bırak; tuvalin Bağla
+   kipi olduğu gibi kullanılır. Osiloskop kartı dokunmatikte satır satır (DP3: ad, adımlayıcı,
+   dokundukça değişen kuplaj / kip düğmesi; "Gelişmiş ayarlar"); çalışırken açık kartın başlığında
+   döndür ve sil yok (yapı kilitli). Açık sorulara kullanıcı kararları: Durdur ve Hız durum
+   satırına dokununca açılan "Simülasyon" sayfasında; Dosya ve Örnekler ⋯ menüsünde (Örnekler,
+   Dosya, Paylaş, Sığdır). Yatay telefon dikeyle aynı düzeni kullanır (şema kutusu kısalır); tablet
+   masaüstünün defter düzenini dokunmatik boyutta kullanır (44 px üst çubuk ve tuval düğmeleri,
+   400 / 500 px defter, tuvalin sağ altında Kablo bağla; bağlarken Geri al, Seçimi bırak, Bitti).
+   Parça ekle sayfası şema kutusunun üstüne binmez (sayfa büyüdükçe kutu kısalır; WebKit'in
+   touch-action kuralı). Eski telefon ve tablet arayüzü kalktı: üst şerit, alt çubuk, Cihazlar /
+   Ölçümler / Mesajlar sayfaları, araç şeridi, İnceleme paneli (`PhoneTopStrip.tsx`, `PhoneBar.tsx`,
+   `TabletChrome.tsx`, `Inspector.tsx` silindi; `InspectTab`, `MessagesTab`, `ExampleTab`,
+   `PhoneSheets`, `PhoneDevices`, `SimBar`, `HintStrip` yalnızca defterin kullandığı parçalara
+   indi). ios-kontrol'ün telefon ve tablet bölümleri yeni düzene göre yazıldı (155 madde).

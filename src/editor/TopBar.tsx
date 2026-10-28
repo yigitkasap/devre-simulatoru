@@ -1,9 +1,7 @@
-// Üst çubuk (tasarım: C-UstCubuk): Dosya, Örnekler, araç seçici (Seç / Kablo), seçili parça eylemleri,
-// geri al / yinele, kayıt durumu, görünüm (yakınlık) ve Ayarlar. Tablette (T01, T02) sade ve dokunmatik
-// boyutlu hâli: devrenin adı ▾ (Dosya), Örnekler, Geri al / Yinele, kip rozeti, sığdır ve Ayarlar.
-// Telefonda üst şerit (PhoneTopStrip) ve alt çubuk (PhoneBar) kullanılır.
-// Tam ekran düğmesi tarayıcıyı tam ekrana alır ve yanları gizler (fullscreen.ts); tam ekranda çubuğun
-// iki ucunda sol ve sağ paneli açıp kapatan düğmeler çıkar.
+// Üst çubuk (tasarım v3: D1–D3): logo, devrenin adı ▾ (Dosya), Örnekler; sağda Geri al, Yardım,
+// Ayarlar, tam ekran; durum, Hız ve ana düğme. Tablette aynı çubuk dokunmatik boyutta. Telefonda
+// PhoneShell'deki üst çubuk kullanılır. Tam ekran düğmesi tarayıcıyı tam ekrana alır ve defteri
+// gizler (fullscreen.ts); tam ekranda çubuğun sağ ucunda defteri açıp kapatan düğme çıkar.
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { tr } from '../i18n/tr';
@@ -11,80 +9,10 @@ import { formatSI } from '../sim/units';
 import type { SaveState } from './autosave';
 import { voltageGradient } from './colors';
 import type { FocusPanels } from './fullscreen';
-import { Kbd } from './HintStrip';
 import { Icon, type IconName } from './icons';
 import type { Settings } from './settings';
 import { SpeedOptions, speedLabel, StatusMark } from './SimBar';
 import type { SimStatus } from './useSimulation';
-
-/** Kare simge düğmesi (36 px; telefonda 40 px). */
-export function ToolButton({
-  icon,
-  label,
-  title,
-  onClick,
-  active = false,
-  disabled = false,
-}: {
-  icon: IconName;
-  label: string;
-  title: string;
-  onClick: () => void;
-  active?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      aria-label={label}
-      aria-pressed={active || undefined}
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md transition-colors disabled:text-stopped desk:h-9 desk:w-9 ${
-        active ? 'bg-accent-soft text-accent-ink' : 'text-ink enabled:hover:bg-app'
-      }`}
-    >
-      <Icon name={icon} />
-    </button>
-  );
-}
-
-function Separator() {
-  return <span className="mx-1.5 h-6 w-px shrink-0 bg-line max-desk:mx-0.5" aria-hidden="true" />;
-}
-
-export interface TopBarProps {
-  readonly toolKind: 'select' | 'wire' | 'place';
-  readonly canUndo: boolean;
-  readonly canRedo: boolean;
-  readonly hasSelection: boolean;
-  /** Seçimde ters çevrilebilen (yönlü) bir parça var mı? */
-  readonly canFlip: boolean;
-  /** Tuvalin yakınlığı (1 = %100). */
-  readonly zoom: number;
-  readonly saveState: SaveState;
-  readonly settings: Settings;
-  readonly onSettings: (patch: Partial<Settings>) => void;
-  readonly onSelectTool: () => void;
-  readonly onWireTool: () => void;
-  readonly onRotate: () => void;
-  readonly onFlip: () => void;
-  readonly onDelete: () => void;
-  readonly onUndo: () => void;
-  readonly onRedo: () => void;
-  readonly onZoomIn: () => void;
-  readonly onZoomOut: () => void;
-  readonly onFit: () => void;
-  readonly fullscreen: FullscreenControls;
-  readonly onNew: () => void;
-  readonly onExport: () => void;
-  readonly onImport: () => void;
-  readonly onShare: () => void;
-  readonly onExamples: () => void;
-  readonly onHelp: () => void;
-  readonly onWelcome: () => void;
-}
 
 /** Tam ekran düğmesi ve tam ekranda yan panellerin düğmeleri. */
 export interface FullscreenControls {
@@ -125,254 +53,6 @@ export function Logo() {
         strokeLinecap="round"
       />
     </svg>
-  );
-}
-
-export function TopBar(props: TopBarProps) {
-  const tools = (
-    <>
-      <div role="group" aria-label={tr.toolbar.tools} className="flex shrink-0 gap-0.5 rounded-[10px] bg-app p-0.5">
-        <ToolSegment
-          icon="pointer"
-          label={tr.toolbar.select}
-          title={tr.toolbar.selectTitle}
-          active={props.toolKind === 'select'}
-          onClick={props.onSelectTool}
-        />
-        <ToolSegment
-          icon="wire"
-          label={tr.toolbar.wire}
-          title={tr.toolbar.wireTitle}
-          active={props.toolKind === 'wire'}
-          onClick={props.onWireTool}
-          shortcut="W"
-        />
-      </div>
-      <Separator />
-      <ToolButton
-        icon="rotate"
-        label={tr.toolbar.rotate}
-        title={tr.toolbar.rotateTitle}
-        onClick={props.onRotate}
-        disabled={!props.hasSelection && props.toolKind !== 'place'}
-      />
-      <ToolButton icon="flip" label={tr.toolbar.flip} title={tr.toolbar.flipTitle} onClick={props.onFlip} disabled={!props.canFlip} />
-      <ToolButton icon="trash" label={tr.toolbar.remove} title={tr.toolbar.removeTitle} onClick={props.onDelete} disabled={!props.hasSelection} />
-      <Separator />
-      <ToolButton icon="undo" label={tr.toolbar.undo} title={tr.toolbar.undoTitle} onClick={props.onUndo} disabled={!props.canUndo} />
-      <ToolButton icon="redo" label={tr.toolbar.redo} title={tr.toolbar.redoTitle} onClick={props.onRedo} disabled={!props.canRedo} />
-    </>
-  );
-
-  return (
-    <header className="flex h-[52px] shrink-0 items-center gap-1.5 border-b border-line bg-panel pr-2.5 pl-3">
-      {props.fullscreen.on && (
-        <PanelToggle side="left" label={tr.toolbar.libraryPanel} open={props.fullscreen.panels.left} onPanel={props.fullscreen.onPanel} />
-      )}
-      <div className="flex shrink-0 items-center gap-2.5 pr-1.5 max-desk:gap-2 max-desk:pr-0.5">
-        <Logo />
-        <h1 className="text-[15px] font-semibold whitespace-nowrap max-wide:sr-only">{tr.site.name}</h1>
-      </div>
-
-      <FileMenu onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
-      <button
-        type="button"
-        onClick={props.onExamples}
-        title={tr.examples.dialogTitle}
-        aria-label={tr.examples.button}
-        className="flex h-10 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-ink hover:bg-app max-desk:w-10 max-desk:justify-center max-desk:px-0 desk:h-9"
-      >
-        <Icon name="book" />
-        <span className="max-desk:sr-only">{tr.examples.button}</span>
-      </button>
-      <Separator />
-
-      {tools}
-      <div className="flex-1" />
-      <SaveStatus state={props.saveState} />
-      <div role="group" aria-label={tr.toolbar.view} className="flex h-9 shrink-0 items-center rounded-[9px] border border-line">
-        <ViewButton icon="minus" label={tr.toolbar.zoomOut} onClick={props.onZoomOut} />
-        <span
-          className="min-w-12 text-center font-mono text-small font-medium tabular"
-          aria-label={`${tr.toolbar.zoom} %${Math.round(props.zoom * 100)}`}
-        >
-          %{Math.round(props.zoom * 100)}
-        </span>
-        <ViewButton icon="plus" label={tr.toolbar.zoomIn} onClick={props.onZoomIn} />
-        <span className="h-5 w-px bg-line" aria-hidden="true" />
-        <ViewButton icon="fit" label={tr.toolbar.fit} title={tr.toolbar.fitTitle} onClick={props.onFit} />
-        <ViewButton
-          icon={props.fullscreen.on ? 'fullscreenExit' : 'fullscreen'}
-          label={props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
-          title={props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreenTitle}
-          onClick={props.fullscreen.onToggle}
-        />
-      </div>
-
-      <ToolButton icon="help" label={tr.help.open} title={tr.help.openTitle} onClick={props.onHelp} />
-      <SettingsMenu settings={props.settings} onChange={props.onSettings} onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
-      {props.fullscreen.on && (
-        <PanelToggle side="right" label={tr.toolbar.inspectorPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} />
-      )}
-    </header>
-  );
-}
-
-/** Seç / Kablo araç seçicisindeki düğme (seçili olan beyaz zeminde). */
-function ToolSegment({
-  icon,
-  label,
-  title,
-  active,
-  onClick,
-  shortcut,
-}: {
-  icon: IconName;
-  label: string;
-  title: string;
-  active: boolean;
-  onClick: () => void;
-  shortcut?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-pressed={active}
-      className={`flex h-8 shrink-0 items-center gap-1.5 rounded-md text-sm font-medium transition-colors ${
-        shortcut ? 'pr-2 pl-2.5' : 'px-2.5'
-      } ${active ? 'bg-panel text-accent-ink shadow-sm' : 'text-ink hover:bg-panel/60'}`}
-    >
-      <Icon name={icon} />
-      {label}
-      {shortcut && (
-        <span className="max-wide:hidden">
-          <Kbd size="sm">{shortcut}</Kbd>
-        </span>
-      )}
-    </button>
-  );
-}
-
-function ViewButton({ icon, label, title = label, onClick }: { icon: IconName; label: string; title?: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={title}
-      className="flex h-[34px] w-[34px] items-center justify-center rounded-[8px] text-ink hover:bg-app"
-    >
-      <Icon name={icon} />
-    </button>
-  );
-}
-
-/** Tablet: 44 px kare simge düğmesi. */
-function TouchIconButton({
-  icon,
-  label,
-  onClick,
-  active = false,
-  disabled = false,
-}: {
-  icon: IconName;
-  label: string;
-  onClick: () => void;
-  active?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={label}
-      title={label}
-      aria-pressed={active || undefined}
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] disabled:text-stopped ${
-        active ? 'bg-accent-soft text-accent-ink' : 'text-ink enabled:active:bg-app'
-      }`}
-    >
-      <Icon name={icon} />
-    </button>
-  );
-}
-
-export interface TabletTopBarProps {
-  readonly title: string;
-  readonly mode: 'kur' | 'bagla' | 'olc' | 'pause';
-  readonly time: number;
-  readonly canUndo: boolean;
-  readonly canRedo: boolean;
-  readonly saveState: SaveState;
-  readonly settings: Settings;
-  readonly onSettings: (patch: Partial<Settings>) => void;
-  readonly onUndo: () => void;
-  readonly onRedo: () => void;
-  readonly onFit: () => void;
-  readonly fullscreen: FullscreenControls;
-  readonly onNew: () => void;
-  readonly onExport: () => void;
-  readonly onImport: () => void;
-  readonly onShare: () => void;
-  readonly onExamples: () => void;
-  readonly onHelp: () => void;
-  readonly onWelcome: () => void;
-}
-
-const MODE_CHIP: Record<TabletTopBarProps['mode'], string> = {
-  kur: 'bg-app text-ink-2',
-  bagla: 'bg-accent-soft text-accent-ink',
-  olc: 'bg-ok-soft text-ok-ink',
-  pause: 'bg-warn-soft text-warn',
-};
-
-/** Tabletin üst çubuğu (tasarım: T01, T02). */
-export function TabletTopBar(props: TabletTopBarProps) {
-  const timed = props.mode === 'olc' || props.mode === 'pause';
-  return (
-    <header className="flex h-14 shrink-0 items-center gap-1 border-b border-line bg-panel pr-2 pl-3" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      {props.fullscreen.on && (
-        <PanelToggle side="left" label={tr.toolbar.railPanel} open={props.fullscreen.panels.left} onPanel={props.fullscreen.onPanel} touch />
-      )}
-      <Logo />
-      <h1 className="sr-only">{tr.site.name}</h1>
-      <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
-      <button
-        type="button"
-        onClick={props.onExamples}
-        className="flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] px-3 text-[15px] font-medium text-ink active:bg-app"
-      >
-        <Icon name="book" />
-        {tr.examples.button}
-      </button>
-      <span className="mx-1.5 h-7 w-px shrink-0 bg-line" aria-hidden="true" />
-      <TouchIconButton icon="undo" label={tr.toolbar.undo} onClick={props.onUndo} disabled={!props.canUndo} />
-      <TouchIconButton icon="redo" label={tr.toolbar.redo} onClick={props.onRedo} disabled={!props.canRedo} />
-      <span className="flex-1" />
-      <span
-        role="status"
-        className={`flex h-[30px] shrink-0 items-center gap-1.5 rounded-full px-3 text-small font-semibold whitespace-nowrap ${MODE_CHIP[props.mode]}`}
-      >
-        {props.mode === 'olc' && <i className="block h-2 w-2 rounded-full bg-ok" aria-hidden="true" />}
-        {tr.phone.modes[props.mode]}
-        {timed && <span className="font-mono font-medium tabular">· {formatSI(props.time, 's', { digits: 4 })}</span>}
-      </span>
-      <SaveStatus state={props.saveState} />
-      <TouchIconButton icon="fit" label={tr.toolbar.fit} onClick={props.onFit} />
-      <TouchIconButton
-        icon={props.fullscreen.on ? 'fullscreenExit' : 'fullscreen'}
-        label={props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen}
-        onClick={props.fullscreen.onToggle}
-      />
-      <TouchIconButton icon="help" label={tr.help.open} onClick={props.onHelp} />
-      <SettingsMenu settings={props.settings} onChange={props.onSettings} touch onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
-      {props.fullscreen.on && (
-        <PanelToggle side="right" label={tr.toolbar.inspectorPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} touch />
-      )}
-    </header>
   );
 }
 
@@ -523,11 +203,18 @@ function SettingsMenu({
 
   return (
     <div ref={rootRef} className="relative shrink-0">
-      {touch ? (
-        <TouchIconButton icon="settings" label={tr.toolbar.settings} onClick={() => setOpen((o) => !o)} active={open} />
-      ) : (
-        <ToolButton icon="settings" label={tr.toolbar.settings} title={tr.toolbar.settings} onClick={() => setOpen((o) => !o)} active={open} />
-      )}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={tr.toolbar.settings}
+        title={tr.toolbar.settings}
+        aria-pressed={open || undefined}
+        className={`flex shrink-0 items-center justify-center transition-colors ${touch ? 'h-11 w-11 rounded-[10px]' : 'h-10 w-10 rounded-md'} ${
+          open ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-app'
+        }`}
+      >
+        <Icon name="settings" />
+      </button>
       {open && (
         <div
           className={`absolute right-0 z-40 flex flex-col gap-4 rounded-[14px] border border-line bg-panel px-[18px] py-4 shadow-[0_16px_40px_rgba(29,39,51,0.18)] ${touch ? 'top-12 w-[380px]' : 'top-11 w-[380px]'}`}
@@ -737,6 +424,8 @@ export interface DeskTopBarProps {
   readonly onExamples: () => void;
   readonly onHelp: () => void;
   readonly onWelcome: () => void;
+  /** Tablet: aynı çubuk dokunmatik boyutta (44 px düğmeler). */
+  readonly touch?: boolean;
 }
 
 /**
@@ -746,9 +435,10 @@ export interface DeskTopBarProps {
  * Kur kipinde yeşil Oynat, çalışırken koyu Duraklat ve yanında Durdur.
  */
 export function DeskTopBar(props: DeskTopBarProps) {
-  const { status } = props;
+  const { status, touch = false } = props;
   const active = status !== 'stopped';
   const running = status === 'running';
+  const main = touch ? 'h-11' : 'h-[42px]';
   const icon = (name: IconName, label: string, onClick: () => void, disabled = false) => (
     <button
       type="button"
@@ -756,7 +446,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink enabled:hover:bg-app disabled:text-stopped"
+      className={`flex shrink-0 items-center justify-center rounded-md text-ink enabled:hover:bg-app disabled:text-stopped ${touch ? 'h-11 w-11' : 'h-10 w-10'}`}
     >
       <Icon name={name} />
     </button>
@@ -766,7 +456,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
       <Logo />
       <h1 className="sr-only">{tr.site.name}</h1>
       <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
-      <button type="button" onClick={props.onExamples} className="flex h-10 shrink-0 items-center rounded-md px-3 text-sm font-medium text-ink hover:bg-app">
+      <button type="button" onClick={props.onExamples} className={`flex shrink-0 items-center rounded-md px-3 text-sm font-medium text-ink hover:bg-app ${touch ? 'h-11' : 'h-10'}`}>
         {tr.examples.button}
       </button>
       <span className="flex-1" />
@@ -774,7 +464,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
       {icon('undo', tr.toolbar.undo, props.onUndo, !props.canUndo)}
       {!active && icon('redo', tr.toolbar.redo, props.onRedo, !props.canRedo)}
       {icon('help', tr.help.open, props.onHelp)}
-      <SettingsMenu settings={props.settings} onChange={props.onSettings} onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
+      <SettingsMenu settings={props.settings} onChange={props.onSettings} touch={touch} onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
       {icon(props.fullscreen.on ? 'fullscreenExit' : 'fullscreen', props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen, props.fullscreen.onToggle)}
       <span className="mx-1.5 h-7 w-px shrink-0 bg-line" aria-hidden="true" />
       <div role="region" aria-label={tr.sim.region} className="flex shrink-0 items-center gap-2">
@@ -786,7 +476,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
               <span className="inline-block min-w-[8ch] font-mono tabular">{formatSI(props.time, 's', { digits: 4 })}</span>
               {props.lagging && <Icon name="info" className="h-4 w-4 text-warn" />}
             </span>
-            <SpeedButton speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} />
+            <SpeedButton speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} touch={touch} />
           </>
         )}
         {running ? (
@@ -794,7 +484,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
             type="button"
             data-tour="play"
             onClick={props.onPause}
-            className="flex h-[42px] shrink-0 items-center gap-2 rounded-[10px] bg-ink pr-4 pl-3 text-sm font-semibold text-white hover:brightness-125"
+            className={`flex shrink-0 items-center gap-2 rounded-[10px] bg-ink pr-4 pl-3 text-sm font-semibold text-white hover:brightness-125 ${main}`}
           >
             <Icon name="pause" />
             {tr.sim.pause}
@@ -804,7 +494,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
             type="button"
             data-tour="play"
             onClick={props.onPlay}
-            className="flex h-[42px] shrink-0 items-center gap-2 rounded-[10px] bg-ok pr-[18px] pl-3.5 text-[15px] font-semibold text-white hover:brightness-110"
+            className={`flex shrink-0 items-center gap-2 rounded-[10px] bg-ok pr-[18px] pl-3.5 text-[15px] font-semibold text-white hover:brightness-110 ${main}`}
           >
             <Icon name="play" />
             {tr.sim.play}
@@ -816,21 +506,21 @@ export function DeskTopBar(props: DeskTopBarProps) {
             onClick={props.onStop}
             aria-label={tr.sim.stop}
             title={tr.sim.stopTitle}
-            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px] border border-line-2 text-ink hover:bg-app"
+            className={`flex shrink-0 items-center justify-center rounded-[10px] border border-line-2 text-ink hover:bg-app ${touch ? 'h-11 w-11' : 'h-[42px] w-[42px]'}`}
           >
             <Icon name="stop" />
           </button>
         )}
       </div>
       {props.fullscreen.on && (
-        <PanelToggle side="right" label={tr.toolbar.notebookPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} />
+        <PanelToggle side="right" label={tr.toolbar.notebookPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} touch={touch} />
       )}
     </header>
   );
 }
 
 /** Üst çubuktaki Hız düğmesi ve aşağı açılan hız penceresi. */
-function SpeedButton({ speed, scopeSpeed, onSpeed }: { speed: number; scopeSpeed: number | null; onSpeed: (speed: number) => void }) {
+function SpeedButton({ speed, scopeSpeed, onSpeed, touch }: { speed: number; scopeSpeed: number | null; onSpeed: (speed: number) => void; touch: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useDismiss(open, setOpen);
   const groupRef = useRef<HTMLDivElement>(null);
@@ -847,14 +537,14 @@ function SpeedButton({ speed, scopeSpeed, onSpeed }: { speed: number; scopeSpeed
         aria-haspopup="dialog"
         aria-expanded={open}
         title={tr.sim.speedTitle}
-        className={`flex h-10 items-center gap-1.5 rounded-[10px] border border-line px-2.5 text-small ${open ? 'bg-accent-soft' : 'hover:bg-app'}`}
+        className={`flex items-center gap-1.5 rounded-[10px] border border-line px-2.5 text-small ${touch ? 'h-11' : 'h-10'} ${open ? 'bg-accent-soft' : 'hover:bg-app'}`}
       >
         {tr.sim.speed}
         <span className="font-mono font-semibold">{speedLabel(speed)}</span>
       </button>
       {open && (
         <div role="dialog" aria-label={tr.sim.speedDialog} className="absolute top-12 right-0 z-[60] w-[300px] rounded-lg border border-line bg-panel p-1.5 shadow-md">
-          <SpeedOptions speed={speed} scopeSpeed={scopeSpeed} onSpeed={onSpeed} groupRef={groupRef} />
+          <SpeedOptions speed={speed} scopeSpeed={scopeSpeed} onSpeed={onSpeed} groupRef={groupRef} touch={touch} />
         </div>
       )}
     </div>

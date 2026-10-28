@@ -111,6 +111,11 @@ export interface PhoneCanvas {
    * boyu değişmez; sayfa üstüne biner. Yoksa (tablet, yatay telefon) tuvalin ortasındadır.
    */
   readonly emptyAreaHeight?: number;
+  /**
+   * Bağla kipinin bilgisi tuvalin dışında, üstteki mavi durum satırında (telefon v3: tam ekran kablo
+   * bağlama, DP2): tuvaldeki bilgi kartı çizilmez, devre de onun için aşağı itilmez.
+   */
+  readonly connectHeader?: boolean;
 }
 
 /** Tuvalin altındaki ipucu şeridinin gösterdiği durum. */
@@ -444,7 +449,7 @@ export function Canvas({
     // Telefonda üstteki bilgi kartı (Bağla) ya da kilit bilgisi (Ölç) devrenin üstüne binmesin; kısa
     // tuvalde kenar payı da küçük.
     const top =
-      phone && (phone.mode === 'bagla' || (phone.mode === 'olc' && phone.lockChip))
+      phone && ((phone.mode === 'bagla' && !phone.connectHeader) || (phone.mode === 'olc' && phone.lockChip))
         ? Math.min(phone.mode === 'bagla' ? 84 : 48, size.height / 4)
         : 0;
     const fitted = fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top), phone ? 20 : 48);
@@ -1914,12 +1919,14 @@ export function Canvas({
 
       {bagla && phone && (
         <>
-          <div role="status" className="absolute inset-x-3 top-3 flex items-start gap-2.5 rounded-xl border border-accent-line bg-panel px-3 py-2.5 text-[13.5px] leading-[1.45] shadow-sm">
-            <Icon name="wire" className="mt-px h-5 w-5 shrink-0 text-accent-ink" />
-            <span>
-              <HintText text={connectCardText(phone.connectStart, doc)} />
-            </span>
-          </div>
+          {!phone.connectHeader && (
+            <div role="status" className="absolute inset-x-3 top-3 flex items-start gap-2.5 rounded-xl border border-accent-line bg-panel px-3 py-2.5 text-[13.5px] leading-[1.45] shadow-sm">
+              <Icon name="wire" className="mt-px h-5 w-5 shrink-0 text-accent-ink" />
+              <span>
+                <HintText text={connectCardText(phone.connectStart, doc)} />
+              </span>
+            </div>
+          )}
           <div className="pointer-events-none absolute bottom-3 left-3 flex gap-3 rounded-[10px] border border-line bg-panel/90 px-2.5 py-1.5 text-label text-ink-2" aria-hidden="true">
             <span className="flex items-center gap-1.5">
               <i className="block h-3 w-3 rounded-full bg-accent" />
@@ -2148,7 +2155,7 @@ function ConnectTargets({
   size: { width: number; height: number };
   start: ConnectStart | null;
 }) {
-  const targets: Array<{ key: string; x: number; y: number; tag: string; connected: boolean; isStart: boolean }> = [];
+  const targets: Array<{ key: string; x: number; y: number; tag: string; name: string; connected: boolean; isStart: boolean }> = [];
   for (const part of doc.parts) {
     pinPositions(part).forEach((pos, i) => {
       const x = pos.x * GRID * view.scale + view.x;
@@ -2159,6 +2166,7 @@ function ConnectTargets({
         x,
         y,
         tag: tr.devices.pinTags[part.type][i] ?? '',
+        name: `${part.label} ${tr.devices.pinShort[part.type][i] ?? ''}`.trim(),
         connected: !connectivity.unconnectedPins.has(pinKey(part.id, i)),
         isStart: start?.partId === part.id && start.pin === i,
       });
@@ -2177,6 +2185,11 @@ function ConnectTargets({
             <circle cx={t.x} cy={t.y} r={24} fill="var(--color-accent)" />
             <text x={t.x} y={t.y + 5} textAnchor="middle" fontSize={font(t.tag, 15)} fontWeight={700} fill="#fff">
               {t.tag}
+            </text>
+            {/* Başlangıç ucunun adı ("R1 2"), ucun üstünde (DP2). */}
+            <rect x={t.x - (t.name.length * 8.4 + 20) / 2} y={t.y - 70} width={t.name.length * 8.4 + 20} height={30} rx={7} fill="var(--color-accent)" />
+            <text x={t.x} y={t.y - 49.5} textAnchor="middle" fontFamily="var(--font-mono)" fontSize={14} fill="#fff">
+              {t.name}
             </text>
           </g>
         ) : t.connected ? (

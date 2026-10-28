@@ -8,7 +8,9 @@
 // - Aynı türden 3 ya da daha fazla parça tek satırda; satır açılınca parçalar altında.
 // - Çalışırken değiştirilen ayarlar (potansiyometre konumu, LDR ışığı, NTC sıcaklığı) kapalı kartta
 //   da görünen bir kaydırıcıdır.
-// Şemada parçaya tıklamak kartını açar ve listeyi oraya kaydırır.
+// Şemada parçaya tıklamak kartını açar ve listeyi oraya kaydırır. Telefonda (DP1–DP4) ekleme satırı
+// yoktur (sol alttaki Parça ekle düğmesi), sorun kartları tek satırdır ("Oku" ile açılır) ve listenin
+// altında yüzen düğmelere yer kalır.
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { resistorBands, resistorColorCode } from '../bench3d/bands';
@@ -60,8 +62,12 @@ export interface NotebookProps extends InspectTabProps {
   readonly issues: ReadonlyMap<string, 'error' | 'warning'>;
   /** Açık örnek: katlı örnek kartı. */
   readonly example: { readonly id: ExampleId | null; readonly onOpen: (id: ExampleId) => void; readonly onClose: () => void };
-  /** Listenin sonundaki parça ekleme satırı. */
-  readonly add: Omit<AddPartRowProps, 'settings'>;
+  /** Listenin sonundaki parça ekleme satırı (telefonda yok: Parça ekle düğmesi). */
+  readonly add?: Omit<AddPartRowProps, 'settings'>;
+  /** Telefon düzeni: tek satırlık sorun kartları, yüzen düğmeler için alt boşluk. */
+  readonly phone?: boolean;
+  /** Sorun kartındaki "D4'ü göster" (verilmezse onSelectPart): telefonda şema açık kalır. */
+  readonly onShowPart?: (partId: string) => void;
   /** Cihaz kartlarının (osiloskop, üreteç, güç kaynağı, hazne) simülasyon bağlantıları. */
   readonly devices: DeviceHooks;
 }
@@ -191,7 +197,12 @@ export function Notebook(props: NotebookProps) {
   };
 
   return (
-    <div id="defter" ref={listRef} className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-panel-2 ${touch ? 'p-3' : 'p-4'}`}>
+    <div
+      id="defter"
+      ref={listRef}
+      className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-panel-2 ${touch ? 'p-3' : 'p-4'}`}
+      style={props.phone ? { paddingBottom: 'calc(104px + env(safe-area-inset-bottom))' } : undefined}
+    >
       <Problems {...props} listRef={listRef} />
       {props.example.id && <ExampleCard id={props.example.id} onOpen={props.example.onOpen} onClose={props.example.onClose} />}
       <div className="flex items-baseline justify-between px-0.5 pb-0.5">
@@ -211,7 +222,7 @@ export function Notebook(props: NotebookProps) {
         </div>
       )}
       {doc.parts.length === 0 ? <p className="px-0.5 text-small text-muted">{t.empty}</p> : entries.map(renderEntry)}
-      <AddPartRow {...props.add} settings={settings} />
+      {props.add && <AddPartRow {...props.add} settings={settings} />}
     </div>
   );
 }
@@ -259,7 +270,7 @@ function Problems(props: NotebookProps & { listRef: RefObject<HTMLDivElement | n
 }
 
 /** Mesajın ilgili parçası ("D4'ü göster") ve düzeltme düğmeleri. */
-function MessageButtons({ item, diagnosticContext, messageActions, onSelectMessage, onSelectPart }: NotebookProps & { item: MessageItem }) {
+function MessageButtons({ item, diagnosticContext, messageActions, onSelectMessage, onSelectPart, onShowPart }: NotebookProps & { item: MessageItem }) {
   const touch = useTouchUi();
   const target = (item.badgeIds ?? item.elementIds)[0];
   const actions = messageActions(item);
@@ -272,7 +283,7 @@ function MessageButtons({ item, diagnosticContext, messageActions, onSelectMessa
           type="button"
           onClick={() => {
             onSelectMessage(item);
-            onSelectPart(target);
+            (onShowPart ?? onSelectPart)(target);
           }}
           className={`rounded-md border border-line-2 bg-panel px-3 font-medium hover:bg-panel-2 ${size}`}
         >
@@ -293,10 +304,39 @@ function MessageButtons({ item, diagnosticContext, messageActions, onSelectMessa
   );
 }
 
-/** Hata (kesintisiz kırmızı çerçeve, dolu daire) ya da uyarı (kesikli amber çerçeve, üçgen) kartı. */
+/** Metnin ilk cümlesi (telefondaki tek satırlık sorun kartı). */
+function firstSentence(text: string): string {
+  const plain = plainText(text);
+  return /^.*?[.!?](?=\s|$)/.exec(plain)?.[0] ?? plain;
+}
+
+/**
+ * Hata (kesintisiz kırmızı çerçeve, dolu daire) ya da uyarı (kesikli amber çerçeve, üçgen) kartı.
+ * Telefonda tek satır ("Toprak tuzağı: D4 kısa devre oldu. Oku"); seçili mesajda açık.
+ */
 function ProblemCard(props: NotebookProps & { item: MessageItem }) {
   const { item, selectedMessage } = props;
   const error = item.severity === 'error';
+  const [read, setRead] = useState(false);
+  const bodyId = useId();
+  const compact = props.phone === true && !read && selectedMessage !== item.key;
+  if (compact) {
+    return (
+      <section
+        data-notebook="problem"
+        aria-label={`${tr.messages.severity[item.severity]} · ${item.title}`}
+        className={`flex shrink-0 rounded-lg border-[1.5px] ${error ? 'border-danger bg-danger-soft' : 'border-dashed border-warn bg-warn-soft'}`}
+      >
+        <button type="button" onClick={() => setRead(true)} aria-expanded={false} aria-controls={bodyId} className="flex min-h-12 w-full items-center gap-2.5 px-3 py-2.5 text-left">
+          <SeverityMark severity={item.severity} size={18} />
+          <span className="line-clamp-2 min-w-0 flex-1 text-small leading-[1.4] text-ink-2">
+            <b className={`font-semibold ${error ? 'text-danger-ink' : 'text-warn'}`}>{item.title}:</b> {firstSentence(item.detail)}
+          </span>
+          <span className={`shrink-0 text-small font-semibold ${error ? 'text-danger-ink' : 'text-warn'}`}>{tr.phone.readMore}</span>
+        </button>
+      </section>
+    );
+  }
   return (
     <section
       data-notebook="problem"
@@ -310,10 +350,15 @@ function ProblemCard(props: NotebookProps & { item: MessageItem }) {
         <h3 className={`text-sm font-semibold ${error ? 'text-danger-ink' : 'text-warn'}`}>
           {tr.messages.severity[item.severity]} · {item.title}
         </h3>
-        <p className="text-small leading-[1.45] text-ink-2">
+        <p id={bodyId} className="text-small leading-[1.45] text-ink-2">
           <Rich text={item.detail} />
         </p>
         <MessageButtons {...props} />
+        {props.phone && read && selectedMessage !== item.key && (
+          <button type="button" onClick={() => setRead(false)} aria-expanded aria-controls={bodyId} className="h-11 self-start text-small font-medium text-accent-ink">
+            {tr.phone.readLess}
+          </button>
+        )}
       </div>
     </section>
   );
@@ -619,8 +664,13 @@ function OpenCardHeader({
       </h3>
       {badges}
       {burned && status !== 'stopped' && action('saved', tr.inspector.repair, () => onRepair(part.id))}
-      {action('rotate', tr.toolbar.rotate, () => onRotate([part.id]))}
-      {action('trash', tr.toolbar.remove, onDelete, true)}
+      {/* Dokunmatikte çalışırken devrenin yapısı kilitli (Ölç kipi; DP3): döndür ve sil yok. */}
+      {!(touch && status !== 'stopped') && (
+        <>
+          {action('rotate', tr.toolbar.rotate, () => onRotate([part.id]))}
+          {action('trash', tr.toolbar.remove, onDelete, true)}
+        </>
+      )}
       {action('chevronUp', t.collapse, onClose)}
     </div>
   );

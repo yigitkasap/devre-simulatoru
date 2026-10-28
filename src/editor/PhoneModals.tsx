@@ -1,6 +1,7 @@
-// Telefonda karartmalı (modal) sayfalar (tasarım: P13, P14): Dosya ve paylaşım, ⋯ (görünüm, paylaş,
-// ayarlar) ve Ölç kipinde "Düzenlemek için durdurulsun mu?" sorusu. Odak içeride başlar, Esc ve
-// karartmaya dokunmak kapatır, kapanınca odak açan düğmeye döner.
+// Telefonda karartmalı (modal) sayfalar (tasarım: P13, P14): Dosya ve paylaşım, ⋯ (örnekler, dosya,
+// paylaş, sığdır; yardım ve ayarlar), durum satırının sayfası (Durdur ve Hız; v3) ve Ölç kipinde
+// "Düzenlemek için durdurulsun mu?" sorusu. Odak içeride başlar, Esc ve karartmaya dokunmak kapatır,
+// kapanınca odak açan düğmeye döner.
 
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { tr } from '../i18n/tr';
@@ -8,9 +9,12 @@ import type { SaveState } from './autosave';
 import { Icon, type IconName } from './icons';
 import type { Settings } from './settings';
 import { PhoneHelp } from './HelpDialog';
+import { SpeedOptions } from './SimBar';
 import { SettingsFields } from './TopBar';
+import type { SimStatus } from './useSimulation';
 
-function ModalSheet({ label, top, onClose, children }: { label: string; top: number; onClose: () => void; children: ReactNode }) {
+/** Alttan açılan karartmalı sayfa; `top` yoksa içeriği kadar yüksek. */
+function ModalSheet({ label, top, onClose, children }: { label: string; top?: number; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -36,7 +40,7 @@ function ModalSheet({ label, top, onClose, children }: { label: string; top: num
         aria-modal="true"
         aria-label={label}
         className="sheet-in absolute inset-x-0 bottom-0 flex flex-col rounded-t-xl bg-panel shadow-[0_-4px_18px_rgba(29,39,51,0.2)]"
-        style={{ top: `calc(${top}px + env(safe-area-inset-top))` }}
+        style={top !== undefined ? { top: `calc(${top}px + env(safe-area-inset-top))` } : { maxHeight: 'calc(100% - 72px - env(safe-area-inset-top))' }}
       >
         <button type="button" onClick={onClose} aria-label={tr.phone.close} className="flex h-11 w-full shrink-0 items-center justify-center rounded-t-xl" tabIndex={-1}>
           <i className="block h-[5px] w-9 rounded-[3px] bg-line-2" aria-hidden="true" />
@@ -168,18 +172,22 @@ export interface MoreSheetProps {
   readonly settings: Settings;
   readonly onSettings: (patch: Partial<Settings>) => void;
   readonly onClose: () => void;
+  readonly onExamples: () => void;
+  readonly onFile: () => void;
   readonly onFit: () => void;
   readonly onShare: () => void;
   readonly onTour: () => void;
   readonly onWelcome: () => void;
 }
 
-export function MoreSheet({ settings, onSettings, onClose, onFit, onShare, onTour, onWelcome }: MoreSheetProps) {
+export function MoreSheet({ settings, onSettings, onClose, onExamples, onFile, onFit, onShare, onTour, onWelcome }: MoreSheetProps) {
   const [tab, setTab] = useState<'help' | 'settings'>('help');
+  // v3: devrenin adı durum satırını açar; Dosya ve Örnekler buradan.
   const quick: Array<{ icon: IconName; label: string; run: () => void; pressed?: boolean }> = [
-    { icon: 'fit', label: tr.phone.fit, run: onFit },
-    { icon: 'measure', label: tr.phone.nodeVoltages, run: () => onSettings({ nodeVoltages: !settings.nodeVoltages }), pressed: settings.nodeVoltages },
+    { icon: 'book', label: tr.phone.examples, run: onExamples },
+    { icon: 'file', label: tr.phone.file, run: onFile },
     { icon: 'share', label: tr.phone.share, run: onShare },
+    { icon: 'fit', label: tr.bench.fit, run: onFit },
   ];
   return (
     <ModalSheet label={tr.phone.moreTitle} top={118} onClose={onClose}>
@@ -223,6 +231,50 @@ export function MoreSheet({ settings, onSettings, onClose, onFit, onShare, onTou
             <SettingsFields settings={settings} onChange={onSettings} touch onWelcome={onWelcome} />
           </div>
         )}
+      </div>
+    </ModalSheet>
+  );
+}
+
+// --- Durum satırı (v3): Durdur ve Hız ------------------------------------------------------------
+
+export function StatusSheet({
+  status,
+  line,
+  speed,
+  scopeSpeed,
+  onSpeed,
+  onStop,
+  onClose,
+}: {
+  status: SimStatus;
+  /** "Çalışıyor · 2,58 s" */
+  line: string;
+  speed: number;
+  scopeSpeed: number | null;
+  onSpeed: (speed: number) => void;
+  onStop: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <ModalSheet label={tr.phone.statusTitle} onClose={onClose}>
+      <div className="flex shrink-0 items-center justify-between pr-2 pb-1 pl-4">
+        <div className="flex min-w-0 flex-col">
+          <b className="text-[18px] font-semibold">{tr.phone.statusTitle}</b>
+          <span className={`text-[12.5px] tabular ${status === 'running' ? 'text-ok-ink' : status === 'paused' ? 'text-warn' : 'text-muted'}`}>{line}</span>
+        </div>
+        <button type="button" onClick={onClose} aria-label={tr.phone.close} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-muted active:bg-app">
+          <Icon name="close" />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
+        {status !== 'stopped' ? (
+          <MenuItem icon="stop" label={tr.sim.stop} note={tr.phone.stopNote} onClick={onStop} />
+        ) : (
+          <p className="border-b border-app py-3 text-[13.5px] leading-normal text-muted">{tr.phone.stoppedNote}</p>
+        )}
+        <h3 className="pt-3.5 pb-1 text-label font-semibold text-muted">{tr.sim.speedDialog}</h3>
+        <SpeedOptions speed={speed} scopeSpeed={scopeSpeed} onSpeed={onSpeed} touch />
       </div>
     </ModalSheet>
   );
