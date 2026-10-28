@@ -1698,8 +1698,6 @@ export default function Simulator() {
                 onZoomOut={() => canvasRef.current?.zoomOut()}
                 onZoomIn={() => canvasRef.current?.zoomIn()}
                 onFit={() => canvasRef.current?.fit()}
-                fullscreen={fullscreenControls.on}
-                onFullscreen={fullscreenControls.onToggle}
                 on3d={() => setViewMode('bench')}
               />
             )}

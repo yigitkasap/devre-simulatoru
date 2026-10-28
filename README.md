@@ -1779,7 +1779,8 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
 2. **Masaüstü kabuğu**: 60 px üst çubuk (`DeskTopBar`: devrenin adı ▾ Dosya, Örnekler; Geri al,
    Kur kipinde İleri al ve kayıt durumu, Yardım, Ayarlar; çalışırken durum ve süre, Hız; Oynat ya da
    Duraklat + Durdur). Alt simülasyon çubuğu ve ipucu şeridi kalktı; elektron akışı Ayarlar'da.
-   Tuvalin sağ altında uzaklaştır, yakınlaştır, sığdır, tam ekran ve 3B (`CanvasControls.tsx`).
+   Tuvalin sağ altında uzaklaştır, yakınlaştır, sığdır ve 3B (`CanvasControls.tsx`); tam ekran
+   düğmesi üst çubukta Ayarlar'ın yanında (çizimlerde yok; kullanıcı kararı).
    Kablo aracı düğmesi kalktı (W kısayolu ve uçtan sürükleme duruyor); sürüklerken bırakılacak uç
    vurgulanıp adıyla etiketlenir, sol altta "Uca bırak: bağla · Esc vazgeç". Parça kütüphanesi ve
    cihaz rafı, yerlerini alan adımlara (4: parça ekleme satırı, 5: cihaz kartları) kadar durur.

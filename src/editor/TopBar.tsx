@@ -741,7 +741,8 @@ export interface DeskTopBarProps {
 
 /**
  * Masaüstü üst çubuğu (tasarım v3: D1–D3, 60 px): logo, devrenin adı ▾ (Dosya), Örnekler; sağda Geri al
- * (Kur kipinde İleri al ve kayıt durumu da), Yardım, Ayarlar; çalışırken durum ve süre, Hız; ana düğme:
+ * (Kur kipinde İleri al ve kayıt durumu da), Yardım, Ayarlar, tam ekran (kullanıcı kararı; çizimlerde
+ * yok); çalışırken durum ve süre, Hız; ana düğme:
  * Kur kipinde yeşil Oynat, çalışırken koyu Duraklat ve yanında Durdur.
  */
 export function DeskTopBar(props: DeskTopBarProps) {
@@ -777,6 +778,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
       {!active && icon('redo', tr.toolbar.redo, props.onRedo, !props.canRedo)}
       {icon('help', tr.help.open, props.onHelp)}
       <SettingsMenu settings={props.settings} onChange={props.onSettings} onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
+      {icon(props.fullscreen.on ? 'fullscreenExit' : 'fullscreen', props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen, props.fullscreen.onToggle)}
       <span className="mx-1.5 h-7 w-px shrink-0 bg-line" aria-hidden="true" />
       <div role="region" aria-label={tr.sim.region} className="flex shrink-0 items-center gap-2">
         {active && (
