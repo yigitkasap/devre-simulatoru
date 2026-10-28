@@ -105,6 +105,13 @@
   --color-info-soft: #eef3f8;
   --color-info-line: #d6e2ee;
   --color-info-ink: #3d5a78;
+  /* Ters zemin (bg-ink) üstündeki yazı ve bağlantı; karartma; seri ekran; 3B tezgâhın arka planı */
+  --color-on-ink: #ffffff;
+  --color-on-ink-accent: #9cc3ff;
+  --color-scrim: #1d2733;
+  --color-console: #1d2733;
+  --color-console-ink: #dde1e6;
+  --color-bench: #dfe3e8;
 
   /* Şema */
   --color-paper: #fbfbf9;
@@ -182,29 +189,79 @@
   --breakpoint-wide: 1280px;
 }
 
-/* Koyu tema (isteğe bağlı; henüz bir ayarla açılmıyor) */
-[data-theme='dark'] {
-  --color-app: #0f141a;
-  --color-panel: #161d25;
-  --color-panel-2: #1b232c;
-  --color-line: #26313d;
-  --color-line-2: #34414f;
-  --color-ink: #e6ebf1;
-  --color-muted: #9aa7b5;
-  --color-accent: #5b9dff;
-  --color-accent-ink: #8db9ff;
-  --color-accent-soft: #1b2a44;
-  --color-paper: #12181f;
-  --color-grid: #27313b;
-  --color-grid-major: #3a4652;
-  --color-symbol: #d9e0e7;
-  --color-v-n100: #5a87e2;
-  --color-v-n50: #5ae2e2;
-  --color-v-0: #5ae287;
-  --color-v-p25: #7ce25a;
-  --color-v-p50: #cbe25a;
-  --color-v-p75: #e2a95a;
-  --color-v-p100: #e25a5a;
+/* Koyu tema: <html data-theme="dark"> (Ayarlar → Tema: Sistem / Açık / Koyu; theme.ts). Her belirtecin
+   koyu karşılığı; yeni anlamlı renk yok. Dolgu renkleri (accent, ok, danger) beyaz yazıyla en az
+   4,3:1, yazı tonları (-ink, muted) koyu panelde en az 6:1. Yazdırırken her zaman açık tema. */
+@media screen {
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --color-app: #0e1318;
+    --color-panel: #161c23;
+    --color-panel-2: #1c242d;
+    --color-line: #2a343f;
+    --color-line-2: #3b4754;
+    --color-ink: #e6ebf0;
+    --color-muted: #9aa6b3;
+    --color-accent: #2a74ec;
+    --color-accent-ink: #8db9ff;
+    --color-accent-soft: #172a47;
+    --color-ok: #1f8a4c;
+    --color-ok-soft: #12291c;
+    --color-warn: #e8913a;
+    --color-warn-soft: #2d2213;
+    --color-danger: #d92d20;
+    --color-danger-soft: #2e1717;
+    --color-paused: #e8a317;
+    --color-stopped: #6c7783;
+    --color-ink-2: #c4cdd7;
+    --color-ok-ink: #7dd3a0;
+    --color-ok-line: #245a3b;
+    --color-accent-line: #2a4a7c;
+    --color-danger-ink: #ff9c95;
+    --color-danger-line: #6b2b29;
+    --color-warn-line: #6a4a1f;
+    --color-info-soft: #172029;
+    --color-info-line: #2b3946;
+    --color-info-ink: #a8c0d9;
+    --color-on-ink: #11171d;
+    --color-on-ink-accent: #1557c0;
+    --color-scrim: #000000;
+    --color-console: #0b1015;
+    --color-console-ink: #c9d1da;
+    --color-bench: #161c22;
+
+    --color-paper: #11171d;
+    --color-grid: #26303a;
+    --color-grid-major: #37424e;
+    --color-symbol: #d9e0e7;
+    --color-select: #4d8dff;
+    --color-pin: #f26a3d;
+    --color-wire-off: #6c7783;
+    --color-earth: #3fae6b;
+
+    --color-rack: #1d252e;
+    --color-rack-line: #33404d;
+    --color-face: #212a33;
+    --color-face-head: #27313b;
+    --color-seg: #2c3743;
+    --color-seg-ink: #d3dbe4;
+    --color-step: #222b35;
+    --color-key: #252f39;
+    --color-lamp-off: #48525e;
+
+    /* Gerilim ölçeği: koyu kağıtta seçilsin diye daha açık (colors.ts aynı formül). */
+    --color-v-n100: #6a92e6;
+    --color-v-n50: #4fd1d1;
+    --color-v-0: #4fd17a;
+    --color-v-p25: #78d14f;
+    --color-v-p50: #c2d14f;
+    --color-v-p75: #e6a44f;
+    --color-v-p100: #e66a6a;
+
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 12px rgb(0 0 0 / 0.45), 0 1px 3px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 16px 40px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.3);
+  }
 }
 
 html,

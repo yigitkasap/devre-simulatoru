@@ -100,7 +100,7 @@ export function Soru({ question, answer, revealed, onReveal, onClose, variant, b
 
   return (
     <section ref={ref} aria-label={tr.baraj.soru.title} className="flex max-h-[34vh] shrink-0 gap-3 border-b border-line bg-panel-2 p-3">
-      <div className="flex w-[500px] max-w-[42%] shrink-0 flex-col gap-1.5 overflow-auto rounded-[10px] border border-[#f0d49a] bg-warn-soft px-4 pt-2.5 pb-3">
+      <div className="flex w-[500px] max-w-[42%] shrink-0 flex-col gap-1.5 overflow-auto rounded-[10px] border border-warn-line bg-warn-soft px-4 pt-2.5 pb-3">
         <span className="text-[12.5px] leading-[22px] font-semibold text-warn">{tr.baraj.soru.predict}</span>
         <span className={big ? 'text-[19px] leading-[1.45]' : 'text-[17px] leading-[1.45]'}>
           <Rich text={question} />

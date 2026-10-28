@@ -34,7 +34,7 @@ export function ShareDialog({ link, onClose }: { link: string; onClose: () => vo
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim/30 p-4"
       onPointerDown={(e) => e.target === e.currentTarget && onClose()}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >

@@ -201,7 +201,7 @@ export function ArduinoCardBody({
           ref={logRef}
           role="log"
           aria-live="off"
-          className="flex h-32 flex-col overflow-y-auto overscroll-contain rounded-md bg-ink px-3 py-2.5 font-mono text-label leading-[1.5] text-line"
+          className="flex h-32 flex-col overflow-y-auto overscroll-contain rounded-md bg-console px-3 py-2.5 font-mono text-label leading-[1.5] text-console-ink"
         >
           <span className="mt-auto" />
           {serial ? (

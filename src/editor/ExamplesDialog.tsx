@@ -31,7 +31,7 @@ function DesktopExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps
   let number = 0;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-ink/30 p-3 sm:items-center sm:p-6"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto overscroll-contain bg-scrim/30 p-3 sm:items-center sm:p-6"
       onPointerDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div

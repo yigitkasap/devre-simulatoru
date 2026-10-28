@@ -18,8 +18,8 @@ const GRID: Readonly<Record<TableVariant, string>> = {
 };
 
 const REGION_CLASS: Readonly<Record<Region, string>> = {
-  saturation: 'bg-ink text-white border-ink',
-  active: 'bg-accent-soft text-accent-ink border-[#9dbcf2]',
+  saturation: 'bg-ink text-on-ink border-ink',
+  active: 'bg-accent-soft text-accent-ink border-accent/45',
   cutoff: 'bg-panel text-muted border-line-2',
 };
 
@@ -40,7 +40,7 @@ function LedDot({ state, level, size }: { state: LedState; level: 1 | 2 | 3; siz
     state === 'on'
       ? { background: c.lamp, boxShadow: `0 0 0 1.5px ${c.badge}, 0 0 10px ${c.lamp}` }
       : state === 'off'
-        ? { background: '#e4e8ec', boxShadow: 'inset 0 0 0 1.5px #b9c0c9' }
+        ? { background: 'var(--color-face)', boxShadow: 'inset 0 0 0 1.5px var(--color-rack-line)' }
         : { background: c.lamp, opacity: 0.45, boxShadow: `inset 0 0 0 1.5px ${c.badge}` };
   return <span aria-hidden="true" className="shrink-0 rounded-full" style={{ width: size, height: size, ...style }} />;
 }
@@ -79,7 +79,7 @@ export function DurumTablosu({ rows, variant, big = false }: DurumTablosuProps) 
             key={row.level}
             role="row"
             // Sabit satır yüksekliği: transistör durumu, akım ya da not gelip gidince tablo boy değiştirmesin.
-            className={`grid items-center gap-2.5 overflow-hidden border-b border-[#eef0f3] ${pad} ${ROW_HEIGHT[variant][big ? 1 : 0]}`}
+            className={`grid items-center gap-2.5 overflow-hidden border-b border-app ${pad} ${ROW_HEIGHT[variant][big ? 1 : 0]}`}
             style={{ gridTemplateColumns: cols, background: row.working ? c.soft : undefined }}
           >
             <span role="cell" className="inline-flex items-center gap-2 font-semibold">

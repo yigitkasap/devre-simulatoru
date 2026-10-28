@@ -65,7 +65,7 @@ export function WiringControls({ canUndo, hasStart, onUndo, onClear, onDone }: {
       <button type="button" onClick={onClear} disabled={!hasStart} className={button}>
         {tr.phone.clearStart}
       </button>
-      <button type="button" onClick={onDone} className="h-11 rounded-[10px] bg-ink px-4 text-sm font-semibold text-white shadow-sm active:brightness-125">
+      <button type="button" onClick={onDone} className="h-11 rounded-[10px] bg-ink px-4 text-sm font-semibold text-on-ink shadow-sm active:brightness-125">
         {tr.phone.done}
       </button>
     </div>

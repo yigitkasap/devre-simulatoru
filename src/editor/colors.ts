@@ -6,12 +6,21 @@
 // ton kağıtta en az 3,5:1 kontrast verir (tasarım: DS-Renk, tokens.css → --color-v-*).
 // Renk körlüğüne uygun ölçek: mavi – gri – turuncu; kırmızı-yeşil ayrımı gerektirmez. Durakları
 // arasında sRGB'de doğrusal geçiş yapılır.
+// Koyu temada (theme.ts) aynı tonlar koyu kağıtta seçilsin diye daha açık çizilir (doygunluk %60,
+// açıklık %56 / %62; renk körlüğü ölçeğinde açık duraklar).
 
 export type WireScale = 'classic' | 'colorblind';
 
 const HUE_ZERO = 140;
 const HUE_POSITIVE = 0;
 const HUE_NEGATIVE = 220;
+
+/** Koyu tema açık mı (theme.ts ayarlar; ilk değer sayfanın başındaki betiğin koyduğu data-theme). */
+let dark = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark';
+
+export function setColorTheme(isDark: boolean): void {
+  dark = isDark;
+}
 
 function clampRatio(ratio: number): number {
   return Math.max(-1, Math.min(1, Number.isFinite(ratio) ? ratio : 0));
@@ -24,8 +33,9 @@ export function voltageHue(ratio: number): number {
 
 function classicColor(ratio: number): string {
   const hue = voltageHue(ratio);
-  const lightness = hue > 45 && hue <= 200 ? 32 : 40;
-  return `hsl(${hue.toFixed(0)} 75% ${lightness}%)`;
+  const band = hue > 45 && hue <= 200;
+  if (dark) return `hsl(${hue.toFixed(0)} 60% ${band ? 56 : 62}%)`;
+  return `hsl(${hue.toFixed(0)} 75% ${band ? 32 : 40}%)`;
 }
 
 /** Renk körlüğüne uygun ölçeğin durakları (oran, renk). */
@@ -36,6 +46,13 @@ const COLORBLIND_STOPS: ReadonlyArray<readonly [number, string]> = [
   [0.5, '#b9762f'],
   [1, '#c45a0a'],
 ];
+const COLORBLIND_STOPS_DARK: ReadonlyArray<readonly [number, string]> = [
+  [-1, '#6f95e0'],
+  [-0.5, '#97aad6'],
+  [0, '#9aa3ad'],
+  [0.5, '#d9a066'],
+  [1, '#f08a3c'],
+];
 
 function hexChannels(hex: string): [number, number, number] {
   const n = Number.parseInt(hex.slice(1), 16);
@@ -44,10 +61,11 @@ function hexChannels(hex: string): [number, number, number] {
 
 function colorblindColor(ratio: number): string {
   const t = clampRatio(ratio);
+  const stops = dark ? COLORBLIND_STOPS_DARK : COLORBLIND_STOPS;
   let i = 0;
-  while (i < COLORBLIND_STOPS.length - 2 && t > COLORBLIND_STOPS[i + 1]![0]) i++;
-  const [r0, c0] = COLORBLIND_STOPS[i]!;
-  const [r1, c1] = COLORBLIND_STOPS[i + 1]!;
+  while (i < stops.length - 2 && t > stops[i + 1]![0]) i++;
+  const [r0, c0] = stops[i]!;
+  const [r1, c1] = stops[i + 1]!;
   const f = (t - r0) / (r1 - r0);
   const a = hexChannels(c0);
   const b = hexChannels(c1);

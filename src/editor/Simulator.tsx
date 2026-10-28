@@ -52,6 +52,7 @@ import { speedLabel } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { Toast, useToast } from './Toast';
 import { DeskTopBar } from './TopBar';
+import { useTheme } from './theme';
 import { TouchUi } from './touchUi';
 import { useLayout } from './useLayout';
 import { useSimulation } from './useSimulation';
@@ -73,6 +74,7 @@ export default function Simulator() {
   const [initial] = useState(initialDoc);
   const [state, dispatch] = useReducer(editorReducer, initial.doc, initialEditorState);
   const [settings, updateSettings] = useSettings();
+  const theme = useTheme(settings.theme);
   const layout = useLayout();
   const phone = layout.kind === 'phone';
   const tablet = layout.kind === 'tablet';
@@ -763,6 +765,7 @@ export default function Simulator() {
           selection={selection.parts}
           overlayOpen={overlayOpen}
           touch={touchUi}
+          dark={theme === 'dark'}
           callbacks={{
             onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
             onToggle: (id) => {
@@ -860,7 +863,7 @@ export default function Simulator() {
         e.preventDefault();
         document.getElementById('tuval')?.focus();
       }}
-      className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:min-h-11"
+      className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-on-ink focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:min-h-11"
     >
       {tr.a11y.skip}
     </a>
@@ -1010,6 +1013,7 @@ export default function Simulator() {
               setModal(null);
               setWelcomeOpen(true);
             }}
+            onTheme={(choice) => updateSettings({ theme: choice })}
           />
         )}
         {stopAsk && (
@@ -1142,6 +1146,9 @@ export default function Simulator() {
           onHelp={() => setHelpOpen(true)}
           onWelcome={() => setWelcomeOpen(true)}
           touch={tablet}
+          theme={settings.theme}
+          appliedTheme={theme}
+          onTheme={(choice) => updateSettings({ theme: choice })}
         />
         {fileInput}
 

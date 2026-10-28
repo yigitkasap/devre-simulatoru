@@ -204,7 +204,7 @@ export function HelpDialog({ scale, onTour, onClose }: { scale: WireScale; onTou
     e.currentTarget.querySelector<HTMLElement>(`#help-tab-${next}`)?.focus();
   };
   return (
-    <div className="scrim-in fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="scrim-in fixed inset-0 z-50 flex items-center justify-center bg-scrim/30 p-4" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={rootRef}
         role="dialog"

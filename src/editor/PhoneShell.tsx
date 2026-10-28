@@ -176,7 +176,7 @@ export function WiringHeader({ step, text, onDone }: { step: 1 | 2; text: string
           <Icon name="chevron" className="rotate-180" />
         </button>
         <span className="min-w-0 flex-1 truncate text-[17px] font-semibold">{tr.phone.wiringTitle}</span>
-        <button type="button" onClick={onDone} className="h-10 shrink-0 rounded-[10px] bg-ink px-4 text-[15px] font-semibold text-white active:brightness-125">
+        <button type="button" onClick={onDone} className="h-10 shrink-0 rounded-[10px] bg-ink px-4 text-[15px] font-semibold text-on-ink active:brightness-125">
           {tr.phone.done}
         </button>
       </header>
@@ -232,8 +232,8 @@ export function PhoneFabs({ status, canAdd, addOpen, onAdd, onPlay, onPause }: {
         data-tour="play"
         onClick={running ? onPause : onPlay}
         aria-label={running ? tr.sim.pause : status === 'paused' ? tr.phone.resume : tr.sim.play}
-        className={`absolute right-4 z-20 flex h-16 w-16 items-center justify-center rounded-full text-white active:brightness-110 ${
-          running ? 'bg-ink shadow-[0_6px_16px_rgba(29,39,51,0.3)]' : 'bg-ok shadow-[0_6px_16px_rgba(27,125,68,0.3)]'
+        className={`absolute right-4 z-20 flex h-16 w-16 items-center justify-center rounded-full active:brightness-110 ${
+          running ? 'bg-ink text-on-ink shadow-[0_6px_16px_rgba(29,39,51,0.3)]' : 'bg-ok text-white shadow-[0_6px_16px_rgba(27,125,68,0.3)]'
         }`}
         style={{ bottom: 'calc(20px + env(safe-area-inset-bottom))' }}
       >

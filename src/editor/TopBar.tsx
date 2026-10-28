@@ -10,8 +10,9 @@ import type { SaveState } from './autosave';
 import { voltageGradient } from './colors';
 import type { FocusPanels } from './fullscreen';
 import { Icon, type IconName } from './icons';
-import type { Settings } from './settings';
+import type { Settings, ThemeChoice } from './settings';
 import { SpeedOptions, speedLabel, StatusMark } from './SimBar';
+import type { Theme } from './theme';
 import type { SimStatus } from './useSimulation';
 
 /** Tam ekran düğmesi ve tam ekranda yan panellerin düğmeleri. */
@@ -93,7 +94,7 @@ function useDismiss(open: boolean, setOpen: (open: boolean) => void) {
 
 /** Menüde ok tuşlarıyla gezinme (yukarı/aşağı, Home/End). */
 function menuKeys(e: ReactKeyboardEvent<HTMLElement>) {
-  const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[role=menuitem]')];
+  const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[role=menuitem], [role=menuitemradio]')];
   const index = items.indexOf(document.activeElement as HTMLElement);
   const go = (i: number) => {
     e.preventDefault();
@@ -426,6 +427,10 @@ export interface DeskTopBarProps {
   readonly onWelcome: () => void;
   /** Tablet: aynı çubuk dokunmatik boyutta (44 px düğmeler). */
   readonly touch?: boolean;
+  /** Renk teması: seçim (Sistem / Açık / Koyu) ve şu an uygulanan. */
+  readonly theme: ThemeChoice;
+  readonly appliedTheme: Theme;
+  readonly onTheme: (choice: ThemeChoice) => void;
 }
 
 /**
@@ -464,6 +469,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
       {icon('undo', tr.toolbar.undo, props.onUndo, !props.canUndo)}
       {!active && icon('redo', tr.toolbar.redo, props.onRedo, !props.canRedo)}
       {icon('help', tr.help.open, props.onHelp)}
+      <ThemeMenu choice={props.theme} theme={props.appliedTheme} onChange={props.onTheme} touch={touch} />
       <SettingsMenu settings={props.settings} onChange={props.onSettings} touch={touch} onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
       {icon(props.fullscreen.on ? 'fullscreenExit' : 'fullscreen', props.fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen, props.fullscreen.onToggle)}
       <span className="mx-1.5 h-7 w-px shrink-0 bg-line" aria-hidden="true" />
@@ -484,7 +490,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
             type="button"
             data-tour="play"
             onClick={props.onPause}
-            className={`flex shrink-0 items-center gap-2 rounded-[10px] bg-ink pr-4 pl-3 text-sm font-semibold text-white hover:brightness-125 ${main}`}
+            className={`flex shrink-0 items-center gap-2 rounded-[10px] bg-ink pr-4 pl-3 text-sm font-semibold text-on-ink hover:brightness-125 ${main}`}
           >
             <Icon name="pause" />
             {tr.sim.pause}
@@ -516,6 +522,62 @@ export function DeskTopBar(props: DeskTopBarProps) {
         <PanelToggle side="right" label={tr.toolbar.notebookPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} touch={touch} />
       )}
     </header>
+  );
+}
+
+const THEME_ICONS: Record<ThemeChoice, IconName> = { system: 'themeSystem', light: 'sun', dark: 'moon' };
+
+/** Tema düğmesi (güneş / ay / yarım daire) ve aşağı açılan seçim: Sistem, Açık, Koyu. */
+export function ThemeMenu({ choice, theme, onChange, touch = false }: { choice: ThemeChoice; theme: Theme; onChange: (choice: ThemeChoice) => void; touch?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useDismiss(open, setOpen);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open) (menuRef.current?.querySelector<HTMLElement>('[aria-checked=true]') ?? menuRef.current?.querySelector<HTMLElement>('[role=menuitemradio]'))?.focus();
+  }, [open]);
+  const label = tr.theme.button(choice, theme);
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        title={label}
+        className={`flex shrink-0 items-center justify-center transition-colors ${touch ? 'h-11 w-11 rounded-[10px]' : 'h-10 w-10 rounded-md'} ${
+          open ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-app'
+        }`}
+      >
+        <Icon name={THEME_ICONS[choice]} />
+      </button>
+      {open && (
+        <div ref={menuRef} role="menu" aria-label={tr.theme.label} onKeyDown={menuKeys} className="absolute top-12 right-0 z-40 w-64 rounded-lg border border-line bg-panel p-1.5 shadow-lg">
+          {(['system', 'light', 'dark'] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              role="menuitemradio"
+              aria-checked={choice === c}
+              onClick={() => {
+                onChange(c);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left outline-none hover:bg-accent-soft focus-visible:bg-accent-soft ${touch ? 'min-h-11' : 'min-h-10'}`}
+            >
+              <Icon name={THEME_ICONS[c]} className="h-5 w-5 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-body font-medium">{tr.theme.options[c]}</span>
+                <span className="block text-[12.5px] leading-[1.35] text-muted">{c === 'system' ? tr.theme.systemNote(theme) : tr.theme.notes[c]}</span>
+              </span>
+              <span className={`text-accent-ink ${choice === c ? '' : 'invisible'}`} aria-hidden="true">
+                ✓
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

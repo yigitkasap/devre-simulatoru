@@ -7,7 +7,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { tr } from '../i18n/tr';
 import type { SaveState } from './autosave';
 import { Icon, type IconName } from './icons';
-import type { Settings } from './settings';
+import type { Settings, ThemeChoice } from './settings';
 import { PhoneHelp } from './HelpDialog';
 import { SpeedOptions } from './SimBar';
 import { SettingsFields } from './TopBar';
@@ -33,7 +33,7 @@ function ModalSheet({ label, top, onClose, children }: { label: string; top?: nu
   }, []);
   return (
     <div className="fixed inset-0 z-50">
-      <div className="scrim-in absolute inset-0 bg-ink/40" onClick={onClose} aria-hidden="true" />
+      <div className="scrim-in absolute inset-0 bg-scrim/40" onClick={onClose} aria-hidden="true" />
       <div
         ref={ref}
         role="dialog"
@@ -178,9 +178,13 @@ export interface MoreSheetProps {
   readonly onShare: () => void;
   readonly onTour: () => void;
   readonly onWelcome: () => void;
+  /** Renk teması (masaüstündeki güneş / ay düğmesinin karşılığı). */
+  readonly onTheme: (choice: ThemeChoice) => void;
 }
 
-export function MoreSheet({ settings, onSettings, onClose, onExamples, onFile, onFit, onShare, onTour, onWelcome }: MoreSheetProps) {
+const THEME_CHOICES = ['system', 'light', 'dark'] as const;
+
+export function MoreSheet({ settings, onSettings, onClose, onExamples, onFile, onFit, onShare, onTour, onWelcome, onTheme }: MoreSheetProps) {
   const [tab, setTab] = useState<'help' | 'settings'>('help');
   // v3: devrenin adı durum satırını açar; Dosya ve Örnekler buradan.
   const quick: Array<{ icon: IconName; label: string; run: () => void; pressed?: boolean }> = [
@@ -207,6 +211,25 @@ export function MoreSheet({ settings, onSettings, onClose, onExamples, onFile, o
               <span className="max-w-full truncate">{q.label}</span>
             </button>
           ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <span id="tema-etiketi" className="w-12 shrink-0 text-sm font-semibold">
+            {tr.theme.label}
+          </span>
+          <div role="radiogroup" aria-labelledby="tema-etiketi" className="flex min-w-0 flex-1 gap-0.5 rounded-[10px] bg-app p-0.5">
+            {THEME_CHOICES.map((c) => (
+              <button
+                key={c}
+                type="button"
+                role="radio"
+                aria-checked={settings.theme === c}
+                onClick={() => onTheme(c)}
+                className={`h-11 flex-1 rounded-lg text-sm font-semibold ${settings.theme === c ? 'bg-panel text-ink shadow-sm' : 'text-ink-2'}`}
+              >
+                {tr.theme.options[c]}
+              </button>
+            ))}
+          </div>
         </div>
         <div role="tablist" aria-label={tr.phone.moreTitle} className="flex gap-0.5 rounded-[10px] bg-app p-0.5">
           {(['help', 'settings'] as const).map((t) => (
@@ -286,7 +309,7 @@ export function StopToEditDialog({ onStop, onCancel }: { onStop: () => void; onC
   const titleId = useId();
   return (
     <div className="fixed inset-0 z-50">
-      <div className="scrim-in absolute inset-0 bg-ink/40" onClick={onCancel} aria-hidden="true" />
+      <div className="scrim-in absolute inset-0 bg-scrim/40" onClick={onCancel} aria-hidden="true" />
       <div
         role="alertdialog"
         aria-modal="true"
@@ -299,7 +322,7 @@ export function StopToEditDialog({ onStop, onCancel }: { onStop: () => void; onC
           {tr.phone.stopToEdit}
         </h2>
         <p className="text-[14.5px] leading-normal text-ink-2">{tr.phone.stopToEditText}</p>
-        <button type="button" autoFocus onClick={onStop} className="h-12 rounded-xl bg-ink text-[15px] font-semibold text-white active:brightness-125">
+        <button type="button" autoFocus onClick={onStop} className="h-12 rounded-xl bg-ink text-[15px] font-semibold text-on-ink active:brightness-125">
           {tr.phone.stopAndEdit}
         </button>
         <button type="button" onClick={onCancel} className="h-12 rounded-xl border border-line-2 bg-panel text-[15px] font-medium">

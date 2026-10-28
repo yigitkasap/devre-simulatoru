@@ -156,7 +156,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
                 aria-selected={selected}
                 onClick={() => setCategory(c.id)}
                 className={`h-11 shrink-0 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap ${
-                  selected ? 'border-ink bg-ink text-white' : 'border-line-2 bg-panel text-ink'
+                  selected ? 'border-ink bg-ink text-on-ink' : 'border-line-2 bg-panel text-ink'
                 }`}
               >
                 {c.label}

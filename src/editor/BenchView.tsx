@@ -70,6 +70,8 @@ export interface BenchViewProps {
   readonly selection: readonly string[];
   readonly overlayOpen: boolean;
   readonly touch: boolean;
+  /** Koyu tema: masa ve arka plan koyu (modeller değişmez). */
+  readonly dark: boolean;
   readonly callbacks: BenchCallbacks;
 }
 
@@ -88,7 +90,7 @@ export function BenchView(props: BenchViewProps) {
     return () => ro.disconnect();
   }, []);
   return (
-    <div ref={host} className="absolute inset-0 overflow-hidden bg-[#dfe3e8]">
+    <div ref={host} className="absolute inset-0 overflow-hidden bg-bench">
       <Suspense
         fallback={
           <div className="absolute inset-0 flex items-center justify-center text-small text-muted" role="status">
@@ -103,6 +105,7 @@ export function BenchView(props: BenchViewProps) {
           selection={props.selection}
           overlayOpen={props.overlayOpen || guideOpen}
           fitRequest={fit}
+          dark={props.dark}
           callbacks={props.callbacks}
         />
       </Suspense>
@@ -137,7 +140,7 @@ export function BenchView(props: BenchViewProps) {
         </Suspense>
       )}
       {roomy && (
-        <p className="pointer-events-none absolute right-3 bottom-3 left-3 z-10 text-center text-label text-ink-2 [text-shadow:0_1px_0_#fff]">
+        <p className="pointer-events-none absolute right-3 bottom-3 left-3 z-10 text-center text-label text-ink-2 [text-shadow:0_1px_0_var(--color-bench)]">
           {props.touch ? tr.bench.hintTouch : tr.bench.hintMouse}
         </p>
       )}

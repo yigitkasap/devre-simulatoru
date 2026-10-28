@@ -231,7 +231,7 @@ export function PropField({
               aria-checked={checked}
               onClick={() => !checked && onCommit(option)}
               className={`flex h-8 items-center gap-2 rounded-sm border px-2.5 text-small font-medium ${
-                checked ? 'border-ink bg-ink text-white' : 'border-line-2 bg-panel text-ink hover:bg-panel-2'
+                checked ? 'border-ink bg-ink text-on-ink' : 'border-line-2 bg-panel text-ink hover:bg-panel-2'
               }`}
             >
               {swatch && <span className="h-3 w-3 rounded-full border border-white/60" style={{ background: swatch }} aria-hidden="true" />}
@@ -327,7 +327,7 @@ function NumberField({
                 aria-pressed={selected}
                 onClick={() => !selected && onCommit(preset)}
                 className={`h-8 rounded-sm border px-2.5 font-mono text-small font-medium ${
-                  selected ? 'border-ink bg-ink text-white' : 'border-line-2 bg-panel text-ink hover:bg-panel-2'
+                  selected ? 'border-ink bg-ink text-on-ink' : 'border-line-2 bg-panel text-ink hover:bg-panel-2'
                 }`}
               >
                 {presetLabel(preset)}

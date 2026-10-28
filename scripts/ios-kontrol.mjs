@@ -591,6 +591,40 @@ try {
     await ctx.close();
   }
 
+  // --- Tema: Sistem / Açık / Koyu ---------------------------------------------------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const themeOf = () => page.evaluate(() => document.documentElement.dataset.theme);
+    const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    check('tema: sistem koyuyken açılış koyu (koyu zemin)', (await themeOf()) === 'dark' && (await bg()) === 'rgb(14, 19, 24)', await bg());
+    const button = page.getByRole('button', { name: /^Tema:/ });
+    await button.click(); await page.waitForTimeout(150);
+    const items = await page.getByRole('menuitemradio').count();
+    await page.getByRole('menuitemradio', { name: /^Açık/ }).click(); await page.waitForTimeout(200);
+    const light = (await themeOf()) === 'light' && (await bg()) === 'rgb(238, 240, 243)';
+    await page.reload({ waitUntil: 'networkidle' });
+    check('tema: üst çubuktaki düğmeden Açık seçilince açık; sistem koyu olsa da yeniden açılışta açık kalıyor', items === 3 && light && (await themeOf()) === 'light', `${items} seçenek`);
+    await page.getByRole('button', { name: /^Tema:/ }).click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitemradio', { name: /^Koyu/ }).click(); await page.waitForTimeout(200);
+    const metaColor = await page.evaluate(() => document.querySelector('meta[name="theme-color"]')?.getAttribute('content'));
+    check('tema: Koyu seçilince koyu; tarayıcı çubuğunun rengi de koyu', (await themeOf()) === 'dark' && metaColor === '#0e1318', metaColor ?? '');
+    await page.goto(URL0 + 'baraj/', { waitUntil: 'networkidle' });
+    check('tema: baraj sayfası aynı ayarı kullanıyor (koyu)', (await themeOf()) === 'dark' && (await page.getByRole('button', { name: /^Tema:/ }).count()) === 1);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
+    const group = page.getByRole('radiogroup', { name: 'Tema' });
+    await group.getByRole('radio', { name: 'Koyu' }).tap(); await page.waitForTimeout(200);
+    const box = await group.getByRole('radio', { name: 'Koyu' }).boundingBox();
+    check('tema: telefonda ⋯ → Tema (Sistem / Açık / Koyu); Koyu seçilince koyu, düğmeler 44 px', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark' && box !== null && box.height >= 43.5);
+    await page.context().close();
+  }
+
   // --- 8. aşama: hoş geldin, yardım, ayarlar, Geri al'lı bildirim -----------------------------
   {
     const ctx = await browser.newContext({ welcome: true, viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
@@ -1162,7 +1196,8 @@ try {
     const switchOn = await card.getByRole('switch', { name: /Tek tuş kısayolları/ }).getAttribute('aria-checked');
     await bp.keyboard.press('Escape'); await bp.waitForTimeout(200);
     check('baraj (masaüstü): Ayarlar kartı açılıyor (dolma süresi, tek tuş kısayolları), Esc ile kapanıyor', fillText.includes('2 s') && switchOn === 'true' && (await bp.getByRole('dialog', { name: 'Ayarlar' }).count()) === 0, fillText.match(/\d+ s/)?.[0] ?? '');
-    await bp.locator('body').click({ position: { x: 700, y: 30 } }).catch(() => {});
+    // Odak Ayarlar düğmesinden çıksın: başlığa tıklanır (çubuktaki boş bir nokta düğmeye denk gelebiliyor).
+    await bp.getByRole('heading', { level: 1 }).click().catch(() => {});
     await bp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
     await bp.keyboard.press('ArrowUp'); await bp.waitForTimeout(200);
     const upFlow = await flowChecked(bp);

@@ -134,7 +134,7 @@ export function AyarlarKarti({ waterResistance, fillTime, onChange, onClose, sho
           <span className={note}>{tr.baraj.ayarlar.fillTimeNote}</span>
         </div>
       </div>
-      <div className="flex flex-col gap-1 border-t border-[#eef0f3] pt-2.5">
+      <div className="flex flex-col gap-1 border-t border-app pt-2.5">
         <button
           type="button"
           onClick={() => onChange({ waterResistance: TANK_DEFAULTS.waterResistance, fillTime: TANK_DEFAULTS.fillTime })}

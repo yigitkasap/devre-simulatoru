@@ -295,7 +295,7 @@ function MessageButtons({ item, diagnosticContext, messageActions, onSelectMessa
           key={action.label}
           type="button"
           onClick={action.run}
-          className={`rounded-md px-3 ${size} ${action.primary ? 'bg-ink font-semibold text-white hover:brightness-125' : 'border border-line-2 bg-panel font-medium hover:bg-panel-2'}`}
+          className={`rounded-md px-3 ${size} ${action.primary ? 'bg-ink font-semibold text-on-ink hover:brightness-125' : 'border border-line-2 bg-panel font-medium hover:bg-panel-2'}`}
         >
           {action.label}
         </button>
@@ -817,7 +817,7 @@ function ValueStepper({
                 aria-pressed={selected}
                 onClick={() => !selected && onCommit(preset)}
                 className={`rounded-sm border px-2.5 font-mono text-small font-medium ${touch ? 'h-11' : 'h-8'} ${
-                  selected ? 'border-ink bg-ink text-white' : 'border-line-2 bg-panel text-ink hover:bg-panel-2'
+                  selected ? 'border-ink bg-ink text-on-ink' : 'border-line-2 bg-panel text-ink hover:bg-panel-2'
                 }`}
               >
                 {presetLabel(preset)}

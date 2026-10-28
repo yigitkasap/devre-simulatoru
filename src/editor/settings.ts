@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react';
 import type { WireScale } from './colors';
 
 export type ResistorStyle = 'zigzag' | 'iec';
+/** Sistem: cihazın açık / koyu ayarına uyar. */
+export type ThemeChoice = 'system' | 'light' | 'dark';
 
 export interface Settings {
   readonly resistorStyle: ResistorStyle;
@@ -19,6 +21,8 @@ export interface Settings {
   readonly magneticField: boolean;
   /** Hoparlör ve buzzerin sesi çalınsın. */
   readonly sound: boolean;
+  /** Renk teması (sayfanın başındaki betik de aynı kaydı okur: BaseLayout.astro). */
+  readonly theme: ThemeChoice;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -29,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   currentDots: true,
   magneticField: false,
   sound: true,
+  theme: 'system',
 };
 
 const STORAGE_KEY = 'devre-simulatoru:ayarlar';
@@ -48,6 +53,7 @@ function loadSettings(): Settings {
       currentDots: record.currentDots !== false,
       magneticField: record.magneticField === true,
       sound: record.sound !== false,
+      theme: record.theme === 'light' || record.theme === 'dark' ? record.theme : 'system',
     };
   } catch {
     return DEFAULT_SETTINGS;

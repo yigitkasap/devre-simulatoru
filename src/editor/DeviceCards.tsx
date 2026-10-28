@@ -300,7 +300,7 @@ function ScopeControls({
               type="button"
               onClick={onAuto}
               title={tr.scope.autoTitle}
-              className={`shrink-0 rounded-md bg-ink px-3 text-small font-semibold text-white hover:brightness-125 ${touch ? 'h-11' : 'h-9'}`}
+              className={`shrink-0 rounded-md bg-ink px-3 text-small font-semibold text-on-ink hover:brightness-125 ${touch ? 'h-11' : 'h-9'}`}
             >
               {tr.scope.auto}
             </button>

@@ -1839,3 +1839,29 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
    `TabletChrome.tsx`, `Inspector.tsx` silindi; `InspectTab`, `MessagesTab`, `ExampleTab`,
    `PhoneSheets`, `PhoneDevices`, `SimBar`, `HintStrip` yalnızca defterin kullandığı parçalara
    indi). ios-kontrol'ün telefon ve tablet bölümleri yeni düzene göre yazıldı (155 madde).
+
+### Renk teması: açık ve koyu (2026-10-28)
+
+Kullanıcı isteği; 8. adım (3B eklemeleri) bunun için bekletildi. Kararlar: seçim **Sistem / Açık /
+Koyu** (varsayılan Sistem: cihazın ayarına uyar, değişince izler); masaüstünde ve tablette üst
+çubukta Ayarlar'ın yanında güneş / ay / yarım daire düğmesi (açılan menüde üç seçenek), telefonda
+⋯ → Tema; baraj sayfasında da aynı düğme (telefonda ⋯ menüsünde, dokundukça sırayla). Kapsam her
+yer: arayüz, defter, şema kâğıdı, 3B tezgâhın arka planı ve kesim altlığı (modeller ve ışık aynı),
+baraj sayfasının panelleri (sahne çizimi şimdilik gündüz; baraj sayfası B1–B6 ile yenilenecek).
+
+- Seçim `settings.ts` → `theme` (bu tarayıcıda saklanır). `theme.ts` → `useTheme` sonucu
+  `<html data-theme>` ile uygular; açılışta yanıp sönmesin diye `BaseLayout.astro`'daki küçük betik
+  aynı kararı React'ten önce verir; tarayıcı çubuğunun rengi (`theme-color`) de değişir.
+- Renkler `global.css`'teki `@theme` belirteçlerinin koyu karşılıkları (`:root[data-theme='dark']`);
+  yeni anlamlı renk yok. Dolgular (accent, ok, danger) beyaz yazıyla en az 4,3:1, yazı tonları koyu
+  panelde en az 6:1. Ters zemin (`bg-ink`: Duraklat, bildirim, seçili çip) koyu temada açılır;
+  üstündeki yazı `text-on-ink`. Yeni rol belirteçleri: `on-ink`, `on-ink-accent`, `scrim`
+  (karartma), `console` ve `console-ink` (Arduino seri ekranı her iki temada koyu), `bench` (3B arka
+  planı). Cihaz ekranları (osiloskop, LCD) iki temada da koyu.
+- Kablo gerilimi renkleri (`colors.ts`) koyu kâğıtta daha açık (aynı tonlar; doygunluk %60, açıklık
+  %56 / %62; renk körlüğü ölçeğinde açık duraklar); açıklama degradesi de buna göre.
+- Yazdırırken (lehim rehberi) her zaman açık tema: koyu belirteçler `@media screen` içinde.
+- ios-kontrol'de 5 tema maddesi (sistem koyuyken koyu açılış, elle Açık seçimi yeniden açılışta
+  kalıyor, Koyu ve tarayıcı çubuğu rengi, baraj sayfası aynı ayar, telefonda ⋯ → Tema 44 px).
+  Baraj maddesinde odağı bırakmak için üst çubukta sabit bir noktaya tıklanıyordu; o nokta "Tek ışık"
+  düğmesine denk gelebildiği için başlığa tıklanacak biçimde düzeltildi (160 madde).

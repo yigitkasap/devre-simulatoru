@@ -48,7 +48,10 @@ export type IconName =
   | 'measure'
   | 'devices'
   | 'lock'
-  | 'external';
+  | 'external'
+  | 'sun'
+  | 'moon'
+  | 'themeSystem';
 
 const PATHS: Record<IconName, ReactNode> = {
   menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
@@ -218,6 +221,19 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="4.5" y="9" width="11" height="8" rx="1.5" />
       <path d="M7 9V6.5a3 3 0 0 1 6 0V9" />
+    </>
+  ),
+  sun: (
+    <>
+      <circle cx="10" cy="10" r="3.4" />
+      <path d="M10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8M4.7 4.7l1.3 1.3M14 14l1.3 1.3M4.7 15.3L6 14M14 6l1.3-1.3" />
+    </>
+  ),
+  moon: <path d="M16.2 12.4A6.6 6.6 0 0 1 7.6 3.8a6.6 6.6 0 1 0 8.6 8.6z" />,
+  themeSystem: (
+    <>
+      <circle cx="10" cy="10" r="6.6" />
+      <path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none" />
     </>
   ),
 };

@@ -146,7 +146,7 @@ export function BurnBalloon({
         <Rich text={detail} />
       </span>
       <div className="flex gap-2">
-        <button type="button" onClick={onRepair} className="h-9 rounded-md bg-ink px-3.5 text-small font-semibold text-white hover:brightness-125">
+        <button type="button" onClick={onRepair} className="h-9 rounded-md bg-ink px-3.5 text-small font-semibold text-on-ink hover:brightness-125">
           {tr.balloon.repair}
         </button>
         <button type="button" onClick={onClose} className="h-9 rounded-md border border-line-2 bg-panel px-3 text-small font-medium hover:bg-panel-2">

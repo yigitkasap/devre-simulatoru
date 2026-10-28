@@ -1276,6 +1276,14 @@ export const tr = {
     welcome: 'İlk açılış turunu göster',
     shortcuts: 'Kısayollar (?)',
   },
+  theme: {
+    label: 'Tema',
+    options: { system: 'Sistem', light: 'Açık', dark: 'Koyu' } as Record<string, string>,
+    notes: { light: 'Açık zemin', dark: 'Koyu zemin' } as Record<string, string>,
+    systemNote: (theme: string) => `Cihazın ayarına uyar (şu an ${theme === 'dark' ? 'koyu' : 'açık'})`,
+    button: (choice: string, theme: string) =>
+      `Tema: ${choice === 'system' ? `Sistem, şu an ${theme === 'dark' ? 'koyu' : 'açık'}` : choice === 'dark' ? 'Koyu' : 'Açık'}`,
+  },
   canvas: {
     label: 'Devre şeması',
     empty: 'Başlamak için sağdaki defterin sonundaki “Parça ekle” satırına bir parça adı yaz.',

@@ -25,7 +25,9 @@ import type { PropValue } from '../sim/netlist';
 import { CircuitView } from '../editor/CircuitView';
 import { useBrowserFullscreen } from '../editor/fullscreen';
 import { Icon } from '../editor/icons';
-import { useSettings } from '../editor/settings';
+import { useSettings, type ThemeChoice } from '../editor/settings';
+import { useTheme } from '../editor/theme';
+import { ThemeMenu } from '../editor/TopBar';
 import { Logo } from '../editor/TopBar';
 import { useLayout } from '../editor/useLayout';
 import { useSimulation, type SimFrame } from '../editor/useSimulation';
@@ -192,7 +194,10 @@ const paperStyle = {
 } as const;
 
 export default function BarajSayfasi() {
-  const [appSettings] = useSettings();
+  const [appSettings, updateAppSettings] = useSettings();
+  // Renk teması simülatörle aynı ayardan (Sistem / Açık / Koyu).
+  const theme = useTheme(appSettings.theme);
+  const setTheme = (choice: ThemeChoice) => updateAppSettings({ theme: choice });
   const layout = useLayout();
   const width = useWindowWidth();
   const phone = layout.kind === 'phone';
@@ -408,7 +413,7 @@ export default function BarajSayfasi() {
         e.preventDefault();
         kumandaRef.current?.focus();
       }}
-      className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:min-h-11"
+      className="sr-only z-[100] rounded-md bg-ink px-4 py-2.5 text-sm font-semibold text-on-ink focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:min-h-11"
     >
       {tr.baraj.skipToControls}
     </a>
@@ -458,6 +463,12 @@ export default function BarajSayfasi() {
         items={[
           { kind: 'link', label: tr.baraj.openShort, href: baseHref, onActivate: refreshHref },
           { kind: 'button', label: tr.baraj.ayarlar.title, onClick: () => setSettingsOpen(true) },
+          // Tema: dokundukça Sistem → Açık → Koyu.
+          {
+            kind: 'button',
+            label: tr.theme.button(appSettings.theme, theme),
+            onClick: () => setTheme(appSettings.theme === 'system' ? 'light' : appSettings.theme === 'light' ? 'dark' : 'system'),
+          },
           ...(fullscreen.supported
             ? [{ kind: 'button' as const, label: fullscreen.on ? tr.toolbar.fullscreenExit : tr.toolbar.fullscreen, onClick: fullscreen.toggle }]
             : []),
@@ -589,6 +600,7 @@ export default function BarajSayfasi() {
         />
         <span className="flex-1" />
         {soruButton}
+        <ThemeMenu choice={appSettings.theme} theme={theme} onChange={setTheme} touch />
         {fullscreen.supported && (
           <button
             type="button"

@@ -104,14 +104,22 @@ function radialTexture(inner: string, outer: string): CanvasTexture {
   return t;
 }
 
-function matTexture(): CanvasTexture {
+/** Arka plan ve kesim altlığı: açık temada açık gri, koyu temada koyu (modeller aynı kalır). */
+const BACKGROUND = { light: '#dfe3e8', dark: '#161c22' } as const;
+const MAT = {
+  light: { fill: '#e9ebe6', thin: 'rgba(80, 96, 110, 0.10)', thick: 'rgba(80, 96, 110, 0.22)' },
+  dark: { fill: '#1f262d', thin: 'rgba(170, 186, 200, 0.08)', thick: 'rgba(170, 186, 200, 0.18)' },
+} as const;
+
+function matTexture(dark = false): CanvasTexture {
   // Kesim altlığı: 1 birim (2,54 mm) aralıklı ince, 10 birimde kalın çizgiler.
+  const colors = dark ? MAT.dark : MAT.light;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 400;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#e9ebe6';
+  ctx.fillStyle = colors.fill;
   ctx.fillRect(0, 0, 400, 400);
-  ctx.strokeStyle = 'rgba(80, 96, 110, 0.10)';
+  ctx.strokeStyle = colors.thin;
   ctx.lineWidth = 1;
   for (let i = 0; i <= 10; i++) {
     ctx.beginPath();
@@ -121,7 +129,7 @@ function matTexture(): CanvasTexture {
     ctx.lineTo(400, i * 40);
     ctx.stroke();
   }
-  ctx.strokeStyle = 'rgba(80, 96, 110, 0.22)';
+  ctx.strokeStyle = colors.thick;
   ctx.lineWidth = 2;
   ctx.strokeRect(0, 0, 400, 400);
   const t = new CanvasTexture(canvas);
@@ -157,6 +165,7 @@ export class BenchScene {
   private animating = false;
   private lastTime = performance.now();
   private fitted = false;
+  private dark = false;
   /** Kullanıcı kamerayı elle oynattı mı (oynatmadıysa alan değişince yeniden sığdırılır). */
   private userMoved = false;
   private lastFitTop = false;
@@ -184,7 +193,7 @@ export class BenchScene {
     this.pmrem = new PMREMGenerator(this.renderer);
     this.scene.environment = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.85;
-    this.scene.background = new Color('#dfe3e8');
+    this.scene.background = new Color(BACKGROUND.light);
     this.scene.add(new HemisphereLight('#ffffff', '#aab4bf', 0.55));
     const sun = new DirectionalLight('#ffffff', 1.5);
     sun.position.set(40, 90, 30);
@@ -239,6 +248,21 @@ export class BenchScene {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     if (this.fitted && !this.userMoved) this.fit(this.lastFitTop);
+    this.dirty = true;
+  }
+
+  /** Koyu tema: arka plan ve masa koyu; ışık ve modeller aynı kalır. */
+  setTheme(dark: boolean): void {
+    if (dark === this.dark) return;
+    this.dark = dark;
+    this.scene.background = new Color(dark ? BACKGROUND.dark : BACKGROUND.light);
+    const material = this.table.material as MeshStandardMaterial;
+    const old = material.map;
+    const texture = matTexture(dark);
+    texture.repeat.set(200, 200);
+    material.map = texture;
+    material.needsUpdate = true;
+    old?.dispose();
     this.dirty = true;
   }
 

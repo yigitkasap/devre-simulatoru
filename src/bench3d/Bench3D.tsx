@@ -15,10 +15,12 @@ export interface Bench3DProps {
   readonly overlayOpen: boolean;
   /** Arttıkça kamera devreyi yeniden sığdırır; `top`: üstten bakış. */
   readonly fitRequest: { readonly n: number; readonly top: boolean };
+  /** Koyu tema: masa ve arka plan koyu. */
+  readonly dark: boolean;
   readonly callbacks: BenchCallbacks;
 }
 
-export default function Bench3D({ doc, frame, active, selection, overlayOpen, fitRequest, callbacks }: Bench3DProps) {
+export default function Bench3D({ doc, frame, active, selection, overlayOpen, fitRequest, dark, callbacks }: Bench3DProps) {
   const host = useRef<HTMLDivElement>(null);
   const scene = useRef<BenchScene | null>(null);
   const cb = useRef(callbacks);
@@ -39,6 +41,7 @@ export default function Bench3D({ doc, frame, active, selection, overlayOpen, fi
     };
   }, []);
 
+  useEffect(() => scene.current?.setTheme(dark), [dark]);
   useEffect(() => scene.current?.setDoc(doc), [doc]);
   useEffect(() => scene.current?.setFrame(frame, active), [frame, active]);
   useEffect(() => scene.current?.setSelection(selection), [selection]);
