@@ -78,14 +78,14 @@ function Label({ children, panel }: { children: ReactNode; panel?: string }) {
 }
 
 /** Açma/kapama satırı (anahtar görünümünde). */
-function ToggleRow({ label, note, checked, onChange }: { label: ReactNode; note?: string; checked: boolean; onChange: (on: boolean) => void }) {
+function ToggleRow({ label, note, checked, onChange, touch = true }: { label: ReactNode; note?: string; checked: boolean; onChange: (on: boolean) => void; touch?: boolean }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex min-h-11 items-center justify-between gap-3 text-left text-[15px]"
+      className={`flex items-center justify-between gap-3 text-left ${touch ? 'min-h-11 text-[15px]' : 'min-h-9 text-sm'}`}
     >
       <span>
         {label}
@@ -186,12 +186,12 @@ export function PhoneDevicesBody(props: PhoneDevicesProps) {
             onJack={jack}
           />
         )}
-        {active.type === 'funcgen' && <PhoneFuncGen part={active} output={props.outputVoltage(active.id)} onChange={change} onJack={jack} />}
+        {active.type === 'funcgen' && <FuncGenControls part={active} output={props.outputVoltage(active.id)} onChange={change} onJack={jack} />}
         {active.type === 'tank' && (
           <TankControls part={active} status={props.status(active.id)} running={props.running} onChange={change} onJack={jack} touch />
         )}
         {active.type === 'dcsupply' && (
-          <PhoneDcSupply
+          <DcSupplyControls
             part={active}
             status={props.status(active.id)}
             running={props.running}
@@ -355,16 +355,19 @@ const WAVE_PATHS: Record<Waveform, string> = {
   triangle: 'M2 17l5-10 5 10 5-10 5 10',
 };
 
-function PhoneFuncGen({
+export function FuncGenControls({
   part,
   output,
   onChange,
   onJack,
+  touch = true,
 }: {
   part: Part;
   output: number | null;
   onChange: (patch: Record<string, PropValue>) => void;
   onJack: (pin: number) => void;
+  /** Telefon: 44 px dokunma hedefleri; defter kartında (masaüstü) sıkı. */
+  touch?: boolean;
 }) {
   const s = funcgenSettings(part.props);
   const L = FUNCGEN_LIMITS;
@@ -396,7 +399,7 @@ function PhoneFuncGen({
               role="radio"
               aria-checked={checked}
               onClick={() => !checked && onChange({ waveform: w })}
-              className={`flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-[10px] text-[13px] ${
+              className={`flex min-w-0 flex-1 ${touch ? 'h-14' : 'h-12'} flex-col items-center justify-center gap-0.5 rounded-[10px] text-[13px] ${
                 checked ? 'border-2 border-ink bg-panel font-semibold' : 'border border-rack-line bg-key font-medium'
               }`}
             >
@@ -411,7 +414,7 @@ function PhoneFuncGen({
       <div className="flex flex-col gap-1">
         <Label panel={`FREQ · ${tr.phone.freqRange}`}>{tr.rack.frequency}</Label>
         <Stepper
-          touch
+          touch={touch}
           label={tr.rack.frequency}
           text={freq}
           canDown={s.frequency > L.minFrequency}
@@ -428,7 +431,7 @@ function PhoneFuncGen({
       <div className="flex flex-col gap-1">
         <Label panel={`${tr.rack.amplitudePanel} · ${tr.phone.amplitudeNote}`}>{tr.rack.amplitude}</Label>
         <Stepper
-          touch
+          touch={touch}
           label={tr.rack.amplitude}
           text={formatSI(s.amplitude, 'V', { digits: 3 })}
           canDown={s.amplitude > 0}
@@ -442,7 +445,7 @@ function PhoneFuncGen({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <Label panel="OFFSET">{tr.rack.offset}</Label>
           <Stepper
-            touch
+            touch={touch}
             label={tr.rack.offset}
             text={`${s.offset > 0 ? '+' : ''}${formatNumber(s.offset, 1)} V`}
             canDown={s.offset > -L.maxOffset}
@@ -455,7 +458,7 @@ function PhoneFuncGen({
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <Label panel="DUTY">{tr.rack.duty}</Label>
           <Stepper
-            touch
+            touch={touch}
             label={tr.rack.duty}
             text={`%${duty}`}
             canDown={duty > L.minDuty}
@@ -474,8 +477,9 @@ function PhoneFuncGen({
         }
         checked={s.attenuate}
         onChange={(attenuate) => onChange({ attenuate })}
+        touch={touch}
       />
-      <ToggleRow label={tr.rack.earthed} note={tr.phone.earthedNote} checked={s.earthed} onChange={(earthed) => onChange({ earthed })} />
+      <ToggleRow label={tr.rack.earthed} note={tr.phone.earthedNote} checked={s.earthed} onChange={(earthed) => onChange({ earthed })} touch={touch} />
       <p className="rounded-[10px] bg-panel px-3 py-2.5 text-[13px] leading-normal text-ink-2">
         <HintText text={output === null ? tr.phone.outputStopped : tr.phone.output(formatSI(output, 'V', { digits: 3 }))} />
       </p>
@@ -490,13 +494,14 @@ function PhoneFuncGen({
 
 // --- DC güç kaynağı ------------------------------------------------------------------------
 
-function PhoneDcSupply({
+export function DcSupplyControls({
   part,
   status,
   running,
   connected,
   onChange,
   onJack,
+  touch = true,
 }: {
   part: Part;
   status: DeviceStatus;
@@ -504,6 +509,8 @@ function PhoneDcSupply({
   connected: readonly [boolean, boolean];
   onChange: (patch: Record<string, PropValue>) => void;
   onJack: (pin: number) => void;
+  /** Telefon: 44 px dokunma hedefleri; defter kartında (masaüstü) sıkı. */
+  touch?: boolean;
 }) {
   const s = dcsupplySettings(part.props);
   return (
@@ -543,7 +550,7 @@ function PhoneDcSupply({
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <Label>{tr.rack.voltage}</Label>
                 <Stepper
-                  touch
+                  touch={touch}
                   label={`${tr.rack.output(n)} ${tr.rack.voltage.toLocaleLowerCase('tr-TR')}`}
                   text={formatNumber(setVoltage, 2)}
                   canDown={setVoltage > 0}
@@ -556,7 +563,7 @@ function PhoneDcSupply({
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <Label>{tr.rack.currentLimit}</Label>
                 <Stepper
-                  touch
+                  touch={touch}
                   label={`${tr.rack.output(n)} ${tr.rack.currentLimit.toLocaleLowerCase('tr-TR')}`}
                   text={formatSI(limit, 'A', { trim: true })}
                   canDown={limit > 1e-3}

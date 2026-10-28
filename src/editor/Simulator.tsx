@@ -22,7 +22,6 @@ import { loadSavedDoc, useAutosave } from './autosave';
 import { BottomSheet, SheetBody, SheetHeader, type SheetSize } from './BottomSheet';
 import { BenchView, ViewToggle, useViewMode } from './BenchView';
 import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type PhoneCanvas } from './Canvas';
-import { DeviceRack, type RackLayout } from './DeviceRack';
 import { ExamplesDialog } from './ExamplesDialog';
 import { ExampleTab } from './ExampleTab';
 import { HelpDialog } from './HelpDialog';
@@ -72,25 +71,8 @@ function initialDoc(): { doc: CircuitDoc; shared: 'loaded' | 'error' | null } {
   return { doc: loadSavedDoc() ?? emptyDoc(), shared: shared === null ? 'error' : null };
 }
 
-/** Masaüstünde kütüphanenin açık ya da şerit olduğu tarayıcıda hatırlanır. */
 /** Ayarları cihaz rafındaki ön panelinde olan parçalar. */
 const RACK_TYPES: ReadonlySet<DeviceType> = new Set<DeviceType>(['oscilloscope', 'funcgen', 'dcsupply', 'tank']);
-
-/** Rafın düzeni (yan yana / tek tek) tarayıcıda hatırlanır. */
-const RACK_KEY = 'devre-simulatoru:raf';
-function loadRackLayout(): RackLayout {
-  try {
-    return window.localStorage.getItem(RACK_KEY) === 'side' ? 'side' : 'single';
-  } catch {
-    return 'single';
-  }
-}
-
-/** Kur düzeninde rafın yüksekliği (px; M05a). Ölç düzeninde kolonun %60'ı (M06a). */
-const RACK_KUR_HEIGHT = 300;
-const RACK_MIN_HEIGHT = 140;
-/** Raf büyürken tuvale (ve ipucu şeridine) en az bu kadar yer kalır. */
-const CANVAS_MIN_HEIGHT = 200;
 
 /** Osiloskop ekranının bir taraması ≈ 0,2 s sürecek simülasyon hızı (en fazla ×1). */
 function sweepSpeed(timePerDiv: number): number {
@@ -119,15 +101,8 @@ export default function Simulator() {
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('inspect');
   /** Artınca İncele sekmesindeki (telefonda parça sayfasındaki) ilk değer alanına odaklanılır. */
   const [focusRequest, setFocusRequest] = useState(0);
-  // Cihaz rafı ve Ölç düzeni (N01).
-  const [rackLayout, setRackLayout] = useState<RackLayout>(loadRackLayout);
+  // Telefon ve tablette Cihazlar sayfasında öndeki cihaz (masaüstünde cihazlar defterin kartları).
   const [rackActive, setRackActive] = useState<string | null>(null);
-  const [rackCollapsed, setRackCollapsed] = useState(false);
-  const [rackHeights, setRackHeights] = useState<{ kur: number; olc: number | null }>({ kur: RACK_KUR_HEIGHT, olc: null });
-  /** Ölç düzeni: Oynat'tan sonra rafta cihaz varsa kütüphane ve İnceleme paneli şeride iner, raf büyür. */
-  const [measureLayout, setMeasureLayout] = useState(false);
-  const [columnHeight, setColumnHeight] = useState(0);
-  const columnRef = useRef<HTMLDivElement>(null);
   /** Rafta bir jaka tıklanınca o ucun kısa süre yanıp sönmesi. */
   const [flash, setFlash] = useState<Highlight | null>(null);
   const [shareLink, setShareLink] = useState<string | null>(null);
@@ -601,31 +576,15 @@ export default function Simulator() {
 
   // --- Cihaz rafı ---------------------------------------------------------------------------
   const instruments = doc.parts.filter((p) => RACK_TYPES.has(p.type));
-  // Tablette cihazlar İnceleme panelinin Cihazlar sekmesinde (raf yok).
-  const showRack = !touchUi && instruments.length > 0;
   // Tuvalde bir cihaz seçilince raf (telefonda Cihazlar sayfası) onu gösterir.
   const selectedInstrument = singlePart && RACK_TYPES.has(singlePart.type) ? singlePart.id : null;
   useEffect(() => {
     if (selectedInstrument) setRackActive(selectedInstrument);
   }, [selectedInstrument]);
-  // Kolonun yüksekliği (rafın en büyük yüksekliği bundan hesaplanır).
-  useEffect(() => {
-    const el = columnRef.current;
-    if (!el) return undefined;
-    const observer = new ResizeObserver((entries) => setColumnHeight(entries[0]?.contentRect.height ?? 0));
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [phone]);
-  const rackMax = Math.max(RACK_MIN_HEIGHT, Math.min(columnHeight * 0.6, columnHeight - CANVAS_MIN_HEIGHT - 28 - 52));
-  const clampRack = (h: number) => Math.round(Math.max(RACK_MIN_HEIGHT, Math.min(rackMax, h)));
-  const rackHeight = clampRack(measureLayout ? (rackHeights.olc ?? rackMax) : rackHeights.kur);
-  // Ölç düzenine giriş (Oynat) ve çıkış (Durdur, parça sürükleme).
   const previousRunStatus = useRef(sim.status);
   useEffect(() => {
     const before = previousRunStatus.current;
     previousRunStatus.current = sim.status;
-    if (sim.status === 'stopped') setMeasureLayout(false);
-    else if (sim.status === 'running' && before === 'stopped' && showRack) setMeasureLayout(true);
     // Kilit bilgisi yalnızca ilk Ölç'te; sonra kip rozeti yeter (N02).
     if (sim.status === 'stopped' && before !== 'stopped') setLockChipClosed(true);
     // Oynat'ta Bağla kipi ve parça ekleme kapanır (Ölç'te yapı kilitli).
@@ -640,10 +599,7 @@ export default function Simulator() {
     } else if (sim.status === 'stopped' && before !== 'stopped') {
       setSheet((s) => (s?.kind === 'devices' || s?.kind === 'speed' ? null : s));
     }
-  }, [sim.status, showRack]);
-  useEffect(() => {
-    if (tool.kind === 'place' || libraryDragType) setMeasureLayout(false);
-  }, [tool.kind, libraryDragType]);
+  }, [sim.status]);
   /** Raftaki jak: o ucun ve kablolarının kısa süre yanıp sönmesi. */
   const flashTimer = useRef(0);
   const flashPin = (partId: string, pin: number) => {
@@ -664,10 +620,7 @@ export default function Simulator() {
     canvasRef.current?.reveal([partId], [...wires]);
     flashTimer.current = window.setTimeout(() => setFlash(null), 1800);
   };
-  const showInRack = (partId: string) => {
-    setRackActive(partId);
-    setRackCollapsed(false);
-  };
+  const showInRack = (partId: string) => setRackActive(partId);
 
   // --- Telefon ------------------------------------------------------------------------------
   // Kip: Bağla (kablo çekerken), Ölç (çalışıyor ya da duraklatılmış; yapı kilitli) ya da Kur.
@@ -1663,7 +1616,7 @@ export default function Simulator() {
       {fileInput}
 
       <div className="relative flex min-h-0 flex-1">
-        <div ref={columnRef} className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 flex-1">
             {canvas}
             {viewMode === 'schematic' && (
@@ -1675,37 +1628,6 @@ export default function Simulator() {
               />
             )}
           </main>
-          {showRack && (
-            <DeviceRack
-              devices={instruments}
-              layout={rackLayout}
-              onLayout={(next) => {
-                setRackLayout(next);
-                try {
-                  window.localStorage.setItem(RACK_KEY, next);
-                } catch {
-                  // Depolama kapalı: tercih yalnızca bu oturumda geçerli.
-                }
-              }}
-              activeId={rackActive ?? instruments[0]!.id}
-              onActive={setRackActive}
-              collapsed={rackCollapsed}
-              onCollapsed={setRackCollapsed}
-              height={rackHeight}
-              onResize={(h) => setRackHeights((hs) => (measureLayout ? { ...hs, olc: clampRack(h) } : { ...hs, kur: clampRack(h) }))}
-              onResizeEnd={() => {}}
-              scopeView={(id) => sim.frame?.scopes.get(id) ?? null}
-              status={(id) => sim.frame?.statuses.get(id) ?? {}}
-              running={sim.status !== 'stopped'}
-              pinConnected={(id, pin) => !connectivity.unconnectedPins.has(pinKey(id, pin))}
-              onChange={changeInstrument}
-              onAuto={(id) => {
-                const target = doc.parts.find((p) => p.id === id);
-                if (target) autoScopeFor(target);
-              }}
-              onJack={flashPin}
-            />
-          )}
 
         </div>
         {focus.panels.right && (
@@ -1730,6 +1652,19 @@ export default function Simulator() {
               issues={issues}
               example={exampleProps}
               add={{ chainTo: deskChainTo, onAdd: addFromNotebook, onOpenExample: loadExample }}
+              devices={{
+                scopeView: (id) => sim.frame?.scopes.get(id) ?? null,
+                status: (id) => sim.frame?.statuses.get(id) ?? {},
+                outputVoltage: (id) => sim.frame?.measurements.get(id)?.voltage ?? null,
+                running: sim.status !== 'stopped',
+                pinConnected: (id, pin) => !connectivity.unconnectedPins.has(pinKey(id, pin)),
+                onChange: changeInstrument,
+                onAuto: (id) => {
+                  const target = doc.parts.find((p) => p.id === id);
+                  if (target) autoScopeFor(target);
+                },
+                onJack: flashPin,
+              }}
             />
           </aside>
         )}

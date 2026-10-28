@@ -12,7 +12,7 @@ import { TANK_LIMITS, TANK_PROBE_HEIGHTS, probeWetness, tankSettings, type TankM
 import type { PropValue } from '../sim/netlist';
 import { formatEditable, formatNumber, formatSI } from '../sim/units';
 import { validateNumber } from './propertyForm';
-import { Face, Jack, Lcd, PanelLabel, Segmented, StatusLamp, Stepper, step125 } from './RackControls';
+import { Jack, Lcd, PanelLabel, Segmented, StatusLamp, Stepper, step125 } from './RackControls';
 
 /** Su rengi (sembol ve kaydırıcı). */
 export const WATER_COLOR = '#2f7fc4';
@@ -146,12 +146,3 @@ export function TankControls({ part, status, running, onChange, onJack, touch = 
 }
 
 /** Raftaki ön panel. */
-export function TankFace({ className, ...props }: TankControlsProps & { readonly className?: string }) {
-  return (
-    <Face title={tr.rack.tank} label={props.part.label} ariaLabel={`${tr.rack.tank} ${props.part.label}`} className={className}>
-      <div className="flex shrink-0 flex-col px-3 py-2.5">
-        <TankControls {...props} />
-      </div>
-    </Face>
-  );
-}

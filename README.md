@@ -1800,3 +1800,11 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
    (zincirle ekle, telefondaki `chainPlacement`); yoksa şemanın görünen alanında boş bir yere, 3B
    görünümde devrenin sağına. "Bütün parçalara göz at (35)" kategorili ızgara penceresini açar.
    Tur, Yardım ve boş tuval metinleri buna göre.
+5. **Cihaz kartları** (`src/editor/DeviceCards.tsx`): alttaki cihaz rafı ve Ölç düzeni kalktı
+   (`DeviceRack.tsx`, `InstrumentFaces.tsx` silindi); osiloskop, fonksiyon üreteci, DC güç kaynağı ve
+   su haznesi defterin kartları. Osiloskop kartı (D2): kart genişliğinde ekran (10 × 8 bölme yatayda
+   esner; sıfır üçgenleri ve harfler gerçek boyutta HTML katmanında), ölçüm satırları, Kanal A,
+   Kanal B (V/b, AC / GND / DC), Zaman (s/b, kip); konum, B ters, tetik ve Oto, giriş, şebeke
+   toprağı ve jaklar "Gelişmiş" altında; başlıkta tetik durumu. Üreteç, güç kaynağı ve hazne
+   telefondaki denetimleri sıkı boyutta kullanır. Kapalı kartta ayar özeti ("Sinüs · 1 kHz · 10 Vpp",
+   osiloskopta çalışırken A'nın tepe-tepesi).

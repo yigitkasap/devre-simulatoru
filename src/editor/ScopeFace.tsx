@@ -1,27 +1,13 @@
-// Osiloskop ön paneli (tasarım: M06a–c, M05a, DS-Cihaz). Ekran (iki kanal, sürüklenebilir sıfır
-// üçgenleri), kanal ayarları, kip, zaman/bölme, tetik ve Oto; altta giriş ve şebeke toprağı. Ayarlar
-// parçanın özelliklerinde saklanır (kaydedilir, paylaşılır, geri alınabilir; simülasyonu durdurmaz).
+// Osiloskobun ekranı (iki kanal, sürüklenebilir sıfır üçgenleri) ve ölçüm satırları; defterdeki
+// osiloskop kartı (DeviceCards.tsx) ve telefonun Cihazlar sayfası kullanır. Ayarlar parçanın
+// özelliklerinde saklanır (kaydedilir, paylaşılır, geri alınabilir; simülasyonu durdurmaz).
 
 import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { tr } from '../i18n/tr';
 import type { Part } from '../model/types';
-import {
-  SCOPE_COUPLINGS,
-  SCOPE_INPUTS,
-  SCOPE_MODES,
-  SCOPE_TRIGGERS,
-  TIME_PER_DIV_STEPS,
-  VOLTS_PER_DIV_STEPS,
-  scopeSettings,
-  type ScopeCoupling,
-  type ScopeInput,
-  type ScopeMode,
-  type ScopeSettings,
-  type ScopeTrigger,
-} from '../sim/devices/oscilloscope';
+import type { ScopeSettings } from '../sim/devices/oscilloscope';
 import type { PropValue } from '../sim/netlist';
-import { formatNumber, formatSI } from '../sim/units';
-import { ChannelBadge, Face, Jack, PanelLabel, Segmented, Stepper } from './RackControls';
+import { formatSI } from '../sim/units';
 import { SCREEN_DIV, SCREEN_H, SCREEN_W, type ChannelStats, type ScopeView } from './scopeView';
 
 /** Kanal renkleri (koyu ekranda iyi seçilen sarı ve camgöbeği; açık zeminde koyu tonları). */
@@ -29,11 +15,9 @@ export const SCOPE_COLORS = ['var(--color-ch-a)', 'var(--color-ch-b)'] as const;
 const LIGHT_COLORS = ['#7a5c00', '#0e6b8a'] as const;
 export const CHANNELS = ['A', 'B'] as const;
 const POSITION_LIMIT = 4;
-const POSITION_STEP = 0.5;
 
 export const voltsLabel = (v: number) => `${formatSI(v, 'V', { trim: true })}${tr.scope.perDiv}`;
 export const timeLabel = (t: number) => `${formatSI(t, 's', { trim: true })}${tr.scope.perDiv}`;
-const positionLabel = (p: number) => `${p > 0 ? '+' : ''}${formatNumber(p, 1)} ${tr.rack.divShort}`;
 
 function statsText(stats: ChannelStats): string {
   const parts = [`${tr.scope.peakToPeak} ${formatSI(stats.peakToPeak, 'V')}`, `${tr.scope.rms} ${formatSI(stats.rms, 'V')}`];
@@ -45,210 +29,6 @@ export function stepIn(steps: readonly number[], value: number, direction: 1 | -
   const index = steps.findIndex((s) => Math.abs(s - value) <= s * 1e-6);
   const i = index < 0 ? steps.findIndex((s) => s > value) : index;
   return steps[Math.min(steps.length - 1, Math.max(0, (i < 0 ? steps.length - 1 : i) + direction))]!;
-}
-
-export interface ScopeFaceProps {
-  readonly part: Part;
-  /** Simülasyon çalışmıyorsa null. */
-  readonly view: ScopeView | null;
-  readonly connected: readonly [boolean, boolean];
-  /** Ekranın yüksekliği (px); genişlik 5:4. */
-  readonly screenHeight: number;
-  readonly onChange: (patch: Record<string, PropValue>) => void;
-  readonly onAuto: () => void;
-  /** Jak: tuvalde ilgili ucu göster (0 = A, 1 = B, 2 = COM). */
-  readonly onJack: (pin: number) => void;
-  readonly className?: string;
-  readonly style?: CSSProperties;
-}
-
-export function ScopeFace({ part, view, connected, screenHeight, onChange, onAuto, onJack, className, style }: ScopeFaceProps) {
-  const settings = scopeSettings(part.props);
-  const xy = settings.mode === 'xy';
-  const add = settings.mode === 'add';
-
-  const status =
-    view && !xy ? (
-      <span className={`ml-2 flex items-center gap-1.5 text-label ${view.triggered ? 'text-ink' : 'text-warn'}`}>
-        <i className={`block h-2 w-2 rounded-full ${view.triggered ? 'bg-ok' : 'bg-paused'}`} aria-hidden="true" />
-        {view.triggered ? tr.rack.triggered : tr.scope.rolling}
-      </span>
-    ) : null;
-  const badge = add ? tr.rack.badgeAdd(settings.invertB) : xy ? tr.rack.badgeXy : null;
-
-  return (
-    <Face
-      title={tr.scope.title}
-      label={part.label}
-      ariaLabel={`${tr.scope.title} ${part.label}${xy ? `, ${tr.rack.badgeXy}` : ''}`}
-      className={className}
-      style={style}
-      extra={
-        <>
-          {status}
-          <span className="flex-1" />
-          {badge ? (
-            <span className="rounded-xs bg-ink px-2 py-0.5 text-label font-semibold text-white">{badge}</span>
-          ) : (
-            <span className="text-label text-muted">{settings.input === 'real' ? tr.rack.inputReal : tr.rack.inputIdeal}</span>
-          )}
-        </>
-      }
-    >
-      {/* İçerik doğal yüksekliğinde; raf alçaksa panel kendi içinde kayar. */}
-      <div className="flex shrink-0 gap-3.5 px-3 py-2.5">
-        <div className="flex shrink-0 flex-col gap-1">
-          <Screen part={part} view={view} settings={settings} height={screenHeight} onChange={onChange} />
-          <StatsLines view={view} settings={settings} connected={connected} />
-        </div>
-
-        <div className="grid min-w-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(150px,1fr))] content-start gap-x-3.5 gap-y-3">
-          {CHANNELS.map((name, index) => (
-            <ChannelControls key={name} name={name} index={index as 0 | 1} settings={settings} onChange={onChange} />
-          ))}
-          <div className="flex flex-col gap-1.5">
-            <span className="flex h-[18px] items-center text-small font-semibold">{tr.rack.modeAndTime}</span>
-            <PanelLabel panel="MODE">{tr.scope.mode}</PanelLabel>
-            <Segmented<ScopeMode>
-              label={tr.scope.mode}
-              options={SCOPE_MODES.map((m) => ({ value: m, text: tr.rack.modes[m] }))}
-              value={settings.mode}
-              onChange={(mode) => onChange({ mode })}
-            />
-            <PanelLabel panel={xy ? tr.rack.xyTimeUnused : 'TIME/DIV'} muted={xy}>
-              {tr.scope.timePerDiv}
-            </PanelLabel>
-            <Stepper
-              label={tr.scope.timePerDiv}
-              text={timeLabel(settings.timePerDiv)}
-              disabled={xy}
-              canDown={settings.timePerDiv > TIME_PER_DIV_STEPS[0]!}
-              canUp={settings.timePerDiv < TIME_PER_DIV_STEPS[TIME_PER_DIV_STEPS.length - 1]!}
-              onStep={(d) => onChange({ timePerDiv: stepIn(TIME_PER_DIV_STEPS, settings.timePerDiv, d) })}
-            />
-            <div className="flex gap-1.5 pt-0.5">
-              <Segmented<ScopeTrigger>
-                label={tr.scope.trigger}
-                className="flex-1"
-                disabled={xy}
-                options={SCOPE_TRIGGERS.map((t) => ({ value: t, text: t === 'A' ? tr.rack.triggerA : t }))}
-                value={settings.trigger}
-                onChange={(trigger) => onChange({ trigger })}
-              />
-              <button
-                type="button"
-                onClick={onAuto}
-                title={tr.scope.autoTitle}
-                className="h-9 rounded-md bg-ink px-3 text-small font-semibold text-white hover:brightness-125"
-              >
-                {tr.scope.auto}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-line-2 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <PanelLabel>{tr.rack.input}</PanelLabel>
-          <Segmented<ScopeInput>
-            label={tr.rack.input}
-            className="w-[210px]"
-            options={SCOPE_INPUTS.map((i) => ({ value: i, text: i === 'real' ? tr.rack.inputRealShort : tr.rack.inputIdealShort }))}
-            value={settings.input}
-            onChange={(input) => onChange({ input })}
-          />
-        </div>
-        <label className="flex cursor-pointer items-center gap-2 text-label font-semibold">
-          <input
-            type="checkbox"
-            checked={settings.earthed}
-            onChange={(e) => onChange({ earthed: e.target.checked })}
-            className="h-[18px] w-[18px] accent-earth"
-          />
-          {tr.rack.earthed}
-        </label>
-        <span className="flex-1" />
-        <div className="flex items-end gap-2">
-          <Jack color="var(--color-ch-a)" name="A" label={tr.rack.jack(`${part.label} A`)} onClick={() => onJack(0)} />
-          <Jack color="var(--color-ch-b)" name="B" label={tr.rack.jack(`${part.label} B`)} onClick={() => onJack(1)} />
-          <Jack color="#2c3846" ring={settings.earthed} name="COM" earthed={settings.earthed} label={tr.rack.jack(`${part.label} COM`)} onClick={() => onJack(2)} />
-        </div>
-      </div>
-    </Face>
-  );
-}
-
-function ChannelControls({
-  name,
-  index,
-  settings,
-  onChange,
-}: {
-  name: 'A' | 'B';
-  index: 0 | 1;
-  settings: ScopeSettings;
-  onChange: (patch: Record<string, PropValue>) => void;
-}) {
-  const xy = settings.mode === 'xy';
-  const volts = settings.voltsPerDiv[index];
-  const position = settings.position[index];
-  const title = xy ? (index === 0 ? tr.rack.xyAxisA : tr.rack.xyAxisB) : tr.scope.channel(name);
-  // X-Y'de A yatay eksendir: konumu sola/sağa kaydırır.
-  const horizontal = xy && index === 0;
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="flex h-[18px] items-center gap-1.5 text-small font-semibold">
-        <ChannelBadge name={name} color={SCOPE_COLORS[index]} />
-        {title}
-        {!xy && <small className="font-mono font-medium text-muted">{index === 0 ? 'CH1' : 'CH2'}</small>}
-      </span>
-      <PanelLabel panel="VOLTS/DIV">{tr.scope.voltsPerDiv}</PanelLabel>
-      <Stepper
-        label={`${name} ${tr.scope.voltsPerDiv.toLocaleLowerCase('tr-TR')}`}
-        text={voltsLabel(volts)}
-        canDown={volts > VOLTS_PER_DIV_STEPS[0]!}
-        canUp={volts < VOLTS_PER_DIV_STEPS[VOLTS_PER_DIV_STEPS.length - 1]!}
-        onStep={(d) => onChange({ [`voltsPerDiv${name}`]: stepIn(VOLTS_PER_DIV_STEPS, volts, d) })}
-      />
-      <Segmented<ScopeCoupling>
-        label={`${name} ${tr.scope.coupling.toLocaleLowerCase('tr-TR')}`}
-        options={(['ac', 'gnd', 'dc'] as const)
-          .filter((c) => SCOPE_COUPLINGS.includes(c))
-          .map((c) => ({ value: c, text: tr.scope.couplings[c] ?? c }))}
-        value={settings.coupling[index]}
-        onChange={(c) => onChange({ [`coupling${name}`]: c })}
-      />
-      <PanelLabel panel="POSITION">{tr.rack.position}</PanelLabel>
-      <Stepper
-        label={`${name} ${tr.rack.position.toLocaleLowerCase('tr-TR')}`}
-        text={positionLabel(position)}
-        downGlyph={horizontal ? '◀' : '▼'}
-        upGlyph={horizontal ? '▶' : '▲'}
-        downLabel={horizontal ? tr.rack.moveLeft(name) : tr.rack.moveDown(name)}
-        upLabel={horizontal ? tr.rack.moveRight(name) : tr.rack.moveUp(name)}
-        canDown={position > -POSITION_LIMIT}
-        canUp={position < POSITION_LIMIT}
-        onStep={(d) => onChange({ [`position${name}`]: Math.max(-POSITION_LIMIT, Math.min(POSITION_LIMIT, position + d * POSITION_STEP)) })}
-      />
-      {index === 1 && (
-        <label
-          className={`flex h-9 cursor-pointer items-center gap-2 rounded-md border-[1.5px] bg-panel px-2.5 text-small font-semibold ${
-            settings.invertB ? 'border-ink' : 'border-rack-line'
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={settings.invertB}
-            onChange={(e) => onChange({ invertB: e.target.checked })}
-            className="h-[18px] w-[18px] accent-ink"
-          />
-          {tr.rack.invert}
-          <small className="font-mono font-medium text-muted">INV</small>
-        </label>
-      )}
-    </div>
-  );
 }
 
 /** Ekranın altındaki ölçüm satırları (kanal harfi renginin yanında). */
@@ -300,6 +80,7 @@ export function Screen({
   view,
   settings,
   height,
+  width,
   onChange,
 }: {
   part: Part;
@@ -307,11 +88,22 @@ export function Screen({
   settings: ScopeSettings;
   /** Ekranın yüksekliği (px); "fill" verilirse genişliğin tamamını kaplar (telefon). */
   height: number | 'fill';
+  /**
+   * Verilirse ekran bu genişlikte (defterdeki osiloskop kartı: kart genişliğinde, 10 × 8 bölme yatayda
+   * esner). Çizgiler esner; sıfır üçgenleri ve harfler gerçek boyutta, HTML katmanında çizilir.
+   */
+  width?: number | string;
   onChange: (patch: Record<string, PropValue>) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const drag = useRef<{ channel: 0 | 1; axis: 'x' | 'y' } | null>(null);
-  const size = height === 'fill' ? { width: '100%', aspectRatio: `${SCREEN_W} / ${SCREEN_H}` } : { width: Math.round((height * SCREEN_W) / SCREEN_H), height };
+  const stretch = width !== undefined && height !== 'fill';
+  const size =
+    height === 'fill'
+      ? { width: '100%', aspectRatio: `${SCREEN_W} / ${SCREEN_H}` }
+      : width !== undefined
+        ? { width, height }
+        : { width: Math.round((height * SCREEN_W) / SCREEN_H), height };
   const grid: string[] = [];
   for (let i = 1; i < 10; i++) grid.push(`M${i * SCREEN_DIV},0 V${SCREEN_H}`);
   for (let i = 1; i < 8; i++) grid.push(`M0,${i * SCREEN_DIV} H${SCREEN_W}`);
@@ -337,6 +129,30 @@ export function Screen({
     e.preventDefault();
     drag.current = { channel, axis };
     svgRef.current?.setPointerCapture(e.pointerId);
+  };
+
+  /** Esneyen ekranda üçgen ve harfler: konum yüzdeyle, boyut pikselle. */
+  const overlayMarker = (channel: 0 | 1, axis: 'x' | 'y') => {
+    const p = settings.position[channel] * SCREEN_DIV;
+    const name = CHANNELS[channel];
+    const style: CSSProperties =
+      axis === 'y' ? { left: 0, top: `${((SCREEN_H / 2 - p) / SCREEN_H) * 100}%`, transform: 'translateY(-50%)' } : { top: 0, left: `${((SCREEN_W / 2 + p) / SCREEN_W) * 100}%`, transform: 'translateX(-50%)' };
+    return (
+      <span
+        key={`m${channel}`}
+        onPointerDown={startDrag(channel, axis)}
+        className={`absolute flex h-7 w-7 items-center ${axis === 'y' ? 'cursor-ns-resize justify-start' : 'cursor-ew-resize items-start justify-center'}`}
+        style={style}
+        aria-hidden="true"
+      >
+        <svg width={axis === 'y' ? 12 : 16} height={axis === 'y' ? 16 : 12} viewBox={axis === 'y' ? '0 0 12 16' : '0 0 16 12'}>
+          <path d={axis === 'y' ? 'M0,0 L12,8 L0,16 Z' : 'M0,0 L8,12 L16,0 Z'} fill={SCOPE_COLORS[channel]} />
+          <text x={axis === 'y' ? 1.5 : 5} y={axis === 'y' ? 11 : 8} fontSize={8} fontWeight={700} fontFamily="var(--font-mono)" fill="#0f1713">
+            {name}
+          </text>
+        </svg>
+      </span>
+    );
   };
 
   const marker = (channel: 0 | 1, axis: 'x' | 'y') => {
@@ -406,7 +222,7 @@ export function Screen({
                 strokeLinejoin="round"
                 style={stroke}
               />
-              {end && (
+              {end && !stretch && (
                 <text
                   x={SCREEN_W - 6}
                   y={Math.max(14, Math.min(SCREEN_H - 6, end.y - 8))}
@@ -422,8 +238,28 @@ export function Screen({
             </g>
           );
         })}
-        {xy ? [marker(0, 'x'), marker(1, 'y')] : (settings.mode === 'add' ? [0] : [0, 1]).map((c) => marker(c as 0 | 1, 'y'))}
+        {!stretch && (xy ? [marker(0, 'x'), marker(1, 'y')] : (settings.mode === 'add' ? [0] : [0, 1]).map((c) => marker(c as 0 | 1, 'y')))}
       </svg>
+      {stretch && (
+        <div className="pointer-events-none absolute inset-0 [&>span]:pointer-events-auto" onPointerMove={onMove} onPointerUp={() => (drag.current = null)}>
+          {xy ? [overlayMarker(0, 'x'), overlayMarker(1, 'y')] : (settings.mode === 'add' ? [0] : [0, 1]).map((c) => overlayMarker(c as 0 | 1, 'y'))}
+          {view?.channels.map((channel, index) => {
+            const end = channel.path ? lastPoint(channel.path) : null;
+            if (!end) return null;
+            const label = settings.mode === 'add' ? tr.scope.sum(settings.invertB).replace(/\s/g, '') : CHANNELS[index];
+            return (
+              <span
+                key={`e${index}`}
+                className="absolute right-1.5 -translate-y-full font-mono text-[11px] font-bold"
+                style={{ top: `${(Math.max(14, Math.min(SCREEN_H - 6, end.y - 8)) / SCREEN_H) * 100}%`, color: SCOPE_COLORS[index] }}
+                aria-hidden="true"
+              >
+                {label}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

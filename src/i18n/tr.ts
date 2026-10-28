@@ -1865,6 +1865,7 @@ export const tr = {
     addChained: (pinOf: string) => `${toDative(pinOf)} bağlanır`,
     browseAll: (n: number) => `Bütün parçalara göz at (${n})`,
     allParts: 'Bütün parçalar',
+    scopeAdvanced: 'Gelişmiş: konum, ters çevirme, tetikleme, şebeke toprağı',
     closeAll: 'Bütün parçalar penceresini kapat',
     showPart: (labelAccusative: string) => `${labelAccusative} göster`,
     moreProblems: (n: number) => `${n} sorun daha`,

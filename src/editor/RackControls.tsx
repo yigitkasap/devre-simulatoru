@@ -2,7 +2,7 @@
 // markanın panelini kopyalamaz. Türkçe ad önde; laboratuvarda görülecek panel yazısı yanında küçük
 // mono (VOLTS/DIV). Döner düğme çizilmez: kademeli ayar (− değer +), tekerlek ve ↑/↓ tuşları.
 
-import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { tr } from '../i18n/tr';
 
 /** Ön panel yazısı: Türkçe ad ve yanında küçük panel yazısı. */
@@ -255,46 +255,6 @@ export function Segmented<T extends string>({
   );
 }
 
-/** Lambalı basma düğmesi: lamba yanınca düğme metni kalınlaşır (renk tek başına bilgi taşımaz). */
-export function LampButton({
-  label,
-  pressed,
-  onClick,
-  lamp = 'green',
-  children,
-  wide = false,
-}: {
-  label: string;
-  pressed: boolean;
-  onClick: () => void;
-  lamp?: 'green' | 'amber';
-  children: ReactNode;
-  wide?: boolean;
-}) {
-  const on = lamp === 'green' ? 'var(--color-lamp-on)' : 'var(--color-ch-a)';
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <i
-        className="block h-2 w-2 rounded-full"
-        style={pressed ? { background: on, boxShadow: `0 0 5px ${on}` } : { background: 'var(--color-rack-line)' }}
-        aria-hidden="true"
-      />
-      <button
-        type="button"
-        aria-pressed={pressed}
-        aria-label={label}
-        title={label}
-        onClick={onClick}
-        className={`flex h-9 items-center justify-center rounded-md border border-stopped bg-key font-mono text-[11px] text-ink shadow-[0_2px_0_var(--color-stopped)] active:translate-y-px active:shadow-none ${
-          wide ? 'w-[54px]' : 'w-11'
-        } ${pressed ? 'font-bold' : 'font-semibold'}`}
-      >
-        {children}
-      </button>
-    </div>
-  );
-}
-
 /** Durum lambası (CV, CC): sönükken gri ve soluk yazılı, yanınca parlak ve kalın. */
 export function StatusLamp({ on, tone, children }: { on: boolean; tone: 'green' | 'red'; children: ReactNode }) {
   const color = tone === 'green' ? 'var(--color-lamp-on)' : 'var(--color-lamp-cc)';
@@ -374,36 +334,6 @@ export function ChannelBadge({ name, color }: { name: string; color: string }) {
     >
       {name}
     </span>
-  );
-}
-
-/** Ön panelin kutusu ve başlığı. */
-export function Face({
-  title,
-  label,
-  extra,
-  ariaLabel,
-  className = '',
-  style,
-  children,
-}: {
-  title: string;
-  label: string;
-  extra?: ReactNode;
-  ariaLabel: string;
-  className?: string;
-  style?: CSSProperties;
-  children: ReactNode;
-}) {
-  return (
-    <div role="group" aria-label={ariaLabel} className={`flex min-h-0 flex-col overflow-hidden rounded-lg border border-rack-line bg-face ${className}`} style={style}>
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-line-2 bg-face-head px-3 text-small">
-        <b className="font-semibold">{title}</b>
-        <span className="font-mono text-muted">{label}</span>
-        {extra}
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain">{children}</div>
-    </div>
   );
 }
 

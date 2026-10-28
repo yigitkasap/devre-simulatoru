@@ -21,6 +21,7 @@ import type { DeviceType, PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
 import { useThrottledText } from './a11y';
 import { ArduinoSection } from './ArduinoPanel';
+import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
 import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
 import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, useCommitField, WireDetails, type InspectTabProps, type PartPatch } from './InspectTab';
@@ -61,6 +62,8 @@ export interface NotebookProps extends InspectTabProps {
   readonly example: { readonly id: ExampleId | null; readonly onOpen: (id: ExampleId) => void; readonly onClose: () => void };
   /** Listenin sonundaki parça ekleme satırı. */
   readonly add: Omit<AddPartRowProps, 'settings'>;
+  /** Cihaz kartlarının (osiloskop, üreteç, güç kaynağı, hazne) simülasyon bağlantıları. */
+  readonly devices: DeviceHooks;
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
@@ -473,7 +476,9 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   const bodyId = useId();
   const typeName = tr.devices.names[part.type];
   const value = partValueText(part);
-  const reading = props.measured === null || props.measured.has(part.id) ? cardReading(part, frame) : null;
+  const device = RACK_DEVICES.has(part.type);
+  const reading = device ? null : props.measured === null || props.measured.has(part.id) ? cardReading(part, frame) : null;
+  const summary = device ? deviceSummary(part, frame ? props.devices.scopeView(part.id) : null) : null;
   const burned = frame?.statuses.get(part.id)?.burned === true;
   const lit = part.type === 'led' && !burned && (frame?.live.get(part.id)?.brightness ?? 0) > 0.05;
   const floating = status === 'stopped' ? (floatingMap.get(part.id) ?? 0) : 0;
@@ -532,6 +537,8 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
                 </>
               )}
             </span>
+          ) : summary ? (
+            <span className="shrink-0 font-mono text-[13px] text-ink-2 tabular">{summary}</span>
           ) : (
             value && <span className={`shrink-0 text-[15px] ${/\d/.test(value) ? 'font-mono tabular' : 'text-ink-2'}`}>{value}</span>
           )}
@@ -543,24 +550,28 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
 
   return (
     <section data-card={part.id} data-notebook="card" aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 rounded-lg border-2 border-accent bg-panel px-3.5 pt-3 pb-3.5">
-      <OpenCardHeader {...props} badges={badges} onClose={onClearSelection} bodyId={bodyId} />
+      <OpenCardHeader
+        {...props}
+        badges={
+          <>
+            {part.type === 'oscilloscope' && <ScopeStatus part={part} view={props.devices.scopeView(part.id)} />}
+            {badges}
+          </>
+        }
+        onClose={onClearSelection}
+        bodyId={bodyId}
+      />
       <div id={bodyId} className="flex flex-col gap-3">
-        <PrimaryControl {...props} values={values} />
-        {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
-        <LiveTiles part={part} frame={frame} />
-        {part.type === 'arduino' && <ArduinoSection part={part} frame={frame} status={status} />}
-        {RACK_DEVICES.has(part.type) && (
-          <div className="flex flex-col items-start gap-2 rounded-md bg-panel-2 px-3 py-2.5">
-            <span className="text-small text-ink-2">{tr.rack.settingsInRack}</span>
-            <button
-              type="button"
-              onClick={() => props.onShowInRack(part.id)}
-              className={`rounded-md border border-line-2 bg-panel px-3 text-small font-medium hover:bg-panel-2 ${touch ? 'h-11' : 'h-9'}`}
-            >
-              {tr.rack.showInRack}
-            </button>
-          </div>
+        {device ? (
+          <DeviceControls part={part} devices={props.devices} />
+        ) : (
+          <>
+            <PrimaryControl {...props} values={values} />
+            {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
+            <LiveTiles part={part} frame={frame} />
+          </>
         )}
+        {part.type === 'arduino' && <ArduinoSection part={part} frame={frame} status={status} />}
         <MoreSettings {...props} values={values} />
       </div>
     </section>
