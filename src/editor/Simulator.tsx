@@ -4,7 +4,7 @@
 // durumu burada tutulur; yükleme (örnek, dosya, paylaşım bağlantısı) ve döndürme gibi birden çok
 // bileşenin kullandığı işlemler de buradadır.
 
-import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
@@ -104,6 +104,9 @@ export default function Simulator() {
   const [schematicFull, setSchematicFull] = useState(false);
   /** Telefon: defterde bir kart açılınca şema 64 px'lik şeride küçülür (DP3). */
   const [schematicStrip, setSchematicStrip] = useState(false);
+  /** Defterdeki "3B'de yaklaş": 3B görünüm uygulayınca boşalır. */
+  const [benchFocus, setBenchFocus] = useState<string | null>(null);
+  const clearBenchFocus = useCallback(() => setBenchFocus(null), []);
   const [connect, setConnect] = useState<{ start: ConnectStart | null } | null>(null);
   const [modal, setModal] = useState<'file' | 'share' | 'more' | 'status' | null>(null);
   const [stopAsk, setStopAsk] = useState(false);
@@ -676,6 +679,16 @@ export default function Simulator() {
       issues={issues}
       example={exampleProps}
       devices={deviceHooks}
+      {...(viewMode === 'bench'
+        ? {
+            onFocus3d: (partId: string) => {
+              setBenchFocus(partId);
+              // Telefonda 3B kutusu görünsün (karta odaklanınca şeride küçülmüştü).
+              setSchematicFull(false);
+              setSchematicStrip(false);
+            },
+          }
+        : {})}
       {...(phone
         ? {
             phone: true,
@@ -760,12 +773,22 @@ export default function Simulator() {
       {viewMode === 'bench' ? (
         <BenchView
           doc={doc}
+          connectivity={connectivity}
           frame={sim.frame}
           active={sim.status !== 'stopped'}
+          running={sim.status === 'running'}
           selection={selection.parts}
           overlayOpen={overlayOpen}
           touch={touchUi}
+          phone={phone}
           dark={theme === 'dark'}
+          settings={settings}
+          onSettings={updateSettings}
+          measured={measuredParts}
+          onSchematic={() => setViewMode('schematic')}
+          focusRequest={benchFocus}
+          onFocusDone={clearBenchFocus}
+          {...(phone ? { controlsInset: { right: 60, bottom: schematicFull ? 'calc(100px + env(safe-area-inset-bottom))' : 10 } } : {})}
           callbacks={{
             onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
             onToggle: (id) => {
@@ -781,7 +804,8 @@ export default function Simulator() {
       ) : (
         schematic
       )}
-      {(phone ? !connect : viewMode === 'bench') && <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} />}
+      {/* Telefonda Şema | 3B şema kutusunun sol üstünde; masaüstünde ve tablette 3B ve Şema sağ alttaki kutularda. */}
+      {phone && !connect && <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} />}
     </>
   );
 
@@ -1060,7 +1084,7 @@ export default function Simulator() {
               {canvas}
               {!wiring && (
                 <SchematicButtons
-                  connect={sim.status === 'stopped' && doc.parts.length > 0}
+                  connect={sim.status === 'stopped' && doc.parts.length > 0 && viewMode === 'schematic'}
                   full={schematicFull}
                   raised={schematicFull}
                   onConnect={startConnect}

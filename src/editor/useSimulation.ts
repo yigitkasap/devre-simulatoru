@@ -43,6 +43,8 @@ export interface SimFrame {
   readonly segmentFlows: Float64Array;
   readonly segmentPhases: Float64Array;
   readonly partFlows: ReadonlyMap<string, PartFlow>;
+  /** Parçaların uçlarına giren akımlar (pin sırasıyla; AC devrede karenin ortalaması). */
+  readonly pinFlows: ReadonlyMap<string, readonly number[]>;
   readonly live: ReadonlyMap<string, LiveVisual>;
   readonly measurements: ReadonlyMap<string, Measurement>;
   readonly statuses: ReadonlyMap<string, DeviceStatus>;
@@ -301,6 +303,7 @@ export function useSimulation(
       segmentFlows: flows,
       segmentPhases: Float64Array.from(ph.segments),
       partFlows,
+      pinFlows,
       live,
       measurements,
       statuses,

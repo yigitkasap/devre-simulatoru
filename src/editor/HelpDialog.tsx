@@ -281,7 +281,7 @@ export function HelpDialog({ scale, onTour, onClose }: { scale: WireScale; onTou
 
 /** Telefonda ⋯ → Yardım (P14): kiplere göre dokunma hareketleri ve kısa tur. */
 export function PhoneHelp({ onTour }: { onTour: () => void }) {
-  const pill: Record<string, string> = { kur: 'bg-app text-ink-2', bagla: 'bg-accent-soft text-accent-ink', olc: 'bg-ok-soft text-ok' };
+  const pill: Record<string, string> = { kur: 'bg-app text-ink-2', bagla: 'bg-accent-soft text-accent-ink', olc: 'bg-ok-soft text-ok', bench: 'bg-app text-ink-2' };
   return (
     <div className="flex flex-col">
       {tr.help.phoneGroups.map((group) => (

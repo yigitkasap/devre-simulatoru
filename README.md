@@ -1840,6 +1840,37 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
    `PhoneSheets`, `PhoneDevices`, `SimBar`, `HintStrip` yalnızca defterin kullandığı parçalara
    indi). ios-kontrol'ün telefon ve tablet bölümleri yeni düzene göre yazıldı (155 madde).
 
+8. **3B eklemeleri** (E1, E3; `BenchView.tsx`, `bench3d/scene.ts`, `bench3d/cableFlow.ts`). Kullanıcı
+   kararı (çizimlerin yerine): masaüstünde ve tablette 3B'ye geçince Şema | 3B düğmesi sol üste
+   sıçramaz; şemadaki sağ alt kutunun tarzında 3B'de sağ altta "− + Sığdır | Şema", üstünde
+   Etiketler, Akım, Kamera ve Lehim rehberi. Telefonda Şema | 3B şema kutusunun sol üstünde kalır,
+   3B seçenekleri (Etiketler, Kamera, Lehim rehberi; 44 px simge) tam ekran düğmesinin solunda.
+   - Etiketler: HTML katmanında, gövdenin üstüne bağlı (sahne her çizimden sonra konumlar; çakışan
+     etiketlerden önceliği düşük olan gizlenir: seçili > ölçü aleti > öbürleri). Ad · değer;
+     çalışırken defterin kapalı kartındaki ölçüm (ölçü aletinde büyük); 250 ms'de bir güncellenir.
+     Seçili parçanınki mavi. Telefonda yalnızca seçili parçanın ve ölçü aletlerinin etiketi.
+     "Etiketler" düğmesi bu tarayıcıda hatırlanır.
+   - Seçim: mevcut mavi seçim halkası. Seçili transistörde uçların harfleri (C B E, D G S), bacaklar
+     ekranda çok yakınsa en az 28 px arayla açılır.
+   - Küçük şema: sol altta 230 px (alan en az 820 × 420 px iken), aynı devre, seçili parça vurgulu;
+     tıklayınca Şema'ya döner. Telefonda yok.
+   - Akım noktaları: çalışırken kabloların ve jumper'ların üstünde akım yönünde (elektron yönü
+     ayarına uyar), duraklatılınca durur; "Akım" düğmesi şemadaki Akım noktaları ayarıdır. Kablo
+     akımları breadboard gruplarında (şerit yarısı, ray) Kirchhoff akım kuralıyla bulunur
+     (`cableFlow.ts`; `tests/cableFlow.test.ts` üç örnekte her grubun dengesini denetler); karede
+     artık uç akımları da var (`SimFrame.pinFlows`).
+   - Kablolar daha alçak kavisle kalkar (en çok 6 birim). Renk kuralı aynı.
+   - Kamera menüsü: Serbest, Üstten, Önden, Seçiliye yaklaş; elle oynatınca Serbest'e döner. Açık
+     kartın başlığında "3B’de yaklaş" (3B görünümdeyken; telefonda şema kutusu açılır).
+   - Ölçü aletlerinin değeri etiketlerinde. Hareket ipucu tuvalden kalktı, Yardım'a taşındı (fare ve
+     dokunma sekmesi, telefonda ⋯ → Yardım → 3B tezgâhta); telefonda 3B ilk açıldığında bir kez tek
+     satır.
+   - Kutup işaretleri: elektrolitik − şeridi, diyot ve zener bandı zaten vardı. LED'e taban halkasının
+     katot tarafında düz kenar ve anot bacağında fazla uzunluğu gösteren küçük kıvrım eklendi (mevcut
+     malzemelerle); başka modele dokunulmadı.
+   - Baraj örneğinde (20 etiket, 75 akım noktası) 3B ekran yenileme hızında (çizim ≈ 2 ms).
+   ios-kontrol'de 8 yeni 3B maddesi (168 madde).
+
 ### Renk teması: açık ve koyu (2026-10-28)
 
 Kullanıcı isteği; 8. adım (3B eklemeleri) bunun için bekletildi. Kararlar: seçim **Sistem / Açık /

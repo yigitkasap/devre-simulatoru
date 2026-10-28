@@ -68,6 +68,8 @@ export interface NotebookProps extends InspectTabProps {
   readonly phone?: boolean;
   /** Sorun kartındaki "D4'ü göster" (verilmezse onSelectPart): telefonda şema açık kalır. */
   readonly onShowPart?: (partId: string) => void;
+  /** 3B görünümdeyken açık kartın başlığındaki "3B'de yaklaş". */
+  readonly onFocus3d?: (partId: string) => void;
   /** Cihaz kartlarının (osiloskop, üreteç, güç kaynağı, hazne) simülasyon bağlantıları. */
   readonly devices: DeviceHooks;
 }
@@ -100,8 +102,8 @@ function liveRows(part: Part, frame: SimFrame | null) {
   return stableReadout(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null);
 }
 
-/** Kapalı kartın sağındaki ölçüm: ölçü aletinde göstergesi, LED'de gerilim ve akım, kaynakta akım, öbürlerinde ilk satır. */
-function cardReading(part: Part, frame: SimFrame | null): { main: string; second?: string; big?: boolean } | null {
+/** Kapalı kartın (ve 3B etiketinin) ölçümü: ölçü aletinde göstergesi, LED'de gerilim ve akım, kaynakta akım, öbürlerinde ilk satır. */
+export function cardReading(part: Part, frame: SimFrame | null): { main: string; second?: string; big?: boolean } | null {
   const m = frame?.measurements.get(part.id);
   if (!m || !frame) return null;
   if (METERS.has(part.type)) {
@@ -429,8 +431,8 @@ function ExampleCard({ id, onOpen, onClose }: { id: ExampleId; onOpen: (id: Exam
   );
 }
 
-/** Kapalı kartlar için seyrek kare: en çok 250 ms'de bir (ölçümler okunabilir hızda değişsin). */
-function useSlowFrame(frame: SimFrame | null): SimFrame | null {
+/** Kapalı kartlar (ve 3B etiketleri) için seyrek kare: en çok 250 ms'de bir (ölçümler okunabilir hızda değişsin). */
+export function useSlowFrame(frame: SimFrame | null): SimFrame | null {
   const [slow, setSlow] = useState(frame);
   const last = useRef(0);
   useEffect(() => {
@@ -640,6 +642,7 @@ function OpenCardHeader({
   onRepair,
   frame,
   onClose,
+  onFocus3d,
 }: NotebookProps & { part: Part; badges: ReactNode; onClose: () => void; bodyId: string }) {
   const touch = useTouchUi();
   const burned = frame?.statuses.get(part.id)?.burned === true;
@@ -663,6 +666,19 @@ function OpenCardHeader({
         {part.label} <span className="font-normal text-muted">· {tr.devices.names[part.type]}</span>
       </h3>
       {badges}
+      {onFocus3d &&
+        (touch ? (
+          action('search', tr.bench.focus, () => onFocus3d(part.id))
+        ) : (
+          <button
+            type="button"
+            onClick={() => onFocus3d(part.id)}
+            className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-line px-2.5 text-label font-medium text-ink hover:bg-panel-2"
+          >
+            <Icon name="search" className="h-3.5 w-3.5" />
+            {tr.bench.focus}
+          </button>
+        ))}
       {burned && status !== 'stopped' && action('saved', tr.inspector.repair, () => onRepair(part.id))}
       {/* Dokunmatikte çalışırken devrenin yapısı kilitli (Ölç kipi; DP3): döndür ve sil yok. */}
       {!(touch && status !== 'stopped') && (

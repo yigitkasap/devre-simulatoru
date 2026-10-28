@@ -1,6 +1,8 @@
-// 3B tezgâh sahnesi: masa, ışık, kamera ve yörünge denetimi; parçalar şemadaki yerlerinde, kablolar
-// uçlarından yukarı kıvrılan atlama kabloları. Yalnızca bir şey değişince (kamera, canlı değer,
-// devre) çizer.
+// 3B tezgâh sahnesi: masa, ışık, kamera ve yörünge denetimi; parçalar breadboard'da ya da masada,
+// kablolar uçlarından alçak kavisle kalkan atlama kabloları. Yalnızca bir şey değişince (kamera, canlı
+// değer, devre) çizer. Tasarım v3 (E1, E3) eklemeleri: kamera görünümleri (Serbest, Üstten, Önden,
+// seçiliye yaklaş) ve yakınlaştırma; HTML etiket katmanının konumları (her çizimden sonra; çakışan
+// etiketlerden önceliği düşük olan gizlenir); çalışırken kabloların üstünde akım yönünde akan noktalar.
 
 import {
   ACESFilmicToneMapping,
@@ -30,13 +32,18 @@ import {
   Vector3,
   WebGLRenderer,
   BoxGeometry,
+  InstancedMesh,
+  Matrix4,
+  SphereGeometry,
+  type Curve,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import type { SimFrame } from '../editor/useSimulation';
+import { dotSpeed, type SimFrame } from '../editor/useSimulation';
 import type { CircuitDoc, Part } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
+import { cableCurrents } from './cableFlow';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
 import { buildPartModel } from './registry';
@@ -47,6 +54,30 @@ export interface BenchCallbacks {
   onToggle(partId: string): void;
   /** Potansiyometre düğmesi sürükleniyor: yeni konum (%); done: bırakıldı. */
   onKnob(partId: string, position: number, done: boolean): void;
+  /** Kullanıcı kamerayı elle oynattı (kamera menüsü "Serbest"e döner). */
+  onCamera?(): void;
+}
+
+/** Kamera görünümleri: Serbest (önden ve yukarıdan, 52°), Üstten, Önden (alçaktan). */
+export type CameraView = 'free' | 'top' | 'front';
+const ELEVATION: Record<CameraView, number> = { free: (52 * Math.PI) / 180, top: Math.PI * 0.47, front: (14 * Math.PI) / 180 };
+
+/** Akım noktaları: aralık (birim), yarıçap ve hız ölçeği (şemadaki piksel/s → birim/s). */
+const DOT_SPACING = 2.6;
+const DOT_RADIUS = 0.32;
+const DOT_SPEED = 0.1;
+const MAX_DOTS = 2000;
+
+/** Akım noktalarının yürüdüğü kablo: eşit aralıklı noktaları ve uzunluğu. */
+interface CablePath {
+  readonly points: readonly Vector3[];
+  readonly length: number;
+}
+
+/** Eğrinin eşit aralıklı noktaları (nokta konumu doğrusal ara değerle bulunur). */
+function cablePath(curve: Curve<Vector3>): CablePath {
+  const length = curve.getLength();
+  return { points: curve.getSpacedPoints(Math.max(8, Math.round(length * 3))), length };
 }
 
 /** Modeli değiştirmeyen, canlı değişen özellikler (model yeniden kurulmaz, update() uygular). */
@@ -61,6 +92,8 @@ interface Placed {
   readonly shadow: Mesh;
   /** Kabloların bağlandığı uçlar (dünya koordinatı). */
   readonly anchors: Vector3[];
+  /** Etiketin bağlandığı nokta: gövdenin üstünün ortası (dünya). */
+  readonly top: Vector3;
 }
 
 /** Deliğin dünya koordinatı (`y`: ağzı BB.height, bacağın bittiği yer BB.height − HOLE_DEPTH). */
@@ -168,7 +201,20 @@ export class BenchScene {
   private dark = false;
   /** Kullanıcı kamerayı elle oynattı mı (oynatmadıysa alan değişince yeniden sığdırılır). */
   private userMoved = false;
-  private lastFitTop = false;
+  private lastView: CameraView = 'free';
+  private plan: BreadboardPlan | null = null;
+  /** Kablolar: önce plan.leads, sonra plan.jumpers sırasıyla. */
+  private cablePaths: CablePath[] = [];
+  private cableAmps = new Float64Array(0);
+  private cablePhases = new Float64Array(0);
+  private readonly dotMaterial = new MeshBasicMaterial({ color: '#ffd43b' });
+  private readonly dots = new InstancedMesh(new SphereGeometry(DOT_RADIUS, 10, 8), this.dotMaterial, MAX_DOTS);
+  private dotsOn = true;
+  private electronFlow = false;
+  /** Duraklatılınca noktalar yerinde durur (şemadaki gibi). */
+  private running = false;
+  private overlay: HTMLElement | null = null;
+  private readonly overlayObserver = new MutationObserver(() => (this.dirty = true));
   private drag: { id: string; x: number; start: number; position: number } | null = null;
   private down: { x: number; y: number; t: number } | null = null;
   /** Son kare süresi (ms) ve çizim sayısı: performans taraması okur. */
@@ -207,7 +253,9 @@ export class BenchScene {
     this.ring.rotation.x = -Math.PI / 2;
     this.ring.position.y = 0.03;
     this.ring.visible = false;
-    this.scene.add(this.ring, this.boards, this.partsGroup, this.cables);
+    this.dots.count = 0;
+    this.dots.frustumCulled = false;
+    this.scene.add(this.ring, this.boards, this.partsGroup, this.cables, this.dots);
 
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
@@ -220,7 +268,10 @@ export class BenchScene {
     this.controls.minDistance = 8;
     this.controls.maxDistance = 900;
     this.controls.addEventListener('change', () => (this.dirty = true));
-    this.controls.addEventListener('start', () => (this.userMoved = true));
+    this.controls.addEventListener('start', () => {
+      this.userMoved = true;
+      this.cb.onCamera?.();
+    });
 
     canvas.addEventListener('pointerdown', this.onPointerDown);
     canvas.addEventListener('pointermove', this.onPointerMove);
@@ -247,8 +298,134 @@ export class BenchScene {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    if (this.fitted && !this.userMoved) this.fit(this.lastFitTop);
+    if (this.fitted && !this.userMoved) this.fit(this.lastView);
     this.dirty = true;
+  }
+
+  // --- Etiket katmanı ve akım noktaları -------------------------------------------------------------
+
+  /**
+   * HTML etiket katmanı: içindeki [data-anchor] öğeleri her çizimden sonra parçanın (data-id) ya da
+   * ucunun (data-pin) ekran konumuna taşınır. İçerik değişince (React) yeniden konumlanır.
+   */
+  setOverlay(el: HTMLElement | null): void {
+    this.overlayObserver.disconnect();
+    this.overlay = el;
+    if (el) this.overlayObserver.observe(el, { childList: true, subtree: true, characterData: true });
+    this.dirty = true;
+  }
+
+  /** Akım noktaları açık mı (Ayarlar → Akım noktaları; 3B'deki Akım düğmesi), elektron yönü ve simülasyon ilerliyor mu. */
+  setDots(on: boolean, electronFlow: boolean, running: boolean): void {
+    this.dotsOn = on;
+    this.electronFlow = electronFlow;
+    this.running = running;
+    this.applyFrame();
+  }
+
+  private positionOverlay(): void {
+    const el = this.overlay;
+    if (!el) return;
+    const canvas = this.renderer.domElement;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    // Önce boyutlar okunur, sonra yazılır (düzen bir kez hesaplanır). Öncelik: uç harfleri, seçili
+    // parça, ölçü aletleri, öbürleri; çakışan etiketlerden önceliği düşük olan gizlenir.
+    const items = [...el.querySelectorAll<HTMLElement>('[data-anchor]')].map((node) => ({
+      node,
+      w: node.offsetWidth,
+      h: node.offsetHeight,
+      priority: Number(node.dataset.priority ?? 0),
+    }));
+    items.sort((a, b) => b.priority - a.priority);
+    const taken: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+    const p = new Vector3();
+    const toScreen = (world: Vector3) => {
+      p.copy(world).project(this.camera);
+      return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h, z: p.z };
+    };
+    // Uç harfleri: bacaklar ekranda çok yakınsa harfler aynı doğru üstünde en az 28 px arayla açılır.
+    const pinSpots = new Map<HTMLElement, { x: number; y: number; z: number }>();
+    const pinNodes = items.filter((i) => i.node.dataset.pin !== undefined).map((i) => i.node);
+    for (const id of new Set(pinNodes.map((n) => n.dataset.id ?? ''))) {
+      const placed = this.parts.get(id);
+      const nodes = pinNodes.filter((n) => n.dataset.id === id);
+      if (!placed) continue;
+      const spots = nodes.map((n) => {
+        const a = placed.anchors[Number(n.dataset.pin)] ?? placed.top;
+        return toScreen(new Vector3(a.x, Math.max(a.y, BB.height) + 2.2, a.z));
+      });
+      const first = spots[0]!;
+      const last = spots[spots.length - 1]!;
+      const span = Math.hypot(last.x - first.x, last.y - first.y);
+      const gap = 28 * (spots.length - 1);
+      if (spots.length > 1 && span < gap) {
+        const cx = spots.reduce((s, q) => s + q.x, 0) / spots.length;
+        const cy = spots.reduce((s, q) => s + q.y, 0) / spots.length;
+        const dx = span > 1 ? (last.x - first.x) / span : 1;
+        const dy = span > 1 ? (last.y - first.y) / span : 0;
+        spots.forEach((q, k) => {
+          const t = (k - (spots.length - 1) / 2) * 28;
+          q.x = cx + dx * t;
+          q.y = cy + dy * t;
+        });
+      }
+      nodes.forEach((n, k) => pinSpots.set(n, spots[k]!));
+    }
+    for (const item of items) {
+      const { node } = item;
+      const placed = this.parts.get(node.dataset.id ?? '');
+      const pin = node.dataset.pin;
+      const world = placed ? (pin !== undefined ? placed.anchors[Number(pin)] : placed.top) : undefined;
+      let show = false;
+      if (world) {
+        const { x, y, z } = pinSpots.get(node) ?? toScreen(world);
+        const box = pin !== undefined ? { x0: x - item.w / 2, y0: y - item.h / 2 } : { x0: x - item.w / 2, y0: y - item.h - 4 };
+        const rect = { ...box, x1: box.x0 + item.w, y1: box.y0 + item.h };
+        const inView = z > -1 && z < 1 && rect.x1 > 0 && rect.y1 > 0 && rect.x0 < w && rect.y0 < h;
+        const clash = pin === undefined && taken.some((r) => rect.x0 < r.x1 && rect.x1 > r.x0 && rect.y0 < r.y1 && rect.y1 > r.y0);
+        if (inView && !clash) {
+          show = true;
+          if (pin === undefined) taken.push(rect);
+          node.style.transform = `translate(${Math.round(rect.x0)}px, ${Math.round(rect.y0)}px)`;
+        }
+      }
+      node.style.opacity = show ? '1' : '0';
+    }
+  }
+
+  /** Noktaları akım yönünde ilerletir ve yerleştirir; hareket eden nokta varsa true. */
+  private updateDots(dt: number): boolean {
+    const matrix = new Matrix4();
+    const at = new Vector3();
+    let count = 0;
+    let moving = false;
+    const show = this.dotsOn && this.active && this.frame !== null;
+    const direction = this.electronFlow ? -1 : 1;
+    for (let i = 0; show && i < this.cablePaths.length; i++) {
+      const amps = this.cableAmps[i] ?? 0;
+      const speed = dotSpeed(amps) * DOT_SPEED;
+      if (speed === 0) continue;
+      moving = true;
+      const path = this.cablePaths[i]!;
+      const step = this.running ? direction * Math.sign(amps) * speed * dt : 0;
+      const phase = (((this.cablePhases[i]! + step) % DOT_SPACING) + DOT_SPACING) % DOT_SPACING;
+      this.cablePhases[i] = phase;
+      const last = path.points.length - 1;
+      for (let s = phase; s < path.length && count < MAX_DOTS; s += DOT_SPACING) {
+        const f = (s / path.length) * last;
+        const k = Math.min(last - 1, Math.floor(f));
+        at.lerpVectors(path.points[k]!, path.points[k + 1]!, f - k);
+        matrix.makeTranslation(at.x, at.y, at.z);
+        this.dots.setMatrixAt(count++, matrix);
+      }
+    }
+    if (count !== this.dots.count || count > 0) {
+      this.dots.count = count;
+      this.dots.instanceMatrix.needsUpdate = true;
+      this.dirty = true;
+    }
+    return moving && this.running;
   }
 
   /** Koyu tema: arka plan ve masa koyu; ışık ve modeller aynı kalır. */
@@ -295,7 +472,7 @@ export class BenchScene {
         this.fit();
         this.fitted = true;
       } else if (this.fitted && !this.userMoved) {
-        this.fit(this.lastFitTop);
+        this.fit(this.lastView);
       }
     }
     this.applyFrame();
@@ -311,6 +488,8 @@ export class BenchScene {
       child.removeFromParent();
       disposeObject(child);
     }
+    this.plan = plan;
+    const paths: CablePath[] = [];
     const usedX = [
       ...[...plan.onBoard.values()].flatMap((p) => [...p.holes, ...(p.extraHoles ?? [])]),
       ...plan.leads.map((l) => l.hole),
@@ -342,25 +521,38 @@ export class BenchScene {
     // Renkler: ağ başına (toprak siyah, besleme kırmızı, öbürleri sırayla; lehim rehberiyle aynı).
     const colorOf = netColors(plan);
     const holeTop = (h: Hole) => holeAt(h, plan.cols, BB.height);
-    for (const j of plan.jumpers) this.cables.add(jumperMesh(holeTop(j.a), holeTop(j.b), colorOf(j.net)));
+    const jumperPaths: CablePath[] = [];
+    for (const j of plan.jumpers) {
+      const jumper = jumperMesh(holeTop(j.a), holeTop(j.b), colorOf(j.net));
+      this.cables.add(jumper);
+      jumperPaths.push(cablePath(jumper.userData.curve as Curve<Vector3>));
+    }
     const plug = new BoxGeometry(0.75, 1.5, 0.75);
     const plugMat = mat('#1b1c1f', 0.6);
     for (const lead of plan.leads) {
       const placed = this.parts.get(lead.partId);
       const from = placed?.anchors[lead.pin];
-      if (!from) continue;
+      if (!from) {
+        paths.push({ points: [], length: 0 });
+        continue;
+      }
       const to = holeTop(lead.hole);
       const color = colorOf(lead.net);
       const a1 = from.clone().add(new Vector3(0, 1.4, 0));
       const b1 = to.clone().add(new Vector3(0, 1.5, 0));
       const dist = a1.distanceTo(b1);
-      const lift = Math.min(14, 2 + 0.2 * dist);
+      // Alçak kavis: parçaların ve etiketlerin üstünü kapatmaz (v3).
+      const lift = Math.min(6, 1.2 + 0.08 * dist);
       const curve = new CubicBezierCurve3(a1, a1.clone().add(new Vector3(0, lift, 0)), b1.clone().add(new Vector3(0, lift, 0)), b1);
+      paths.push(cablePath(curve));
       this.cables.add(new Mesh(new TubeGeometry(curve, Math.max(12, Math.round(dist * 1.5)), 0.28, 8, false), mat(color, 0.55)));
       this.cables.add(mesh(plug, plugMat, from.x, from.y + 0.75, from.z));
       this.cables.add(mesh(plug, plugMat, to.x, to.y + 0.75, to.z));
       this.cables.add(rod(new Vector3(to.x, to.y - HOLE_DEPTH, to.z), to, 0.1, M.tin(), 6));
     }
+    this.cablePaths = [...paths, ...jumperPaths];
+    this.cableAmps = new Float64Array(this.cablePaths.length);
+    this.cablePhases = new Float64Array(this.cablePaths.length);
     this.dirty = true;
   }
 
@@ -415,7 +607,8 @@ export class BenchScene {
     shadow.position.set(center.x, base + 0.03, center.z);
     shadow.scale.set(size.x * 1.2 + 1, size.z * 1.2 + 1, 1);
     this.scene.add(shadow);
-    return { key: partKey(part), part, model, group, shadow, anchors };
+    const top = new Vector3(center.x, box.max.y + 0.6, center.z);
+    return { key: partKey(part), part, model, group, shadow, anchors, top };
   }
 
   private removePart(placed: Placed): void {
@@ -453,6 +646,14 @@ export class BenchScene {
       });
       if (more) animating = true;
     }
+    // Kablo akımları (akım noktaları): breadboard grupları için Kirchhoff akım kuralı (cableFlow.ts).
+    if (this.plan && this.frame && this.active && this.dotsOn) {
+      const { leads, jumpers } = cableCurrents(this.plan, this.frame.pinFlows);
+      this.cableAmps = Float64Array.from([...leads, ...jumpers]);
+    } else {
+      this.cableAmps = new Float64Array(this.cablePaths.length);
+    }
+    if (this.updateDots(0)) animating = true;
     this.animating = animating;
     this.dirty = true;
   }
@@ -476,9 +677,9 @@ export class BenchScene {
 
   // --- Kamera ---------------------------------------------------------------------------------------
 
-  /** Bütün devre görünsün: önden ve yukarıdan (52°) bakış. */
-  fit(top = false): void {
-    this.lastFitTop = top;
+  /** Bütün devre görünsün: Serbest (önden ve yukarıdan, 52°), Üstten ya da Önden (alçaktan). */
+  fit(view: CameraView = 'free'): void {
+    this.lastView = view;
     this.userMoved = false;
     const box = new Box3();
     // Parçalara, kablolara ve breadboard'un kullanılan bölümüne sığdırılır.
@@ -491,14 +692,47 @@ export class BenchScene {
     const radius = Math.max(size.x, size.z * 1.1, 20) / 2;
     const fov = (this.camera.fov * Math.PI) / 180;
     const aspect = Math.min(1.6, this.camera.aspect);
-    const distance = (radius / Math.tan(fov / 2)) * (aspect < 1 ? 1.15 / aspect : 1.05);
-    const elevation = top ? Math.PI * 0.47 : (52 * Math.PI) / 180;
+    const distance = (radius / Math.tan(fov / 2)) * (aspect < 1 ? 1.15 / aspect : 1.05) * (view === 'front' ? 1.12 : 1);
+    const elevation = ELEVATION[view];
     this.controls.target.copy(center).setY(0);
     this.camera.position.set(center.x, distance * Math.sin(elevation), center.z + distance * Math.cos(elevation));
     this.camera.near = Math.max(0.5, distance / 200);
     this.camera.far = distance * 20;
     this.camera.updateProjectionMatrix();
     this.controls.update();
+    this.dirty = true;
+  }
+
+  /** Seçiliye yaklaş: parça kadrajın ortasında, yakından; bakış yönü (azimut) korunur. */
+  focus(partId: string): void {
+    const placed = this.parts.get(partId);
+    if (!placed) return;
+    const box = new Box3().setFromObject(placed.group);
+    const center = box.getCenter(new Vector3());
+    const size = box.getSize(new Vector3());
+    const distance = Math.max(30, 5 * Math.max(size.x, size.y, size.z));
+    const azimuth = Math.atan2(this.camera.position.x - this.controls.target.x, this.camera.position.z - this.controls.target.z);
+    const elevation = (40 * Math.PI) / 180;
+    this.controls.target.copy(center);
+    this.camera.position.set(
+      center.x + distance * Math.cos(elevation) * Math.sin(azimuth),
+      center.y + distance * Math.sin(elevation),
+      center.z + distance * Math.cos(elevation) * Math.cos(azimuth),
+    );
+    this.camera.near = Math.max(0.3, distance / 200);
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+    this.userMoved = true;
+    this.dirty = true;
+  }
+
+  /** Yakınlaştır (factor < 1) ya da uzaklaştır (> 1): kamera hedefe doğru yaklaşır. */
+  zoom(factor: number): void {
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const length = Math.min(this.controls.maxDistance, Math.max(this.controls.minDistance, offset.length() * factor));
+    this.camera.position.copy(this.controls.target).add(offset.setLength(length));
+    this.controls.update();
+    this.userMoved = true;
     this.dirty = true;
   }
 
@@ -563,12 +797,16 @@ export class BenchScene {
   private readonly tick = () => {
     const now = performance.now();
     const moved = this.controls.update();
-    if (this.animating) this.applyFrame();
+    if (this.animating) {
+      this.applyFrame();
+      this.updateDots(Math.min(0.1, (now - this.lastTime) / 1000));
+    }
     this.lastTime = now;
     if (!(this.dirty || moved || this.animating)) return;
     this.dirty = false;
     const t0 = performance.now();
     this.renderer.render(this.scene, this.camera);
+    this.positionOverlay();
     this.stats.renderMs = performance.now() - t0;
     this.stats.frames++;
   };
@@ -582,6 +820,9 @@ export class BenchScene {
   dispose(): void {
     this.renderer.setAnimationLoop(null);
     this.observer.disconnect();
+    this.overlayObserver.disconnect();
+    this.dots.geometry.dispose();
+    this.dotMaterial.dispose();
     this.controls.dispose();
     for (const placed of this.parts.values()) this.removePart(placed);
     this.parts.clear();

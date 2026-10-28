@@ -51,7 +51,10 @@ export type IconName =
   | 'external'
   | 'sun'
   | 'moon'
-  | 'themeSystem';
+  | 'themeSystem'
+  | 'tag'
+  | 'camera'
+  | 'dots';
 
 const PATHS: Record<IconName, ReactNode> = {
   menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
@@ -230,6 +233,26 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   moon: <path d="M16.2 12.4A6.6 6.6 0 0 1 7.6 3.8a6.6 6.6 0 1 0 8.6 8.6z" />,
+  tag: (
+    <>
+      <path d="M3 9.6V4a1 1 0 0 1 1-1h5.6l7.9 7.9-6.6 6.6z" />
+      <circle cx="6.8" cy="6.8" r="1.2" />
+    </>
+  ),
+  camera: (
+    <>
+      <path d="M3 7.2a1.5 1.5 0 0 1 1.5-1.5h2.1l1.4-2h4l1.4 2h2.1A1.5 1.5 0 0 1 17 7.2v7.8a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 15z" />
+      <circle cx="10" cy="11" r="2.9" />
+    </>
+  ),
+  dots: (
+    <>
+      <path d="M2.5 10h15" opacity={0.45} />
+      <circle cx="5" cy="10" r="1.8" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="10" r="1.8" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="10" r="1.8" fill="currentColor" stroke="none" />
+    </>
+  ),
   themeSystem: (
     <>
       <circle cx="10" cy="10" r="6.6" />

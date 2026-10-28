@@ -126,6 +126,7 @@ export function jumperMesh(a: Vector3, b: Vector3, color: string): Group {
     new Vector3(b.x, top + 0.05, b.z),
   ];
   const curve = new CatmullRomCurve3(pts, false, 'centripetal');
+  g.userData.curve = curve;
   g.add(new Mesh(new TubeGeometry(curve, Math.max(12, Math.round(dist * 2)), 0.2, 8, false), mat(color, 0.5)));
   for (const p of [a, b]) g.add(rod(new Vector3(p.x, top - HOLE_DEPTH, p.z), new Vector3(p.x, top + 0.1, p.z), 0.1, M.tin(), 6));
   return g;

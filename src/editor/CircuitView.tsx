@@ -23,6 +23,10 @@ export interface CircuitViewProps {
   readonly minWidth?: number;
   /** Kabloların ve parçaların altında çizilen katman (dünya koordinatı). */
   readonly underlay?: ReactNode;
+  /** Vurgulanan (seçili) parçalar: 3B'nin köşesindeki küçük şema. */
+  readonly selected?: readonly string[];
+  /** Çizimin sınıfı (varsayılan: tuvalle aynı "schematic"). */
+  readonly className?: string;
 }
 
 /** Devrenin sınırları (ızgara birimi), kenar boşluğuyla. */
@@ -51,7 +55,7 @@ function bounds(doc: CircuitDoc) {
   return { x: x0 - pad, y: y0 - pad, w: x1 - x0 + 2 * pad + 6, h: y1 - y0 + 2 * pad };
 }
 
-export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth, underlay }: CircuitViewProps) {
+export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth, underlay, selected, className = 'schematic block h-full w-full' }: CircuitViewProps) {
   const b = bounds(doc);
   return (
     <div className="h-full w-full overflow-auto overscroll-contain">
@@ -59,7 +63,7 @@ export const CircuitView = memo(function CircuitView({ doc, connectivity, frame,
         role="img"
         aria-label={label}
         viewBox={`${b.x * GRID} ${b.y * GRID} ${b.w * GRID} ${b.h * GRID}`}
-        className="schematic block h-full w-full"
+        className={className}
         style={minWidth ? { minWidth, minHeight: (minWidth * b.h) / b.w } : undefined}
         preserveAspectRatio="xMidYMid meet"
       >
@@ -90,7 +94,7 @@ export const CircuitView = memo(function CircuitView({ doc, connectivity, frame,
         ))}
         {doc.parts.map((part) => {
           const live = frame?.live.get(part.id);
-          return <PartView key={part.id} part={part} tone="normal" resistorStyle={settings.resistorStyle} {...(live ? { live } : {})} />;
+          return <PartView key={part.id} part={part} tone={selected?.includes(part.id) ? 'selected' : 'normal'} resistorStyle={settings.resistorStyle} {...(live ? { live } : {})} />;
         })}
       </svg>
     </div>

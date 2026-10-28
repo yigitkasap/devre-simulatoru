@@ -5,11 +5,13 @@
 import {
   BoxGeometry,
   CylinderGeometry,
+  ExtrudeGeometry,
   Group,
   LatheGeometry,
   Mesh,
   MeshStandardMaterial,
   PlaneGeometry,
+  Shape,
   SphereGeometry,
   TorusGeometry,
   Vector2,
@@ -252,12 +254,28 @@ export function ledModel(props: Props): PartModel {
   dome.userData.live = true;
   dome.add(mesh(new CylinderGeometry(1.0, 1.0, 1.7, 26), lens, 0, 2.95, 0));
   dome.add(mesh(new SphereGeometry(1.0, 26, 14, 0, Math.PI * 2, 0, Math.PI / 2), lens, 0, 3.8, 0));
-  dome.add(mesh(new CylinderGeometry(1.15, 1.15, 0.3, 26), lens, 0, 2.15, 0));
+  // Taban halkasının katot tarafı (+x, ikinci uç) düzdür: gerçek 5 mm LED'deki kutup işareti.
+  const flat = 0.95;
+  const cut = Math.acos(flat / 1.15);
+  const rim = new Shape();
+  rim.absarc(0, 0, 1.15, cut, Math.PI * 2 - cut, false);
+  rim.lineTo(flat, 1.15 * Math.sin(cut));
+  const flange = new ExtrudeGeometry(rim, { depth: 0.3, bevelEnabled: false, curveSegments: 26 });
+  flange.rotateX(-Math.PI / 2);
+  dome.add(mesh(flange, lens, 0, 2.0, 0));
   body.add(dome);
   const glow = glowSprite(light, 7);
   glow.position.y = 3.5;
   body.add(glow);
-  const model = radial('led', body, 1, 2.0);
+  // Anot bacağı daha uzundur: deliğe takılınca fazlası küçük bir kıvrım olarak görünür.
+  const root = new Group();
+  const anchors = pinAnchors('led');
+  root.add(body);
+  const top = new Vector3(-0.5, 2.0, 0);
+  const bend = [top, new Vector3(-0.5, 1.75, 0), new Vector3(-0.78, 1.5, 0), new Vector3(-0.5, 1.25, 0)];
+  root.add(wirePath(bend, 0.14, M.tin(), 6), legDown(bend[3]!, anchors[0]!));
+  root.add(legDown(new Vector3(0.5, 2.0, 0), anchors[1]!));
+  const model: PartModel = { root, anchors };
   return {
     ...model,
     update(ctx) {

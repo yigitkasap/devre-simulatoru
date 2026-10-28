@@ -591,6 +591,66 @@ try {
     await ctx.close();
   }
 
+  // --- 3B (v3: E1, E3; kullanıcı kararı: denetimler sağ altta) -----------------------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: '3B', exact: true }).click();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
+    const main = await page.locator('main').boundingBox();
+    const schemaButton = await page.locator('main').getByRole('button', { name: 'Şema', exact: true }).boundingBox();
+    const options = await Promise.all(['Etiketler', 'Akım', 'Lehim rehberi'].map((n) => page.locator('main').getByRole('button', { name: n, exact: true }).boundingBox()));
+    const mini = await page.getByRole('button', { name: 'Şemaya dön' }).boundingBox();
+    const right = main.x + main.width;
+    const bottom = main.y + main.height;
+    check('3B (masaüstü): sol üstte Şema | 3B yok; Şema ve öbür seçenekler sağ altta; sol altta küçük şema',
+      (await page.getByRole('group', { name: 'Görünüm' }).evaluateAll((els) => els.every((e) => e.getBoundingClientRect().top > window.innerHeight - 90))) && schemaButton !== null && schemaButton.x > right - 120 && schemaButton.y > bottom - 70 &&
+      options.every((b) => b !== null && b.y > bottom - 130 && b.x > main.x + main.width / 3) && mini !== null && mini.x < main.x + 30 && mini.y + mini.height > bottom - 30,
+      schemaButton ? `Şema ${Math.round(right - schemaButton.x)} px sağdan` : 'Şema yok');
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(1200);
+    const labels = await page.locator('[data-anchor="part"]').evaluateAll((els) => els.filter((e) => getComputedStyle(e).opacity === '1').map((e) => e.textContent));
+    const dots = await page.evaluate(() => window.__tezgah?.dots.count ?? 0);
+    check('3B: çalışırken parçaların etiketleri (ad · değer, ampermetrede akım) ve kablolarda akım noktaları', labels.some((t) => t?.startsWith('A1 · Ampermetre') && /mA/.test(t)) && labels.length >= 3 && dots > 0, `${labels.length} etiket, ${dots} nokta`);
+    await page.locator('main').getByRole('button', { name: 'Akım', exact: true }).click(); await page.waitForTimeout(300);
+    const dotsOff = await page.evaluate(() => window.__tezgah?.dots.count ?? -1);
+    await page.locator('main').getByRole('button', { name: 'Akım', exact: true }).click(); await page.waitForTimeout(200);
+    check('3B: Akım düğmesi akım noktalarını kapatıyor (şemadaki ayarla aynı)', dotsOff === 0);
+    const elevation = () => page.evaluate(() => { const t = window.__tezgah; const c = t.camera.position; const g = t.controls.target; return Math.atan2(c.y - g.y, Math.hypot(c.x - g.x, c.z - g.z)) * 180 / Math.PI; });
+    const e0 = await elevation();
+    await page.getByRole('button', { name: /^Kamera:/ }).click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitemradio', { name: 'Üstten' }).click(); await page.waitForTimeout(400);
+    const eTop = await elevation();
+    check('3B: Kamera menüsünde Üstten yukarıdan bakıyor', eTop > 80 && e0 < 60, `${e0.toFixed(0)}° → ${eTop.toFixed(0)}°`);
+    await page.locator('#defter').getByRole('button', { name: /^R1 ·/ }).click(); await page.waitForTimeout(300);
+    const distance = () => page.evaluate(() => window.__tezgah.camera.position.distanceTo(window.__tezgah.controls.target));
+    const d0 = await distance();
+    await page.locator('#defter').getByRole('button', { name: '3B’de yaklaş' }).click(); await page.waitForTimeout(400);
+    const d1 = await distance();
+    const selectedLabel = await page.locator('[data-anchor="part"].bg-accent').textContent().catch(() => '');
+    check('3B: açık kartta "3B’de yaklaş" kamerayı parçaya yaklaştırıyor; seçili parçanın etiketi mavi', d1 < d0 * 0.8 && (selectedLabel ?? '').startsWith('R1'), `${d0.toFixed(0)} → ${d1.toFixed(0)}`);
+    await page.locator('main').getByRole('button', { name: 'Yakınlaştır' }).click(); await page.waitForTimeout(200);
+    check('3B: sağ alttaki + yakınlaştırıyor', (await distance()) < d1);
+    await page.locator('main').getByRole('button', { name: 'Şema', exact: true }).click(); await page.waitForTimeout(300);
+    check('3B: sağ alttaki Şema düğmesi şemaya döndürüyor', (await page.locator('svg.schematic').count()) === 1 && (await page.evaluate(() => window.__tezgah === undefined)));
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'LED ve ön direnç');
+    await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: '3B' }).tap();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
+    const labels = await page.locator('[data-anchor="part"]').allTextContents();
+    const tag = await page.getByRole('button', { name: 'Etiketler' }).boundingBox();
+    const full = await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).boundingBox();
+    check('3B (telefon): etiket yalnızca ölçü aletinde (seçim yokken); Etiketler, Kamera ve Lehim rehberi sağ altta, 44 px',
+      labels.length === 1 && labels[0].startsWith('A1') && tag !== null && tag.height >= 43.5 && full !== null && Math.abs(tag.y - full.y) < 2 && tag.x < full.x, labels.join(' | '));
+    await page.context().close();
+  }
+
   // --- Tema: Sistem / Açık / Koyu ---------------------------------------------------------------
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
