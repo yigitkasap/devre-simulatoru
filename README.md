@@ -1343,6 +1343,33 @@ kısımlar:
    devre seçimi ve kumanda üst çubukta. Ayarlar kartı ⋯ menüsünün altında açılır. Kumanda mantığı
    (`useBarajKumanda`) ve klavye kısayolları aynı. ios-kontrol'ün baraj maddeleri yeni düzene göre
    yazıldı (174 madde).
+2. **Devre paneli** (`DevrePaneli.tsx`, `seviye.ts` → `katDevreleri`): tam şema ve kat bantları
+   (`SeviyeBantlari.tsx`, `durumRows`, `levelBands` silindi) yerine kendi çizimleri. Başlıkta "Devre" ve
+   sekmeler: Kat 1, Kat 2, Kat 3 (lambayla aynı renkli numara) ve Tüm devre (ok tuşları, Home / End).
+   Sahnede lambaya tıklamak (ya da odaklanıp Enter) o katı seçer, panel kapalıysa açar; lambalar ekranda
+   44 px'ten küçük kalırsa (telefon, dar tablet) tıklanmaz. Kat çizimi (B2): +9 V bara, ortak prob, su
+   (kuruysa kesikli turuncu "Su yok · açık"), prob, RB, baz düğümü (C ve RP toprağa), Q, RC, LED;
+   altında "Baz akımı" ve "LED akımı" (≈ 0,43 mA, ≈ 14,5 mA) ve "Tüm devreyi simülatörde aç". Tek
+   ışıkta (B4) panelin üstünde öncelik kuralı (Yeşil = 1 VE 2 değil · Sarı = 2 VE 3 değil · Kırmızı = 3);
+   Kat 1'in çiziminde Q4 (Prob 2'den RS4 ile), Kat 2'ninkinde Q5 (Prob 3'ten RS5 ile), kollektörleri
+   katın baz düğümünde. Susturma etkinken Q4'ün altında "susturucu · doyumda", baz düğümünde ≈ 0,01 V
+   ve akımların yerine tek cümle ("Prob 2 ıslanınca Q4 doyuma girer ve Q1'in bazını toprağa çeker…").
+   Tüm devre (B5): panel 840 px, sahne 600 px (sahne dikey kadraja geçer); hazne (su seviyesi canlı),
+   pil, +9 V bara, toprak barası ve üç kat tek çizimde; tek ışıkta Q4 / Q5 ve onları süren teller
+   (kesişmede köprü). Panelin üstünde her kapanan halka için "Kat N devresi tamamlandı: B1 + → ortak
+   prob → su → Prob N → RBN → QN → toprak → B1 −" (susturulan katta QN yerine Q4), kuru problar için
+   "Prob 2, 3 kuru: devre açık"; kuru prob ucunda kesikli turuncu halka ve "açık". Başlıktaki "Devreyi
+   tam ekran aç" paneli sayfa genişliğine açar (sahne gizlenir). Akım yolu vurgusu simülasyondan gelir:
+   her dal (su yolu ve RB, baz, kondansatör, emetör, LED; susturucunun bazı ve kollektörü) uçlarına
+   giren akım 2 µA'in üstündeyse yeşil çizilir; akım yönü okları da yalnızca akım geçen dallarda. Akım
+   geçmeyen parça grubu gri (prob kuru ve baz düğümü boş; transistör kesimde). Bu yüzden su probun
+   altına inince kondansatörün bazı bir süre beslediği de görünür. Çizim renkleri tema belirteçleriyle
+   (koyu temada okunur); su ve seviye renkleri sahneyle aynı. Tasarımdaki iki küçük düzeltme: Tüm devre
+   çizimindeki LED'in yönü (anot RC'de, katot kollektörde; çizimde tersti) ve "Ortak prob" yazısı hazne
+   duvarının dışına alındı. Telefonda panel tam ekran: başlık ve kapat, altında sekmeler; çizim okunur
+   genişlikte (kat 440 px, tüm devre 680 px) panel içinde kayar. Testler: `katDevreleri` gerçek
+   simülasyonla (%50 Kat 1 doyumda ve akımlar, kondansatörün boşalması, tek ışık %75 Q4 susturuyor,
+   saf su). ios-kontrol'e panel maddeleri eklendi (178 madde).
 
 ### Föy parça modelleri (föy için 2. aşama)
 

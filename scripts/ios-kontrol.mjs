@@ -1245,7 +1245,7 @@ try {
     await page.context().close();
   }
 
-  // --- Baraj sayfası (/baraj/): v3 düzeni (docs/tasarim-v3 → B1–B3) ---------------------------
+  // --- Baraj sayfası (/baraj/): v3 düzeni (docs/tasarim-v3 → B1–B5) ---------------------------
   const BARAJ = `${URL0.replace(/\/?$/, '/')}baraj/`;
   const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);
   /** Su seviyesi (%): üst çubuktaki seviye çubuğunun değeri. */
@@ -1301,8 +1301,19 @@ try {
     await page.getByRole('button', { name: 'Devreyi gör ›' }).tap(); await page.waitForTimeout(300);
     const circuitDialog = page.getByRole('dialog', { name: 'Devre' });
     const full = await circuitDialog.boundingBox();
+    const drawingOf = async (root) => (await root.getByRole('tabpanel').locator('svg[role=img]').getAttribute('aria-label')) ?? '';
+    const phoneKat = await drawingOf(circuitDialog);
+    const phoneTabs = await circuitDialog.getByRole('tab').count();
+    const dialogSmall = await circuitDialog.evaluate((root) => [...root.querySelectorAll('button, a, [role=tab]')]
+      .map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 20), w: r.width, h: r.height }; })
+      .filter((r) => r.w > 0 && r.h > 0 && (r.h < 43.5 || r.w < 43.5)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
+    await circuitDialog.getByRole('tab', { name: 'Tüm devre' }).tap(); await page.waitForTimeout(250);
+    const phoneAll = await drawingOf(circuitDialog);
+    const dialogScrolls = await pageScrolls(page);
     await circuitDialog.getByRole('button', { name: 'Devreyi kapat' }).tap(); await page.waitForTimeout(200);
-    check('baraj (telefon): "Devreyi gör ›" devreyi tam ekran açıyor, Kapat kapatıyor', full !== null && full.height >= 840 && (await circuitDialog.count()) === 0);
+    check('baraj (telefon): "Devreyi gör ›" devreyi tam ekran açıyor (Kat 1, 2, 3, Tüm devre sekmeleri; çizim panel içinde kayar, sayfa kaymaz; hedefler ≥ 44 px); Kapat kapatıyor',
+      full !== null && full.height >= 840 && phoneTabs === 4 && phoneKat.startsWith('Kat 1 devresi:') && phoneAll.startsWith('Tüm devre:') && !dialogScrolls && dialogSmall.length === 0 && (await circuitDialog.count()) === 0,
+      dialogSmall.join(', ') || phoneKat.slice(0, 40));
     await page.context().close();
   }
   {
@@ -1336,11 +1347,6 @@ try {
     const scaleAfter = await bp.locator('svg[role=img] text', { hasText: '%100' }).count();
     await bp.getByRole('button', { name: 'Yüzde ölçeği' }).click();
     check('baraj (masaüstü): yüzde ölçeği varsayılan gizli, "Göster: Yüzde ölçeği" ile açılıyor', scaleBefore === 0 && scaleAfter === 1);
-    await bp.getByRole('button', { name: 'Devre', exact: true }).click(); await bp.waitForTimeout(300);
-    const bandTexts = await bp.locator('svg.schematic text').allTextContents();
-    const panel = await bp.getByRole('complementary', { name: 'Devre' }).boundingBox();
-    check('baraj (masaüstü, B2): Devre düğmesi sağda devre panelini açıyor (üç seviye bandı)', panel !== null && panel.x > 700 && ['Seviye 1 · yeşil', 'Seviye 2 · sarı', 'Seviye 3 · kırmızı'].every((t) => bandTexts.includes(t)));
-    await bp.getByRole('button', { name: 'Devreyi kapat' }).click(); await bp.waitForTimeout(200);
     // Ayarlar: ⋯ menüsünde; dolma süresini kısalt (klavye denemesi hızlı bitsin).
     await bp.getByRole('button', { name: /^Diğer/ }).click(); await bp.waitForTimeout(150);
     await bp.getByRole('menuitem', { name: 'Ayarlar' }).click(); await bp.waitForTimeout(200);
@@ -1362,6 +1368,54 @@ try {
     await bp.keyboard.press('r'); await bp.waitForTimeout(400);
     check('baraj (masaüstü): klavye: ↑ Doldur, Boşluk Durdur, 2 → %75, Sayfa Aşağı → %95, R başa alır (%20)',
       upFlow === 'Doldur' && spaceFlow === 'Durdur' && at2 === 75 && at3 === 95 && (await barajLevel(bp)) === 20 && (await flowChecked(bp)) === 'Durdur', `${upFlow}, ${spaceFlow}, %${at2}, %${at3}, %${await barajLevel(bp)}`);
+    // Devre paneli (B2, B4, B5): kat sekmeleri, akım yolu ve akımlar, lambaya tıklama, tüm devre, tek ışıkta susturma.
+    await bp.keyboard.press('1'); await waitLevel(bp, 50, 4000); await bp.waitForTimeout(700);
+    await bp.getByRole('button', { name: 'Devre', exact: true }).click(); await bp.waitForTimeout(300);
+    const aside = bp.getByRole('complementary', { name: 'Devre' });
+    const tabSelected = async (name) => (await aside.getByRole('tab', { name, exact: true }).getAttribute('aria-selected')) === 'true';
+    const drawing = async () => (await aside.getByRole('tabpanel').locator('svg[role=img]').getAttribute('aria-label')) ?? '';
+    const panelBox = await aside.boundingBox();
+    const kat1 = await drawing();
+    const readings = (await aside.getByRole('tabpanel').textContent()) ?? '';
+    check('baraj (masaüstü, B2): Devre paneli sağda (600 px), Kat 1 seçili: prob ıslak, Q1 doyumda, baz ve LED akımı yazıyor; "Tüm devreyi simülatörde aç"',
+      panelBox !== null && panelBox.x > 800 && Math.abs(panelBox.width - 600) < 2 && (await aside.getByRole('tab').count()) === 4 && (await tabSelected('Kat 1')) &&
+      kat1.includes('Prob 1 ıslak') && kat1.includes('Q1 doyumda') && /Baz akımı≈ 0,[2-6]\d mA/.test(readings) && /LED akımı≈ 1[3-5],\d mA/.test(readings) &&
+      (await aside.getByRole('link', { name: 'Tüm devreyi simülatörde aç' }).count()) === 1, `${kat1.slice(0, 50)} · ${readings.match(/Baz akımı[^A-Z]*/)?.[0] ?? ''}`);
+    await bp.getByRole('button', { name: /^Kat 2 devresini göster/ }).click(); await bp.waitForTimeout(200);
+    const kat2Selected = await tabSelected('Kat 2');
+    const kat2 = await drawing();
+    await aside.getByRole('tab', { name: 'Kat 2', exact: true }).focus(); await bp.keyboard.press('ArrowRight'); await bp.waitForTimeout(150);
+    check('baraj (masaüstü): sahnede sarı lambaya tıklamak Kat 2’yi gösteriyor (prob kuru, açık); sekmede → Kat 3’e geçiyor, su seviyesi değişmiyor',
+      kat2Selected && kat2.includes('Prob 2 kuru, açık') && (await tabSelected('Kat 3')) && (await barajLevel(bp)) === 50, kat2.slice(0, 60));
+    await aside.getByRole('tab', { name: 'Tüm devre', exact: true }).click(); await bp.waitForTimeout(300);
+    const allBox = await aside.boundingBox();
+    const sceneAll = await bp.getByRole('region', { name: 'Baraj ve ışık kulesi' }).boundingBox();
+    const allText = (await aside.textContent()) ?? '';
+    const openMarks = await aside.locator('svg[role=img] text', { hasText: /^açık$/ }).count();
+    check('baraj (masaüstü, B5): Tüm devre: panel 840 px, sahne 600 px; "Kat 1 devresi tamamlandı: B1 + → … → B1 −"; kuru iki probda "açık"',
+      allBox !== null && Math.abs(allBox.width - 840) < 2 && sceneAll !== null && Math.abs(sceneAll.width - 600) < 2 &&
+      allText.includes('Kat 1 devresi tamamlandı: B1 + → ortak prob → su → Prob 1 → RB1 → Q1 → toprak → B1 −') && allText.includes('Prob 2, 3 kuru: devre açık') && openMarks === 2,
+      `${Math.round(allBox?.width ?? 0)}/${Math.round(sceneAll?.width ?? 0)} px · açık ×${openMarks}`);
+    await aside.getByRole('button', { name: 'Devreyi tam ekran aç' }).click(); await bp.waitForTimeout(200);
+    const wideBox = await aside.boundingBox();
+    const sceneHidden = !(await bp.getByRole('region', { name: 'Baraj ve ışık kulesi' }).isVisible());
+    await aside.getByRole('button', { name: 'Devreyi küçült' }).click(); await bp.waitForTimeout(200);
+    const backBox = await aside.boundingBox();
+    check('baraj (masaüstü): Tüm devrede "Devreyi tam ekran aç" sayfa genişliğine açıyor, "Devreyi küçült" geri alıyor',
+      wideBox !== null && wideBox.width > 1400 && sceneHidden && backBox !== null && Math.abs(backBox.width - 840) < 2, `${Math.round(wideBox?.width ?? 0)} px`);
+    await bp.getByRole('radio', { name: 'Tek ışık' }).click(); await bp.waitForTimeout(300);
+    await bp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await bp.keyboard.press('2'); await waitLevel(bp, 75, 4000); await bp.waitForTimeout(800);
+    await aside.getByRole('tab', { name: 'Kat 1', exact: true }).click(); await bp.waitForTimeout(300);
+    const tekText = (await aside.textContent()) ?? '';
+    const tekKat1 = await drawing();
+    check('baraj (masaüstü, B4): Tek ışık %75: öncelik kuralı satırı; Kat 1’de Q4 susturucu doyumda, baz düğümü ≈ 0,0x V, Q1 kesimde, açıklama cümlesi',
+      tekText.includes('Öncelik:') && tekText.includes('Yeşil = 1 VE 2 değil') && tekText.includes('susturucu · doyumda') && /≈ 0,0\d V/.test(tekText) &&
+      tekText.includes('Prob 2 ıslanınca Q4 doyuma girer ve Q1’in bazını toprağa çeker; yeşil söner, sarı yanar.') && tekKat1.includes('Q1 kesimde'), tekKat1.slice(0, 70));
+    await bp.getByRole('radio', { name: 'Çubuk gösterge' }).click(); await bp.waitForTimeout(200);
+    await aside.getByRole('button', { name: 'Devreyi kapat' }).click(); await bp.waitForTimeout(200);
+    await bp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await bp.keyboard.press('r'); await waitLevel(bp, 20, 2000);
     await bp.keyboard.press('s'); await bp.waitForTimeout(200);
     const strip = bp.getByRole('region', { name: 'Soru' });
     await strip.getByRole('button', { name: 'Cevabı göster' }).click(); await bp.waitForTimeout(200);

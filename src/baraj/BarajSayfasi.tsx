@@ -24,18 +24,17 @@ import { shareUrl } from '../model/share';
 import type { CircuitDoc } from '../model/types';
 import { probeWetness, TANK_PROBE_HEIGHTS, tankSettings } from '../sim/devices/tank';
 import type { PropValue } from '../sim/netlist';
-import { CircuitView } from '../editor/CircuitView';
 import { useBrowserFullscreen } from '../editor/fullscreen';
 import { Icon } from '../editor/icons';
 import { useSettings, type ThemeChoice } from '../editor/settings';
 import { useTheme } from '../editor/theme';
 import { ThemeMenu } from '../editor/TopBar';
 import { useLayout } from '../editor/useLayout';
-import { useSimulation, type SimFrame } from '../editor/useSimulation';
+import { useSimulation } from '../editor/useSimulation';
 import { AyarlarKarti } from './AyarlarKarti';
 import { alertOf, BarajSahnesi, type Lamps, type SceneLayout } from './BarajSahnesi';
-import { bandOf, durumRows, levelBands, START_LEVEL, stopAbove, stopBelow, type LevelNo, type Stop } from './seviye';
-import { BantLejanti, SeviyeBantlari } from './SeviyeBantlari';
+import { DevrePaneli, type CircuitTab } from './DevrePaneli';
+import { bandOf, katDevreleri, START_LEVEL, stopAbove, stopBelow, type LevelNo, type Stop } from './seviye';
 import { Soru } from './Soru';
 import { AkisDugmeleri, DolulukKarti, GosterCipleri, SeviyeCubugu } from './UstKumanda';
 import { useBarajKumanda } from './useBarajKumanda';
@@ -78,27 +77,6 @@ function lessonDoc(variant: Variant, tank?: Record<string, PropValue>): CircuitD
   const doc = exampleDoc(variant)!;
   const h1 = doc.parts.find((p) => p.type === 'tank')!;
   return updatePart(doc, h1.id, { props: { ...h1.props, level: START_LEVEL, mode: 'stop', ...tank } });
-}
-
-/** LED parlaklığı azalıyor mu (sönüyor): son ≈ 0,05 s'lik eğim (sönme ≈ 0,3 s sürer; kısa pencere kaçırmasın). */
-function useLedTrend(frame: SimFrame | null, doc: CircuitDoc): (id: string) => boolean {
-  const memory = useRef(new Map<string, { b: number; t: number; falling: boolean }>());
-  return useMemo(() => {
-    const m = memory.current;
-    if (!frame) {
-      m.clear();
-      return () => false;
-    }
-    for (const part of doc.parts) {
-      if (part.type !== 'led') continue;
-      const b = frame.live.get(part.id)?.brightness ?? 0;
-      const prev = m.get(part.id);
-      if (!prev || frame.time < prev.t) m.set(part.id, { b, t: frame.time, falling: false });
-      else if (frame.time - prev.t >= 0.05) m.set(part.id, { b, t: frame.time, falling: (b - prev.b) / (frame.time - prev.t) < -0.05 });
-    }
-    const snapshot = new Map(Array.from(m, ([id, v]) => [id, v.falling] as const));
-    return (id: string) => snapshot.get(id) ?? false;
-  }, [frame, doc]);
 }
 
 /** Canlı duyuru: yalnızca seviye bandı ya da uyarı değişince (kısa bir sakinleşmeden sonra). */
@@ -166,13 +144,6 @@ function VariantSeg({ value, onChange, className, labelledBy, big }: { value: Va
   );
 }
 
-const paperStyle = {
-  backgroundColor: 'var(--color-paper)',
-  backgroundImage: 'radial-gradient(circle, #b3bac3 1.3px, transparent 1.6px), radial-gradient(circle, #d3d7dc 1px, transparent 1.3px)',
-  backgroundSize: '75px 75px, 15px 15px',
-  backgroundPosition: '7px 7px, 7px 7px',
-} as const;
-
 export default function BarajSayfasi() {
   const [appSettings, updateAppSettings] = useSettings();
   // Renk teması simülatörle aynı ayardan (Sistem / Açık / Koyu).
@@ -227,10 +198,9 @@ export default function BarajSayfasi() {
   const lamps: Lamps = { green: lamp('LED1'), yellow: lamp('LED2'), red: lamp('LED3') };
   const alert = alertOf(lamps);
   const band = bandOf(level);
-  const falling = useLedTrend(sim.frame, doc);
-  const rows = durumRows(doc, sim.frame, wet, falling);
-  const bands = useMemo(() => levelBands(doc), [doc]);
-  const working = (n: LevelNo) => rows.find((r) => r.level === n)?.working ?? false;
+  const katlar = katDevreleri(doc, sim.frame, wet);
+  const battery = doc.parts.find((p) => p.type === 'battery');
+  const supply = typeof battery?.props.voltage === 'number' ? battery.props.voltage : 9;
   const announcement = useAnnouncement(band, lamps);
 
   // --- Soru, Ayarlar, Devre paneli, katmanlar ------------------------------------------------
@@ -241,6 +211,16 @@ export default function BarajSayfasi() {
   const [moreOpen, setMoreOpen] = useState(false);
   /** Devre paneli (B2; telefonda tam ekran). Varsayılan görünüm yalnızca sahne (B1). */
   const [circuitOpen, setCircuitOpen] = useState(false);
+  /** Gösterilen kat ya da tüm devre (B5). */
+  const [circuitTab, setCircuitTab] = useState<CircuitTab>(1);
+  /** Tüm devre sayfa genişliğinde (sahne gizli; masaüstü). */
+  const [circuitWideOn, setCircuitWide] = useState(false);
+  const circuitWide = circuitWideOn && circuitTab === 'all';
+  /** Sahnede lambaya tıklamak o katın devresini açar. */
+  const selectFloor = useCallback((n: LevelNo) => {
+    setCircuitTab(n);
+    setCircuitOpen(true);
+  }, []);
   /** Sahnenin isteğe bağlı katmanları ("Göster" çipleri): varsayılan kapalı. */
   const [showIons, setShowIons] = useState(false);
   const [showScale, setShowScale] = useState(false);
@@ -278,7 +258,7 @@ export default function BarajSayfasi() {
     const target = e.target instanceof HTMLElement || e.target instanceof SVGElement ? e.target : null;
     if (target?.closest('input, textarea, select, [contenteditable="true"], [role=slider], [role=dialog], [role=menu]')) return;
     // Odak bir düğmedeyken Boşluk ve Enter o düğmeye basar; radyo gruplarında oklar seçimi değiştirir.
-    if (target?.closest('button, a, [role=radio], [role=tab], [role=switch]') && (e.key === ' ' || e.key === 'Enter')) return;
+    if (target?.closest('button, a, [role=button], [role=radio], [role=tab], [role=switch]') && (e.key === ' ' || e.key === 'Enter')) return;
     if (target?.closest('[role=radio], [role=tab]') && e.key.startsWith('Arrow')) return;
     const key = e.key.length === 1 ? e.key.toLocaleLowerCase('tr') : e.key;
     let handled = true;
@@ -302,7 +282,8 @@ export default function BarajSayfasi() {
   }, []);
 
   // --- Parçalar ---------------------------------------------------------------------------
-  const sceneLayout: SceneLayout = landscape ? 'landscape' : phone ? 'phone' : desktop || big ? 'wide' : 'tablet';
+  // Tüm devre açıkken sahne dar ve uzun (B5): telefonun dikey kadrajı.
+  const sceneLayout: SceneLayout = landscape ? 'landscape' : phone || (circuitOpen && circuitTab === 'all') ? 'phone' : desktop || big ? 'wide' : 'tablet';
   const textPx = big ? 16.7 : desktop ? 14.7 : 13;
   const onPreview = (v: number | null) => {
     setPreview(v);
@@ -323,20 +304,31 @@ export default function BarajSayfasi() {
         ions={showIons && preview === null ? sim.frame?.live.get(tank.id)?.ions : undefined}
         onPreview={onPreview}
         onCommit={kumanda.commitLevel}
+        {...(phone ? {} : { onLamp: selectFloor })}
         className="h-full w-full"
       />
       <DolulukKarti level={shown} alert={alert} size={phone ? 'phone' : big ? 'big' : 'desk'} />
     </>
   );
-  const circuit = (minWidth?: number) => (
-    <CircuitView
-      doc={doc}
-      connectivity={connectivity}
-      frame={sim.frame}
-      settings={appSettings}
-      label={tr.baraj.circuitLabel(tr.baraj.variants[variant] ?? '')}
-      underlay={<SeviyeBantlari bands={bands} working={working} />}
-      {...(minWidth ? { minWidth } : {})}
+  const panel = (layoutKind: 'side' | 'sheet') => (
+    <DevrePaneli
+      variant={variant}
+      katlar={katlar}
+      tab={circuitTab}
+      onTab={setCircuitTab}
+      level={shown}
+      supply={supply}
+      battery={battery?.label ?? 'B1'}
+      openHref={baseHref}
+      onOpenActivate={refreshHref}
+      onClose={() => {
+        setCircuitOpen(false);
+        setCircuitWide(false);
+      }}
+      {...(layoutKind === 'side' ? { wide: { on: circuitWide, onToggle: () => setCircuitWide((on) => !on) } } : {})}
+      layout={layoutKind}
+      touch={phone || layout.kind === 'tablet'}
+      big={big}
     />
   );
   const flow = <AkisDugmeleri mode={s.mode} onFlow={kumanda.setFlow} touch={phone || layout.kind === 'tablet'} />;
@@ -488,23 +480,17 @@ export default function BarajSayfasi() {
           {settingsCard}
         </section>
         {circuitOpen && (
-          <div role="dialog" aria-modal="true" aria-label={tr.baraj.devre.title} className="fixed inset-0 z-40 flex flex-col bg-panel" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-            <div className="flex h-14 shrink-0 items-center gap-2 border-b border-line pr-2 pl-4">
-              <span className="text-[17px] font-semibold">{tr.baraj.devre.title}</span>
-              <span className="min-w-0 flex-1 truncate text-small text-muted">{tr.baraj.variants[variant]}</span>
-              <button
-                type="button"
-                autoFocus
-                onClick={() => setCircuitOpen(false)}
-                aria-label={tr.baraj.closeCircuit}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] hover:bg-panel-2"
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-            <div className="min-h-0 flex-1" style={paperStyle}>
-              {circuit(520)}
-            </div>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={tr.baraj.devre.title}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setCircuitOpen(false);
+            }}
+            className="fixed inset-0 z-40 flex flex-col bg-panel"
+            style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            {panel('sheet')}
           </div>
         )}
       </div>
@@ -573,7 +559,7 @@ export default function BarajSayfasi() {
       </header>
       {soru(false)}
       <div className="relative flex min-h-0 flex-1">
-        <section aria-label={tr.baraj.sceneTitle} className="relative min-w-0 flex-1 overflow-hidden bg-[#e9eef3]">
+        <section aria-label={tr.baraj.sceneTitle} hidden={circuitOpen && circuitWide} className="relative min-w-0 flex-1 overflow-hidden bg-[#e9eef3]">
           {scene}
           <GosterCipleri
             ions={showIons}
@@ -584,31 +570,12 @@ export default function BarajSayfasi() {
           />
         </section>
         {circuitOpen && (
-          <aside aria-label={tr.baraj.devre.title} className="flex min-h-0 shrink-0 flex-col border-l border-line bg-panel" style={{ width: roomy ? 600 : '45%' }}>
-            <div className="flex h-12 shrink-0 items-center gap-3 border-b border-line pr-2 pl-4">
-              <span className={`font-semibold ${big ? 'text-[17px]' : 'text-[15px]'}`}>{tr.baraj.devre.title}</span>
-              <span className={`text-muted ${big ? 'text-[16px]' : 'text-small'}`}>{tr.baraj.variants[variant]}</span>
-              <span className="flex-1" />
-              <BantLejanti />
-              <button
-                type="button"
-                onClick={() => setCircuitOpen(false)}
-                aria-label={tr.baraj.closeCircuit}
-                title={tr.baraj.closeCircuit}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-panel-2"
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-            <div
-              tabIndex={0}
-              role="group"
-              aria-label={tr.baraj.circuitLabel(tr.baraj.variants[variant] ?? '')}
-              className="min-h-0 flex-1 p-2 outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset"
-              style={paperStyle}
-            >
-              {circuit()}
-            </div>
+          <aside
+            aria-label={tr.baraj.devre.title}
+            className={`flex min-h-0 min-w-0 flex-col border-l border-line bg-panel ${circuitWide ? 'flex-1' : 'shrink-0'}`}
+            style={circuitWide ? undefined : { width: circuitTab === 'all' ? (roomy ? 840 : '58%') : roomy ? 600 : '45%' }}
+          >
+            {panel('side')}
           </aside>
         )}
         {settingsCard}

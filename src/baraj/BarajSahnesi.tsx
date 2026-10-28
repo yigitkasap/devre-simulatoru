@@ -56,6 +56,8 @@ export interface BarajSahnesiProps {
   readonly onPreview: (level: number | null) => void;
   /** Tutamak bırakıldı ya da tuşla değişti: seviye uygulanır. */
   readonly onCommit: (level: number) => void;
+  /** Lambaya tıklanınca o katın devresi gösterilir (lambalar dokunma hedefi olacak kadar büyükse). */
+  readonly onLamp?: (level: LevelNo) => void;
   readonly className?: string;
 }
 
@@ -234,7 +236,7 @@ function IonLegend({ viewBox, fs }: { viewBox: readonly [number, number, number,
   );
 }
 
-export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx, scale: showScale = false, handle = true, ions, onPreview, onCommit, className = '' }: BarajSahnesiProps) {
+export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx, scale: showScale = false, handle = true, ions, onPreview, onCommit, onLamp, className = '' }: BarajSahnesiProps) {
   const id = useId().replace(/:/g, '');
   const viewBox = VIEW_BOXES[layout];
   const { ref, scale } = useScale(viewBox);
@@ -251,7 +253,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
 
   // --- Tutamak: sürükleme ve tuşlar ------------------------------------------------------
   const drag = useRef<{ pointer: number; offset: number; level: number } | null>(null);
-  const [focusRing, setFocusRing] = useState(false);
+  const [focusRing, setFocusRing] = useState<'handle' | LevelNo | null>(null);
   const toLevel = (clientX: number, clientY: number, offset: number) => {
     const svg = ref.current;
     const ctm = svg?.getScreenCTM();
@@ -310,6 +312,11 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
   const tri = tagH * 0.21;
   const hcx = handleX + handleW / 2;
   const hcy = tagTop + tagH / 2;
+
+  // Lambaların tıklama alanı: kulenin üstünde üst üste üç dikdörtgen (46 birim arayla); ekranda 44 px'ten
+  // küçük kalırsa lambalar tıklanmaz (katlar devre panelinin sekmelerinden seçilir).
+  const lampHitW = Math.max(52, 44 / scale);
+  const lampsClickable = onLamp !== undefined && 46 * scale >= 44;
 
   const badgeR = fs * 0.76;
   const badgeX = FACE_X + 26 + badgeR * 1.38;
@@ -486,14 +493,40 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
 
       {ions && level > TANK_PROBE_HEIGHTS[0] && <IonLegend viewBox={viewBox} fs={fs} />}
     </svg>
-    {/* Sürükleme tutamağı (ayrı katman) */}
-    {handle && (
+    {/* Sürükleme tutamağı ve lambaların tıklama alanları (ayrı katman) */}
+    {(handle || lampsClickable) && (
     <svg
       viewBox={viewBox.join(' ')}
       className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
       style={{ touchAction: 'none' }}
       preserveAspectRatio="xMidYMid meet"
     >
+      {lampsClickable &&
+        LAMPS.map(({ key, level: n }, i) => {
+          const cy = 96 + i * 46;
+          return (
+            <g
+              key={key}
+              role="button"
+              tabIndex={0}
+              aria-label={tr.baraj.panel.lampButton(n, tr.baraj.lampNames[key])}
+              onClick={() => onLamp?.(n)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                onLamp?.(n);
+              }}
+              onFocus={(e) => setFocusRing(e.currentTarget.matches(':focus-visible') ? n : null)}
+              onBlur={() => setFocusRing(null)}
+              style={{ cursor: 'pointer', outline: 'none', pointerEvents: 'auto' }}
+            >
+              <title>{tr.baraj.panel.lampButton(n, tr.baraj.lampNames[key])}</title>
+              <rect x={668 - lampHitW / 2} y={cy - 23} width={lampHitW} height={46} fill="transparent" />
+              {focusRing === n && <circle cx={668} cy={cy} r={22} fill="none" stroke="#1f6feb" strokeWidth={3 / scale} />}
+            </g>
+          );
+        })}
+      {handle && (
       <g
         role="slider"
         tabIndex={0}
@@ -508,12 +541,12 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onKeyDown={onKeyDown}
-        onFocus={(e) => setFocusRing(e.currentTarget.matches(':focus-visible'))}
-        onBlur={() => setFocusRing(false)}
+        onFocus={(e) => setFocusRing(e.currentTarget.matches(':focus-visible') ? 'handle' : null)}
+        onBlur={() => setFocusRing(null)}
         style={{ cursor: 'ns-resize', touchAction: 'none', outline: 'none', pointerEvents: 'auto' }}
       >
         <rect x={hitX} y={hitY} width={hitW} height={hitH} fill="transparent" />
-        {focusRing && (
+        {focusRing === 'handle' && (
           <rect x={hitX - 2} y={hitY - 2} width={hitW + 4} height={hitH + 4} rx={hitH / 2} fill="none" stroke="#1f6feb" strokeWidth={3 / scale} />
         )}
         <rect x={handleX} y={tagTop} width={handleW} height={tagH} rx={tagH / 2} fill="#ffffff" stroke={WATER} strokeWidth={tagH * 0.094} />
@@ -522,6 +555,7 @@ export function BarajSahnesi({ level, wet, lamps, mode, running, layout, textPx,
           fill={WATER}
         />
       </g>
+      )}
     </svg>
     )}
     </div>

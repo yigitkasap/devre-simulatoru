@@ -1,5 +1,5 @@
 // Baraj sayfasına özel küçük simgeler: durumun biçimi (doluluk kartında; daire, onay, üçgen, sekizgen:
-// renk tek başına anlam taşımaz) ve su akışı okları (▼ ■ ▲).
+// renk tek başına anlam taşımaz), su akışı okları (▼ ■ ▲) ve devre panelindeki "Tüm devre" simgesi.
 
 export type AlertKind = 'none' | 'normal' | 'warning' | 'danger';
 
@@ -38,6 +38,17 @@ export function FlowIcon({ kind, size = 14 }: { kind: 'drain' | 'stop' | 'fill';
       {kind === 'drain' && <path d="M7 11.5L12.5 3H1.5Z" fill="currentColor" />}
       {kind === 'stop' && <rect x="2.5" y="2.5" width="9" height="9" rx="1.5" fill="currentColor" />}
       {kind === 'fill' && <path d="M7 2.5L12.5 11H1.5Z" fill="currentColor" />}
+    </svg>
+  );
+}
+
+/** "Tüm devre" sekmesi: üst üste üç kat. */
+export function FloorsIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+      <rect x="3" y="3" width="14" height="4" rx="1" />
+      <rect x="3" y="8" width="14" height="4" rx="1" />
+      <rect x="3" y="13" width="14" height="4" rx="1" />
     </svg>
   );
 }
