@@ -8,11 +8,13 @@
 // - Aynı türden 3 ya da daha fazla parça tek satırda; satır açılınca parçalar altında.
 // - Çalışırken değiştirilen ayarlar (potansiyometre konumu, LDR ışığı, NTC sıcaklığı) kapalı kartta
 //   da görünen bir kaydırıcıdır.
+// Klavye (9. adım): kartların başları ([data-nav]) arasında ↑ ↓, Home / End; kart açılınca odak açık
+// karta, Esc ile kapanınca kartın düğmesine döner (şemadan seçilince odak tuvalde kalır).
 // Şemada parçaya tıklamak kartını açar ve listeyi oraya kaydırır. Telefonda (DP1–DP4) ekleme satırı
 // yoktur (sol alttaki Parça ekle düğmesi), sorun kartları tek satırdır ("Oku" ile açılır) ve listenin
 // altında yüzen düğmelere yer kalır.
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { resistorBands, resistorColorCode } from '../bench3d/bands';
 import type { ExampleId } from '../examples';
 import { ek } from '../i18n/ek';
@@ -137,6 +139,44 @@ export function Notebook(props: NotebookProps) {
     el?.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
   }, [openId]);
 
+  /** Defterden açılan ya da kapatılan kart: çizimden sonra odak ona (şemadan seçimde boş kalır). */
+  const focusAfter = useRef<{ id: string; open: boolean } | null>(null);
+  useEffect(() => {
+    const want = focusAfter.current;
+    if (!want) return;
+    // Başka bir kart açıldıysa (ör. şemadan) istek geçersizdir.
+    if (want.open && want.id !== openId) {
+      focusAfter.current = null;
+      return;
+    }
+    const card = listRef.current?.querySelector<HTMLElement>(`[data-card="${CSS.escape(want.id)}"]`);
+    const target = want.open ? card : card?.querySelector<HTMLElement>('[data-nav]');
+    if (!target) return;
+    focusAfter.current = null;
+    target.focus({ preventScroll: true });
+  }, [openId]);
+  const closeOpen = () => {
+    if (openId) focusAfter.current = { id: openId, open: false };
+    props.onClearSelection();
+  };
+  const onNavKeys = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (!target.hasAttribute('data-nav') || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    if (e.key === 'Escape' && target.dataset.card === openId && openId) {
+      e.preventDefault();
+      closeOpen();
+      return;
+    }
+    const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[data-nav]')];
+    const i = items.indexOf(target);
+    const next =
+      e.key === 'ArrowDown' ? items[i + 1] : e.key === 'ArrowUp' ? items[i - 1] : e.key === 'Home' ? items[0] : e.key === 'End' ? items[items.length - 1] : undefined;
+    if (!next) return;
+    e.preventDefault();
+    next.focus();
+    next.scrollIntoView?.({ block: 'nearest' });
+  };
+
   const others = selection.parts.length + selection.wires.length;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
   // Kapalı kartlar seyrek karelerle ve sabit geri çağırmalarla bir kez kurulur: simülasyon her karede
@@ -146,7 +186,10 @@ export function Notebook(props: NotebookProps) {
   latest.current = props;
   const callbacks = useMemo(
     () => ({
-      onSelectPart: (id: string) => latest.current.onSelectPart(id),
+      onSelectPart: (id: string) => {
+        focusAfter.current = { id, open: true };
+        latest.current.onSelectPart(id);
+      },
       onUpdatePart: (id: string, patch: PartPatch) => latest.current.onUpdatePart(id, patch),
       onSlidePart: (id: string, patch: PartPatch, done: boolean) => {
         const { onSlidePart, onUpdatePart } = latest.current;
@@ -169,7 +212,7 @@ export function Notebook(props: NotebookProps) {
     }
     return map;
   }, [doc.parts, openId, slow, status, settings, floating, measured, issues, callbacks, touch]);
-  const card = (part: Part) => (part.id === openId ? <PartCard key={part.id} {...props} part={part} open /> : closed.get(part.id));
+  const card = (part: Part) => (part.id === openId ? <PartCard key={part.id} {...props} onClearSelection={closeOpen} part={part} open /> : closed.get(part.id));
 
   const renderEntry = (entry: NotebookEntry): ReactNode => {
     if (entry.kind === 'part') return card(entry.part);
@@ -202,6 +245,7 @@ export function Notebook(props: NotebookProps) {
     <div
       id="defter"
       ref={listRef}
+      onKeyDown={onNavKeys}
       className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-panel-2 ${touch ? 'p-3' : 'p-4'}`}
       style={props.phone ? { paddingBottom: 'calc(104px + env(safe-area-inset-bottom))' } : undefined}
     >
@@ -329,7 +373,7 @@ function ProblemCard(props: NotebookProps & { item: MessageItem }) {
         aria-label={`${tr.messages.severity[item.severity]} · ${item.title}`}
         className={`flex shrink-0 rounded-lg border-[1.5px] ${error ? 'border-danger bg-danger-soft' : 'border-dashed border-warn bg-warn-soft'}`}
       >
-        <button type="button" onClick={() => setRead(true)} aria-expanded={false} aria-controls={bodyId} className="flex min-h-12 w-full items-center gap-2.5 px-3 py-2.5 text-left">
+        <button type="button" data-nav onClick={() => setRead(true)} aria-expanded={false} aria-controls={bodyId} className="flex min-h-12 w-full items-center gap-2.5 px-3 py-2.5 text-left">
           <SeverityMark severity={item.severity} size={18} />
           <span className="line-clamp-2 min-w-0 flex-1 text-small leading-[1.4] text-ink-2">
             <b className={`font-semibold ${error ? 'text-danger-ink' : 'text-warn'}`}>{item.title}:</b> {firstSentence(item.detail)}
@@ -342,6 +386,8 @@ function ProblemCard(props: NotebookProps & { item: MessageItem }) {
   return (
     <section
       data-notebook="problem"
+      data-nav
+      tabIndex={-1}
       aria-label={`${tr.messages.severity[item.severity]} · ${item.title}`}
       className={`flex shrink-0 gap-3 rounded-lg border-[1.5px] px-3.5 py-3 ${error ? 'border-danger bg-danger-soft' : 'border-dashed border-warn bg-warn-soft'} ${
         selectedMessage === item.key ? 'ring-2 ring-accent' : ''
@@ -376,6 +422,7 @@ function InfoCard(props: NotebookProps & { item: MessageItem }) {
     <section aria-label={`${tr.messages.severity.info} · ${item.title}`} className="flex shrink-0 flex-col rounded-lg border border-info-line bg-info-soft">
       <button
         type="button"
+        data-nav
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls={id}
@@ -410,6 +457,7 @@ function ExampleCard({ id, onOpen, onClose }: { id: ExampleId; onOpen: (id: Exam
     <section data-notebook="example" aria-label={tr.examples.tabBadge(groupOf(id))} className="flex shrink-0 flex-col rounded-lg border border-line bg-panel">
       <button
         type="button"
+        data-nav
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-controls={bodyId}
@@ -481,6 +529,7 @@ function GroupRow({
     <div className="flex flex-col gap-2">
       <button
         type="button"
+        data-nav
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={id}
@@ -562,6 +611,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
       <div data-card={part.id} data-notebook="card" className="flex shrink-0 flex-col rounded-lg border border-line bg-panel hover:border-line-2">
         <button
           type="button"
+          data-nav
           onClick={() => onSelectPart(part.id)}
           aria-expanded={false}
           aria-label={`${t.openCard(part.label, typeName)}${reading ? `, ${reading.main}` : value ? `, ${value}` : ''}`}
@@ -596,7 +646,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   }
 
   return (
-    <section data-card={part.id} data-notebook="card" aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 rounded-lg border-2 border-accent bg-panel px-3.5 pt-3 pb-3.5">
+    <section data-card={part.id} data-notebook="card" data-nav tabIndex={-1} aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 rounded-lg border-2 border-accent bg-panel px-3.5 pt-3 pb-3.5">
       <OpenCardHeader
         {...props}
         badges={

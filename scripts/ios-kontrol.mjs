@@ -591,6 +591,80 @@ try {
     await ctx.close();
   }
 
+  // --- Erişilebilirlik (v3, 9. adım): defterde klavyeyle gezinme, odak, adsız düğme yok ------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(500);
+    await page.locator('#tuval').focus();
+    const active = () => page.evaluate(() => {
+      const el = document.activeElement;
+      return { nav: el?.hasAttribute('data-nav') ?? false, card: el?.closest('[data-card]')?.getAttribute('data-card') ?? '', open: el?.matches('section[data-card]') ?? false, label: (el?.getAttribute('aria-label') ?? el?.textContent ?? '').slice(0, 30) };
+    });
+    await page.keyboard.press('Alt+Digit1'); await page.waitForTimeout(150);
+    const first = await active();
+    await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80);
+    const second = await active();
+    await page.keyboard.press('End'); await page.waitForTimeout(80);
+    const last = await active();
+    await page.keyboard.press('Home'); await page.waitForTimeout(80);
+    const home = await page.evaluate(() => document.activeElement === document.querySelector('#defter [data-nav]'));
+    check('erişilebilirlik: Alt+1 ilk parça kartına; ↓ sonraki karta, End sona, Home defterin başına (örnek kartı) geçiyor',
+      first.nav && first.card !== '' && second.nav && second.card !== first.card && last.nav && last.card !== second.card && home, `${first.label} → ${second.label} → ${last.label}`);
+    await page.keyboard.press('Alt+Digit1'); await page.waitForTimeout(150);
+    await page.keyboard.press('ArrowDown'); await page.waitForTimeout(80);
+    const target = (await active()).card;
+    await page.keyboard.press('Enter'); await page.waitForTimeout(250);
+    const opened = await active();
+    await page.keyboard.press('Escape'); await page.waitForTimeout(250);
+    const closed = await active();
+    const expanded = await page.evaluate(() => document.activeElement?.getAttribute('aria-expanded'));
+    check('erişilebilirlik: Enter kartı açıp odağı açık karta taşıyor; Esc kartı kapatıp odağı kartın düğmesine döndürüyor',
+      opened.open && opened.card === target && closed.nav && !closed.open && closed.card === target && expanded === 'false', `${opened.card} / ${closed.card}`);
+    await ctx.close();
+  }
+  {
+    // Adı olmayan düğme, bağlantı ya da form alanı yok (simge düğmelerinde görünmez etiket).
+    const unnamed = (page) => page.evaluate(() => {
+      const out = [];
+      for (const el of document.querySelectorAll('button, a[href], input:not([type=file]), select, textarea, [role=switch], [role=tab], [role=radio], [role=menuitem], [role=menuitemradio], [role=option], [role=slider]')) {
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0 && !el.classList.contains('sr-only')) continue;
+        const clone = el.cloneNode(true);
+        clone.querySelectorAll('[aria-hidden="true"], svg').forEach((n) => n.remove());
+        const id = el.id;
+        const label = el.getAttribute('aria-label') || (el.getAttribute('aria-labelledby') && el.getAttribute('aria-labelledby').split(' ').map((x) => document.getElementById(x)?.textContent ?? '').join('').trim()) ||
+          clone.textContent.trim() || (id && document.querySelector(`label[for="${CSS.escape(id)}"]`)?.textContent?.trim()) || el.closest('label')?.textContent?.trim();
+        if (!label) out.push(el.outerHTML.slice(0, 100));
+      }
+      return out;
+    });
+    const found = [];
+    const dctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const dp = await dctx.newPage();
+    await dp.goto(URL0, { waitUntil: 'networkidle' });
+    await dp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await dp.waitForTimeout(200);
+    await dp.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }).click(); await dp.waitForTimeout(500);
+    await dp.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await dp.waitForTimeout(600);
+    for (const name of [/^OSC1 ·/, /^FG1 ·/]) {
+      await notebook(dp).getByRole('button', { name }).click(); await dp.waitForTimeout(200);
+      found.push(...await unnamed(dp));
+    }
+    await dp.getByRole('button', { name: '3B', exact: true }).click();
+    await dp.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await dp.waitForTimeout(500);
+    found.push(...await unnamed(dp));
+    await dctx.close();
+    const { page: pp } = await phone();
+    found.push(...await unnamed(pp));
+    await pp.getByRole('button', { name: /^Daha fazla/ }).tap(); await pp.waitForTimeout(300);
+    found.push(...await unnamed(pp));
+    await pp.context().close();
+    check('erişilebilirlik: adı olmayan düğme ya da alan yok (masaüstü kartlar, 3B, telefon, ⋯)', found.length === 0, found.slice(0, 2).join(' | '));
+  }
+
   // --- 3B (v3: E1, E3; kullanıcı kararı: denetimler sağ altta) -----------------------------------
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });

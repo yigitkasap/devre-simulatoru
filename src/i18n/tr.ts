@@ -2480,6 +2480,16 @@ export const tr = {
           ['Yardım', '?'],
         ],
       },
+      {
+        title: 'Defter',
+        rows: [
+          ['Kartlar arasında gez', '↑ ya da ↓'],
+          ['İlk ya da son kart', 'Home ya da End'],
+          ['Kartı aç (odak açılan karta geçer)', 'Enter'],
+          ['Açık kartı kapat (odak kartın düğmesine döner)', 'Esc'],
+          ['Kartın içindeki ayarlar', 'Tab'],
+        ],
+      },
     ] as ReadonlyArray<{ title: string; rows: ReadonlyArray<readonly [string, string]> }>,
     keysNote: 'Kısayollar odak tuvaldeyken çalışır; bir alana yazarken harf tuşları yazıya gider. Türkçe Q klavyede de aynı tuşlar.',
     mouse: 'Fare',

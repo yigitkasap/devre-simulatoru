@@ -1763,7 +1763,7 @@ zip verir: üreticiye doğrudan yüklenen **üretim zip'i** (`devre-<tarih>-uret
 PCB araştırması ve sonraki aşamalar: `docs/pcb/arastirma.md`.
 
 
-### Arayüz v3: "Defter" düzeni (2026-10-28, sürüyor)
+### Arayüz v3: "Defter" düzeni (2026-10-28)
 
 Brif ve çizimler `docs/tasarim-v3/` (önerilen sıradaki 9 adım; motor, model, örnekler ve 3B
 modellerin görünüşü değişmez). Yapılanlar ve kararlar:
@@ -1870,6 +1870,14 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
      malzemelerle); başka modele dokunulmadı.
    - Baraj örneğinde (20 etiket, 75 akım noktası) 3B ekran yenileme hızında (çizim ≈ 2 ms).
    ios-kontrol'de 8 yeni 3B maddesi (168 madde).
+9. **Erişilebilirlik**: defterde kartların başları (`data-nav`: kapalı kartın düğmesi, açık kart,
+   grup satırı, örnek, sorun ve bilgi kartları) arasında ↑ ↓, Home / End; kartın içindeki ayarlara
+   Tab. Kart defterden açılınca (tıklama ya da Enter) odak açık karta geçer, kartın Esc ile ya da
+   küçült düğmesiyle kapanınca kartın düğmesine döner; şemadan ya da 3B'den seçilince odak tuvalde
+   kalır. Alt+1…3 kartların başlarına gider. Yardım → Klavye kısayolları'nda "Defter" bölümü.
+   Bütün arayüzde adı olmayan düğme ve alan taraması (masaüstü kartlar, 3B, telefon, ⋯ menüsü): simge
+   düğmelerinin hepsinin görünmez etiketi (aria-label) vardı; ios-kontrol'de bu tarama ve klavye
+   gezinmesi için 3 madde (171 madde).
 
 ### Renk teması: açık ve koyu (2026-10-28)
 

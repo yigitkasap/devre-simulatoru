@@ -843,7 +843,8 @@ export default function Simulator() {
         // Defter (v3): sekme yok; Alt+1 parça kartları, Alt+2 örnek kartı, Alt+3 sorun kartları.
         const part = n === '1' ? 'card' : n === '2' ? 'example' : 'problem';
         window.setTimeout(() => {
-          const target = document.querySelector<HTMLElement>(`#defter [data-notebook="${part}"] button`) ?? document.querySelector<HTMLElement>('#defter [data-notebook="card"] button');
+          const first = (kind: string) => document.querySelector<HTMLElement>(`#defter [data-notebook="${kind}"][data-nav], #defter [data-notebook="${kind}"] [data-nav]`);
+          const target = first(part) ?? first('card');
           target?.focus();
         }, 0);
       }
