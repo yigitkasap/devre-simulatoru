@@ -4,7 +4,7 @@
 // durumu burada tutulur; yükleme (örnek, dosya, paylaşım bağlantısı) ve döndürme gibi birden çok
 // bileşenin kullandığı işlemler de buradadır.
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
@@ -70,6 +70,9 @@ function sweepSpeed(timePerDiv: number): number {
   return Math.min(1, Math.max(1e-6, 50 * timePerDiv));
 }
 
+// Karta aktar (delikli plaket ve baskı devre, 3B kart): yalnızca açılınca yüklenir.
+const KartaAktarDialog = lazy(() => import('./KartaAktar'));
+
 export default function Simulator() {
   const [initial] = useState(initialDoc);
   const [state, dispatch] = useReducer(editorReducer, initial.doc, initialEditorState);
@@ -116,6 +119,8 @@ export default function Simulator() {
   // İlk açılış (M01): hoş geldin yalnızca ilk ziyarette (kayıtlı devre ya da paylaşım bağlantısı yoksa).
   const [welcomeOpen, setWelcomeOpen] = useState(() => !welcomeSeen() && initialIsFresh());
   const [helpOpen, setHelpOpen] = useState(false);
+  /** Karta aktar penceresi (3B kart: delikli plaket ve baskı devre). */
+  const [kartaOpen, setKartaOpen] = useState(false);
   const [tour, setTour] = useState<{ step: TourStep; parts: number; wires: number } | null>(null);
   const canvasRef = useRef<CanvasHandle>(null);
   const [viewMode, setViewMode] = useViewMode();
@@ -710,7 +715,7 @@ export default function Simulator() {
     setConnect({ start: null });
   };
 
-  const overlayOpen = Boolean(shareLink) || examplesOpen || modal !== null || stopAsk;
+  const overlayOpen = Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || kartaOpen;
   const schematic = (
     <Canvas
       ref={canvasRef}
@@ -786,6 +791,7 @@ export default function Simulator() {
           onSettings={updateSettings}
           measured={measuredParts}
           onSchematic={() => setViewMode('schematic')}
+          onKarta={() => setKartaOpen(true)}
           focusRequest={benchFocus}
           onFocusDone={clearBenchFocus}
           {...(phone ? { controlsInset: { right: 60, bottom: schematicFull ? 'calc(100px + env(safe-area-inset-bottom))' : 10 } } : {})}
@@ -937,6 +943,11 @@ export default function Simulator() {
           onClose={closeWelcome}
         />
       )}
+      {kartaOpen && (
+        <Suspense fallback={null}>
+          <KartaAktarDialog doc={doc} title={circuitTitle} phone={phone} dark={theme === 'dark'} onClose={() => setKartaOpen(false)} />
+        </Suspense>
+      )}
       {helpOpen && <HelpDialog scale={settings.wireScale} onTour={startTour} onClose={() => setHelpOpen(false)} />}
       {tour && !welcomeOpen && (
         <Tour
@@ -1014,6 +1025,10 @@ export default function Simulator() {
             onImport={() => {
               setModal(null);
               fileInputRef.current?.click();
+            }}
+            onKarta={() => {
+              setModal(null);
+              setKartaOpen(true);
             }}
           />
         )}
@@ -1167,6 +1182,7 @@ export default function Simulator() {
           onExport={() => downloadDoc(doc)}
           onImport={() => fileInputRef.current?.click()}
           onShare={() => setShareLink(shareUrl(doc, window.location.href))}
+          onKarta={() => setKartaOpen(true)}
           onExamples={() => setExamplesOpen(true)}
           onHelp={() => setHelpOpen(true)}
           onWelcome={() => setWelcomeOpen(true)}

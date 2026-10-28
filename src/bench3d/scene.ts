@@ -5,15 +5,11 @@
 // etiketlerden önceliği düşük olan gizlenir); çalışırken kabloların üstünde akım yönünde akan noktalar.
 
 import {
-  ACESFilmicToneMapping,
   Box3,
   CanvasTexture,
   Color,
   CubicBezierCurve3,
-  DirectionalLight,
   Group,
-  HemisphereLight,
-  MOUSE,
   Material,
   Mesh,
   MeshBasicMaterial,
@@ -21,7 +17,7 @@ import {
   Object3D,
   PerspectiveCamera,
   PlaneGeometry,
-  PMREMGenerator,
+  type PMREMGenerator,
   Raycaster,
   RepeatWrapping,
   Scene,
@@ -30,15 +26,14 @@ import {
   TubeGeometry,
   Vector2,
   Vector3,
-  WebGLRenderer,
+  type WebGLRenderer,
   BoxGeometry,
   InstancedMesh,
   Matrix4,
   SphereGeometry,
   type Curve,
 } from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { dotSpeed, type SimFrame } from '../editor/useSimulation';
 import type { CircuitDoc, Part } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
@@ -47,6 +42,7 @@ import { cableCurrents } from './cableFlow';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
 import { buildPartModel } from './registry';
+import { BACKGROUND, createControls, createRenderer, lightScene, radialTexture } from './stage';
 
 export interface BenchCallbacks {
   onSelect(partId: string | null): void;
@@ -123,22 +119,7 @@ function disposeObject(root: Object3D): void {
   });
 }
 
-function radialTexture(inner: string, outer: string): CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 64;
-  const ctx = canvas.getContext('2d')!;
-  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  g.addColorStop(0, inner);
-  g.addColorStop(1, outer);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 64, 64);
-  const t = new CanvasTexture(canvas);
-  t.colorSpace = SRGBColorSpace;
-  return t;
-}
-
-/** Arka plan ve kesim altlığı: açık temada açık gri, koyu temada koyu (modeller aynı kalır). */
-const BACKGROUND = { light: '#dfe3e8', dark: '#161c22' } as const;
+/** Kesim altlığı: açık temada açık, koyu temada koyu (modeller aynı kalır). */
 const MAT = {
   light: { fill: '#e9ebe6', thin: 'rgba(80, 96, 110, 0.10)', thick: 'rgba(80, 96, 110, 0.22)' },
   dark: { fill: '#1f262d', thin: 'rgba(170, 186, 200, 0.08)', thick: 'rgba(170, 186, 200, 0.18)' },
@@ -224,26 +205,10 @@ export class BenchScene {
     private readonly container: HTMLElement,
     private readonly cb: BenchCallbacks,
   ) {
-    this.renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.toneMapping = ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer = createRenderer(container);
     const canvas = this.renderer.domElement;
-    canvas.style.display = 'block';
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
-    canvas.style.touchAction = 'none';
-    canvas.setAttribute('aria-hidden', 'true');
-    container.appendChild(canvas);
-
-    this.pmrem = new PMREMGenerator(this.renderer);
-    this.scene.environment = this.pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.scene.environmentIntensity = 0.85;
-    this.scene.background = new Color(BACKGROUND.light);
-    this.scene.add(new HemisphereLight('#ffffff', '#aab4bf', 0.55));
-    const sun = new DirectionalLight('#ffffff', 1.5);
-    sun.position.set(40, 90, 30);
-    this.scene.add(sun);
+    // Işık ve arka plan Karta aktar'ın kart sahnesiyle ortak (stage.ts).
+    this.pmrem = lightScene(this.scene, this.renderer);
 
     const texture = matTexture();
     texture.repeat.set(200, 200);
@@ -257,16 +222,8 @@ export class BenchScene {
     this.dots.frustumCulled = false;
     this.scene.add(this.ring, this.boards, this.partsGroup, this.cables, this.dots);
 
-    this.controls = new OrbitControls(this.camera, canvas);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.12;
-    this.controls.screenSpacePanning = true;
-    // Fare: sol tuş kaydırır, orta tuş döndürür (kullanıcı isteği); orta tuşu olmayan dokunmatik
-    // yüzeyler için sağ tuş da döndürür. Tekerlek yakınlaştırır. Tıklama (sürüklemeden) seçer.
-    this.controls.mouseButtons = { LEFT: MOUSE.PAN, MIDDLE: MOUSE.ROTATE, RIGHT: MOUSE.ROTATE };
-    this.controls.maxPolarAngle = Math.PI * 0.47;
-    this.controls.minDistance = 8;
-    this.controls.maxDistance = 900;
+    // Fare eşlemesi stage.ts'te (sol kaydırır, orta / sağ döndürür). Tıklama (sürüklemeden) seçer.
+    this.controls = createControls(this.camera, canvas, { min: 8, max: 900 });
     this.controls.addEventListener('change', () => (this.dirty = true));
     this.controls.addEventListener('start', () => {
       this.userMoved = true;
@@ -277,13 +234,6 @@ export class BenchScene {
     canvas.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('pointercancel', this.onPointerUp);
-    // Orta tuş: tarayıcının otomatik kaydırması (Windows) döndürmeyi bozmasın.
-    canvas.addEventListener('mousedown', (e) => e.button === 1 && e.preventDefault());
-    canvas.addEventListener('auxclick', (e) => e.button === 1 && e.preventDefault());
-    // iOS: dokunuş sayfayı kaydırmasın, yakınlaştırmasın.
-    const prevent = (e: TouchEvent) => e.preventDefault();
-    canvas.addEventListener('touchstart', prevent, { passive: false });
-    canvas.addEventListener('touchmove', prevent, { passive: false });
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);

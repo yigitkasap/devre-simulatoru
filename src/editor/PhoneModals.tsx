@@ -81,6 +81,7 @@ export interface FileSheetProps {
   readonly onNew: () => void;
   readonly onExport: () => void;
   readonly onImport: () => void;
+  readonly onKarta: () => void;
 }
 
 export function FileSheet(props: FileSheetProps) {
@@ -161,6 +162,7 @@ export function FileSheet(props: FileSheetProps) {
         </div>
         <MenuItem icon="download" label={tr.file.exportJson} onClick={props.onExport} />
         <MenuItem icon="upload" label={tr.file.importJson} onClick={props.onImport} />
+        <MenuItem icon="board" label={tr.karta.open} onClick={props.onKarta} />
       </div>
     </ModalSheet>
   );
