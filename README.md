@@ -1794,3 +1794,9 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
    dokunulmadı); açılınca açıklama, "Ne işe yarar?", "Günlük hayatta", önceki / sonraki. Alt+1…3
    masaüstünde deftere geçer (parçalar · örnek · sorunlar). Kullanıcı kararları: önce uyarılar,
    sonra örnek kartı; bilgi mesajları sade kart.
+4. **Parça ekleme** (`src/editor/NotebookAdd.tsx`): sol kütüphane kalktı (`Library.tsx` silindi).
+   Defterin sonunda "Parça ekle" satırı: yazınca adı eşleşen parçalar ve o parçayı içeren örnekler;
+   oklar seçer, Enter ekler, Esc temizler. Açık kartın boştaki ucu varsa parça o uca bağlı eklenir
+   (zincirle ekle, telefondaki `chainPlacement`); yoksa şemanın görünen alanında boş bir yere, 3B
+   görünümde devrenin sağına. "Bütün parçalara göz at (35)" kategorili ızgara penceresini açar.
+   Tur, Yardım ve boş tuval metinleri buna göre.

@@ -4,13 +4,13 @@
 // dokunmatik İnceleme paneli (cihazlar panelin bir sekmesinde). Belge durumu burada tutulur; yükleme (örnek, dosya, paylaşım bağlantısı) ve
 // döndürme gibi birden çok bileşenin kullandığı işlemler de buradadır.
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
-import { pinPositions } from '../model/geometry';
+import { partBounds, pinPositions } from '../model/geometry';
 import { docFromHash, shareUrl } from '../model/share';
 import { CATALOG } from '../model/catalog';
 import { emptyDoc, type CircuitDoc } from '../model/types';
@@ -31,7 +31,6 @@ import { Inspector, type InspectorTab } from './Inspector';
 import { InspectTab, type PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { useFocusMode } from './fullscreen';
-import { Library, LibraryFlyout, type LibraryMode } from './Library';
 import {
   earthTrapItem,
   findEarthTrap,
@@ -60,7 +59,6 @@ import { Toast, useToast } from './Toast';
 import { TabletBar, TabletPartsCard, TabletRail } from './TabletChrome';
 import { DeskTopBar, TabletTopBar } from './TopBar';
 import { TouchUi } from './touchUi';
-import { useCoarsePointer } from './useCoarsePointer';
 import { CanvasControls } from './CanvasControls';
 import { Notebook } from './Notebook';
 import { useLayout } from './useLayout';
@@ -75,22 +73,6 @@ function initialDoc(): { doc: CircuitDoc; shared: 'loaded' | 'error' | null } {
 }
 
 /** Masaüstünde kütüphanenin açık ya da şerit olduğu tarayıcıda hatırlanır. */
-const LIBRARY_KEY = 'devre-simulatoru:kutuphane';
-function loadLibraryPref(): 'open' | 'rail' {
-  try {
-    return window.localStorage.getItem(LIBRARY_KEY) === 'rail' ? 'rail' : 'open';
-  } catch {
-    return 'open';
-  }
-}
-function saveLibraryPref(pref: 'open' | 'rail'): void {
-  try {
-    window.localStorage.setItem(LIBRARY_KEY, pref);
-  } catch {
-    // Depolama kapalı: tercih yalnızca bu oturumda geçerli.
-  }
-}
-
 /** Ayarları cihaz rafındaki ön panelinde olan parçalar. */
 const RACK_TYPES: ReadonlySet<DeviceType> = new Set<DeviceType>(['oscilloscope', 'funcgen', 'dcsupply', 'tank']);
 
@@ -131,13 +113,9 @@ export default function Simulator() {
   /** Dokunmatik düzen (telefon ya da tablet): tuvalde Kur / Bağla / Ölç kipleri. */
   const touchUi = phone || tablet;
   const [speedOpen, setSpeedOpen] = useState(false);
-  const [libraryPref, setLibraryPref] = useState(loadLibraryPref);
-  const [flyoutOpen, setFlyoutOpen] = useState(false);
-  const [focusSearch, setFocusSearch] = useState(0);
   const [recentParts, rememberPart] = useRecentParts();
-  const [libraryDragType, setLibraryDragType] = useState<DeviceType | null>(null);
-  const [hoveredType, setHoveredType] = useState<DeviceType | null>(null);
-  const [lastInfoType, setLastInfoType] = useState<DeviceType>('battery');
+  // Parça kütüphanesi v3'te kalktı (parçalar defterden eklenir); tuvale HTML sürükle-bırakla parça gelmez.
+  const libraryDragType: DeviceType | null = null;
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('inspect');
   /** Artınca İncele sekmesindeki (telefonda parça sayfasındaki) ilk değer alanına odaklanılır. */
   const [focusRequest, setFocusRequest] = useState(0);
@@ -180,7 +158,6 @@ export default function Simulator() {
   const [welcomeOpen, setWelcomeOpen] = useState(() => !welcomeSeen() && initialIsFresh());
   const [helpOpen, setHelpOpen] = useState(false);
   const [tour, setTour] = useState<{ step: TourStep; parts: number; wires: number } | null>(null);
-  const touch = useCoarsePointer();
   const canvasRef = useRef<CanvasHandle>(null);
   const [viewMode, setViewMode] = useViewMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -213,22 +190,6 @@ export default function Simulator() {
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
   const canFlip = selectedParts.some((p) => CATALOG[p.type].polarized);
   const singlePart = selectedParts.length === 1 && selection.wires.length === 0 ? selectedParts[0]! : null;
-
-  // --- Kütüphane (masaüstü) -----------------------------------------------------------------
-  // Ölç düzeninde kütüphane ve İnceleme paneli olduğu gibi kalır; yalnızca raf büyür.
-  const libraryMode: LibraryMode = layout.kind === 'compact' || libraryPref === 'rail' ? 'rail' : 'full';
-  const showFlyout = layout.kind === 'compact' && flyoutOpen;
-  const setLibraryPrefSaved = (pref: 'open' | 'rail') => {
-    setLibraryPref(pref);
-    saveLibraryPref(pref);
-  };
-  // Bilgi alanındaki parça: üzerine gelinen, yerleştirilen, sürüklenen ya da seçili tek parça; hiçbiri
-  // yoksa en son anlatılan.
-  const currentInfo = hoveredType ?? (tool.kind === 'place' ? tool.type : null) ?? libraryDragType ?? singlePart?.type ?? null;
-  useEffect(() => {
-    if (currentInfo) setLastInfoType(currentInfo);
-  }, [currentInfo]);
-  const infoType = currentInfo ?? lastInfoType;
 
   // --- Yükleme (örnek, dosya, paylaşım bağlantısı, yeni devre) ---------------------------
   /** Yeni bir belge yükler; önceki belge geri alma geçmişinde kalır. */
@@ -708,29 +669,6 @@ export default function Simulator() {
     setRackCollapsed(false);
   };
 
-  const closeFlyout = useCallback(() => setFlyoutOpen(false), []);
-  const libraryProps = {
-    width: layout.libraryWidth,
-    tool,
-    settings,
-    dispatch,
-    onDragTypeChange: setLibraryDragType,
-    onClose: closeFlyout,
-    onCollapse: () => setLibraryPrefSaved('rail'),
-    onExpand: (search: boolean) => {
-      if (layout.kind === 'compact') setFlyoutOpen(true);
-      else setLibraryPrefSaved('open');
-      if (search) setFocusSearch((n) => n + 1);
-    },
-    focusSearch,
-    touch,
-    onPreview: setHoveredType,
-    infoType,
-    recent: recentParts,
-    flyoutOpen: showFlyout,
-    onAddPart: (type: DeviceType) => canvasRef.current?.addPartAtCenter(type),
-  };
-
   // --- Telefon ------------------------------------------------------------------------------
   // Kip: Bağla (kablo çekerken), Ölç (çalışıyor ya da duraklatılmış; yapı kilitli) ya da Kur.
   const phoneMode: PhoneMode = connect ? 'bagla' : sim.status === 'running' ? 'olc' : sim.status === 'paused' ? 'pause' : 'kur';
@@ -802,6 +740,34 @@ export default function Simulator() {
     }
     canvasRef.current?.addPartAtCenter(type);
   };
+  /**
+   * Defter (v3, masaüstü): listenin sonundaki ekleme satırı. Açık kartın boştaki ilk ucu varsa parça
+   * o uca bağlı eklenir (zincirle ekle); yoksa şemanın görünen alanında boş bir yere, 3B görünümde
+   * (şema tuvali yokken) devrenin sağına.
+   */
+  const deskChainPin = singlePart ? firstFreePin(singlePart.id, connectivity.unconnectedPins, doc) : null;
+  const deskChainTo = singlePart && deskChainPin !== null ? tr.phone.pinOf(singlePart.label, tr.devices.pins[singlePart.type][deskChainPin] ?? '') : null;
+  const addFromNotebook = (type: DeviceType) => {
+    if (singlePart && deskChainPin !== null) {
+      const place = chainPlacement(doc, type, { partId: singlePart.id, pin: deskChainPin });
+      if (place) {
+        const added = addPart(doc, type, place.at, place.rotation);
+        const wired = addWire(added.doc, place.wire);
+        dispatch({ type: 'commit', doc: wired.doc, selection: { parts: [added.id], wires: [] } });
+        rememberPart(type);
+        return;
+      }
+    }
+    if (canvasRef.current) {
+      canvasRef.current.addPartAtCenter(type);
+      return;
+    }
+    const boxes = doc.parts.map((p) => partBounds(p));
+    const at = boxes.length > 0 ? { x: Math.round(Math.max(...boxes.map((b) => b.x + b.w)) + 6), y: Math.round(Math.min(...boxes.map((b) => b.y))) } : { x: 0, y: 0 };
+    const added = addPart(doc, type, at, 0);
+    dispatch({ type: 'commit', doc: added.doc, selection: { parts: [added.id], wires: [] } });
+    rememberPart(type);
+  };
   const connectStartPart = connect?.start?.partId ? doc.parts.find((p) => p.id === connect.start!.partId) : undefined;
   const panelTabs: SheetTab<PanelTab>[] = [
     ...(activeExample ? [{ id: 'example' as const, label: tr.phone.tabs.example }] : []),
@@ -854,7 +820,7 @@ export default function Simulator() {
   };
 
   const overlayOpen =
-    showFlyout || Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || (tablet && (sheet?.kind === 'parts' || speedOpen));
+    Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || (tablet && (sheet?.kind === 'parts' || speedOpen));
   const schematic = (
     <Canvas
       ref={canvasRef}
@@ -1697,10 +1663,8 @@ export default function Simulator() {
       {fileInput}
 
       <div className="relative flex min-h-0 flex-1">
-        {focus.panels.left && <Library mode={libraryMode} {...libraryProps} />}
         <div ref={columnRef} className="flex min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 flex-1">
-            {showFlyout && <LibraryFlyout {...libraryProps} />}
             {canvas}
             {viewMode === 'schematic' && (
               <CanvasControls
@@ -1765,6 +1729,7 @@ export default function Simulator() {
               diagnosticContext={diagnosticContext}
               issues={issues}
               example={exampleProps}
+              add={{ chainTo: deskChainTo, onAdd: addFromNotebook, onOpenExample: loadExample }}
             />
           </aside>
         )}

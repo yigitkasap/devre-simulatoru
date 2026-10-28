@@ -593,13 +593,13 @@ try {
     await page.keyboard.press('Enter');
     const afterSkip = await active();
     check('ilk Tab durağı "Tuvale atla"; Enter tuvale götürüyor', first.text === 'Tuvale atla' && afterSkip.id === 'tuval', `${first.text} → ${afterSkip.id}`);
-    // Kütüphane tek durak: oklarla gez, Enter tuvalin ortasına ekler.
-    await page.getByRole('button', { name: 'Pil', exact: true }).focus();
-    await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
-    const libFocus = await active();
+    // v3: defterin sonundaki Parça ekle satırı; yaz, oklarla seç, Enter ekler.
+    const addRow = page.getByRole('combobox', { name: /Parça ekle/ });
+    await addRow.focus(); await page.keyboard.type('diyot'); await page.waitForTimeout(150);
+    await page.keyboard.press('ArrowDown');
+    const pick = (await page.getByRole('option', { selected: true }).textContent()) ?? '';
     await page.keyboard.press('Enter'); await page.waitForTimeout(300);
-    const tabStops = await page.locator('[data-lib-item][tabindex="0"]').count();
-    check('kütüphane listesi tek durak; oklarla geziliyor, Enter tuvale ekliyor', libFocus.text === 'Toprak' && tabStops === 1 && (await doc(page)).parts.some((p) => p.type === 'ground'), libFocus.text);
+    check('masaüstü (v3): Parça ekle satırında yazıp okla seçilen parça Enter’la ekleniyor', pick.startsWith('Zener diyot') && (await doc(page)).parts.some((p) => p.type === 'zener'), pick.slice(0, 30));
     await page.getByRole('button', { name: 'Örnekler', exact: true }).focus();
     await page.keyboard.press('Space'); await page.waitForTimeout(300);
     const examplesOpen = (await page.getByRole('dialog', { name: 'Örnek devreler' }).count()) === 1;
@@ -649,12 +649,15 @@ try {
   const dp = await desk.newPage();
   dp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await dp.goto(URL0, { waitUntil: 'networkidle' });
-  await dp.getByRole('button', { name: 'Kondansatör', exact: true }).hover(); await dp.waitForTimeout(200);
-  const info = dp.locator('aside[aria-label="Parçalar"] [aria-live="polite"]');
-  const infoText = (await info.textContent().catch(() => '')) ?? '';
-  const infoBox = await info.boundingBox();
   const canvas = await dp.locator('svg.schematic').boundingBox();
-  check('masaüstü: fareyle gelinen parça kütüphanenin bilgi alanında anlatılıyor', infoText.includes('Kondansatör') && infoText.includes('Yük depolar') && infoBox !== null && infoBox.x + infoBox.width <= canvas.x + 1, infoText.slice(0, 40));
+  // v3: sol kütüphane yok; "Bütün parçalara göz at (35)" kategorili ızgarayı açar, tıklanan parça eklenir.
+  await notebook(dp).getByRole('button', { name: /Bütün parçalara göz at \(35\)/ }).click(); await dp.waitForTimeout(200);
+  const grid = dp.getByRole('dialog', { name: 'Bütün parçalar' });
+  const tiles = await grid.locator('button[data-part]').count();
+  await grid.getByRole('button', { name: 'Kondansatör', exact: true }).click(); await dp.waitForTimeout(300);
+  check('masaüstü (v3): kütüphane yok; "Bütün parçalar" 35 parçayı gösteriyor, tıklanan parça ekleniyor, pencere kapanıyor',
+    (await dp.getByPlaceholder(/Parça ara/).count()) === 0 && tiles === 35 && (await doc(dp)).parts.some((p) => p.type === 'capacitor') && (await grid.count()) === 0, `${tiles} parça`);
+  await dp.getByRole('button', { name: 'Geri al', exact: true }).click(); await dp.waitForTimeout(150);
   // v3: alt simülasyon çubuğu ve ipucu şeridi yok; tuval alta kadar, görünüm düğmeleri sağ altında.
   const view = await dp.getByRole('group', { name: 'Görünüm' }).boundingBox();
   check('masaüstü (v3): alt çubuk yok, tuval alta iniyor; görünüm düğmeleri tuvalin sağ altında',
@@ -732,7 +735,7 @@ try {
   const panelTabs = await notebook(rp).count();
   const railOpen = await rp.getByRole('button', { name: 'Parça kütüphanesini aç' }).count();
   const measureBox = await rack.boundingBox();
-  check('masaüstü: Oynat’tan sonra Ölç düzeni (kütüphane ve defter açık kalıyor, raf büyük)', panelStrip === 0 && panelTabs === 1 && railOpen === 0 && measureBox.height > rackBox.height + 40, `raf ${Math.round(rackBox.height)} → ${Math.round(measureBox.height)}`);
+  check('masaüstü: Oynat’tan sonra Ölç düzeni (defter açık kalıyor, raf büyük)', panelStrip === 0 && panelTabs === 1 && railOpen === 0 && measureBox.height > rackBox.height + 40, `raf ${Math.round(rackBox.height)} → ${Math.round(measureBox.height)}`);
   if ((await rp.getByRole('tab', { name: /OSC1/ }).count()) > 0) { await rp.getByRole('tab', { name: /OSC1/ }).click(); await rp.waitForTimeout(150); }
   await rp.getByRole('button', { name: 'Oto', exact: true }).click(); await rp.waitForTimeout(300);
   const autoToast = (await rp.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
@@ -848,12 +851,6 @@ try {
     const fp = await ctx.newPage();
     fp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await fp.goto(URL0, { waitUntil: 'networkidle' });
-    const listHeights = new Set();
-    for (const name of ['Pil', 'Direnç', 'Osiloskop', 'Su haznesi', 'Toprak']) {
-      await fp.getByRole('button', { name, exact: true }).hover(); await fp.waitForTimeout(60);
-      listHeights.add(Math.round((await fp.locator('nav[aria-label] ').filter({ has: fp.locator('li') }).first().boundingBox())?.height ?? 0));
-    }
-    check('masaüstü: parçaların üzerine gelince kütüphane listesi ve bilgi kutusu boy değiştirmez', listHeights.size === 1, [...listHeights].join(','));
     // Hız düğmesi yalnızca çalışırken (v3).
     await fp.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await fp.waitForTimeout(300);
     await fp.getByRole('button', { name: /^Hız/ }).first().click(); await fp.waitForTimeout(200);
@@ -878,7 +875,9 @@ try {
     const bp = await ctx.newPage();
     bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await bp.goto(URL0, { waitUntil: 'networkidle' });
-    const inLibrary = await bp.getByRole('button', { name: 'Bobin', exact: true }).count();
+    await notebook(bp).getByRole('combobox', { name: /Parça ekle/ }).fill('bobin'); await bp.waitForTimeout(150);
+    const inLibrary = await bp.getByRole('option', { name: /^Bobin/ }).count();
+    await notebook(bp).getByRole('combobox', { name: /Parça ekle/ }).fill('');
     await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
     await bp.getByRole('button', { name: 'RL devresi', exact: true }).click(); await bp.waitForTimeout(400);
     await bp.getByRole('button', { name: 'Oynat', exact: true }).last().click(); await bp.waitForTimeout(400);
@@ -889,28 +888,23 @@ try {
     await toggle();
     const text = (await notebook(bp).textContent()) ?? '';
     check(
-      'masaüstü: kütüphanede Bobin; RL örneğinde akım ≈ 89 mA, anahtar açılınca Lenz uyarısı (Fizik 7)',
+      'masaüstü: Parça ekle’de Bobin; RL örneğinde akım ≈ 89 mA, anahtar açılınca Lenz uyarısı (Fizik 7)',
       inLibrary >= 1 && closedText.includes('89,') && text.includes('Bobin akımı aniden kesildi') && text.includes('Lenz'),
       `${inLibrary} kütüphane; ampermetre ${closedText}; ${text.slice(0, 50)}`,
     );
     await ctx.close();
   }
 
-  // --- Sıkışık masaüstü (1100 px): kütüphane şerit, açılır kart --------------------------
+  // --- Sıkışık masaüstü (1100 px): defter 400 px, parça defterden eklenir (v3) ---------------
   const compact = await browser.newContext({ viewport: { width: 1100, height: 760 }, locale: 'tr-TR' });
   const cp = await compact.newPage();
   cp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await cp.goto(URL0, { waitUntil: 'networkidle' });
-  const railVisible = await cp.getByRole('button', { name: 'Parça kütüphanesini aç' }).isVisible();
-  const listHidden = (await cp.getByRole('button', { name: 'Kondansatör', exact: true }).count()) === 0;
-  check('1100 px: kütüphane 56 px şerit olarak başlıyor', railVisible && listHidden);
-  await cp.getByRole('button', { name: 'Parça kütüphanesini aç' }).click(); await cp.waitForTimeout(200);
-  await cp.getByRole('button', { name: 'Kondansatör', exact: true }).click(); await cp.waitForTimeout(200);
-  const flyoutClosed = (await cp.getByRole('button', { name: 'Kondansatör', exact: true }).count()) === 0;
-  const cbox = await cp.locator('svg.schematic').boundingBox();
-  await cp.mouse.click(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2); await cp.waitForTimeout(200);
+  const nbBox = await notebook(cp).boundingBox();
+  const addRowCp = notebook(cp).getByRole('combobox', { name: /Parça ekle/ });
+  await addRowCp.fill('kondansatör'); await addRowCp.press('Enter'); await cp.waitForTimeout(300);
   const placed = (await doc(cp)).parts.some((p) => p.type === 'capacitor');
-  check('1100 px: açılır karttan parça seçilince kart kapanıyor, tuvale tıklayınca ekleniyor', flyoutClosed && placed);
+  check('1100 px (v3): defter 400 px; Parça ekle satırından eklenen parça şemaya geliyor', nbBox !== null && Math.round(nbBox.width) === 400 && placed, nbBox ? `${Math.round(nbBox.width)} px` : 'yok');
   await compact.close();
 
   // --- Tam ekran (masaüstü, tablet): tarayıcı tam ekranı, yalnızca devre şeması -------------
@@ -920,19 +914,17 @@ try {
     fp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await fp.goto(URL0, { waitUntil: 'networkidle' });
     const fsElement = () => fp.evaluate(() => document.fullscreenElement?.tagName ?? null);
-    const libraryShown = () => fp.getByPlaceholder(/Parça ara/).count();
     const inspectorShown = () => notebook(fp).count();
     const canvasWidth = async () => (await fp.locator('svg.schematic').boundingBox())?.width ?? 0;
     const w0 = await canvasWidth();
     await fp.getByRole('button', { name: 'Tam ekran', exact: true }).click(); await fp.waitForTimeout(500);
     const w1 = await canvasWidth();
-    check('masaüstü: Tam ekran tarayıcıyı tam ekrana alıyor; kütüphane ve İnceleme paneli gizleniyor', (await fsElement()) === 'HTML' && (await libraryShown()) === 0 && (await inspectorShown()) === 0 && w1 > 1400, `tuval ${Math.round(w0)} → ${Math.round(w1)} px`);
-    await fp.getByRole('button', { name: 'Parça kütüphanesi', exact: true }).click();
+    check('masaüstü: Tam ekran tarayıcıyı tam ekrana alıyor; defter gizleniyor', (await fsElement()) === 'HTML' && (await inspectorShown()) === 0 && w1 > 1400, `tuval ${Math.round(w0)} → ${Math.round(w1)} px`);
     await fp.getByRole('button', { name: 'Defter', exact: true }).click(); await fp.waitForTimeout(300);
-    const pressed = await fp.getByRole('button', { name: 'Parça kütüphanesi', exact: true }).getAttribute('aria-pressed');
-    check('masaüstü: tam ekranda üst çubuğun iki ucundaki düğmeler sol ve sağ paneli açıyor', (await libraryShown()) === 1 && (await inspectorShown()) === 1 && pressed === 'true' && (await fsElement()) === 'HTML');
+    const pressed = await fp.getByRole('button', { name: 'Defter', exact: true }).getAttribute('aria-pressed');
+    check('masaüstü: tam ekranda üst çubuğun sağındaki Defter düğmesi defteri açıyor', (await inspectorShown()) === 1 && pressed === 'true' && (await fsElement()) === 'HTML');
     await fp.evaluate(() => document.exitFullscreen()); await fp.waitForTimeout(400);
-    check('masaüstü: tarayıcının tam ekranından çıkınca (Esc) kip kapanıyor, paneller yerinde', (await fp.getByRole('button', { name: 'Tam ekran', exact: true }).count()) === 1 && (await fp.getByRole('button', { name: 'Parça kütüphanesi', exact: true }).count()) === 0 && (await libraryShown()) === 1 && (await inspectorShown()) === 1);
+    check('masaüstü: tarayıcının tam ekranından çıkınca (Esc) kip kapanıyor, defter yerinde', (await fp.getByRole('button', { name: 'Tam ekran', exact: true }).count()) === 1 && (await fp.getByRole('button', { name: 'Defter', exact: true }).count()) === 0 && (await inspectorShown()) === 1);
     await fsCtx.close();
 
     const tCtx = await browser.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'tr-TR' });

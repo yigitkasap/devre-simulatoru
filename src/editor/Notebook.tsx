@@ -27,6 +27,7 @@ import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVI
 import { stableMeterText, stableReadout } from './liveReadout';
 import type { MessageItem } from './messages';
 import { SeverityMark, type MessageAction } from './MessagesTab';
+import { AddPartRow, type AddPartRowProps } from './NotebookAdd';
 import { notebookEntries, type NotebookEntry } from './notebookOrder';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, stepValue, validateNumber, valuePresets } from './propertyForm';
@@ -58,6 +59,8 @@ export interface NotebookProps extends InspectTabProps {
   readonly issues: ReadonlyMap<string, 'error' | 'warning'>;
   /** Açık örnek: katlı örnek kartı. */
   readonly example: { readonly id: ExampleId | null; readonly onOpen: (id: ExampleId) => void; readonly onClose: () => void };
+  /** Listenin sonundaki parça ekleme satırı. */
+  readonly add: Omit<AddPartRowProps, 'settings'>;
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
@@ -205,6 +208,7 @@ export function Notebook(props: NotebookProps) {
         </div>
       )}
       {doc.parts.length === 0 ? <p className="px-0.5 text-small text-muted">{t.empty}</p> : entries.map(renderEntry)}
+      <AddPartRow {...props.add} settings={settings} />
     </div>
   );
 }

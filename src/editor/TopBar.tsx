@@ -763,9 +763,6 @@ export function DeskTopBar(props: DeskTopBarProps) {
   );
   return (
     <header className="flex h-[60px] shrink-0 items-center gap-2 border-b border-line bg-panel pr-3 pl-4">
-      {props.fullscreen.on && (
-        <PanelToggle side="left" label={tr.toolbar.libraryPanel} open={props.fullscreen.panels.left} onPanel={props.fullscreen.onPanel} />
-      )}
       <Logo />
       <h1 className="sr-only">{tr.site.name}</h1>
       <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
