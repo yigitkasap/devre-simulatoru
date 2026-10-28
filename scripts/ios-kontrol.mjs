@@ -706,6 +706,29 @@ try {
   check('masaüstü: Oynat’tan sonra örnek kartı aynı açıklamayı gösteriyor', after.includes('Ne işe yarar?'), after.slice(0, 40));
   await desk.close();
 
+  // --- Masaüstü (v3): Arduino kartı (D3) ------------------------------------------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const ap = await ctx.newPage();
+    ap.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await ap.goto(URL0, { waitUntil: 'networkidle' });
+    await ap.getByRole('button', { name: 'Örnekler', exact: true }).click(); await ap.waitForTimeout(200);
+    await ap.getByRole('button', { name: 'Arduino: yanıp sönen LED', exact: true }).click(); await ap.waitForTimeout(500);
+    await ap.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click();
+    await notebook(ap).getByRole('button', { name: /^ARD1 ·/ }).click();
+    await ap.waitForFunction(() => /D13 · Çıkış/.test(document.querySelector('#defter')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {});
+    const card = notebook(ap).getByRole('region', { name: 'ARD1 · Arduino Uno' });
+    const program = await card.getByRole('combobox', { name: 'Program' }).inputValue();
+    const cardText = (await card.textContent()) ?? '';
+    await card.getByRole('button', { name: /^Kod/ }).click(); await ap.waitForTimeout(150);
+    const code = (await card.locator('pre code').textContent()) ?? '';
+    check('masaüstü (v3): Arduino kartında program seçimi, kullanılan pinin canlı değeri (D13 çıkış), seri ekran ve açılan kod',
+      program === 'blink' && /D13 · Çıkış/.test(cardText) && cardText.includes('Seri ekran') && code.includes('digitalWrite'), cardText.slice(0, 80));
+    await card.getByRole('combobox', { name: 'Program' }).selectOption('fade'); await ap.waitForTimeout(200);
+    check('masaüstü (v3): Arduino kartında program değiştirilebiliyor', (await part(ap, 'ARD1')).props.program === 'fade');
+    await ctx.close();
+  }
+
   // --- Masaüstü (v3): cihaz kartları (raf yok) -----------------------------------------------
   const rackCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
   const rp = await rackCtx.newPage();

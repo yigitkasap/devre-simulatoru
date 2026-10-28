@@ -20,7 +20,7 @@ import type { Part } from '../model/types';
 import type { DeviceType, PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
 import { useThrottledText } from './a11y';
-import { ArduinoSection } from './ArduinoPanel';
+import { ArduinoCardBody } from './ArduinoPanel';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
 import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
@@ -495,7 +495,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
     const v = typeof values[prop.key] === 'number' ? (values[prop.key] as number) : 0;
     return (
       <div key={prop.key} className="flex items-center gap-3">
-        <span className="w-24 shrink-0 text-small">{label}</span>
+        <span className="shrink-0 text-small whitespace-nowrap">{label}</span>
         <PropSlider def={prop} value={v} label={label} touch={touch} onSlide={slide(prop)} />
         <span className="w-16 shrink-0 text-right font-mono text-sm tabular">{formatSI(v, prop.unit, { trim: true, digits: 3 })}</span>
       </div>
@@ -564,6 +564,14 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
       <div id={bodyId} className="flex flex-col gap-3">
         {device ? (
           <DeviceControls part={part} devices={props.devices} />
+        ) : part.type === 'arduino' ? (
+          <ArduinoCardBody
+            part={part}
+            frame={frame}
+            status={status}
+            pinConnected={(pin) => props.devices.pinConnected(part.id, pin)}
+            onProgram={(program) => onUpdatePart(part.id, { props: withProp(part.type, part.props, 'program', program) })}
+          />
         ) : (
           <>
             <PrimaryControl {...props} values={values} />
@@ -571,7 +579,6 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
             <LiveTiles part={part} frame={frame} />
           </>
         )}
-        {part.type === 'arduino' && <ArduinoSection part={part} frame={frame} status={status} />}
         <MoreSettings {...props} values={values} />
       </div>
     </section>

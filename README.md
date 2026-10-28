@@ -1808,3 +1808,8 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
    toprağı ve jaklar "Gelişmiş" altında; başlıkta tetik durumu. Üreteç, güç kaynağı ve hazne
    telefondaki denetimleri sıkı boyutta kullanır. Kapalı kartta ayar özeti ("Sinüs · 1 kHz · 10 Vpp",
    osiloskopta çalışırken A'nın tepe-tepesi).
+6. **Arduino kartı** (`ArduinoCardBody`, D3): program seçimi (açılır liste); kullanılan pinlerin
+   canlı değerleri (5V / 3V3 besleme, şemada bağlı D ve A pinleri: kip, gerilim, çıkışta akım), öbür
+   pinler "Diğer pinler · N pin" altında; seri ekran (koyu zemin, eş genişlikli yazı, son satır
+   parlak, en alta kayar, kodda `Serial.begin` varsa baud, Temizle); "Kod · salt okunur, önceden
+   derlendi" satırı renklendirilmiş kodu açar. Tablet ve telefon eski Arduino bölümünü kullanır.
