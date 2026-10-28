@@ -1784,3 +1784,13 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
    Kablo aracı düğmesi kalktı (W kısayolu ve uçtan sürükleme duruyor); sürüklerken bırakılacak uç
    vurgulanıp adıyla etiketlenir, sol altta "Uca bırak: bağla · Esc vazgeç". Parça kütüphanesi ve
    cihaz rafı, yerlerini alan adımlara (4: parça ekleme satırı, 5: cihaz kartları) kadar durur.
+3. **Uyarı ve örnek kartları**: masaüstünde İncele / Örnek / Mesajlar sekmeleri kalktı; sağ panel
+   yalnızca defter. En üstte hata (kesintisiz kırmızı çerçeve, dolu daire) ve uyarı (kesikli amber
+   çerçeve, üçgen) kartları; metinler mevcut mesajlar; "D4’ü göster" mesajı şemada vurgular ve
+   parçanın kartını açar; düzeltme düğmeleri (Onar, "R1’i … yap") kartta. En çok 3 sorun kartı,
+   fazlası "N sorun daha". Kur kipinde boşta uç uyarıları kart olmaz (kartta "1 uç boşta" rozeti
+   var). Bilgi mesajları uyarıların altında sade, katlı kartlar. Altında katlı örnek kartı
+   ("Örnek · grup" ve kısa cümle; `tr.examples.cues`, 61 örneğe yeni yazıldı, mevcut metinlere
+   dokunulmadı); açılınca açıklama, "Ne işe yarar?", "Günlük hayatta", önceki / sonraki. Alt+1…3
+   masaüstünde deftere geçer (parçalar · örnek · sorunlar). Kullanıcı kararları: önce uyarılar,
+   sonra örnek kartı; bilgi mesajları sade kart.

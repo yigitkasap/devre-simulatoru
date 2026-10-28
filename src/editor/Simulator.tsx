@@ -973,8 +973,17 @@ export default function Simulator() {
       if (next && !phone) {
         e.preventDefault();
         if (focus.on) focus.showPanel('right', true);
-        setInspectorTab(next);
-        window.setTimeout(() => document.getElementById(`inspector-tab-${next}`)?.focus(), 0);
+        if (tablet) {
+          setInspectorTab(next);
+          window.setTimeout(() => document.getElementById(`inspector-tab-${next}`)?.focus(), 0);
+        } else {
+          // Masaüstü (v3): sekme yok; Alt+1 parça kartları, Alt+2 örnek kartı, Alt+3 sorun kartları.
+          const part = n === '1' ? 'card' : n === '2' ? 'example' : 'problem';
+          window.setTimeout(() => {
+            const target = document.querySelector<HTMLElement>(`#defter [data-notebook="${part}"] button`) ?? document.querySelector<HTMLElement>('#defter [data-notebook="card"] button');
+            target?.focus();
+          }, 0);
+        }
       }
       return;
     }
@@ -1736,25 +1745,28 @@ export default function Simulator() {
 
         </div>
         {focus.panels.right && (
-          <Inspector
-            width={layout.inspectorWidth}
-            collapsed={false}
-            onExpand={setInspectorTab}
-            tab={inspectorTab}
-            onTab={setInspectorTab}
-            inspect={inspectProps}
-            inspectBody={
-              <Notebook
-                {...inspectProps}
-                floating={floatingParts}
-                measured={measuredParts}
-                onClearSelection={() => dispatch({ type: 'select', selection: EMPTY_SELECTION })}
-              />
-            }
-            example={exampleProps}
-            messages={messagesProps}
+          // Defter (v3): İncele, Örnek ve Mesajlar sekmeleri yerine tek liste.
+          <aside
+            data-tour="inspect"
+            aria-label={tr.notebook.label}
             onKeyDown={backToCanvas}
-          />
+            className="flex min-h-0 shrink-0 flex-col border-l border-line"
+            style={{ width: layout.inspectorWidth }}
+          >
+            <Notebook
+              {...inspectProps}
+              floating={floatingParts}
+              measured={measuredParts}
+              onClearSelection={() => dispatch({ type: 'select', selection: EMPTY_SELECTION })}
+              messages={messages}
+              selectedMessage={selectedMessage}
+              onSelectMessage={selectMessage}
+              messageActions={messageActions}
+              diagnosticContext={diagnosticContext}
+              issues={issues}
+              example={exampleProps}
+            />
+          </aside>
         )}
       </div>
 

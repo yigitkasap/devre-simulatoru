@@ -10,18 +10,23 @@
 //   da görünen bir kaydırıcıdır.
 // Şemada parçaya tıklamak kartını açar ve listeyi oraya kaydırır.
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { resistorBands, resistorColorCode } from '../bench3d/bands';
-import { tr } from '../i18n/tr';
+import type { ExampleId } from '../examples';
+import { ek } from '../i18n/ek';
+import { tr, type DiagnosticContext } from '../i18n/tr';
 import { CATALOG, withProp, type NumberPropDef, type PropDef } from '../model/catalog';
 import type { Part } from '../model/types';
 import type { DeviceType, PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
 import { useThrottledText } from './a11y';
 import { ArduinoSection } from './ArduinoPanel';
+import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
 import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, useCommitField, WireDetails, type InspectTabProps, type PartPatch } from './InspectTab';
 import { stableMeterText, stableReadout } from './liveReadout';
+import type { MessageItem } from './messages';
+import { SeverityMark, type MessageAction } from './MessagesTab';
 import { notebookEntries, type NotebookEntry } from './notebookOrder';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, stepValue, validateNumber, valuePresets } from './propertyForm';
@@ -41,6 +46,18 @@ export interface NotebookProps extends InspectTabProps {
   readonly onClearSelection: () => void;
   /** Kapalı kartında ölçüm gösterilen parçalar; null: hepsi (DC devre, değerler salınmaz). */
   readonly measured: ReadonlySet<string> | null;
+  /** Hata, uyarı ve bilgi mesajları (önce hatalar); kartları defterin en üstünde. */
+  readonly messages: readonly MessageItem[];
+  /** Şemada vurgulanan mesaj. */
+  readonly selectedMessage: string | null;
+  readonly onSelectMessage: (item: MessageItem | null) => void;
+  /** Mesajın düzeltme düğmeleri (Onar, "R1'i 360 Ω yap"). */
+  readonly messageActions: (item: MessageItem) => readonly MessageAction[];
+  readonly diagnosticContext: DiagnosticContext;
+  /** Kartında hata ya da uyarı rozeti olan parçalar (şemadaki işaretlerle aynı kural). */
+  readonly issues: ReadonlyMap<string, 'error' | 'warning'>;
+  /** Açık örnek: katlı örnek kartı. */
+  readonly example: { readonly id: ExampleId | null; readonly onOpen: (id: ExampleId) => void; readonly onClose: () => void };
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
@@ -125,16 +142,19 @@ export function Notebook(props: NotebookProps) {
     }),
     [],
   );
-  const { status, settings, floating, measured } = props;
+  const { status, settings, floating, measured, issues } = props;
   const closed = useMemo(() => {
     const map = new Map<string, ReactNode>();
     for (const part of doc.parts) {
       if (part.id !== openId) {
-        map.set(part.id, <PartCard key={part.id} {...latest.current} {...callbacks} part={part} open={false} frame={slow} status={status} settings={settings} floating={floating} measured={measured} />);
+        map.set(
+          part.id,
+          <PartCard key={part.id} {...latest.current} {...callbacks} part={part} open={false} frame={slow} status={status} settings={settings} floating={floating} measured={measured} issues={issues} />,
+        );
       }
     }
     return map;
-  }, [doc.parts, openId, slow, status, settings, floating, measured, callbacks, touch]);
+  }, [doc.parts, openId, slow, status, settings, floating, measured, issues, callbacks, touch]);
   const card = (part: Part) => (part.id === openId ? <PartCard key={part.id} {...props} part={part} open /> : closed.get(part.id));
 
   const renderEntry = (entry: NotebookEntry): ReactNode => {
@@ -148,6 +168,7 @@ export function Notebook(props: NotebookProps) {
         frame={slow}
         status={status}
         floating={floating}
+        issues={issues}
         settings={settings}
         onToggle={() =>
           setOpenGroups((s) => {
@@ -164,10 +185,15 @@ export function Notebook(props: NotebookProps) {
   };
 
   return (
-    <div ref={listRef} className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-panel-2 ${touch ? 'p-3' : 'p-4'}`}>
+    <div id="defter" ref={listRef} className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-panel-2 ${touch ? 'p-3' : 'p-4'}`}>
+      <Problems {...props} listRef={listRef} />
+      {props.example.id && <ExampleCard id={props.example.id} onOpen={props.example.onOpen} onClose={props.example.onClose} />}
       <div className="flex items-baseline justify-between px-0.5 pb-0.5">
         <h2 className="text-[17px] font-semibold">{t.title}</h2>
-        <span className="text-small text-muted">{t.count(doc.parts.length)}</span>
+        <span className="text-small text-muted">
+          {t.count(doc.parts.length)}
+          {status !== 'stopped' && !props.messages.some((m) => m.severity !== 'info') ? ` · ${t.noProblems}` : ''}
+        </span>
       </div>
       {openId === null && others > 0 && (
         <div className="flex flex-col gap-4 rounded-lg border-2 border-accent bg-panel px-3.5 py-3">
@@ -180,6 +206,174 @@ export function Notebook(props: NotebookProps) {
       )}
       {doc.parts.length === 0 ? <p className="px-0.5 text-small text-muted">{t.empty}</p> : entries.map(renderEntry)}
     </div>
+  );
+}
+
+// --- Sorunlar ve örnek -------------------------------------------------------------------------
+
+/** En üstte en çok bu kadar sorun kartı; fazlası "N sorun daha" ile açılır. */
+const PROBLEMS_SHOWN = 3;
+
+/**
+ * Hata ve uyarı kartları (defterin en üstünde), altlarında katlı bilgi kartları. Kur kipinde boşta uç
+ * uyarıları kart olmaz (parçanın kartında "1 uç boşta" rozeti var); çalışırken ya da Oynat'a basılıp
+ * başlayamadığında kart olur. Yeni bir hata ya da uyarı gelince liste en üste kaydırılır.
+ */
+function Problems(props: NotebookProps & { listRef: RefObject<HTMLDivElement | null> }) {
+  const { messages, status, listRef } = props;
+  const [all, setAll] = useState(false);
+  const calm = status === 'stopped' && props.issues.size === 0;
+  const problems = messages.filter((m) => m.severity !== 'info' && !(calm && m.code === 'floating-pin'));
+  const infos = messages.filter((m) => m.severity === 'info');
+  const keys = problems.map((m) => m.key).join(';');
+  const previous = useRef('');
+  useEffect(() => {
+    const before = new Set(previous.current.split(';'));
+    previous.current = keys;
+    if (keys && keys.split(';').some((k) => !before.has(k))) listRef.current?.scrollTo?.({ top: 0 });
+  }, [keys, listRef]);
+  if (problems.length === 0 && infos.length === 0) return null;
+  const shown = all ? problems : problems.slice(0, PROBLEMS_SHOWN);
+  return (
+    <>
+      {shown.map((item) => (
+        <ProblemCard key={item.key} {...props} item={item} />
+      ))}
+      {problems.length > PROBLEMS_SHOWN && (
+        <button type="button" onClick={() => setAll((a) => !a)} aria-expanded={all} className="h-9 self-start px-1 text-small font-medium text-accent-ink hover:underline">
+          {all ? t.fewerProblems : t.moreProblems(problems.length - PROBLEMS_SHOWN)}
+        </button>
+      )}
+      {infos.map((item) => (
+        <InfoCard key={item.key} {...props} item={item} />
+      ))}
+    </>
+  );
+}
+
+/** Mesajın ilgili parçası ("D4'ü göster") ve düzeltme düğmeleri. */
+function MessageButtons({ item, diagnosticContext, messageActions, onSelectMessage, onSelectPart }: NotebookProps & { item: MessageItem }) {
+  const touch = useTouchUi();
+  const target = (item.badgeIds ?? item.elementIds)[0];
+  const actions = messageActions(item);
+  if (!target && actions.length === 0) return null;
+  const size = touch ? 'h-11 text-sm' : 'h-8 text-small';
+  return (
+    <div className="flex flex-wrap gap-2">
+      {target && (
+        <button
+          type="button"
+          onClick={() => {
+            onSelectMessage(item);
+            onSelectPart(target);
+          }}
+          className={`rounded-md border border-line-2 bg-panel px-3 font-medium hover:bg-panel-2 ${size}`}
+        >
+          {t.showPart(ek(diagnosticContext.label(target), 'i'))}
+        </button>
+      )}
+      {actions.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          onClick={action.run}
+          className={`rounded-md px-3 ${size} ${action.primary ? 'bg-ink font-semibold text-white hover:brightness-125' : 'border border-line-2 bg-panel font-medium hover:bg-panel-2'}`}
+        >
+          {action.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Hata (kesintisiz kırmızı çerçeve, dolu daire) ya da uyarı (kesikli amber çerçeve, üçgen) kartı. */
+function ProblemCard(props: NotebookProps & { item: MessageItem }) {
+  const { item, selectedMessage } = props;
+  const error = item.severity === 'error';
+  return (
+    <section
+      data-notebook="problem"
+      aria-label={`${tr.messages.severity[item.severity]} · ${item.title}`}
+      className={`flex shrink-0 gap-3 rounded-lg border-[1.5px] px-3.5 py-3 ${error ? 'border-danger bg-danger-soft' : 'border-dashed border-warn bg-warn-soft'} ${
+        selectedMessage === item.key ? 'ring-2 ring-accent' : ''
+      }`}
+    >
+      <SeverityMark severity={item.severity} />
+      <div className="flex min-w-0 flex-col gap-2">
+        <h3 className={`text-sm font-semibold ${error ? 'text-danger-ink' : 'text-warn'}`}>
+          {tr.messages.severity[item.severity]} · {item.title}
+        </h3>
+        <p className="text-small leading-[1.45] text-ink-2">
+          <Rich text={item.detail} />
+        </p>
+        <MessageButtons {...props} />
+      </div>
+    </section>
+  );
+}
+
+/** Bilgi: sade ve katlı (bir sorun değil, açıklama). */
+function InfoCard(props: NotebookProps & { item: MessageItem }) {
+  const { item } = props;
+  const touch = useTouchUi();
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  return (
+    <section aria-label={`${tr.messages.severity.info} · ${item.title}`} className="flex shrink-0 flex-col rounded-lg border border-info-line bg-info-soft">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={id}
+        className={`flex items-center gap-2.5 px-3.5 text-left ${touch ? 'min-h-12' : 'min-h-11'}`}
+      >
+        <SeverityMark severity="info" size={18} />
+        <span className="min-w-0 flex-1 truncate text-small">
+          <b className="font-semibold text-info-ink">{tr.messages.severity.info}</b> · {item.title}
+        </span>
+        <Icon name={open ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0" />
+      </button>
+      {open && (
+        <div id={id} className="flex flex-col gap-2 px-3.5 pb-3">
+          <p className="text-small leading-[1.45] text-ink-2">
+            <Rich text={item.detail} />
+          </p>
+          <MessageButtons {...props} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Açık örnek: katlı kart ("Örnek · grup" ve kısa başlık); açılınca açıklama, metinler, önceki / sonraki. */
+function ExampleCard({ id, onOpen, onClose }: { id: ExampleId; onOpen: (id: ExampleId) => void; onClose: () => void }) {
+  const touch = useTouchUi();
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
+  // Başka örnek açılınca kart katlı başlar.
+  useEffect(() => setOpen(false), [id]);
+  return (
+    <section data-notebook="example" aria-label={tr.examples.tabBadge(groupOf(id))} className="flex shrink-0 flex-col rounded-lg border border-line bg-panel">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-controls={bodyId}
+        className={`flex items-center gap-3 px-3.5 py-2.5 text-left ${touch ? 'min-h-14' : ''}`}
+      >
+        <Icon name="book" className="h-5 w-5 shrink-0 text-accent-ink" />
+        <span className="flex min-w-0 flex-1 flex-col gap-px">
+          <span className="text-label font-semibold text-accent-ink">{tr.examples.tabBadge(groupOf(id))}</span>
+          <span className="text-sm font-semibold">{tr.examples.cues[id]}</span>
+        </span>
+        <Icon name={open ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0" />
+      </button>
+      {open && (
+        <div id={bodyId} className="flex flex-col gap-3 px-3.5 pb-3">
+          <ExampleDetails id={id} onOpen={onOpen} onClose={onClose} />
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -209,6 +403,7 @@ function GroupRow({
   frame,
   status,
   floating,
+  issues,
   settings,
   onToggle,
   children,
@@ -218,6 +413,7 @@ function GroupRow({
   frame: SimFrame | null;
   status: NotebookProps['status'];
   floating: ReadonlyMap<string, number>;
+  issues: ReadonlyMap<string, 'error' | 'warning'>;
   settings: NotebookProps['settings'];
   onToggle: () => void;
   children: ReactNode;
@@ -226,7 +422,7 @@ function GroupRow({
   const name = t.plural[entry.type];
   const labels = entry.parts.map((p) => p.label).join(', ');
   // Rozet: sorunlu üyelerin adları (yanmış ya da boşta ucu olan).
-  const flagged = entry.parts.filter((p) => frame?.statuses.get(p.id)?.burned === true || (status === 'stopped' && (floating.get(p.id) ?? 0) > 0));
+  const flagged = entry.parts.filter((p) => issues.has(p.id) || frame?.statuses.get(p.id)?.burned === true || (status === 'stopped' && (floating.get(p.id) ?? 0) > 0));
   return (
     <div className="flex flex-col gap-2">
       <button
@@ -241,7 +437,7 @@ function GroupRow({
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
           {name} <span className="font-normal text-muted">· {labels}</span>
         </span>
-        {flagged.length > 0 && <Badge tone="warn">{flagged.map((p) => p.label).join(', ')}</Badge>}
+        {flagged.length > 0 && <Badge tone={flagged.some((p) => issues.get(p.id) === 'error') ? 'danger' : 'warn'}>{flagged.map((p) => p.label).join(', ')}</Badge>}
         <Icon name={open ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0" />
       </button>
       {open && (
@@ -277,6 +473,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   const burned = frame?.statuses.get(part.id)?.burned === true;
   const lit = part.type === 'led' && !burned && (frame?.live.get(part.id)?.brightness ?? 0) > 0.05;
   const floating = status === 'stopped' ? (floatingMap.get(part.id) ?? 0) : 0;
+  const issue = props.issues.get(part.id);
   const sliders = sliderProps(part);
   const values = partValues(part);
   const slide = (prop: NumberPropDef) => (v: number, done: boolean) => {
@@ -298,6 +495,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   const badges = (
     <>
       {floating > 0 && <Badge tone="warn">{t.floating(floating)}</Badge>}
+      {issue && !burned && <Badge tone={issue === 'error' ? 'danger' : 'warn'}>{tr.messages.severity[issue]}</Badge>}
       {burned && <Badge tone="danger">{t.burned}</Badge>}
       {lit && <Badge tone="danger">{t.lit}</Badge>}
     </>
@@ -305,7 +503,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
 
   if (!open) {
     return (
-      <div data-card={part.id} className="flex shrink-0 flex-col rounded-lg border border-line bg-panel hover:border-line-2">
+      <div data-card={part.id} data-notebook="card" className="flex shrink-0 flex-col rounded-lg border border-line bg-panel hover:border-line-2">
         <button
           type="button"
           onClick={() => onSelectPart(part.id)}
@@ -340,7 +538,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   }
 
   return (
-    <section data-card={part.id} aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 rounded-lg border-2 border-accent bg-panel px-3.5 pt-3 pb-3.5">
+    <section data-card={part.id} data-notebook="card" aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 rounded-lg border-2 border-accent bg-panel px-3.5 pt-3 pb-3.5">
       <OpenCardHeader {...props} badges={badges} onClose={onClearSelection} bodyId={bodyId} />
       <div id={bodyId} className="flex flex-col gap-3">
         <PrimaryControl {...props} values={values} />

@@ -76,6 +76,8 @@ async function openExample(page, name) {
 /** Üst şeritteki kip rozeti (Kur, Bağla, Ölç, Duraklatıldı). */
 const mode = async (page) => (await page.locator('header [role=status], aside [role=status]').first().textContent()) ?? '';
 const selectedCount = (page) => page.locator('svg.schematic rect[data-selected]').count();
+/** Masaüstünde sağdaki defter (v3). */
+const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
 /** Bir nesneye doğrudan bağlı olay dinleyicileri (CDP). */
 async function listeners(cdp, expression) {
   const { result } = await cdp.send('Runtime.evaluate', { expression });
@@ -631,9 +633,9 @@ try {
     await page.keyboard.press('p'); await page.waitForTimeout(200);
     const paused = (await page.getByRole('region', { name: 'Simülasyon' }).getByRole('status').first().textContent()) ?? '';
     check('P oynatıp duraklatıyor', running.includes('Çalışıyor') && paused.includes('Duraklatıldı'), `${running} / ${paused}`);
-    await page.keyboard.press('Alt+Digit3'); await page.waitForTimeout(150);
-    const messagesTab = await page.getByRole('tab', { name: /Mesajlar/ }).getAttribute('aria-selected');
-    check('Alt+3 Mesajlar sekmesine geçiyor', messagesTab === 'true');
+    await page.keyboard.press('Alt+Digit1'); await page.waitForTimeout(150);
+    const inNotebook = await page.evaluate(() => Boolean(document.activeElement?.closest('#defter [data-notebook="card"]')));
+    check('Alt+1 deftere (parça kartlarına) geçiyor (v3)', inNotebook);
     await page.locator('#tuval').focus();
     await page.keyboard.press('?'); await page.waitForTimeout(200);
     const helpOpen = (await page.getByRole('dialog', { name: 'Yardım' }).count()) === 1;
@@ -674,9 +676,11 @@ try {
   // --- Masaüstü: İnceleme paneli (İncele, Örnek, Mesajlar) ----------------------------
   await dp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await dp.waitForTimeout(200);
   await dp.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await dp.waitForTimeout(500);
-  const exampleTab = await dp.getByRole('tab', { name: 'Örnek' }).getAttribute('aria-selected');
-  const exampleText = (await dp.getByRole('tabpanel').textContent()) ?? '';
-  check('masaüstü: örnek açılınca Örnek sekmesi "Ne işe yarar?" ve "Günlük hayatta" ile açılıyor, soru yok', exampleTab === 'true' && exampleText.includes('Ne işe yarar?') && exampleText.includes('Günlük hayatta') && !exampleText.includes('Tahmin'));
+  const exampleCard = notebook(dp).getByRole('region', { name: /^Örnek ·/ });
+  const folded = (await exampleCard.textContent()) ?? '';
+  await exampleCard.getByRole('button').first().click(); await dp.waitForTimeout(150);
+  const exampleText = (await exampleCard.textContent()) ?? '';
+  check('masaüstü (v3): örnek kartı katlı ("Örnek · grup" ve kısa başlık); açılınca "Ne işe yarar?" ve "Günlük hayatta", soru yok', folded.includes('Örnek · Temel devreler') && !folded.includes('Ne işe yarar?') && exampleText.includes('Ne işe yarar?') && exampleText.includes('Günlük hayatta') && !exampleText.includes('Tahmin'), folded.slice(0, 60));
   const deskR1 = await part(dp, 'R1');
   const r1At = await screen(dp, deskR1.x, deskR1.y);
   await dp.mouse.dblclick(r1At.x, r1At.y); await dp.waitForTimeout(250);
@@ -686,18 +690,17 @@ try {
   check('masaüstü: değer Enter ile uygulanıyor', (await part(dp, 'R1')).props.resistance === 1000);
   const valueField = dp.getByLabel('Direnç', { exact: true });
   await valueField.fill('abc'); await valueField.press('Enter'); await dp.waitForTimeout(150);
-  const alert = (await dp.getByRole('tabpanel').getByRole('alert').textContent().catch(() => '')) ?? '';
+  const alert = (await notebook(dp).getByRole('alert').textContent().catch(() => '')) ?? '';
   check('masaüstü: geçersiz değer uygulanmıyor, hata alanın altında', alert.includes('sayı değil') && (await part(dp, 'R1')).props.resistance === 1000, alert.slice(0, 30));
   await valueField.press('Escape');
   await dp.getByRole('button', { name: 'Oynat' }).first().click(); await dp.waitForTimeout(600);
   await valueField.fill('470'); await valueField.press('Tab'); await dp.waitForTimeout(400);
   const statusText = (await dp.getByRole('region', { name: 'Simülasyon' }).getByRole('status').textContent()) ?? '';
   check('masaüstü: çalışırken alandan çıkınca değer uygulanıyor, simülasyon durmuyor', (await part(dp, 'R1')).props.resistance === 470 && statusText.includes('Çalışıyor'), statusText);
-  const live = (await dp.getByRole('tabpanel').textContent()) ?? '';
+  const live = (await notebook(dp).textContent()) ?? '';
   check('masaüstü: defterde açık kartta canlı ölçüm görünüyor', live.includes('Canlı uygulanır') && /Akım\s*[\d,]+\s*mA/.test(live), live.slice(0, 60));
-  await dp.getByRole('tab', { name: 'Örnek' }).click(); await dp.waitForTimeout(150);
-  const after = (await dp.getByRole('tabpanel').textContent()) ?? '';
-  check('masaüstü: Oynat’tan sonra Örnek sekmesi aynı açıklamayı gösteriyor', after.includes('Ne işe yarar?'), after.slice(0, 40));
+  const after = (await exampleCard.textContent()) ?? '';
+  check('masaüstü: Oynat’tan sonra örnek kartı aynı açıklamayı gösteriyor', after.includes('Ne işe yarar?'), after.slice(0, 40));
   await desk.close();
 
   // --- Masaüstü: cihaz rafı ve Ölç düzeni ------------------------------------------------
@@ -722,19 +725,20 @@ try {
   check('masaüstü: üretecin frekansı değere tıklayıp yazılarak değişiyor', (await part(rp, 'FG1')).props.frequency === 2000);
   await rp.getByRole('button', { name: 'FG1 OUT ucunu tuvalde göster' }).click(); await rp.waitForTimeout(150);
   check('masaüstü: jaka tıklayınca tuvalde uç yanıp sönüyor', (await rp.locator('svg.schematic circle.alarm-blink').count()) > 0);
+  await notebook(rp).getByRole('region', { name: /^Örnek ·/ }).getByRole('button').first().click(); await rp.waitForTimeout(100);
   await rp.getByRole('button', { name: 'Örneği kapat' }).click(); await rp.waitForTimeout(150);
   await rp.getByRole('button', { name: 'Oynat' }).first().click(); await rp.waitForTimeout(700);
   const panelStrip = await rp.getByRole('navigation', { name: 'İnceleme paneli (daraltılmış)' }).count();
-  const panelTabs = await rp.getByRole('tablist', { name: 'İnceleme paneli' }).count();
+  const panelTabs = await notebook(rp).count();
   const railOpen = await rp.getByRole('button', { name: 'Parça kütüphanesini aç' }).count();
   const measureBox = await rack.boundingBox();
-  check('masaüstü: Oynat’tan sonra Ölç düzeni (kütüphane ve İnceleme paneli açık kalıyor, raf büyük)', panelStrip === 0 && panelTabs === 1 && railOpen === 0 && measureBox.height > rackBox.height + 40, `raf ${Math.round(rackBox.height)} → ${Math.round(measureBox.height)}`);
+  check('masaüstü: Oynat’tan sonra Ölç düzeni (kütüphane ve defter açık kalıyor, raf büyük)', panelStrip === 0 && panelTabs === 1 && railOpen === 0 && measureBox.height > rackBox.height + 40, `raf ${Math.round(rackBox.height)} → ${Math.round(measureBox.height)}`);
   if ((await rp.getByRole('tab', { name: /OSC1/ }).count()) > 0) { await rp.getByRole('tab', { name: /OSC1/ }).click(); await rp.waitForTimeout(150); }
   await rp.getByRole('button', { name: 'Oto', exact: true }).click(); await rp.waitForTimeout(300);
   const autoToast = (await rp.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
   check('masaüstü: Oto neyin değiştiğini bildiriyor', autoToast);
   await rp.getByRole('button', { name: 'Durdur', exact: true }).click(); await rp.waitForTimeout(300);
-  check('masaüstü: Durdur’la Kur düzenine dönülüyor', (await rp.getByRole('tablist', { name: 'İnceleme paneli' }).count()) === 1 && (await rp.getByRole('navigation', { name: 'İnceleme paneli (daraltılmış)' }).count()) === 0);
+  check('masaüstü: Durdur’la Kur düzenine dönülüyor', (await notebook(rp).count()) === 1 && (await rp.getByRole('navigation', { name: 'İnceleme paneli (daraltılmış)' }).count()) === 0);
   await rackCtx.close();
 
   // --- Masaüstü: hatalar ve uyarılar (rozet, LED balonu, düzeltmeler, toprak yok, tuzak) ------
@@ -745,14 +749,13 @@ try {
   await ep.getByRole('button', { name: 'Örnekler', exact: true }).click(); await ep.waitForTimeout(200);
   await ep.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await ep.waitForTimeout(400);
   await ep.getByRole('button', { name: 'Oynat' }).first().click(); await ep.waitForTimeout(400);
-  await ep.getByRole('tab', { name: 'İncele' }).click();
-  await ep.getByRole('button', { name: /^R1/ }).first().click();
+  await notebook(ep).getByRole('button', { name: /^R1 ·/ }).first().click();
   const r1Field = ep.getByLabel('Direnç', { exact: true });
   await r1Field.fill('10'); await r1Field.press('Enter'); await ep.waitForTimeout(900);
   const balloon = ep.getByRole('alertdialog', { name: /LED1 yandı/ });
-  check('masaüstü: LED yanınca balon ve Mesajlar sekmesi öne geliyor', (await balloon.count()) === 1 && (await ep.getByRole('tab', { name: /Mesajlar/ }).getAttribute('aria-selected')) === 'true');
+  check('masaüstü (v3): LED yanınca balon ve defterin en üstünde hata kartı', (await balloon.count()) === 1 && (await notebook(ep).getByRole('region', { name: /^Hata ·/ }).count()) >= 1);
   await balloon.getByRole('button', { name: 'Neden?' }).click(); await ep.waitForTimeout(200);
-  const fix = ep.getByRole('tabpanel').getByRole('button', { name: /^R1’i .* yap$/ });
+  const fix = notebook(ep).getByRole('button', { name: /^R1’i .* yap$/ });
   const fixLabel = (await fix.textContent().catch(() => '')) ?? '';
   check('masaüstü: "Neden?" mesajı seçiyor; seri direnç önerisi var', fixLabel.includes('160'), fixLabel);
   await fix.click(); await ep.waitForTimeout(700);
@@ -789,16 +792,15 @@ try {
   await tp.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }).click(); await tp.waitForTimeout(400);
   const earthLines = await tp.locator('svg.schematic g.earth-line path').count();
   const earthLabel = await tp.locator('svg.schematic g.earth-line text', { hasText: 'toprak hattı' }).count();
-  await tp.getByRole('tab', { name: /Mesajlar/ }).click(); await tp.waitForTimeout(150);
-  const trapText = (await tp.getByRole('tabpanel').textContent()) ?? '';
+  const trapText = (await notebook(tp).textContent()) ?? '';
   check(
     'masaüstü: toprak tuzağında uyarı ve kesikli toprak hattı (tek mesaj)',
     earthLines >= 1 && earthLabel <= 1 && trapText.includes('Toprak tuzağı') && trapText.includes('D4 kısa devre oldu') && !trapText.includes('toprak hattı üzerinden dönüyor'),
     `${earthLines} çizgi, ${earthLabel} etiket; ${trapText.slice(0, 50)}`,
   );
-  await tp.getByRole('tabpanel').getByText('Toprak tuzağı', { exact: true }).first().click(); await tp.waitForTimeout(200);
+  await notebook(tp).getByRole('button', { name: 'D4’ü göster' }).click(); await tp.waitForTimeout(200);
   const earthGlow = await tp.locator('svg.schematic g.earth-line path[stroke-opacity="0.35"]').count();
-  check('masaüstü: toprak tuzağı mesajına tıklayınca toprak hattı vurgulanır', earthGlow >= 1, `${earthGlow} vurgu`);
+  check('masaüstü (v3): uyarı kartında "D4’ü göster" toprak hattını vurguluyor, D4’ün kartını açıyor', earthGlow >= 1 && (await notebook(tp).getByRole('region', { name: 'D4 · Diyot' }).count()) === 1, `${earthGlow} vurgu`);
   await trapCtx.close();
 
   // --- Gerçek dünya sınırları (Fizik 5): ısınan direnç, ters LED, ters elektrolitik ------------
@@ -828,12 +830,12 @@ try {
     lp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await lp.goto(URL0, { waitUntil: 'networkidle' });
     await lp.getByRole('button', { name: 'Oynat' }).last().click(); await lp.waitForTimeout(800);
-    await lp.getByRole('tab', { name: /Mesajlar/ }).click(); await lp.waitForTimeout(200);
-    const text = (await lp.getByRole('tabpanel').textContent()) ?? '';
+    const text = (await notebook(lp).textContent()) ?? '';
+    const warningCards = await notebook(lp).getByRole('region', { name: /^Uyarı ·/ }).count();
     const hot = await lp.locator('svg.schematic polyline[stroke^="rgb("]').count();
     check(
       'masaüstü: ısınan direnç kızıl, ters LED ve ters elektrolitik için uyarı (Fizik 5)',
-      hot >= 1 && text.includes('Direnç ısınıyor') && text.includes('LED ters yönde') && text.includes('elektrolitik kondansatör ters yönde') && text.includes('3 uyarı'),
+      hot >= 1 && text.includes('Direnç ısınıyor') && text.includes('LED ters yönde') && text.includes('elektrolitik kondansatör ters yönde') && warningCards === 3,
       `${hot} kızıl gövde; ${text.slice(0, 60)}`,
     );
     await ctx.close();
@@ -885,8 +887,7 @@ try {
     await toggle();
     const closedText = (await bp.locator('svg.schematic text', { hasText: /mA$/ }).allTextContents()).join(' ');
     await toggle();
-    await bp.getByRole('tab', { name: /Mesajlar/ }).click(); await bp.waitForTimeout(200);
-    const text = (await bp.getByRole('tabpanel').textContent()) ?? '';
+    const text = (await notebook(bp).textContent()) ?? '';
     check(
       'masaüstü: kütüphanede Bobin; RL örneğinde akım ≈ 89 mA, anahtar açılınca Lenz uyarısı (Fizik 7)',
       inLibrary >= 1 && closedText.includes('89,') && text.includes('Bobin akımı aniden kesildi') && text.includes('Lenz'),
@@ -920,14 +921,14 @@ try {
     await fp.goto(URL0, { waitUntil: 'networkidle' });
     const fsElement = () => fp.evaluate(() => document.fullscreenElement?.tagName ?? null);
     const libraryShown = () => fp.getByPlaceholder(/Parça ara/).count();
-    const inspectorShown = () => fp.getByRole('tab', { name: 'İncele' }).count();
+    const inspectorShown = () => notebook(fp).count();
     const canvasWidth = async () => (await fp.locator('svg.schematic').boundingBox())?.width ?? 0;
     const w0 = await canvasWidth();
     await fp.getByRole('button', { name: 'Tam ekran', exact: true }).click(); await fp.waitForTimeout(500);
     const w1 = await canvasWidth();
     check('masaüstü: Tam ekran tarayıcıyı tam ekrana alıyor; kütüphane ve İnceleme paneli gizleniyor', (await fsElement()) === 'HTML' && (await libraryShown()) === 0 && (await inspectorShown()) === 0 && w1 > 1400, `tuval ${Math.round(w0)} → ${Math.round(w1)} px`);
     await fp.getByRole('button', { name: 'Parça kütüphanesi', exact: true }).click();
-    await fp.getByRole('button', { name: 'İnceleme paneli', exact: true }).click(); await fp.waitForTimeout(300);
+    await fp.getByRole('button', { name: 'Defter', exact: true }).click(); await fp.waitForTimeout(300);
     const pressed = await fp.getByRole('button', { name: 'Parça kütüphanesi', exact: true }).getAttribute('aria-pressed');
     check('masaüstü: tam ekranda üst çubuğun iki ucundaki düğmeler sol ve sağ paneli açıyor', (await libraryShown()) === 1 && (await inspectorShown()) === 1 && pressed === 'true' && (await fsElement()) === 'HTML');
     await fp.evaluate(() => document.exitFullscreen()); await fp.waitForTimeout(400);

@@ -826,7 +826,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
         )}
       </div>
       {props.fullscreen.on && (
-        <PanelToggle side="right" label={tr.toolbar.inspectorPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} />
+        <PanelToggle side="right" label={tr.toolbar.notebookPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} />
       )}
     </header>
   );

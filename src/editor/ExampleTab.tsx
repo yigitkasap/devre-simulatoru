@@ -15,7 +15,7 @@ export interface ExampleTabProps {
   readonly onBrowse: () => void;
 }
 
-function groupOf(id: ExampleId): string {
+export function groupOf(id: ExampleId): string {
   const group = EXAMPLE_GROUPS.find((g) => (g.ids as readonly ExampleId[]).includes(id));
   return group ? tr.examples.groups[group.id] : '';
 }
@@ -54,28 +54,41 @@ export function ExampleTab({ id, onOpen, onClose, onBrowse }: ExampleTabProps) {
     );
   }
 
-  const texts = tr.examples.texts[id];
-  const index = EXAMPLE_IDS.indexOf(id);
-  const previous = index > 0 ? EXAMPLE_IDS[index - 1] : undefined;
-  const next = index < EXAMPLE_IDS.length - 1 ? EXAMPLE_IDS[index + 1] : undefined;
-
   return (
     <div className={`flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain pb-5 ${touch ? 'px-4 pt-2' : 'px-5 pt-4'}`}>
       <div className="flex flex-col gap-1.5">
         <span className="self-start rounded-xs bg-accent-soft px-2 py-0.5 text-label font-semibold text-accent-ink">
           {tr.examples.tabBadge(groupOf(id))}
         </span>
-        <h2 className="text-title leading-tight font-semibold">{texts.title}</h2>
-        {(id === 'baraj-cubuk' || id === 'baraj-tek-isik') && (
-          <a
-            href={`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}baraj/`}
-            className={`flex items-center gap-1.5 self-start text-sm font-semibold text-accent-ink underline-offset-2 hover:underline ${touch ? 'min-h-11' : ''}`}
-          >
-            <Icon name="external" className="h-[18px] w-[18px]" />
-            {tr.baraj.exampleTabLink}
-          </a>
-        )}
+        <h2 className="text-title leading-tight font-semibold">{tr.examples.texts[id].title}</h2>
       </div>
+      <ExampleDetails id={id} onOpen={onOpen} onClose={onClose} />
+    </div>
+  );
+}
+
+/**
+ * Örneğin metinleri ve gezinme: baraj sayfası bağlantısı, kurulum açıklaması, "Ne işe yarar?",
+ * "Günlük hayatta", altta önceki / örneği kapat / sonraki. Örnek sekmesi ve defterin örnek kartı.
+ */
+export function ExampleDetails({ id, onOpen, onClose }: { id: ExampleId; onOpen: (id: ExampleId) => void; onClose: () => void }) {
+  const touch = useTouchUi();
+  const h9 = touch ? 'h-11' : 'h-9';
+  const texts = tr.examples.texts[id];
+  const index = EXAMPLE_IDS.indexOf(id);
+  const previous = index > 0 ? EXAMPLE_IDS[index - 1] : undefined;
+  const next = index < EXAMPLE_IDS.length - 1 ? EXAMPLE_IDS[index + 1] : undefined;
+  return (
+    <>
+      {(id === 'baraj-cubuk' || id === 'baraj-tek-isik') && (
+        <a
+          href={`${import.meta.env.BASE_URL.replace(/\/?$/, '/')}baraj/`}
+          className={`flex items-center gap-1.5 self-start text-sm font-semibold text-accent-ink underline-offset-2 hover:underline ${touch ? 'min-h-11' : ''}`}
+        >
+          <Icon name="external" className="h-[18px] w-[18px]" />
+          {tr.baraj.exampleTabLink}
+        </a>
+      )}
       <p className="text-sm leading-[1.55] text-ink-2">
         <Rich text={texts.description} />
       </p>
@@ -124,6 +137,6 @@ export function ExampleTab({ id, onOpen, onClose, onBrowse }: ExampleTabProps) {
           {tr.examples.next}
         </button>
       </div>
-    </div>
+    </>
   );
 }
