@@ -54,7 +54,16 @@ export type IconName =
   | 'themeSystem'
   | 'tag'
   | 'camera'
-  | 'dots';
+  | 'dots'
+  | 'board'
+  | 'perfboard'
+  | 'chip'
+  | 'printer'
+  | 'list'
+  | 'shield'
+  | 'copy'
+  | 'check'
+  | 'warning';
 
 const PATHS: Record<IconName, ReactNode> = {
   menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
@@ -257,6 +266,52 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <circle cx="10" cy="10" r="6.6" />
       <path d="M10 3.4a6.6 6.6 0 0 1 0 13.2z" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Karta aktar (K1–K4, L1–L2): kart, delikli plaket, entegre, yazıcı, liste, denetim, kopyala, onay, uyarı.
+  board: (
+    <>
+      <rect x="2.5" y="4.5" width="15" height="11" rx="1.5" />
+      <path d="M6 12.5V9h3.5v3.5H13V7.5" />
+      <circle cx="13" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+    </>
+  ),
+  perfboard: (
+    <>
+      <rect x="3" y="4" width="14" height="12" rx="2" />
+      {[7, 10, 13].map((x) => [8, 12].map((y) => <circle key={`${x}-${y}`} cx={x} cy={y} r="0.9" fill="currentColor" stroke="none" />))}
+    </>
+  ),
+  chip: (
+    <>
+      <rect x="5.5" y="5.5" width="9" height="9" rx="1.2" />
+      <path d="M8 3v2.5M12 3v2.5M8 14.5V17M12 14.5V17M3 8h2.5M3 12h2.5M14.5 8H17M14.5 12H17" />
+    </>
+  ),
+  printer: (
+    <>
+      <path d="M6 7.5V3h8v4.5M6 14H4a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1V13a1 1 0 0 1-1 1h-2" />
+      <rect x="6" y="11.5" width="8" height="5.5" rx="0.6" />
+    </>
+  ),
+  list: <path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9M3.5 5.5h.5M3.5 10h.5M3.5 14.5h.5" />,
+  shield: (
+    <>
+      <path d="M10 2.8l6 2.3v4.6c0 3.6-2.5 6.3-6 7.5-3.5-1.2-6-3.9-6-7.5V5.1z" />
+      <path d="M7.2 10l2 2 3.6-3.8" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="7" y="7" width="9.5" height="9.5" rx="1.5" />
+      <path d="M13 4.8V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13h.3" />
+    </>
+  ),
+  check: <path d="M4.5 10.5l3.5 3.5 7.5-8" />,
+  warning: (
+    <>
+      <path d="M10 3l7.5 13.5h-15z" />
+      <path d="M10 8.5v3.5M10 14.3v.1" />
     </>
   ),
 };

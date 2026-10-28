@@ -1740,6 +1740,8 @@ kırpıcı (89 000 adım/s) bu işten önce de sınırdaydı (önceki taramada 4
 
 ### Lehim rehberi (2026-10-28)
 
+(Pencere sonra "Karta aktar"ın Delikli plaket sekmesi oldu; aşağıda "Karta aktar". Hesap aynı.)
+
 3B tezgâhta "Lehim rehberi" (`src/bench3d/guide.ts`, `src/editor/SolderGuide.tsx`): breadboard
 yerleşimi, breadboard düzenindeki bir delikli plakete (ör. Adafruit Perma-Proto: aynı sütun
 numaraları, a–j satırları ve raylar) aktarılır.
@@ -1789,6 +1791,8 @@ baskı devre tasarımı olarak indirir: `devre-<tarih>-kicad.zip` içinde `.kica
 
 ### PCB: otomatik yollar ve üretim dosyaları (2026-10-28)
 
+(Bu bölüm sonra "Karta aktar"ın Baskı devre sekmesi oldu, `PcbPanel.tsx` kalktı; aşağıda.)
+
 Lehim rehberinin sonundaki bölüm ("Baskı devre (PCB) olarak üret", `src/editor/PcbPanel.tsx`)
 kartın üstten görünüşünü (pedler, üst yüz kırmızı, alt yüz mavi yollar, serigrafi) gösterir ve iki
 zip verir: üreticiye doğrudan yüklenen **üretim zip'i** (`devre-<tarih>-uretim.zip`) ve yolları
@@ -1815,6 +1819,75 @@ zip verir: üreticiye doğrudan yüklenen **üretim zip'i** (`devre-<tarih>-uret
   telefonda Gerber indirme maddesi.
 
 PCB araştırması ve sonraki aşamalar: `docs/pcb/arastirma.md`.
+
+### Karta aktar: delikli plaket ve baskı devre, 3B (2026-10-28)
+
+Tasarım `docs/tasarim-v3/` → "Karta aktar" (K1–K4, L1–L2). Lehim rehberi ve PCB bölümü tek
+pencerede iki sekme oldu ("Delikli plaket | Baskı devre (PCB)"), iki sekmede de kart 3B. Hesap kodu
+(planBreadboard, buildSolderGuide, designPcb, routePcb, checkPcb, fabricationZip, kicadZip)
+değişmedi; değişen arayüz ve görünüm.
+
+- Açılış: 3B'nin sağ altındaki "Lehim rehberi" düğmesi "Karta aktar" oldu (kart simgesi; telefonda
+  yalnızca simge, `aria-label`), ayrıca Dosya menüsünde (telefonda dosya sayfasında) "Karta aktar".
+  Pencere Simulator düzeyinde, tembel yüklenir. Son seçilen sekme hatırlanır.
+- 3B (`src/bench3d/boardScene.ts`, `boardModels.ts`): başlangıç `docs/tasarim-v3/karta-aktar-3b/main.ts`
+  idi; kartı ve parçaları kuran kod `src/bench3d/` altına taşındı, parçalar `buildPartModel` ile
+  (yeni model yok), bacaklar ped ya da delik konumlarında (tezgâhtaki `placeOnBoard` mantığı). Işık,
+  yörünge denetimi (sol tuş kaydırır, orta / sağ döndürür, tekerlek yakınlaştırır) ve koyu tema
+  arka planı tezgâhla ortak: `src/bench3d/stage.ts` (tezgâh da bunu kullanıyor). Kart masanın biraz
+  üstünde, altında yumuşak gölge; kamera önden sola yukarıdan, kart araç hapının üstünde kalacak
+  biçimde sığdırılır. HTML katmanı (eksik bağlantı rozetleri, delik etiketleri, ipucu) her
+  çizimden sonra 3B noktaların ekrandaki yerine taşınır. WebGL açılamazsa sahnede bir uyarı.
+- Baskı devre (K1–K3): FR-4 kenarlı levha, yeşil maske, maskenin altında yollar, kalaylı pedler,
+  serigrafi (ref ve uç adları), montaj delikleri; eklenen dekuplaj, vidalı klemens, pin başlık. Araç
+  hapı: Parçalarla | Yalın kart, Üst yüz | Alt yüz (kart çevrilir), − + Sığdır; sol üstte "70 × 51 mm ·
+  2 katman". Parçanın üstüne gelince koyu ipucu (ref · malzeme listesindeki ad, eşdeğer KiCad kılıfı).
+  Panel: durum ("Üretime hazır" / "N bağlantı çizilemedi" / tasarım kuralı hatası), "Üretim
+  dosyalarını indir" ve "KiCad projesi", SİPARİŞTE SEÇ (altı satır, Kopyala düz metin), KARTA
+  EKLENENLER (çipin üstüne gelince kartta mavi çerçeve, yalın kartta pedlerinde halka; tıklayınca
+  seçili kalır ve açıklaması yazar), en altta açılan "Gümrük ve üretici seçenekleri". Eksik yolda:
+  kartta turuncu kesikli çizgi ve halka, numaralı rozet; EKSİK BAĞLANTILAR listesi (aynı ağdaki en
+  yakın ped, hedef ucun adı, uzaklık; satıra basınca kamera oraya yaklaşır), birincil "KiCad
+  projesini indir", üretim düğmesi kilitli, 4 KiCad adımı. Kullanıcı kararı: eksik yolda da sipariş
+  ayarları ve eklenenler KiCad adımlarının altında görünür. Şebekeli devrede sahnede `tr.pcb.mains`.
+- Delikli plaket (L1): breadboard düzeninde altın kaplama delikler, şerit çerçeveleri, kırmızı / mavi
+  raylar, sütun numaraları; parçalar, jumper'lar ve dışarı giden teller tezgâhtaki yerleşimle aynı
+  deliklerde; alt yüzde lehim noktaları. Adım adım: o adıma kadar takılanlar görünür, şimdiki adımın
+  deliklerinde mavi halka ve delik etiketi ("+ 10c", "− 11c"; transistörde C B E, entegrede 1. bacak;
+  bitişik etiketler yana açılıp çizgiyle deliğe bağlanır). Panel: TAKMA SIRASI ve "19 / 25", ilerleme
+  çubuğu, grup çipleri (tür başına; bitenler yeşil tikli, şimdiki mavi "1/2"), ŞİMDİ TAK kartı
+  (rehberin başlığı, delikleri, kutup / yön notu ve lehim ipucu; ölçü aleti ve şebeke uyarısı ilgili
+  dış tel adımının kartında), Önceki ve "Sonraki: CV" (← → tuşları da), SIRADAKİLER, en altta
+  Malzemeler, Denetim (panelde açılır) ve Yazdır. Kullanıcı kararı: son adımda düğme "Bitti ·
+  Denetle" (Denetim'i açar). Yazdır bugünkü yazdırılabilir rehberi basar (koyu temada da açık).
+- Rehber adımlarının plandaki karşılığı `src/bench3d/boardData.ts` → `stepTargets` (başlıktan: "Jumper
+  N", "ETİKET · …", dış telde rehberdekiyle aynı uç adı); eksik bağlantılar, eklenenlerin kısa adı
+  (`design.added` satırları kılıflarla eşlenir) ve ipucu da orada.
+- Telefon (K4, L2): tam ekran sayfa; başlık ve kapat, tam genişlik sekmeler, 340 px sahne (altta küçük
+  araç hapı ve "Tam ekran": sahne bütün ekranı kaplar), altında durum ya da "Şimdi tak" kartı ve
+  açılır satırlar (PCB: Siparişte seç, Karta eklenenler, Gümrük ve üretici; plaket: Malzemeler,
+  Denetim), en altta sabit birincil düğme. Kullanıcı kararları: telefonda da Üst | Alt yüz ile
+  Malzemeler ve Denetim var; çizimdeki 32–40 px'lik düğmeler 44 px'e büyütüldü.
+- Metinler: `tr.karta` (pencere), `tr.pcb` ve `tr.solderGuide` (var olanlar). Uzun paragraflar kısa
+  parçalara bölündü, bilgi kaybolmadı: `tr.pcb.text` → `about` (Gümrük satırında), `tr.pcb.order` →
+  `orderSpecs` (SİPARİŞTE SEÇ) ve `orderNotes`, `tr.solderGuide.intro` → üç cümle (Malzemeler ve
+  yazdırılan rehber). KiCad 2. adımı çizimde "Turuncu çizgileri…" idi; KiCad'de eksik bağlantılar
+  turuncu değil, "İnce çizgileri (ratsnest) X tuşuyla yola çevir" yazıldı (OKU.txt ile aynı).
+- Renkler belirteçlerden: ipucu `console` (iki temada koyu), rozet `pin` (turuncu), not simgesi
+  `paused`, sahne `bench`. 3B malzemelerin renkleri (maske, bakır, kalay) temadan bağımsız.
+- Esc kapatır. Şemada Esc'ye önce simülatör tepki verip sayfayı yeniden çizdiğinden, olay sürerken
+  yeniden kaydedilen dinleyici onu kaçırıyordu: pencerenin Esc ve ← → dinleyicileri bir kez
+  kaydedilir, güncel değerleri ref'ten okur.
+- `tsconfig.json`: `docs/` tür denetiminden çıkarıldı (tasarım betikleri, ör. `karta-aktar-3b/main.ts`,
+  uygulamanın parçası değil; `astro check` onlarda hata veriyordu).
+- Testler: `tests/boardData.test.ts` (62 örnekte rehberin her adımı plandaki bir jumper'a, parçaya ya
+  da dış tele karşılık gelir, her adımın delik etiketi var, grupların toplamı adım sayısı; 555'te
+  gruplar ve "+ / −" etiketleri; eklenen parçaların kısa adları; eksik bağlantının uçları ve
+  uzaklığı). ios-kontrol'de Lehim rehberi ve PCB maddeleri yeni düzene göre: masaüstünde Dosya
+  menüsünden açılış, 368 px panel, delik etiketleri, ← → ile adım, Malzemeler / Denetim, yazdırma
+  ortamında rehberin açık zeminle basılması, PCB durumu, kopyalama, eklenen parça çipi, Gümrük
+  satırı, Esc; telefonda iki sekme, 44 px hedefler, parmakla kartı döndürme, KiCad ve Gerber
+  indirme, Kapat ve son sekmenin hatırlanması (175 madde).
 
 
 ### Arayüz v3: "Defter" düzeni (2026-10-28)

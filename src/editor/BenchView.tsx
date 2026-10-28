@@ -21,8 +21,6 @@ import type { Settings } from './settings';
 import type { SimFrame } from './useSimulation';
 
 const Bench3D = lazy(() => import('../bench3d/Bench3D'));
-// Lehim rehberi ve KiCad aktarımı: yalnızca açılınca yüklenir.
-const SolderGuideDialog = lazy(() => import('./SolderGuide').then((m) => ({ default: m.SolderGuideDialog })));
 
 export type ViewMode = 'schematic' | 'bench';
 
@@ -105,6 +103,8 @@ export interface BenchViewProps {
   readonly running: boolean;
   readonly selection: readonly string[];
   readonly overlayOpen: boolean;
+  /** Karta aktar penceresini açar (delikli plaket ve baskı devre). */
+  readonly onKarta: () => void;
   readonly touch: boolean;
   /** Telefon: etiketler yalnızca seçili parçada ve ölçü aletlerinde; küçük şema yok; denetimler simge. */
   readonly phone: boolean;
@@ -132,7 +132,6 @@ export function BenchView(props: BenchViewProps) {
   const [camera, setCamera] = useState<CameraRequest>({ n: 0, view: 'free' });
   const [cameraLabel, setCameraLabel] = useState<CameraChoice>('free');
   const [zoom, setZoom] = useState({ n: 0, factor: 1 });
-  const [guideOpen, setGuideOpen] = useState(false);
   const [labels, setLabels] = useState(() => readStored(LABELS_KEY, true));
   const [overlay, setOverlay] = useState<HTMLDivElement | null>(null);
   const slow = useSlowFrame(props.active ? frame : null);
@@ -209,7 +208,7 @@ export function BenchView(props: BenchViewProps) {
           active={props.active}
           running={props.running}
           selection={selection}
-          overlayOpen={props.overlayOpen || guideOpen}
+          overlayOpen={props.overlayOpen}
           camera={camera}
           zoom={zoom}
           dots={settings.currentDots}
@@ -284,9 +283,9 @@ export function BenchView(props: BenchViewProps) {
         {!phone && toggle('dots', tr.bench.current, settings.currentDots, () => props.onSettings({ currentDots: !settings.currentDots }))}
         <CameraMenu choice={cameraLabel} canFocus={single !== null} phone={phone} touch={touch} onPick={pickCamera} />
         {doc.parts.length > 0 && (
-          <button type="button" onClick={() => setGuideOpen(true)} aria-label={phone ? tr.solderGuide.open : undefined} title={tr.solderGuide.open} className={button(false, iconOnly)}>
-            <Icon name="book" className="h-[18px] w-[18px]" />
-            {!phone && tr.solderGuide.open}
+          <button type="button" onClick={props.onKarta} aria-label={phone ? tr.karta.open : undefined} title={tr.karta.open} className={button(false, iconOnly)}>
+            <Icon name="board" className="h-[18px] w-[18px]" />
+            {!phone && tr.karta.open}
           </button>
         )}
         </div>
@@ -302,11 +301,6 @@ export function BenchView(props: BenchViewProps) {
         )}
       </div>
 
-      {guideOpen && (
-        <Suspense fallback={null}>
-          <SolderGuideDialog doc={doc} touch={touch} onClose={() => setGuideOpen(false)} />
-        </Suspense>
-      )}
     </div>
   );
 }

@@ -665,6 +665,76 @@ try {
     check('erişilebilirlik: adı olmayan düğme ya da alan yok (masaüstü kartlar, 3B, telefon, ⋯)', found.length === 0, found.slice(0, 2).join(' | '));
   }
 
+  // --- Karta aktar (masaüstü, K1–K2, L1): Dosya menüsünden; delikli plaket adım adım, PCB -----------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: '555 ile yanıp sönen LED (astabil)' }).first().click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: /^Dosya|^555/ }).first().click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitem', { name: /^Karta aktar/ }).click();
+    const karta = page.getByRole('dialog', { name: 'Karta aktar' });
+    await karta.waitFor();
+    await page.waitForFunction(() => window.__kart !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(600);
+    await karta.getByRole('tab', { name: 'Delikli plaket' }).click(); await page.waitForTimeout(300);
+    const dialogBox = await karta.boundingBox();
+    const aside = await karta.getByRole('complementary', { name: 'Delikli plaket' }).boundingBox();
+    const chip = (await karta.getByText(/breadboard düzeni$/).textContent()) ?? '';
+    const holeLabels = await karta.locator('[data-anchor^="hole-"]').allTextContents();
+    await karta.getByRole('button', { name: /^Sonraki/ }).focus();
+    for (let i = 0; i < 18; i++) await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(400);
+    const at19 = (await karta.locator('[aria-label$=". adımı"]').getAttribute('aria-label')) ?? '';
+    const now = (await karta.getByText('ŞİMDİ TAK').locator('..').textContent()) ?? '';
+    const labels19 = await karta.locator('[data-anchor^="hole-"]').allTextContents();
+    await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(200);
+    const at18 = (await karta.locator('[aria-label$=". adımı"]').getAttribute('aria-label')) ?? '';
+    await shot(page, 'karta-plaket.png');
+    check('Karta aktar (masaüstü, L1): Dosya menüsünden açılıyor (16 px kenar boşluğu, panel 368 px); bilgi çipi; delik etiketleri; → ve ← adımı değiştiriyor; 19. adımda C1 · 10c ↔ 11c, + ve − etiketi',
+      dialogBox !== null && Math.round(dialogBox.x) === 16 && aside !== null && Math.round(aside.width) === 368 && chip === 'Yarım boy · 30 sütun · breadboard düzeni' && holeLabels.length === 2 &&
+      /25 adımın 19\. adımı/.test(at19) && /C1 · Elektrolitik/.test(now) && labels19.some((l) => l.startsWith('+ ')) && labels19.some((l) => l.startsWith('− ')) && /adımın 18\. adımı/.test(at18),
+      `${at19} · ${labels19.join(', ')}`);
+    await karta.getByRole('button', { name: 'Malzemeler' }).click(); await page.waitForTimeout(200);
+    const materials = (await karta.getByRole('complementary', { name: 'Delikli plaket' }).textContent()) ?? '';
+    await karta.getByRole('button', { name: 'Denetim' }).click(); await page.waitForTimeout(200);
+    const checks = (await karta.getByRole('complementary', { name: 'Delikli plaket' }).textContent()) ?? '';
+    await page.evaluate(() => { window.print = () => { window.__printed = true; }; });
+    await karta.getByRole('button', { name: 'Yazdır' }).click(); await page.waitForTimeout(200);
+    const printed = await page.evaluate(() => window.__printed === true);
+    // Yazdırma ortamında: rehber görünür, zemini açık (koyu tema belirteçleri yalnızca ekranda), adımların hepsi var.
+    await page.emulateMedia({ media: 'print' });
+    const paper = await page.evaluate(() => { const el = document.getElementById('lehim-rehberi'); return el ? { display: getComputedStyle(el).display, bg: getComputedStyle(el).backgroundColor, steps: el.querySelectorAll('ol > li').length } : null; });
+    await page.emulateMedia({ media: 'screen' });
+    check('Karta aktar (masaüstü): Malzemeler ve Denetim panelde; Yazdır bugünkü rehberi basıyor (koyu temada da açık zemin, 25 adım)',
+      materials.includes('Perma-Proto') && materials.includes('DIP-8 soket') && checks.includes('Lehim köprüsü yok') && printed && paper?.display === 'block' && paper.bg === 'rgb(255, 255, 255)' && paper.steps === 25,
+      JSON.stringify(paper));
+    await karta.getByRole('tab', { name: 'Baskı devre (PCB)' }).click();
+    await karta.getByText('Üretime hazır').waitFor({ timeout: 10000 }).catch(() => {});
+    const pcbPanel = karta.getByRole('complementary', { name: 'Baskı devre (PCB)' });
+    const pcbText = (await pcbPanel.textContent()) ?? '';
+    const pcbChip = (await karta.getByText(/^70 × 51 mm$/).count()) === 1;
+    await pcbPanel.getByRole('button', { name: /^C_D1/ }).click(); await page.waitForTimeout(200);
+    const pressed = await pcbPanel.getByRole('button', { name: /^C_D1/ }).getAttribute('aria-pressed');
+    const explained = (await pcbPanel.textContent())?.includes('C_D1: U1 için 100 nF dekuplaj') ?? false;
+    await pcbPanel.getByRole('button', { name: 'Sipariş ayarlarını kopyala' }).click(); await page.waitForTimeout(200);
+    const copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+    await karta.getByRole('button', { name: 'Yalın kart' }).click();
+    await karta.getByRole('button', { name: 'Alt yüz' }).click(); await page.waitForTimeout(300);
+    await shot(page, 'karta-pcb.png');
+    await pcbPanel.getByRole('button', { name: 'Gümrük ve üretici seçenekleri' }).click(); await page.waitForTimeout(150);
+    const notes = (await pcbPanel.textContent()) ?? '';
+    check('Karta aktar (masaüstü, K1–K2): PCB "Üretime hazır", 70 × 51 mm çipi; SİPARİŞTE SEÇ kopyalanıyor; C_D1 çipi seçiliyor ve açıklaması çıkıyor; Gümrük satırı açılıyor',
+      pcbText.includes('19 bağlantının hepsi çizildi') && pcbChip && pressed === 'true' && explained && copied.includes('Yüzey: Kurşunsuz HASL') && notes.includes('30 € muafiyeti yok') && notes.includes('Malzeme listesi KiCad zip’inde'),
+      `${pcbText.slice(0, 40)} · kopya ${copied.split('\n').length} satır`);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+    check('Karta aktar (masaüstü): Esc kapatıyor, 3B sahnesi bırakılıyor', (await page.getByRole('dialog', { name: 'Karta aktar' }).count()) === 0 && (await page.evaluate(() => window.__kart === undefined)));
+    await ctx.close();
+  }
+
   // --- 3B (v3: E1, E3; kullanıcı kararı: denetimler sağ altta) -----------------------------------
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
@@ -677,7 +747,7 @@ try {
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
     const main = await page.locator('main').boundingBox();
     const schemaButton = await page.locator('main').getByRole('button', { name: 'Şema', exact: true }).boundingBox();
-    const options = await Promise.all(['Etiketler', 'Akım', 'Lehim rehberi'].map((n) => page.locator('main').getByRole('button', { name: n, exact: true }).boundingBox()));
+    const options = await Promise.all(['Etiketler', 'Akım', 'Karta aktar'].map((n) => page.locator('main').getByRole('button', { name: n, exact: true }).boundingBox()));
     const mini = await page.getByRole('button', { name: 'Şemaya dön' }).boundingBox();
     const right = main.x + main.width;
     const bottom = main.y + main.height;
@@ -720,7 +790,7 @@ try {
     const labels = await page.locator('[data-anchor="part"]').allTextContents();
     const tag = await page.getByRole('button', { name: 'Etiketler' }).boundingBox();
     const full = await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).boundingBox();
-    check('3B (telefon): etiket yalnızca ölçü aletinde (seçim yokken); Etiketler, Kamera ve Lehim rehberi sağ altta, 44 px',
+    check('3B (telefon): etiket yalnızca ölçü aletinde (seçim yokken); Etiketler, Kamera ve Karta aktar sağ altta, 44 px',
       labels.length === 1 && labels[0].startsWith('A1') && tag !== null && tag.height >= 43.5 && full !== null && Math.abs(tag.y - full.y) < 2 && tag.x < full.x, labels.join(' | '));
     await page.context().close();
   }
@@ -1214,32 +1284,48 @@ try {
     const scrolled = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop);
     check('3B: tek parmakla sürükleyince kamera dönüyor, sayfa kaymıyor', Boolean(before) && before !== after && scrolled === 0, `${before} → ${after}`);
     await shot(page, 'ios-3b.png');
-    // Lehim rehberi: pencere içinde kayar, sayfa kaymaz, düğmeler 44 px, Kapat kapatır.
-    await page.getByRole('button', { name: 'Lehim rehberi' }).tap(); await page.waitForTimeout(500);
-    const guide = page.getByRole('dialog', { name: /Lehim rehberi/ });
-    await guide.waitFor(); // tembel yüklenir
-    const guideButtons = await guide.getByRole('button').evaluateAll((els) => els.map((el) => Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height)));
-    const scroller = guide.locator('div.overflow-y-auto');
-    const sbox = await scroller.boundingBox();
-    await drag(page, cdp, { x: sbox.x + sbox.width / 2, y: sbox.y + sbox.height * 0.8 }, { x: sbox.x + sbox.width / 2, y: sbox.y + sbox.height * 0.2 });
-    const scrolledInside = await scroller.evaluate((el) => el.scrollTop);
-    const pageScroll = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop);
-    await shot(page, 'ios-3b-rehber.png');
-    // PCB (KiCad): rehberin sonundaki düğme zip indirir.
-    const pcbButton = guide.getByRole('button', { name: 'KiCad dosyalarını indir (.zip)' });
-    await pcbButton.scrollIntoViewIfNeeded();
-    const pcbSize = await pcbButton.evaluate((el) => Math.min(el.getBoundingClientRect().width, el.getBoundingClientRect().height));
-    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), pcbButton.tap()]);
-    check('3B: rehberdeki "KiCad dosyalarını indir" düğmesi ≥ 44 px ve zip indiriyor', pcbSize >= 44 && download !== null && download.suggestedFilename().endsWith('-kicad.zip'), `${Math.round(pcbSize)} px, ${download?.suggestedFilename() ?? 'indirme yok'}`);
-    // Yollar çizilince üretim (Gerber) zip'i.
-    await guide.getByText(/bağlantının hepsi çizildi/).waitFor({ timeout: 10000 }).catch(() => {});
-    const fabButton = guide.getByRole('button', { name: 'Üretim dosyalarını indir (Gerber, .zip)' });
-    const [fab] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), fabButton.tap()]);
-    check('3B: kartın yolları çiziliyor, "Üretim dosyalarını indir (Gerber)" zip indiriyor', fab !== null && fab.suggestedFilename().endsWith('-uretim.zip'), fab?.suggestedFilename() ?? 'indirme yok');
-    await guide.getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
-    check('3B: lehim rehberi açılıyor, içi parmakla kayıyor, sayfa kaymıyor, düğmeler ≥ 44 px, Kapat kapatıyor',
-      guideButtons.every((s) => s >= 44) && scrolledInside > 50 && pageScroll === 0 && (await page.getByRole('dialog', { name: /Lehim rehberi/ }).count()) === 0,
-      `kaydırma ${Math.round(scrolledInside)} px, düğmeler ${guideButtons.map((s) => Math.round(s)).join(', ')}`);
+    // Karta aktar (K4, L2): tam ekran sayfa; iki sekme, 3B kart, sabit alt düğmeler; hedefler 44 px.
+    await page.getByRole('button', { name: 'Karta aktar' }).tap();
+    const karta = page.getByRole('dialog', { name: 'Karta aktar' });
+    await karta.waitFor(); // tembel yüklenir
+    await page.waitForFunction(() => window.__kart !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(500);
+    const kartaSmall = async () => karta.evaluate((root) => [...root.querySelectorAll('button, a, [role=tab]')]
+      .map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), w: r.width, h: r.height }; })
+      .filter((r) => r.w > 0 && r.h > 0 && (r.h < 43.5 || r.w < 43.5)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
+    await karta.getByRole('tab', { name: 'Delikli plaket' }).tap(); await page.waitForTimeout(400);
+    const perfSmall = await kartaSmall();
+    const counter0 = (await karta.locator('[aria-label$=". adımı"]').getAttribute('aria-label')) ?? '';
+    await karta.getByRole('button', { name: /^Sonraki/ }).tap(); await page.waitForTimeout(400);
+    const counter1 = (await karta.locator('[aria-label$=". adımı"]').getAttribute('aria-label')) ?? '';
+    const kartaBefore = await page.evaluate(() => window.__kart?.camera.position.toArray().map((v) => v.toFixed(2)).join(','));
+    const kbox = await karta.locator('canvas').boundingBox();
+    await drag(page, cdp, { x: kbox.x + kbox.width * 0.5, y: kbox.y + kbox.height * 0.3 }, { x: kbox.x + kbox.width * 0.8, y: kbox.y + kbox.height * 0.4 });
+    await page.waitForTimeout(400);
+    const kartaAfter = await page.evaluate(() => window.__kart?.camera.position.toArray().map((v) => v.toFixed(2)).join(','));
+    const kartaScroll = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop);
+    const next = await karta.getByRole('button', { name: /^Sonraki/ }).boundingBox();
+    await shot(page, 'ios-karta-plaket.png');
+    check('Karta aktar (telefon, L2): Delikli plaket 3B; Sonraki adımı ilerletiyor; parmakla kart dönüyor, sayfa kaymıyor; Sonraki altta sabit; hedefler ≥ 44 px',
+      perfSmall.length === 0 && /adımın 1\. adımı$/.test(counter0) && /adımın 2\. adımı$/.test(counter1) && Boolean(kartaBefore) && kartaBefore !== kartaAfter && kartaScroll === 0 && next !== null && next.y + next.height > 780,
+      perfSmall.join(', ') || `${counter0} → ${counter1}`);
+    await karta.getByRole('tab', { name: 'Baskı devre (PCB)' }).tap();
+    await karta.getByText('Üretime hazır').waitFor({ timeout: 10000 }).catch(() => {});
+    const pcbSmall = await kartaSmall();
+    await karta.getByRole('button', { name: /^Siparişte seç/ }).tap(); await page.waitForTimeout(200);
+    const specs = (await karta.textContent()) ?? '';
+    await shot(page, 'ios-karta-pcb.png');
+    const [kicad] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), karta.getByRole('button', { name: 'KiCad projesi', exact: true }).tap()]);
+    const [fab] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), karta.getByRole('button', { name: /^Üretim dosyalarını indir/ }).tap()]);
+    check('Karta aktar (telefon, K4): PCB "Üretime hazır"; Siparişte seç açılıyor; KiCad ve Üretim (Gerber) zip indiriyor; hedefler ≥ 44 px',
+      pcbSmall.length === 0 && specs.includes('Kurşunsuz HASL') && kicad !== null && kicad.suggestedFilename().endsWith('-kicad.zip') && fab !== null && fab.suggestedFilename().endsWith('-uretim.zip'),
+      pcbSmall.join(', ') || `${kicad?.suggestedFilename() ?? 'KiCad yok'}, ${fab?.suggestedFilename() ?? 'üretim yok'}`);
+    await karta.getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
+    const closed = (await page.getByRole('dialog', { name: 'Karta aktar' }).count()) === 0;
+    await page.getByRole('button', { name: 'Karta aktar' }).tap();
+    await karta.waitFor(); await page.waitForTimeout(300);
+    const remembered = await karta.getByRole('tab', { name: 'Baskı devre (PCB)' }).getAttribute('aria-selected');
+    await karta.getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
+    check('Karta aktar (telefon): Kapat kapatıyor, yeniden açınca son seçilen sekme (PCB) açılıyor', closed && remembered === 'true' && (await page.getByRole('dialog', { name: 'Karta aktar' }).count()) === 0);
     await group.getByRole('button', { name: 'Şema' }).tap(); await page.waitForTimeout(500);
     check('3B: Şema’ya dönünce tuval geri geliyor, 3B sahnesi kapanıyor', (await page.locator('svg.schematic').count()) === 1 && (await page.evaluate(() => window.__tezgah === undefined)));
     await page.context().close();

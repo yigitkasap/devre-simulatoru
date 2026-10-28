@@ -111,12 +111,14 @@ function FileMenu({
   onExport,
   onImport,
   onShare,
+  onKarta,
   title,
 }: {
   onNew: () => void;
   onExport: () => void;
   onImport: () => void;
   onShare: () => void;
+  onKarta: () => void;
   /** Tablet: düğmede "Dosya" yerine devrenin adı (44 px). */
   title?: string;
 }) {
@@ -131,7 +133,8 @@ function FileMenu({
     { icon: 'fileNew', label: tr.file.newCircuit, note: tr.file.newCircuitNote, action: onNew, divider: true },
     { icon: 'download', label: tr.file.exportJson, note: tr.file.exportNote, action: onExport },
     { icon: 'upload', label: tr.file.importJson, note: tr.file.importNote, action: onImport },
-    { icon: 'share', label: tr.file.share, note: tr.file.shareNote, action: onShare },
+    { icon: 'share', label: tr.file.share, note: tr.file.shareNote, action: onShare, divider: true },
+    { icon: 'board', label: tr.karta.open, note: tr.karta.fileNote, action: onKarta },
   ];
   return (
     <div ref={rootRef} className="relative shrink-0">
@@ -422,6 +425,7 @@ export interface DeskTopBarProps {
   readonly onExport: () => void;
   readonly onImport: () => void;
   readonly onShare: () => void;
+  readonly onKarta: () => void;
   readonly onExamples: () => void;
   readonly onHelp: () => void;
   readonly onWelcome: () => void;
@@ -460,7 +464,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
     <header className="flex h-[60px] shrink-0 items-center gap-2 border-b border-line bg-panel pr-3 pl-4">
       <Logo />
       <h1 className="sr-only">{tr.site.name}</h1>
-      <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
+      <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} onKarta={props.onKarta} />
       <button type="button" onClick={props.onExamples} className={`flex shrink-0 items-center rounded-md px-3 text-sm font-medium text-ink hover:bg-app ${touch ? 'h-11' : 'h-10'}`}>
         {tr.examples.button}
       </button>
