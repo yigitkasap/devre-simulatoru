@@ -653,17 +653,23 @@ try {
   const infoBox = await info.boundingBox();
   const canvas = await dp.locator('svg.schematic').boundingBox();
   check('masaüstü: fareyle gelinen parça kütüphanenin bilgi alanında anlatılıyor', infoText.includes('Kondansatör') && infoText.includes('Yük depolar') && infoBox !== null && infoBox.x + infoBox.width <= canvas.x + 1, infoText.slice(0, 40));
-  const strip = await dp.locator('main + div').first().boundingBox();
-  check('masaüstü: ipucu şeridi tuvalin altında, üstüne binmiyor', strip !== null && strip.y >= canvas.y + canvas.height - 1 && strip.height <= 30, strip ? `y ${Math.round(strip.y)} · tuval altı ${Math.round(canvas.y + canvas.height)}` : 'yok');
+  // v3: alt simülasyon çubuğu ve ipucu şeridi yok; tuval alta kadar, görünüm düğmeleri sağ altında.
+  const view = await dp.getByRole('group', { name: 'Görünüm' }).boundingBox();
+  check('masaüstü (v3): alt çubuk yok, tuval alta iniyor; görünüm düğmeleri tuvalin sağ altında',
+    canvas.y + canvas.height >= 899 && view !== null && view.x + view.width <= canvas.x + canvas.width && view.y + view.height >= canvas.y + canvas.height - 24,
+    view ? `tuval altı ${Math.round(canvas.y + canvas.height)} · düğmeler ${Math.round(view.x)},${Math.round(view.y)}` : 'yok');
+  // Hız yalnızca çalışırken üst çubukta.
+  await dp.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await dp.waitForTimeout(300);
   await dp.getByRole('button', { name: /^Hız/ }).click(); await dp.waitForTimeout(200);
   await dp.getByRole('radio', { name: /Ağır çekim/ }).click(); await dp.waitForTimeout(200);
   const speedText = (await dp.getByRole('button', { name: /^Hız/ }).textContent()) ?? '';
-  check('masaüstü: hız penceresinde "Ağır çekim" ×10⁻⁶ yapıyor', speedText.includes('10⁻⁶') && speedText.includes('1 µs'), speedText);
+  check('masaüstü: hız penceresinde "Ağır çekim" ×10⁻⁶ yapıyor', speedText.includes('10⁻⁶'), speedText);
   await dp.keyboard.press('Escape'); await dp.waitForTimeout(100);
   check('masaüstü: hız penceresi Esc ile kapanıyor', (await dp.getByRole('dialog', { name: 'Simülasyon hızı' }).count()) === 0);
   // Hızı gerçek zamana geri al (aşağıdaki denetimler için).
   await dp.getByRole('button', { name: /^Hız/ }).click(); await dp.getByRole('radio', { name: /Gerçek zaman/ }).click();
   await dp.keyboard.press('Escape');
+  await dp.getByRole('button', { name: 'Durdur', exact: true }).click(); await dp.waitForTimeout(200);
 
   // --- Masaüstü: İnceleme paneli (İncele, Örnek, Mesajlar) ----------------------------
   await dp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await dp.waitForTimeout(200);
@@ -671,8 +677,6 @@ try {
   const exampleTab = await dp.getByRole('tab', { name: 'Örnek' }).getAttribute('aria-selected');
   const exampleText = (await dp.getByRole('tabpanel').textContent()) ?? '';
   check('masaüstü: örnek açılınca Örnek sekmesi "Ne işe yarar?" ve "Günlük hayatta" ile açılıyor, soru yok', exampleTab === 'true' && exampleText.includes('Ne işe yarar?') && exampleText.includes('Günlük hayatta') && !exampleText.includes('Tahmin'));
-  const stripText = (await dp.locator('main + div').first().textContent()) ?? '';
-  check('masaüstü: ipucu şeridi örnek yönlendirmesini gösteriyor', stripText.includes('Örnek açık'), stripText.slice(0, 40));
   const deskR1 = await part(dp, 'R1');
   const r1At = await screen(dp, deskR1.x, deskR1.y);
   await dp.mouse.dblclick(r1At.x, r1At.y); await dp.waitForTimeout(250);
@@ -693,8 +697,7 @@ try {
   check('masaüstü: defterde açık kartta canlı ölçüm görünüyor', live.includes('Canlı uygulanır') && /Akım\s*[\d,]+\s*mA/.test(live), live.slice(0, 60));
   await dp.getByRole('tab', { name: 'Örnek' }).click(); await dp.waitForTimeout(150);
   const after = (await dp.getByRole('tabpanel').textContent()) ?? '';
-  const stripAfter = (await dp.locator('main + div').first().textContent()) ?? '';
-  check('masaüstü: Oynat’tan sonra Örnek sekmesi aynı açıklamayı gösteriyor, şeritteki örnek yönlendirmesi kalkıyor', after.includes('Ne işe yarar?') && !stripAfter.includes('Örnek açık'), stripAfter.slice(0, 40));
+  check('masaüstü: Oynat’tan sonra Örnek sekmesi aynı açıklamayı gösteriyor', after.includes('Ne işe yarar?'), after.slice(0, 40));
   await desk.close();
 
   // --- Masaüstü: cihaz rafı ve Ölç düzeni ------------------------------------------------
@@ -849,11 +852,13 @@ try {
       listHeights.add(Math.round((await fp.locator('nav[aria-label] ').filter({ has: fp.locator('li') }).first().boundingBox())?.height ?? 0));
     }
     check('masaüstü: parçaların üzerine gelince kütüphane listesi ve bilgi kutusu boy değiştirmez', listHeights.size === 1, [...listHeights].join(','));
+    // Hız düğmesi yalnızca çalışırken (v3).
+    await fp.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await fp.waitForTimeout(300);
     await fp.getByRole('button', { name: /^Hız/ }).first().click(); await fp.waitForTimeout(200);
     const dialog = fp.getByRole('dialog', { name: /hız/i }).first();
     const heights = new Set();
     for (const v of ['0.00', '1.37', '2.50', '3.91', '5.20', '6.00']) {
-      await fp.locator('input[type=range]').first().evaluate((el, value) => {
+      await dialog.locator('input[type=range]').first().evaluate((el, value) => {
         Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, value);
         el.dispatchEvent(new Event('input', { bubbles: true }));
       }, v);
@@ -901,8 +906,10 @@ try {
   await cp.getByRole('button', { name: 'Parça kütüphanesini aç' }).click(); await cp.waitForTimeout(200);
   await cp.getByRole('button', { name: 'Kondansatör', exact: true }).click(); await cp.waitForTimeout(200);
   const flyoutClosed = (await cp.getByRole('button', { name: 'Kondansatör', exact: true }).count()) === 0;
-  const placeHint = (await cp.locator('main + div').first().textContent().catch(() => '')) ?? '';
-  check('1100 px: açılır karttan parça seçilince kart kapanıyor, yerleştirme başlıyor', flyoutClosed && placeHint.includes('Kondansatör:'), placeHint.slice(0, 40));
+  const cbox = await cp.locator('svg.schematic').boundingBox();
+  await cp.mouse.click(cbox.x + cbox.width / 2, cbox.y + cbox.height / 2); await cp.waitForTimeout(200);
+  const placed = (await doc(cp)).parts.some((p) => p.type === 'capacitor');
+  check('1100 px: açılır karttan parça seçilince kart kapanıyor, tuvale tıklayınca ekleniyor', flyoutClosed && placed);
   await compact.close();
 
   // --- Tam ekran (masaüstü, tablet): tarayıcı tam ekranı, yalnızca devre şeması -------------

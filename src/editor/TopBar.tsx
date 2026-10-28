@@ -14,6 +14,8 @@ import type { FocusPanels } from './fullscreen';
 import { Kbd } from './HintStrip';
 import { Icon, type IconName } from './icons';
 import type { Settings } from './settings';
+import { SpeedOptions, speedLabel, StatusMark } from './SimBar';
+import type { SimStatus } from './useSimulation';
 
 /** Kare simge düğmesi (36 px; telefonda 40 px). */
 export function ToolButton({
@@ -699,6 +701,161 @@ export function SettingsFields({
               {tr.settings.shortcuts}
             </button>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Masaüstü üst çubuğu (v3, "Defter") -------------------------------------------------------
+
+export interface DeskTopBarProps {
+  /** Devrenin adı (açık örneğin adı, yoksa "Devrem"); yanındaki ok Dosya menüsünü açar. */
+  readonly title: string;
+  readonly status: SimStatus;
+  readonly time: number;
+  readonly speed: number;
+  /** Simülasyon istenen hıza yetişemiyor. */
+  readonly lagging: boolean;
+  readonly scopeSpeed: number | null;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  readonly saveState: SaveState;
+  readonly settings: Settings;
+  readonly onSettings: (patch: Partial<Settings>) => void;
+  readonly onUndo: () => void;
+  readonly onRedo: () => void;
+  readonly onPlay: () => void;
+  readonly onPause: () => void;
+  readonly onStop: () => void;
+  readonly onSpeed: (speed: number) => void;
+  readonly fullscreen: FullscreenControls;
+  readonly onNew: () => void;
+  readonly onExport: () => void;
+  readonly onImport: () => void;
+  readonly onShare: () => void;
+  readonly onExamples: () => void;
+  readonly onHelp: () => void;
+  readonly onWelcome: () => void;
+}
+
+/**
+ * Masaüstü üst çubuğu (tasarım v3: D1–D3, 60 px): logo, devrenin adı ▾ (Dosya), Örnekler; sağda Geri al
+ * (Kur kipinde İleri al ve kayıt durumu da), Yardım, Ayarlar; çalışırken durum ve süre, Hız; ana düğme:
+ * Kur kipinde yeşil Oynat, çalışırken koyu Duraklat ve yanında Durdur.
+ */
+export function DeskTopBar(props: DeskTopBarProps) {
+  const { status } = props;
+  const active = status !== 'stopped';
+  const running = status === 'running';
+  const icon = (name: IconName, label: string, onClick: () => void, disabled = false) => (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink enabled:hover:bg-app disabled:text-stopped"
+    >
+      <Icon name={name} />
+    </button>
+  );
+  return (
+    <header className="flex h-[60px] shrink-0 items-center gap-2 border-b border-line bg-panel pr-3 pl-4">
+      {props.fullscreen.on && (
+        <PanelToggle side="left" label={tr.toolbar.libraryPanel} open={props.fullscreen.panels.left} onPanel={props.fullscreen.onPanel} />
+      )}
+      <Logo />
+      <h1 className="sr-only">{tr.site.name}</h1>
+      <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} />
+      <button type="button" onClick={props.onExamples} className="flex h-10 shrink-0 items-center rounded-md px-3 text-sm font-medium text-ink hover:bg-app">
+        {tr.examples.button}
+      </button>
+      <span className="flex-1" />
+      {!active && <SaveStatus state={props.saveState} />}
+      {icon('undo', tr.toolbar.undo, props.onUndo, !props.canUndo)}
+      {!active && icon('redo', tr.toolbar.redo, props.onRedo, !props.canRedo)}
+      {icon('help', tr.help.open, props.onHelp)}
+      <SettingsMenu settings={props.settings} onChange={props.onSettings} onWelcome={props.onWelcome} onShortcuts={props.onHelp} />
+      <span className="mx-1.5 h-7 w-px shrink-0 bg-line" aria-hidden="true" />
+      <div role="region" aria-label={tr.sim.region} className="flex shrink-0 items-center gap-2">
+        {active && (
+          <>
+            <span role="status" className="flex shrink-0 items-center gap-2 pr-1 text-small" title={props.lagging ? tr.sim.lagging : tr.sim.status[status]}>
+              <StatusMark status={status} />
+              <span className="sr-only">{tr.sim.status[status]}</span>
+              <span className="inline-block min-w-[8ch] font-mono tabular">{formatSI(props.time, 's', { digits: 4 })}</span>
+              {props.lagging && <Icon name="info" className="h-4 w-4 text-warn" />}
+            </span>
+            <SpeedButton speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} />
+          </>
+        )}
+        {running ? (
+          <button
+            type="button"
+            data-tour="play"
+            onClick={props.onPause}
+            className="flex h-[42px] shrink-0 items-center gap-2 rounded-[10px] bg-ink pr-4 pl-3 text-sm font-semibold text-white hover:brightness-125"
+          >
+            <Icon name="pause" />
+            {tr.sim.pause}
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-tour="play"
+            onClick={props.onPlay}
+            className="flex h-[42px] shrink-0 items-center gap-2 rounded-[10px] bg-ok pr-[18px] pl-3.5 text-[15px] font-semibold text-white hover:brightness-110"
+          >
+            <Icon name="play" />
+            {tr.sim.play}
+          </button>
+        )}
+        {active && (
+          <button
+            type="button"
+            onClick={props.onStop}
+            aria-label={tr.sim.stop}
+            title={tr.sim.stopTitle}
+            className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[10px] border border-line-2 text-ink hover:bg-app"
+          >
+            <Icon name="stop" />
+          </button>
+        )}
+      </div>
+      {props.fullscreen.on && (
+        <PanelToggle side="right" label={tr.toolbar.inspectorPanel} open={props.fullscreen.panels.right} onPanel={props.fullscreen.onPanel} />
+      )}
+    </header>
+  );
+}
+
+/** Üst çubuktaki Hız düğmesi ve aşağı açılan hız penceresi. */
+function SpeedButton({ speed, scopeSpeed, onSpeed }: { speed: number; scopeSpeed: number | null; onSpeed: (speed: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useDismiss(open, setOpen);
+  const groupRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const radios = groupRef.current?.querySelectorAll<HTMLElement>('[role=radio]');
+    (groupRef.current?.querySelector<HTMLElement>('[aria-checked=true]') ?? radios?.[0])?.focus();
+  }, [open]);
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        title={tr.sim.speedTitle}
+        className={`flex h-10 items-center gap-1.5 rounded-[10px] border border-line px-2.5 text-small ${open ? 'bg-accent-soft' : 'hover:bg-app'}`}
+      >
+        {tr.sim.speed}
+        <span className="font-mono font-semibold">{speedLabel(speed)}</span>
+      </button>
+      {open && (
+        <div role="dialog" aria-label={tr.sim.speedDialog} className="absolute top-12 right-0 z-[60] w-[300px] rounded-lg border border-line bg-panel p-1.5 shadow-md">
+          <SpeedOptions speed={speed} scopeSpeed={scopeSpeed} onSpeed={onSpeed} groupRef={groupRef} />
         </div>
       )}
     </div>

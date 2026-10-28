@@ -49,6 +49,7 @@ import {
 import { BurnBalloon, ContextMenu, ZeroMark, type MenuItem } from './CanvasOverlays';
 import { ANION_COLOR, CATION_COLOR } from './ions';
 import { FIELD_COLOR, MagneticField } from './MagneticField';
+import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
@@ -173,6 +174,11 @@ export interface CanvasProps {
   readonly keepVisible?: readonly string[];
   /** Telefon düzeni; masaüstünde ve tablette null. */
   readonly phone?: PhoneCanvas | null;
+  /**
+   * Masaüstü (v3): kablo çekerken bırakılabilecek uç vurgulanıp adıyla etiketlenir, ipucu sol altta
+   * ("Uca bırak: bağla · Esc vazgeç"); üstteki "Kablo çiziliyor" çipi yok.
+   */
+  readonly desk?: boolean;
   /** Tuvalin üstünde kaydırılabilir bir katman açık (çekmece, pencere): tuval dokunmayı tutmasın. */
   readonly overlayOpen: boolean;
   /** İpucu ya da yakınlık değişince çağrılır. */
@@ -300,6 +306,7 @@ export function Canvas({
   fitRequest,
   keepVisible,
   phone = null,
+  desk = false,
   overlayOpen,
   onStatusChange,
   onPartPlaced,
@@ -1383,10 +1390,17 @@ export function Canvas({
   };
 
   let wiringPreview: Point[] | null = null;
+  /** Kablo çekerken imlecin altındaki uç (masaüstü: vurgu ve ad etiketi). */
+  let dropPin: { pos: Point; name: string } | null = null;
   if (interaction.kind === 'wiring') {
     const last = interaction.points[interaction.points.length - 1]!;
     const target = cursor ? wireTarget(cursor).point : last;
     wiringPreview = [...interaction.points, ...routeL(last, target, horizontalFirst(interaction.points, target))];
+    const hit = desk && cursor ? hitTest(cursor, { parts: false }) : null;
+    if (hit?.kind === 'pin') {
+      const part = doc.parts.find((p) => p.id === hit.partId);
+      if (part) dropPin = { pos: hit.pos, name: tr.devices.pinShort[part.type][hit.index] ?? '' };
+    }
   }
 
   const ghostType: DeviceType | null = tool.kind === 'place' ? tool.type : dropGhost ? libraryDragType : null;
@@ -1752,6 +1766,12 @@ export function Canvas({
               fill="var(--color-select)"
             />
           )}
+          {dropPin && (
+            <g pointerEvents="none">
+              <circle cx={dropPin.pos.x * GRID} cy={dropPin.pos.y * GRID} r={9} fill="var(--color-accent-soft)" stroke="var(--color-select)" strokeWidth={2} />
+              <circle cx={dropPin.pos.x * GRID} cy={dropPin.pos.y * GRID} r={3} fill="var(--color-select)" />
+            </g>
+          )}
           {wiringPreview && (
             <polyline
               points={wiringPreview.map((p) => `${p.x * GRID},${p.y * GRID}`).join(' ')}
@@ -1917,7 +1937,24 @@ export function Canvas({
         </>
       )}
 
-      {interaction.kind === 'wiring' && (
+      {dropPin?.name && (
+        <span
+          className="pointer-events-none absolute z-20 rounded-[5px] bg-accent px-2 py-0.5 font-mono text-label text-white"
+          style={{ left: dropPin.pos.x * GRID * view.scale + view.x + 14, top: dropPin.pos.y * GRID * view.scale + view.y - 30 }}
+        >
+          {dropPin.name}
+        </span>
+      )}
+      {interaction.kind === 'wiring' && desk && (
+        <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-[10px] border border-line bg-panel px-3 py-2 text-small text-ink-2">
+          {tr.canvas.dropHint}
+          <span className="text-line-2" aria-hidden="true">
+            ·
+          </span>
+          <Kbd size="sm">Esc</Kbd> {tr.canvas.escCancel}
+        </div>
+      )}
+      {interaction.kind === 'wiring' && !desk && (
         <div className="absolute top-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-panel/95 py-1 pr-1 pl-3 text-xs shadow-md">
           <span className="text-muted">{tr.canvas.wiringActive}</span>
           <button

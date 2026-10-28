@@ -1282,6 +1282,8 @@ export const tr = {
     emptyMobile: 'Parça eklemek için alttaki **Parça** düğmesine dokun.',
     wiringActive: 'Kablo çiziliyor: bir pine ya da kabloya dokun',
     cancelWire: 'İptal',
+    dropHint: 'Uca bırak: bağla',
+    escCancel: 'vazgeç',
   },
   sim: {
     play: 'Oynat',

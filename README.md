@@ -1762,3 +1762,24 @@ zip verir: üreticiye doğrudan yüklenen **üretim zip'i** (`devre-<tarih>-uret
 
 PCB araştırması ve sonraki aşamalar: `docs/pcb/arastirma.md`.
 
+
+### Arayüz v3: "Defter" düzeni (2026-10-28, sürüyor)
+
+Brif ve çizimler `docs/tasarim-v3/` (önerilen sıradaki 9 adım; motor, model, örnekler ve 3B
+modellerin görünüşü değişmez). Yapılanlar ve kararlar:
+
+1. **Defter** (`src/editor/Notebook.tsx`, `notebookOrder.ts`): sağdaki panelde her parça bir kart;
+   açık kart seçimle aynı şey. Sıra: önce laboratuvar cihazları ve Arduino, sonra etiket sırası;
+   aynı türden 3+ parça tek satırda. 20'den fazla parçalı devrelerde de aynı kural (açık soruya
+   karar: yeni başlık ya da arama kutusu eklenmez; gruplama listeyi kısaltır, kapalı başlar).
+   Kapalı kartların ölçümleri 250 ms'de bir güncellenir. İzleme (salınan değerlerin kararlı
+   gösterimi) pahalıdır: bütün parçalar izlenince 3B baraj örneği 115 → 26 fps. Bu yüzden zamanla
+   değişen kaynağı olan devrede yalnızca kaynaklar, LED'ler, ölçü aletleri ve seçim izlenir (öbür
+   kapalı kartlar değerini gösterir); DC devrede kapalı kartlar anlık değeri izlemeden gösterir.
+2. **Masaüstü kabuğu**: 60 px üst çubuk (`DeskTopBar`: devrenin adı ▾ Dosya, Örnekler; Geri al,
+   Kur kipinde İleri al ve kayıt durumu, Yardım, Ayarlar; çalışırken durum ve süre, Hız; Oynat ya da
+   Duraklat + Durdur). Alt simülasyon çubuğu ve ipucu şeridi kalktı; elektron akışı Ayarlar'da.
+   Tuvalin sağ altında uzaklaştır, yakınlaştır, sığdır, tam ekran ve 3B (`CanvasControls.tsx`).
+   Kablo aracı düğmesi kalktı (W kısayolu ve uçtan sürükleme duruyor); sürüklerken bırakılacak uç
+   vurgulanıp adıyla etiketlenir, sol altta "Uca bırak: bağla · Esc vazgeç". Parça kütüphanesi ve
+   cihaz rafı, yerlerini alan adımlara (4: parça ekleme satırı, 5: cihaz kartları) kadar durur.

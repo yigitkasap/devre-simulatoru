@@ -178,7 +178,7 @@ function SimButton({
 }
 
 /** Durum işareti: renk tek başına okunmasın diye biçimi de değişir (daire · iki çubuk · kare). */
-function StatusMark({ status }: { status: SimStatus }) {
+export function StatusMark({ status }: { status: SimStatus }) {
   if (status === 'running') return <i className="block h-2.5 w-2.5 rounded-full bg-ok" aria-hidden="true" />;
   if (status === 'paused')
     return (

@@ -10,7 +10,7 @@ import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
-import { nextRotation, pinPositions } from '../model/geometry';
+import { pinPositions } from '../model/geometry';
 import { docFromHash, shareUrl } from '../model/share';
 import { CATALOG } from '../model/catalog';
 import { emptyDoc, type CircuitDoc } from '../model/types';
@@ -21,7 +21,7 @@ import { formatSI } from '../sim/units';
 import { loadSavedDoc, useAutosave } from './autosave';
 import { BottomSheet, SheetBody, SheetHeader, type SheetSize } from './BottomSheet';
 import { BenchView, ViewToggle, useViewMode } from './BenchView';
-import { Canvas, type CanvasHandle, type CanvasStatus, type ConnectStart, type Highlight, type PhoneCanvas } from './Canvas';
+import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type PhoneCanvas } from './Canvas';
 import { DeviceRack, type RackLayout } from './DeviceRack';
 import { ExamplesDialog } from './ExamplesDialog';
 import { ExampleTab } from './ExampleTab';
@@ -31,7 +31,6 @@ import { Inspector, type InspectorTab } from './Inspector';
 import { InspectTab, type PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { useFocusMode } from './fullscreen';
-import { HintStrip, type StripHint } from './HintStrip';
 import { Library, LibraryFlyout, type LibraryMode } from './Library';
 import {
   earthTrapItem,
@@ -55,13 +54,14 @@ import { useRecentParts } from './recentParts';
 import { autoSettings } from './scopeView';
 import { useSettings } from './settings';
 import { ShareDialog } from './ShareDialog';
-import { SimBar, SpeedOptions, speedLabel } from './SimBar';
+import { SpeedOptions, speedLabel } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { Toast, useToast } from './Toast';
 import { TabletBar, TabletPartsCard, TabletRail } from './TabletChrome';
-import { TabletTopBar, TopBar } from './TopBar';
+import { DeskTopBar, TabletTopBar } from './TopBar';
 import { TouchUi } from './touchUi';
 import { useCoarsePointer } from './useCoarsePointer';
+import { CanvasControls } from './CanvasControls';
 import { Notebook } from './Notebook';
 import { useLayout } from './useLayout';
 import { useSimulation } from './useSimulation';
@@ -138,7 +138,6 @@ export default function Simulator() {
   const [libraryDragType, setLibraryDragType] = useState<DeviceType | null>(null);
   const [hoveredType, setHoveredType] = useState<DeviceType | null>(null);
   const [lastInfoType, setLastInfoType] = useState<DeviceType>('battery');
-  const [canvasStatus, setCanvasStatus] = useState<CanvasStatus>({ hint: { kind: 'select' }, scale: 1 });
   const [inspectorTab, setInspectorTab] = useState<InspectorTab>('inspect');
   /** Artınca İncele sekmesindeki (telefonda parça sayfasındaki) ilk değer alanına odaklanılır. */
   const [focusRequest, setFocusRequest] = useState(0);
@@ -320,10 +319,6 @@ export default function Simulator() {
   };
   const flipSelection = (ids: readonly string[]) => {
     if (ids.length > 0) dispatch({ type: 'commit', doc: flipParts(doc, new Set(ids)) });
-  };
-  const rotate = () => {
-    if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
-    else rotateSelection(selection.parts);
   };
   /** Seçili öğeleri siler; bildirimde Geri al (P00: "Geri al her silme bildiriminde"). */
   const deleteSelection = () => {
@@ -591,18 +586,7 @@ export default function Simulator() {
       slideBefore.current = null;
     }
   };
-  const idleHint = canvasStatus.hint.kind === 'select' || canvasStatus.hint.kind === 'empty' || canvasStatus.hint.kind === 'simulating';
   const summary = tr.messages.summary(errorCount, warningCount);
-  const stripHint: StripHint =
-    sim.notice?.kind === 'error' && idleHint
-      ? { kind: 'issues', text: tr.messages.stripBlocked(summary), tone: 'error' }
-      : sim.status !== 'stopped' && runtimeIssues && idleHint
-        ? { kind: 'issues', text: tr.messages.stripRuntime(summary), tone: errorCount > 0 ? 'error' : 'warn' }
-        : measureLayout && idleHint
-          ? { kind: 'measure' }
-          : activeExample && !examplePlayed && idleHint && canvasStatus.hint.kind !== 'simulating'
-            ? { kind: 'example' }
-            : canvasStatus.hint;
 
   // --- Osiloskop -------------------------------------------------------------------------
   // "Osiloskoba göre" hızının osiloskobu: seçili osiloskop, yoksa son seçilen, o da yoksa ilki.
@@ -915,7 +899,7 @@ export default function Simulator() {
           : null
       }
       overlayOpen={overlayOpen}
-      onStatusChange={setCanvasStatus}
+      desk={!phone && !tablet}
       onPartPlaced={rememberPart}
       onExamples={() => setExamplesOpen(true)}
       issues={issues}
@@ -952,7 +936,7 @@ export default function Simulator() {
       ) : (
         schematic
       )}
-      <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} phone={phone} />
+      {(phone || tablet || viewMode === 'bench') && <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} phone={phone} />}
     </>
   );
 
@@ -1674,26 +1658,24 @@ export default function Simulator() {
     <div className="app-root flex flex-col overflow-hidden">
 
       {skipLink}
-      <TopBar
-        toolKind={tool.kind}
+      <DeskTopBar
+        title={circuitTitle}
+        status={sim.status}
+        time={sim.frame?.time ?? 0}
+        speed={sim.speed}
+        lagging={sim.frame?.lagging ?? false}
+        scopeSpeed={scopeSpeed}
         canUndo={state.past.length > 0}
         canRedo={state.future.length > 0}
-        hasSelection={hasSelection}
-        canFlip={canFlip}
-        zoom={canvasStatus.scale}
         saveState={saveState}
         settings={settings}
         onSettings={updateSettings}
-        onSelectTool={() => dispatch({ type: 'set-tool', tool: { kind: 'select' } })}
-        onWireTool={() => dispatch({ type: 'set-tool', tool: tool.kind === 'wire' ? { kind: 'select' } : { kind: 'wire' } })}
-        onRotate={rotate}
-        onFlip={() => flipSelection(selection.parts)}
-        onDelete={deleteSelection}
         onUndo={() => dispatch({ type: 'undo' })}
         onRedo={() => dispatch({ type: 'redo' })}
-        onZoomIn={() => canvasRef.current?.zoomIn()}
-        onZoomOut={() => canvasRef.current?.zoomOut()}
-        onFit={() => canvasRef.current?.fit()}
+        onPlay={sim.play}
+        onPause={sim.pause}
+        onStop={sim.stop}
+        onSpeed={sim.setSpeed}
         fullscreen={fullscreenControls}
         onNew={() => loadDoc(emptyDoc(), tr.file.newDone)}
         onExport={() => downloadDoc(doc)}
@@ -1711,8 +1693,17 @@ export default function Simulator() {
           <main className="relative min-h-0 flex-1">
             {showFlyout && <LibraryFlyout {...libraryProps} />}
             {canvas}
+            {viewMode === 'schematic' && (
+              <CanvasControls
+                onZoomOut={() => canvasRef.current?.zoomOut()}
+                onZoomIn={() => canvasRef.current?.zoomIn()}
+                onFit={() => canvasRef.current?.fit()}
+                fullscreen={fullscreenControls.on}
+                onFullscreen={fullscreenControls.onToggle}
+                on3d={() => setViewMode('bench')}
+              />
+            )}
           </main>
-          <HintStrip hint={stripHint} />
           {showRack && (
             <DeviceRack
               devices={instruments}
@@ -1745,21 +1736,6 @@ export default function Simulator() {
             />
           )}
 
-          <SimBar
-            status={sim.status}
-            time={sim.frame?.time ?? 0}
-            speed={sim.speed}
-            notice={sim.notice}
-            lagging={sim.frame?.lagging ?? false}
-            electronFlow={settings.electronFlow}
-            diagnosticContext={diagnosticContext}
-            scopeSpeed={scopeSpeed}
-            onPlay={sim.play}
-            onPause={sim.pause}
-            onStop={sim.stop}
-            onSpeed={sim.setSpeed}
-            onElectronFlow={(on) => updateSettings({ electronFlow: on })}
-          />
         </div>
         {focus.panels.right && (
           <Inspector
