@@ -346,7 +346,13 @@ export function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wir
   // Telefonda silme alt çubukta (Ölç kipinde yapı kilitli).
   const touch = useTouchUi();
   const voltage = frame?.wireVoltages.get(wireId);
-  const spoken = useThrottledText(voltage === undefined ? '' : `${tr.inspector.wireVoltage} ${formatSI(voltage, 'V')}`);
+  // Salınan gerilim: pencerenin ortalaması büyük, uçları altında (anlık değer her karede zıplar).
+  const summary = frame?.wireSummaries.get(wireId);
+  const range = summary?.varying ? summary : null;
+  const shown = range ? `≈ ${formatSI(range.mean, 'V')}` : voltage === undefined ? '' : formatSI(voltage, 'V');
+  const spoken = useThrottledText(
+    shown === '' ? '' : `${tr.inspector.wireVoltage} ${shown}${range ? `, ${tr.inspector.wireLowest} ${formatSI(range.min, 'V')}, ${tr.inspector.wireHighest} ${formatSI(range.max, 'V')}` : ''}`,
+  );
   return (
     <>
       <header className="flex items-center gap-2.5">
@@ -372,14 +378,30 @@ export function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wir
         </p>
         <SectionTitle>{tr.inspector.live}</SectionTitle>
         <div className="flex flex-col gap-0.5 rounded-[10px] border border-line px-3 py-2.5">
-          <span className="text-label text-muted">{tr.inspector.wireVoltage}</span>
-          {voltage === undefined ? (
-            <span className="font-mono text-[22px] leading-7 text-stopped">– – – V</span>
-          ) : (
-            <BigValue value={formatSI(voltage, 'V')} size="lg" />
+          <span className="text-label text-muted">
+            {tr.inspector.wireVoltage}
+            {range && ` · ${tr.inspector.wireAverage}`}
+          </span>
+          {shown === '' ? <span className="font-mono text-[22px] leading-7 text-stopped">– – – V</span> : <BigValue value={shown} size="lg" />}
+          {range && (
+            <dl className="mt-1.5 grid grid-cols-2 gap-2 border-t border-line pt-2">
+              {(
+                [
+                  [tr.inspector.wireLowest, range.min],
+                  [tr.inspector.wireHighest, range.max],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="flex flex-col gap-0.5">
+                  <dt className="text-label text-muted">{label}</dt>
+                  <dd className="m-0">
+                    <BigValue value={formatSI(value, 'V')} size="md" />
+                  </dd>
+                </div>
+              ))}
+            </dl>
           )}
         </div>
-        <p className="text-small text-muted">{tr.inspector.wireHint}</p>
+        <p className="text-small text-muted">{range ? tr.inspector.wireVarying : tr.inspector.wireHint}</p>
       </section>
     </>
   );

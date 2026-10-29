@@ -1597,6 +1597,14 @@ karşılaştırıldı; bulunan hatalar düzeltildi (testler: `tests/ngspice-kars
   (`stableValue`). Gerilim ve akımın etkin değeri yalnızca ağırlıkla tek kutuplu değerde
   (|ortalama| ≥ 0,2 × etkin) ortalamanın işaretini alır; simetriğe yakın AC işaretsizdir (diyotlu
   yükte ortalama hafif negatif olduğu için "≈ −3,46 V" yazıyordu).
+  Aynı gün: tuvaldeki düğüm gerilimi etiketleri ve kablo seçiliyken panel AC devrede karenin
+  ortalamasını gösteriyordu; bir kare (1/60 s) tam sayıda periyot içermediği için kareden kareye
+  oynuyordu (1N4001 X-Y örneğinde −1,19 … −1,52 V). Artık 0,4 s'lik pencere (`NodeWindow`):
+  salınan gerilim "≈ ortalama" (etikette ve panelde), panelde altında pencerenin en düşük ve en
+  yüksek değeri; sabit ya da tek yönde değişen gerilim canlı. Uçlar motordan, her kabul edilen
+  adımda (`voltageRangeAt`; yalnızca sayaç, fiziğe etkisi yok); AC kaynaksız devrede (hızlı 555)
+  karede bir anlık değerden. Osiloskobun ekran altı ölçümleri (tepe-tepe, etkin, frekans) da
+  pencere boyunca sabit (son hane karede bir titriyordu); iz her karede güncellenir.
 
 Kalan dört fark da ele alındı (2026-10-27; testler `tests/ngspice-karsilastirma.test.ts`,
 `tests/gummel-poon.test.ts`, `tests/dc-homotopi.test.ts`; kıyas `scripts/tarama/qrr.tarama.ts`):

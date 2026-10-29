@@ -1095,8 +1095,31 @@ try {
     fgOuts.push(((await fgRegion.textContent()) ?? '').match(/Çıkış \(OUT − COM\) ([^·]+)·/)?.[1]?.trim() ?? '');
     await rp.waitForTimeout(100);
   }
+  // ≈ 1 s'lik okumada pencere (0,4 s) en çok üç kez yenilenir; düzeltmeden önce her okuma farklıydı.
+  const changes = (texts) => texts.filter((t, i) => i > 0 && t !== texts[i - 1]).length;
   check('masaüstü: çalışırken üreteç kartında çıkış "≈ etkin değer" (her karede zıplamıyor, simetrik AC işaretsiz)',
-    fgOuts.every((t) => /^≈ \d/.test(t)) && new Set(fgOuts).size <= 2, fgOuts.join(' | '));
+    fgOuts.every((t) => /^≈ \d/.test(t)) && changes(fgOuts) <= 3, fgOuts.join(' | '));
+  // Salınan bir kablo seçilince panelde pencerenin ortalaması (≈), en düşük ve en yüksek değer; değer karede bir zıplamıyor.
+  const wireSpots = await rp.evaluate(() => [...document.querySelectorAll('svg.schematic polyline[stroke-width="3"]')].map((el) => {
+    const pts = el.points;
+    if (pts.length < 2) return null;
+    const ctm = el.getScreenCTM();
+    const p = new DOMPoint((pts[0].x + pts[1].x) / 2, (pts[0].y + pts[1].y) / 2).matrixTransform(ctm);
+    return { x: p.x, y: p.y, length: Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y) };
+  }).filter((s) => s && s.length > 40).sort((a, b) => b.length - a.length).slice(0, 6));
+  let wireTexts = [];
+  for (const spot of wireSpots) {
+    await rp.mouse.click(spot.x, spot.y); await rp.waitForTimeout(700);
+    const text = (await notebook(rp).textContent()) ?? '';
+    if (!text.includes('En düşük')) continue;
+    for (let i = 0; i < 6; i++) {
+      wireTexts.push(((await notebook(rp).textContent()) ?? '').match(/ortalama\s*(≈ [^E]+?)En düşük/)?.[1]?.trim() ?? '');
+      await rp.waitForTimeout(100);
+    }
+    break;
+  }
+  check('masaüstü: çalışırken salınan kablo seçilince panelde "≈ ortalama", en düşük ve en yüksek; değer karede bir zıplamıyor',
+    wireTexts.length === 6 && wireTexts.every((t) => t.startsWith('≈ ')) && changes(wireTexts) <= 3, wireTexts.join(' | ') || `${wireSpots.length} kablo denendi`);
   await rp.getByRole('button', { name: 'Durdur', exact: true }).click(); await rp.waitForTimeout(300);
   await rackCtx.close();
 

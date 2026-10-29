@@ -20,8 +20,8 @@ import {
 } from '../sim';
 import { SimAudio } from './audio';
 import { IonPhases } from './ions';
-import { LiveWindow, type LiveSummary } from './liveReadout';
-import { buildScopeView, type ScopeView } from './scopeView';
+import { DISPLAY_WINDOW, LiveWindow, NodeWindow, type LiveSummary, type NodeSummary } from './liveReadout';
+import { buildScopeView, type ChannelStats, type ScopeView } from './scopeView';
 import type { LiveVisual } from './symbols';
 
 export type SimStatus = 'stopped' | 'running' | 'paused';
@@ -33,12 +33,36 @@ export interface PartFlow {
   readonly phase: number;
 }
 
+/** Bir osiloskobun ekranın altındaki ölçümleri (tepe-tepe, etkin, frekans): son değer ve yaşı (s). */
+interface ScopeHold {
+  readonly stats: readonly (ChannelStats | null)[];
+  age: number;
+}
+
+/**
+ * Ölçümler her karede yeniden hesaplanınca son hanesi titrer (2,52 ⇄ 2,53 V): bir pencere
+ * (DISPLAY_WINDOW) boyunca son değer gösterilir, multimetre gibi. İz her karede güncellenir;
+ * kanal bağlanınca ya da kopunca ölçüm hemen değişir.
+ */
+function holdScopeStats(holds: Map<string, ScopeHold>, id: string, view: ScopeView, dtReal: number): ScopeView {
+  const held = holds.get(id);
+  if (held && held.age < DISPLAY_WINDOW && view.channels.every((c, i) => (c.stats === null) === (held.stats[i] === null))) {
+    held.age += dtReal;
+    const [a, b] = view.channels;
+    return { ...view, channels: [{ ...a, stats: held.stats[0] ?? null }, { ...b, stats: held.stats[1] ?? null }] };
+  }
+  holds.set(id, { stats: view.channels.map((c) => c.stats), age: 0 });
+  return view;
+}
+
 /** Bir animasyon karesinde tuvale aktarılan değerler. */
 export interface SimFrame {
   readonly time: number;
   /** Renk ölçeği: devredeki en büyük kaynak gerilimi. */
   readonly vmax: number;
   readonly wireVoltages: ReadonlyMap<string, number>;
+  /** Kabloların son ölçüm penceresi: salınan gerilimin ortalaması ve uçları (etiket ve panel). */
+  readonly wireSummaries: ReadonlyMap<string, NodeSummary>;
   /** Akım çizgesindeki her kablo parçasının akımı ve nokta konumu. */
   readonly segmentFlows: Float64Array;
   readonly segmentPhases: Float64Array;
@@ -129,6 +153,9 @@ export function useSimulation(
   watchedRef.current = watched;
   /** İzlenen parçaların ölçüm pencereleri. */
   const liveWindows = useRef(new Map<string, LiveWindow>());
+  const wireWindows = useRef(new Map<string, NodeWindow>());
+  /** Osiloskop ölçüm satırları (tepe-tepe, etkin, frekans) pencere boyunca sabit: son değer ve yaşı. */
+  const scopeHolds = useRef(new Map<string, ScopeHold>());
   const simRef = useRef<CircuitSimulator | null>(null);
   const audio = useRef<SimAudio | null>(null);
   const soundRef = useRef(sound);
@@ -170,9 +197,20 @@ export function useSimulation(
     const voltageOf = (key: string) => (averaged ? sim.averageVoltageAt(key) : sim.voltageAt(key));
 
     const wireVoltages = new Map<string, number>();
+    const wireSummaries = new Map<string, NodeSummary>();
+    const nodeWindows = wireWindows.current;
+    for (const id of [...nodeWindows.keys()]) if (!d.wires.some((w) => w.id === id)) nodeWindows.delete(id);
     for (const wire of d.wires) {
-      const v = voltageOf(wireKey(wire.id));
-      if (v !== null) wireVoltages.set(wire.id, v);
+      const key = wireKey(wire.id);
+      const v = voltageOf(key);
+      if (v === null) continue;
+      wireVoltages.set(wire.id, v);
+      const end = averaged ? (sim.voltageAt(key) ?? v) : v;
+      const range = averaged ? sim.voltageRangeAt(key) : null;
+      let w = nodeWindows.get(wire.id);
+      if (!w) nodeWindows.set(wire.id, (w = new NodeWindow()));
+      w.add({ mean: v, min: range?.min ?? Math.min(v, end), max: range?.max ?? Math.max(v, end), end }, dtReal);
+      if (w.summary) wireSummaries.set(wire.id, w.summary);
     }
     const measurements = new Map<string, Measurement>();
     /** Uçlara giren akımlar (AC devrede karenin ortalaması). */
@@ -277,7 +315,7 @@ export function useSimulation(
         const device = sim.device(part.id);
         if (device instanceof OscilloscopeDevice) {
           const connected = [0, 1].map((pin) => !conn.unconnectedPins.has(pinKey(part.id, pin))) as [boolean, boolean];
-          scopes.set(part.id, buildScopeView(device.recorder, scopeSettings(part.props), connected));
+          scopes.set(part.id, holdScopeStats(scopeHolds.current, part.id, buildScopeView(device.recorder, scopeSettings(part.props), connected), dtReal));
           // Ekran karede bir kez yakalanır: gösterildikten sonra kayıt bir sonraki tetiğe kurulur.
           device.recorder.perFrame = true;
           device.recorder.rearm();
@@ -300,6 +338,7 @@ export function useSimulation(
       vmax,
       summaries,
       wireVoltages,
+      wireSummaries,
       segmentFlows: flows,
       segmentPhases: Float64Array.from(ph.segments),
       partFlows,
@@ -322,6 +361,8 @@ export function useSimulation(
     ionPhases.current = new Map();
     motorAngles.current = new Map();
     liveWindows.current = new Map();
+    wireWindows.current = new Map();
+    scopeHolds.current = new Map();
     audio.current?.reset();
     setStatus('stopped');
     setFrame(null);

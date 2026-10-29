@@ -3,7 +3,7 @@
 // canlı gösterilir; hesaplanamayan değer "hesaplanamıyor" yazar.
 
 import { describe, expect, it } from 'vitest';
-import { LiveWindow, stableMeterText, stableReadout, stableValue } from '../src/editor/liveReadout';
+import { LiveWindow, NodeWindow, stableMeterText, stableReadout, stableValue } from '../src/editor/liveReadout';
 import type { Part } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
 import { circuit } from './helpers';
@@ -68,6 +68,56 @@ describe('Canlı ölçümler: kararlı gösterim', () => {
     const halfWave = value(reverse, 'R2');
     expect(halfWave.approx).toBe(true);
     expect(halfWave.value).toBeLessThan(-1);
+  });
+
+  it('kablo gerilimi (1N4001 X-Y örneği gibi): karenin ortalaması oynasa da pencere ortalaması sabit; uçlar her adımdan', () => {
+    // Toprak diyot ile direnç arasında: üretecin iki ucu da salınır, karenin (1/60 s, 16,7 periyot)
+    // ortalaması kareden kareye oynar (−1,2 … −1,5 V).
+    const sim = new CircuitSimulator(
+      circuit().acsource('AC1', 's', 'com', { amplitude: 5, frequency: 1000 }).resistor('R50', 's', 'o', 50).diode('D1', 'o', 'gnd').ground('G1', 'gnd').resistor('R1', 'gnd', 'com', 1000).build(),
+    );
+    const window = new NodeWindow();
+    const frameMeans: number[] = [];
+    const summaries: string[] = [];
+    for (let i = 0; i < 60; i++) {
+      expect(sim.advance(1 / 60, 20000).ok).toBe(true);
+      const mean = sim.averageVoltageAt('o')!;
+      const range = sim.voltageRangeAt('o')!;
+      // Uçlar her adımdan: diyodun iletimdeki gerilimi ve ters yöndeki tepe.
+      expect(range.max).toBeGreaterThan(0.5);
+      expect(range.max).toBeLessThan(0.9);
+      expect(range.min).toBeLessThan(-4.8);
+      frameMeans.push(mean);
+      window.add({ mean, min: range.min, max: range.max, end: sim.voltageAt('o')! }, 1 / 60);
+      if (i >= 30) summaries.push(`${window.summary!.mean.toFixed(3)} ${window.summary!.varying}`);
+    }
+    // Karenin ortalaması oynuyor (etiket bu yüzden titriyordu); pencerenin özeti 0,4 s'de bir değişir.
+    expect(Math.max(...frameMeans.slice(10)) - Math.min(...frameMeans.slice(10))).toBeGreaterThan(0.05);
+    expect(new Set(summaries).size).toBeLessThanOrEqual(3);
+    expect(window.summary!.varying).toBe(true);
+    expect(window.summary!.mean).toBeLessThan(-1);
+    expect(window.summary!.mean).toBeGreaterThan(-1.6);
+    expect(window.summary!.min).toBeLessThan(-4.8);
+    expect(window.summary!.max).toBeGreaterThan(0.5);
+  });
+
+  it('kablo gerilimi: sabit ve tek yönde değişen değer salınım sayılmaz (canlı gösterilir)', () => {
+    const steady = new NodeWindow();
+    for (let i = 0; i < 30; i++) steady.add({ mean: 9, min: 9, max: 9, end: 9 }, 1 / 60);
+    expect(steady.summary!.varying).toBe(false);
+    // Dolan kondansatör: kare başına 0,05 V artış.
+    const ramp = new NodeWindow();
+    for (let i = 0; i < 30; i++) ramp.add({ mean: i * 0.05 + 0.025, min: i * 0.05, max: (i + 1) * 0.05, end: (i + 1) * 0.05 }, 1 / 60);
+    expect(ramp.summary!.varying).toBe(false);
+    // Hızlı kare dalga, karede bir anlık örnekle (AC kaynaksız 555): salınım; ortalama ≈ doluluk × yüksek.
+    const square = new NodeWindow();
+    for (let i = 0; i < 30; i++) {
+      const v = (i * 7) % 3 === 0 ? 0 : 9;
+      square.add({ mean: v, min: v, max: v, end: v }, 1 / 60);
+    }
+    expect(square.summary!.varying).toBe(true);
+    expect(square.summary!.min).toBe(0);
+    expect(square.summary!.max).toBe(9);
   });
 
   it('DC devre: değerler canlı ve işaretsiz (≈ yok)', () => {

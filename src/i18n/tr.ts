@@ -1985,6 +1985,10 @@ export const tr = {
     wire: 'Kablo',
     wireVoltage: 'Gerilim (toprağa göre)',
     wireHint: 'Kablonun bağlı olduğu noktanın toprağa göre gerilimi. Kablonun her yerinde aynıdır.',
+    wireAverage: 'ortalama',
+    wireLowest: 'En düşük',
+    wireHighest: 'En yüksek',
+    wireVarying: 'Gerilim salınıyor: son 0,4 saniyenin ortalaması, en düşük ve en yüksek değeri.',
     repair: 'Onar',
   },
   notebook: {

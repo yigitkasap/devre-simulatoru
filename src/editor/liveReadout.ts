@@ -44,6 +44,65 @@ export class LiveWindow {
   }
 }
 
+/** Bir kablonun (düğümün) bir karedeki değeri: ortalama, uçlar ve kare sonundaki anlık değer. */
+export interface NodeSample {
+  readonly mean: number;
+  readonly min: number;
+  readonly max: number;
+  readonly end: number;
+}
+
+/** Bir kablonun pencere özeti; salınıyorsa (varying) ortalama ve uçlar gösterilir. */
+export interface NodeSummary {
+  readonly mean: number;
+  readonly min: number;
+  readonly max: number;
+  readonly varying: boolean;
+}
+
+/**
+ * Kablo (düğüm) gerilimlerinin pencere toplayıcısı: tuvaldeki etiket ve kablo seçiliyken panel.
+ * AC devrede motor karenin ortalamasını ve uçlarını verir (bir kare tam sayıda periyot içermediği
+ * için karenin ortalaması bile kareden kareye oynar); öbür devrelerde kare başına anlık değer.
+ * Salınım LiveWindow'daki gibi: toplam değişim aralığın 1,5 katını aşarsa. Karenin içindeki
+ * değişim bilinmez; başlangıçtan (önceki karenin sonu) iki uca uğrayıp sona giden en kısa yol alınır.
+ */
+export class NodeWindow {
+  private time = 0;
+  private sum = 0;
+  private min = Infinity;
+  private max = -Infinity;
+  private variation = 0;
+  private real = 0;
+  private previous: number | null = null;
+  /** Son tamamlanan pencere; henüz yoksa null. */
+  summary: NodeSummary | null = null;
+
+  add(s: NodeSample, dtReal: number, window = DISPLAY_WINDOW): void {
+    const from = this.previous ?? s.mean;
+    const lo = Math.min(s.min, from, s.end);
+    const hi = Math.max(s.max, from, s.end);
+    this.variation += hi - lo + Math.min(from - lo + (hi - s.end), hi - from + (s.end - lo));
+    this.previous = s.end;
+    this.min = Math.min(this.min, s.min);
+    this.max = Math.max(this.max, s.max);
+    this.sum += s.mean * dtReal;
+    this.time += dtReal;
+    this.real += dtReal;
+    if (this.real >= window || this.summary === null) {
+      const span = this.max - this.min;
+      const varying = span > 1e-6 * Math.max(Math.abs(this.max), Math.abs(this.min)) + 1e-9 && this.variation > 1.5 * span;
+      this.summary = { mean: this.time > 0 ? this.sum / this.time : s.mean, min: this.min, max: this.max, varying };
+      this.time = 0;
+      this.sum = 0;
+      this.min = Infinity;
+      this.max = -Infinity;
+      this.variation = 0;
+      this.real = 0;
+    }
+  }
+}
+
 /** Değer pencere içinde salındı mı (sabit ya da tek yönde değişmediyse). */
 export function oscillates(s: KeyStats): boolean {
   if (s.kind !== 'number') return s.changes >= 2;

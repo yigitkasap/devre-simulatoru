@@ -149,6 +149,9 @@ export class CircuitSimulator {
   /** Doğrusal olmayan bileşenler (her adımda yeniden süzülmesin diye). */
   private nonlinearDevices: readonly Device[] = [];
   private xSum: Float64Array;
+  /** Aralıktaki her düğümün en küçük ve en büyük değeri (her kabul edilen adımda; arayüzün gösterdiği uçlar). */
+  private xMin: Float64Array;
+  private xMax: Float64Array;
   /** Bileşen başına uç akımlarının integrali (bileşen sırasıyla). */
   private pinSums: Float64Array[] = [];
   private deviceIndex = new Map<string, number>();
@@ -221,6 +224,8 @@ export class CircuitSimulator {
     this.xNew = new Float64Array(n);
     this.xIter = new Float64Array(n);
     this.xSum = new Float64Array(n);
+    this.xMin = new Float64Array(n).fill(Infinity);
+    this.xMax = new Float64Array(n).fill(-Infinity);
     this.staticSys = new MnaSystem(n);
     this.stepSys = new MnaSystem(n);
     this.iterSys = new MnaSystem(n);
@@ -375,6 +380,8 @@ export class CircuitSimulator {
       this.xNew = new Float64Array(n);
       this.xIter = new Float64Array(n);
       this.xSum = new Float64Array(n);
+      this.xMin = new Float64Array(n).fill(Infinity);
+      this.xMax = new Float64Array(n).fill(-Infinity);
       this.staticSys = new MnaSystem(n);
       this.stepSys = new MnaSystem(n);
       this.iterSys = new MnaSystem(n);
@@ -633,6 +640,21 @@ export class CircuitSimulator {
     const node = this.circuit.nodeOfRoot.get(this.circuit.nets.findKey(key));
     if (node === undefined) return null;
     return node < 0 ? 0 : this.xSum[node]! / this.intervalTime;
+  }
+
+  /**
+   * Son advance() çağrısı boyunca bir ağın en küçük ve en büyük gerilimi (her adımda); AC kaynaklı
+   * değilse ya da o çağrıda ortalama alınmadıysa null (arayüz anlık değeri kullanır).
+   */
+  voltageRangeAt(key: string): { readonly min: number; readonly max: number } | null {
+    if (this.intervalTime <= 0) return null;
+    if (!this.circuit.nets.has(key)) return null;
+    const node = this.circuit.nodeOfRoot.get(this.circuit.nets.findKey(key));
+    if (node === undefined) return null;
+    if (node < 0) return { min: 0, max: 0 };
+    const min = this.xMin[node]!;
+    const max = this.xMax[node]!;
+    return min <= max ? { min, max } : null;
   }
 
   /** Bir bileşenin uçlarına giren anlık akımlar. */
@@ -918,6 +940,8 @@ export class CircuitSimulator {
     this.intervalTime = 0;
     this.sampleClock = 0;
     this.xSum.fill(0);
+    this.xMin.fill(Infinity);
+    this.xMax.fill(-Infinity);
     for (const sums of this.pinSums) sums.fill(0);
   }
 
@@ -969,6 +993,12 @@ export class CircuitSimulator {
    */
   private accumulate(h: number): void {
     if (!this.hasAcSources) return;
+    // Uçlar her adımda (ortalamalar seyrek örneklenir; tepeler kaçmasın).
+    for (let i = 0; i < this.x.length; i++) {
+      const v = this.x[i]!;
+      if (v < this.xMin[i]!) this.xMin[i] = v;
+      if (v > this.xMax[i]!) this.xMax[i] = v;
+    }
     this.sampleClock += h;
     if (this.sampleClock < this.sampleSpacing * (1 - 1e-9)) return;
     const weight = this.sampleClock;

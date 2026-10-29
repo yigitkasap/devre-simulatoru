@@ -293,11 +293,14 @@ export default function Simulator() {
   /** Ayarlar → "Düğüm gerilimlerini yaz": her düğümün en uzun kablo parçasının ortasında gerilim. */
   const nodeLabels = useMemo(() => {
     if (!settings.nodeVoltages || !sim.frame || !compiled) return undefined;
-    const best = new Map<string, { at: { x: number; y: number }; length: number; voltage: number }>();
+    const best = new Map<string, { at: { x: number; y: number }; length: number; text: string }>();
     for (const wire of doc.wires) {
       const key = wireKey(wire.id);
       const voltage = sim.frame.wireVoltages.get(wire.id);
       if (voltage === undefined || !compiled.nets.has(key)) continue;
+      // Salınan gerilim (AC, hızlı kare dalga): pencerenin ortalaması, 0,4 s'de bir; öbürleri canlı.
+      const summary = sim.frame.wireSummaries.get(wire.id);
+      const text = summary?.varying ? `≈ ${formatSI(summary.mean, 'V', { digits: 3 })}` : formatSI(voltage, 'V', { digits: 3 });
       const net = compiled.nets.findKey(key);
       for (let i = 1; i < wire.points.length; i++) {
         const a = wire.points[i - 1]!;
@@ -305,10 +308,10 @@ export default function Simulator() {
         const length = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
         if (length < (best.get(net)?.length ?? 0)) continue;
         const at = { x: Math.round((a.x + b.x) / 2), y: Math.round((a.y + b.y) / 2) };
-        best.set(net, { at, length, voltage });
+        best.set(net, { at, length, text });
       }
     }
-    return [...best.values()].map((n) => ({ at: n.at, text: formatSI(n.voltage, 'V', { digits: 3 }) }));
+    return [...best.values()].map((n) => ({ at: n.at, text: n.text }));
   }, [settings.nodeVoltages, sim.frame, compiled, doc.wires]);
 
   /** Bir mesajın vurgulayacağı parçalar ve kablolar. */
