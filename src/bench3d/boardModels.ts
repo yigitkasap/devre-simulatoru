@@ -1,6 +1,7 @@
 // Karta aktar'ın 3B kartları (tasarım v3: K1–K4, L1–L2; başlangıç docs/tasarim-v3/karta-aktar-3b/main.ts).
-// Baskı devre: FR-4 kenarlı 1,6 mm levha, yeşil maske, maskenin altında yollar, kalaylı (HASL) pedler,
-// beyaz serigrafi (ref ve uç adları), montaj delikleri; parçalar tezgâhın modelleriyle (buildPartModel),
+// Baskı devre: FR-4 kenarlı 1,6 mm levha, parlak yeşil maske, maskenin altında kabarık yollar, kubbeli
+// kalaylı (HASL) pedler, kartı delip geçen kaplamalı delikler, beyaz serigrafi (ref ve uç adları), montaj
+// delikleri; parçalar tezgâhın modelleriyle (buildPartModel),
 // bacakları ped deliklerinde; eklenen dekuplaj kondansatörü, vidalı klemens ve pin başlık. Eksik
 // bağlantılar turuncu kesikli çizgi ve uçlarında halka. Delikli plaket: breadboard düzeninde (sütun
 // numaraları, a–j, raylar) altın kaplama delikler; parçalar ve jumper'lar tezgâhtaki yerleşimle aynı
@@ -12,16 +13,21 @@ import {
   CanvasTexture,
   CatmullRomCurve3,
   CylinderGeometry,
+  DoubleSide,
   ExtrudeGeometry,
   Group,
   Mesh,
+  MeshBasicMaterial,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
+  Path,
   PlaneGeometry,
   Shape,
+  ShapeGeometry,
   SRGBColorSpace,
   TorusGeometry,
   TubeGeometry,
+  Vector2,
   Vector3,
   type Material,
   type Object3D,
@@ -43,8 +49,7 @@ const U = (mm: number) => mm / 2.54;
 
 const MASK = new MeshPhysicalMaterial({ color: '#0a4a28', roughness: 0.45, clearcoat: 0.6, clearcoatRoughness: 0.35 });
 const FR4 = new MeshStandardMaterial({ color: '#c8c08f', roughness: 0.8 });
-const TRACK = new MeshPhysicalMaterial({ color: '#1f8a4a', roughness: 0.36, clearcoat: 0.8, clearcoatRoughness: 0.25 });
-const HASL = new MeshStandardMaterial({ color: '#d8dce1', roughness: 0.28, metalness: 1 });
+const HASL = new MeshStandardMaterial({ color: '#dfe3e8', roughness: 0.22, metalness: 1 });
 const GOLD = new MeshStandardMaterial({ color: '#d9b45a', roughness: 0.3, metalness: 1 });
 const HOLE = new MeshStandardMaterial({ color: '#0b0f0c', roughness: 0.9 });
 /** Vurgu (seçili parça, şimdiki adımın delikleri) ve eksik bağlantı. */
@@ -205,63 +210,248 @@ function ratsnest(a: Vector3, b: Vector3, ringR: number, root: Group): void {
 }
 
 // --- Baskı devre ----------------------------------------------------------------------------------
+// Yüzey gerçek kart gibi: parlak yeşil lehim maskesi, maskenin altında yollar (biraz açık renkli ve
+// kabarık; ışık kenarlarında parlar), maskede ince "portakal kabuğu". Renk dokusu (maske, yollar,
+// serigrafi) ile normal dokusu (kabartılar) aynı çizimden tuvalde üretilir. Delikler levhayı gerçekten
+// deler; kaplamalı deliklerin içi kalaylı. Gerber'de olmayan bir şey (dolgu, yazı) eklenmez.
 
-export function buildPcbBoard(doc: CircuitDoc, design: PcbDesign, routing: Routing | null, missing: readonly MissingConnection[], withParts: boolean, tip: (f: PcbFootprint) => { name: string; detail: string }): BoardModel {
+const MASK_COLOR = '#04561f';
+const MASK_TRACK = '#10702a';
+/** Portakal kabuğunun yüksekliği (yolun kabarıklığı 1). */
+const PEEL = 0.3;
+const SILK = '#f3f4ee';
+/** Kapalı via'nın ortası (maske deliğe çöker, biraz koyu). */
+const MASK_DIMPLE = '#03461a';
+const HIDDEN = new MeshBasicMaterial({ visible: false });
+const BARREL = new MeshStandardMaterial({ color: '#c9ced4', roughness: 0.35, metalness: 1, side: DoubleSide });
+
+interface Drill {
+  readonly x: number;
+  readonly z: number;
+  readonly r: number;
+}
+
+/** Kartın dış çizgisi (yuvarlak köşeli) ve delikleri; `flip`: şekil y'si −z (üst yüz için, bkz. pcbFace). */
+function pcbOutline(w: number, d: number, radius: number, drills: readonly Drill[], flip: boolean): Shape {
+  const k = flip ? -1 : 1;
+  const s = new Shape();
+  const x0 = -w / 2;
+  const z0 = -d / 2;
+  const r = radius;
+  s.moveTo(x0 + r, k * z0);
+  s.lineTo(x0 + w - r, k * z0);
+  s.quadraticCurveTo(x0 + w, k * z0, x0 + w, k * (z0 + r));
+  s.lineTo(x0 + w, k * (z0 + d - r));
+  s.quadraticCurveTo(x0 + w, k * (z0 + d), x0 + w - r, k * (z0 + d));
+  s.lineTo(x0 + r, k * (z0 + d));
+  s.quadraticCurveTo(x0, k * (z0 + d), x0, k * (z0 + d - r));
+  s.lineTo(x0, k * (z0 + r));
+  s.quadraticCurveTo(x0, k * z0, x0 + r, k * z0);
+  for (const h of drills) s.holes.push(new Path().absarc(h.x, k * h.z, h.r, 0, Math.PI * 2, true));
+  return s;
+}
+
+/** Delikli levha: yalnızca kenarlar ve delik duvarları (FR-4); iki yüzü pcbFace çizer. */
+function pcbSlab(w: number, d: number, radius: number, drills: readonly Drill[]): Mesh {
+  const g = new ExtrudeGeometry(pcbOutline(w, d, radius, drills, false), { depth: T, bevelEnabled: false, curveSegments: 8 });
+  g.rotateX(Math.PI / 2);
+  g.translate(0, T, 0);
+  return new Mesh(g, [HIDDEN, FR4]);
+}
+
+/** Kartın bir yüzü (delikleriyle); dokular kartın x, z koordinatına göre (tuvalin üst kenarı −z). */
+function pcbFace(w: number, d: number, radius: number, drills: readonly Drill[], top: boolean, material: Material): Mesh {
+  const g = new ShapeGeometry(pcbOutline(w, d, radius, drills, top), 8);
+  g.rotateX(top ? -Math.PI / 2 : Math.PI / 2);
+  const pos = g.attributes.position!;
+  const uv = g.attributes.uv!;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + w / 2) / w, 1 - (pos.getZ(i) + d / 2) / d);
+  g.translate(0, top ? T : 0, 0);
+  return new Mesh(g, material);
+}
+
+/** Yerinde kutu bulanıklığı (yatay + dikey); `wrap`: kenarlar karşıdan sarılır (döşeme). */
+function blur(h: Float32Array, W: number, H: number, r: number, wrap = false): void {
+  if (r < 1) return;
+  const n = 2 * r + 1;
+  const line = new Float32Array(Math.max(W, H) + n);
+  // Satır ya da sütun: `len` öğe, ilki `o`, aralarında `step`.
+  const pass = (len: number, count: number, stride: number, step: number) => {
+    for (let k = 0; k < count; k++) {
+      const o = k * stride;
+      for (let i = -r; i < len + r; i++) {
+        const j = wrap ? (i + len) % len : i < 0 ? 0 : i >= len ? len - 1 : i;
+        line[i + r] = h[o + j * step]!;
+      }
+      let sum = 0;
+      for (let i = 0; i < n; i++) sum += line[i]!;
+      for (let i = 0; i < len; i++) {
+        h[o + i * step] = sum / n;
+        sum += line[i + n]! - line[i]!;
+      }
+    }
+  };
+  pass(W, H, W, 1);
+  pass(H, W, 1, W);
+}
+
+/** Maskenin "portakal kabuğu": 128 × 128 döşenen yumuşak gürültü (sabit tohum: her açılışta aynı). */
+let peelTile: Float32Array | null = null;
+function peel(): Float32Array {
+  if (peelTile) return peelTile;
+  const t = new Float32Array(128 * 128);
+  let seed = 7;
+  for (let i = 0; i < t.length; i++) {
+    seed = (seed * 16807) % 2147483647;
+    t[i] = seed / 2147483647 - 0.5;
+  }
+  blur(t, 128, 128, 2, true);
+  blur(t, 128, 128, 2, true);
+  peelTile = t;
+  return t;
+}
+
+type FacePaint = (ctx: CanvasRenderingContext2D, X: (x: number) => number, Z: (z: number) => number, s: number, relief: boolean) => void;
+
+/**
+ * Bir yüzün dokuları. `paint` iki kez çağrılır: renk (relief: false) ve kabartı (relief: true; siyah
+ * zemine yollar beyaz, serigrafi gri). Kabartı bulanıklaştırılıp portakal kabuğu eklenir, eğiminden
+ * normal dokusu çıkar.
+ */
+function faceTextures(w: number, d: number, paint: FacePaint): { map: CanvasTexture; normal: CanvasTexture } {
+  const canvas = (scale: number, fill: string, relief: boolean) => {
+    const c = document.createElement('canvas');
+    c.width = Math.max(2, Math.round(w * scale));
+    c.height = Math.max(2, Math.round(d * scale));
+    const ctx = c.getContext('2d', { willReadFrequently: relief })!;
+    ctx.fillStyle = fill;
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    paint(ctx, (x) => (x + w / 2) * scale, (z) => (z + d / 2) * scale, scale, relief);
+    return { c, ctx };
+  };
+  // Renk: milimetrede en çok 28 piksel; telefon belleği için doku başına en çok ~2,6 milyon piksel.
+  const s = Math.min(28 * 2.54, Math.sqrt(2.6e6 / (w * d)));
+  const color = canvas(s, MASK_COLOR, false);
+  // Kabartı yarı çözünürlükte: yumuşak eğimlere yeter, hesap dört kat kısa.
+  const sn = s / 2;
+  const relief = canvas(sn, '#000', true);
+  const W = relief.c.width;
+  const H = relief.c.height;
+  const img = relief.ctx.getImageData(0, 0, W, H);
+  const px = img.data;
+  const h = new Float32Array(W * H);
+  for (let i = 0; i < h.length; i++) h[i] = px[i * 4]! / 255;
+  // Maske yolun kenarında ~0,15 mm'de iner.
+  const r = Math.max(1, Math.round(sn * U(0.08)));
+  blur(h, W, H, r);
+  blur(h, W, H, r);
+  const tile = peel();
+  for (let y = 0; y < H; y++) {
+    const row = (y & 127) << 7;
+    for (let x = 0; x < W; x++) h[y * W + x] = h[y * W + x]! + tile[row + (x & 127)]! * PEEL;
+  }
+  const k = 0.9 * r;
+  for (let y = 0; y < H; y++) {
+    const up = Math.max(0, y - 1) * W;
+    const down = Math.min(H - 1, y + 1) * W;
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      const nx = (h[y * W + (x > 0 ? x - 1 : 0)]! - h[y * W + (x < W - 1 ? x + 1 : x)]!) * k;
+      const ny = (h[down + x]! - h[up + x]!) * k;
+      const inv = 127.5 / Math.sqrt(nx * nx + ny * ny + 1);
+      px[i * 4] = nx * inv + 127.5;
+      px[i * 4 + 1] = ny * inv + 127.5;
+      px[i * 4 + 2] = inv + 127.5;
+      px[i * 4 + 3] = 255;
+    }
+  }
+  relief.ctx.putImageData(img, 0, 0);
+  const map = new CanvasTexture(color.c);
+  map.colorSpace = SRGBColorSpace;
+  map.anisotropy = 8;
+  const normal = new CanvasTexture(relief.c);
+  normal.anisotropy = 8;
+  return { map, normal };
+}
+
+/** Maske malzemesi: parlak vernik (clearcoat) da kabartıları izler. */
+function maskMaterial(t: { map: CanvasTexture; normal: CanvasTexture }): MeshPhysicalMaterial {
+  return new MeshPhysicalMaterial({
+    map: t.map,
+    normalMap: t.normal,
+    normalScale: new Vector2(1, 1),
+    roughness: 0.5,
+    specularIntensity: 0.4,
+    clearcoat: 0.85,
+    // Biraz pürüzlü vernik: ortamdaki ayrı lambaların yansıması yol kenarında kesik kesik görünmesin.
+    clearcoatRoughness: 0.24,
+    clearcoatNormalMap: t.normal,
+    clearcoatNormalScale: new Vector2(0.7, 0.7),
+  });
+}
+
+/**
+ * Baskı devrenin iki yüzünün maskesi (renk ve kabartı dokuları). Dokuların üretimi pahalı: kart yeniden
+ * kurulurken (Parçalarla / Yalın kart) aynı yüzey kullanılır, yalnızca tasarım ya da yollar değişince
+ * yenisi üretilir. Kartın dispose'u bunları bırakmaz; `dispose` ayrı çağrılır.
+ */
+export interface PcbSurface {
+  readonly top: Material;
+  readonly bottom: Material;
+  dispose(): void;
+}
+
+export function buildPcbSurface(design: PcbDesign, routing: Routing | null): PcbSurface {
   const o = design.outline;
   const cx = (o.x0 + o.x1) / 2;
   const cy = (o.y0 + o.y1) / 2;
-  const P = (x: number, y: number, h = T) => new Vector3(U(x - cx), h, U(y - cy));
   const bw = U(o.x1 - o.x0);
   const bd = U(o.y1 - o.y0);
-  const root = new Group();
-  const models: PartModel[] = [];
-  root.add(boardSlab(bw, bd, U(0.8)));
-
-  // Yollar: üst yüzde maskenin hemen üstünde, alt yüzde altında (maske rengi yolun üstünde biraz açık).
-  for (const t of routing?.tracks ?? []) {
-    const y = t.layer === 0 ? T + 0.022 : -0.022;
-    const a = P(t.x0, t.y0, y);
-    const b = P(t.x1, t.y1, y);
-    const w = U(t.width);
-    const m = box(a.distanceTo(b), 0.04, w, TRACK, (a.x + b.x) / 2, y, (a.z + b.z) / 2);
-    m.rotation.y = -Math.atan2(b.z - a.z, b.x - a.x);
-    root.add(m);
-    for (const e of [a, b]) root.add(disc(w / 2, 0.04, TRACK, e.x, y, e.z, 12));
-  }
-  // Pedler (iki yüzde) ve delikler; montaj delikleri kaplamasız.
-  for (const f of design.footprints)
-    for (const p of f.pads) {
-      const c = P(p.x, p.y);
-      if (p.npth) {
-        for (const y of [T + 0.006, -0.006]) root.add(disc(U(p.size / 2), 0.012, HOLE, c.x, y, c.z, 32));
-        continue;
-      }
-      for (const y of [T + 0.03, -0.03]) {
-        const pad = p.shape === 'rect' ? box(U(p.size), 0.05, U(p.size), HASL, c.x, y, c.z) : p.shape === 'oval' ? box(U(p.size) * 0.8, 0.05, U(p.size), HASL, c.x, y, c.z) : disc(U(p.size / 2), 0.05, HASL, c.x, y, c.z);
-        root.add(pad);
-        root.add(disc(U(p.drill / 2), 0.06, HOLE, c.x, y + (y > 0 ? 0.005 : -0.005), c.z, 16));
-      }
-    }
-  for (const v of routing?.vias ?? []) {
-    const c = P(v.x, v.y);
-    for (const y of [T + 0.03, -0.03]) {
-      root.add(disc(U(0.4), 0.05, HASL, c.x, y, c.z, 16));
-      root.add(disc(U(0.2), 0.06, HOLE, c.x, y, c.z, 12));
-    }
-  }
-  // Serigrafi: kılıf çizgileri, ref ve uç adları.
-  root.add(
-    silkPlane(
-      bw,
-      bd,
-      60,
-      (ctx, X, Z, s) => {
+  // Maske, altındaki yollar; üstte serigrafi (kılıf çizgileri, ref ve uç adları).
+  const face = (top: boolean) =>
+    maskMaterial(
+      faceTextures(bw, bd, (ctx, X, Z, s, relief) => {
         const x = (mm: number) => X(U(mm - cx));
         const z = (mm: number) => Z(U(mm - cy));
-        ctx.strokeStyle = '#f4f4ee';
-        ctx.fillStyle = '#f4f4ee';
+        ctx.strokeStyle = relief ? '#fff' : MASK_TRACK;
+        for (const t of routing?.tracks ?? []) {
+          if (t.layer !== (top ? 0 : 1)) continue;
+          ctx.lineWidth = U(t.width) * s;
+          ctx.beginPath();
+          ctx.moveTo(x(t.x0), z(t.y0));
+          ctx.lineTo(x(t.x1), z(t.y1));
+          ctx.stroke();
+        }
+        // Via'lar maskeyle kapalı (Gerber'deki gibi): maskenin altında halka, ortasında küçük çukur.
+        for (const v of routing?.vias ?? []) {
+          for (const [r, fill] of [
+            [U(0.4), relief ? '#fff' : MASK_TRACK],
+            [U(0.2), relief ? '#000' : MASK_DIMPLE],
+          ] as const) {
+            ctx.fillStyle = fill;
+            ctx.beginPath();
+            ctx.arc(x(v.x), z(v.y), r * s, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+        if (relief) {
+          // Pedin bakırı da kabarık: yol pede yumuşakça bağlanır.
+          ctx.fillStyle = '#fff';
+          for (const f of design.footprints)
+            for (const p of f.pads) {
+              if (p.npth) continue;
+              ctx.beginPath();
+              ctx.arc(x(p.x), z(p.y), (U(p.size) / 2) * s, 0, Math.PI * 2);
+              ctx.fill();
+            }
+        }
+        if (!top) return;
+        const ink = relief ? '#666' : SILK;
+        ctx.strokeStyle = ink;
+        ctx.fillStyle = ink;
         ctx.lineWidth = U(0.15) * s;
-        ctx.lineCap = 'round';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         for (const f of design.footprints) {
@@ -284,10 +474,103 @@ export function buildPcbBoard(doc: CircuitDoc, design: PcbDesign, routing: Routi
           ctx.font = `500 ${U(0.95) * s}px "IBM Plex Sans", sans-serif`;
           for (const p of f.pads) if (p.label) ctx.fillText(p.label, x(p.x), z(p.y + (p.labelDy ?? 2.4)));
         }
-      },
-      T + 0.058,
-    ),
-  );
+      }),
+    );
+  const top = face(true);
+  const bottom = face(false);
+  return {
+    top,
+    bottom,
+    dispose: () => {
+      for (const m of [top, bottom]) {
+        m.map?.dispose();
+        m.normalMap?.dispose();
+        m.dispose();
+      }
+    },
+  };
+}
+
+/** Kubbeli kalay ped (ortası delik); kenarları yuvarlatılmış. Aynı ölçüdekiler ortak geometri kullanır. */
+function padGeometry(cache: Map<string, ExtrudeGeometry>, shape: 'circle' | 'rect' | 'oval', size: number, drill: number, top: boolean): ExtrudeGeometry {
+  const key = `${shape} ${size} ${drill} ${top}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const a = U(size) / 2;
+  const s = new Shape();
+  if (shape === 'circle') s.absarc(0, 0, a, 0, Math.PI * 2, false);
+  else {
+    // Kare ped; oval: 0,8 × 1 boyunda, uçları yarım daire.
+    const hx = shape === 'oval' ? a * 0.8 : a;
+    const rr = shape === 'oval' ? hx : U(0.05);
+    s.moveTo(-hx + rr, -a);
+    s.lineTo(hx - rr, -a);
+    s.quadraticCurveTo(hx, -a, hx, -a + rr);
+    s.lineTo(hx, a - rr);
+    s.quadraticCurveTo(hx, a, hx - rr, a);
+    s.lineTo(-hx + rr, a);
+    s.quadraticCurveTo(-hx, a, -hx, a - rr);
+    s.lineTo(-hx, -a + rr);
+    s.quadraticCurveTo(-hx, -a, -hx + rr, -a);
+  }
+  s.holes.push(new Path().absarc(0, 0, U(drill) / 2, 0, Math.PI * 2, true));
+  const bevel = Math.min(U(0.09), (U(size) - U(drill)) / 5);
+  const thick = U(0.03);
+  const g = new ExtrudeGeometry(s, { depth: U(0.02), bevelEnabled: true, bevelThickness: thick, bevelSize: bevel, bevelOffset: -bevel, bevelSegments: 3, curveSegments: 12 });
+  g.translate(0, 0, thick);
+  g.rotateX(top ? -Math.PI / 2 : Math.PI / 2);
+  cache.set(key, g);
+  return g;
+}
+
+/** `surface`: aynı tasarımla buildPcbSurface'in ürettiği yüzey (yollar ve via'lar onda). */
+export function buildPcbBoard(
+  doc: CircuitDoc,
+  design: PcbDesign,
+  surface: PcbSurface,
+  missing: readonly MissingConnection[],
+  withParts: boolean,
+  tip: (f: PcbFootprint) => { name: string; detail: string },
+): BoardModel {
+  const o = design.outline;
+  const cx = (o.x0 + o.x1) / 2;
+  const cy = (o.y0 + o.y1) / 2;
+  const P = (x: number, y: number, h = T) => new Vector3(U(x - cx), h, U(y - cy));
+  const bw = U(o.x1 - o.x0);
+  const bd = U(o.y1 - o.y0);
+  const root = new Group();
+  const models: PartModel[] = [];
+
+  // Delikler: pedler ve montaj delikleri (via'lar maskeyle kapalı; yüzeyde çizilir).
+  const drills: Drill[] = [];
+  for (const f of design.footprints) for (const p of f.pads) drills.push({ x: U(p.x - cx), z: U(p.y - cy), r: U(p.drill / 2) });
+  const corner = U(0.8);
+  root.add(pcbSlab(bw, bd, corner, drills));
+
+  // İki yüz: maske, altındaki yollar, serigrafi (buildPcbSurface).
+  root.add(pcbFace(bw, bd, corner, drills, true, surface.top), pcbFace(bw, bd, corner, drills, false, surface.bottom));
+
+  // Pedler (iki yüzde kubbeli kalay) ve kaplamalı delik duvarları; montaj delikleri kaplamasız.
+  const pads = new Map<string, ExtrudeGeometry>();
+  const barrels = new Map<number, CylinderGeometry>();
+  const barrel = (c: Vector3, r: number) => {
+    let g = barrels.get(r);
+    if (!g) barrels.set(r, (g = new CylinderGeometry(r * 0.985, r * 0.985, T, 16, 1, true)));
+    const m = new Mesh(g, BARREL);
+    m.position.set(c.x, T / 2, c.z);
+    root.add(m);
+  };
+  for (const f of design.footprints)
+    for (const p of f.pads) {
+      if (p.npth) continue;
+      const c = P(p.x, p.y);
+      for (const top of [true, false]) {
+        const m = new Mesh(padGeometry(pads, p.shape, p.size, p.drill, top), HASL);
+        m.position.set(c.x, top ? T : 0, c.z);
+        root.add(m);
+      }
+      barrel(c, U(p.drill / 2));
+    }
 
   // Eksik bağlantılar: kesikli turuncu çizgi, uçlarda halka; rozet HTML katmanında (orta nokta).
   const anchors = new Map<string, Vector3>();

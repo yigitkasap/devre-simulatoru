@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { addedParts, footprintTip, holeLabels, missingConnections, perfboardInfo, stepGroups, stepRef, stepTargets, stepWarning, type MissingConnection, type StepTarget } from '../bench3d/boardData';
-import { buildPcbBoard, buildPerfboard, type BoardModel } from '../bench3d/boardModels';
+import { buildPcbBoard, buildPcbSurface, buildPerfboard, type BoardModel } from '../bench3d/boardModels';
 import { BoardScene, type BoardSide } from '../bench3d/boardScene';
 import { planBreadboard } from '../bench3d/breadboard';
 import { fabricationZip } from '../bench3d/gerber';
@@ -412,10 +412,14 @@ function PcbTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { do
   const [pinned, setPinned] = useState<string | null>(null);
   const api = useRef<SceneApi | null>(null);
   const design = result.ok ? result.design : null;
+  const routing = current?.routing ?? null;
+  // Maske dokuları pahalı: yalnızca tasarım ya da yollar değişince üretilir (Parçalarla / Yalın kart değil).
+  const surface = useMemo(() => (design ? buildPcbSurface(design, routing) : null), [design, routing]);
+  useEffect(() => () => surface?.dispose(), [surface]);
   const model = useMemo(() => {
-    if (!design) return null;
-    return buildPcbBoard(doc, design, current?.routing ?? null, missing, withParts, footprintTip);
-  }, [doc, design, current, missing, withParts]);
+    if (!design || !surface) return null;
+    return buildPcbBoard(doc, design, surface, missing, withParts, footprintTip);
+  }, [doc, design, surface, missing, withParts]);
   const sz = phone ? 'touch' : 'desk';
 
   if (!result.ok || !design) {
@@ -650,7 +654,8 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
   const targets = useMemo(() => stepTargets(doc, plan, guide), [doc, plan, guide]);
   const total = guide.steps.length;
   const [step, setStep] = useState(0);
-  const [mode, setMode] = useState<'step' | 'all'>('step');
+  // Kart açılınca bütün devre görünür (kullanıcı isteği); "Adım adım başla" ya da Gösterim seçicisi adım adıma geçer.
+  const [mode, setMode] = useState<'step' | 'all'>('all');
   const [side, setSide] = useState<BoardSide>('top');
   const [view, setView] = useState<'steps' | 'materials' | 'checks'>('steps');
   const [hover, setHover] = useState<string | null>(null);
@@ -661,6 +666,10 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
   const last = current >= total - 1;
   const go = useCallback((delta: number) => setStep((s) => Math.min(Math.max(0, s + delta), Math.max(0, total - 1))), [total]);
   const next = () => (last ? setView('checks') : go(1));
+  const start = () => {
+    setStep(0);
+    setMode('step');
+  };
   const nextRef = last ? '' : stepRef(guide.steps[current + 1]!, targets[current + 1] ?? null);
   const groups = stepGroups(targets, all ? total : current);
   const labels = !all && !phone && targets[current] ? holeLabels(targets[current]!, plan) : [];
@@ -747,8 +756,10 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
     </BoardView>
   );
 
-  const progress = total > 0 ? ((current + 1) / total) * 100 : 0;
-  const counter = (
+  const progress = all ? 100 : total > 0 ? ((current + 1) / total) * 100 : 0;
+  const counter = all ? (
+    <span className="shrink-0 text-small whitespace-nowrap text-ink-2">{t.plaket.stepCount(total)}</span>
+  ) : (
     <span aria-label={t.plaket.progressLabel(current + 1, total)} className="shrink-0 whitespace-nowrap">
       <span className={`font-bold text-ink ${phone ? 'text-body' : 'text-[18px]'}`}>{current + 1}</span>
       <span className="text-small text-ink-2">{` / ${total}`}</span>
@@ -771,6 +782,32 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
     </button>
   );
 
+  const startButton = (h: string) => (
+    <button type="button" onClick={start} className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent px-4 text-[16px] font-semibold text-white shadow-[0_6px_16px_rgba(31,111,235,0.28)] hover:brightness-105 ${h}`}>
+      <span className="truncate">{t.plaket.start}</span>
+      <Icon name="chevron" className="h-5 w-5 shrink-0" />
+    </button>
+  );
+  const groupChips = (
+    <ul aria-label={t.plaket.groupsLabel} className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+      {groups.map((g) => {
+        const done = !all && g.done === g.total;
+        const now = !all && g.current;
+        return (
+          <li
+            key={g.name}
+            className={`flex h-[26px] items-center gap-[5px] rounded-full px-2.5 text-label ${now ? 'bg-accent-soft font-semibold text-accent-ink' : done || all ? 'bg-ok-soft text-ok-ink' : 'bg-panel-2 text-muted'}`}
+          >
+            {(done || all) && <Icon name="check" className="h-3 w-3" />}
+            {g.name}
+            <span className="font-mono">{now ? `${g.position}/${g.total}` : g.total}</span>
+            <span className="sr-only">{now ? ` (${t.plaket.groupNow})` : done ? ` (${t.plaket.groupDone})` : ''}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
   if (phone) {
     const upcoming = guide.steps[current + 1];
     return (
@@ -781,8 +818,8 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
             {bar}
             {counter}
           </div>
-          <NowCard guide={guide} targets={targets} step={current} phone />
-          {upcoming && (
+          {all ? groupChips : <NowCard guide={guide} targets={targets} step={current} phone />}
+          {!all && upcoming && (
             <p className="m-0 text-small text-muted">
               {`${t.plaket.upcomingLine} `}
               <b className="font-semibold text-ink">{stepRef(upcoming, targets[current + 1] ?? null)}</b>
@@ -799,8 +836,14 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
           </div>
         </div>
         <div className="flex shrink-0 gap-2 px-4 pt-2.5" style={{ paddingBottom: 'calc(18px + env(safe-area-inset-bottom))' }}>
-          {prevButton('h-[54px] w-[54px]')}
-          {nextButton('h-[54px]')}
+          {all ? (
+            startButton('h-[54px]')
+          ) : (
+            <>
+              {prevButton('h-[54px] w-[54px]')}
+              {nextButton('h-[54px]')}
+            </>
+          )}
         </div>
       </>
     );
@@ -837,26 +880,12 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
                 {counter}
               </div>
               <div className="my-2.5 flex">{bar}</div>
-              <ul aria-label={t.plaket.groupsLabel} className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-                {groups.map((g) => {
-                  const done = !all && g.done === g.total;
-                  const now = !all && g.current;
-                  return (
-                    <li
-                      key={g.name}
-                      className={`flex h-[26px] items-center gap-[5px] rounded-full px-2.5 text-label ${now ? 'bg-accent-soft font-semibold text-accent-ink' : done || all ? 'bg-ok-soft text-ok-ink' : 'bg-panel-2 text-muted'}`}
-                    >
-                      {(done || all) && <Icon name="check" className="h-3 w-3" />}
-                      {g.name}
-                      <span className="font-mono">{now ? `${g.position}/${g.total}` : g.total}</span>
-                      <span className="sr-only">{now ? ` (${t.plaket.groupNow})` : done ? ` (${t.plaket.groupDone})` : ''}</span>
-                    </li>
-                  );
-                })}
-              </ul>
+              {groupChips}
             </section>
             {!all && <NowCard guide={guide} targets={targets} step={current} phone={false} />}
-            {!all && (
+            {all ? (
+              <div className="flex">{startButton('h-[54px]')}</div>
+            ) : (
               <div className="flex gap-2">
                 {prevButton('h-[54px] w-[54px]')}
                 {nextButton('h-[54px]')}

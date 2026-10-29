@@ -1871,7 +1871,8 @@ değişmedi; değişen arayüz ve görünüm.
   biçimde sığdırılır. HTML katmanı (eksik bağlantı rozetleri, delik etiketleri, ipucu) her
   çizimden sonra 3B noktaların ekrandaki yerine taşınır. WebGL açılamazsa sahnede bir uyarı.
 - Baskı devre (K1–K3): FR-4 kenarlı levha, yeşil maske, maskenin altında yollar, kalaylı pedler,
-  serigrafi (ref ve uç adları), montaj delikleri; eklenen dekuplaj, vidalı klemens, pin başlık. Araç
+  serigrafi (ref ve uç adları), montaj delikleri; eklenen dekuplaj, vidalı klemens, pin başlık
+  (yüzeyin ayrıntısı aşağıda, "Gerçekçi PCB yüzeyi"). Araç
   hapı: Parçalarla | Yalın kart, Üst yüz | Alt yüz (kart çevrilir), − + Sığdır; sol üstte "70 × 51 mm ·
   2 katman". Parçanın üstüne gelince koyu ipucu (ref · malzeme listesindeki ad, eşdeğer KiCad kılıfı).
   Panel: durum ("Üretime hazır" / "N bağlantı çizilemedi" / tasarım kuralı hatası), "Üretim
@@ -1884,7 +1885,10 @@ değişmedi; değişen arayüz ve görünüm.
   ayarları ve eklenenler KiCad adımlarının altında görünür. Şebekeli devrede sahnede `tr.pcb.mains`.
 - Delikli plaket (L1): breadboard düzeninde altın kaplama delikler, şerit çerçeveleri, kırmızı / mavi
   raylar, sütun numaraları; parçalar, jumper'lar ve dışarı giden teller tezgâhtaki yerleşimle aynı
-  deliklerde; alt yüzde lehim noktaları. Adım adım: o adıma kadar takılanlar görünür, şimdiki adımın
+  deliklerde; alt yüzde lehim noktaları. Kullanıcı kararı (2026-10-29): sekme "Tamamı" ile açılır
+  (bütün devre takılı; panelde "25 adım", dolu çubuk, tikli grup çipleri ve birincil "Adım adım başla";
+  telefonda aynı düğme altta sabit). "Adım adım başla" ya da Gösterim seçicisi adım adıma geçer;
+  düğme 1. adımdan başlatır. Adım adım: o adıma kadar takılanlar görünür, şimdiki adımın
   deliklerinde mavi halka ve delik etiketi ("+ 10c", "− 11c"; transistörde C B E, entegrede 1. bacak;
   bitişik etiketler yana açılıp çizgiyle deliğe bağlanır). Panel: TAKMA SIRASI ve "19 / 25", ilerleme
   çubuğu, grup çipleri (tür başına; bitenler yeşil tikli, şimdiki mavi "1/2"), ŞİMDİ TAK kartı
@@ -1892,6 +1896,16 @@ değişmedi; değişen arayüz ve görünüm.
   dış tel adımının kartında), Önceki ve "Sonraki: CV" (← → tuşları da), SIRADAKİLER, en altta
   Malzemeler, Denetim (panelde açılır) ve Yazdır. Kullanıcı kararı: son adımda düğme "Bitti ·
   Denetle" (Denetim'i açar). Yazdır bugünkü yazdırılabilir rehberi basar (koyu temada da açık).
+- Gerçekçi PCB yüzeyi (2026-10-29, kullanıcı isteği: düz yeşil düzlem değil, gerçek kart fotoğrafı
+  gibi; `boardModels.ts` → `buildPcbSurface`): parlak, doygun yeşil lehim maskesi (vernik:
+  `clearcoat`); yollar maskenin altında biraz açık renkli ve kabarık, ışık kenarlarında parlar;
+  maskede ince "portakal kabuğu". Renk dokusu (maske, yollar, serigrafi) ve normal dokusu
+  (kabartılar; yarı çözünürlükte, kutu bulanıklığıyla yumuşatılıp eğiminden) aynı tuval çiziminden
+  üretilir; doku başına en çok ~2,6 milyon piksel (milimetrede en çok 28). Delikler levhayı gerçekten
+  deler (arkası görünür); kaplamalı deliklerin içi kalaylı, pedler kenarı yuvarlatılmış kubbeli kalay
+  (HASL). Via'lar Gerber'deki gibi maskeyle kapalı: maskenin altında halka, ortasında çukur. Gerber'de
+  olmayan bir şey (bakır dolgu, yazı) eklenmez. Dokular yalnızca tasarım ya da yollar değişince
+  üretilir; Parçalarla / Yalın kart geçişi aynı yüzeyi kullanır (anında). Delikli plaket değişmedi.
 - Rehber adımlarının plandaki karşılığı `src/bench3d/boardData.ts` → `stepTargets` (başlıktan: "Jumper
   N", "ETİKET · …", dış telde rehberdekiyle aynı uç adı); eksik bağlantılar, eklenenlerin kısa adı
   (`design.added` satırları kılıflarla eşlenir) ve ipucu da orada.

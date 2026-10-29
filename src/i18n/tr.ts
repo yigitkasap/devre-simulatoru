@@ -1847,6 +1847,8 @@ export const tr = {
       all: 'Tamamı',
       order: 'TAKMA SIRASI',
       progressLabel: (i: number, n: number) => `${n} adımın ${i}. adımı`,
+      stepCount: (n: number) => `${n} adım`,
+      start: 'Adım adım başla',
       now: 'ŞİMDİ TAK',
       next: (ref: string) => `Sonraki: ${ref}`,
       finish: 'Bitti · Denetle',

@@ -665,7 +665,7 @@ try {
     check('erişilebilirlik: adı olmayan düğme ya da alan yok (masaüstü kartlar, 3B, telefon, ⋯)', found.length === 0, found.slice(0, 2).join(' | '));
   }
 
-  // --- Karta aktar (masaüstü, K1–K2, L1): Dosya menüsünden; delikli plaket adım adım, PCB -----------
+  // --- Karta aktar (masaüstü, K1–K2, L1): Dosya menüsünden; delikli plaket (Tamamı, adım adım), PCB --
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
@@ -681,6 +681,14 @@ try {
     await karta.waitFor();
     await page.waitForFunction(() => window.__kart !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(600);
     await karta.getByRole('tab', { name: 'Delikli plaket' }).click(); await page.waitForTimeout(300);
+    // Varsayılan "Tamamı" (kullanıcı isteği): bütün devre takılı, "25 adım"; Önceki / Sonraki yerine "Adım adım başla".
+    const allScene = (await karta.getByRole('img', { name: /^Delikli plaket 3B/ }).getAttribute('aria-label')) ?? '';
+    const allAside = (await karta.getByRole('complementary', { name: 'Delikli plaket' }).textContent()) ?? '';
+    const allNav = await karta.getByRole('button', { name: /^Sonraki/ }).count();
+    await karta.getByRole('button', { name: 'Adım adım başla' }).click(); await page.waitForTimeout(300);
+    const started = (await karta.locator('[aria-label$=". adımı"]').getAttribute('aria-label')) ?? '';
+    check('Karta aktar (masaüstü): delikli plaket "Tamamı" ile açılıyor (bütün parçalar, "25 adım", adım düğmesi yok); "Adım adım başla" 1. adımdan başlatıyor',
+      allScene.includes('bütün parçalar takılı') && allAside.includes('25 adım') && allNav === 0 && /25 adımın 1\. adımı$/.test(started), `${allScene.slice(0, 48)} → ${started}`);
     const dialogBox = await karta.boundingBox();
     const aside = await karta.getByRole('complementary', { name: 'Delikli plaket' }).boundingBox();
     const chip = (await karta.getByText(/breadboard düzeni$/).textContent()) ?? '';
@@ -725,6 +733,21 @@ try {
     await karta.getByRole('button', { name: 'Yalın kart' }).click();
     await karta.getByRole('button', { name: 'Alt yüz' }).click(); await page.waitForTimeout(300);
     await shot(page, 'karta-pcb.png');
+    // Gerçekçi yüzey: iki yüzde dokulu, vernikli maske (renk + kabartı); delikler levhayı deliyor, kaplamalı olanların içi kalaylı.
+    const surface = await page.evaluate(() => {
+      let masks = 0;
+      let holes = -1;
+      let barrels = 0;
+      window.__kart?.scene.traverse((o) => {
+        const m = o.material;
+        if (m && !Array.isArray(m) && m.map && m.normalMap && m.clearcoat > 0) masks++;
+        if (o.geometry?.type === 'ExtrudeGeometry' && Array.isArray(m) && m[0].visible === false) holes = o.geometry.parameters.shapes.holes.length;
+        if (o.geometry?.type === 'CylinderGeometry' && o.geometry.parameters.openEnded) barrels++;
+      });
+      return { masks, holes, barrels };
+    });
+    check('Karta aktar (masaüstü): PCB yüzeyi gerçekçi: iki yüzde dokulu ve vernikli maske (yollar kabarık), delikler levhayı deliyor, kaplamalı deliklerin içi kalaylı (4 montaj deliği kaplamasız)',
+      surface.masks === 2 && surface.holes > 20 && surface.barrels === surface.holes - 4, JSON.stringify(surface));
     await pcbPanel.getByRole('button', { name: 'Gümrük ve üretici seçenekleri' }).click(); await page.waitForTimeout(150);
     const notes = (await pcbPanel.textContent()) ?? '';
     check('Karta aktar (masaüstü, K1–K2): PCB "Üretime hazır", 70 × 51 mm çipi; SİPARİŞTE SEÇ kopyalanıyor; C_D1 çipi seçiliyor ve açıklaması çıkıyor; Gümrük satırı açılıyor',
@@ -1293,7 +1316,11 @@ try {
       .map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), w: r.width, h: r.height }; })
       .filter((r) => r.w > 0 && r.h > 0 && (r.h < 43.5 || r.w < 43.5)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
     await karta.getByRole('tab', { name: 'Delikli plaket' }).tap(); await page.waitForTimeout(400);
-    const perfSmall = await kartaSmall();
+    const phoneAll = (await karta.getByRole('img', { name: /^Delikli plaket 3B/ }).getAttribute('aria-label')) ?? '';
+    const startBox = await karta.getByRole('button', { name: 'Adım adım başla' }).boundingBox();
+    const allSmall = await kartaSmall();
+    await karta.getByRole('button', { name: 'Adım adım başla' }).tap(); await page.waitForTimeout(400);
+    const perfSmall = [...allSmall, ...(await kartaSmall())];
     const counter0 = (await karta.locator('[aria-label$=". adımı"]').getAttribute('aria-label')) ?? '';
     await karta.getByRole('button', { name: /^Sonraki/ }).tap(); await page.waitForTimeout(400);
     const counter1 = (await karta.locator('[aria-label$=". adımı"]').getAttribute('aria-label')) ?? '';
@@ -1305,8 +1332,8 @@ try {
     const kartaScroll = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop);
     const next = await karta.getByRole('button', { name: /^Sonraki/ }).boundingBox();
     await shot(page, 'ios-karta-plaket.png');
-    check('Karta aktar (telefon, L2): Delikli plaket 3B; Sonraki adımı ilerletiyor; parmakla kart dönüyor, sayfa kaymıyor; Sonraki altta sabit; hedefler ≥ 44 px',
-      perfSmall.length === 0 && /adımın 1\. adımı$/.test(counter0) && /adımın 2\. adımı$/.test(counter1) && Boolean(kartaBefore) && kartaBefore !== kartaAfter && kartaScroll === 0 && next !== null && next.y + next.height > 780,
+    check('Karta aktar (telefon, L2): Delikli plaket 3B "Tamamı" ile açılıyor, altta "Adım adım başla"; Sonraki adımı ilerletiyor; parmakla kart dönüyor, sayfa kaymıyor; Sonraki altta sabit; hedefler ≥ 44 px',
+      perfSmall.length === 0 && phoneAll.includes('bütün parçalar takılı') && startBox !== null && startBox.y + startBox.height > 780 && /adımın 1\. adımı$/.test(counter0) && /adımın 2\. adımı$/.test(counter1) && Boolean(kartaBefore) && kartaBefore !== kartaAfter && kartaScroll === 0 && next !== null && next.y + next.height > 780,
       perfSmall.join(', ') || `${counter0} → ${counter1}`);
     await karta.getByRole('tab', { name: 'Baskı devre (PCB)' }).tap();
     await karta.getByText('Üretime hazır').waitFor({ timeout: 10000 }).catch(() => {});
