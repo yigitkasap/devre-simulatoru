@@ -1357,6 +1357,8 @@ try {
       .map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 20), w: r.width, h: r.height }; })
       .filter((r) => r.w > 0 && r.h > 0 && (r.h < 43.5 || r.w < 43.5)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
     check('baraj (telefon): bütün dokunma hedefleri en az 44 px', small.length === 0, small.join(', '));
+    const phoneView = await page.evaluate(() => window.__baraj3b?.view ?? null);
+    check('baraj (telefon, 3B): sahne three.js ile (WebGL), dar alanda telefon kamerası; yeşil lamba yanıyor', phoneView === 'phone' && (await page.evaluate(() => (window.__baraj3b?.lamps[2]?.lens.emissiveIntensity ?? 0) > 0.3)), String(phoneView));
     await page.getByRole('radio', { name: 'Tek ışık' }).tap(); await page.waitForTimeout(1200);
     check('baraj (telefon): Tek ışık’a geçince su aynı yerde kalıyor, devre çalışmaya devam ediyor', (await barajLevel(page)) === 50 && (await sceneLabel(page)).includes('yeşil yanıyor'), `%${await barajLevel(page)}`);
     await page.getByRole('button', { name: 'Soru', exact: true }).tap(); await page.waitForTimeout(300);
@@ -1428,9 +1430,10 @@ try {
     check('baraj (masaüstü, B1): sayfa kaymıyor; yalnızca sahne (devre kapalı, tablo yok, alt kumanda yok); akış yalnızca simge',
       !(await pageScrolls(bp)) && (await bp.getByRole('table').count()) === 0 && (await bp.locator('svg.schematic').count()) === 0 && sceneBox !== null && sceneBox.width > 1400 && sceneBox.y + sceneBox.height >= 899 &&
       flowNames.join(',') === 'Boşalt|,Durdur|,Doldur|', flowNames.join(','));
-    const scaleBefore = await bp.locator('svg[role=img] text', { hasText: '%100' }).count();
+    const sceneRegion = bp.getByRole('region', { name: 'Baraj ve ışık kulesi' });
+    const scaleBefore = await sceneRegion.locator('svg text', { hasText: '%100' }).count();
     await bp.getByRole('button', { name: 'Yüzde ölçeği' }).click(); await bp.waitForTimeout(150);
-    const scaleAfter = await bp.locator('svg[role=img] text', { hasText: '%100' }).count();
+    const scaleAfter = await sceneRegion.locator('svg text', { hasText: '%100' }).count();
     await bp.getByRole('button', { name: 'Yüzde ölçeği' }).click();
     check('baraj (masaüstü): yüzde ölçeği varsayılan gizli, "Göster: Yüzde ölçeği" ile açılıyor', scaleBefore === 0 && scaleAfter === 1);
     // Ayarlar: ⋯ menüsünde; dolma süresini kısalt (klavye denemesi hızlı bitsin).
@@ -1458,6 +1461,8 @@ try {
     await bp.keyboard.press('1'); await waitLevel(bp, 50, 4000); await bp.waitForTimeout(700);
     await bp.getByRole('button', { name: 'Devre', exact: true }).click(); await bp.waitForTimeout(300);
     const aside = bp.getByRole('complementary', { name: 'Devre' });
+    const view3d = async () => bp.evaluate(() => window.__baraj3b?.view ?? null);
+    const openView = await view3d();
     const tabSelected = async (name) => (await aside.getByRole('tab', { name, exact: true }).getAttribute('aria-selected')) === 'true';
     const drawing = async () => (await aside.getByRole('tabpanel').locator('svg[role=img]').getAttribute('aria-label')) ?? '';
     const panelBox = await aside.boundingBox();
@@ -1482,6 +1487,7 @@ try {
       allBox !== null && Math.abs(allBox.width - 840) < 2 && sceneAll !== null && Math.abs(sceneAll.width - 600) < 2 &&
       allText.includes('Kat 1 devresi tamamlandı: B1 + → ortak prob → su → Prob 1 → RB1 → Q1 → toprak → B1 −') && allText.includes('Prob 2, 3 kuru: devre açık') && openMarks === 2,
       `${Math.round(allBox?.width ?? 0)}/${Math.round(sceneAll?.width ?? 0)} px · açık ×${openMarks}`);
+    const allView = await view3d();
     await aside.getByRole('button', { name: 'Devreyi tam ekran aç' }).click(); await bp.waitForTimeout(200);
     const wideBox = await aside.boundingBox();
     const sceneHidden = !(await bp.getByRole('region', { name: 'Baraj ve ışık kulesi' }).isVisible());
@@ -1501,6 +1507,23 @@ try {
     await bp.getByRole('radio', { name: 'Çubuk gösterge' }).click(); await bp.waitForTimeout(200);
     await aside.getByRole('button', { name: 'Devreyi kapat' }).click(); await bp.waitForTimeout(200);
     await bp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await bp.keyboard.press('r'); await waitLevel(bp, 20, 2000);
+    await bp.waitForTimeout(300);
+    const deskView = await view3d();
+    check('baraj (masaüstü, 3B): kamera sahnenin en-boy oranına göre: tam genişlik "desk", devre açık "open", tüm devre "all"',
+      deskView === 'desk' && openView === 'open' && allView === 'all', `${deskView} / ${openView} / ${allView}`);
+    // Su yüzeyindeki tutamak: yukarı sürükleyince su yükseliyor, akış Durdur.
+    const handle3d = await sceneRegion.getByRole('slider', { name: 'Su seviyesi' }).boundingBox();
+    await bp.mouse.move(handle3d.x + handle3d.width / 2, handle3d.y + handle3d.height / 2);
+    await bp.mouse.down(); await bp.mouse.move(handle3d.x + handle3d.width / 2, handle3d.y - 120, { steps: 6 }); await bp.mouse.up();
+    await bp.waitForTimeout(300);
+    const raised = await barajLevel(bp);
+    check('baraj (masaüstü, 3B): su yüzeyindeki tutamak sürüklenince su bırakılan yerde kalıyor, akış Durdur', raised > 30 && (await flowChecked(bp)) === 'Durdur', `%20 → %${raised}`);
+    await bp.keyboard.press('1'); await waitLevel(bp, 50, 4000); await bp.waitForTimeout(900);
+    const bubbles = await bp.evaluate(() => (window.__baraj3b?.bubbles ?? []).map((pool) => pool.filter((b) => b.visible).length));
+    const lit = await bp.evaluate(() => (window.__baraj3b?.lamps ?? []).map((l) => Math.round(l.lens.emissiveIntensity * 100) / 100));
+    check('baraj (masaüstü, 3B): %50’de ortak prob ve Prob 1 ıslak: uçlarında elektroliz kabarcıkları; yalnız yeşil lamba yanıyor',
+      bubbles[0] > 0 && bubbles[1] > 0 && bubbles[2] === 0 && bubbles[3] === 0 && lit[2] > 0.3 && lit[0] === 0 && lit[1] === 0, `kabarcık ${bubbles.join('/')} · lamba ${lit.join('/')}`);
     await bp.keyboard.press('r'); await waitLevel(bp, 20, 2000);
     await bp.keyboard.press('s'); await bp.waitForTimeout(200);
     const strip = bp.getByRole('region', { name: 'Soru' });

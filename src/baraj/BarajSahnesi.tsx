@@ -113,7 +113,7 @@ function useScale(viewBox: readonly [number, number, number, number]) {
 const TIP_X = 452;
 
 /** Bir iyon: renkli daire, içinde + (katyon) ya da − (anyon). */
-function SceneIon({ ion, r, opacity = 1 }: { ion: PlacedIon; r: number; opacity?: number }) {
+export function SceneIon({ ion, r, opacity = 1 }: { ion: PlacedIon; r: number; opacity?: number }) {
   const g = r * 0.5;
   return (
     <g opacity={opacity}>

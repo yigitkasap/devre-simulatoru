@@ -14,7 +14,7 @@
 // satır kumanda; sahne ekranın altına kadar; sol altta "Devreyi gör ›" (devre tam ekran). Sayfanın
 // kendisi hiçbir düzende kaymaz; paneller kendi içinde kayar.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { exampleDoc } from '../examples';
 import { tr } from '../i18n/tr';
 import { buildConnectivity } from '../model/connectivity';
@@ -38,6 +38,18 @@ import { bandOf, katDevreleri, START_LEVEL, stopAbove, stopBelow, type LevelNo, 
 import { Soru } from './Soru';
 import { AkisDugmeleri, DolulukKarti, GosterCipleri, SeviyeCubugu } from './UstKumanda';
 import { useBarajKumanda } from './useBarajKumanda';
+
+// three.js sahnesi tembel yüklenir; WebGL yoksa SVG çizimi (BarajSahnesi) kullanılır.
+const BarajSahnesi3B = lazy(() => import('./BarajSahnesi3B'));
+
+function supportsWebGL(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    return Boolean(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
+  } catch {
+    return false;
+  }
+}
 
 type Variant = 'baraj-cubuk' | 'baraj-tek-isik';
 const VARIANTS: readonly Variant[] = ['baraj-cubuk', 'baraj-tek-isik'];
@@ -150,6 +162,8 @@ export default function BarajSayfasi() {
   const theme = useTheme(appSettings.theme);
   const setTheme = (choice: ThemeChoice) => updateAppSettings({ theme: choice });
   const layout = useLayout();
+  /** three.js sahnesi (WebGL varsa); yoksa SVG çizimi. */
+  const [webgl] = useState(supportsWebGL);
   const width = useWindowWidth();
   const phone = layout.kind === 'phone';
   const landscape = phone && layout.landscape;
@@ -289,8 +303,29 @@ export default function BarajSayfasi() {
     setPreview(v);
     if (v !== null && s.mode !== 'stop') kumanda.setFlow('stop');
   };
+  const ionView = showIons && preview === null ? sim.frame?.live.get(tank.id)?.ions : undefined;
   const scene = (
     <>
+      {webgl ? (
+        <Suspense fallback={<div className="h-full w-full" style={{ background: 'linear-gradient(#b9d3ea, #dfeaf3 60%, #eef3f6)' }} />}>
+          <BarajSahnesi3B
+            level={shown}
+            wet={sceneWet}
+            lamps={lamps}
+            mode={s.mode}
+            running={running}
+            textPx={textPx}
+            scale={showScale}
+            handle={!phone}
+            {...(ionView ? { ions: ionView } : {})}
+            currents={sim.frame?.live.get(tank.id)?.ions?.probeCurrents ?? null}
+            onPreview={onPreview}
+            onCommit={kumanda.commitLevel}
+            {...(phone ? {} : { onLamp: selectFloor })}
+            className="h-full w-full"
+          />
+        </Suspense>
+      ) : (
       <BarajSahnesi
         level={shown}
         wet={sceneWet}
@@ -301,12 +336,13 @@ export default function BarajSayfasi() {
         textPx={textPx}
         scale={showScale}
         handle={!phone}
-        ions={showIons && preview === null ? sim.frame?.live.get(tank.id)?.ions : undefined}
+        ions={ionView}
         onPreview={onPreview}
         onCommit={kumanda.commitLevel}
         {...(phone ? {} : { onLamp: selectFloor })}
         className="h-full w-full"
       />
+      )}
       <DolulukKarti level={shown} alert={alert} size={phone ? 'phone' : big ? 'big' : 'desk'} />
     </>
   );

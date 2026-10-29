@@ -1370,6 +1370,22 @@ kısımlar:
    genişlikte (kat 440 px, tüm devre 680 px) panel içinde kayar. Testler: `katDevreleri` gerçek
    simülasyonla (%50 Kat 1 doyumda ve akımlar, kondansatörün boşalması, tek ışık %75 Q4 susturuyor,
    saf su). ios-kontrol'e panel maddeleri eklendi (178 madde).
+3. **three.js sahnesi** (`barajScene.ts`, `BarajSahnesi3B.tsx`; başlangıç
+   `docs/tasarim-v3/baraj-3b/main.js`): toprak bloğu, beton baraj (kesit yüzü koyu), taç yolu ve
+   korkuluk, kontrol evi (içinde üç katlı devre kartı, klemens, 9 V pil), hazne suyu, mansap deresi,
+   paslanmaz problar (renkli bilezik, grafit uç; yükseklikler tankınkiyle aynı: %12,5, 37,5, 62,5,
+   87,5), beton içinde kablo kanalı ve dört kablo, üç lambalı ışık kulesi, evden kuleye kablo. Işık ve
+   malzeme tezgâhla aynı dil (ACES, RoomEnvironment, MeshStandardMaterial, yumuşak gölge; çizici
+   `bench3d/stage.ts`'ten). Kamera sabit: sahne alanının en-boy oranına göre README'deki ön ayarlardan
+   seçilir (≥ 1,35 masaüstü, ≥ 0,85 devre açık, ≥ 0,66 tüm devre, altı telefon); lambalar, problar ve
+   ev kadrajda kalmazsa kamera geri çekilir. Su seviyesi, ıslak problardaki elektroliz kabarcıkları
+   (katotta daha çok) ve lambaların parlaklığı canlı; sahne yalnızca bir şey değişince çizilir
+   (kabarcıklar akarken sürekli). HTML katmanı (3B noktaların izdüşümü): prob ve lamba numaraları,
+   ıslak prob ucunda yeşil halka, "Ortak +9 V", su yüzeyi tutamağı (masaüstü; sürükle ya da oklar),
+   yüzde ölçeği ve iyonlar (iyon açıklaması yalnızca iyonlar açıkken), lambalara 44 px'lik tıklama
+   alanı (o katın devresi). Sahne tembel yüklenir; WebGL yoksa SVG çizimi (BarajSahnesi) kullanılır.
+   ios-kontrol: kamera ön ayarları (desk / open / all / phone), tutamakla su yükseltme, %50'de
+   kabarcıklar ve yalnız yeşil lamba (186 madde).
 
 ### Föy parça modelleri (föy için 2. aşama)
 
