@@ -56,6 +56,15 @@ export function oscillates(s: KeyStats): boolean {
 
 const mean = (s: KeyStats) => (s.time > 0 ? s.sum / s.time : s.last);
 const rms = (s: KeyStats) => (s.time > 0 ? Math.sqrt(Math.max(0, s.sumSquares / s.time)) : Math.abs(s.last));
+/**
+ * Gerilim ve akımın özeti: etkin değer. Ağırlıkla tek kutuplu değerde (doğrultulmuş, darbeli DC)
+ * ortalamanın işaretini alır; simetriğe yakın AC'de işaretsizdir (ortalama sıfıra yakın olduğundan
+ * işareti pencereye ve yük asimetrisine göre rastgele değişir: "≈ −3,46 V" yazmasın).
+ */
+function signedRms(s: KeyStats): number {
+  const r = rms(s);
+  return Math.abs(mean(s)) >= 0.2 * r ? Math.sign(mean(s)) * r : r;
+}
 
 type Pick = 'min' | 'max' | 'summary';
 
@@ -73,7 +82,7 @@ function leafValue(part: Part, key: string, s: KeyStats, pick: Pick): number | b
     const ac = part.props.mode === 'ac';
     return ac && key !== 's.reading' ? rms(s) : mean(s);
   }
-  if (key === 'm.voltage' || key === 'm.current') return Math.sign(mean(s)) * rms(s) || rms(s);
+  if (key === 'm.voltage' || key === 'm.current') return signedRms(s);
   return mean(s);
 }
 
@@ -137,6 +146,15 @@ export function stableReadout(part: Part, m: Measurement, status: DeviceStatus, 
   });
   const note = avg?.note !== undefined && base.note !== avg.note ? avg.note : base.note;
   return { title: base.title, rows: guard(rows), ...(note !== undefined ? { note } : {}), varying };
+}
+
+/**
+ * Tek bir gerilim ya da akım yaprağının kararlı değeri (fonksiyon üretecinin çıkış satırı gibi):
+ * pencerede salınıyorsa etkin değeri (signedRms; `approx`, başına "≈" konur), yoksa canlı değer.
+ */
+export function stableValue(live: number, s: KeyStats | undefined): { value: number; approx: boolean } {
+  if (!s || s.kind !== 'number' || !oscillates(s)) return { value: live, approx: false };
+  return { value: signedRms(s), approx: true };
 }
 
 /** Ölçü aletinin göstergesi: salınıyorsa pencere özeti (DC ortalama, AC etkin), yoksa canlı. */

@@ -39,8 +39,8 @@ import { useTouchUi } from './touchUi';
 export interface DeviceHooks {
   readonly scopeView: (id: string) => ScopeView | null;
   readonly status: (id: string) => DeviceStatus;
-  /** Fonksiyon üretecinin çıkış gerilimi; simülasyon durmuşsa null. */
-  readonly outputVoltage: (id: string) => number | null;
+  /** Fonksiyon üretecinin çıkış gerilimi (salınıyorsa pencerenin etkin değeri, `approx`); simülasyon durmuşsa null. */
+  readonly outputVoltage: (id: string) => { readonly value: number; readonly approx: boolean } | null;
   readonly running: boolean;
   readonly pinConnected: (id: string, pin: number) => boolean;
   readonly onChange: (id: string, patch: Record<string, PropValue>) => void;

@@ -1086,6 +1086,17 @@ try {
   await notebook(rp).getByRole('button', { name: 'Oto', exact: true }).click(); await rp.waitForTimeout(300);
   const autoToast = (await rp.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
   check('masaüstü (v3): çalışırken osiloskop kartı tetik durumunu gösteriyor; Gelişmiş’teki Oto neyin değiştiğini bildiriyor', autoToast && (status.includes('Tetikleniyor') || status.includes('Tetiklenmiyor')), status.slice(0, 40));
+  // Üretecin çıkış satırı AC'de anlık değeri değil, 0,4 s'lik pencerenin etkin değerini gösterir (her karede zıplamaz; simetrik AC işaretsiz).
+  const fgRegion = notebook(rp).getByRole('region', { name: 'FG1 · Fonksiyon üreteci' });
+  if (!(await fgRegion.count())) await notebook(rp).getByRole('button', { name: /^FG1 ·/ }).click();
+  await rp.waitForTimeout(900);
+  const fgOuts = [];
+  for (let i = 0; i < 8; i++) {
+    fgOuts.push(((await fgRegion.textContent()) ?? '').match(/Çıkış \(OUT − COM\) ([^·]+)·/)?.[1]?.trim() ?? '');
+    await rp.waitForTimeout(100);
+  }
+  check('masaüstü: çalışırken üreteç kartında çıkış "≈ etkin değer" (her karede zıplamıyor, simetrik AC işaretsiz)',
+    fgOuts.every((t) => /^≈ \d/.test(t)) && new Set(fgOuts).size <= 2, fgOuts.join(' | '));
   await rp.getByRole('button', { name: 'Durdur', exact: true }).click(); await rp.waitForTimeout(300);
   await rackCtx.close();
 

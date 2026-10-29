@@ -87,7 +87,8 @@ export function FuncGenControls({
   touch = true,
 }: {
   part: Part;
-  output: number | null;
+  /** Çıkış gerilimi; salınıyorsa (AC) pencerenin etkin değeri ve `approx` ("≈"). */
+  output: { readonly value: number; readonly approx: boolean } | null;
   onChange: (patch: Record<string, PropValue>) => void;
   onJack: (pin: number) => void;
   /** Telefon: 44 px dokunma hedefleri; defter kartında (masaüstü) sıkı. */
@@ -205,7 +206,7 @@ export function FuncGenControls({
       />
       <ToggleRow label={tr.rack.earthed} note={tr.phone.earthedNote} checked={s.earthed} onChange={(earthed) => onChange({ earthed })} touch={touch} />
       <p className="rounded-[10px] bg-panel px-3 py-2.5 text-[13px] leading-normal text-ink-2">
-        <HintText text={output === null ? tr.phone.outputStopped : tr.phone.output(formatSI(output, 'V', { digits: 3 }))} />
+        <HintText text={output === null ? tr.phone.outputStopped : tr.phone.output(`${output.approx ? '≈ ' : ''}${formatSI(output.value, 'V', { digits: 3 })}`)} />
       </p>
       <Jacks>
         <Jack color="var(--color-danger)" name="OUT" label={tr.rack.jack(`${part.label} OUT`)} onClick={() => onJack(0)} />

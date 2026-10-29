@@ -38,6 +38,7 @@ import {
   suggestedResistor,
   type MessageItem,
 } from './messages';
+import { stableValue } from './liveReadout';
 import type { MessageAction } from './MessagesTab';
 import { Notebook } from './Notebook';
 import { FileSheet, MoreSheet, StatusSheet, StopToEditDialog } from './PhoneModals';
@@ -653,7 +654,11 @@ export default function Simulator() {
   const deviceHooks: DeviceHooks = {
     scopeView: (id) => sim.frame?.scopes.get(id) ?? null,
     status: (id) => sim.frame?.statuses.get(id) ?? {},
-    outputVoltage: (id) => sim.frame?.measurements.get(id)?.voltage ?? null,
+    // Anlık değer AC'de her karede zıplar: salınıyorsa pencerenin etkin değeri (öbür canlı ölçümler gibi).
+    outputVoltage: (id) => {
+      const m = sim.frame?.measurements.get(id);
+      return m ? stableValue(m.voltage, sim.frame?.summaries.get(id)?.get('m.voltage')) : null;
+    },
     running: sim.status !== 'stopped',
     pinConnected: (id, pin) => !connectivity.unconnectedPins.has(pinKey(id, pin)),
     onChange: changeInstrument,

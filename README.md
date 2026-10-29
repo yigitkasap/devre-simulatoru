@@ -1592,7 +1592,11 @@ karşılaştırıldı; bulunan hatalar düzeltildi (testler: `tests/ngspice-kars
   Motor gösterilen parçaların ölçüm ve durum yapraklarını her adımda tümler (`sim/watch.ts`);
   arayüz 0,4 s'lik pencerelerde salınan değeri "≈" ile etkin değer ya da ortalama olarak, gidip
   gelen durumu "Yüksek ⇄ Düşük" olarak gösterir (`editor/liveReadout.ts`). NaN ve sonsuz değer
-  "hesaplanamıyor" yazar.
+  "hesaplanamıyor" yazar. 2026-10-29: fonksiyon üretecinin kartındaki "Çıkış (OUT − COM)" satırı
+  anlık değeri gösteriyordu (AC'de her karede −5 … +5 V arası zıplıyordu); artık aynı kuralla
+  (`stableValue`). Gerilim ve akımın etkin değeri yalnızca ağırlıkla tek kutuplu değerde
+  (|ortalama| ≥ 0,2 × etkin) ortalamanın işaretini alır; simetriğe yakın AC işaretsizdir (diyotlu
+  yükte ortalama hafif negatif olduğu için "≈ −3,46 V" yazıyordu).
 
 Kalan dört fark da ele alındı (2026-10-27; testler `tests/ngspice-karsilastirma.test.ts`,
 `tests/gummel-poon.test.ts`, `tests/dc-homotopi.test.ts`; kıyas `scripts/tarama/qrr.tarama.ts`):

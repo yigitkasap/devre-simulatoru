@@ -3,7 +3,7 @@
 // canlı gösterilir; hesaplanamayan değer "hesaplanamıyor" yazar.
 
 import { describe, expect, it } from 'vitest';
-import { LiveWindow, stableMeterText, stableReadout } from '../src/editor/liveReadout';
+import { LiveWindow, stableMeterText, stableReadout, stableValue } from '../src/editor/liveReadout';
 import type { Part } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
 import { circuit } from './helpers';
@@ -40,6 +40,34 @@ describe('Canlı ölçümler: kararlı gösterim', () => {
     expect(Math.abs(power - 50)).toBeLessThan(0.5);
     // Pencere içinde (0,4 s = 24 kare) değer aynı kalır.
     expect(new Set(rows.slice(30, 50).map((r) => r[0])).size).toBeLessThanOrEqual(2);
+  });
+
+  it('yükü asimetrik AC (diyotlu yük, 50 Ω çıkış direnci): etkin değer işaretsiz; tek kutuplu değer işaretli', () => {
+    // 1N4001 X-Y örneğindeki gibi: üretecin çıkışı (o) pozitif yarıda biraz düşer, ortalaması hafif
+    // negatif olur; "≈ −3,4 V" değil "≈ 3,4 V" yazmalı. Ters diyotlu dirençte yalnızca negatif yarı
+    // dalga var: işaret kalır.
+    const base = () => circuit().acsource('AC1', 's', 'gnd', { amplitude: 5, frequency: 50 }).ground('G1', 'gnd').resistor('R50', 's', 'o', 50).resistor('RP', 'o', 'gnd', 1e6);
+    const forward = () => base().diode('D1', 'o', 'k').resistor('R1', 'k', 'gnd', 1000).build();
+    const reverse = () => base().diode('D2', 'n', 'o').resistor('R2', 'n', 'gnd', 1000).build();
+    const out = frames(new CircuitSimulator(forward()), part('RP', 'resistor', { resistance: 1e6 }), 60).last;
+    expect(out[0]).toMatch(/^Gerilim: ≈ 3,\d+ V$/);
+    // Üretecin kartındaki satır (stableValue): ölçümün kendisi işaretli.
+    const value = (build: typeof forward, id: string) => {
+      const sim = new CircuitSimulator(build());
+      sim.watch([id]);
+      const window = new LiveWindow();
+      for (let i = 0; i < 60; i++) {
+        expect(sim.advance(1 / 60, 6000).ok).toBe(true);
+        window.add(sim.watchedStats(id), 1 / 60);
+      }
+      return stableValue(sim.measure(id)!.voltage, window.summary?.get('m.voltage'));
+    };
+    const symmetric = value(forward, 'RP');
+    expect(symmetric.approx).toBe(true);
+    expect(symmetric.value).toBeGreaterThan(3.2);
+    const halfWave = value(reverse, 'R2');
+    expect(halfWave.approx).toBe(true);
+    expect(halfWave.value).toBeLessThan(-1);
   });
 
   it('DC devre: değerler canlı ve işaretsiz (≈ yok)', () => {
