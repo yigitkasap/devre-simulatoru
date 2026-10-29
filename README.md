@@ -1317,7 +1317,7 @@ yok, ekrandaki her şey ya bir ölçüm ya bir düğme.
   sürükleme; yatay telefon; masaüstünde düzen ve bantlar, Ayarlar ve Esc, klavye, Soru şeridi, Durum
   Gizle, projeksiyon yazı boyu, Simülatörde aç).
 
-### Baraj sayfası v3 (2026-10-28, sürüyor)
+### Baraj sayfası v3 (2026-10-28 – 29)
 
 Tasarım `docs/tasarim-v3/` → "Baraj sayfası (B1–B6)". Simülasyon, sahne çizimi ve örnek devreler aynı;
 değişen sayfanın düzeni. Dört aşama: 1 düzen, 2 devre paneli (kat sekmeleri, tek kat çizimi, Tüm
@@ -1386,6 +1386,22 @@ kısımlar:
    alanı (o katın devresi). Sahne tembel yüklenir; WebGL yoksa SVG çizimi (BarajSahnesi) kullanılır.
    ios-kontrol: kamera ön ayarları (desk / open / all / phone), tutamakla su yükseltme, %50'de
    kabarcıklar ve yalnız yeşil lamba (186 madde).
+4. **İçini göster** (B6; `barajScene.ts` → `setXray`, `setInset`; katman `BarajSahnesi3B.tsx`):
+   sahnenin sağ altındaki aç / kapa düğmesi (basılıyken koyu; telefonda da sağ altta). Basılınca beton,
+   kesit yüzü, taç yolu, ev duvarları, çatı, camlar ve kablo kanalı yarı saydam olur, kenarları ince
+   çizgiyle çizilir (`main.js`'teki `ghost()` ve `outline()`; yarı saydamken gölge düşürmezler); kamera
+   eve ve kablo kanalına yaklaşır (ön ayar "xray"; problar, ev ve kanal kadrajda kalmazsa geri çekilir).
+   Malzemeler ve kamera yaklaşık 0,7 s'de yumuşakça geçer; kamera yine kullanıcıya bırakılmaz. Beton
+   içinde dört kablo (Prob 1 yeşil, 2 sarı, 3 kırmızı, ortak siyah) bağlantı plakalarından kanala girip
+   yukarıda eve çıkar; yanında "Kablo kanalı · beton içinde" etiketi. Ev kesikli mavi çerçeveli; sağ
+   üstte evin yakın planı (ön ayar "house"; aynı çizici sahnenin içindeki pencereye ikinci kamerayla
+   çizer): "Kumanda evi", kartın her katında 1, 2, 3 numarası, "Devre kartı · 3 kat", "Klemens", "9 V
+   pil", "Prob kabloları", "Lamba kablosu → kule". Masaüstünde pencere en çok 520 × 380 px, dar sahnede
+   (telefon) üstte tam genişlik; pencerenin altında kalan ana görünüm etiketleri gizlenir (pencere aynı
+   tuvale çizildiği için HTML onu örtemez). Su, kabarcıklar ve lambalar canlı kalır, seviye bu
+   görünümde de değişir; tekrar basınca normal görünüme döner. WebGL yoksa (SVG çizimi) düğme yok.
+   ios-kontrol: masaüstünde açma (kamera "xray", beton saydamlığı, kenar çizgileri, yakın plan ve
+   etiketleri, su ayarı) ve kapatma; telefonda 44 px düğme ve tam genişlik yakın plan (189 madde).
 
 ### Föy parça modelleri (föy için 2. aşama)
 

@@ -2161,6 +2161,19 @@ export const tr = {
     closeCircuit: 'Devreyi kapat',
     seeCircuit: 'Devreyi gör ›',
     moreDesk: 'Diğer: Ayarlar, Başa al, Tam ekran, Simülatörde aç',
+    /** İçini göster (B6). */
+    ici: {
+      button: 'İçini göster',
+      conduit: 'Kablo kanalı · beton içinde',
+      house: 'Kumanda evi',
+      pcb: 'Devre kartı · 3 kat',
+      battery: '9 V pil',
+      terminal: 'Klemens',
+      probeCables: 'Prob kabloları',
+      lampCable: 'Lamba kablosu → kule',
+      insetLabel: 'Kumanda evinin içi: üç katlı devre kartı, altında klemens ve 9 V pil; probların dört kablosu alttan girer, lamba kablosu kuleye çıkar.',
+      sceneLabel: 'İçi gösteriliyor: beton ve kumanda evi yarı saydam; prob kabloları beton içindeki kanaldan kumanda evine çıkıyor.',
+    },
     /** Devre paneli (B2, B4, B5). */
     panel: {
       tabs: 'Devre katları',

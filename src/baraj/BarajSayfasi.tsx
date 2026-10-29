@@ -238,6 +238,8 @@ export default function BarajSayfasi() {
   /** Sahnenin isteğe bağlı katmanları ("Göster" çipleri): varsayılan kapalı. */
   const [showIons, setShowIons] = useState(false);
   const [showScale, setShowScale] = useState(false);
+  /** İçini göster (B6): yalnızca three.js sahnesinde. */
+  const [xray, setXray] = useState(false);
   const moreButton = useRef<HTMLButtonElement>(null);
   const closeSettings = useCallback(() => {
     setSettingsOpen(false);
@@ -322,6 +324,8 @@ export default function BarajSayfasi() {
             onPreview={onPreview}
             onCommit={kumanda.commitLevel}
             {...(phone ? {} : { onLamp: selectFloor })}
+            xray={xray}
+            onXray={setXray}
             className="h-full w-full"
           />
         </Suspense>

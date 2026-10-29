@@ -8,6 +8,11 @@
 // kabarcıkları ve lambalar canlı güncellenir. Numaralar, ıslak prob halkası, tutamak, ölçek ve iyonlar
 // HTML katmanında (BarajSahnesi3B): konumları `screen()` ile 3B noktaların ekrandaki izdüşümünden.
 // Yalnızca bir şey değişince çizer (kabarcıklar akarken sürekli).
+//
+// "İçini göster" (README 13, B6): beton, kesit yüzü, taç yolu, ev duvarları, çatı, camlar ve kablo
+// kanalı yarı saydam olur, kenarları ince çizgiyle çizilir; kamera eve ve kablo kanalına yumuşakça
+// yaklaşır (ön ayar "xray"). Evin yakın planı ("house") aynı çiziciyle sahnenin içindeki bir pencereye
+// (setInset; HTML çerçevesi BarajSahnesi3B'de) çizilir. Su, kabarcıklar ve lambalar canlı kalır.
 
 import {
   AdditiveBlending,
@@ -105,6 +110,23 @@ function cameraFor(aspect: number): CameraName {
   return 'phone';
 }
 
+/** Kadraj denetimi için geçici kamera: noktanın görüş alanında (kenarlardan pay bırakarak) olup olmadığı. */
+class Camera3 {
+  private readonly cam: PerspectiveCamera;
+  constructor(fov: number, aspect: number) {
+    this.cam = new PerspectiveCamera(fov, aspect, 0.5, 200);
+  }
+  place(pos: Vector3, look: Vector3): void {
+    this.cam.position.copy(pos);
+    this.cam.lookAt(look);
+    this.cam.updateMatrixWorld(true);
+  }
+  inside(p: Vector3): boolean {
+    const q = p.clone().project(this.cam);
+    return Math.abs(q.x) <= 0.9 && Math.abs(q.y) <= 0.86 && q.z < 1;
+  }
+}
+
 /** Tohumlu sözde rastgele (dokular her açılışta aynı görünsün). */
 function rng(seed: number): () => number {
   let s = seed >>> 0;
@@ -139,6 +161,16 @@ export class BarajScene {
   private height = 1;
   private dirty = true;
   private cameraName: CameraName = 'desk';
+  /** Kameranın baktığı nokta (geçişte ara değer). */
+  private readonly look = new Vector3();
+  /** İçini göster: istenen durum ve 0..1 arası ara değer (malzeme saydamlığı). */
+  private xray = false;
+  private xrayAmount = 0;
+  private transition: { from: { pos: Vector3; look: Vector3; fov: number; amount: number }; start: number } | null = null;
+  /** Evin yakın planı: kapsayıcıya göre px (null: yok). */
+  private inset: { x: number; y: number; w: number; h: number } | null = null;
+  private readonly houseCamera = new PerspectiveCamera(38, 1.37, 0.05, 80);
+  private readonly ghostMeshes: Mesh[] = [];
   // Canlı parçalar
   private readonly water: Mesh;
   private readonly surface: Mesh;
@@ -192,6 +224,14 @@ export class BarajScene {
     this.surfaceLine = line;
     this.buildProbes();
     this.buildTower();
+    const ghostSet = new Set<Material>(this.ghosts.map((g) => g.material));
+    this.scene.traverse((o) => {
+      if (o instanceof Mesh && !Array.isArray(o.material) && ghostSet.has(o.material)) this.ghostMeshes.push(o);
+    });
+    const hc = CAMERAS.house;
+    this.houseCamera.position.set(...hc.pos);
+    this.houseCamera.lookAt(new Vector3(...hc.look));
+    this.houseCamera.fov = hc.fov;
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);
@@ -494,33 +534,116 @@ export class BarajScene {
     this.cb.onLayout();
   }
 
-  /** Ön ayar en-boy oranına göre; lambalar, problar ve ev kadrajda kalmazsa kamera geri çekilir. */
-  private applyCamera(): void {
+  /**
+   * Kamera hedefi: ön ayar en-boy oranına göre (içini gösterirken "xray"); kadrajda kalması gerekenler
+   * (lambalar, problar ve ev; içini gösterirken problar, ev ve kablo kanalı) dışarıda kalırsa geri çekilir.
+   */
+  private cameraTarget(): { name: CameraName; pos: Vector3; look: Vector3; fov: number } {
     const aspect = this.width / this.height;
-    const name = cameraFor(aspect);
-    this.cameraName = name;
+    const name: CameraName = this.xray ? 'xray' : cameraFor(aspect);
     const c = CAMERAS[name];
-    this.camera.fov = c.fov;
-    this.camera.aspect = aspect;
-    this.camera.updateProjectionMatrix();
+    const probe = new Camera3(c.fov, aspect);
     const look = new Vector3(...c.look);
     const offset = new Vector3(...c.pos).sub(look);
-    const keep = [
-      ...LAMP_Y.flatMap((y) => [new Vector3(TOWER_X - 0.8, HEAD_Y + y + 0.7, TOWER_Z), new Vector3(TOWER_X + 0.8, HEAD_Y + y - 0.7, TOWER_Z)]),
-      ...[0, 1, 2, 3].map((k) => new Vector3(TIP_X - 0.6, probeY(k), PROBE_Z)),
-      new Vector3(0.65, 10.9, FRONT - 1.4),
-    ];
+    const keep = this.xray
+      ? [...[0, 1, 2, 3].map((k) => new Vector3(TIP_X - 0.6, probeY(k), PROBE_Z)), new Vector3(0.65, 10.9, FRONT - 1.4), new Vector3(1.4, 9.2, FRONT - 1.4)]
+      : [
+          ...LAMP_Y.flatMap((y) => [new Vector3(TOWER_X - 0.8, HEAD_Y + y + 0.7, TOWER_Z), new Vector3(TOWER_X + 0.8, HEAD_Y + y - 0.7, TOWER_Z)]),
+          ...[0, 1, 2, 3].map((k) => new Vector3(TIP_X - 0.6, probeY(k), PROBE_Z)),
+          new Vector3(0.65, 10.9, FRONT - 1.4),
+        ];
     for (let i = 0; i < 40; i++) {
-      this.camera.position.copy(look).add(offset);
-      this.camera.lookAt(look);
-      this.camera.updateMatrixWorld(true);
-      const inside = keep.every((p) => {
-        const q = p.clone().project(this.camera);
-        return Math.abs(q.x) <= 0.9 && Math.abs(q.y) <= 0.86 && q.z < 1;
-      });
-      if (inside) break;
+      probe.place(look.clone().add(offset), look);
+      if (keep.every((p) => probe.inside(p))) break;
       offset.multiplyScalar(1.05);
     }
+    return { name, pos: look.clone().add(offset), look, fov: c.fov };
+  }
+
+  /** Kamerayı hedefe hemen yerleştirir (boyut değişince; geçiş sürüyorsa hedefi güncellenir). */
+  private applyCamera(): void {
+    const t = this.cameraTarget();
+    this.cameraName = t.name;
+    this.camera.aspect = this.width / this.height;
+    if (this.transition) return;
+    this.camera.fov = t.fov;
+    this.camera.updateProjectionMatrix();
+    this.camera.position.copy(t.pos);
+    this.look.copy(t.look);
+    this.camera.lookAt(this.look);
+    this.camera.updateMatrixWorld(true);
+  }
+
+  /** İçini göster: aç / kapat. Kamera ve malzemeler yaklaşık 0,7 s'de yumuşakça geçer. */
+  setXray(on: boolean): void {
+    if (on === this.xray) return;
+    this.xray = on;
+    this.transition = {
+      from: { pos: this.camera.position.clone(), look: this.look.clone(), fov: this.camera.fov, amount: this.xrayAmount },
+      start: performance.now(),
+    };
+    if (on) for (const l of this.outlines) l.visible = true;
+    this.cameraName = on ? 'xray' : cameraFor(this.width / this.height);
+    this.dirty = true;
+  }
+
+  /** Evin yakın planının yeri (kapsayıcıya göre px); null kapatır. */
+  setInset(rect: { x: number; y: number; w: number; h: number } | null): void {
+    const same = rect && this.inset && rect.x === this.inset.x && rect.y === this.inset.y && rect.w === this.inset.w && rect.h === this.inset.h;
+    if (same || (!rect && !this.inset)) return;
+    this.inset = rect;
+    if (rect) {
+      this.houseCamera.aspect = rect.w / rect.h;
+      this.houseCamera.updateProjectionMatrix();
+      this.houseCamera.updateMatrixWorld(true);
+    }
+    this.dirty = true;
+  }
+
+  /** Yakın plan penceresinde ekran konumu (pencereye göre px). */
+  insetScreen(p: Vector3): { x: number; y: number } {
+    const r = this.inset ?? { x: 0, y: 0, w: 1, h: 1 };
+    const q = p.clone().project(this.houseCamera);
+    return { x: ((q.x + 1) / 2) * r.w, y: ((1 - q.y) / 2) * r.h };
+  }
+
+  /** Hayalet malzemeler: a = 0 opak, 1 içini göster. */
+  private applyGhosts(a: number): void {
+    this.xrayAmount = a;
+    for (const g of this.ghosts) {
+      const transparent = a > 0.001;
+      if (g.material.transparent !== transparent) g.material.needsUpdate = true;
+      g.material.transparent = transparent;
+      g.material.opacity = 1 + (g.opacity - 1) * a;
+      g.material.depthWrite = !transparent;
+    }
+    for (const m of this.ghostMeshes) m.castShadow = a < 0.5;
+  }
+
+  private stepTransition(now: number): void {
+    const tr = this.transition;
+    if (!tr) return;
+    const t = Math.min(1, (now - tr.start) / 700);
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const target = this.cameraTarget();
+    this.camera.position.lerpVectors(tr.from.pos, target.pos, e);
+    this.look.lerpVectors(tr.from.look, target.look, e);
+    this.camera.fov = tr.from.fov + (target.fov - tr.from.fov) * e;
+    this.camera.updateProjectionMatrix();
+    this.camera.lookAt(this.look);
+    this.camera.updateMatrixWorld(true);
+    this.applyGhosts(tr.from.amount + ((this.xray ? 1 : 0) - tr.from.amount) * e);
+    if (t >= 1) {
+      this.transition = null;
+      if (!this.xray) for (const l of this.outlines) l.visible = false;
+    }
+    this.dirty = true;
+    this.cb.onLayout();
+  }
+
+  /** İçini göster açık mı ve geçiş bitti mi (katman yakın planı ve etiketleri buna göre gösterir). */
+  get xrayState(): { on: boolean; settled: boolean } {
+    return { on: this.xray, settled: this.transition === null };
   }
 
   /** Ekran konumu (kapsayıcıya göre px). */
@@ -546,6 +669,20 @@ export class BarajScene {
     staff: (level: number) => new Vector3(-3.2, (FULL * Math.min(100, Math.max(0, level))) / 100, FRONT),
     /** Hazne: kesit yüzündeki su bölgesinin köşesi (iyonlar). */
     water: (x: number, level: number) => new Vector3(x, (FULL * level) / 100, FRONT),
+    /** Kablo kanalı (beton içinde, ortası). */
+    conduit: () => new Vector3(0.35, 5.5, FRONT - 0.85),
+    /** Kontrol evinin köşeleri (çatı dahil): ekranda kesikli çerçeve. */
+    houseCorners: () =>
+      [-0.8, 0.8].flatMap((x) => [0, 1.72].flatMap((y) => [-0.86, 0.86].map((z) => new Vector3(0.65 + x, 9.18 + y, FRONT - 1.4 + z)))),
+    /** Yakın plandaki etiketlerin noktaları (evin içi). */
+    house: {
+      rows: [0.8, 0.62, 0.44].map((y) => new Vector3(0.65 - 0.44, 9.18 + y, FRONT - 1.4 - 0.67)),
+      pcb: new Vector3(0.65 + 0.02, 9.18 + 0.92, FRONT - 1.4 - 0.7),
+      battery: new Vector3(0.65 - 0.42, 9.18 + 0.16, FRONT - 1.4 - 0.5),
+      terminal: new Vector3(0.65 - 0.3, 9.18 + 0.36, FRONT - 1.4 - 0.66),
+      probeCables: new Vector3(0.38, 9.3, FRONT - 0.95),
+      lampCable: new Vector3(0.65 + 0.55, 9.18 + 0.92, FRONT - 1.4),
+    },
   };
 
   // --- Canlı durum -------------------------------------------------------------------------------------------
@@ -619,10 +756,23 @@ export class BarajScene {
   // --- Çizim ------------------------------------------------------------------------------------------------
 
   private readonly tick = () => {
-    if (this.bubbling()) this.placeBubbles((performance.now() - this.start) / 1000);
+    const now = performance.now();
+    this.stepTransition(now);
+    if (this.bubbling()) this.placeBubbles((now - this.start) / 1000);
     if (!this.dirty) return;
     this.dirty = false;
     this.renderer.render(this.scene, this.camera);
+    // Evin yakın planı: aynı sahne, ikinci kamera, sahnenin içindeki pencereye.
+    const r = this.inset;
+    if (r) {
+      const y = this.height - r.y - r.h;
+      this.renderer.setScissorTest(true);
+      this.renderer.setScissor(r.x, y, r.w, r.h);
+      this.renderer.setViewport(r.x, y, r.w, r.h);
+      this.renderer.render(this.scene, this.houseCamera);
+      this.renderer.setScissorTest(false);
+      this.renderer.setViewport(0, 0, this.width, this.height);
+    }
   };
 
   /** Hangi kamera ön ayarı seçildi (denetim). */

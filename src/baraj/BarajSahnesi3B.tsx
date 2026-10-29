@@ -4,6 +4,11 @@
 // ölçeği ve iyonlar ("Göster" çipleri). Konumlar 3B noktaların ekrana izdüşümünden; sahne boyu ya da
 // kamera değişince yeniden hesaplanır. Lambaya tıklamak o katın devresini açar (onLamp). Bu modül tembel
 // yüklenir; WebGL yoksa BarajSahnesi (SVG) kullanılır.
+//
+// "İçini göster" (README 13, B6): sağ alttaki aç / kapa düğmesi (basılıyken koyu). Açıkken ana görünümde
+// "Kablo kanalı · beton içinde" etiketi ve evin çevresinde kesikli mavi çerçeve; sağ üstte evin yakın
+// planı (sahne ikinci kamerayla bu pencereye çizer): kat numaraları ve "Devre kartı · 3 kat", "Klemens",
+// "9 V pil", "Prob kabloları", "Lamba kablosu → kule" etiketleri.
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { ANION_COLOR, CATION_COLOR, ionsOnLine, jiggle, seeded, type IonView, type PlacedIon } from '../editor/ions';
@@ -29,6 +34,9 @@ export interface BarajSahnesi3BProps {
   readonly onPreview: (level: number | null) => void;
   readonly onCommit: (level: number) => void;
   readonly onLamp?: (level: LevelNo) => void;
+  /** İçini göster açık mı; düğmeye basınca onXray. */
+  readonly xray?: boolean;
+  readonly onXray?: (on: boolean) => void;
   readonly className?: string;
 }
 
@@ -39,7 +47,7 @@ const LAMP_ORDER = [
   { key: 'red', n: 3 },
 ] as const;
 
-export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, scale: showScale = false, handle = true, ions, currents, onPreview, onCommit, onLamp, className = '' }: BarajSahnesi3BProps) {
+export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, scale: showScale = false, handle = true, ions, currents, onPreview, onCommit, onLamp, xray = false, onXray, className = '' }: BarajSahnesi3BProps) {
   const host = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<BarajScene | null>(null);
   const [, setLayout] = useState(0);
@@ -61,12 +69,27 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
   useEffect(() => {
     scene?.setState({ level, wet, lamps, currents: running ? currents : null });
   });
+  useEffect(() => scene?.setXray(xray), [scene, xray]);
+  // Evin yakın planı: masaüstünde sağ üstte (520 × 380'e kadar), dar sahnede üstte tam genişlik.
+  const hostW = host.current?.clientWidth ?? 0;
+  const hostH = host.current?.clientHeight ?? 0;
+  const inset = (() => {
+    if (!xray || hostW === 0) return null;
+    if (hostW < 640) {
+      const w = hostW - 24;
+      return { x: 12, y: 72, w, h: Math.round(Math.min(w * 0.62, hostH * 0.42)) };
+    }
+    const w = Math.round(Math.min(520, Math.max(340, hostW * 0.38)));
+    return { x: hostW - w - 24, y: 24, w, h: Math.round((w * 380) / 520) };
+  })();
+  useEffect(() => scene?.setInset(inset), [scene, inset?.x, inset?.y, inset?.w, inset?.h]);
 
   const lampText = LAMP_ORDER.slice()
     .reverse()
     .map(({ key }) => `${tr.baraj.lampNames[key]} ${lamps[key] > 0.3 ? tr.baraj.lampOn : tr.baraj.lampOff}`)
     .join(', ');
-  const label = tr.baraj.sceneLabel(Math.round(level), lampText) + (ions && ions.channels.length > 0 ? ` ${tr.baraj.ions.sceneLabel}` : '');
+  const label =
+    tr.baraj.sceneLabel(Math.round(level), lampText) + (ions && ions.channels.length > 0 ? ` ${tr.baraj.ions.sceneLabel}` : '') + (xray ? ` ${tr.baraj.ici.sceneLabel}` : '');
 
   // --- Tutamak: sürükleme ve tuşlar (ekran y'si ↔ seviye: ölçeğin %0 ve %100 noktaları arası) -----------
   const drag = useRef<{ pointer: number; offset: number; level: number } | null>(null);
@@ -113,6 +136,8 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
   const at = (p: Parameters<BarajScene['screen']>[0]) => scene?.screen(p) ?? { x: -999, y: -999 };
   const badge = Math.round(Math.max(22, textPx * 1.7));
   const fs = Math.round(textPx);
+  /** Yakın plan penceresinin altında kalan ana görünüm etiketleri gizlenir (pencere aynı tuvale çizilir, HTML onu örtemez). */
+  const covered = (x: number, y: number) => inset !== null && x > inset.x - 12 && x < inset.x + inset.w + 12 && y > inset.y - 12 && y < inset.y + inset.h + 12;
 
   // --- İyonlar: probların uçları arasında, ekran koordinatlarında (SVG sahnesindeki çizimle aynı) --------
   const ionLayer = (() => {
@@ -215,6 +240,7 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
             const collar = at(scene.points.collar(k));
             const tip = at(scene.points.tip(k));
             const colors = k > 0 ? LEVEL_COLORS[k as LevelNo] : null;
+            if (covered(collar.x, collar.y) || covered(tip.x, tip.y)) return null;
             return (
               <div key={k}>
                 {k > 0 && wet[k] && (
@@ -249,6 +275,7 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
             const p = at(scene.points.lamp(n));
             const radius = scene.scaleAt(scene.points.lamp(n), 0.5);
             const colors = LEVEL_COLORS[n];
+            if (covered(p.x, p.y)) return null;
             return (
               <span
                 key={n}
@@ -268,6 +295,7 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
           const p = at(scene.points.lamp(n));
           const size = Math.max(44, Math.round(scene.scaleAt(scene.points.lamp(n), 1.2)));
           const name = tr.baraj.panel.lampButton(n, tr.baraj.lampNames[key]);
+          if (covered(p.x, p.y)) return null;
           return (
             <button
               key={n}
@@ -280,6 +308,26 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
             />
           );
         })}
+      {/* İçini göster: kablo kanalı etiketi ve evin çevresinde kesikli çerçeve (ana görünüm). */}
+      {scene && xray && <IciEtiketleri scene={scene} fs={fs} covered={covered} />}
+      {scene && inset && <YakinPlan scene={scene} rect={inset} fs={fs} />}
+      {onXray && (
+        <button
+          type="button"
+          aria-pressed={xray}
+          onClick={() => onXray(!xray)}
+          className={`absolute z-10 flex h-11 items-center gap-2 rounded-full border pr-[18px] pl-3.5 text-body font-semibold shadow-[0_4px_12px_rgba(29,39,51,0.2)] ${hostW < 640 ? 'right-3' : 'right-6 bottom-6'} ${
+            xray ? 'border-ink bg-ink text-on-ink' : 'border-line-2 bg-panel text-ink hover:bg-panel-2'
+          }`}
+          style={{ bottom: hostW < 640 ? 'calc(16px + env(safe-area-inset-bottom))' : undefined }}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="15" height="15" rx="2" strokeDasharray="3 2.2" />
+            <path d="M6 14V9h3.5v5H13V6" />
+          </svg>
+          {tr.baraj.ici.button}
+        </button>
+      )}
       {/* Su yüzeyindeki tutamak: yalnızca yukarı-aşağı oku. */}
       {handle && handlePos && (
         <div
@@ -305,5 +353,104 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
         </div>
       )}
     </div>
+  );
+}
+
+/** Kablo renkleri: Prob 1 yeşil, Prob 2 sarı, Prob 3 kırmızı, ortak prob siyah. */
+const WIRE_COLORS = ['#1b7d44', '#e8b10f', '#d92d20', '#1d1f23'] as const;
+
+const LABEL = 'absolute flex h-7 items-center gap-1.5 rounded-lg border border-[#c4cad2] bg-white/95 px-2.5 font-semibold whitespace-nowrap text-[#1d2733] shadow-[0_2px_6px_rgba(29,39,51,0.12)]';
+
+/** Ana görünümde: kablo kanalının etiketi ve kontrol evinin çevresinde kesikli mavi çerçeve. */
+function IciEtiketleri({ scene, fs, covered }: { scene: BarajScene; fs: number; covered: (x: number, y: number) => boolean }) {
+  const c = scene.screen(scene.points.conduit());
+  const corners = scene.points.houseCorners().map((p) => scene.screen(p));
+  const xs = corners.map((p) => p.x);
+  const ys = corners.map((p) => p.y);
+  const box = { x: Math.min(...xs) - 6, y: Math.min(...ys) - 6, w: Math.max(...xs) - Math.min(...xs) + 12, h: Math.max(...ys) - Math.min(...ys) + 12 };
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      {!covered(box.x + box.w / 2, box.y + box.h / 2) && (
+        <span className="absolute rounded-lg border-2 border-dashed border-[#1f6feb]" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} />
+      )}
+      {!covered(c.x + 60, c.y) && (
+      <>
+      <svg className="absolute inset-0 h-full w-full overflow-visible">
+        <line x1={c.x} y1={c.y} x2={c.x + 34} y2={c.y} stroke="#1f6feb" strokeWidth={1.5} />
+        <circle cx={c.x} cy={c.y} r={3} fill="#1f6feb" />
+      </svg>
+      <span className={LABEL} style={{ left: c.x + 34, top: c.y - 14, fontSize: Math.round(fs * 0.9) }}>
+        <span className="flex gap-0.5">
+          {WIRE_COLORS.map((color) => (
+            <span key={color} className="h-3.5 w-1 rounded-sm" style={{ background: color }} />
+          ))}
+        </span>
+        {tr.baraj.ici.conduit}
+      </span>
+      </>
+      )}
+    </div>
+  );
+}
+
+/** Evin yakın planı: sahne bu dikdörtgene ikinci kamerayla çizer; burada çerçeve, kat numaraları ve etiketler. */
+function YakinPlan({ scene, rect, fs }: { scene: BarajScene; rect: { x: number; y: number; w: number; h: number }; fs: number }) {
+  const h = scene.points.house;
+  const at = (p: Parameters<BarajScene['insetScreen']>[0]) => scene.insetScreen(p);
+  const k = rect.w / 520;
+  const labels: Array<{ key: string; text: string; p: { x: number; y: number }; dx: number; dy: number }> = [
+    { key: 'pcb', text: tr.baraj.ici.pcb, p: at(h.pcb), dx: -10, dy: -46 },
+    { key: 'battery', text: tr.baraj.ici.battery, p: at(h.battery), dx: -90, dy: 16 },
+    { key: 'terminal', text: tr.baraj.ici.terminal, p: at(h.terminal), dx: 60, dy: 40 },
+    { key: 'probes', text: tr.baraj.ici.probeCables, p: at(h.probeCables), dx: 70, dy: 60 },
+    { key: 'lamp', text: tr.baraj.ici.lampCable, p: at(h.lampCable), dx: 70, dy: 30 },
+  ];
+  const size = Math.round(fs * 0.85);
+  const clampX = (x: number, half: number) => Math.min(rect.w - half - 8, Math.max(half + 8, x));
+  const clampY = (y: number) => Math.min(rect.h - 22, Math.max(22, y));
+  return (
+    <figure
+      role="img"
+      aria-label={tr.baraj.ici.insetLabel}
+      className="pointer-events-none absolute m-0 overflow-visible rounded-[6px] border-2 border-[#1f6feb] shadow-[0_10px_28px_rgba(29,39,51,0.22)]"
+      style={{ left: rect.x - 2, top: rect.y - 2, width: rect.w + 4, height: rect.h + 4 }}
+    >
+      <div aria-hidden="true" className="absolute inset-0.5">
+        <svg className="absolute inset-0 h-full w-full overflow-visible">
+          {labels.map((l) => {
+            const half = (l.text.length * size * 0.55) / 2 + 10;
+            return <line key={l.key} x1={l.p.x} y1={l.p.y} x2={clampX(l.p.x + l.dx * k, half)} y2={clampY(l.p.y + l.dy * k)} stroke="#1f6feb" strokeWidth={1.5} />;
+          })}
+          {labels.map((l) => (
+            <circle key={l.key} cx={l.p.x} cy={l.p.y} r={3} fill="#1f6feb" />
+          ))}
+        </svg>
+        <span className="absolute top-2.5 left-2.5 flex h-7 items-center rounded-lg bg-[#1f6feb] px-2.5 font-semibold text-white" style={{ fontSize: size }}>
+          {tr.baraj.ici.house}
+        </span>
+        {h.rows.map((p, i) => {
+          const q = at(p);
+          const n = (3 - i) as LevelNo;
+          const colors = LEVEL_COLORS[n];
+          return (
+            <span
+              key={n}
+              className="absolute flex h-5 w-5 -translate-x-full -translate-y-1/2 items-center justify-center rounded-full text-[11px] font-bold"
+              style={{ left: q.x - 6, top: q.y, background: colors.badge, color: colors.badgeInk }}
+            >
+              {n}
+            </span>
+          );
+        })}
+        {labels.map((l) => {
+          const half = (l.text.length * size * 0.55) / 2 + 10;
+          return (
+            <span key={l.key} className={`${LABEL} -translate-x-1/2 -translate-y-1/2`} style={{ left: clampX(l.p.x + l.dx * k, half), top: clampY(l.p.y + l.dy * k), fontSize: size }}>
+              {l.text}
+            </span>
+          );
+        })}
+      </div>
+    </figure>
   );
 }

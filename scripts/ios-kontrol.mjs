@@ -1359,6 +1359,14 @@ try {
     check('baraj (telefon): bütün dokunma hedefleri en az 44 px', small.length === 0, small.join(', '));
     const phoneView = await page.evaluate(() => window.__baraj3b?.view ?? null);
     check('baraj (telefon, 3B): sahne three.js ile (WebGL), dar alanda telefon kamerası; yeşil lamba yanıyor', phoneView === 'phone' && (await page.evaluate(() => (window.__baraj3b?.lamps[2]?.lens.emissiveIntensity ?? 0) > 0.3)), String(phoneView));
+    await page.getByRole('button', { name: 'İçini göster' }).tap(); await page.waitForTimeout(1100);
+    const phoneInset = await page.getByRole('img', { name: /^Kumanda evinin içi/ }).boundingBox();
+    const phoneIciButton = await page.getByRole('button', { name: 'İçini göster' }).boundingBox();
+    const phoneIciScroll = await pageScrolls(page);
+    await page.getByRole('button', { name: 'İçini göster' }).tap(); await page.waitForTimeout(900);
+    check('baraj (telefon, B6): sağ altta "İçini göster" (44 px); basınca evin yakın planı sahnenin üstünde tam genişlik, sayfa kaymıyor',
+      phoneInset !== null && phoneInset.width > 340 && phoneIciButton !== null && phoneIciButton.height >= 43.5 && phoneIciButton.x > 200 && !phoneIciScroll && (await page.getByRole('img', { name: /^Kumanda evinin içi/ }).count()) === 0,
+      phoneInset ? `${Math.round(phoneInset.width)}×${Math.round(phoneInset.height)}` : 'yok');
     await page.getByRole('radio', { name: 'Tek ışık' }).tap(); await page.waitForTimeout(1200);
     check('baraj (telefon): Tek ışık’a geçince su aynı yerde kalıyor, devre çalışmaya devam ediyor', (await barajLevel(page)) === 50 && (await sceneLabel(page)).includes('yeşil yanıyor'), `%${await barajLevel(page)}`);
     await page.getByRole('button', { name: 'Soru', exact: true }).tap(); await page.waitForTimeout(300);
@@ -1524,6 +1532,28 @@ try {
     const lit = await bp.evaluate(() => (window.__baraj3b?.lamps ?? []).map((l) => Math.round(l.lens.emissiveIntensity * 100) / 100));
     check('baraj (masaüstü, 3B): %50’de ortak prob ve Prob 1 ıslak: uçlarında elektroliz kabarcıkları; yalnız yeşil lamba yanıyor',
       bubbles[0] > 0 && bubbles[1] > 0 && bubbles[2] === 0 && bubbles[3] === 0 && lit[2] > 0.3 && lit[0] === 0 && lit[1] === 0, `kabarcık ${bubbles.join('/')} · lamba ${lit.join('/')}`);
+    // İçini göster (B6): beton yarı saydam, kamera eve ve kanala yaklaşır, sağ üstte evin yakın planı.
+    const iciButton = sceneRegion.getByRole('button', { name: 'İçini göster' });
+    await iciButton.click(); await bp.waitForTimeout(1100);
+    const ici = await bp.evaluate(() => {
+      const s = window.__baraj3b;
+      return s ? { view: s.view, state: s.xrayState, dam: Math.round((s.ghosts[0]?.material.opacity ?? 1) * 100) / 100, outlines: s.outlines.filter((l) => l.visible).length } : null;
+    });
+    const iciText = (await sceneRegion.textContent()) ?? '';
+    const inset = sceneRegion.getByRole('img', { name: /^Kumanda evinin içi/ });
+    const insetBox = await inset.boundingBox();
+    const regionBox = await sceneRegion.boundingBox();
+    await bp.keyboard.press('2'); await waitLevel(bp, 75, 4000);
+    const iciLevel = await barajLevel(bp);
+    check('baraj (masaüstü, B6): "İçini göster" basılı: beton yarı saydam ve kenarları çizgili, kamera eve ve kanala yaklaşıyor; sağ üstte evin yakın planı ve etiketleri; su yine ayarlanıyor',
+      (await iciButton.getAttribute('aria-pressed')) === 'true' && ici?.view === 'xray' && ici.state.on && ici.state.settled && ici.dam < 0.3 && ici.outlines > 0 &&
+      insetBox !== null && regionBox !== null && insetBox.x + insetBox.width > regionBox.x + regionBox.width - 40 && insetBox.y < regionBox.y + 40 &&
+      ['Kablo kanalı · beton içinde', 'Kumanda evi', 'Devre kartı · 3 kat', 'Klemens', '9 V pil', 'Prob kabloları', 'Lamba kablosu → kule'].every((t) => iciText.includes(t)) && iciLevel === 75,
+      JSON.stringify(ici));
+    await iciButton.click(); await bp.waitForTimeout(1100);
+    const iciOff = await bp.evaluate(() => ({ view: window.__baraj3b?.view, dam: window.__baraj3b?.ghosts[0]?.material.opacity, outlines: window.__baraj3b?.outlines.filter((l) => l.visible).length }));
+    check('baraj (masaüstü): "İçini göster"e yeniden basınca normal görünüm (kamera, opak beton, yakın plan kapalı)',
+      (await iciButton.getAttribute('aria-pressed')) === 'false' && iciOff.view === 'desk' && iciOff.dam === 1 && iciOff.outlines === 0 && (await inset.count()) === 0, JSON.stringify(iciOff));
     await bp.keyboard.press('r'); await waitLevel(bp, 20, 2000);
     await bp.keyboard.press('s'); await bp.waitForTimeout(200);
     const strip = bp.getByRole('region', { name: 'Soru' });
