@@ -18,6 +18,13 @@ import { meterText, partReadout, type Readout, type ReadoutRow } from './readout
 /** Salınan değerlerin güncellenme aralığı (gerçek zaman, s): multimetrelerin ≈ 2–3 okuma/s'si. */
 export const DISPLAY_WINDOW = 0.4;
 
+/**
+ * Ölçü aletlerinin okuma aralığı (gerçek zaman, s): gerçek bir multimetre gibi saniyede 4 okuma.
+ * Okuma karede bir kez hesaplanır (meterReadings); şemadaki gösterge, defter kartı, 3B etiketi ve
+ * 3B aletin ekranı aynı okumayı gösterir.
+ */
+export const METER_REFRESH = 0.25;
+
 /** Bir pencerenin özeti: yaprak → istatistik. */
 export type LiveSummary = ReadonlyMap<string, KeyStats>;
 
@@ -216,10 +223,31 @@ export function stableValue(live: number, s: KeyStats | undefined): { value: num
   return { value: signedRms(s), approx: true };
 }
 
-/** Ölçü aletinin göstergesi: salınıyorsa pencere özeti (DC ortalama, AC etkin), yoksa canlı. */
+/** Ölçü aletinin göstergesi: salınıyorsa pencere özeti (DC ortalama, AC etkin) "≈" ile, yoksa canlı. */
 export function stableMeterText(part: Part, m: Measurement, status: DeviceStatus, summary: LiveSummary | null): string | null {
   const keys = summary ? [...summary].filter(([, s]) => oscillates(s)).map(([key]) => key) : [];
   if (!summary || keys.length === 0) return meterText(part, m, status);
-  const v = variant(part, m, status, summary, keys, 'summary');
-  return meterText(part, v.m, v.status);
+  const [low, high, avg] = (['min', 'max', 'summary'] as const).map((pick) => {
+    const v = variant(part, m, status, summary, keys, pick);
+    return meterText(part, v.m, v.status);
+  });
+  if (low === high || avg === null) return meterText(part, m, status);
+  return `≈ ${avg}`;
+}
+
+/** Devredeki ölçü aletlerinin okumaları (parça kimliği → gösterge metni). */
+export function meterReadings(
+  parts: readonly Part[],
+  measurements: ReadonlyMap<string, Measurement>,
+  statuses: ReadonlyMap<string, DeviceStatus>,
+  summaries: ReadonlyMap<string, LiveSummary>,
+): ReadonlyMap<string, string> {
+  const texts = new Map<string, string>();
+  for (const part of parts) {
+    if (!isMeter(part)) continue;
+    const m = measurements.get(part.id);
+    const text = m ? stableMeterText(part, m, statuses.get(part.id) ?? {}, summaries.get(part.id) ?? null) : null;
+    if (text) texts.set(part.id, text);
+  }
+  return texts;
 }

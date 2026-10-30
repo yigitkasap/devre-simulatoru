@@ -34,6 +34,8 @@ export interface BarajSahnesi3BProps {
   readonly onPreview: (level: number | null) => void;
   readonly onCommit: (level: number) => void;
   readonly onLamp?: (level: LevelNo) => void;
+  /** Tüm devre açık (masaüstü): sahne dar, kamera "all" ön ayarında. */
+  readonly narrow?: boolean;
   /** İçini göster açık mı; düğmeye basınca onXray. */
   readonly xray?: boolean;
   readonly onXray?: (on: boolean) => void;
@@ -47,7 +49,7 @@ const LAMP_ORDER = [
   { key: 'red', n: 3 },
 ] as const;
 
-export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, scale: showScale = false, handle = true, ions, currents, onPreview, onCommit, onLamp, xray = false, onXray, className = '' }: BarajSahnesi3BProps) {
+export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, scale: showScale = false, handle = true, ions, currents, onPreview, onCommit, onLamp, narrow = false, xray = false, onXray, className = '' }: BarajSahnesi3BProps) {
   const host = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<BarajScene | null>(null);
   const [, setLayout] = useState(0);
@@ -70,6 +72,8 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
     scene?.setState({ level, wet, lamps, currents: running ? currents : null });
   });
   useEffect(() => scene?.setXray(xray), [scene, xray]);
+  // Tutamak ve problar her genişlikte kadrajda (Tüm devrede dar sahnenin kamerası).
+  useEffect(() => scene?.setFraming(narrow ? 'all' : null, handle), [scene, narrow, handle]);
   // Evin yakın planı: masaüstünde sağ üstte (520 × 380'e kadar), dar sahnede üstte tam genişlik.
   const hostW = host.current?.clientWidth ?? 0;
   const hostH = host.current?.clientHeight ?? 0;

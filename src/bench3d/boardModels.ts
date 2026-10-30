@@ -623,6 +623,17 @@ export function buildPcbBoard(
 
 // --- Delikli plaket ---------------------------------------------------------------------------------
 
+/** Deliğin kartın en yakın kenarına uzaklığı ve o kenara doğru birim yön (x ya da z ekseninde). */
+export function nearestEdge(hole: { x: number; z: number }, bw: number, bd: number, centerZ: number): { distance: number; dx: number; dz: number } {
+  const edges = [
+    { distance: hole.x + bw / 2, dx: -1, dz: 0 },
+    { distance: bw / 2 - hole.x, dx: 1, dz: 0 },
+    { distance: hole.z - (centerZ - bd / 2), dx: 0, dz: -1 },
+    { distance: centerZ + bd / 2 - hole.z, dx: 0, dz: 1 },
+  ];
+  return edges.reduce((best, e) => (e.distance < best.distance ? e : best));
+}
+
 /**
  * Breadboard düzeninde delikli plaket. `upto`: bu adıma kadar takılanlar görünür (−1: hiçbiri);
  * `current`: şimdiki adım (delikleri mavi halkalı; null: halka yok, "Tamamı").
@@ -753,14 +764,28 @@ export function buildPerfboard(
       g = seat(target.part, at.mount === 'axial' || at.mount === 'radial' ? 'pair' : at.mount === 'to92' ? 'to92' : 'center', hs, ex, models);
       label = target.part.label;
     } else {
-      // Dışarı giden tel: delikten kalkar, kartın en yakın kenarından çıkar.
+      // Dışarı giden tel: delikten biraz kalkar, kartın en yakın kenarına doğru kıvrılır, kartın
+      // üstünden alçakta (yolundaki parçaların ve tellerin üstünden) geçer ve kenarın dışında aşağı
+      // sarkarak biter.
       const lead = plan.leads[target.index]!;
       const a = holeIn(lead.hole);
-      const edgeZ = a.z < boardZ(lead.hole.board) ? boardZ(lead.hole.board) - bd / 2 - 3 : boardZ(lead.hole.board) + bd / 2 + 3;
-      const dir = Math.sign(edgeZ - a.z);
-      const pts = [new Vector3(a.x, T + 0.05, a.z), new Vector3(a.x, T + 1.0, a.z), new Vector3(a.x + 0.3, T + 1.4, a.z + dir * 1.5), new Vector3(a.x + 0.6, T + 1.2, edgeZ)];
+      const edge = nearestEdge(a, bw, bd, boardZ(lead.hole.board));
+      const along = (t: number, y: number) => new Vector3(a.x + edge.dx * t, y, a.z + edge.dz * t);
+      const below = [...parts.values()].filter((p) => !p.name.startsWith('lead-')).map((p) => p.box);
+      const height = (t: number) => {
+        const q = along(t, 0);
+        let top = T + 0.85;
+        for (const box of below) {
+          if (q.x > box.min.x - 0.5 && q.x < box.max.x + 0.5 && q.z > box.min.z - 0.5 && q.z < box.max.z + 0.5) top = Math.max(top, box.max.y + 0.35);
+        }
+        return top;
+      };
+      const pts = [along(0, T + 0.05), along(0, T + 0.45)];
+      const samples = Math.max(1, Math.ceil(edge.distance / 1.2));
+      for (let k = 1; k <= samples; k++) pts.push(along((edge.distance * k) / samples, height((edge.distance * k) / samples)));
+      pts.push(along(edge.distance + 1.4, T - 0.1), along(edge.distance + 2.6, T - 1.3));
       g = new Group();
-      g.add(new Mesh(new TubeGeometry(new CatmullRomCurve3(pts), 40, 0.24, 10, false), mat(colorOf(lead.net), 0.5)));
+      g.add(new Mesh(new TubeGeometry(new CatmullRomCurve3(pts, false, 'centripetal'), 48, 0.24, 10, false), mat(colorOf(lead.net), 0.5)));
       label = `lead-${target.index}`;
     }
     // Alt yüzde lehim noktaları (takılan her adımın deliklerinde).

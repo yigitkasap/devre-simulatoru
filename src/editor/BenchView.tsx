@@ -166,6 +166,10 @@ export function BenchView(props: BenchViewProps) {
     return () => window.clearTimeout(timer);
   }, [hint]);
 
+  // İpucu sağ alttaki düğmelerin (44 px) hemen üstünde.
+  const controlsBottom = props.controlsInset?.bottom ?? 16;
+  const hintBottom = typeof controlsBottom === 'number' ? controlsBottom + 52 : `calc(${controlsBottom} + 52px)`;
+
   const pickCamera = (choice: CameraChoice) => {
     setCameraLabel(choice);
     setCamera((c) => (choice === 'part' ? (single ? { n: c.n + 1, view: 'part', partId: single } : c) : { n: c.n + 1, view: choice }));
@@ -219,8 +223,9 @@ export function BenchView(props: BenchViewProps) {
         />
       </Suspense>
 
-      {/* Etiketler ve uç harfleri: konumlarını sahne verir (scene.ts → positionOverlay). */}
-      <div ref={setOverlay} className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      {/* Etiketler ve uç harfleri: konumlarını sahne verir (scene.ts → positionOverlay). İpucu katmanda
+          bir engeldir: sahnenin altında, düğmelerin üstünde; çakışan etiket ipucu kalkana kadar gizlenir. */}
+      <div ref={setOverlay} className="pointer-events-none absolute inset-0 overflow-hidden">
         {labelled.map((part) => (
           <BenchLabel key={part.id} part={part} frame={slow} measured={props.measured} selected={selection.includes(part.id)} />
         ))}
@@ -232,11 +237,17 @@ export function BenchView(props: BenchViewProps) {
               data-id={lettered.id}
               data-pin={i}
               data-priority={4}
+              aria-hidden="true"
               className="absolute top-0 left-0 flex h-6 min-w-6 items-center justify-center rounded-full bg-accent px-1 font-mono text-[13px] font-semibold text-white opacity-0 shadow-sm"
             >
               {letter}
             </span>
           ))}
+        {hint && (
+          <p data-obstacle className="absolute left-3 m-0 max-w-[calc(100%-24px)] rounded-md bg-panel/90 px-2 py-1 text-label text-ink-2 shadow-sm" style={{ bottom: hintBottom }}>
+            {tr.bench.hintPhone}
+          </p>
+        )}
       </div>
 
       {!phone && roomy && doc.parts.length > 0 && (
@@ -262,10 +273,6 @@ export function BenchView(props: BenchViewProps) {
             />
           </span>
         </button>
-      )}
-
-      {hint && (
-        <p className="pointer-events-none absolute top-[62px] left-3 z-10 rounded-md bg-panel/90 px-2 py-1 text-label text-ink-2 shadow-sm">{tr.bench.hintPhone}</p>
       )}
 
       {/* Sağ alt: 3B seçenekleri ve altında görünüm kutusu (şemadaki "− + Sığdır | 3B" kutusunun karşılığı). */}
@@ -314,6 +321,7 @@ function BenchLabel({ part, frame, measured, selected }: { part: Part; frame: Si
       data-anchor="part"
       data-id={part.id}
       data-priority={selected ? 3 : meter ? 2 : 1}
+      aria-hidden="true"
       className={`absolute top-0 left-0 flex flex-col rounded-lg px-2.5 py-1.5 leading-tight whitespace-nowrap opacity-0 shadow-md ${selected ? 'bg-accent text-white' : 'bg-ink text-on-ink'}`}
     >
       <span className="text-[13px] font-semibold">

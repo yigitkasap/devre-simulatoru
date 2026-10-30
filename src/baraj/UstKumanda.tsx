@@ -204,8 +204,8 @@ export function GosterCipleri({ ions, scale, onIons, onScale, touch = false }: {
   const chip = (on: boolean) =>
     `rounded-full border px-3.5 text-small font-medium shadow-sm ${touch ? 'h-11' : 'h-9'} ${on ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-panel/95 text-ink hover:bg-panel'}`;
   return (
-    <div role="group" aria-label={tr.baraj.show} className="absolute bottom-6 left-6 z-10 flex items-center gap-2">
-      <span className="text-small font-semibold text-ink [text-shadow:0_1px_0_var(--color-panel)]">{tr.baraj.show}:</span>
+    <div role="group" aria-label={tr.baraj.show} className="absolute bottom-6 left-6 z-10 flex items-center gap-2 rounded-full border border-line bg-panel/85 p-1 pl-3.5 shadow-sm backdrop-blur-sm">
+      <span className="text-small font-semibold text-ink">{tr.baraj.show}:</span>
       <button type="button" aria-pressed={ions} onClick={onIons} className={chip(ions)}>
         {tr.baraj.showIons}
       </button>

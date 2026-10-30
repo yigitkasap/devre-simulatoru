@@ -3,7 +3,7 @@
 // canlı gösterilir; hesaplanamayan değer "hesaplanamıyor" yazar.
 
 import { describe, expect, it } from 'vitest';
-import { LiveWindow, NodeWindow, stableMeterText, stableReadout, stableValue } from '../src/editor/liveReadout';
+import { LiveWindow, NodeWindow, meterReadings, stableMeterText, stableReadout, stableValue } from '../src/editor/liveReadout';
 import type { Part } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
 import { circuit } from './helpers';
@@ -150,10 +150,34 @@ describe('Canlı ölçümler: kararlı gösterim', () => {
     );
     const { texts } = frames(sim, part('V1', 'voltmeter', { mode: 'dc' }), 40, 1 / 60, true);
     const values = texts.slice(25).map((t) => Number(t!.replace(/[^\d,]/g, '').replace(',', '.')));
-    // Yüksek ≈ 7,6 V, doluluk ≈ %52 → ortalama ≈ 4 V; pencere içinde sabit.
+    // Yüksek ≈ 7,6 V, doluluk ≈ %52 → ortalama ≈ 4 V; pencere içinde sabit, başında "≈".
     for (const v of values) expect(v).toBeGreaterThan(3.5);
     for (const v of values) expect(v).toBeLessThan(4.6);
     expect(new Set(texts.slice(25)).size).toBeLessThanOrEqual(2);
+    for (const t of texts.slice(25)) expect(t).toMatch(/^≈ \d/);
+  });
+
+  it('ölçü aletlerinin okuması tek yerde (meterReadings): şema, defter ve 3B aynı metni gösterir', () => {
+    // 555 çıkışında V1 (salınıyor: "≈ ..."), pilde V2 (sabit: "≈" yok); direnç okuma almaz.
+    const b = circuit().battery('B', 'v', 'g', 9).ground('G', 'g').resistor('RA', 'v', 'd', 1e3).resistor('RB', 'd', 't', 10e3).capacitor('C', 't', 'g', 68e-9);
+    const sim = new CircuitSimulator(
+      b.capacitor('CV', 'cv', 'g', 10e-9).resistor('RL', 'o', 'g', 10e3).add('timer555', 'U', ['g', 't', 'o', 'v', 'cv', 't', 'd', 'v']).voltmeter('V1', 'o', 'g').voltmeter('V2', 'v', 'g').build(),
+    );
+    const parts = [part('V1', 'voltmeter', { mode: 'dc' }), part('V2', 'voltmeter', { mode: 'dc' }), part('RL', 'resistor', { resistance: 10e3 })];
+    sim.watch(['V1', 'V2']);
+    const windows = new Map(['V1', 'V2'].map((id) => [id, new LiveWindow()]));
+    for (let i = 0; i < 40; i++) {
+      expect(sim.advance(1 / 60, 6000).ok).toBe(true);
+      for (const [id, w] of windows) w.add(sim.watchedStats(id), 1 / 60);
+    }
+    const measurements = new Map(parts.map((p) => [p.id, sim.measure(p.id)!]));
+    const statuses = new Map(parts.map((p) => [p.id, sim.status(p.id)]));
+    const summaries = new Map([...windows].map(([id, w]) => [id, w.summary!]));
+    const texts = meterReadings(parts, measurements, statuses, summaries);
+    expect([...texts.keys()]).toEqual(['V1', 'V2']);
+    expect(texts.get('V1')).toMatch(/^≈ [34],\d+ V$/);
+    expect(texts.get('V2')).toBe('9,000 V');
+    expect(texts.get('V1')).toBe(stableMeterText(parts[0]!, measurements.get('V1')!, statuses.get('V1')!, summaries.get('V1')!));
   });
 
   it('hesaplanamayan değer "hesaplanamıyor" yazar', () => {

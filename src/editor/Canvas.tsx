@@ -54,7 +54,6 @@ import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
 import { routeAround } from './phoneTools';
-import { stableMeterText } from './liveReadout';
 import { HintText } from './HintStrip';
 import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
@@ -1644,14 +1643,13 @@ export function Canvas({
           <g opacity={bagla ? 0.38 : 1}>
           {doc.parts.map((part) => {
             const live = frame?.live.get(part.id);
-            const measurement = frame?.measurements.get(part.id);
             return (
               <PartView
                 key={part.id}
                 part={part}
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
-                meterText={measurement ? stableMeterText(part, measurement, frame?.statuses.get(part.id) ?? {}, frame?.summaries.get(part.id) ?? null) : null}
+                meterText={frame?.meterTexts.get(part.id) ?? null}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
                 hideValue={lod && !selectedParts.has(part.id)}

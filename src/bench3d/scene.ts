@@ -280,7 +280,8 @@ export class BenchScene {
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
     // Önce boyutlar okunur, sonra yazılır (düzen bir kez hesaplanır). Öncelik: uç harfleri, seçili
-    // parça, ölçü aletleri, öbürleri; çakışan etiketlerden önceliği düşük olan gizlenir.
+    // parça, ölçü aletleri, öbürleri; çakışan etiketlerden önceliği düşük olan gizlenir. Katmandaki
+    // engellerle ([data-obstacle]: telefonda hareket ipucu) çakışan etiket de gizlenir.
     const items = [...el.querySelectorAll<HTMLElement>('[data-anchor]')].map((node) => ({
       node,
       w: node.offsetWidth,
@@ -288,7 +289,12 @@ export class BenchScene {
       priority: Number(node.dataset.priority ?? 0),
     }));
     items.sort((a, b) => b.priority - a.priority);
-    const taken: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+    const taken: Array<{ x0: number; y0: number; x1: number; y1: number }> = [...el.querySelectorAll<HTMLElement>('[data-obstacle]')].map((o) => ({
+      x0: o.offsetLeft,
+      y0: o.offsetTop,
+      x1: o.offsetLeft + o.offsetWidth,
+      y1: o.offsetTop + o.offsetHeight,
+    }));
     const p = new Vector3();
     const toScreen = (world: Vector3) => {
       p.copy(world).project(this.camera);
@@ -588,6 +594,7 @@ export class BenchScene {
         live: this.frame?.live.get(id),
         status: this.frame?.statuses.get(id),
         measurement: this.frame?.measurements.get(id),
+        reading: this.frame?.meterTexts.get(id),
         scope: this.frame?.scopes.get(id),
         props: placed.part.props,
         active: this.active && this.frame !== null,

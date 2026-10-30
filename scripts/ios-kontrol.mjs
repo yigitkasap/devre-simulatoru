@@ -90,6 +90,39 @@ const phoneNotebook = (page) => page.getByRole('region', { name: /^Defter/ });
 const selectedCount = (page) => page.locator('svg.schematic rect[data-selected]').count();
 /** Masaüstünde sağdaki defter (v3). */
 const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
+/**
+ * Bir yazının ekrandaki kontrastı (WCAG): öğenin ekran görüntüsünde en sık görülen renk zemin,
+ * yazı rengi hesaplanmış `color`. Zemin WebGL sahnesi olabildiği için piksellerden ölçülür.
+ */
+async function contrastOf(page, locator) {
+  const box = await locator.boundingBox();
+  const png = await page.screenshot({ clip: box });
+  const color = await locator.evaluate((el) => getComputedStyle(el).color);
+  return page.evaluate(async ([b64, color]) => {
+    const img = new Image();
+    img.src = 'data:image/png;base64,' + b64;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    const buckets = new Map();
+    for (let i = 0; i < d.length; i += 4) {
+      const k = `${d[i] >> 3},${d[i + 1] >> 3},${d[i + 2] >> 3}`;
+      const b = buckets.get(k) ?? { n: 0, r: 0, g: 0, b: 0 };
+      b.n += 1; b.r += d[i]; b.g += d[i + 1]; b.b += d[i + 2];
+      buckets.set(k, b);
+    }
+    const bg = [...buckets.values()].sort((a, b) => b.n - a.n)[0];
+    const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    const lum = (r, gg, b) => 0.2126 * lin(r) + 0.7152 * lin(gg) + 0.0722 * lin(b);
+    const [r, gg, b] = color.match(/[\d.]+/g).map(Number);
+    const L1 = lum(r, gg, b);
+    const L2 = lum(bg.r / bg.n, bg.g / bg.n, bg.b / bg.n);
+    return (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+  }, [png.toString('base64'), color]);
+}
 /** Bir nesneye doğrudan bağlı olay dinleyicileri (CDP). */
 async function listeners(cdp, expression) {
   const { result } = await cdp.send('Runtime.evaluate', { expression });
@@ -685,6 +718,21 @@ try {
     const allScene = (await karta.getByRole('img', { name: /^Delikli plaket 3B/ }).getAttribute('aria-label')) ?? '';
     const allAside = (await karta.getByRole('complementary', { name: 'Delikli plaket' }).textContent()) ?? '';
     const allNav = await karta.getByRole('button', { name: /^Sonraki/ }).count();
+    // Dış teller (kullanıcı isteği): delikten biraz kalkıp en yakın kenara kıvrılıyor, kenarın dışında
+    // aşağı sarkıyor (dimdik yukarı çıkmıyor). Kart kalınlığı T = 1,6 / 2,54.
+    const leadBoxes = await page.evaluate(() => [...(window.__kart?.model?.parts ?? [])].filter(([k]) => k.startsWith('lead-')).map(([, v]) => ({ min: v.box.min.y, max: v.box.max.y })));
+    const T = 1.6 / 2.54;
+    const perfAside = karta.getByRole('complementary', { name: 'Delikli plaket' });
+    const bomBox = await perfAside.getByRole('region', { name: 'Malzemeler' }).boundingBox().catch(() => null);
+    const startBox = await karta.getByRole('button', { name: 'Adım adım başla' }).boundingBox();
+    const linksBox = await perfAside.getByRole('button', { name: 'Yazdır' }).boundingBox();
+    const asideScrolls = await perfAside.evaluate((a) => a.scrollHeight > a.clientHeight + 1);
+    const bomText = bomBox ? ((await perfAside.getByRole('region', { name: 'Malzemeler' }).textContent()) ?? '') : '';
+    check('Karta aktar (masaüstü, Tamamı): dış teller delikten alçakta kalkıp kartın kenarından dışarı sarkıyor (dimdik yukarı çıkmıyor)',
+      leadBoxes.length === 4 && leadBoxes.every((b) => b.max < T + 1.35 && b.min < -0.5), leadBoxes.map((b) => `${b.min.toFixed(1)}..${b.max.toFixed(1)}`).join(' '));
+    check('Karta aktar (masaüstü, Tamamı): "Adım adım başla" ile alttaki bağlantılar arasında malzeme listesi; panel kaymıyor, bağlantılar görünür',
+      bomBox !== null && startBox !== null && linksBox !== null && bomBox.y >= startBox.y + startBox.height && bomBox.y + bomBox.height <= linksBox.y && !asideScrolls && bomText.includes('NE555') && bomText.includes('Direnç 68 kΩ'),
+      bomBox ? `${Math.round(bomBox.y)}–${Math.round(bomBox.y + bomBox.height)} · bağlantılar ${Math.round(linksBox?.y ?? 0)}` : 'liste yok');
     await karta.getByRole('button', { name: 'Adım adım başla' }).click(); await page.waitForTimeout(300);
     const started = (await karta.locator('[aria-label$=". adımı"]').getAttribute('aria-label')) ?? '';
     check('Karta aktar (masaüstü): delikli plaket "Tamamı" ile açılıyor (bütün parçalar, "25 adım", adım düğmesi yok); "Adım adım başla" 1. adımdan başlatıyor',
@@ -805,6 +853,44 @@ try {
     check('3B: sağ alttaki Şema düğmesi şemaya döndürüyor', (await page.locator('svg.schematic').count()) === 1 && (await page.evaluate(() => window.__tezgah === undefined)));
     await ctx.close();
   }
+  // --- Ölçü aletinin okuması her yerde aynı: şema göstergesi, defter kartı, 3B etiketi, 3B ekranı ----
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: '555 ile yanıp sönen LED (astabil)' }).first().click(); await page.waitForTimeout(500);
+    const sim = page.getByRole('region', { name: 'Simülasyon' });
+    /** V1'in şemadaki göstergesi, defter kartı, 3B etiketi ve 3B aletin ekranı. */
+    const readings = () => page.evaluate(() => {
+      const value = (el) => el?.textContent?.replace(/^.*Voltmetre/, '').trim() ?? null;
+      const id = JSON.parse(localStorage.getItem('devre-simulatoru:devre')).parts.find((p) => p.label === 'V1').id;
+      const placed = window.__tezgah?.parts.get(id);
+      return {
+        gauge: document.querySelector('svg.schematic text[fill="#a6f4bd"]')?.textContent ?? null,
+        card: value(document.querySelector(`[data-card="${id}"]`)),
+        label: value([...document.querySelectorAll('[data-anchor="part"]')].find((e) => e.textContent?.startsWith('V1'))),
+        screen: placed?.model.root.userData.screen ?? null,
+      };
+    });
+    await sim.getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(1200);
+    const running = [];
+    for (let i = 0; i < 5; i++) { running.push(await readings()); await page.waitForTimeout(130); }
+    await sim.getByRole('button', { name: 'Duraklat' }).click(); await page.waitForTimeout(400);
+    const paused = await readings();
+    await page.getByRole('button', { name: '3B', exact: true }).click();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
+    const bench = await readings();
+    await sim.getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(900);
+    await sim.getByRole('button', { name: 'Duraklat' }).click(); await page.waitForTimeout(400);
+    const bench2 = await readings();
+    check('ölçü aleti (555): çalışırken şema göstergesi ve defter kartı aynı okumayı gösteriyor', running.every((r) => r.gauge !== null && r.gauge === r.card) && new Set(running.map((r) => r.gauge)).size >= 2, running.map((r) => `${r.gauge}/${r.card}`).join(' '));
+    check('ölçü aleti (555): duraklatılmışken şema, defter kartı, 3B etiketi ve 3B aletin ekranı aynı sayı; ekran boş değil',
+      paused.gauge !== null && paused.gauge === paused.card && bench.card === paused.card && bench.label === paused.card && bench.screen === paused.card && bench2.label === bench2.card && bench2.screen === bench2.card && bench2.card !== paused.card,
+      `şema ${paused.gauge} · kart ${paused.card} · 3B ${bench.label} · ekran ${bench.screen} → ${bench2.card}/${bench2.label}/${bench2.screen}`);
+    await ctx.close();
+  }
   {
     const { page } = await phone();
     await openExample(page, 'LED ve ön direnç');
@@ -815,6 +901,20 @@ try {
     const full = await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).boundingBox();
     check('3B (telefon): etiket yalnızca ölçü aletinde (seçim yokken); Etiketler, Kamera ve Karta aktar sağ altta, 44 px',
       labels.length === 1 && labels[0].startsWith('A1') && tag !== null && tag.height >= 43.5 && full !== null && Math.abs(tag.y - full.y) < 2 && tag.x < full.x, labels.join(' | '));
+    // İlk açılıştaki hareket ipucu: sahnenin altında, düğmelerin üstünde; görünen hiçbir etiketin üstüne binmiyor.
+    const hint = await page.getByText(/^Bir parmak: döndür/).boundingBox();
+    const area = await page.locator('main').boundingBox();
+    const hintClash = await page.evaluate(() => {
+      const h = [...document.querySelectorAll('[data-obstacle]')][0]?.getBoundingClientRect();
+      if (!h) return ['ipucu yok'];
+      return [...document.querySelectorAll('[data-anchor]')].filter((e) => getComputedStyle(e).opacity === '1').filter((e) => {
+        const b = e.getBoundingClientRect();
+        return b.left < h.right && b.right > h.left && b.top < h.bottom && b.bottom > h.top;
+      }).map((e) => e.textContent);
+    });
+    check('3B (telefon): ilk açılıştaki "Bir parmak: döndür…" ipucu sahnenin altında, düğmelerin üstünde; etiketlerin üstüne binmiyor',
+      hint !== null && area !== null && tag !== null && hint.y > area.y + area.height / 2 && hint.y + hint.height <= tag.y + 1 && hintClash.length === 0 && labels.length === 1,
+      hint ? `ipucu ${Math.round(hint.y)}–${Math.round(hint.y + hint.height)}, düğmeler ${Math.round(tag?.y ?? 0)} · ${hintClash.join(', ')}` : 'ipucu yok');
     await page.context().close();
   }
 
@@ -1460,17 +1560,28 @@ try {
     const full = await circuitDialog.boundingBox();
     const drawingOf = async (root) => (await root.getByRole('tabpanel').locator('svg[role=img]').getAttribute('aria-label')) ?? '';
     const phoneKat = await drawingOf(circuitDialog);
+    /** Çizim ve yazıları ekranın içinde mi (yatay kaydırma gerekmeden). */
+    const fitsScreen = (root) => root.evaluate((d) => {
+      const svg = d.querySelector('[role=tabpanel] svg[role=img]');
+      const r = svg.getBoundingClientRect();
+      const right = Math.max(r.right, ...[...svg.querySelectorAll('text')].map((t) => t.getBoundingClientRect().right));
+      const panel = d.querySelector('[role=tabpanel]');
+      return { ok: r.left >= 0 && right <= window.innerWidth - 4 && panel.scrollWidth <= panel.clientWidth + 1, right: Math.round(right) };
+    });
+    const fitKat = await fitsScreen(circuitDialog);
     const phoneTabs = await circuitDialog.getByRole('tab').count();
     const dialogSmall = await circuitDialog.evaluate((root) => [...root.querySelectorAll('button, a, [role=tab]')]
       .map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 20), w: r.width, h: r.height }; })
       .filter((r) => r.w > 0 && r.h > 0 && (r.h < 43.5 || r.w < 43.5)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
     await circuitDialog.getByRole('tab', { name: 'Tüm devre' }).tap(); await page.waitForTimeout(250);
     const phoneAll = await drawingOf(circuitDialog);
+    const fitAll = await fitsScreen(circuitDialog);
     const dialogScrolls = await pageScrolls(page);
     await circuitDialog.getByRole('button', { name: 'Devreyi kapat' }).tap(); await page.waitForTimeout(200);
-    check('baraj (telefon): "Devreyi gör ›" devreyi tam ekran açıyor (Kat 1, 2, 3, Tüm devre sekmeleri; çizim panel içinde kayar, sayfa kaymaz; hedefler ≥ 44 px); Kapat kapatıyor',
+    check('baraj (telefon): "Devreyi gör ›" devreyi tam ekran açıyor (Kat 1, 2, 3, Tüm devre sekmeleri; sayfa kaymaz; hedefler ≥ 44 px); Kapat kapatıyor',
       full !== null && full.height >= 840 && phoneTabs === 4 && phoneKat.startsWith('Kat 1 devresi:') && phoneAll.startsWith('Tüm devre:') && !dialogScrolls && dialogSmall.length === 0 && (await circuitDialog.count()) === 0,
       dialogSmall.join(', ') || phoneKat.slice(0, 40));
+    check('baraj (telefon): Kat 1 (LED, RC1 dahil) ve Tüm devre çizimi açılışta ekran genişliğine sığıyor (yana kaydırma yok)', fitKat.ok && fitAll.ok, `sağ kenar ${fitKat.right} / ${fitAll.right} px`);
     await page.context().close();
   }
   {
@@ -1487,6 +1598,61 @@ try {
     check('baraj (yatay telefon): sayfa kaymıyor; devre seçimi ve kumanda üst çubukta tek satır, sahne altta', !(await pageScrolls(lp)) && header !== null && flowBox !== null && flowBox.y < header.y + header.height && sceneBox !== null && sceneBox.y >= header.y + header.height - 1,
       `çubuk ${Math.round(header?.height ?? 0)} px`);
     await lCtx.close();
+  }
+  // Devre paneli (B2, B4): kat çizimleri panele sığıyor, dikeyde geniş, değerler hemen altında; Tüm devre
+  // (B5): sahne 600 px, kamera dar sahne ayarında ("all"), tutamak, problar ve ışık kulesi kadrajda.
+  for (const width of [1440, 1180]) {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, locale: 'tr-TR' });
+    const pg = await ctx.newPage();
+    pg.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await pg.goto(BARAJ, { waitUntil: 'networkidle' }); await pg.waitForTimeout(500);
+    await pg.getByRole('button', { name: 'Devre', exact: true }).click(); await pg.waitForTimeout(300);
+    const aside = pg.getByRole('complementary', { name: 'Devre' });
+    const layoutOf = () => aside.evaluate((a) => {
+      const box = a.getBoundingClientRect();
+      const out = [...a.querySelectorAll('text, a, p, [role=tabpanel] span')].filter((e) => {
+        const b = e.getBoundingClientRect();
+        return b.width > 0 && (b.right > box.right - 1 || b.left < box.left);
+      }).map((e) => e.textContent.trim().slice(0, 24));
+      const svg = a.querySelector('[role=tabpanel] svg[role=img]').getBoundingClientRect();
+      const link = [...a.querySelectorAll('a')].find((e) => e.textContent.includes('simülatörde aç'))?.getBoundingClientRect();
+      const foot = [...a.querySelectorAll('[role=tabpanel] span, [role=tabpanel] p')].map((e) => e.getBoundingClientRect().top).filter((t) => t > svg.bottom - 2);
+      return { out, h: svg.height, gap: foot.length ? Math.min(...foot) - svg.bottom : 999, link: link ? link.right <= box.right - 8 : false };
+    });
+    const rows = [];
+    for (const variant of ['Çubuk gösterge', 'Tek ışık']) {
+      await pg.getByRole('radio', { name: variant }).click(); await pg.waitForTimeout(400);
+      for (const k of ['Kat 1', 'Kat 2', 'Kat 3']) {
+        await aside.getByRole('tab', { name: k, exact: true }).click(); await pg.waitForTimeout(250);
+        rows.push({ name: `${variant} ${k}`, ...(await layoutOf()) });
+      }
+    }
+    const bad = rows.filter((r) => r.out.length > 0 || !r.link || r.gap > 24 || r.h < (width >= 1280 ? 480 : 400));
+    check(`baraj (masaüstü ${width}): Kat 1, 2, 3 ve Tek ışık çizimleri panele sığıyor ("LED … · sönük" ve "Tüm devreyi simülatörde aç" kesilmiyor), dikeyde büyük, değerler hemen altında`,
+      bad.length === 0, bad.map((r) => `${r.name}: ${r.out.join('/') || ''} h ${Math.round(r.h)} ara ${Math.round(r.gap)} bağlantı ${r.link}`).join(' | ') || `çizim ${Math.round(rows[0].h)} px`);
+    await pg.getByRole('radio', { name: 'Çubuk gösterge' }).click(); await pg.waitForTimeout(300);
+    await aside.getByRole('tab', { name: 'Tüm devre', exact: true }).click(); await pg.waitForTimeout(900);
+    const scene = await pg.getByRole('region', { name: 'Baraj ve ışık kulesi' }).boundingBox();
+    const handle = await pg.getByRole('region', { name: 'Baraj ve ışık kulesi' }).getByRole('slider', { name: 'Su seviyesi' }).boundingBox();
+    const framing = await pg.evaluate(() => {
+      const s = window.__baraj3b;
+      const pts = [0, 1, 2, 3].map((k) => s.screen(s.points.tip(k))).concat([1, 2, 3].map((n) => s.screen(s.points.lamp(n))));
+      return { view: s.view, xs: pts.map((p) => p.x), ys: pts.map((p) => p.y) };
+    });
+    const margin = Math.min(handle ? handle.x - scene.x : -1, ...framing.xs, ...framing.xs.map((x) => scene.width - x));
+    check(`baraj (masaüstü ${width}, B5): Tüm devrede sahne 600 px, kamera dar sahne ayarında (all); tutamak, problar ve ışık kulesi kadrajda`,
+      Math.abs(scene.width - 600) < 1.5 && framing.view === 'all' && handle !== null && handle.x >= scene.x + 8 && handle.x + handle.width <= scene.x + scene.width - 8 && margin >= 8 && framing.ys.every((y) => y > 8 && y < scene.height - 8),
+      `sahne ${Math.round(scene.width)} px, ${framing.view}, en dar pay ${Math.round(margin)} px`);
+    await ctx.close();
+  }
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
+    const pg = await ctx.newPage();
+    await pg.goto(BARAJ, { waitUntil: 'networkidle' }); await pg.waitForTimeout(800);
+    const label = pg.getByRole('group', { name: 'Göster' }).getByText('Göster:');
+    const ratio = await contrastOf(pg, label);
+    check('baraj (koyu tema): sol alttaki "Göster:" yazısı okunuyor (zeminle kontrastı WCAG AA, ≥ 4,5)', ratio >= 4.5, `${ratio.toFixed(2)} : 1`);
+    await ctx.close();
   }
   {
     const bCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });

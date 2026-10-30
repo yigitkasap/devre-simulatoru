@@ -324,6 +324,7 @@ export default function BarajSayfasi() {
             onPreview={onPreview}
             onCommit={kumanda.commitLevel}
             {...(phone ? {} : { onLamp: selectFloor })}
+            narrow={!phone && circuitOpen && circuitTab === 'all'}
             xray={xray}
             onXray={setXray}
             className="h-full w-full"
@@ -541,6 +542,8 @@ export default function BarajSayfasi() {
   // Dar ekranda başlık görünmez (yalnızca ekran okuyucuya), Devre ve Soru yalnızca simge.
   const roomy = width >= 1280;
   const narrow = width < 1100;
+  /** Tüm devre (masaüstü, README B5): sahne 600 px, devre paneli kalan genişlik. */
+  const sceneFixed = desktop && circuitOpen && circuitTab === 'all' && !circuitWide;
   const moreMenu = moreOpen && (
     <MoreMenu
       onClose={() => setMoreOpen(false)}
@@ -599,7 +602,12 @@ export default function BarajSayfasi() {
       </header>
       {soru(false)}
       <div className="relative flex min-h-0 flex-1">
-        <section aria-label={tr.baraj.sceneTitle} hidden={circuitOpen && circuitWide} className="relative min-w-0 flex-1 overflow-hidden bg-[#e9eef3]">
+        <section
+          aria-label={tr.baraj.sceneTitle}
+          hidden={circuitOpen && circuitWide}
+          className={`relative min-w-0 overflow-hidden bg-[#e9eef3] ${sceneFixed ? 'shrink-0' : 'flex-1'}`}
+          style={sceneFixed ? { width: ALL_SCENE_WIDTH } : undefined}
+        >
           {scene}
           <GosterCipleri
             ions={showIons}
@@ -612,8 +620,8 @@ export default function BarajSayfasi() {
         {circuitOpen && (
           <aside
             aria-label={tr.baraj.devre.title}
-            className={`flex min-h-0 min-w-0 flex-col border-l border-line bg-panel ${circuitWide ? 'flex-1' : 'shrink-0'}`}
-            style={circuitWide ? undefined : { width: circuitTab === 'all' ? (roomy ? 840 : '58%') : roomy ? 600 : '45%' }}
+            className={`flex min-h-0 min-w-0 flex-col border-l border-line bg-panel ${circuitWide || sceneFixed ? 'flex-1' : 'shrink-0'}`}
+            style={circuitWide || sceneFixed ? undefined : { width: circuitTab === 'all' ? '58%' : roomy ? 600 : '45%' }}
           >
             {panel('side')}
           </aside>
@@ -623,6 +631,9 @@ export default function BarajSayfasi() {
     </div>
   );
 }
+
+/** Tüm devre açıkken sahnenin genişliği (masaüstü; README B5: panel 840 px, sahne 600 px). */
+const ALL_SCENE_WIDTH = 600;
 
 type MenuItem =
   | { readonly kind: 'link'; readonly label: string; readonly href: string; readonly onActivate: (e: { currentTarget: HTMLAnchorElement }) => void }

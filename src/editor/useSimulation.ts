@@ -20,7 +20,7 @@ import {
 } from '../sim';
 import { SimAudio } from './audio';
 import { IonPhases } from './ions';
-import { DISPLAY_WINDOW, LiveWindow, NodeWindow, type LiveSummary, type NodeSummary } from './liveReadout';
+import { DISPLAY_WINDOW, LiveWindow, METER_REFRESH, NodeWindow, meterReadings, type LiveSummary, type NodeSummary } from './liveReadout';
 import { buildScopeView, type ChannelStats, type ScopeView } from './scopeView';
 import type { LiveVisual } from './symbols';
 
@@ -74,6 +74,13 @@ export interface SimFrame {
   readonly statuses: ReadonlyMap<string, DeviceStatus>;
   /** İzlenen parçaların son ölçüm penceresi (salınan değerlerin kararlı gösterimi için). */
   readonly summaries: ReadonlyMap<string, LiveSummary>;
+  /**
+   * Ölçü aletlerinin okuması (gösterge metni): şema, defter kartı, 3B etiketi ve 3B aletin ekranı
+   * bunu gösterir. METER_REFRESH'te bir ve duraklatınca yenilenir.
+   */
+  readonly meterTexts: ReadonlyMap<string, string>;
+  /** Okumaların yenilenme sayacı: kapalı kartlar ve 3B etiketleri bununla birlikte yenilenir. */
+  readonly readoutTick: number;
   /** Simülasyon sırasında oluşan uyarılar (kısa devre, yanmış LED). */
   readonly runtime: readonly Diagnostic[];
   /** Kısa devre olan pillerin kimlikleri (kırmızı yanıp sönen çerçeve). */
@@ -156,6 +163,8 @@ export function useSimulation(
   const wireWindows = useRef(new Map<string, NodeWindow>());
   /** Osiloskop ölçüm satırları (tepe-tepe, etkin, frekans) pencere boyunca sabit: son değer ve yaşı. */
   const scopeHolds = useRef(new Map<string, ScopeHold>());
+  /** Ölçü aletlerinin son okuması, yaşı (s) ve yenilenme sayacı. */
+  const meterHold = useRef({ texts: new Map() as ReadonlyMap<string, string>, age: Infinity, tick: 0 });
   const simRef = useRef<CircuitSimulator | null>(null);
   const audio = useRef<SimAudio | null>(null);
   const soundRef = useRef(sound);
@@ -182,6 +191,15 @@ export function useSimulation(
   const setStatus = useCallback((next: SimStatus) => {
     statusRef.current = next;
     setStatusState(next);
+  }, []);
+
+  /** Ölçü aletlerinin okumasını karedeki ölçümlerden yeniler. */
+  const refreshReadings = useCallback((f: SimFrame): SimFrame => {
+    const hold = meterHold.current;
+    hold.texts = meterReadings(latest.current.doc.parts, f.measurements, f.statuses, f.summaries);
+    hold.age = 0;
+    hold.tick += 1;
+    return { ...f, meterTexts: hold.texts, readoutTick: hold.tick };
   }, []);
 
   /**
@@ -333,10 +351,14 @@ export function useSimulation(
       if (w.summary) summaries.set(id, w.summary);
     }
 
-    return {
+    const hold = meterHold.current;
+    hold.age += dtReal;
+    const frame: SimFrame = {
       time: sim.time,
       vmax,
       summaries,
+      meterTexts: hold.texts,
+      readoutTick: hold.tick,
       wireVoltages,
       wireSummaries,
       segmentFlows: flows,
@@ -351,7 +373,9 @@ export function useSimulation(
       scopes,
       lagging,
     };
-  }, []);
+    // Okuma METER_REFRESH'te bir; duraklatılmışken (dtReal = 0: değer değişti, LED onarıldı) hemen.
+    return dtReal === 0 || hold.age >= METER_REFRESH ? refreshReadings(frame) : frame;
+  }, [refreshReadings]);
 
   const stop = useCallback(() => {
     simRef.current = null;
@@ -363,6 +387,7 @@ export function useSimulation(
     liveWindows.current = new Map();
     wireWindows.current = new Map();
     scopeHolds.current = new Map();
+    meterHold.current = { texts: new Map(), age: Infinity, tick: meterHold.current.tick };
     audio.current?.reset();
     setStatus('stopped');
     setFrame(null);
@@ -393,8 +418,11 @@ export function useSimulation(
   }, [setStatus]);
 
   const pause = useCallback(() => {
-    if (statusRef.current === 'running') setStatus('paused');
-  }, [setStatus]);
+    if (statusRef.current !== 'running') return;
+    setStatus('paused');
+    // Duraklatılınca bütün göstergeler son durumun okumasını gösterir.
+    setFrame((f) => f && refreshReadings(f));
+  }, [setStatus, refreshReadings]);
 
   const repair = useCallback(
     (partId: string) => {
@@ -449,7 +477,7 @@ export function useSimulation(
     let lagSamples = 0;
     const tick = (now: number) => {
       const sim = simRef.current;
-      if (!sim) return;
+      if (!sim || statusRef.current !== 'running') return;
       const dtReal = Math.min(MAX_FRAME_SECONDS, Math.max(0, (now - last) / 1000));
       last = now;
       const simDt = dtReal * speedRef.current;

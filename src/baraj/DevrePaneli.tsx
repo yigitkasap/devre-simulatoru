@@ -170,62 +170,65 @@ function silencedText(kat: KatDevresi): string {
   return tr.baraj.panel.silencedNote(upper, kat.silencer?.label ?? '', kat.labels.q, colorName(kat.level), colorName(upper));
 }
 
-/** Kat çizimi (B2): çubuk gösterge ve tek ışıkta Kat 3. */
+/**
+ * Kat çizimi (B2): çubuk gösterge ve tek ışıkta Kat 3. Çizim dikeyde geniş (panelin yüksekliğini
+ * kullanır); RC ve LED'in yazısı LED'in solunda, bütün yazılar çizimin içinde (panele sığar).
+ */
 function KatSemasi({ kat, supply, className, style }: SchematicProps) {
   const c = kat.currents;
   const ink = katInks(kat);
   const led = ledLook(kat);
   const t = tr.baraj.panel;
   return (
-    <svg viewBox="0 0 560 380" role="img" aria-label={floorAria(kat)} className={className} style={style}>
+    <svg viewBox="0 0 560 510" role="img" aria-label={floorAria(kat)} className={className} style={style}>
       <Highlight
         paths={[
-          carries(c?.probe) && 'M40 30H70V170H250',
-          carries(c?.base) && 'M250 170H362',
-          carries(c?.capacitor) && 'M250 170V330H316',
-          (carries(c?.emitter) || carries(c?.base)) && 'M384 194V330H316',
-          carries(c?.led) && 'M40 30H460V130H384V146',
+          carries(c?.probe) && 'M40 40H70V260H250',
+          carries(c?.base) && 'M250 260H362',
+          carries(c?.capacitor) && 'M250 260V470H316',
+          (carries(c?.emitter) || carries(c?.base)) && 'M384 284V470H316',
+          carries(c?.led) && 'M40 40H460V196H384V236',
         ]}
       />
-      {led.glow && <circle cx={460} cy={98} r={22} fill={led.glow} opacity={0.25 + 0.25 * Math.min(1, kat.brightness)} />}
+      {led.glow && <circle cx={460} cy={134} r={22} fill={led.glow} opacity={0.25 + 0.25 * Math.min(1, kat.brightness)} />}
       <g fill="none" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M40 30H520" stroke={INK.rail} strokeWidth={3} />
+        <path d="M40 40H520" stroke={INK.rail} strokeWidth={3} />
         <g stroke={ink.input}>
-          <path d="M70 30V80M70 140V170H120" />
-          <path d="M120 170l6-12 10 24 10-24 10 24 10-24 10 24 10-24 4 12" />
-          <path d="M200 170H362" />
-          <path d="M250 170V210M235 210H265M235 220H265M250 220V330" />
-          <path d="M300 170V200l-10 6 20 10-20 10 20 10-20 10 20 10-10 6V330" />
+          <path d="M70 40V120M70 180V260H120" />
+          <path d="M120 260l6-12 10 24 10-24 10 24 10-24 10 24 10-24 4 12" />
+          <path d="M200 260H362" />
+          <path d="M250 260V320M235 320H265M235 330H265M250 330V470" />
+          <path d="M300 260V300l-10 6 20 10-20 10 20 10-20 10 20 10-10 6V470" />
         </g>
         <g stroke={INK.symbol}>
-          <path d="M250 330H384M316 330V342M302 342H330M306 349H326M311 356H321" />
+          <path d="M250 470H384M316 470V482M302 482H330M306 489H326M311 496H321" />
         </g>
-        <Npn cx={372} cy={170} r={28} bar={10} lead={12} reach={24} stroke={ink.stage} />
+        <Npn cx={372} cy={260} r={28} bar={10} lead={12} reach={24} stroke={ink.stage} />
         <g stroke={ink.stage}>
-          <path d="M384 146V130H460M384 194V330" />
-          <path d="M460 30V40l-10 4 20 8-20 8 20 8-20 8 10 4V86" />
-          <path d="M446 86H474L460 110Z" fill={led.fill} />
-          <path d="M446 112H474M460 112V130" />
+          <path d="M384 236V196H460M384 284V470" />
+          <path d="M460 40V70l-10 4 20 8-20 8 20 8-20 8 10 4V122" />
+          <path d="M446 122H474L460 146Z" fill={led.fill} />
+          <path d="M446 148H474M460 148V196" />
         </g>
       </g>
-      <WaterBox x={58} y={80} wet={kat.wet} />
-      <circle cx={70} cy={170} r={5} fill={kat.wet ? INK.okDot : INK.muted} />
-      <circle cx={250} cy={170} r={4} fill={ink.input} />
-      <circle cx={300} cy={170} r={4} fill={ink.input} />
+      <WaterBox x={58} y={120} wet={kat.wet} />
+      <circle cx={70} cy={260} r={5} fill={kat.wet ? INK.okDot : INK.muted} />
+      <circle cx={250} cy={260} r={4} fill={ink.input} />
+      <circle cx={300} cy={260} r={4} fill={ink.input} />
       <g fontSize={14} fill={INK.symbol} style={sans}>
-        <text x={40} y={20} fontWeight={600} fill={INK.railInk}>{`+${formatSI(supply, 'V', { trim: true })}`}</text>
-        <text x={92} y={62}>{t.common}</text>
-        <text x={92} y={116} fill={kat.wet ? INK.symbol : INK.warn} fontWeight={kat.wet ? 400 : 600}>
+        <text x={40} y={28} fontWeight={600} fill={INK.railInk}>{`+${formatSI(supply, 'V', { trim: true })}`}</text>
+        <text x={92} y={100}>{t.common}</text>
+        <text x={92} y={156} fill={kat.wet ? INK.symbol : INK.warn} fontWeight={kat.wet ? 400 : 600}>
           {kat.wet ? t.water : t.noWater}
         </text>
-        <text x={20} y={196} fontWeight={600} fill={kat.wet ? INK.ok : INK.muted}>{probeText(kat.level, kat.wet)}</text>
-        <text x={126} y={152} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.rb} ${ohms(kat.values.rb)}`}</text>
-        <text x={170} y={222} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.c} ${farads(kat.values.c)}`}</text>
-        <text x={316} y={270} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.rp} ${ohms(kat.values.rp)}`}</text>
-        <text x={410} y={176} fontWeight={600} fill={ink.stageOn ? INK.symbol : INK.muted}>{kat.labels.q}</text>
-        <text x={410} y={194} fill={INK.muted}>{regionText(kat.region)}</text>
-        <text x={484} y={66} fill={ink.stageOn ? INK.symbol : INK.muted}>{`${kat.labels.rc} ${ohms(kat.values.rc)}`}</text>
-        <text x={484} y={104} fontWeight={600} fill={led.textFill}>{led.text}</text>
+        <text x={20} y={288} fontWeight={600} fill={kat.wet ? INK.ok : INK.muted}>{probeText(kat.level, kat.wet)}</text>
+        <text x={126} y={242} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.rb} ${ohms(kat.values.rb)}`}</text>
+        <text x={170} y={332} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.c} ${farads(kat.values.c)}`}</text>
+        <text x={316} y={376} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.rp} ${ohms(kat.values.rp)}`}</text>
+        <text x={410} y={266} fontWeight={600} fill={ink.stageOn ? INK.symbol : INK.muted}>{kat.labels.q}</text>
+        <text x={410} y={284} fill={INK.muted}>{regionText(kat.region)}</text>
+        <text x={440} y={95} textAnchor="end" fill={ink.stageOn ? INK.symbol : INK.muted}>{`${kat.labels.rc} ${ohms(kat.values.rc)}`}</text>
+        <text x={432} y={139} textAnchor="end" fontWeight={600} fill={led.textFill}>{led.text}</text>
       </g>
     </svg>
   );
@@ -244,75 +247,75 @@ function SusturmaliKatSemasi({ kat, supply, className, style }: SchematicProps) 
   const driveInk = s.wet || sc === null ? INK.symbol : INK.off;
   const silSat = s.region === 'saturation';
   return (
-    <svg viewBox="0 0 560 390" role="img" aria-label={floorAria(kat)} className={className} style={style}>
+    <svg viewBox="0 0 560 490" role="img" aria-label={floorAria(kat)} className={className} style={style}>
       <Highlight
         paths={[
-          carries(c?.probe) && 'M20 30H70V150H236',
-          carries(sc?.collector) && 'M236 150V246',
-          (carries(sc?.emitter) || carries(sc?.collector)) && 'M236 294V360H344',
-          carries(sc?.base) && 'M20 30H30V270H214',
-          carries(c?.base) && 'M236 150H430',
-          carries(c?.capacitor) && 'M236 150H320V360H344',
-          (carries(c?.emitter) || carries(c?.base)) && 'M452 174V360H344',
-          carries(c?.led) && 'M20 30H500V110H452V126',
+          carries(c?.probe) && 'M20 40H70V190H236',
+          carries(sc?.collector) && 'M236 190V306',
+          (carries(sc?.emitter) || carries(sc?.collector)) && 'M236 354V450H344',
+          carries(sc?.base) && 'M20 40H30V330H214',
+          carries(c?.base) && 'M236 190H430',
+          carries(c?.capacitor) && 'M236 190H320V450H344',
+          (carries(c?.emitter) || carries(c?.base)) && 'M452 214V450H344',
+          carries(c?.led) && 'M20 40H500V150H452V166',
         ]}
       />
-      {led.glow && <circle cx={500} cy={90} r={20} fill={led.glow} opacity={0.25 + 0.25 * Math.min(1, kat.brightness)} />}
+      {led.glow && <circle cx={500} cy={118} r={20} fill={led.glow} opacity={0.25 + 0.25 * Math.min(1, kat.brightness)} />}
       <g fill="none" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M20 30H540" stroke={INK.rail} strokeWidth={3} />
+        <path d="M20 40H540" stroke={INK.rail} strokeWidth={3} />
         <g stroke={ink.input}>
-          <path d="M70 30V50M70 110V150H110" />
-          <path d="M110 150l6-12 10 24 10-24 10 24 10-24 10 24 10-24 4 12" />
-          <path d="M190 150H430" />
-          <path d="M320 150V190M305 190H335M305 200H335M320 200V360" />
-          <path d="M360 150V180l-10 6 20 10-20 10 20 10-20 10 20 10-10 6V360" />
+          <path d="M70 40V70M70 130V190H110" />
+          <path d="M110 190l6-12 10 24 10-24 10 24 10-24 10 24 10-24 4 12" />
+          <path d="M190 190H430" />
+          <path d="M320 190V250M305 250H335M305 260H335M320 260V450" />
+          <path d="M360 190V230l-10 6 20 10-20 10 20 10-20 10 20 10-10 6V450" />
         </g>
         <g stroke={driveInk}>
-          <path d="M30 30V180M30 240V270H70" />
-          <path d="M70 270l6-12 10 24 10-24 10 24 10-24 10 24 10-24 4 12" />
-          <path d="M150 270H214" />
+          <path d="M30 40V230M30 290V330H70" />
+          <path d="M70 330l6-12 10 24 10-24 10 24 10-24 10 24 10-24 4 12" />
+          <path d="M150 330H214" />
         </g>
-        <Npn cx={226} cy={270} r={24} bar={12} lead={10} reach={24} stroke={silInk} />
-        <path d="M236 246V150M236 294V360" stroke={silInk} />
-        <path d="M236 360H452M344 360V372M330 372H358M335 379H353M340 386H348" stroke={INK.symbol} />
-        <Npn cx={440} cy={150} r={26} bar={10} lead={12} reach={24} stroke={ink.stage} />
+        <Npn cx={226} cy={330} r={24} bar={12} lead={10} reach={24} stroke={silInk} />
+        <path d="M236 306V190M236 354V450" stroke={silInk} />
+        <path d="M236 450H452M344 450V462M330 462H358M335 469H353M340 476H348" stroke={INK.symbol} />
+        <Npn cx={440} cy={190} r={26} bar={10} lead={12} reach={24} stroke={ink.stage} />
         <g stroke={ink.stage}>
-          <path d="M452 126V110H500M452 174V360" />
-          <path d="M500 30V36l-10 4 20 8-20 8 20 8-20 8 10 4V80" />
-          <path d="M486 80H514L500 100Z" fill={led.fill} />
-          <path d="M486 100H514M500 100V110" />
+          <path d="M452 166V150H500M452 214V450" />
+          <path d="M500 40V60l-10 4 20 8-20 8 20 8-20 8 10 4V108" />
+          <path d="M486 108H514L500 128Z" fill={led.fill} />
+          <path d="M486 128H514M500 128V150" />
         </g>
       </g>
-      <WaterBox x={58} y={50} wet={kat.wet} />
-      <WaterBox x={18} y={180} wet={s.wet} />
-      <circle cx={70} cy={150} r={5} fill={kat.wet ? INK.okDot : INK.muted} />
-      <circle cx={30} cy={270} r={5} fill={s.wet ? INK.okDot : INK.muted} />
-      <circle cx={236} cy={150} r={kat.silenced ? 5 : 4} fill={kat.silenced ? INK.warn : ink.input} />
-      <circle cx={320} cy={150} r={4} fill={ink.input} />
-      <circle cx={360} cy={150} r={4} fill={ink.input} />
+      <WaterBox x={58} y={70} wet={kat.wet} />
+      <WaterBox x={18} y={230} wet={s.wet} />
+      <circle cx={70} cy={190} r={5} fill={kat.wet ? INK.okDot : INK.muted} />
+      <circle cx={30} cy={330} r={5} fill={s.wet ? INK.okDot : INK.muted} />
+      <circle cx={236} cy={190} r={kat.silenced ? 5 : 4} fill={kat.silenced ? INK.warn : ink.input} />
+      <circle cx={320} cy={190} r={4} fill={ink.input} />
+      <circle cx={360} cy={190} r={4} fill={ink.input} />
       <g fontSize={14} fill={INK.symbol} style={sans}>
-        <text x={24} y={20} fontWeight={600} fill={INK.railInk}>{`+${formatSI(supply, 'V', { trim: true })}`}</text>
-        <text x={92} y={86} fill={kat.wet ? INK.symbol : INK.warn} fontWeight={kat.wet ? 400 : 600}>
+        <text x={24} y={28} fontWeight={600} fill={INK.railInk}>{`+${formatSI(supply, 'V', { trim: true })}`}</text>
+        <text x={92} y={106} fill={kat.wet ? INK.symbol : INK.warn} fontWeight={kat.wet ? 400 : 600}>
           {kat.wet ? t.water : t.noWater}
         </text>
-        <text x={82} y={178} fontWeight={600} fill={kat.wet ? INK.ok : INK.muted}>{probeText(kat.level, kat.wet)}</text>
-        <text x={118} y={132} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.rb} ${ohms(kat.values.rb)}`}</text>
+        <text x={82} y={218} fontWeight={600} fill={kat.wet ? INK.ok : INK.muted}>{probeText(kat.level, kat.wet)}</text>
+        <text x={118} y={172} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.rb} ${ohms(kat.values.rb)}`}</text>
         {kat.silenced && kat.baseVoltage !== null && (
-          <text x={246} y={138} fontWeight={700} fill={INK.warn}>{`≈ ${formatNumber(kat.baseVoltage, 2)} V`}</text>
+          <text x={246} y={178} fontWeight={700} fill={INK.warn}>{`≈ ${formatNumber(kat.baseVoltage, 2)} V`}</text>
         )}
-        <text x={248} y={230} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.c} ${farads(kat.values.c)}`}</text>
-        <text x={372} y={232} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.rp} ${ohms(kat.values.rp)}`}</text>
-        <text x={476} y={160} fontWeight={600} fill={ink.stageOn ? INK.symbol : INK.muted}>{kat.labels.q}</text>
-        <text x={476} y={178} fill={INK.muted}>{regionText(kat.region)}</text>
-        <text x={404} y={62} fill={ink.stageOn ? INK.symbol : INK.muted}>{`${kat.labels.rc} ${ohms(kat.values.rc)}`}</text>
-        <text x={482} y={96} textAnchor="end" fontWeight={600} fill={led.textFill}>{led.text}</text>
+        <text x={248} y={290} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.c} ${farads(kat.values.c)}`}</text>
+        <text x={372} y={282} fill={ink.inputOn ? INK.symbol : INK.muted}>{`${kat.labels.rp} ${ohms(kat.values.rp)}`}</text>
+        <text x={476} y={200} fontWeight={600} fill={ink.stageOn ? INK.symbol : INK.muted}>{kat.labels.q}</text>
+        <text x={476} y={218} fill={INK.muted}>{regionText(kat.region)}</text>
+        <text x={404} y={86} fill={ink.stageOn ? INK.symbol : INK.muted}>{`${kat.labels.rc} ${ohms(kat.values.rc)}`}</text>
+        <text x={478} y={124} textAnchor="end" fontWeight={600} fill={led.textFill}>{led.text}</text>
         {!s.wet && (
-          <text x={50} y={216} fontWeight={600} fill={INK.warn}>{t.open}</text>
+          <text x={50} y={266} fontWeight={600} fill={INK.warn}>{t.open}</text>
         )}
-        <text x={44} y={302} fontWeight={600} fill={s.wet ? INK.ok : INK.muted}>{probeText(kat.level + 1, s.wet)}</text>
-        <text x={76} y={252} fill={s.wet ? INK.symbol : INK.muted}>{`${s.resistor} ${ohms(s.resistance)}`}</text>
-        <text x={96} y={330} fontWeight={700} fill={silSat ? INK.warn : INK.muted}>{s.label}</text>
-        <text x={96} y={348} fill={silSat ? INK.warn : INK.muted}>{`${t.silencer}${s.region ? ` · ${regionText(s.region)}` : ''}`}</text>
+        <text x={44} y={362} fontWeight={600} fill={s.wet ? INK.ok : INK.muted}>{probeText(kat.level + 1, s.wet)}</text>
+        <text x={76} y={312} fill={s.wet ? INK.symbol : INK.muted}>{`${s.resistor} ${ohms(s.resistance)}`}</text>
+        <text x={96} y={390} fontWeight={700} fill={silSat ? INK.warn : INK.muted}>{s.label}</text>
+        <text x={96} y={408} fill={silSat ? INK.warn : INK.muted}>{`${t.silencer}${s.region ? ` · ${regionText(s.region)}` : ''}`}</text>
       </g>
     </svg>
   );
@@ -691,20 +694,21 @@ export function DevrePaneli({ variant, katlar, tab, onTab, level, supply, batter
   );
   const tabs = <Tabs tab={tab} onTab={onTab} touch={touch} panelId={panelId} idBase={idBase} />;
 
-  // Çizim: masaüstünde panele sığar (gerekirse küçülür), telefonda en az okunur genişlikte, panel içinde kayar.
-  const drawingClass = sheet ? 'block h-auto shrink-0' : 'block min-h-0 w-full shrink';
-  const drawing = (vb: readonly [number, number], minWidth: number): { className: string; style: CSSProperties } => ({
+  // Çizim panelin genişliğine sığar: masaüstünde yer azsa küçülür (değerler satırı hemen altında),
+  // telefonda açılışta ekran genişliğinde (sayfa iki parmakla yakınlaştırılıp kaydırılabilir).
+  const drawingClass = sheet ? 'block h-auto w-full shrink-0' : 'block min-h-0 w-full shrink';
+  const drawing = (vb: readonly [number, number]): { className: string; style: CSSProperties } => ({
     className: drawingClass,
-    style: sheet ? { width: `max(100%, ${minWidth}px)`, aspectRatio: `${vb[0]} / ${vb[1]}` } : { aspectRatio: `${vb[0]} / ${vb[1]}` },
+    style: { aspectRatio: `${vb[0]} / ${vb[1]}` },
   });
 
   let svg: ReactNode;
   if (kat === null) {
-    svg = <TumDevreSemasi katlar={katlar} level={level} supply={supply} battery={battery} {...drawing([tek ? 1020 : 960, 686], 680)} />;
+    svg = <TumDevreSemasi katlar={katlar} level={level} supply={supply} battery={battery} {...drawing([tek ? 1020 : 960, 686])} />;
   } else if (kat.silencer) {
-    svg = <SusturmaliKatSemasi kat={kat} supply={supply} {...drawing([560, 390], 440)} />;
+    svg = <SusturmaliKatSemasi kat={kat} supply={supply} {...drawing([560, 490])} />;
   } else {
-    svg = <KatSemasi kat={kat} supply={supply} {...drawing([560, 380], 440)} />;
+    svg = <KatSemasi kat={kat} supply={supply} {...drawing([560, 510])} />;
   }
 
   const closed = katlar.filter(circuitClosed);
@@ -726,7 +730,7 @@ export function DevrePaneli({ variant, katlar, tab, onTab, level, supply, batter
         href={openHref}
         onPointerDown={onOpenActivate}
         onClick={onOpenActivate}
-        className={`flex shrink-0 items-center font-medium text-accent-ink hover:underline ${touch ? 'min-h-11' : ''} ${textSize}`}
+        className={`flex min-w-0 items-center font-medium text-accent-ink hover:underline ${touch ? 'min-h-11' : ''} ${textSize}`}
       >
         {t.openAll}
       </a>

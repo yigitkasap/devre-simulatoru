@@ -284,8 +284,10 @@ export function meterDisplayRect(part: Part, flip: boolean): { x: number; y: num
   return { x: flip ? b.x - gap - w : b.x + b.w + gap, y, w, h };
 }
 
-/** Ölçü aletinin küçük ekranı. */
+/** Ölçü aletinin küçük ekranı; uzun okuma ("≈ 230,0 V~") ekrana sığsın diye yazı küçülür. */
 function meterDisplay(unit: string, text: string | null) {
+  const shown = text ?? `– – – ${unit}`;
+  const fontSize = Math.min(11.5, (DISPLAY_W - 10) / (0.6 * shown.length));
   return (
     <g>
       <rect width={DISPLAY_W} height={DISPLAY_H} rx={3} fill="#1e2a25" stroke="#0f1512" strokeWidth={1} />
@@ -295,10 +297,10 @@ function meterDisplay(unit: string, text: string | null) {
         textAnchor="end"
         dominantBaseline="central"
         fill={text ? '#a6f4bd' : '#5e7a68'}
-        style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}
+        style={{ fontFamily: 'var(--font-mono)', fontSize }}
         className="tabular"
       >
-        {text ?? `– – – ${unit}`}
+        {shown}
       </text>
     </g>
   );

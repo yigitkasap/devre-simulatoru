@@ -29,7 +29,7 @@ import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './
 import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
 import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, useCommitField, WireDetails, type InspectTabProps, type PartPatch } from './InspectTab';
-import { stableMeterText, stableReadout } from './liveReadout';
+import { stableReadout } from './liveReadout';
 import type { MessageItem } from './messages';
 import { SeverityMark, type MessageAction } from './MessagesTab';
 import { AddPartRow, type AddPartRowProps } from './NotebookAdd';
@@ -101,7 +101,11 @@ const sliderProps = (part: Part) => CATALOG[part.type].propDefs.filter((p): p is
 function liveRows(part: Part, frame: SimFrame | null) {
   const m = frame?.measurements.get(part.id);
   if (!m || !frame) return null;
-  return stableReadout(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null);
+  const readout = stableReadout(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null);
+  // Ölçü aletinin göstergesi her yerde aynı okuma (useSimulation → meterTexts).
+  const reading = METERS.has(part.type) ? frame.meterTexts.get(part.id) : undefined;
+  if (!readout || reading === undefined) return readout;
+  return { ...readout, rows: readout.rows.map((row) => (row.label === tr.readout.reading ? { ...row, value: reading } : row)) };
 }
 
 /** Kapalı kartın (ve 3B etiketinin) ölçümü: ölçü aletinde göstergesi, LED'de gerilim ve akım, kaynakta akım, öbürlerinde ilk satır. */
@@ -109,7 +113,7 @@ export function cardReading(part: Part, frame: SimFrame | null): { main: string;
   const m = frame?.measurements.get(part.id);
   if (!m || !frame) return null;
   if (METERS.has(part.type)) {
-    const text = stableMeterText(part, m, frame.statuses.get(part.id) ?? {}, frame.summaries.get(part.id) ?? null);
+    const text = frame.meterTexts.get(part.id);
     return text ? { main: text, big: true } : null;
   }
   const rows = liveRows(part, frame)?.rows;
@@ -479,22 +483,16 @@ function ExampleCard({ id, onOpen, onClose }: { id: ExampleId; onOpen: (id: Exam
   );
 }
 
-/** Kapalı kartlar (ve 3B etiketleri) için seyrek kare: en çok 250 ms'de bir (ölçümler okunabilir hızda değişsin). */
+/**
+ * Kapalı kartlar (ve 3B etiketleri) için seyrek kare: ölçü aletlerinin okumasıyla birlikte
+ * (METER_REFRESH'te bir ve duraklatınca) yenilenir; ölçümler okunabilir hızda değişir ve kart,
+ * şemadaki gösterge ile 3B aynı okumayı gösterir. Aynı çizimde güncellenir (efekt beklenmez).
+ */
 export function useSlowFrame(frame: SimFrame | null): SimFrame | null {
   const [slow, setSlow] = useState(frame);
-  const last = useRef(0);
-  useEffect(() => {
-    if (frame === null) {
-      setSlow(null);
-      return;
-    }
-    const now = performance.now();
-    if (now - last.current >= 250) {
-      last.current = now;
-      setSlow(frame);
-    }
-  }, [frame]);
-  return frame === null ? null : slow;
+  const stale = frame !== null && (slow === null || slow.readoutTick !== frame.readoutTick);
+  if (stale) setSlow(frame);
+  return frame === null ? null : stale ? frame : slow;
 }
 
 // --- Grup satırı ------------------------------------------------------------------------------

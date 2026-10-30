@@ -64,6 +64,8 @@ const DAM_DEPTH = 18;
 const PROBE_Z = FRONT - 0.5;
 const TIP_X = -1.45;
 const COLLAR_X = -0.35;
+/** Ölçek ve su yüzeyi tutamağı: kesit yüzünde, barajın solunda. */
+const STAFF_X = -3.2;
 const TOWER_X = 12.5;
 const TOWER_Z = 0.4;
 const HEAD_Y = 9.3;
@@ -161,6 +163,10 @@ export class BarajScene {
   private height = 1;
   private dirty = true;
   private cameraName: CameraName = 'desk';
+  /** Sabit ön ayar (Tüm devre: dar sahnenin "all" kamerası); null: en-boy oranına göre. */
+  private preset: CameraName | null = null;
+  /** Su yüzeyi tutamağı sahnede (masaüstü): kadrajda kalması gerekir. */
+  private handle = false;
   /** Kameranın baktığı nokta (geçişte ara değer). */
   private readonly look = new Vector3();
   /** İçini göster: istenen durum ve 0..1 arası ara değer (malzeme saydamlığı). */
@@ -540,7 +546,7 @@ export class BarajScene {
    */
   private cameraTarget(): { name: CameraName; pos: Vector3; look: Vector3; fov: number } {
     const aspect = this.width / this.height;
-    const name: CameraName = this.xray ? 'xray' : cameraFor(aspect);
+    const name: CameraName = this.xray ? 'xray' : (this.preset ?? cameraFor(aspect));
     const c = CAMERAS[name];
     const probe = new Camera3(c.fov, aspect);
     const look = new Vector3(...c.look);
@@ -551,6 +557,8 @@ export class BarajScene {
           ...LAMP_Y.flatMap((y) => [new Vector3(TOWER_X - 0.8, HEAD_Y + y + 0.7, TOWER_Z), new Vector3(TOWER_X + 0.8, HEAD_Y + y - 0.7, TOWER_Z)]),
           ...[0, 1, 2, 3].map((k) => new Vector3(TIP_X - 0.6, probeY(k), PROBE_Z)),
           new Vector3(0.65, 10.9, FRONT - 1.4),
+          // Tutamak (≈ 44 px): ölçeğin iki ucunda, yarı genişliği kadar payla.
+          ...(this.handle ? [0, FULL].map((y) => new Vector3(STAFF_X - 1.1, y, FRONT)) : []),
         ];
     for (let i = 0; i < 40; i++) {
       probe.place(look.clone().add(offset), look);
@@ -583,8 +591,18 @@ export class BarajScene {
       start: performance.now(),
     };
     if (on) for (const l of this.outlines) l.visible = true;
-    this.cameraName = on ? 'xray' : cameraFor(this.width / this.height);
+    this.cameraName = on ? 'xray' : (this.preset ?? cameraFor(this.width / this.height));
     this.dirty = true;
+  }
+
+  /** Kadraj: sabit ön ayar (null: en-boy oranına göre) ve tutamağın kadrajda tutulması. */
+  setFraming(preset: 'all' | null, handle: boolean): void {
+    if (preset === this.preset && handle === this.handle) return;
+    this.preset = preset;
+    this.handle = handle;
+    this.applyCamera();
+    this.dirty = true;
+    this.cb.onLayout();
   }
 
   /** Evin yakın planının yeri (kapsayıcıya göre px); null kapatır. */
@@ -666,7 +684,7 @@ export class BarajScene {
     /** Lamba merkezi (1 yeşil, 2 sarı, 3 kırmızı). */
     lamp: (n: 1 | 2 | 3) => new Vector3(TOWER_X, HEAD_Y + LAMP_Y[3 - n]!, TOWER_Z + 0.6),
     /** Ölçek ve tutamak: kesit yüzünde, barajın biraz solunda. */
-    staff: (level: number) => new Vector3(-3.2, (FULL * Math.min(100, Math.max(0, level))) / 100, FRONT),
+    staff: (level: number) => new Vector3(STAFF_X, (FULL * Math.min(100, Math.max(0, level))) / 100, FRONT),
     /** Hazne: kesit yüzündeki su bölgesinin köşesi (iyonlar). */
     water: (x: number, level: number) => new Vector3(x, (FULL * level) / 100, FRONT),
     /** Kablo kanalı (beton içinde, ortası). */

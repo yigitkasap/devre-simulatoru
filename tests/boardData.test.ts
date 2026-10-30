@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { addedParts, footprintTip, holeLabels, missingConnections, perfboardInfo, shortHole, stepGroups, stepRef, stepTargets, stepWarning } from '../src/bench3d/boardData';
+import { nearestEdge } from '../src/bench3d/boardModels';
 import { planBreadboard } from '../src/bench3d/breadboard';
 import { buildSolderGuide } from '../src/bench3d/guide';
 import { designPcb } from '../src/bench3d/kicad';
@@ -93,5 +94,17 @@ describe('Karta aktar: baskı devre', () => {
     expect(row!.pin).toBe('R1 2. ucu');
     expect(row!.mm).toBeGreaterThan(0);
     expect(row!.b).toEqual({ x: target.x, y: target.y });
+  });
+});
+
+describe('Karta aktar: dışarı giden tel', () => {
+  it('delikten kartın en yakın kenarına gider (x ya da z ekseninde; kart 40 × 20, ortası z = 5)', () => {
+    // Sol kenara 1 birim: sola.
+    expect(nearestEdge({ x: -19, z: 5 }, 40, 20, 5)).toEqual({ distance: 1, dx: -1, dz: 0 });
+    // Ortada, arka kenara 3, ön kenara 17: arkaya (−z).
+    expect(nearestEdge({ x: 0, z: -2 }, 40, 20, 5)).toEqual({ distance: 3, dx: 0, dz: -1 });
+    // Sağ alt köşeye yakın: önce en yakın kenar (ön, 0,5).
+    expect(nearestEdge({ x: 18, z: 14.5 }, 40, 20, 5)).toEqual({ distance: 0.5, dx: 0, dz: 1 });
+    expect(nearestEdge({ x: 19.5, z: 13 }, 40, 20, 5)).toEqual({ distance: 0.5, dx: 1, dz: 0 });
   });
 });

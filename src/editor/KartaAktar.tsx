@@ -611,6 +611,21 @@ function NowCard({ guide, targets, step, phone }: { guide: SolderGuide; targets:
   );
 }
 
+/** Malzeme satırları: adet × ad, ayrıntı, devredeki adları. */
+function MaterialItems({ guide }: { guide: SolderGuide }) {
+  return (
+    <ul className="m-0 flex list-none flex-col p-0">
+      {guide.materials.map((m, i) => (
+        <li key={m.name} className={`flex flex-col py-2 text-small ${i > 0 ? 'border-t border-line' : ''}`}>
+          <span className="font-medium">{`${m.labels.length > 1 ? `${m.labels.length} × ` : ''}${m.name}`}</span>
+          <span className="text-ink-2">{m.detail}</span>
+          {m.labels.length > 0 && <span className="font-mono text-label text-muted">{m.labels.join(', ')}</span>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function MaterialsList({ guide }: { guide: SolderGuide }) {
   return (
     <div className="flex flex-col gap-3">
@@ -620,15 +635,7 @@ function MaterialsList({ guide }: { guide: SolderGuide }) {
           {p}
         </p>
       ))}
-      <ul className="m-0 flex list-none flex-col p-0">
-        {guide.materials.map((m, i) => (
-          <li key={m.name} className={`flex flex-col py-2 text-small ${i > 0 ? 'border-t border-line' : ''}`}>
-            <span className="font-medium">{`${m.labels.length > 1 ? `${m.labels.length} × ` : ''}${m.name}`}</span>
-            <span className="text-ink-2">{m.detail}</span>
-            {m.labels.length > 0 && <span className="font-mono text-label text-muted">{m.labels.join(', ')}</span>}
-          </li>
-        ))}
-      </ul>
+      <MaterialItems guide={guide} />
       {guide.warnings.map((w) => (
         <p key={w} role="note" className="m-0 rounded-lg border border-warn-line bg-warn-soft px-3 py-2 text-small text-warn">
           {w}
@@ -884,7 +891,15 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
             </section>
             {!all && <NowCard guide={guide} targets={targets} step={current} phone={false} />}
             {all ? (
-              <div className="flex">{startButton('h-[54px]')}</div>
+              <>
+                <div className="flex">{startButton('h-[54px]')}</div>
+                {/* Tamamı: düğme ile alttaki bağlantılar arasındaki boşlukta malzeme listesi (kendi içinde kayar). */}
+                <section aria-label={t.plaket.materials} tabIndex={0} className="-mt-1 min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1">
+                  <Heading>{t.plaket.materials.toLocaleUpperCase('tr')}</Heading>
+                  <p className="m-0 mt-1 text-small leading-[1.45] text-ink-2">{guide.board}</p>
+                  <MaterialItems guide={guide} />
+                </section>
+              </>
             ) : (
               <div className="flex gap-2">
                 {prevButton('h-[54px] w-[54px]')}

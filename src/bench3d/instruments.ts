@@ -1,5 +1,7 @@
 // Ekranlı cihazlar: multimetre (voltmetre, ampermetre), DC güç kaynağı, fonksiyon üreteci, osiloskop
 // ve su haznesi. Ekranlar tuval dokusudur; değer değişince (en çok saniyede 10 kez) yeniden çizilir.
+// Sıklık sınırına takılan değişiklik bekletilir (update true döner, sahne bir sonraki karede yeniden
+// dener): duraklatılınca ekran son değerde kalır, ilk açılıştaki "– – –"da kalmaz.
 
 import { BoxGeometry, CanvasTexture, CylinderGeometry, Group, Mesh, MeshStandardMaterial, SRGBColorSpace, Vector3 } from 'three';
 import { SCOPE_DIVISIONS_X, SCOPE_DIVISIONS_Y } from '../sim/scope';
@@ -31,13 +33,15 @@ function panelBox(w: number, d: number, h: number, body: MeshStandardMaterial, p
     ctx: canvas.getContext('2d')!,
     W: canvas.width,
     H: canvas.height,
-    /** key değiştiyse (ve son çizimden 0,1 s geçtiyse) çizer. */
-    redraw(key: string, now: number, draw: () => void, force = false) {
-      if (!force && (key === last || now - lastTime < 0.1)) return;
+    /** key değiştiyse (ve son çizimden 0,1 s geçtiyse) çizer; sıklık sınırı yüzünden çizilmediyse true (bekliyor). */
+    redraw(key: string, now: number, draw: () => void, force = false): boolean {
+      if (!force && key === last) return false;
+      if (!force && now - lastTime < 0.1) return true;
       last = key;
       lastTime = now;
       draw();
       texture.needsUpdate = true;
+      return false;
     },
     dispose() {
       texture.dispose();
@@ -84,6 +88,8 @@ export function meterModel(type: 'voltmeter' | 'ammeter'): PartModel {
   const unit = type === 'voltmeter' ? 'V' : 'A';
   const draw = (text: string, mode: string) => {
     const { ctx, W, H } = panel;
+    // Ekranda yazan (denetim betikleri okur).
+    root.userData.screen = text;
     ctx.fillStyle = '#2b2f35';
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#f2c230';
@@ -107,11 +113,10 @@ export function meterModel(type: 'voltmeter' | 'ammeter'): PartModel {
     root,
     anchors,
     update(ctx: LiveContext) {
-      const reading = ctx.status?.reading ?? ctx.measurement?.[type === 'voltmeter' ? 'voltage' : 'current'];
       const mode = strProp(ctx.props, 'mode', ['dc', 'ac'], 'dc') === 'ac' ? 'AC' : 'DC';
-      const text = ctx.active && reading !== undefined ? formatSI(reading, unit, { digits: 4 }) : '– – –';
-      panel.redraw(text + mode, ctx.now, () => draw(text, `${type === 'voltmeter' ? 'VOLTMETRE' : 'AMPERMETRE'} · ${mode}`));
-      return false;
+      // Şemadaki gösterge ve defter kartıyla aynı okuma (salınıyorsa "≈ ...").
+      const text = ctx.active && ctx.reading !== undefined ? ctx.reading : '– – –';
+      return panel.redraw(text + mode, ctx.now, () => draw(text, `${type === 'voltmeter' ? 'VOLTMETRE' : 'AMPERMETRE'} · ${mode}`));
     },
     dispose: panel.dispose,
   };
@@ -167,8 +172,7 @@ export function dcsupplyModel(): PartModel {
         const o = outs?.[k];
         return ctx.active && o ? [formatSI(o.voltage, 'V', { digits: 4 }), formatSI(o.current, 'A', { digits: 3 })] : ['– – – V', '– – – A'];
       });
-      panel.redraw(lines.join('|'), ctx.now, () => draw(lines));
-      return false;
+      return panel.redraw(lines.join('|'), ctx.now, () => draw(lines));
     },
     dispose: panel.dispose,
   };
@@ -223,8 +227,7 @@ export function funcgenModel(): PartModel {
       const wave = strProp(ctx.props, 'waveform', ['sine', 'square', 'triangle'], 'sine');
       const freq = formatSI(numProp(ctx.props, 'frequency', 1000), 'Hz', { trim: true, digits: 4 });
       const amp = `${formatSI(numProp(ctx.props, 'amplitude', 2), 'V', { trim: true, digits: 3 })}pp`;
-      panel.redraw(wave + freq + amp, ctx.now, () => draw(wave, freq, amp));
-      return false;
+      return panel.redraw(wave + freq + amp, ctx.now, () => draw(wave, freq, amp));
     },
     dispose: panel.dispose,
   };
@@ -295,8 +298,7 @@ export function oscilloscopeModel(): PartModel {
       const view = ctx.active ? ctx.scope : undefined;
       const paths = view ? view.channels.map((c) => c.path) : ['', ''];
       const xy = view?.xyPath ?? '';
-      panel.redraw(paths.join('|') + xy, ctx.now, () => draw(paths, xy));
-      return false;
+      return panel.redraw(paths.join('|') + xy, ctx.now, () => draw(paths, xy));
     },
     dispose: panel.dispose,
   };

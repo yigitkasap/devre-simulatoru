@@ -1334,7 +1334,8 @@ kısımlar:
    (`Kumanda.tsx`, `DurumTablosu.tsx` silindi) ve yüzdeli seviye etiketi kalktı. Sahnenin sol üstünde
    tek büyük değer: doluluk (eş genişlikli yazı); çerçeve ve işaret durumun rengini taşır, işaretin
    biçimi de durumu söyler (renk tek başına anlam taşımasın diye eski uyarı simgeleri; çizimde düz
-   nokta), durum metni `aria-label`'da. Sol altta "Göster: İyonlar · Yüzde ölçeği" çipleri (ikisi de
+   nokta), durum metni `aria-label`'da. Sol altta "Göster: İyonlar · Yüzde ölçeği" çipleri (yazıyla birlikte
+   yarı saydam panel zemininde: koyu temada toprak üstünde de okunur; ikisi de
    varsayılan kapalı; iyon açıklaması yalnızca iyonlar açıkken). Sahnede "Seviye N" yazıları yok
    (prob ve lamba aynı numara ve renk), ıslak prob ucu yeşil halkalı, su yüzeyindeki tutamakta yalnızca
    ok. Telefon (B3): üst çubuk (geri, başlık, Soru, ⋯: Simülatörde aç, Ayarlar, Başa al, İyonlar, Yüzde
@@ -1349,12 +1350,17 @@ kısımlar:
    Sahnede lambaya tıklamak (ya da odaklanıp Enter) o katı seçer, panel kapalıysa açar; lambalar ekranda
    44 px'ten küçük kalırsa (telefon, dar tablet) tıklanmaz. Kat çizimi (B2): +9 V bara, ortak prob, su
    (kuruysa kesikli turuncu "Su yok · açık"), prob, RB, baz düğümü (C ve RP toprağa), Q, RC, LED;
-   altında "Baz akımı" ve "LED akımı" (≈ 0,43 mA, ≈ 14,5 mA) ve "Tüm devreyi simülatörde aç". Tek
+   altında "Baz akımı" ve "LED akımı" (≈ 0,43 mA, ≈ 14,5 mA) ve "Tüm devreyi simülatörde aç". Kat
+   çizimleri (2026-10-30, kullanıcı isteği) panelin genişliğine sığar ve dikeyde geniştir (560 × 510,
+   tek ışıkta 560 × 490): RC ve LED'in yazısı LED'in solunda ("LED yeşil · sönük" kesilmez), değerler
+   satırı çizimin hemen altında; bağlantı yer yoksa alt satıra geçer. Tek
    ışıkta (B4) panelin üstünde öncelik kuralı (Yeşil = 1 VE 2 değil · Sarı = 2 VE 3 değil · Kırmızı = 3);
    Kat 1'in çiziminde Q4 (Prob 2'den RS4 ile), Kat 2'ninkinde Q5 (Prob 3'ten RS5 ile), kollektörleri
    katın baz düğümünde. Susturma etkinken Q4'ün altında "susturucu · doyumda", baz düğümünde ≈ 0,01 V
    ve akımların yerine tek cümle ("Prob 2 ıslanınca Q4 doyuma girer ve Q1'in bazını toprağa çeker…").
-   Tüm devre (B5): panel 840 px, sahne 600 px (sahne dikey kadraja geçer); hazne (su seviyesi canlı),
+   Tüm devre (B5): sahne 600 px, panel kalan genişlik (1440 px'te 840 px); kamera dar sahne ayarında
+   (`all`: fov 42, kamera (6,5, 8, 36), hedef (5,6, 5,4, 0)); problar, tutamak ve ışık kulesi her
+   genişlikte kadrajda (dışarıda kalan varsa kamera geri çekilir); hazne (su seviyesi canlı),
    pil, +9 V bara, toprak barası ve üç kat tek çizimde; tek ışıkta Q4 / Q5 ve onları süren teller
    (kesişmede köprü). Panelin üstünde her kapanan halka için "Kat N devresi tamamlandı: B1 + → ortak
    prob → su → Prob N → RBN → QN → toprak → B1 −" (susturulan katta QN yerine Q4), kuru problar için
@@ -1366,8 +1372,8 @@ kısımlar:
    altına inince kondansatörün bazı bir süre beslediği de görünür. Çizim renkleri tema belirteçleriyle
    (koyu temada okunur); su ve seviye renkleri sahneyle aynı. Tasarımdaki iki küçük düzeltme: Tüm devre
    çizimindeki LED'in yönü (anot RC'de, katot kollektörde; çizimde tersti) ve "Ortak prob" yazısı hazne
-   duvarının dışına alındı. Telefonda panel tam ekran: başlık ve kapat, altında sekmeler; çizim okunur
-   genişlikte (kat 440 px, tüm devre 680 px) panel içinde kayar. Testler: `katDevreleri` gerçek
+   duvarının dışına alındı. Telefonda panel tam ekran: başlık ve kapat, altında sekmeler; çizim
+   açılışta ekran genişliğine sığar (iki parmakla yakınlaştırılıp kaydırılabilir). Testler: `katDevreleri` gerçek
    simülasyonla (%50 Kat 1 doyumda ve akımlar, kondansatörün boşalması, tek ışık %75 Q4 susturuyor,
    saf su). ios-kontrol'e panel maddeleri eklendi (178 madde).
 3. **three.js sahnesi** (`barajScene.ts`, `BarajSahnesi3B.tsx`; başlangıç
@@ -1605,6 +1611,14 @@ karşılaştırıldı; bulunan hatalar düzeltildi (testler: `tests/ngspice-kars
   adımda (`voltageRangeAt`; yalnızca sayaç, fiziğe etkisi yok); AC kaynaksız devrede (hızlı 555)
   karede bir anlık değerden. Osiloskobun ekran altı ölçümleri (tepe-tepe, etkin, frekans) da
   pencere boyunca sabit (son hane karede bir titriyordu); iz her karede güncellenir.
+  2026-10-30: ölçü aletinin okuması yerden yere farklıydı (555 örneğinde duraklatılmışken 3B etiketi
+  4,458 V, defter kartı 4,902 V, 3B aletin ekranı "– – –"): şema göstergesi her karede, defter kartı
+  ve 3B etiketi ayrı 250 ms'lik saatlerle, 3B ekranı ham değerle besleniyordu; ekranın 0,1 s'lik
+  çizim sınırı duraklatınca son değeri atlıyordu. Artık okuma karede bir kez hesaplanır
+  (`meterReadings`, `SimFrame.meterTexts`): 0,25 s'de bir (multimetre gibi) ve duraklatınca hemen
+  yenilenir; şema göstergesi, defter kartı (kapalı ve açık kartın Gösterge satırı), 3B etiketi ve
+  3B aletin ekranı aynı metni gösterir; salınıyorsa başında "≈". Kapalı kartlar okumayla birlikte
+  yenilenir (`readoutTick`). 3B ekranlar sıklık sınırına takılan değişikliği bekletir, sonra çizer.
 
 Kalan dört fark da ele alındı (2026-10-27; testler `tests/ngspice-karsilastirma.test.ts`,
 `tests/gummel-poon.test.ts`, `tests/dc-homotopi.test.ts`; kıyas `scripts/tarama/qrr.tarama.ts`):
@@ -1908,6 +1922,11 @@ değişmedi; değişen arayüz ve görünüm.
   dış tel adımının kartında), Önceki ve "Sonraki: CV" (← → tuşları da), SIRADAKİLER, en altta
   Malzemeler, Denetim (panelde açılır) ve Yazdır. Kullanıcı kararı: son adımda düğme "Bitti ·
   Denetle" (Denetim'i açar). Yazdır bugünkü yazdırılabilir rehberi basar (koyu temada da açık).
+  2026-10-30 (kullanıcı isteği): dışarı giden teller delikten biraz kalkar, kartın en yakın kenarına
+  (`nearestEdge`) kıvrılır, yolundaki parçaların üstünden alçakta geçer ve kenarın dışında aşağı
+  sarkarak biter (önceden ön ya da arka kenara havada gidiyor, dimdik yukarı çıkıyormuş gibi
+  görünüyordu). Masaüstünde "Tamamı"da "Adım adım başla" ile alttaki bağlantılar arasında malzeme
+  listesi (kendi içinde kayar; bağlantılar hep görünür).
 - Gerçekçi PCB yüzeyi (2026-10-29, kullanıcı isteği: düz yeşil düzlem değil, gerçek kart fotoğrafı
   gibi; `boardModels.ts` → `buildPcbSurface`): parlak, doygun yeşil lehim maskesi (vernik:
   `clearcoat`); yollar maskenin altında biraz açık renkli ve kabarık, ışık kenarlarında parlar;
@@ -1957,7 +1976,8 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
    açık kart seçimle aynı şey. Sıra: önce laboratuvar cihazları ve Arduino, sonra etiket sırası;
    aynı türden 3+ parça tek satırda. 20'den fazla parçalı devrelerde de aynı kural (açık soruya
    karar: yeni başlık ya da arama kutusu eklenmez; gruplama listeyi kısaltır, kapalı başlar).
-   Kapalı kartların ölçümleri 250 ms'de bir güncellenir. İzleme (salınan değerlerin kararlı
+   Kapalı kartların ölçümleri ölçü aletlerinin okumasıyla birlikte (0,25 s'de bir ve duraklatınca)
+   güncellenir. İzleme (salınan değerlerin kararlı
    gösterimi) pahalıdır: bütün parçalar izlenince 3B baraj örneği 115 → 26 fps. Bu yüzden zamanla
    değişen kaynağı olan devrede yalnızca kaynaklar, LED'ler, ölçü aletleri ve seçim izlenir (öbür
    kapalı kartlar değerini gösterir); DC devrede kapalı kartlar anlık değeri izlemeden gösterir.
@@ -2049,7 +2069,9 @@ modellerin görünüşü değişmez). Yapılanlar ve kararlar:
      kartın başlığında "3B’de yaklaş" (3B görünümdeyken; telefonda şema kutusu açılır).
    - Ölçü aletlerinin değeri etiketlerinde. Hareket ipucu tuvalden kalktı, Yardım'a taşındı (fare ve
      dokunma sekmesi, telefonda ⋯ → Yardım → 3B tezgâhta); telefonda 3B ilk açıldığında bir kez tek
-     satır.
+     satır: sahnenin altında, sağ alttaki düğmelerin üstünde (2026-10-30: üstteki parça etiketinin
+     üstüne biniyordu). Etiket katmanında engeldir (`data-obstacle`): çakışan etiket ipucu kalkana
+     kadar gizlenir.
    - Kutup işaretleri: elektrolitik − şeridi, diyot ve zener bandı zaten vardı. LED'e taban halkasının
      katot tarafında düz kenar ve anot bacağında fazla uzunluğu gösteren küçük kıvrım eklendi (mevcut
      malzemelerle); başka modele dokunulmadı.

@@ -12,6 +12,8 @@ export interface LiveContext {
   readonly live: LiveVisual | undefined;
   readonly status: DeviceStatus | undefined;
   readonly measurement: Measurement | undefined;
+  /** Ölçü aletinin okuması (şemadaki gösterge ve defter kartıyla aynı metin). */
+  readonly reading: string | undefined;
   readonly scope: ScopeView | undefined;
   readonly props: Props;
   /** Simülasyon çalışıyor mu (durmuşken değerler sıfırlanır). */
