@@ -2953,7 +2953,7 @@ export const tr = {
       cursor: (f: string, g: string, db: string, ph: string) => `f = ${f} · ${g} kat (${db} dB) · ${ph}°`,
       gainLabel: (n: number) => `Bode kazanç grafiği, ${n} ölçüm noktası`,
       phaseLabel: (n: number) => `Bode faz grafiği, ${n} ölçüm noktası`,
-      rows: { mid: 'Orta bant kazancı', midDb: 'Orta bant kazancı (dB)', fH: 'f_H (−3 dB)', fL: 'f_L (−3 dB)' },
+      rows: { mid: 'Orta bant kazancı', midDb: 'Orta bant kazancı (dB)', fH: 'f_{H} (−3 dB)', fL: 'f_{L} (−3 dB)' },
       source: (f: string) => `Bode, ${f}`,
       sourceInterp: 'Bode, ara değer',
       file: 'bode',

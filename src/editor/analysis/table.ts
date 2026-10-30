@@ -4,6 +4,7 @@
 import type { FitSpec, TableRow } from '../../model/analysis';
 import { formatNumber, formatSI, parseValue, type UnitSymbol } from '../../sim/units';
 import { tr } from '../../i18n/tr';
+import { plainText } from '../Rich';
 import { toCsv, type CsvSeparator } from './format';
 import type { TraceRecorder } from './recorder';
 
@@ -107,7 +108,7 @@ export function tableCsv(rows: readonly TableRow[], labColumn: boolean, sep: Csv
   const body = rows.map((r) => {
     const theory = parseTheory(r.theory, r.unit);
     const e = percentError(r.measured, theory);
-    return [r.name, r.formula, theory ?? r.theory, r.measured ?? '', r.unit, r.source, e ?? '', ...(labColumn ? [parseTheory(r.lab, r.unit) ?? r.lab] : [])];
+    return [plainText(r.name), plainText(r.formula), theory ?? r.theory, r.measured ?? '', r.unit, r.source, e ?? '', ...(labColumn ? [parseTheory(r.lab, r.unit) ?? r.lab] : [])];
   });
   return toCsv(header, body, sep);
 }
@@ -118,7 +119,7 @@ export function tableTsv(rows: readonly TableRow[], labColumn: boolean): string 
   const lines = [[t.name, t.theory, t.measured, t.error, ...(labColumn ? [t.lab] : [])].join('\t')];
   for (const r of rows) {
     const e = percentError(r.measured, parseTheory(r.theory, r.unit));
-    lines.push([r.formula ? `${r.name} (${r.formula})` : r.name, r.theory, measuredText(r), errorText(e), ...(labColumn ? [r.lab] : [])].join('\t'));
+    lines.push([r.formula ? `${plainText(r.name)} (${plainText(r.formula)})` : plainText(r.name), r.theory, measuredText(r), errorText(e), ...(labColumn ? [r.lab] : [])].join('\t'));
   }
   return lines.join('\n');
 }

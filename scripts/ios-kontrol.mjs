@@ -933,7 +933,7 @@ try {
     const fitChart = (await fitPanel.getByRole('img').getAttribute('aria-label')) ?? '';
     const rowsBefore = await drawer.locator('tbody tr').count();
     await fitPanel.getByRole('button', { name: 'τ’yu tabloya ekle' }).click(); await page.waitForTimeout(150);
-    const tauRow = `${await drawer.locator('tbody tr').last().getByRole('textbox', { name: 'Büyüklüğün adı' }).inputValue()} ${((await drawer.locator('tbody tr').last().textContent()) ?? '').replace(/\s+/g, ' ')}`;
+    const tauRow = ((await drawer.locator('tbody tr').last().textContent()) ?? '').replace(/\s+/g, ' ');
     check('analiz (Tablo): doğru uydur y = ln(a − V(C1)), x = t → eğim, τ = −1 / eğim, R²; grafik role="img"; "τ’yu tabloya ekle"',
       /Eğim−\d/.test(fitText) && /τ = −1 \/ eğim\d/.test(fitText) && /R²0,\d{4} · \d+ nokta/.test(fitText) && fitChart.startsWith('Doğru uydurma: ln(10') &&
       (await drawer.locator('tbody tr').count()) === rowsBefore + 1 && tauRow.includes('τ (uydurma)') && tauRow.includes('doğru uydurma'), `${fitText.slice(0, 80)} · ${tauRow.slice(0, 40)}`);
@@ -1070,7 +1070,7 @@ try {
     await page.waitForTimeout(700);
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).analysis?.rows ?? []);
     check('Bode: "Tabloya aktar" orta bant kazancını (kat, dB) ve f_H’yi tabloya geçiriyor; CSV (f, genlikler, kazanç, dB, faz, oturdu)',
-      saved.some((r) => r.name === 'Orta bant kazancı' && r.measured > 200) && saved.some((r) => r.name === 'f_H (−3 dB)' && r.unit === 'Hz') &&
+      saved.some((r) => r.name === 'Orta bant kazancı' && r.measured > 200) && saved.some((r) => r.name === 'f_{H} (−3 dB)' && r.unit === 'Hz') &&
       /^bode-.*\.csv$/.test(csv.suggestedFilename()) && csvText.startsWith('﻿f (Hz);giriş genliği (V);çıkış genliği (V);kazanç (kat);kazanç (dB);faz (°);oturdu') && csvText.split('\r\n').length >= 17,
       `${saved.length} satır · ${csv.suggestedFilename()}`);
     await ctx.close();

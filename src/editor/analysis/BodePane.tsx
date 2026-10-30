@@ -33,8 +33,8 @@ export function bodeToTable(api: AnalysisApi): number {
   const r = tr.analysis.bode.rows;
   const src = tr.analysis.bode.source(hz(s.mid.f));
   const rows = [
-    { name: r.mid, formula: 'A_v', theory: '', measured: s.mid.gain, unit: '', source: src, lab: '' },
-    { name: r.midDb, formula: '20 log A_v', theory: '', measured: toDb(s.mid.gain), unit: 'dB', source: src, lab: '' },
+    { name: r.mid, formula: 'A_{v}', theory: '', measured: s.mid.gain, unit: '', source: src, lab: '' },
+    { name: r.midDb, formula: '20 log A_{v}', theory: '', measured: toDb(s.mid.gain), unit: 'dB', source: src, lab: '' },
     ...(s.fH !== null ? [{ name: r.fH, formula: '', theory: '', measured: s.fH, unit: 'Hz', source: tr.analysis.bode.sourceInterp, lab: '' }] : []),
     ...(s.fL !== null ? [{ name: r.fL, formula: '', theory: '', measured: s.fL, unit: 'Hz', source: tr.analysis.bode.sourceInterp, lab: '' }] : []),
   ];

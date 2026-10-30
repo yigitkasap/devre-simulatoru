@@ -2,12 +2,12 @@
 // altında kaynağı), isteğe bağlı Laboratuvar sütunu, % Hata. Sağda (telefonda altta) doğru uydurma:
 // x ve y seçilir (y'ye ln(a − y) dönüşümü), noktalar ve doğru çizilir; eğim, τ = −1 / eğim ve R².
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { tr } from '../../i18n/tr';
 import type { FitSpec, TableRow } from '../../model/analysis';
 import { formatNumber, formatSI } from '../../sim/units';
 import { Icon } from '../icons';
-import { Rich } from '../Rich';
+import { plainText, Rich } from '../Rich';
 import { useTouchUi } from '../touchUi';
 import { cursorTime } from './Chart';
 import { niceTicks, tickText } from './format';
@@ -64,13 +64,13 @@ export function TablePane({ api, recorder, version, title, compact = false }: Ta
           <b className="font-mono text-small font-semibold tabular">{measuredText(r)}</b>
           <span className="truncate text-label text-muted">{r.source}</span>
         </span>
-        <button type="button" onClick={() => update(r.id, { measured: null, source: '' })} aria-label={t.pickMeasuredLabel(r.name)} title={t.pickMeasured} className={iconBtn}>
+        <button type="button" onClick={() => update(r.id, { measured: null, source: '' })} aria-label={t.pickMeasuredLabel(plainText(r.name))} title={t.pickMeasured} className={iconBtn}>
           <Icon name="close" className="h-3.5 w-3.5" />
         </button>
       </div>
     ) : (
       <select
-        aria-label={t.pickMeasuredLabel(r.name)}
+        aria-label={t.pickMeasuredLabel(plainText(r.name))}
         value=""
         disabled={options.length === 0}
         onChange={(e) => {
@@ -95,8 +95,8 @@ export function TablePane({ api, recorder, version, title, compact = false }: Ta
 
   const nameCell = (r: TableRow) => (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <input aria-label={t.nameLabel} value={r.name} onChange={(e) => update(r.id, { name: e.target.value })} className={`${field} border-transparent bg-transparent px-1 font-sans font-semibold hover:border-line`} />
-      <input aria-label={t.formulaLabel} placeholder={t.formula} value={r.formula} onChange={(e) => update(r.id, { formula: e.target.value })} className={`${field} h-7 border-transparent bg-transparent px-1 text-label text-muted hover:border-line`} />
+      <RichField label={t.nameLabel} value={r.name} onChange={(v) => update(r.id, { name: v })} className={`${field} font-sans font-semibold`} />
+      <RichField label={t.formulaLabel} placeholder={t.formula} value={r.formula} onChange={(v) => update(r.id, { formula: v })} className={`${field} h-7 text-label text-muted`} />
     </div>
   );
 
@@ -121,13 +121,13 @@ export function TablePane({ api, recorder, version, title, compact = false }: Ta
             <li key={r.id} className="flex flex-col gap-2 rounded-xl border border-line bg-panel p-3">
               <div className="flex items-start gap-1">
                 {nameCell(r)}
-                <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))} aria-label={t.removeRow(r.name)} className={iconBtn}>
+                <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))} aria-label={t.removeRow(plainText(r.name))} className={iconBtn}>
                   <Icon name="trash" className="h-4 w-4" />
                 </button>
               </div>
               <label className="flex flex-col gap-1 text-label text-muted">
                 {t.theoryHint}
-                <input aria-label={t.theoryLabel(r.name)} value={r.theory} placeholder={r.unit} onChange={(e) => update(r.id, { theory: e.target.value })} className={field} />
+                <input aria-label={t.theoryLabel(plainText(r.name))} value={r.theory} placeholder={r.unit} onChange={(e) => update(r.id, { theory: e.target.value })} className={field} />
               </label>
               <div className="flex flex-col gap-1 text-label text-muted">
                 {t.measuredHint}
@@ -136,7 +136,7 @@ export function TablePane({ api, recorder, version, title, compact = false }: Ta
               {lab && (
                 <label className="flex flex-col gap-1 text-label text-muted">
                   {t.lab}
-                  <input aria-label={t.labLabel(r.name)} value={r.lab} placeholder={r.unit} onChange={(e) => update(r.id, { lab: e.target.value })} className={field} />
+                  <input aria-label={t.labLabel(plainText(r.name))} value={r.lab} placeholder={r.unit} onChange={(e) => update(r.id, { lab: e.target.value })} className={field} />
                 </label>
               )}
               <span className="flex items-center justify-between text-label text-muted">
@@ -163,12 +163,12 @@ export function TablePane({ api, recorder, version, title, compact = false }: Ta
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-line align-top">
                   <td className="py-1.5 pr-3">{nameCell(r)}</td>
-                  <td className="py-1.5 pr-3"><input aria-label={t.theoryLabel(r.name)} value={r.theory} placeholder={r.unit} onChange={(e) => update(r.id, { theory: e.target.value })} className={field} /></td>
+                  <td className="py-1.5 pr-3"><input aria-label={t.theoryLabel(plainText(r.name))} value={r.theory} placeholder={r.unit} onChange={(e) => update(r.id, { theory: e.target.value })} className={field} /></td>
                   <td className="py-1.5 pr-3">{measuredCell(r)}</td>
-                  {lab && <td className="py-1.5 pr-3"><input aria-label={t.labLabel(r.name)} value={r.lab} placeholder={r.unit} onChange={(e) => update(r.id, { lab: e.target.value })} className={field} /></td>}
+                  {lab && <td className="py-1.5 pr-3"><input aria-label={t.labLabel(plainText(r.name))} value={r.lab} placeholder={r.unit} onChange={(e) => update(r.id, { lab: e.target.value })} className={field} /></td>}
                   <td className="py-2.5 pr-2 text-right">{errorCell(r)}</td>
                   <td className="py-1.5">
-                    <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))} aria-label={t.removeRow(r.name)} title={t.removeRow(r.name)} className={iconBtn}>
+                    <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))} aria-label={t.removeRow(plainText(r.name))} title={t.removeRow(plainText(r.name))} className={iconBtn}>
                       <Icon name="trash" className="h-4 w-4" />
                     </button>
                   </td>
@@ -401,5 +401,40 @@ function FitChart({ fit, yName, xName, height }: { fit: FitState; yName: string;
       {xs.map((x, i) => (i % stride === 0 ? <circle key={i} cx={X(x)} cy={Y(ys[i]!)} r={2.2} fill="var(--color-tr-1)" /> : null))}
       {result && <line x1={X(x0)} y1={Y(result.slope * x0 + result.intercept)} x2={X(x1)} y2={Y(result.slope * x1 + result.intercept)} stroke="var(--color-tr-2)" strokeWidth={1.6} strokeDasharray="5 3" />}
     </svg>
+  );
+}
+
+/**
+ * Alt indisli yazı alanı: normalde metin <sub> ile gösterilir ("f_{H}" → f<sub>H</sub>; arayüzde alt
+ * çizgi görünmez), tıklanınca ya da odaklanınca düz metin olarak düzenlenir.
+ */
+function RichField({ label, value, placeholder = '', onChange, className }: { label: string; value: string; placeholder?: string; onChange: (v: string) => void; className: string }) {
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        aria-label={label}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setEditing(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur();
+        }}
+        className={`${className} border-line px-1`}
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-label={`${label}: ${plainText(value) || placeholder}`}
+      onClick={() => setEditing(true)}
+      onFocus={() => setEditing(true)}
+      className={`${className} flex items-center border-transparent bg-transparent px-1 text-left hover:border-line ${value ? '' : 'text-muted'}`}
+    >
+      <span className="truncate">{value ? <Rich text={value} /> : placeholder}</span>
+    </button>
   );
 }
