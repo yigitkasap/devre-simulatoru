@@ -1209,6 +1209,124 @@ try {
       `Bode ile ölç ${Math.round(bodeBox?.height ?? 0)} px`);
     await page.context().close();
   }
+  // --- Gömme (C4, C5, C8; N7, N8): Paylaş → Sayfaya göm, /embed/ sade görünüm, salt okunur, Moodle ------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /RC dolma/ }).first().click(); await page.waitForTimeout(500);
+    const savedBefore = await page.evaluate(() => localStorage.getItem('devre-simulatoru:devre'));
+    await page.getByRole('button', { name: /^Dosya|^RC dolma/ }).first().click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitem', { name: /^Paylaş/ }).click(); await page.waitForTimeout(300);
+    const dlg = page.getByRole('dialog', { name: 'Paylaş' });
+    const tabs = await dlg.getByRole('tab').allTextContents();
+    await dlg.getByRole('tab', { name: 'Sayfaya göm' }).click(); await page.waitForTimeout(200);
+    const codeBox = dlg.getByRole('textbox', { name: 'Gömme kodu' });
+    const code = await codeBox.inputValue();
+    const switches = await dlg.getByRole('switch').evaluateAll((els) => els.map((e) => `${e.textContent.trim()}=${e.getAttribute('aria-checked')}`));
+    const steps = await dlg.locator('ol li').allTextContents();
+    const recipe = dlg.getByRole('link', { name: 'Ayrıntılı tarif (yeni sekmede)' });
+    const privacy = (await dlg.getByText(/öğrenci verisi toplamaz/).textContent()) ?? '';
+    check('gömme (N7): Paylaş penceresinde "Bağlantı | Sayfaya göm"; Sade görünüm, Salt okunur açık, Oynat ve Başa al, Defter, Tam ekranda aç; iframe kodu /embed/?ornek=rc-dolma&salt-okunur=1, 560 px; Moodle’da 5 adım, Ayrıntılı tarif, gizlilik notu',
+      tabs.join('|') === 'Bağlantı|Sayfaya göm' && code.startsWith(`<iframe src="${URL0}embed/?ornek=rc-dolma&salt-okunur=1"`) && code.includes('height="560"') && code.includes('title="Devre simülatörü: RC dolma"') &&
+      switches.join(',') === 'Salt okunurParça ve kablo değişmez=true,Oynat ve Başa al=true,Defter paneli=false,Tam ekranda aç bağlantısı=true' &&
+      (await dlg.getByRole('radio', { name: 'Sade: yalnız tezgâh' }).getAttribute('aria-checked')) === 'true' &&
+      steps.length === 5 && steps[0].includes('Sayfa') && steps[4].includes('Sınav') && (await recipe.getAttribute('href'))?.endsWith('/docs/hoca/moodle-gomme.md') && (await recipe.getAttribute('target')) === '_blank' &&
+      privacy.includes('GitHub Pages'),
+      code.split('\n')[0]);
+    await dlg.getByRole('switch', { name: 'Defter paneli' }).click();
+    await dlg.getByRole('textbox', { name: 'Gömülü görünümün yüksekliği (piksel)' }).fill('640');
+    await dlg.getByRole('textbox', { name: 'Gömülü görünümün yüksekliği (piksel)' }).press('Enter');
+    await dlg.getByRole('button', { name: 'Kodu kopyala' }).click(); await page.waitForTimeout(200);
+    const copied = await page.evaluate(() => navigator.clipboard.readText()).catch(() => '');
+    check('gömme: Defter açılınca adrese defter=1, yükseklik 640; "Kodu kopyala" panoya yazıyor; ayar hatırlanıyor',
+      copied.includes('&defter=1"') && copied.includes('height="640"') && (await page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:gomme')).height)) === 640,
+      copied.split('\n')[0]);
+    await dlg.getByRole('switch', { name: 'Defter paneli' }).click();
+    await dlg.getByRole('textbox', { name: 'Gömülü görünümün yüksekliği (piksel)' }).fill('560');
+    await dlg.getByRole('textbox', { name: 'Gömülü görünümün yüksekliği (piksel)' }).press('Enter');
+    await dlg.getByRole('button', { name: 'Kapat' }).click();
+
+    // Ders sayfası benzeri ev sahibinde iframe (N8).
+    const host = await ctx.newPage();
+    host.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await host.setContent(`<body style="margin:0"><div style="max-width:1000px;margin:40px auto">${code}</div></body>`);
+    await host.waitForTimeout(2500);
+    const frame = host.frames().find((f) => f.url().includes('/embed/'));
+    const bar = frame ? ((await frame.getByRole('banner').textContent()) ?? '') : '';
+    const open = frame ? await frame.getByRole('link', { name: 'Simülatörde aç (yeni sekmede)' }).getAttribute('href') : '';
+    const frameBox = await host.locator('iframe').boundingBox();
+    check('gömme (N8): iframe içinde ince şerit (simge, "RC dolma", "Salt okunur", Başa al, Oynat, Simülatörde aç), altında yalnız tezgâh; üst çubuk ve Analiz yok; 560 px',
+      frame !== undefined && bar.startsWith('RC dolma') && bar.includes('Salt okunur') && bar.includes('Başa al') && bar.includes('Oynat') && open?.startsWith(`${URL0}#d=`) &&
+      (await frame.getByRole('button', { name: 'Örnekler', exact: true }).count()) === 0 && (await frame.getByRole('button', { name: 'Analiz', exact: true }).count()) === 0 &&
+      (await frame.locator('svg.schematic').count()) === 1 && Math.round(frameBox?.height ?? 0) === 560,
+      bar);
+    // Salt okunur: anahtar çalışır, parça silinmez; Başa al ilk hâle döndürür; ana kayıt değişmez.
+    const strip = frame.getByRole('banner');
+    await strip.getByRole('button', { name: 'Oynat', exact: true }).click(); await host.waitForTimeout(400);
+    const s1 = await frame.locator('svg.schematic text', { hasText: /^S1$/ }).first().boundingBox();
+    await host.mouse.click(s1.x + s1.width / 2, s1.y + s1.height + 22); await host.waitForTimeout(1500);
+    const v1 = (await frame.locator('svg.schematic text[fill="#a6f4bd"]').first().textContent()) ?? '';
+    await frame.locator('svg.schematic').click({ position: { x: 20, y: 20 } });
+    await host.keyboard.press('Control+a'); await host.keyboard.press('Delete'); await host.waitForTimeout(300);
+    const blocked = await frame.getByText('Salt okunur: parça ve kablo değiştirilemez.').count();
+    const r1 = await frame.locator('svg.schematic text', { hasText: /^R1$/ }).count();
+    await strip.getByRole('button', { name: 'Başa al' }).click(); await host.waitForTimeout(400);
+    const after = (await strip.textContent()) ?? '';
+    const savedAfter = await page.evaluate(() => localStorage.getItem('devre-simulatoru:devre'));
+    check('gömme (salt okunur): Oynat’la S1’e tıklayınca anahtar kapanıyor (V1 ≈ 10 V); parça silinmiyor, "Salt okunur" bildirimi; Başa al durduruyor; asıl devrenin kaydı değişmiyor',
+      /^(9,9\d|10,0)\d? V$/.test(v1.trim()) && blocked === 1 && r1 === 1 && after.includes('Oynat') && savedAfter === savedBefore,
+      `V1 ${v1.trim()}`);
+    // Tam uygulama ve bozuk adres
+    await page.goto(`${URL0}embed/?ornek=rc-dolma&salt-okunur=1&gorunum=tam`, { waitUntil: 'networkidle' }); await page.waitForTimeout(600);
+    const full = (await page.getByText('Salt okunur · parça ve kablo değişmez').count()) === 1 && (await page.getByRole('button', { name: 'Analiz', exact: true }).count()) === 1;
+    await page.goto(`${URL0}embed/?salt-okunur=1#d=bozuk`, { waitUntil: 'networkidle' }); await page.waitForTimeout(600);
+    check('gömme: gorunum=tam bütün uygulamayı "Salt okunur" çipiyle açıyor; bozuk adreste "Gömülü devre bulunamadı"',
+      full && (await page.getByText(/^Gömülü devre bulunamadı/).count()) === 1);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await page.goto(`${URL0}embed/?ornek=rc-dolma&salt-okunur=1&defter=1`, { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const bar = page.getByRole('banner');
+    const sizes = await bar.evaluate((root) => [...root.querySelectorAll('button, a')].map((el) => { const r = el.getBoundingClientRect(); return Math.min(r.width, r.height); }));
+    const title = await bar.getByRole('heading').evaluate((el) => ({ w: el.clientWidth, full: el.scrollWidth <= el.clientWidth }));
+    check('gömme (telefon genişliğinde iframe): şeritteki hedefler ≥ 44 px, devrenin adı okunuyor; defter tezgâhın altında; sayfa kaymıyor',
+      sizes.length === 3 && sizes.every((x) => x >= 44) && title.full && (await page.getByRole('complementary', { name: /^Defter/ }).count()) === 1 && !(await pageScrolls(page)),
+      `${sizes.map(Math.round).join(', ')} · ad ${title.w} px${title.full ? '' : ' (kesik)'}`);
+    await page.goto(URL0, { waitUntil: 'networkidle' }); await page.waitForTimeout(600);
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Dosya', exact: true }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('button', { name: 'Sayfaya göm' }).tap(); await page.waitForTimeout(400);
+    const dlg = page.getByRole('dialog', { name: 'Paylaş' });
+    const small = await dlg.evaluate((root) => [...root.querySelectorAll('button, a, input, textarea, [role=tab]')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 16), h: r.height, fs: parseFloat(getComputedStyle(el).fontSize), tag: el.tagName }; })
+      .filter((r) => r.h > 0 && (r.h < 43.5 || (['INPUT', 'TEXTAREA'].includes(r.tag) && r.fs < 16))).map((r) => `${r.n} ${Math.round(r.h)}/${r.fs}`));
+    check('gömme (telefon): ⋯ → Dosya → Sayfaya göm, Paylaş penceresi Sayfaya göm sekmesinde; hedefler ≥ 44 px, yazı alanları 16 px; sayfa kaymıyor',
+      (await dlg.getByRole('tab', { name: 'Sayfaya göm' }).getAttribute('aria-selected')) === 'true' && small.length === 0 && !(await pageScrolls(page)), small.join(', '));
+    await page.context().close();
+  }
+  // --- 3B tezgâh: masadaki parçalardan gelen kablolar gövdelerin içinden geçmiyor (pil) ----------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const hits = [];
+    for (const id of ['rc-dolma', 'ard-blink', 'transformator', 'bjt-yukseltec']) {
+      await page.goto('about:blank');
+      await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(300);
+      hits.push(`${id}:${await page.evaluate(() => window.__tezgah?.cableHits() ?? -1)}`);
+    }
+    check('3B: masadaki parçalardan (pil, Arduino, transformatör, cihazlar) gelen kablolar gövdelerin içinden geçmiyor; pilin uzak ucundaki kablo üstünden aşıyor',
+      hits.every((h) => h.endsWith(':0')), hits.join(' '));
+    await ctx.close();
+  }
   // --- Ölçü aletinin okuması her yerde aynı: şema göstergesi, defter kartı, 3B etiketi, 3B ekranı ----
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
@@ -1737,8 +1855,9 @@ try {
   await cp.goto(URL0, { waitUntil: 'networkidle' });
   const nbBox = await notebook(cp).boundingBox();
   const addRowCp = notebook(cp).getByRole('combobox', { name: /Parça ekle/ });
-  await addRowCp.fill('kondansatör'); await addRowCp.press('Enter'); await cp.waitForTimeout(300);
-  const placed = (await doc(cp)).parts.some((p) => p.type === 'capacitor');
+  await addRowCp.fill('kondansatör'); await addRowCp.press('Enter');
+  // Otomatik kayıt 0,4 s gecikmeli; uzun çalıştırmada yük altında daha geç düşebilir (3 s'ye kadar beklenir).
+  const placed = await cp.waitForFunction(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre') ?? 'null')?.parts?.some((p) => p.type === 'capacitor'), null, { timeout: 3000 }).then(() => true, () => false);
   check('1100 px (v3): defter 400 px; Parça ekle satırından eklenen parça şemaya geliyor', nbBox !== null && Math.round(nbBox.width) === 400 && placed, nbBox ? `${Math.round(nbBox.width)} px` : 'yok');
   await compact.close();
 

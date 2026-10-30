@@ -11,7 +11,8 @@ const STORAGE_KEY = 'devre-simulatoru:devre';
 const SAVE_DELAY_MS = 400;
 
 /** Son kayıt denemesinin sonucu. */
-export type SaveState = 'saved' | 'failed';
+/** 'off': kayıt kapalı (gömülü görünüm); durum yazılmaz. */
+export type SaveState = 'saved' | 'failed' | 'off';
 
 export function loadSavedDoc(): CircuitDoc | null {
   try {
@@ -43,20 +44,21 @@ function save(doc: CircuitDoc, analysis: AnalysisDoc): boolean {
 }
 
 /** Belge (ya da analiz bölümü) değiştikçe kısa bir gecikmeyle kaydeder; sayfa kapanırken bekleyen kaydı hemen yazar. */
-export function useAutosave(doc: CircuitDoc, analysis: AnalysisDoc = EMPTY_ANALYSIS): SaveState {
+export function useAutosave(doc: CircuitDoc, analysis: AnalysisDoc = EMPTY_ANALYSIS, enabled = true): SaveState {
   const latest = useRef({ doc, analysis });
   const pending = useRef(false);
   const [state, setState] = useState<SaveState>('saved');
   latest.current = { doc, analysis };
 
   useEffect(() => {
+    if (!enabled) return undefined;
     pending.current = true;
     const timer = window.setTimeout(() => {
       pending.current = false;
       setState(save(doc, analysis) ? 'saved' : 'failed');
     }, SAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [doc, analysis]);
+  }, [doc, analysis, enabled]);
 
   useEffect(() => {
     const flush = () => {
@@ -69,5 +71,5 @@ export function useAutosave(doc: CircuitDoc, analysis: AnalysisDoc = EMPTY_ANALY
     return () => window.removeEventListener('pagehide', flush);
   }, []);
 
-  return state;
+  return enabled ? state : 'off';
 }

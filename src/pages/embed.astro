@@ -1,0 +1,14 @@
+---
+// Gömülü görünüm (N8): ders sayfasına (Moodle vb.) iframe ile konan sade simülatör. Devre adresten
+// (?ornek=… ya da #d=…); ayarlar: src/model/embed.ts.
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Simulator from '../editor/Simulator';
+import { tr } from '../i18n/tr';
+---
+
+<BaseLayout title={tr.embed.barLabel}>
+  <Simulator client:only="react" embed />
+  <noscript>
+    <p style="padding: 2rem; font-size: 1.1rem;">{tr.app.noScript}</p>
+  </noscript>
+</BaseLayout>

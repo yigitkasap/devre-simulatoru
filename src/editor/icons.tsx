@@ -55,6 +55,8 @@ export type IconName =
   | 'devices'
   | 'lock'
   | 'external'
+  | 'code'
+  | 'restart'
   | 'sun'
   | 'moon'
   | 'themeSystem'
@@ -193,6 +195,8 @@ const PATHS: Record<IconName, ReactNode> = {
   upload: <path d="M10 13V3M6 7l4-4 4 4M4 16h12" />,
   share: <path d="M8.5 11.5l3-3M7 9L5.5 10.5a3 3 0 0 0 4 4L11 13M13 11l1.5-1.5a3 3 0 0 0-4-4L9 7" />,
   external: <path d="M11.5 4H16v4.5M16 4l-7 7M14 11.5V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3.5" />,
+  code: <path d="M7 6l-4 4 4 4M13 6l4 4-4 4" />,
+  restart: <path d="M4.5 10a5.5 5.5 0 1 0 1.8-4.1M4 3.5v3.2h3.2" />,
   chevron: <path d="M7.5 5l5 5-5 5" />,
   chevronDown: <path d="M5 8l5 5 5-5" />,
   chevronUp: <path d="M5 12l5-5 5 5" />,

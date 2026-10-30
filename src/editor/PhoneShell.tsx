@@ -25,6 +25,7 @@ function Logo() {
 
 /** Üst çubuktaki durum satırı: "Kur · kaydedildi", "Çalışıyor · 2,58 s". */
 export function statusLine(status: SimStatus, time: number, saveState: SaveState): string {
+  if (status === 'stopped' && saveState === 'off') return tr.phone.statusLine.stopped;
   if (status === 'stopped') return `${tr.phone.statusLine.stopped} · ${saveState === 'failed' ? tr.phone.notSavedShort : tr.phone.savedShort}`;
   return `${tr.phone.statusLine[status]} · ${formatSI(time, 's', { digits: 3 })}`;
 }

@@ -5,7 +5,7 @@
 // bileşenin kullandığı işlemler de buradadır.
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { exampleDoc, type ExampleId } from '../examples';
+import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
@@ -22,6 +22,7 @@ import { useAnalysis } from './analysis/useAnalysis';
 import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
 import { parseTask, respectsTask, targetMet, taskFromHash, type TaskDef } from '../model/task';
+import { parseEmbedParams, type EmbedOptions } from '../model/embed';
 import { toSerializable } from '../model/serialize';
 import { datedName, saveFile } from './analysis/format';
 import { plainText } from './Rich';
@@ -60,7 +61,8 @@ import { chainPlacement, firstFreePin } from './phoneTools';
 import { useRecentParts } from './recentParts';
 import { autoSettings } from './scopeView';
 import { useSettings } from './settings';
-import { ShareDialog } from './ShareDialog';
+import { ShareDialog, type ShareTab } from './ShareDialog';
+import { EmbedBar } from './embed/EmbedBar';
 import { speedLabel } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
 import { Toast, useToast } from './Toast';
@@ -83,19 +85,40 @@ function loadSavedTask(): TaskDef | null {
   }
 }
 
-function initialDoc(): { doc: CircuitDoc; analysis: AnalysisDoc; task: TaskDef | null; shared: 'loaded' | 'error' | 'task' | 'task-error' | null } {
+type Initial = {
+  doc: CircuitDoc;
+  analysis: AnalysisDoc;
+  task: TaskDef | null;
+  example: ExampleId | null;
+  shared: 'loaded' | 'error' | 'task' | 'task-error' | 'embed-error' | null;
+};
+
+/** Salt okunur gömülü görünümün kuralı: görevdeki kilit gibi (hiçbir parça değişmez, yeni parça ve kablo yok). */
+const READ_ONLY: TaskDef = { name: '', instruction: '', editable: [], allowNew: false, targets: [] };
+
+function initialDoc(embed: (EmbedOptions & { readonly example: string | null }) | null): Initial {
+  // Gömülü görünüm (N8): devre adresten (?ornek=… ya da #d=…). Otomatik kayıt ve görev okunmaz, adres
+  // silinmez (sayfa yenilenince aynı devre gelsin).
+  if (embed) {
+    const id = EXAMPLE_IDS.find((x) => x === embed.example) ?? null;
+    const fromExample = id ? exampleDoc(id) : null;
+    const fromHash = fromExample ? null : docFromHash(window.location.hash);
+    const doc = fromExample ?? fromHash ?? null;
+    return { doc: doc ?? emptyDoc(), analysis: EMPTY_ANALYSIS, task: null, example: fromExample ? id : null, shared: doc ? null : 'embed-error' };
+  }
   // Görev bağlantısı (#g=…, C1): devre ve görev birlikte.
   const fromTask = taskFromHash(window.location.hash);
   if (fromTask !== undefined) clearHash();
-  if (fromTask) return { doc: fromTask.doc, analysis: EMPTY_ANALYSIS, task: fromTask.task, shared: 'task' };
+  if (fromTask) return { doc: fromTask.doc, analysis: EMPTY_ANALYSIS, task: fromTask.task, example: null, shared: 'task' };
   const shared = fromTask === null ? undefined : docFromHash(window.location.hash);
   if (shared !== undefined) clearHash();
-  if (shared) return { doc: shared, analysis: EMPTY_ANALYSIS, task: null, shared: 'loaded' };
+  if (shared) return { doc: shared, analysis: EMPTY_ANALYSIS, task: null, example: null, shared: 'loaded' };
   const saved = loadSavedDoc();
   return {
     doc: saved ?? emptyDoc(),
     analysis: saved ? loadSavedAnalysis() : EMPTY_ANALYSIS,
     task: saved ? loadSavedTask() : null,
+    example: null,
     shared: fromTask === null ? 'task-error' : shared === null ? 'error' : null,
   };
 }
@@ -108,37 +131,44 @@ function sweepSpeed(timePerDiv: number): number {
 // Karta aktar (delikli plaket ve baskı devre, 3B kart): yalnızca açılınca yüklenir.
 const KartaAktarDialog = lazy(() => import('./KartaAktar'));
 
-export default function Simulator() {
-  const [initial] = useState(initialDoc);
+export default function Simulator({ embed: embedPage = false }: { embed?: boolean } = {}) {
+  /** Gömülü görünüm (/embed/, N8): ayarlar adresten. */
+  const [embed] = useState(() => (embedPage ? parseEmbedParams(window.location.search) : null));
+  const [initial] = useState(() => initialDoc(embed));
   const [state, rawDispatch] = useReducer(editorReducer, initial.doc, initialEditorState);
   /** Görev (C1, öğrenci): kilitli parçalar değişmez; değiştiren düzenleme yapılmaz ve söylenir. */
   const [task, setTask] = useState<TaskDef | null>(initial.task);
   useEffect(() => {
+    if (embed) return;
     try {
       if (task) window.localStorage.setItem(TASK_KEY, JSON.stringify(task));
       else window.localStorage.removeItem(TASK_KEY);
     } catch {
       // Depolama kapalı: görev yalnızca bu oturumda.
     }
-  }, [task]);
+  }, [embed, task]);
   const taskRef = useRef(task);
   taskRef.current = task;
   const docRef = useRef(state.doc);
   docRef.current = state.doc;
   const lockNotice = useRef<{ at: number; show: (message: string) => void }>({ at: 0, show: () => {} });
-  const dispatch = useCallback((action: EditorAction) => {
-    const t = taskRef.current;
-    if (t && (action.type === 'commit' || action.type === 'preview') && !respectsTask(docRef.current, action.doc, t)) {
-      const now = performance.now();
-      if (now - lockNotice.current.at > 1500) {
-        lockNotice.current.at = now;
-        const grows = action.doc.parts.length > docRef.current.parts.length || action.doc.wires.length > docRef.current.wires.length;
-        lockNotice.current.show(grows && !t.allowNew ? tr.task.lockedNew : tr.task.locked);
+  const readOnly = embed?.readOnly ?? false;
+  const dispatch = useCallback(
+    (action: EditorAction) => {
+      const t = taskRef.current ?? (readOnly ? READ_ONLY : null);
+      if (t && (action.type === 'commit' || action.type === 'preview') && !respectsTask(docRef.current, action.doc, t)) {
+        const now = performance.now();
+        if (now - lockNotice.current.at > 1500) {
+          lockNotice.current.at = now;
+          const grows = action.doc.parts.length > docRef.current.parts.length || action.doc.wires.length > docRef.current.wires.length;
+          lockNotice.current.show(!taskRef.current ? tr.embed.blocked : grows && !t.allowNew ? tr.task.lockedNew : tr.task.locked);
+        }
+        return;
       }
-      return;
-    }
-    rawDispatch(action);
-  }, []);
+      rawDispatch(action);
+    },
+    [readOnly],
+  );
   const [settings, updateSettings] = useSettings();
   const theme = useTheme(settings.theme);
   const layout = useLayout();
@@ -146,6 +176,8 @@ export default function Simulator() {
   const tablet = layout.kind === 'tablet';
   /** Dokunmatik düzen (telefon ya da tablet): tuvalde Kur / Bağla / Ölç kipleri. */
   const touchUi = phone || tablet;
+  /** Dokunmatik ekran (gömülü görünüm genişlikten bağımsız dokunma boyutuna geçer). */
+  const [coarsePointer] = useState(() => window.matchMedia?.('(pointer: coarse)').matches ?? false);
   const [recentParts, rememberPart] = useRecentParts();
   // Parça kütüphanesi v3'te kalktı (parçalar defterden eklenir); tuvale HTML sürükle-bırakla parça gelmez.
   const libraryDragType: DeviceType | null = null;
@@ -153,13 +185,13 @@ export default function Simulator() {
   const [focusRequest, setFocusRequest] = useState(0);
   /** Cihaz kartında bir jaka dokunulunca o ucun kısa süre yanıp sönmesi. */
   const [flash, setFlash] = useState<Highlight | null>(null);
-  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [share, setShare] = useState<ShareTab | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const [fitRequest, setFitRequest] = useState(0);
   // Tam ekran (masaüstü, tablet): önce devre sığdırılır, böylece defter gizlenince yeni alana yeniden sığar.
   const focus = useFocusMode(() => canvasRef.current?.fit());
   const fullscreenControls = { on: focus.on, panels: focus.panels, onToggle: focus.toggle, onPanel: focus.showPanel };
-  const [activeExample, setActiveExample] = useState<ExampleId | null>(null);
+  const [activeExample, setActiveExample] = useState<ExampleId | null>(initial.example);
   const [chosenScope, setChosenScope] = useState<string | null>(null);
   // Telefon (DP1–DP4): Parça ekle alt sayfası, kablo bağlama, karartmalı sayfalar ve şemanın boyu.
   const [addSheet, setAddSheet] = useState<SheetSize | null>(null);
@@ -183,7 +215,7 @@ export default function Simulator() {
   const [taskDialog, setTaskDialog] = useState(false);
   const [taskDraft, setTaskDraft] = useState<TaskDef | null>(null);
   // İlk açılış (M01): hoş geldin yalnızca ilk ziyarette (kayıtlı devre ya da paylaşım bağlantısı yoksa).
-  const [welcomeOpen, setWelcomeOpen] = useState(() => !welcomeSeen() && initialIsFresh());
+  const [welcomeOpen, setWelcomeOpen] = useState(() => !embed && !welcomeSeen() && initialIsFresh());
   const [helpOpen, setHelpOpen] = useState(false);
   /** Karta aktar penceresi (3B kart: delikli plaket ve baskı devre). */
   const [kartaOpen, setKartaOpen] = useState(false);
@@ -203,7 +235,8 @@ export default function Simulator() {
   // Analiz (grafik, tablo, eğri izleyici, Bode): izler ve tablo devreyle birlikte kaydedilir.
   const notify = useCallback((message: string) => showToast(message), [showToast]);
   const analysis = useAnalysis(doc, connectivity, initial.analysis, notify, selection.parts.length === 1 && selection.wires.length === 0 ? selection.parts[0]! : null);
-  const saveState = useAutosave(doc, analysis.doc);
+  // Gömülü görünüm kaydetmez: aynı sitedeki asıl devreye (otomatik kayıt) dokunmasın.
+  const saveState = useAutosave(doc, analysis.doc, embed === null);
   /** Analiz çekmecesinin yüksekliği (masaüstü) ve Büyüt. */
   const [drawerHeight, setDrawerHeight] = useState(DEFAULT_DRAWER);
   const [drawerExpanded, setDrawerExpanded] = useState(false);
@@ -327,6 +360,7 @@ export default function Simulator() {
     if (initial.shared === 'error') showToast(tr.file.sharedError, 'error');
     if (initial.shared === 'task' && initial.task) showToast(tr.task.opened(initial.task.name));
     if (initial.shared === 'task-error') showToast(tr.task.openError, 'error');
+    if (initial.shared === 'embed-error') showToast(tr.embed.missing, 'error');
   }, [initial, showToast]);
 
   // iOS Safari dokunuşları sayfaya yalnızca o olay türünü dinleyen bir öğenin alanında iletir. React ise
@@ -726,6 +760,13 @@ export default function Simulator() {
     : doc.parts.length === 0 && doc.wires.length === 0
       ? tr.phone.emptyName
       : tr.phone.defaultName;
+  /** Gömülü görünüm: Başa al simülasyonu durdurur ve devreyi ilk hâline (anahtarlar dahil) döndürür. */
+  const resetEmbed = () => {
+    sim.stop();
+    if (docRef.current !== initial.doc) rawDispatch({ type: 'commit', doc: initial.doc, selection: EMPTY_SELECTION });
+  };
+  /** Gömülü görünümde "Simülatörde aç": o anki devre, tam uygulamada paylaşım bağlantısıyla. */
+  const openInSimulator = useMemo(() => (embed ? shareUrl(doc, new URL(import.meta.env.BASE_URL, window.location.origin).href.replace(/\/?$/, '/')) : ''), [embed, doc]);
   /** Zincirle ekle (telefon): Parça ekle sayfası açıkken seçili parçanın boştaki ilk ucu. */
   const chainPart = addOpen && !chainOff ? singlePart : null;
   const chainPin = chainPart ? firstFreePin(chainPart.id, connectivity.unconnectedPins, doc) : null;
@@ -866,7 +907,7 @@ export default function Simulator() {
     setConnect({ start: null });
   };
 
-  const overlayOpen = Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || kartaOpen;
+  const overlayOpen = share !== null || examplesOpen || modal !== null || stopAsk || kartaOpen;
   const schematic = (
     <Canvas
       ref={canvasRef}
@@ -878,7 +919,7 @@ export default function Simulator() {
       dispatch={dispatch}
       libraryDragType={libraryDragType}
       onOpenProperties={openProperties}
-      keyboardEnabled={!shareLink && !examplesOpen && modal === null && !helpOpen && !welcomeOpen}
+      keyboardEnabled={share === null && !examplesOpen && modal === null && !helpOpen && !welcomeOpen}
       flowGraph={flowGraph}
       simActive={sim.status !== 'stopped'}
       frame={sim.frame}
@@ -988,7 +1029,7 @@ export default function Simulator() {
   // Klavye kısayolları (onaylı liste, M12): + / − yakınlaştır, Shift+1 sığdır, P oynat/duraklat,
   // Alt+1…3 panel sekmeleri, ? yardım. Yazı alanlarında ve açık pencerelerde çalışmaz. Tuşlar e.key ve
   // e.code ile okunur; Türkçe Q klavyede de aynı.
-  const dialogOpen = Boolean(shareLink) || examplesOpen || modal !== null || stopAsk || helpOpen || welcomeOpen;
+  const dialogOpen = share !== null || examplesOpen || modal !== null || stopAsk || helpOpen || welcomeOpen;
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   shortcutRef.current = (e: KeyboardEvent) => {
     if (dialogOpen || e.defaultPrevented) return;
@@ -1146,6 +1187,58 @@ export default function Simulator() {
     </TouchUi.Provider>
   );
 
+  const shareDialogEl = share && (
+    <TouchUi.Provider value={phone || tablet}>
+      <ShareDialog doc={doc} example={activeExample} title={circuitTitle} initialTab={share} onClose={() => setShare(null)} />
+    </TouchUi.Provider>
+  );
+
+  // Gömülü sade görünüm (N8): ince üst şerit ve yalnız tezgâh (isteğe bağlı defter). Telefon genişliğinde
+  // (iframe dar) defter tezgâhın altına iner.
+  if (embed && embed.view === 'sade') {
+    const stacked = phone;
+    return (
+      <TouchUi.Provider value={coarsePointer || phone || tablet}>
+        <div className="app-root flex flex-col overflow-hidden bg-panel">
+          <EmbedBar
+            title={circuitTitle}
+            readOnly={readOnly}
+            controls={embed.controls}
+            openHref={embed.fullLink ? openInSimulator : null}
+            status={sim.status}
+            onPlay={sim.play}
+            onPause={sim.pause}
+            onReset={resetEmbed}
+          />
+          <div className={`relative flex min-h-0 flex-1 ${stacked ? 'flex-col' : ''}`}>
+            <main className="relative min-h-0 min-w-0 flex-1 bg-paper">
+              {canvas}
+              {viewMode === 'schematic' && !phone && (
+                <CanvasControls
+                  onZoomOut={() => canvasRef.current?.zoomOut()}
+                  onZoomIn={() => canvasRef.current?.zoomIn()}
+                  onFit={() => canvasRef.current?.fit()}
+                  on3d={() => setViewMode('bench')}
+                  touch={coarsePointer || tablet}
+                />
+              )}
+            </main>
+            {embed.notebook && (
+              <aside
+                aria-label={tr.notebook.label}
+                className={`flex min-h-0 flex-col border-line ${stacked ? 'flex-1 border-t' : 'shrink-0 border-l'}`}
+                style={stacked ? undefined : { width: Math.min(layout.inspectorWidth, 380) }}
+              >
+                {notebook}
+              </aside>
+            )}
+          </div>
+          <Toast toast={toast} onDone={hideToast} />
+        </div>
+      </TouchUi.Provider>
+    );
+  }
+
   if (phone) {
     // Görev yeni parça ve kablo değişikliğine kapalıysa telefonda Kablo bağla ve Parça ekle gösterilmez.
     const taskFrozen = task !== null && !task.allowNew;
@@ -1197,6 +1290,10 @@ export default function Simulator() {
             onTask={() => {
               setModal(null);
               setTaskDialog(true);
+            }}
+            onEmbed={() => {
+              setModal(null);
+              setShare('embed');
             }}
             onExport={() => {
               setModal(null);
@@ -1251,6 +1348,7 @@ export default function Simulator() {
           />
         )}
         {examplesDialog}
+        {shareDialogEl}
       </>
     );
 
@@ -1381,7 +1479,7 @@ export default function Simulator() {
           onNew={() => loadDoc(emptyDoc(), tr.file.newDone)}
           onExport={() => downloadDoc(doc, analysis.doc)}
           onImport={() => fileInputRef.current?.click()}
-          onShare={() => setShareLink(shareUrl(doc, window.location.href))}
+          onShare={() => setShare('link')}
           onKarta={() => setKartaOpen(true)}
           onTask={() => setTaskDialog(true)}
           onExamples={() => setExamplesOpen(true)}
@@ -1400,10 +1498,10 @@ export default function Simulator() {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 min-w-0 flex-1">
             {canvas}
-            {task && (
+            {(task || readOnly) && (
               <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft/95 px-3 py-1.5 text-small font-semibold text-accent-ink shadow-sm">
-                <Icon name="target" className="h-4 w-4" />
-                {tr.task.mode(editableLabels)}
+                <Icon name={task ? 'target' : 'lock'} className="h-4 w-4" />
+                {task ? tr.task.mode(editableLabels) : tr.embed.mode}
               </p>
             )}
             {viewMode === 'schematic' &&
@@ -1459,7 +1557,7 @@ export default function Simulator() {
           )}
         </div>
 
-        {shareLink && <ShareDialog link={shareLink} onClose={() => setShareLink(null)} />}
+        {shareDialogEl}
         {stopAsk && (
           <StopToEditDialog
             onStop={() => {

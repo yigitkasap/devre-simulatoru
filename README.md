@@ -1785,6 +1785,11 @@ kırpıcı (89 000 adım/s) bu işten önce de sınırdaydı (önceki taramada 4
   multimetreler) arkada, jakları breadboard'a dönük; lamba, motor, hoparlör, röle modülü,
   transformatör, hazne önde. Uçlarından breadboard'a dupont uçlu kablolar. Toprak sembolü fiziksel
   bir parça değildir (− rayı).
+- **Kabloların yolu** (`src/bench3d/leadRoute.ts`, 2026-10-30): masadaki parçadan gelen kablo uçtan
+  dik kalkan alçak bir kavistir; yol masadaki bir parçanın gövdesine (kutusuna, kablo yarıçapı ve pay
+  eklenmiş) girerse kavis çarpan tarafta adım adım yükseltilir. Önceden pilin uzak ucundaki (+) uçtan
+  çıkan kablo pilin gövdesinin içinden geçiyordu; şimdi üstünden aşar, yakın uçtaki kablo eskisi gibi
+  alçak kalır. 62 örneğin hiçbirinde gövdeden geçen kablo yok (`tests/kablo-3b.test.ts`, ios-kontrol).
 - **Ağlar:** her ağın bir ya da birkaç şeridi olur, şeritler jumper'larla birleştirilir. Toprak ağı
   − rayına, ana besleme (Arduino 5V, pil +, güç kaynağı +) + rayına bağlanır. Parçalar şemadaki
   soldan sağa sırasıyla yerleşir; ardışık iki parçanın ortak ağı varsa aynı şeridi paylaşır
@@ -2204,6 +2209,20 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   çerçeve; defterde kilit ve kalem simgesi; tuvalin sol üstünde "Görev kipi · yalnızca RB ve RC
   değişir". "Teslim dosyası (.json)": devre, analiz ve `teslim` alanında hedeflerin ölçülen değerleri.
   Kart not vermediğini yazar. Görev bu tarayıcıda devreyle birlikte hatırlanır; "Görevden çık" kaldırır.
+- **Gömme (C4, C5, C8; N7, N8):** Dosya → "Paylaş…" (telefonda ⋯ → Dosya → Sayfaya göm) iki sekmeli
+  pencere açar: "Bağlantı | Sayfaya göm". Gömme ayarları: Sade (ince üst şerit ve yalnız tezgâh) ya da
+  Tam uygulama; Salt okunur (varsayılan açık), Oynat ve Başa al, Defter paneli, Tam ekranda aç
+  bağlantısı; yükseklik (320–1200 px). Kod kutusu `/embed/?ornek=rc-dolma&salt-okunur=1` adresli iframe
+  verir (değişmemiş örnek adıyla; değiştirilmiş ya da kendi devre `#d=…`'de sıkıştırılmış), "Kodu
+  kopyala"; ayarlar bu tarayıcıda hatırlanır. Altında Moodle'a ekleme adımları (5 madde), "Ayrıntılı
+  tarif" (`docs/hoca/moodle-gomme.md`) ve gizlilik notu. `/embed/` sayfası (`src/model/embed.ts`):
+  adresten devreyi okur; otomatik kayda, göreve ve hoş geldin penceresine dokunmaz (aynı sitedeki asıl
+  devre bozulmasın), adresi silmez. Salt okunur kural görevdeki kilitle aynı: anahtar, potansiyometre
+  gibi kullanma denetimleri ve ölçü aletleri serbest, değişiklik denemesinde "Salt okunur" bildirimi.
+  Sade görünümün şeridi (N8): simge, devrenin adı, "Salt okunur", Başa al (durdurur ve devreyi ilk
+  hâline döndürür), Oynat / Duraklat, "Simülatörde aç" (o anki devre, yeni sekmede). Dar çerçevede
+  (telefon genişliği) defter tezgâhın altına iner, dokunmatikte hedefler 44 px. Canlı sitenin çerçeve
+  içinde gösterilmesini engelleyen başlığı yok (`X-Frame-Options`, CSP denetlendi).
 - **Kayıt:** izler ve tablo devreyle birlikte kaydedilir (otomatik kayıt ve indirilen dosyada
   `analysis` alanı); devrenin yapı anahtarına ve geri alma geçmişine girmez, tablo yazarken simülasyon
   yeniden kurulmaz. Paylaşım bağlantısına girmez.
@@ -2214,5 +2233,6 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   4,14 / 3,25 / 2,46 / 1,78 mA), transfer, diyot akım sınırı, BJT β, yük doğrusu (BC107: R_C, 12 V, Q
   doğrunun üstünde); `tests/analiz-bode.test.ts`: sinüs uydurması, BC107'de 1 kHz kazancı 205,5 kat
   ± %2 ve faz ≈ −180°, referans veriden orta bant ve f_H; `tests/gorev.test.ts`: bağlantı ve dosya,
-  hedef değerlendirme, hedef seçenekleri, kilit kuralları; ios-kontrol "Analiz", "Bode" ve "görev"
+  hedef değerlendirme, hedef seçenekleri, kilit kuralları; `tests/gomme.test.ts`: gömme adresi ve
+  iframe kodu, adres ayarları, salt okunur kural; ios-kontrol "Analiz", "Bode", "görev" ve "gömme"
   maddeleri.

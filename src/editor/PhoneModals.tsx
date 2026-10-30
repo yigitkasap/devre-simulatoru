@@ -84,6 +84,8 @@ export interface FileSheetProps {
   readonly onKarta: () => void;
   /** Görev oluştur (C1, N6). */
   readonly onTask: () => void;
+  /** Paylaş → Sayfaya göm (N7). */
+  readonly onEmbed: () => void;
 }
 
 export function FileSheet(props: FileSheetProps) {
@@ -116,9 +118,11 @@ export function FileSheet(props: FileSheetProps) {
       <div className="flex shrink-0 items-center justify-between pr-2 pb-1 pl-4">
         <div className="flex min-w-0 flex-col">
           <b className="truncate text-[18px] font-semibold">{props.title}</b>
-          <span className={`text-[12.5px] ${props.saveState === 'failed' ? 'text-warn' : 'text-ok'}`}>
-            {props.saveState === 'failed' ? tr.phone.notSaved : tr.phone.autosaved}
-          </span>
+          {props.saveState !== 'off' && (
+            <span className={`text-[12.5px] ${props.saveState === 'failed' ? 'text-warn' : 'text-ok'}`}>
+              {props.saveState === 'failed' ? tr.phone.notSaved : tr.phone.autosaved}
+            </span>
+          )}
         </div>
         <button type="button" onClick={props.onClose} aria-label={tr.phone.close} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-muted active:bg-app">
           <Icon name="close" />
@@ -166,6 +170,7 @@ export function FileSheet(props: FileSheetProps) {
         <MenuItem icon="upload" label={tr.file.importJson} onClick={props.onImport} />
         <MenuItem icon="board" label={tr.karta.open} onClick={props.onKarta} />
         <MenuItem icon="target" label={tr.task.menu} onClick={props.onTask} />
+        <MenuItem icon="code" label={tr.embed.menu} onClick={props.onEmbed} />
       </div>
     </ModalSheet>
   );

@@ -486,7 +486,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
         {tr.analysis.button}
       </button>
       <span className="flex-1" />
-      {!active && <SaveStatus state={props.saveState} />}
+      {!active && props.saveState !== 'off' && <SaveStatus state={props.saveState} />}
       {icon('undo', tr.toolbar.undo, props.onUndo, !props.canUndo)}
       {!active && icon('redo', tr.toolbar.redo, props.onRedo, !props.canRedo)}
       {icon('help', tr.help.open, props.onHelp)}
