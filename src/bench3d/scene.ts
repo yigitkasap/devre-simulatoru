@@ -38,6 +38,7 @@ import { dotSpeed, type SimFrame } from '../editor/useSimulation';
 import type { CircuitDoc, Part } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
+import { collisions, leadCurve, type Obstacle } from './leadRoute';
 import { cableCurrents } from './cableFlow';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
@@ -186,6 +187,9 @@ export class BenchScene {
   private plan: BreadboardPlan | null = null;
   /** Kablolar: önce plan.leads, sonra plan.jumpers sırasıyla. */
   private cablePaths: CablePath[] = [];
+  /** Masadaki parçalardan gelen kabloların eğrileri ve engelleri (denetim: `cableHits`). */
+  private leadCurves: CubicBezierCurve3[] = [];
+  private leadObstacles: Obstacle[][] = [];
   private cableAmps = new Float64Array(0);
   private cablePhases = new Float64Array(0);
   private readonly dotMaterial = new MeshBasicMaterial({ color: '#ffd43b' });
@@ -399,6 +403,11 @@ export class BenchScene {
     this.dirty = true;
   }
 
+  /** Denetim (ios-kontrol): masadaki bir parçanın gövdesinin içinden geçen kablo sayısı. */
+  cableHits(): number {
+    return this.leadCurves.filter((curve, i) => collisions(curve, this.leadObstacles[i] ?? []).length > 0).length;
+  }
+
   /** Dokunmaya (çekmece açıkken) kapalı: tuval sayfa kaydırmasına izin verir. */
   setInteractive(on: boolean): void {
     this.controls.enabled = on;
@@ -485,6 +494,13 @@ export class BenchScene {
     }
     const plug = new BoxGeometry(0.75, 1.5, 0.75);
     const plugMat = mat('#1b1c1f', 0.6);
+    // Masadaki parçaların gövdeleri: kablolar içlerinden geçmez (pilin uzak ucundan çıkan kablo üstünden aşar).
+    const bodies = [...plan.table.keys()].flatMap((id) => {
+      const placed = this.parts.get(id);
+      return placed ? [{ id, box: new Box3().setFromObject(placed.model.root) }] : [];
+    });
+    this.leadObstacles = [];
+    this.leadCurves = [];
     for (const lead of plan.leads) {
       const placed = this.parts.get(lead.partId);
       const from = placed?.anchors[lead.pin];
@@ -497,9 +513,10 @@ export class BenchScene {
       const a1 = from.clone().add(new Vector3(0, 1.4, 0));
       const b1 = to.clone().add(new Vector3(0, 1.5, 0));
       const dist = a1.distanceTo(b1);
-      // Alçak kavis: parçaların ve etiketlerin üstünü kapatmaz (v3).
-      const lift = Math.min(6, 1.2 + 0.08 * dist);
-      const curve = new CubicBezierCurve3(a1, a1.clone().add(new Vector3(0, lift, 0)), b1.clone().add(new Vector3(0, lift, 0)), b1);
+      const obstacles: Obstacle[] = bodies.map((b) => ({ box: b.box, own: b.id === lead.partId }));
+      this.leadObstacles.push(obstacles);
+      const curve = leadCurve(a1, b1, obstacles);
+      this.leadCurves.push(curve);
       paths.push(cablePath(curve));
       this.cables.add(new Mesh(new TubeGeometry(curve, Math.max(12, Math.round(dist * 1.5)), 0.28, 8, false), mat(color, 0.55)));
       this.cables.add(mesh(plug, plugMat, from.x, from.y + 0.75, from.z));
