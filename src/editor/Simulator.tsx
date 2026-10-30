@@ -1202,7 +1202,7 @@ export default function Simulator() {
               onSize={setAnalysisSheet}
               onClose={() => analysis.setOpen(false)}
             >
-              <AnalysisSheetBody api={analysis} recorder={sim.traceRecorder} status={sim.status} frame={sim.frame} notify={notify} onClose={() => analysis.setOpen(false)} onPlay={sim.play} onPause={sim.pause} />
+              <AnalysisSheetBody api={analysis} recorder={sim.traceRecorder} status={sim.status} frame={sim.frame} notify={notify} title={circuitTitle} onClose={() => analysis.setOpen(false)} onPlay={sim.play} onPause={sim.pause} />
             </BottomSheet>
           )}
         </div>
@@ -1286,6 +1286,7 @@ export default function Simulator() {
               status={sim.status}
               frame={sim.frame}
               notify={notify}
+              title={circuitTitle}
               height={drawerExpanded ? drawerMax : Math.min(drawerHeight, drawerMax)}
               maxHeight={drawerMax}
               onHeight={(h) => {

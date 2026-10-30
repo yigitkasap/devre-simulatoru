@@ -915,6 +915,37 @@ try {
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).analysis ?? null);
     check('analiz: Tablo sekmesinde eklenen satırlar; tutamak (↑) çekmeceyi büyütüyor; izler ve tablo devreyle kaydediliyor',
       tableText.includes('V(C1)') && tableText.includes('imleç') && Math.abs(taller - 420) < 2 && saved?.traces?.length === 2 && saved?.rows?.length === 2, `${Math.round(taller)} px · ${saved?.traces?.length}/${saved?.rows?.length}`);
+    // Tablo (A2, N2): sütunlar, % hata, laboratuvar sütunu, satır ekle ve kaynak seçimi, doğru uydurma, CSV menüsü.
+    const heads = await drawer.locator('thead th').allTextContents();
+    await drawer.getByRole('textbox', { name: 'V(C1): teorik değer' }).fill('10 V'); await page.waitForTimeout(100);
+    const errText = ((await drawer.locator('tbody tr').first().locator('td').nth(3).textContent()) ?? '').trim();
+    await drawer.getByRole('button', { name: 'Laboratuvar sütunu' }).click(); await page.waitForTimeout(100);
+    const labHead = await drawer.locator('thead th', { hasText: 'Laboratuvar' }).count();
+    await drawer.getByRole('button', { name: 'Satır ekle' }).click(); await page.waitForTimeout(100);
+    await drawer.getByRole('combobox', { name: 'Yeni büyüklük: ölçülen değerin kaynağı' }).selectOption({ index: 1 }); await page.waitForTimeout(100);
+    const newRow = ((await drawer.locator('tbody tr').nth(2).textContent()) ?? '').replace(/\s+/g, ' ');
+    check('analiz (Tablo, N2): Büyüklük | Teorik (sen gir) | Ölçülen (simülasyon) | % Hata; teorik 10 V → % hata; Laboratuvar sütunu; Satır ekle ve ölçüleni imleçten seç',
+      heads.slice(0, 4).join('|') === 'Büyüklük|Teorik (sen gir)|Ölçülen (simülasyon)|% Hata' && /^0,\d\d$/.test(errText) && labHead === 1 && /imleç/.test(newRow),
+      `${heads.join('|')} · hata ${errText} · ${newRow.slice(0, 40)}`);
+    const fitPanel = drawer.getByRole('region', { name: 'Doğru uydur' });
+    await fitPanel.getByRole('combobox', { name: 'y dönüşümü' }).selectOption('ln'); await page.waitForTimeout(200);
+    const fitText = ((await fitPanel.locator('dl').textContent()) ?? '').replace(/\s+/g, ' ');
+    const fitChart = (await fitPanel.getByRole('img').getAttribute('aria-label')) ?? '';
+    const rowsBefore = await drawer.locator('tbody tr').count();
+    await fitPanel.getByRole('button', { name: 'τ’yu tabloya ekle' }).click(); await page.waitForTimeout(150);
+    const tauRow = `${await drawer.locator('tbody tr').last().getByRole('textbox', { name: 'Büyüklüğün adı' }).inputValue()} ${((await drawer.locator('tbody tr').last().textContent()) ?? '').replace(/\s+/g, ' ')}`;
+    check('analiz (Tablo): doğru uydur y = ln(a − V(C1)), x = t → eğim, τ = −1 / eğim, R²; grafik role="img"; "τ’yu tabloya ekle"',
+      /Eğim−\d/.test(fitText) && /τ = −1 \/ eğim\d/.test(fitText) && /R²0,\d{4} · \d+ nokta/.test(fitText) && fitChart.startsWith('Doğru uydurma: ln(10') &&
+      (await drawer.locator('tbody tr').count()) === rowsBefore + 1 && tauRow.includes('τ (uydurma)') && tauRow.includes('doğru uydurma'), `${fitText.slice(0, 80)} · ${tauRow.slice(0, 40)}`);
+    await drawer.getByRole('button', { name: 'CSV seçenekleri' }).click(); await page.waitForTimeout(150);
+    const radios = await page.getByRole('menuitemradio').evaluateAll((els) => els.map((e) => `${e.textContent.trim()}=${e.getAttribute('aria-checked')}`));
+    await page.getByRole('menuitemradio', { name: /Virgül/ }).click(); await page.waitForTimeout(100);
+    const [tableCsv] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: /tablo\.csv indir/ }).click()]);
+    const tableCsvText = Buffer.concat(await (await tableCsv.createReadStream()).toArray()).toString('utf8');
+    const savedSep = await page.evaluate(() => localStorage.getItem('devre-simulatoru:csv-ayirici'));
+    check('analiz (Tablo): CSV menüsünde ayırıcı (varsayılan noktalı virgül, virgül seçilebiliyor ve hatırlanıyor); tablo.csv ve grafik verisi ayrı',
+      radios.length === 2 && radios[0].endsWith('=true') && /^tablo-.*\.csv$/.test(tableCsv.suggestedFilename()) && tableCsvText.startsWith('\uFEFFBüyüklük,Formül,Teorik,Ölçülen,Birim,Kaynak,% Hata,Laboratuvar') && savedSep === ',',
+      `${radios.join(' / ')} · ${tableCsvText.split('\r\n')[1]?.slice(0, 40)}`);
     await ctx.close();
   }
   {
@@ -934,6 +965,15 @@ try {
     check('analiz (telefon, N9): ⋯ → Analiz alt sayfası; dört sekme, + İz ile şemadan V(C1); hedefler ≥ 44 px; altta "Tabloya ekle" ve "CSV paylaş"; sayfa kaymıyor',
       chips.includes('V(C1)') && tabSizes.length === 4 && tabSizes.every((h) => h >= 44) && small.length === 0 && bottom !== null && bottom.y + bottom.height <= 844 && !(await pageScrolls(page)),
       small.join(', ') || chips.join(','));
+    await sheet.getByRole('tab', { name: 'Tablo' }).tap(); await page.waitForTimeout(200);
+    await sheet.getByRole('button', { name: 'Satır ekle' }).tap(); await page.waitForTimeout(200);
+    const theoryInput = sheet.getByRole('textbox', { name: 'Yeni büyüklük: teorik değer' });
+    const inputBox = await theoryInput.boundingBox();
+    const inputFont = await theoryInput.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const tableButtons = await Promise.all(['Kopyala', 'CSV paylaş'].map((n) => sheet.getByRole('button', { name: n, exact: true }).boundingBox()));
+    check('analiz (telefon, Tablo): satırlar kart; girdiler ≥ 44 px ve 16 px yazı (iOS yakınlaştırmaz); altta Kopyala ve CSV paylaş; doğru uydurma altında',
+      inputBox !== null && inputBox.height >= 43.5 && inputFont >= 16 && tableButtons.every((b) => b !== null && b.height >= 44) && (await sheet.getByRole('region', { name: 'Doğru uydur' }).count()) === 1,
+      `${Math.round(inputBox?.height ?? 0)} px · ${inputFont} px`);
     await page.context().close();
   }
   // --- Ölçü aletinin okuması her yerde aynı: şema göstergesi, defter kartı, 3B etiketi, 3B ekranı ----

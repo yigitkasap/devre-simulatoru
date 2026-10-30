@@ -6,11 +6,13 @@ import { memo, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent a
 import { tr } from '../../i18n/tr';
 import { formatSI } from '../../sim/units';
 import { Icon, type IconName } from '../icons';
-import { useTouchUi } from '../touchUi';
+import { TouchUi, useTouchUi } from '../touchUi';
 import type { SimFrame, SimStatus } from '../useSimulation';
 import { Chart, cursorTime, recordSpan, timeUnit, type ChartTrace } from './Chart';
 import { datedName, saveFile, svgToPng, tickText, toCsv } from './format';
 import type { TraceRecorder } from './recorder';
+import { tableCsv, tableTsv } from './table';
+import { TablePane } from './TablePane';
 import { traceColor } from './traces';
 import { ANALYSIS_TABS, type AnalysisApi, type AnalysisTab } from './useAnalysis';
 
@@ -22,6 +24,8 @@ export interface AnalysisPanelProps {
   readonly status: SimStatus;
   readonly frame: SimFrame | null;
   readonly notify: (message: string) => void;
+  /** Devrenin adı (tablonun başlığı). */
+  readonly title: string;
 }
 
 const TAB_ICONS: Record<AnalysisTab, IconName> = { graph: 'chart', table: 'table', curve: 'curve', bode: 'bode' };
@@ -84,7 +88,78 @@ function useGraph({ api, recorder: rec, status, frame, notify }: AnalysisPanelPr
         interval: `${rec.perFrame ? '' : `${formatSI(rec.interval, 's', { trim: true })} · `}${tr.analysis.graph.points(rec.count)}`,
       }
     : null;
-  return { version, chartTraces, cursor, setCursor, timeText, svg, csv, png, toTable, statusText, info, span };
+  // Tablo (N2): panoya kopyala, CSV (ayırıcı menüsü; tablo ve grafik verisi ayrı dosya).
+  const tableBlob = () => new Blob([tableCsv(api.doc.rows, api.doc.labColumn, api.separator)], { type: 'text/csv;charset=utf-8' });
+  const tableFile = (share: boolean) => void saveFile(datedName(tr.analysis.files.table, 'csv'), tableBlob(), share);
+  const copyTable = async () => {
+    try {
+      await navigator.clipboard.writeText(tableTsv(api.doc.rows, api.doc.labColumn));
+      notify(tr.analysis.table.copied);
+    } catch {
+      notify(tr.analysis.table.copyFailed);
+    }
+  };
+  return { recCount: rec.count, version, chartTraces, cursor, setCursor, timeText, svg, csv, png, toTable, statusText, info, span, tableFile, copyTable };
+}
+
+/** CSV menüsü (N2): ayırıcı (noktalı virgül varsayılan, virgül) ve iki dosya. */
+function CsvMenu({ api, g, touch }: { api: AnalysisApi; g: Graph; touch: boolean }) {
+  const t = tr.analysis.table;
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    document.addEventListener('keydown', onKey);
+    root.current?.querySelector<HTMLElement>('[role=menuitemradio]')?.focus();
+    return () => {
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  const item = `flex w-full items-center gap-2 rounded-lg px-2.5 text-left text-small hover:bg-panel-2 ${touch ? 'h-11' : 'h-9'}`;
+  return (
+    <div ref={root} className="relative">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t.csvMenu}
+        onClick={() => setOpen((o) => !o)}
+        className={`flex shrink-0 items-center gap-1.5 rounded-[10px] bg-accent px-3.5 text-small font-semibold text-white hover:brightness-105 ${touch ? 'h-11' : 'h-9'}`}
+      >
+        <Icon name="download" className="h-4 w-4" />
+        {t.csv}
+        <Icon name="chevronDown" className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <div role="menu" aria-label={t.csvMenu} className="absolute top-full right-0 z-30 mt-2 flex w-[264px] flex-col rounded-xl border border-line bg-panel p-1.5 shadow-lg">
+          <span className="px-2.5 pt-1 pb-1.5 text-label text-muted">{t.separator}</span>
+          {([';', ','] as const).map((sep) => (
+            <button key={sep} type="button" role="menuitemradio" aria-checked={api.separator === sep} onClick={() => api.setSeparator(sep)} className={`${item} ${api.separator === sep ? 'bg-accent-soft text-accent-ink' : ''}`}>
+              <span className="min-w-0 flex-1">{sep === ';' ? t.semicolon : t.comma}</span>
+              {api.separator === sep && <Icon name="check" className="h-4 w-4" />}
+            </button>
+          ))}
+          <span aria-hidden="true" className="my-1 h-px bg-line" />
+          <button type="button" role="menuitem" onClick={() => { g.tableFile(false); setOpen(false); }} className={`${item} font-medium text-accent-ink`}>
+            <Icon name="download" className="h-4 w-4" />
+            {t.tableFile(`${tr.analysis.files.table}.csv`)}
+          </button>
+          <button type="button" role="menuitem" disabled={!g.span} onClick={() => { g.csv(false); setOpen(false); }} className={`${item} disabled:opacity-50`}>
+            <Icon name="download" className="h-4 w-4" />
+            {t.graphFile(`${tr.analysis.files.graph}.csv`, g.span ? g.recCount : 0)}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // --- Masaüstü çekmecesi -------------------------------------------------------------------------------
@@ -128,6 +203,14 @@ export function AnalysisDrawer(
           {tr.analysis.graph.csv}
         </button>
       </>
+    ) : api.tab === 'table' ? (
+      <>
+        <button type="button" onClick={() => void g.copyTable()} className={`${btn} border border-line bg-panel px-3 text-ink hover:bg-panel-2`}>
+          <Icon name="copy" className="h-4 w-4" />
+          {tr.analysis.table.copy}
+        </button>
+        <CsvMenu api={api} g={g} touch={touch} />
+      </>
     ) : null;
   return (
     <section aria-label={tr.analysis.title} className="relative flex shrink-0 flex-col border-t border-line bg-panel" style={{ height }}>
@@ -165,7 +248,7 @@ export function AnalysisDrawer(
         </button>
       </div>
       <div role="tabpanel" id={`${idBase}-panel`} aria-labelledby={`${idBase}-${api.tab}`} className="flex min-h-0 flex-1 flex-col">
-        {api.tab === 'graph' ? <GraphDesk {...props} g={g} touch={touch} /> : api.tab === 'table' ? <TableSimple api={api} /> : <Soon />}
+        {api.tab === 'graph' ? <GraphDesk {...props} g={g} touch={touch} /> : api.tab === 'table' ? <TablePane api={api} recorder={props.recorder} version={g.version} title={props.title} /> : <Soon />}
       </div>
     </section>
   );
@@ -299,6 +382,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
   const idBase = useId().replace(/:/g, '');
   const t = tr.analysis.graph;
   return (
+    <TouchUi.Provider value>
     <div className="flex min-h-0 flex-1 flex-col">
       <div data-sheet-grab="" className="flex shrink-0 touch-none items-center gap-2 pr-2 pl-4">
         <h2 className="m-0 min-w-0 flex-1 truncate text-[18px] font-semibold">{tr.analysis.title}</h2>
@@ -363,11 +447,23 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
             {recorder.perFrame && api.traces.length > 0 && <p className="m-0 text-label text-warn">{t.perFrame}</p>}
           </>
         ) : api.tab === 'table' ? (
-          <TableSimple api={api} />
+          <TablePane api={api} recorder={recorder} version={g.version} title={props.title} compact />
         ) : (
           <Soon />
         )}
       </div>
+      {api.tab === 'table' && (
+        <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
+          <button type="button" onClick={() => void g.copyTable()} disabled={api.doc.rows.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
+            <Icon name="copy" className="h-4 w-4" />
+            {tr.analysis.table.copy}
+          </button>
+          <button type="button" onClick={() => g.tableFile(true)} disabled={api.doc.rows.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
+            <Icon name="share" className="h-4 w-4" />
+            {tr.analysis.graph.csvShare}
+          </button>
+        </div>
+      )}
       {api.tab === 'graph' && (
         <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
           <button type="button" onClick={g.toTable} disabled={!g.span} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
@@ -381,21 +477,6 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
         </div>
       )}
     </div>
-  );
-}
-
-// --- Tablo (2. aşamada tamamlanır) -------------------------------------------------------------------------
-
-function TableSimple({ api }: { api: AnalysisApi }) {
-  return (
-    <ul className="m-0 flex list-none flex-col p-0 px-4 text-small">
-      {api.doc.rows.map((r) => (
-        <li key={r.id} className="flex gap-3 border-b border-line py-2">
-          <b className="w-32 shrink-0 font-mono">{r.name}</b>
-          <span className="font-mono">{r.measured === null ? '—' : formatSI(r.measured, r.unit, { digits: 4 })}</span>
-          <span className="text-muted">{r.source}</span>
-        </li>
-      ))}
-    </ul>
+    </TouchUi.Provider>
   );
 }

@@ -2135,8 +2135,21 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   akım ekseni (yazıları izin renginde); sürüklenebilir imleç (klavyeyle ← → Home End), değer kutusu ve
   "Tabloya ekle". PNG (tema renkleri yazılır) ve CSV (noktalı virgül, ondalık virgül, BOM); telefonda
   CSV `navigator.share` ile, yoksa indirilir.
+- **Tablo (A2, N2):** Büyüklük (adı ve altında formül, ikisi de yazılabilir), Teorik (öğrenci yazar:
+  "100 ms", "6,32 V", "3,68m"), Ölçülen (simülasyon; altında kaynağı: "imleç 100 ms", "doğru uydurma,
+  R² = 1,0000"), % Hata = |Ölçülen − Teorik| / Teorik × 100 (%5'in altı yeşil). "Laboratuvar
+  sütunu" gerçek ölçüm için boş bir sütun ekler. "Satır ekle" boş satır açar; ölçüleni imleçteki iz
+  değerlerinden ya da uydurmanın sonucundan seçilir. Sağda (telefonda altta) "Doğru uydur": y (isteğe
+  bağlı ln(a − y); a, y'nin en büyük değerinin iki anlamlı basamağa yukarı yuvarlanmışı, 9,99 V → 10)
+  ve x (t ya da başka bir iz), x aralığı ("İmleçten" kısa yolu: dolmanın başladığı andan sonrası);
+  noktalar ve doğru çizilir, eğim, kesişim, τ = −1 / eğim (x = t ve ln dönüşümünde) ve R²; "τ'yu
+  tabloya ekle". ln'in içi a'nın %1'inin altına inen noktalar atılır. Kopyala panoya sekmeyle ayrılmış
+  tablo verir (Excel / Word'e yapıştırılır). CSV menüsü: ayırıcı noktalı virgül (Türkçe Excel; ondalık
+  virgül) ya da virgül (uluslararası; ondalık nokta), bu tarayıcıda hatırlanır; iki dosya: tablo ve
+  grafik verisi. Telefonda tablo kartlar hâlinde, girdiler 44 px ve 16 px yazı (iOS yakınlaştırmaz).
 - **Kayıt:** izler ve tablo devreyle birlikte kaydedilir (otomatik kayıt ve indirilen dosyada
   `analysis` alanı); devrenin yapı anahtarına ve geri alma geçmişine girmez, tablo yazarken simülasyon
   yeniden kurulmaz. Paylaşım bağlantısına girmez.
 - Testler `tests/analiz-grafik.test.ts`: RC dolmada kayıt tasarımın referans verisiyle
-  (`tests/veri/veri-rc-dolma.json`) %0,1 içinde; ios-kontrol "Analiz" maddeleri.
+  (`tests/veri/veri-rc-dolma.json`) %0,1 içinde; `tests/analiz-tablo.test.ts`: teorik değer okuma,
+  % hata, RC'de ln uydurmasından τ ≈ 100 ms (R² > 0,9999), CSV; ios-kontrol "Analiz" maddeleri.
