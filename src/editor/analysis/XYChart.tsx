@@ -81,7 +81,8 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
   // Doğrusal eksen sıfırdan başlar; küçük negatif taşma (doyumdaki ters akım) ekseni uzatmaz.
   else if (!logX) y0 = y0 < 0 && -y0 > 0.05 * Math.abs(y1) ? y0 : 0;
   const xt = logX ? { ticks: decades(x0, x1), step: 1 } : niceTicks(x0, x1, compact ? 4 : 6);
-  const yt = niceTicks(y0, y1, compact ? 3 : 5);
+  // Bölme sayısı çizimin yüksekliğine göre (alçak grafikte yazılar üst üste binmesin).
+  const yt = niceTicks(y0, y1, Math.max(2, Math.min(compact ? 3 : 5, Math.floor(ph / 28))));
   const xa = logX ? Math.floor(x0) : xt.ticks[0]!;
   const xb = logX ? Math.ceil(x1) : xt.ticks[xt.ticks.length - 1]!;
   const ya = yt.ticks[0]!;

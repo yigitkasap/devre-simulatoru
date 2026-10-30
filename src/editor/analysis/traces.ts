@@ -62,7 +62,9 @@ export function netIndex(doc: CircuitDoc, conn: Connectivity): NetIndex {
   return { netOf, pins: (net) => byNet.get(net) ?? [], ground };
 }
 
-const byLabel = (a: { part: Part }, b: { part: Part }) => a.part.label.localeCompare(b.part.label, 'tr', { numeric: true });
+/** Düğüme ad verecek parçanın önceliği: yarı iletken ve entegre uçları, sonra öbürleri, en son ölçü aletleri ve kaynaklar. */
+const RANK: Partial<Record<Part['type'], number>> = { npn: 0, pnp: 0, njfet: 0, pjfet: 0, nmos: 0, pmos: 0, opamp: 0, timer555: 0, oscilloscope: 2, voltmeter: 2, ammeter: 2, funcgen: 2, dcsupply: 2, acsource: 2, battery: 2 };
+const byLabel = (a: { part: Part }, b: { part: Part }) => (RANK[a.part.type] ?? 1) - (RANK[b.part.type] ?? 1) || a.part.label.localeCompare(b.part.label, 'tr', { numeric: true });
 
 /** Düğümün adı ("C1" ya da "Q1 C"); toprak ağıysa "0". */
 export function nodeName(key: string, idx: NetIndex): string {

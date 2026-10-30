@@ -9,6 +9,7 @@ import type { Connectivity } from '../../model/connectivity';
 import type { CircuitDoc, Point } from '../../model/types';
 import type { CanvasMark, PickTarget } from '../Canvas';
 import { liveTraces, netIndex, nodeName, traceColor, traceLabel, type TraceLabel } from './traces';
+import { useBode, type BodeApi } from './useBode';
 import { useTracer, type TracerApi } from './useTracer';
 
 export type AnalysisTab = 'graph' | 'table' | 'curve' | 'bode';
@@ -47,6 +48,8 @@ export interface AnalysisApi {
   readonly setSeparator: (sep: CsvSeparator) => void;
   /** Eğri izleyici (A3). */
   readonly tracer: TracerApi;
+  /** Ölçülen Bode (A4). */
+  readonly bode: BodeApi;
 }
 
 const SEPARATOR_KEY = 'devre-simulatoru:csv-ayirici';
@@ -81,6 +84,7 @@ export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial
   const liveKey = live.map((t) => t.id).join(',');
   const traces = useMemo(() => live, [liveKey]);
   const labels = useMemo(() => new Map(traces.map((t) => [t.id, traceLabel(t, doc, idx)])), [traces, doc, idx]);
+  const bode = useBode(doc, connectivity, idx, traces, labels);
 
   const addTrace = useCallback((def: DistributiveOmit<TraceDef, 'id' | 'color'>) => {
     setDoc((a) => ({ ...a, traces: [...a.traces, { ...def, id: newId('t'), color: nextTraceColor(a.traces) } as TraceDef] }));
@@ -143,8 +147,13 @@ export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial
       out.push({ at: { x: p.x, y: p.y }, text: `scan-${p.id}`, color: 'var(--color-accent)', kind: 'ring', r: 30 });
       out.push({ at: { x: p.x, y: p.y - 2 }, text: tr.analysis.curve.scanned(p.label), color: 'var(--color-accent)', kind: 'pill' });
     }
+    // Bode: giriş ve çıkış noktaları.
+    if (tab === 'bode') {
+      if (bode.input?.at) out.push({ at: bode.input.at, text: tr.analysis.bode.inputMark, color: traceColor(0), kind: 'pill' });
+      if (bode.output?.at) out.push({ at: bode.output.at, text: tr.analysis.bode.outputMark, color: traceColor(3), kind: 'pill' });
+    }
     return out;
-  }, [traces, labels, doc.parts, pick, tab, tracer.part]);
+  }, [traces, labels, doc.parts, pick, tab, tracer.part, bode.input?.at, bode.output?.at]);
 
   const addRows = useCallback((rows: readonly Omit<TableRow, 'id'>[]) => {
     setDoc((a) => ({ ...a, rows: [...a.rows, ...rows.map((r) => ({ ...r, id: newId('r') }))] }));
@@ -175,6 +184,7 @@ export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial
     separator,
     setSeparator,
     tracer,
+    bode,
   };
 }
 

@@ -2162,6 +2162,29 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   Tarama Web Worker'da (`sweep.worker.ts`, Vite `worker.format: 'es'`; ≈ 120 kB, yalnız tarama
   başlayınca yüklenir): arayüz donmaz, İptal iş parçacığını sonlandırır; parametre değişince
   kendiliğinden yeniden taranır. CSV: x ve her basamağın akımı.
+- **Ölçülen Bode (A4, N4):** giriş (fonksiyon üretecinin OUT − COM'u ya da AC kaynak) ve çıkış
+  (osiloskop kanalı; önce B, laboratuvar düzeninde A giriş, B çıkış; ya da Grafik'teki bir gerilim izi)
+  seçilir; frekans aralığı ve nokta sayısı (logaritmik; "20", "1k", "2M" yazılabilir). Laboratuvardaki
+  gibi tek bir simülatörde üretecin frekansı adım adım değiştirilir (`update()`; çalışma noktası oturmuş
+  kalır). Önce kaynağın genliği sıfırken devre DC'de oturtulur (en çok 10 Hz'te: motorun en büyük adımı
+  kaynağın periyoduna bağlı). Her frekansta aynı oturma ölçütü: son üç periyodun genliğinden kalan hata
+  geometrik olarak tahmin edilir (Aitken), genliğin binde birinden ve faz değişimi 0,1°'den azsa
+  oturmuş sayılır (ardışık iki periyodu karşılaştırmak yavaş kaymayı kaçırıyordu: 1 kHz'te %12 hata;
+  yüksek frekansta eğride basamak çıkardı). Sonra 2 periyot `runUntil` ile tam anlarda (periyot başına
+  128 örnek) ölçülür; genlik ve faz ayrık Fourier katsayısıyla (sinüs uydurması). Faz açılır (eviren
+  yükselteçte ≈ −180°'den başlar). Kazanç (dB) ve faz alt alta, aynı log frekans ekseninde; orta bant
+  (kazancı en büyüğün 1 dB yakınındaki noktaların logaritmik ortasına en yakın ölçüm) ve −3 dB noktaları
+  (f_H, f_L: iki ölçüm noktası arasında dB – log f doğrusal ara değeri; ipucunda yazılı) kendiliğinden.
+  Tabloya aktar: orta bant kazancı (kat ve dB), f_H, f_L. Ölçüm Web Worker'da; noktalar geldikçe çizilir.
+  BC107 örneğinde 16 nokta ≈ 1,5 s: orta bant 205,8 kat (46,3 dB), 1 kHz'te 205,8 kat ve −179,9°
+  (tasarımın referansı 205,5 kat), f_H ≈ 1,08 MHz.
+  2 MHz üstü (kullanıcı isteğiyle denetlendi): fonksiyon üreteci ve AC kaynak en çok 2 MHz verir
+  (`FUNCGEN_LIMITS`, `AC_MAX_FREQUENCY`); daha yüksek istenince motor frekansı 2 MHz'e kırpar, ölçüm ise
+  istenen frekansta uydurma yaptığı için giriş genliği anlamsız çıkar (3 / 4,5 / 6,7 MHz'te 3,5 / 1,1 /
+  3,0 mV, hiçbiri oturmuyor). Tasarımın verisindeki 5 MHz tutarsızlığı da bundandır. Aralık artık
+  kaynağın sınırında kalır ve bu yazılır. Ayrıca periyot başına 64 örnekte 2 MHz kazancı geçmişe göre
+  %3 oynuyordu (101,6 / 104,6 kat); 128 örnekte 105,5 kat (256'da 106,1). Tasarımın 2 MHz değeri
+  (91,3 kat) ve ondan çıkan f_H ≈ 0,82 MHz büyük olasılıkla kaba örneklemedendir.
 - **Kayıt:** izler ve tablo devreyle birlikte kaydedilir (otomatik kayıt ve indirilen dosyada
   `analysis` alanı); devrenin yapı anahtarına ve geri alma geçmişine girmez, tablo yazarken simülasyon
   yeniden kurulmaz. Paylaşım bağlantısına girmez.
@@ -2170,4 +2193,5 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   % hata, RC'de ln uydurmasından τ ≈ 100 ms (R² > 0,9999), CSV; `tests/analiz-egri.test.ts`: BF245A
   çıkış ailesi referansla (`tests/veri/veri-bf245a.json`) bütün eğri boyunca %1 içinde (V_DS = 10 V'ta
   4,14 / 3,25 / 2,46 / 1,78 mA), transfer, diyot akım sınırı, BJT β, yük doğrusu (BC107: R_C, 12 V, Q
-  doğrunun üstünde); ios-kontrol "Analiz" maddeleri.
+  doğrunun üstünde); `tests/analiz-bode.test.ts`: sinüs uydurması, BC107'de 1 kHz kazancı 205,5 kat
+  ± %2 ve faz ≈ −180°, referans veriden orta bant ve f_H; ios-kontrol "Analiz" maddeleri.

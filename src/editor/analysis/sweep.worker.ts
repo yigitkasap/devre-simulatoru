@@ -2,14 +2,18 @@
 // parçacığı sonlandırılarak yapılır (tarama yarıda kalır, sonuç gönderilmez).
 
 import type { Netlist } from '../../sim';
+import { measureBode, type BodePoint, type BodeRequest } from './bode';
 import { loadLine, runSweep, type SweepRequest } from './sweep';
 
 export type WorkerRequest =
-  | { readonly kind: 'curve'; readonly request: SweepRequest; readonly netlist: Netlist | null; readonly dutId: string; readonly labels: Readonly<Record<string, string>> };
+  | { readonly kind: 'curve'; readonly request: SweepRequest; readonly netlist: Netlist | null; readonly dutId: string; readonly labels: Readonly<Record<string, string>> }
+  | { readonly kind: 'bode'; readonly request: BodeRequest };
 
 export type WorkerReply =
   | { readonly type: 'progress'; readonly done: number; readonly total: number }
   | { readonly type: 'curves'; readonly curves: ReturnType<typeof runSweep>; readonly load: ReturnType<typeof loadLine> }
+  | { readonly type: 'bodePoint'; readonly point: BodePoint; readonly done: number; readonly total: number }
+  | { readonly type: 'bodeDone'; readonly points: readonly BodePoint[] }
   | { readonly type: 'error'; readonly message: string };
 
 const post = (reply: WorkerReply) => (self as unknown as { postMessage: (m: WorkerReply) => void }).postMessage(reply);
@@ -28,6 +32,9 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       });
       const load = msg.netlist && msg.request.mode === 'output' ? loadLine(msg.netlist, msg.dutId, msg.labels) : null;
       post({ type: 'curves', curves, load });
+    } else if (msg.kind === 'bode') {
+      const points = measureBode(msg.request, (point, i, total) => post({ type: 'bodePoint', point, done: i + 1, total }));
+      post({ type: 'bodeDone', points });
     }
   } catch (err) {
     post({ type: 'error', message: err instanceof Error ? err.message : String(err) });

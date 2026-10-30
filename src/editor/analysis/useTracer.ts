@@ -79,7 +79,7 @@ export function useTracer(doc: CircuitDoc, connectivity: Connectivity, selected:
       if (reply.type === 'progress') setProgress({ done: reply.done, total: reply.total });
       else {
         if (reply.type === 'curves') setResult({ key: k, curves: reply.curves, load: reply.load });
-        else setError(reply.message);
+        else if (reply.type === 'error') setError(reply.message);
         setProgress(null);
         w.terminate();
         if (worker.current === w) worker.current = null;
