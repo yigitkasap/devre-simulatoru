@@ -2111,3 +2111,32 @@ baraj sayfasının panelleri (sahne çizimi şimdilik gündüz; baraj sayfası B
   kalıyor, Koyu ve tarayıcı çubuğu rengi, baraj sayfası aynı ayar, telefonda ⋯ → Tema 44 px).
   Baraj maddesinde odağı bırakmak için üst çubukta sabit bir noktaya tıklanıyordu; o nokta "Tek ışık"
   düğmesine denk gelebildiği için başlığa tıklanacak biçimde düzeltildi (160 madde).
+
+### Analiz katmanı (2026-10-30)
+
+Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motoruna dokunulmadı; analiz yalnızca
+`CircuitSimulator`'ın var olan arabirimini kullanır (`advance`, `runUntil`, `measure`, `voltageAt`,
+`status`, `watch`). Grafikler elle çizilen SVG'dir: grafik kütüphanesi eklenmedi.
+
+- **Çekmece (N1, N9):** üst çubukta Örnekler'in yanında "Analiz" (basılıyken `aria-pressed`). Tezgâhın
+  (şema ya da 3B) altında 380 px; üstteki tutamaktan (fare ya da ↑ ↓) boyu değişir, Büyüt ve Kapat.
+  Sekmeler Grafik | Tablo | Eğri izleyici | Bode. Telefonda ⋯ → Analiz alt sayfası: tam genişlik
+  sekmeler, başlıkta Oynat / Duraklat (sağ alttaki Oynat düğmesi sayfa açıkken gizli), altta sabit
+  "Tabloya ekle" ve "CSV paylaş".
+- **Grafik (A1):** "İz ekle", sonra şemada tıklama: parça → akımı (pin 0'dan pin 1'e), düğüm (kablo ya
+  da uç) → toprağa göre gerilimi; ilk düğümden sonra ikinci düğüm fark gerilimi, "Toprağa göre ekle"
+  tek düğüm (Esc vazgeçer; 3B'deyken şemaya geçilir). Adlar `V(C1)` (öbür ucu toprakta olan iki uçlu
+  parça), `I(R1)`, `V(C1, R1 1)`; şemada her iz kendi renginde etiketle (`--color-tr-1…6`, iki temada).
+  Yalnız seçili izler kaydedilir (`analysis/recorder.ts`). Örnekler sabit aralıkta: kare başına ≈ 3
+  örnek (×1'de 5 ms); AC kaynağı olmayan devrede karenin ilerlemesi örnek anlarında bölünür ve izlenen
+  istatistikler parçalar boyunca birleştirilir. AC kaynaklı devrede bölmek karenin ortalamalarını
+  (kablo rengi, LED parlaklığı) son parçaya indirirdi: orada karede bir örnek alınır ve bu yazılır.
+  Bellek 20 000 örnekte dolar; her ikinci örnek atılır, aralık iki katına çıkar. Solda gerilim, sağda
+  akım ekseni (yazıları izin renginde); sürüklenebilir imleç (klavyeyle ← → Home End), değer kutusu ve
+  "Tabloya ekle". PNG (tema renkleri yazılır) ve CSV (noktalı virgül, ondalık virgül, BOM); telefonda
+  CSV `navigator.share` ile, yoksa indirilir.
+- **Kayıt:** izler ve tablo devreyle birlikte kaydedilir (otomatik kayıt ve indirilen dosyada
+  `analysis` alanı); devrenin yapı anahtarına ve geri alma geçmişine girmez, tablo yazarken simülasyon
+  yeniden kurulmaz. Paylaşım bağlantısına girmez.
+- Testler `tests/analiz-grafik.test.ts`: RC dolmada kayıt tasarımın referans verisiyle
+  (`tests/veri/veri-rc-dolma.json`) %0,1 içinde; ios-kontrol "Analiz" maddeleri.

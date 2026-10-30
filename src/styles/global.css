@@ -189,6 +189,17 @@
   --breakpoint-wide: 1280px;
 }
 
+/* Analiz izleri (grafik, eğri izleyici, Bode): sırayla mavi, kiremit, yeşil, mor, hardal, camgöbeği.
+   Yalnızca var() ile kullanılır; @theme'de kullanılmayan belirteçler derlemede atıldığı için burada. */
+:root {
+  --color-tr-1: #1f6feb;
+  --color-tr-2: #c2410c;
+  --color-tr-3: #1b7d44;
+  --color-tr-4: #7c3aed;
+  --color-tr-5: #a16207;
+  --color-tr-6: #0e7490;
+}
+
 /* Koyu tema: <html data-theme="dark"> (Ayarlar → Tema: Sistem / Açık / Koyu; theme.ts). Her belirtecin
    koyu karşılığı; yeni anlamlı renk yok. Dolgu renkleri (accent, ok, danger) beyaz yazıyla en az
    4,3:1, yazı tonları (-ink, muted) koyu panelde en az 6:1. Yazdırırken her zaman açık tema. */
@@ -238,6 +249,12 @@
     --color-pin: #f26a3d;
     --color-wire-off: #6c7783;
     --color-earth: #3fae6b;
+    --color-tr-1: #5b9bff;
+    --color-tr-2: #f0793a;
+    --color-tr-3: #3fbf74;
+    --color-tr-4: #b28cf5;
+    --color-tr-5: #e0b23a;
+    --color-tr-6: #2bb3c9;
 
     --color-rack: #1d252e;
     --color-rack-line: #33404d;

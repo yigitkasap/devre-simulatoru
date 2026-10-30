@@ -4,6 +4,10 @@
 import type { ReactNode } from 'react';
 
 export type IconName =
+  | 'chart'
+  | 'table'
+  | 'curve'
+  | 'bode'
   | 'menu'
   | 'pointer'
   | 'wire'
@@ -66,6 +70,15 @@ export type IconName =
   | 'warning';
 
 const PATHS: Record<IconName, ReactNode> = {
+  chart: <path d="M3 3.5v13h14M5.5 13.5l3.5-5 3 2.5 4.5-6" />,
+  table: (
+    <>
+      <rect x="3" y="4" width="14" height="12" rx="1.5" />
+      <path d="M3 8h14M3 12h14M8.5 8v8" />
+    </>
+  ),
+  curve: <path d="M3 3.5v13h14M3.5 15.5c2-6 4-8.5 13-9M3.5 15.5c2.5-3 5-4 13-4.5" />,
+  bode: <path d="M3 5h7.5c1.5 0 2.5 1 3.5 3l3 7.5M3 15.5h14" />,
   menu: <path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13" />,
   pointer: <path d="M5 3l10 6-4.5 1.2L13 15l-2 1-2.4-4.6L5 14z" />,
   wire: (

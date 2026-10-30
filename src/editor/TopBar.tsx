@@ -427,6 +427,9 @@ export interface DeskTopBarProps {
   readonly onShare: () => void;
   readonly onKarta: () => void;
   readonly onExamples: () => void;
+  /** Analiz çekmecesi (grafik, tablo, eğri izleyici, Bode): açık mı, aç / kapat. */
+  readonly analysisOpen: boolean;
+  readonly onAnalysis: () => void;
   readonly onHelp: () => void;
   readonly onWelcome: () => void;
   /** Tablet: aynı çubuk dokunmatik boyutta (44 px düğmeler). */
@@ -467,6 +470,15 @@ export function DeskTopBar(props: DeskTopBarProps) {
       <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} onKarta={props.onKarta} />
       <button type="button" onClick={props.onExamples} className={`flex shrink-0 items-center rounded-md px-3 text-sm font-medium text-ink hover:bg-app ${touch ? 'h-11' : 'h-10'}`}>
         {tr.examples.button}
+      </button>
+      <button
+        type="button"
+        aria-pressed={props.analysisOpen}
+        onClick={props.onAnalysis}
+        className={`flex shrink-0 items-center gap-2 rounded-md px-3 text-sm font-medium ${touch ? 'h-11' : 'h-10'} ${props.analysisOpen ? 'bg-accent-soft font-semibold text-accent-ink' : 'text-ink hover:bg-app'}`}
+      >
+        <Icon name="chart" className="h-[18px] w-[18px]" />
+        {tr.analysis.button}
       </button>
       <span className="flex-1" />
       {!active && <SaveStatus state={props.saveState} />}

@@ -90,6 +90,8 @@ const phoneNotebook = (page) => page.getByRole('region', { name: /^Defter/ });
 const selectedCount = (page) => page.locator('svg.schematic rect[data-selected]').count();
 /** Masaüstünde sağdaki defter (v3). */
 const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
+/** Sayfa (belge) kayıyor mu (dikey ya da yatay). */
+const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);
 /**
  * Bir yazının ekrandaki kontrastı (WCAG): öğenin ekran görüntüsünde en sık görülen renk zemin,
  * yazı rengi hesaplanmış `color`. Zemin WebGL sahnesi olabildiği için piksellerden ölçülür.
@@ -853,6 +855,87 @@ try {
     check('3B: sağ alttaki Şema düğmesi şemaya döndürüyor', (await page.locator('svg.schematic').count()) === 1 && (await page.evaluate(() => window.__tezgah === undefined)));
     await ctx.close();
   }
+  // --- Analiz (docs/tasarim-v3 → "Analiz katmanı", N1, N9): çekmece, izler, kayıt, imleç, CSV / PNG ----
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', acceptDownloads: true });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /^\d*RC dolma/ }).first().click(); await page.waitForTimeout(500);
+    const button = page.getByRole('button', { name: 'Analiz', exact: true });
+    const examplesBox = await page.getByRole('button', { name: 'Örnekler', exact: true }).boundingBox();
+    const buttonBox = await button.boundingBox();
+    await button.click(); await page.waitForTimeout(300);
+    const drawer = page.getByRole('region', { name: 'Analiz' });
+    const dBox = await drawer.boundingBox();
+    const mainBox = await page.locator('main').boundingBox();
+    const nbBox = await notebook(page).boundingBox();
+    const tabs = await drawer.getByRole('tab').allTextContents();
+    check('analiz (masaüstü, N1): üst çubukta Örnekler’in yanında "Analiz" (basılı); tezgâhın altında 380 px çekmece, defter yerinde; sekmeler Grafik | Tablo | Eğri izleyici | Bode',
+      buttonBox !== null && examplesBox !== null && buttonBox.x > examplesBox.x && buttonBox.x - (examplesBox.x + examplesBox.width) < 24 && (await button.getAttribute('aria-pressed')) === 'true' &&
+      dBox !== null && Math.abs(dBox.height - 380) < 2 && mainBox !== null && dBox.y >= mainBox.y + mainBox.height - 1 && nbBox !== null && nbBox.x >= dBox.x + dBox.width - 1 && tabs.join('|') === 'Grafik|Tablo|Eğri izleyici|Bode',
+      `${Math.round(dBox?.height ?? 0)} px · ${tabs.join('|')}`);
+    // İz ekle: kabloya tıkla (düğüm, toprağa göre), parçaya tıkla (akım).
+    await drawer.getByRole('button', { name: 'İz ekle' }).click(); await page.waitForTimeout(150);
+    let at = await screen(page, 28, -8); await page.mouse.click(at.x, at.y); await page.waitForTimeout(150);
+    const pickText = (await drawer.getByRole('status').textContent().catch(() => '')) ?? '';
+    await drawer.getByRole('button', { name: 'Toprağa göre ekle' }).click(); await page.waitForTimeout(150);
+    await drawer.getByRole('button', { name: 'İz ekle' }).click(); await page.waitForTimeout(150);
+    at = await screen(page, 20, -8); await page.mouse.click(at.x, at.y); await page.waitForTimeout(200);
+    const names = await drawer.locator('b.font-mono').allTextContents();
+    const marks = await page.locator('svg.schematic text').allTextContents();
+    check('analiz: "İz ekle" → düğüme tıklayınca V(C1) (fark için ikinci düğüm sorulur), parçaya tıklayınca I(R1); şemada izin renginde etiketler',
+      pickText.startsWith('C1 seçildi') && names.slice(0, 2).join(',') === 'V(C1),I(R1)' && marks.includes('V(C1)') && marks.includes('I(R1) →'), `${names.slice(0, 2).join(',')} · ${pickText.slice(0, 30)}`);
+    // Kayıt: S1 çalışırken kapanır, kondansatör dolar.
+    const sim = page.getByRole('region', { name: 'Simülasyon' });
+    await sim.getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(150);
+    at = await screen(page, 8, -8); await page.mouse.click(at.x, at.y); await page.waitForTimeout(900);
+    await sim.getByRole('button', { name: 'Duraklat' }).click(); await page.waitForTimeout(400);
+    const info = ((await drawer.locator('dl').textContent()) ?? '').replace(/\s+/g, ' ');
+    const chartLabel = (await drawer.getByRole('img').getAttribute('aria-label')) ?? '';
+    const slider = drawer.getByRole('slider', { name: 'İmleç zamanı' });
+    await slider.focus(); await page.keyboard.press('End'); await page.waitForTimeout(150);
+    const endValue = ((await drawer.locator('.shadow-lg').first().textContent()) ?? '').replace(/\s+/g, ' ');
+    check('analiz: kayıt yalnız seçili izler, 5 ms aralıkla; grafik role="img" açıklamalı; imleç klavyeyle sona gidiyor, değer kutusunda V(C1) ≈ 9,9 V',
+      /Aralık ?5 ms · \d{2,} nokta/.test(info) && chartLabel.startsWith('Grafik: V(C1), I(R1)') && /V\(C1\) ?9,[89]\d\d V/.test(endValue), `${info} · ${endValue.slice(0, 60)}`);
+    await drawer.getByRole('button', { name: 'Tabloya ekle' }).click(); await page.waitForTimeout(200);
+    const [csv] = await Promise.all([page.waitForEvent('download'), drawer.getByRole('button', { name: 'CSV indir' }).click()]);
+    const csvText = Buffer.concat(await (await csv.createReadStream()).toArray()).toString('utf8');
+    const [png] = await Promise.all([page.waitForEvent('download'), drawer.getByRole('button', { name: 'PNG' }).click()]);
+    check('analiz: "Tabloya ekle" imleçteki değerleri tabloya geçiriyor; CSV (noktalı virgül, ondalık virgül) ve PNG indiriliyor',
+      /^grafik-verisi-.*\.csv$/.test(csv.suggestedFilename()) && csvText.startsWith('﻿t (s);V(C1) (V);I(R1) (A)') && /\r\n0,00\d+;/.test(csvText) && /^grafik-.*\.png$/.test(png.suggestedFilename()),
+      `${csv.suggestedFilename()} · ${png.suggestedFilename()}`);
+    await drawer.getByRole('tab', { name: 'Tablo' }).click(); await page.waitForTimeout(150);
+    const tableText = (await drawer.getByRole('tabpanel').textContent()) ?? '';
+    const sep = drawer.getByRole('separator', { name: 'Analiz çekmecesinin yüksekliği' });
+    await sep.focus(); await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp'); await page.waitForTimeout(150);
+    const taller = (await drawer.boundingBox())?.height ?? 0;
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).analysis ?? null);
+    check('analiz: Tablo sekmesinde eklenen satırlar; tutamak (↑) çekmeceyi büyütüyor; izler ve tablo devreyle kaydediliyor',
+      tableText.includes('V(C1)') && tableText.includes('imleç') && Math.abs(taller - 420) < 2 && saved?.traces?.length === 2 && saved?.rows?.length === 2, `${Math.round(taller)} px · ${saved?.traces?.length}/${saved?.rows?.length}`);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'RC dolma');
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(500);
+    const sheet = page.getByRole('region', { name: 'Analiz' });
+    await sheet.getByRole('button', { name: 'İz ekle' }).tap(); await page.waitForTimeout(200);
+    const at = await screen(page, 28, -8);
+    await page.touchscreen.tap(at.x, at.y); await page.waitForTimeout(250);
+    await sheet.getByRole('button', { name: 'Toprağa göre ekle' }).tap(); await page.waitForTimeout(250);
+    const chips = await sheet.locator('span.font-mono').allTextContents();
+    const tabSizes = await sheet.getByRole('tab').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+    const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab]')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 16), w: r.width, h: r.height }; }).filter((r) => r.w > 0 && (r.h < 43.5 || r.w < 35)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
+    const bottom = await sheet.getByRole('button', { name: 'CSV paylaş' }).boundingBox();
+    check('analiz (telefon, N9): ⋯ → Analiz alt sayfası; dört sekme, + İz ile şemadan V(C1); hedefler ≥ 44 px; altta "Tabloya ekle" ve "CSV paylaş"; sayfa kaymıyor',
+      chips.includes('V(C1)') && tabSizes.length === 4 && tabSizes.every((h) => h >= 44) && small.length === 0 && bottom !== null && bottom.y + bottom.height <= 844 && !(await pageScrolls(page)),
+      small.join(', ') || chips.join(','));
+    await page.context().close();
+  }
   // --- Ölçü aletinin okuması her yerde aynı: şema göstergesi, defter kartı, 3B etiketi, 3B ekranı ----
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
@@ -1494,7 +1577,6 @@ try {
 
   // --- Baraj sayfası (/baraj/): v3 düzeni (docs/tasarim-v3 → B1–B5) ---------------------------
   const BARAJ = `${URL0.replace(/\/?$/, '/')}baraj/`;
-  const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);
   /** Su seviyesi (%): üst çubuktaki seviye çubuğunun değeri. */
   const barajLevel = async (pg) => Number(await pg.getByRole('slider', { name: 'Su seviyesi' }).first().getAttribute('aria-valuenow'));
   /** Seçili su akışı (düğmeler yalnızca simge: adı aria-label'da). */

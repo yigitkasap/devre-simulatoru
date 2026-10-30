@@ -175,6 +175,8 @@ export interface MoreSheetProps {
   readonly onSettings: (patch: Partial<Settings>) => void;
   readonly onClose: () => void;
   readonly onExamples: () => void;
+  /** Analiz alt sayfası (N9). */
+  readonly onAnalysis: () => void;
   readonly onFile: () => void;
   readonly onFit: () => void;
   readonly onShare: () => void;
@@ -186,11 +188,12 @@ export interface MoreSheetProps {
 
 const THEME_CHOICES = ['system', 'light', 'dark'] as const;
 
-export function MoreSheet({ settings, onSettings, onClose, onExamples, onFile, onFit, onShare, onTour, onWelcome, onTheme }: MoreSheetProps) {
+export function MoreSheet({ settings, onSettings, onClose, onExamples, onAnalysis, onFile, onFit, onShare, onTour, onWelcome, onTheme }: MoreSheetProps) {
   const [tab, setTab] = useState<'help' | 'settings'>('help');
   // v3: devrenin adı durum satırını açar; Dosya ve Örnekler buradan.
   const quick: Array<{ icon: IconName; label: string; run: () => void; pressed?: boolean }> = [
     { icon: 'book', label: tr.phone.examples, run: onExamples },
+    { icon: 'chart', label: tr.analysis.button, run: onAnalysis },
     { icon: 'file', label: tr.phone.file, run: onFile },
     { icon: 'share', label: tr.phone.share, run: onShare },
     { icon: 'fit', label: tr.bench.fit, run: onFit },

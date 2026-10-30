@@ -9,6 +9,7 @@
 // }
 
 import type { PropValue } from '../sim/netlist';
+import { serializeAnalysis, type AnalysisDoc } from './analysis';
 import { isDeviceType } from './catalog';
 import { DOC_VERSION, type CircuitDoc, type Part, type Point, type Rotation, type Wire } from './types';
 import { normalizePoints } from './wires';
@@ -25,10 +26,14 @@ interface SerializedDoc {
     props: Record<string, PropValue>;
   }>;
   wires: Array<{ id: string; points: Array<[number, number]> }>;
+  /** Analiz katmanı (izler, ölçüm tablosu); devrenin bağlantısına girmez. */
+  analysis?: Record<string, unknown>;
 }
 
-export function toSerializable(doc: CircuitDoc): SerializedDoc {
+export function toSerializable(doc: CircuitDoc, analysis?: AnalysisDoc): SerializedDoc {
+  const extra = analysis ? serializeAnalysis(analysis) : undefined;
   return {
+    ...(extra ? { analysis: extra } : {}),
     version: doc.version,
     parts: doc.parts.map((p) => ({
       id: p.id,
@@ -43,8 +48,8 @@ export function toSerializable(doc: CircuitDoc): SerializedDoc {
   };
 }
 
-export function serializeDoc(doc: CircuitDoc): string {
-  return JSON.stringify(toSerializable(doc));
+export function serializeDoc(doc: CircuitDoc, analysis?: AnalysisDoc): string {
+  return JSON.stringify(toSerializable(doc, analysis));
 }
 
 const ROTATIONS: readonly number[] = [0, 90, 180, 270];

@@ -9,6 +9,7 @@ import type { CircuitDoc } from '../model/types';
 import { numProp } from '../sim/netlist';
 import {
   CircuitSimulator,
+  type KeyStats,
   LED_NOMINAL_CURRENT,
   OscilloscopeDevice,
   ledBrightness,
@@ -18,6 +19,8 @@ import {
   type Measurement,
   type ScopeRecorder,
 } from '../sim';
+import type { TraceDef } from '../model/analysis';
+import { advanceRecorded, TraceRecorder } from './analysis/recorder';
 import { SimAudio } from './audio';
 import { IonPhases } from './ions';
 import { DISPLAY_WINDOW, LiveWindow, METER_REFRESH, NodeWindow, meterReadings, type LiveSummary, type NodeSummary } from './liveReadout';
@@ -25,6 +28,8 @@ import { buildScopeView, type ChannelStats, type ScopeView } from './scopeView';
 import type { LiveVisual } from './symbols';
 
 export type SimStatus = 'stopped' | 'running' | 'paused';
+
+const NO_TRACES: readonly TraceDef[] = [];
 
 export interface PartFlow {
   /** Pin 0'dan pin 1'e akan akım (A). */
@@ -109,6 +114,8 @@ export interface SimulationApi {
   readonly repair: (partId: string) => void;
   /** Çalışan simülasyondaki bir osiloskobun kaydı (Oto ayar için); yoksa null. */
   readonly scopeRecorder: (partId: string) => ScopeRecorder | null;
+  /** Analiz → Grafik: seçili izlerin kaydı (yalnızca iz varken örneklenir). */
+  readonly traceRecorder: TraceRecorder;
 }
 
 /**
@@ -155,6 +162,8 @@ export function useSimulation(
   sound = true,
   /** Canlı ölçümleri gösterilen parçalar: her adımda istatistikleri tutulur. */
   watched: readonly string[] = [],
+  /** Analiz grafiğinin izleri: yalnızca bunlar kaydedilir. */
+  traces: readonly TraceDef[] = NO_TRACES,
 ): SimulationApi {
   const watchedRef = useRef(watched);
   watchedRef.current = watched;
@@ -166,6 +175,10 @@ export function useSimulation(
   /** Ölçü aletlerinin son okuması, yaşı (s) ve yenilenme sayacı. */
   const meterHold = useRef({ texts: new Map() as ReadonlyMap<string, string>, age: Infinity, tick: 0 });
   const simRef = useRef<CircuitSimulator | null>(null);
+  const recorderRef = useRef<TraceRecorder | null>(null);
+  if (recorderRef.current === null) recorderRef.current = new TraceRecorder();
+  const recorder = recorderRef.current;
+  useEffect(() => recorder.setTraces(traces), [recorder, traces]);
   const audio = useRef<SimAudio | null>(null);
   const soundRef = useRef(sound);
   soundRef.current = sound;
@@ -207,7 +220,7 @@ export function useSimulation(
    * AC devrede kablo renkleri, akım noktaları ve LED parlaklığı karenin ortalamasından çizilir:
    * anlık değerler kare hızında örneklenince titrer ya da yanıltıcı biçimde yavaş dalgalanırdı.
    */
-  const buildFrame = useCallback((sim: CircuitSimulator, dtReal: number, lagging = false): SimFrame => {
+  const buildFrame = useCallback((sim: CircuitSimulator, dtReal: number, lagging = false, merged: ReadonlyMap<string, ReadonlyMap<string, KeyStats>> | null = null): SimFrame => {
     const { doc: d, flowGraph: graph, electronFlow: electrons, connectivity: conn } = latest.current;
     const vmax = Math.max(sim.maxSourceVoltage(), 1e-6);
     const direction = electrons ? -1 : 1;
@@ -347,7 +360,8 @@ export function useSimulation(
     for (const id of watchedRef.current) {
       let w = windows.get(id);
       if (!w) windows.set(id, (w = new LiveWindow()));
-      w.add(sim.watchedStats(id), dtReal);
+      // Kayıt kareyi parçalara böldüyse istatistikler bütün parçaların birleşimi.
+      w.add(merged ? (merged.get(id) ?? null) : sim.watchedStats(id), dtReal);
       if (w.summary) summaries.set(id, w.summary);
     }
 
@@ -403,6 +417,8 @@ export function useSimulation(
     if (!sim) {
       // Yeni simülasyon: LED'ler onarılmış, kondansatörler başlangıç geriliminde başlar.
       sim = new CircuitSimulator(latest.current.connectivity.netlist);
+      // Yeni kayıt (grafik): AC kaynaklı devrede karede bir örnek.
+      recorder.reset(0, speedRef.current, sim.hasAcSources);
       simRef.current = sim;
       // Osiloskoplar ekranı karede bir yakalar (buildFrame'de yeniden kurulur).
       for (const device of sim.devices) if (device instanceof OscilloscopeDevice) device.recorder.perFrame = true;
@@ -437,10 +453,14 @@ export function useSimulation(
     [buildFrame],
   );
 
-  const setSpeed = useCallback((value: number) => {
-    speedRef.current = value;
-    setSpeedState(value);
-  }, []);
+  const setSpeed = useCallback(
+    (value: number) => {
+      speedRef.current = value;
+      setSpeedState(value);
+      recorder.setSpeed(simRef.current?.time ?? 0, value);
+    },
+    [recorder],
+  );
 
   // Devrenin yapısı değişirse (parça/kablo eklenip silinirse ya da taşınırsa) simülasyon durur.
   useEffect(() => {
@@ -484,7 +504,10 @@ export function useSimulation(
       sim.watch(watchedRef.current);
       // Süre sınırı çağrı anından (rAF zaman damgası karenin başı: önceki karenin çizimi o süreyi yemiş olabilir).
       const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.maxTimeStep) * 8 + 64);
-      const result = sim.advance(simDt, maxSteps, performance.now() + FRAME_COMPUTE_MS);
+      // İz varsa kayıt: AC kaynaksız devrede kare örnek anlarında bölünür (istatistikler birleştirilir).
+      if (recorder.active && recorder.count === 0 && recorder.due < sim.time) recorder.reset(sim.time, speedRef.current, sim.hasAcSources);
+      const recorded = recorder.active ? advanceRecorded(sim, simDt, maxSteps, performance.now() + FRAME_COMPUTE_MS, recorder, watchedRef.current) : null;
+      const result = recorded ? recorded.result : sim.advance(simDt, maxSteps, performance.now() + FRAME_COMPUTE_MS);
       // Bütçe bittiyse istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
       lagSamples = (lagSamples * 0.9) + (result.truncated ? 0.1 : 0);
       if (!result.ok) {
@@ -493,18 +516,18 @@ export function useSimulation(
         setFrame(buildFrame(sim, 0));
         return;
       }
-      setFrame(buildFrame(sim, dtReal, lagSamples > 0.5));
+      setFrame(buildFrame(sim, dtReal, lagSamples > 0.5, recorded?.stats ?? null));
       audio.current?.render(sim.devices, sim.time, soundRef.current && speedRef.current === 1 && lagSamples <= 0.5);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [status, buildFrame, setStatus]);
+  }, [status, buildFrame, setStatus, recorder]);
 
   const scopeRecorder = useCallback((partId: string) => {
     const device = simRef.current?.device(partId);
     return device instanceof OscilloscopeDevice ? device.recorder : null;
   }, []);
 
-  return { status, frame, notice, speed, setSpeed, play, pause, stop, repair, scopeRecorder };
+  return { status, frame, notice, speed, setSpeed, play, pause, stop, repair, scopeRecorder, traceRecorder: recorder };
 }

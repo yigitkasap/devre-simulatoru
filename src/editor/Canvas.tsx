@@ -18,7 +18,7 @@ import {
 import { tr } from '../i18n/tr';
 import { CATALOG, isDeviceType, type Box } from '../model/catalog';
 import type { Connectivity } from '../model/connectivity';
-import { pinKey } from '../model/connectivity';
+import { pinKey, wireKey } from '../model/connectivity';
 import { addPart, addWire, moveSelection, removeItems, replaceWirePoints, updatePart } from '../model/docOps';
 import { partAxis, type FlowGraph } from '../model/flow';
 import {
@@ -202,7 +202,26 @@ export interface CanvasProps {
   readonly zeroPoints?: readonly { readonly at: Point; readonly grounded: boolean }[];
   /** Yanan LED balonundaki "Neden?": Mesajlar sekmesinde açıklama. */
   readonly onExplain?: (partId: string) => void;
+  /**
+   * Analiz → "İz ekle": tıklanan parça ya da düğüm (pin veya kablo) bildirilir; tuvalin öbür işleri
+   * (seçim, kablo çekme) bu sırada yapılmaz.
+   */
+  readonly onPick?: ((target: PickTarget) => void) | null;
+  /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
+  readonly marks?: readonly CanvasMark[];
   readonly ref?: Ref<CanvasHandle>;
+}
+
+/** "İz ekle"de tıklanan şey: parça (akım) ya da düğüm (gerilim; anahtar ve tıklanan ızgara noktası). */
+export type PickTarget = { readonly kind: 'part'; readonly partId: string } | { readonly kind: 'node'; readonly key: string; readonly at: Point };
+
+/** Şemadaki iz etiketi (renkli hap ve nokta) ya da bekleyen seçimin halkası. */
+export interface CanvasMark {
+  readonly at: Point;
+  readonly text: string;
+  /** CSS rengi (tema belirteci). */
+  readonly color: string;
+  readonly kind: 'pill' | 'ring';
 }
 
 type Hit =
@@ -320,6 +339,8 @@ export function Canvas({
   nodeLabels,
   zeroPoints,
   onExplain,
+  onPick,
+  marks,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -911,6 +932,20 @@ export function Canvas({
     }
     if (pointers.current.size > 2) return;
 
+    // Analiz → İz ekle: parça akımı ya da düğüm gerilimi seçilir.
+    if (onPick && e.button === 0) {
+      const g = toGrid(e.clientX, e.clientY);
+      const hit = hitTest(g);
+      if (hit?.kind === 'part') onPick({ kind: 'part', partId: hit.partId });
+      else if (hit?.kind === 'pin') onPick({ kind: 'node', key: pinKey(hit.partId, hit.index), at: hit.pos });
+      else if (hit?.kind === 'wire') {
+        const wire = doc.wires.find((w) => w.id === hit.wireId)!;
+        onPick({ kind: 'node', key: wireKey(wire.id), at: snapToSegment(g, wire.points[hit.segment]!, wire.points[hit.segment + 1]!) });
+      }
+      e.preventDefault();
+      return;
+    }
+
     if (phone && e.button === 0) {
       phonePointerDown(e, phone.mode);
       return;
@@ -1493,7 +1528,7 @@ export function Canvas({
     <div className="absolute inset-0 overflow-hidden bg-paper">
       <svg
         ref={svgRef}
-        className={`schematic block h-full w-full ${cursorClass}`}
+        className={`schematic block h-full w-full ${onPick ? 'cursor-crosshair' : cursorClass}`}
         // iOS/WebKit, touch-action: none bölgesini üstüne binen katmanlara da uygulayabiliyor; o zaman
         // tuvalin üstündeki çekmece ya da pencere parmakla kaydırılamıyor. Katman açıkken kapatılır.
         style={overlayOpen ? { touchAction: 'auto' } : undefined}
@@ -1680,6 +1715,24 @@ export function Canvas({
               </text>
             </g>
           ))}
+
+          {marks?.map((mark) => {
+            const x = mark.at.x * GRID;
+            const y = mark.at.y * GRID;
+            if (mark.kind === 'ring') {
+              return <circle key={`r${mark.text}`} cx={x} cy={y} r={9} fill="none" stroke={mark.color} strokeWidth={2} strokeDasharray="4 3" pointerEvents="none" />;
+            }
+            const w = mark.text.length * 6 + 14;
+            return (
+              <g key={`m${mark.text}${x},${y}`} pointerEvents="none" aria-hidden="true">
+                <circle cx={x} cy={y} r={4} fill={mark.color} stroke="var(--color-paper)" strokeWidth={1.5} />
+                <rect x={x - w / 2} y={y - 30} width={w} height={17} rx={8.5} fill={mark.color} />
+                <text x={x} y={y - 18.5} textAnchor="middle" fontSize={9.5} fontWeight={700} fontFamily="var(--font-mono)" fill="#ffffff">
+                  {mark.text}
+                </text>
+              </g>
+            );
+          })}
 
           {doc.parts.map((part) =>
             pinPositions(part).map((pos, i) =>

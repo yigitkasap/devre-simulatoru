@@ -17,7 +17,10 @@ import { compileNetlist, scopeSettings, type CompiledCircuit, type Diagnostic } 
 import { loadArduinoRuntime } from '../sim/arduino/runtime';
 import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
 import { formatSI } from '../sim/units';
-import { loadSavedDoc, useAutosave } from './autosave';
+import { AnalysisDrawer, AnalysisSheetBody, DEFAULT_DRAWER, MIN_DRAWER } from './analysis/AnalysisPanel';
+import { useAnalysis } from './analysis/useAnalysis';
+import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
+import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
 import { BottomSheet, SheetHeader, type SheetSize } from './BottomSheet';
 import { BenchView, ViewToggle, useViewMode } from './BenchView';
 import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type PhoneCanvas } from './Canvas';
@@ -59,11 +62,12 @@ import { useLayout } from './useLayout';
 import { useSimulation } from './useSimulation';
 
 /** Açılışta: adreste paylaşım bağlantısı varsa o devre, yoksa otomatik kayıt, o da yoksa boş devre. */
-function initialDoc(): { doc: CircuitDoc; shared: 'loaded' | 'error' | null } {
+function initialDoc(): { doc: CircuitDoc; analysis: AnalysisDoc; shared: 'loaded' | 'error' | null } {
   const shared = docFromHash(window.location.hash);
   if (shared !== undefined) clearHash();
-  if (shared) return { doc: shared, shared: 'loaded' };
-  return { doc: loadSavedDoc() ?? emptyDoc(), shared: shared === null ? 'error' : null };
+  if (shared) return { doc: shared, analysis: EMPTY_ANALYSIS, shared: 'loaded' };
+  const saved = loadSavedDoc();
+  return { doc: saved ?? emptyDoc(), analysis: saved ? loadSavedAnalysis() : EMPTY_ANALYSIS, shared: shared === null ? 'error' : null };
 }
 
 /** Osiloskop ekranının bir taraması ≈ 0,2 s sürecek simülasyon hızı (en fazla ×1). */
@@ -133,9 +137,29 @@ export default function Simulator() {
   useEffect(() => {
     if (hasArduino) void loadArduinoRuntime();
   }, [hasArduino]);
-  const saveState = useAutosave(doc);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
+  // Analiz (grafik, tablo, eğri izleyici, Bode): izler ve tablo devreyle birlikte kaydedilir.
+  const notify = useCallback((message: string) => showToast(message), [showToast]);
+  const analysis = useAnalysis(doc, connectivity, initial.analysis, notify);
+  const saveState = useAutosave(doc, analysis.doc);
+  /** Analiz çekmecesinin yüksekliği (masaüstü) ve Büyüt. */
+  const [drawerHeight, setDrawerHeight] = useState(DEFAULT_DRAWER);
+  const [drawerExpanded, setDrawerExpanded] = useState(false);
+  const [analysisSheet, setAnalysisSheet] = useState<SheetSize>('half');
+  const [windowHeight, setWindowHeight] = useState(() => window.innerHeight);
+  useEffect(() => {
+    const onResize = () => setWindowHeight(window.innerHeight);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  /** Çekmece en çok: üst çubuk (60 px) ve tezgâhtan en az 140 px kalır. */
+  const drawerMax = Math.max(MIN_DRAWER, windowHeight - 200);
+  // İz eklerken şema gerekir: 3B'deyken şemaya geçilir.
+  const picking = analysis.pick !== null;
+  useEffect(() => {
+    if (picking && viewMode === 'bench') setViewMode('schematic');
+  }, [picking, viewMode, setViewMode]);
   // Canlı ölçümleri gösterilen parçalar (seçim ve ölçü aletleri): motor bunların istatistiğini tutar
   // (salınan değerlerin kararlı gösterimi). İzleme pahalıdır (bütün parçalar izlenince büyük devrede
   // kare hızı dörtte birine iner), bu yüzden defterin kapalı kartları için: zamanla değişen kaynağı
@@ -150,15 +174,17 @@ export default function Simulator() {
   const watched = useMemo(() => (watchedKey ? [...new Set(watchedKey.split(','))] : []), [watchedKey]);
   /** Defterde kapalı kartı ölçüm gösterebilen parçalar (DC devrede hepsi). */
   const measuredParts = useMemo<ReadonlySet<string> | null>(() => (timeVarying ? new Set(watched) : null), [timeVarying, watched]);
-  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound, watched);
+  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
   const singlePart = selectedParts.length === 1 && selection.wires.length === 0 ? selectedParts[0]! : null;
 
   // --- Yükleme (örnek, dosya, paylaşım bağlantısı, yeni devre) ---------------------------
   /** Yeni bir belge yükler; önceki belge geri alma geçmişinde kalır. */
-  const loadDoc = (next: CircuitDoc, message: string, example: ExampleId | null = null) => {
+  const loadDoc = (next: CircuitDoc, message: string, example: ExampleId | null = null, nextAnalysis: AnalysisDoc = EMPTY_ANALYSIS) => {
     dispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
+    analysis.setDoc(nextAnalysis);
+    analysis.cancelPick();
     dispatch({ type: 'set-tool', tool: { kind: 'select' } });
     setActiveExample(example);
     setConnect(null);
@@ -219,7 +245,7 @@ export default function Simulator() {
   const importFile = async (file: File | undefined) => {
     if (!file) return;
     const next = await readDocFile(file);
-    if (next) loadDoc(next, tr.file.imported);
+    if (next) loadDoc(next.doc, tr.file.imported, null, next.analysis);
     else showToast(tr.file.importError, 'error');
   };
 
@@ -777,6 +803,8 @@ export default function Simulator() {
       nodeLabels={nodeLabels}
       zeroPoints={zeroPoints}
       onExplain={explain}
+      onPick={analysis.pick ? analysis.onPick : null}
+      {...(analysis.open ? { marks: analysis.marks } : {})}
     />
   );
   // Şema | 3B: devre şemada kurulur; 3B tezgâhta aynı devre masada (izlenir, anahtar ve
@@ -848,6 +876,11 @@ export default function Simulator() {
     if (dialogOpen || e.defaultPrevented) return;
     const target = e.target as HTMLElement | null;
     if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+    if (e.key === 'Escape' && analysis.pick) {
+      e.preventDefault();
+      analysis.cancelPick();
+      return;
+    }
     if (e.ctrlKey || e.metaKey) return;
     if (e.altKey) {
       const n = /^Digit([1-3])$/.exec(e.code)?.[1];
@@ -1028,7 +1061,7 @@ export default function Simulator() {
             }}
             onExport={() => {
               setModal(null);
-              downloadDoc(doc);
+              downloadDoc(doc, analysis.doc);
             }}
             onImport={() => {
               setModal(null);
@@ -1048,6 +1081,11 @@ export default function Simulator() {
             onExamples={() => {
               setModal(null);
               setExamplesOpen(true);
+            }}
+            onAnalysis={() => {
+              setModal(null);
+              setAddSheet(null);
+              analysis.setOpen(true);
             }}
             onFile={() => setModal('file')}
             onFit={() => {
@@ -1125,7 +1163,7 @@ export default function Simulator() {
           {wiring && (
             <WiringFooter canUndo={state.past.length > 0} hasStart={connect.start !== null} onUndo={() => dispatch({ type: 'undo' })} onClear={() => setConnect({ start: null })} />
           )}
-          {!wiring && !addSheet && (
+          {!wiring && !addSheet && !analysis.open && (
             <PhoneFabs status={sim.status} canAdd={sim.status === 'stopped'} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={sim.play} onPause={sim.pause} />
           )}
           {addSheet && !wiring && (
@@ -1153,10 +1191,24 @@ export default function Simulator() {
               />
             </BottomSheet>
           )}
+          {analysis.open && !addSheet && !wiring && (
+            <BottomSheet
+              size={analysisSheet}
+              sizes={['half', 'full']}
+              halfRatio={0.72}
+              label={tr.analysis.title}
+              areaHeight={phoneAreaHeight}
+              onHeight={setSheetHeight}
+              onSize={setAnalysisSheet}
+              onClose={() => analysis.setOpen(false)}
+            >
+              <AnalysisSheetBody api={analysis} recorder={sim.traceRecorder} status={sim.status} frame={sim.frame} notify={notify} onClose={() => analysis.setOpen(false)} onPlay={sim.play} onPause={sim.pause} />
+            </BottomSheet>
+          )}
         </div>
         {modals}
         {overlays}
-        <Toast toast={toast} offset={addSheet ? sheetHeight + 12 : wiring ? 92 : 96} onDone={hideToast} />
+        <Toast toast={toast} offset={addSheet || analysis.open ? sheetHeight + 12 : wiring ? 92 : 96} onDone={hideToast} />
       </div>
     );
   }
@@ -1187,11 +1239,13 @@ export default function Simulator() {
           onSpeed={sim.setSpeed}
           fullscreen={fullscreenControls}
           onNew={() => loadDoc(emptyDoc(), tr.file.newDone)}
-          onExport={() => downloadDoc(doc)}
+          onExport={() => downloadDoc(doc, analysis.doc)}
           onImport={() => fileInputRef.current?.click()}
           onShare={() => setShareLink(shareUrl(doc, window.location.href))}
           onKarta={() => setKartaOpen(true)}
           onExamples={() => setExamplesOpen(true)}
+          analysisOpen={analysis.open}
+          onAnalysis={() => analysis.setOpen(!analysis.open)}
           onHelp={() => setHelpOpen(true)}
           onWelcome={() => setWelcomeOpen(true)}
           touch={tablet}
@@ -1202,6 +1256,7 @@ export default function Simulator() {
         {fileInput}
 
         <div className="relative flex min-h-0 flex-1">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 min-w-0 flex-1">
             {canvas}
             {viewMode === 'schematic' &&
@@ -1224,6 +1279,24 @@ export default function Simulator() {
                 />
               ))}
           </main>
+          {analysis.open && (
+            <AnalysisDrawer
+              api={analysis}
+              recorder={sim.traceRecorder}
+              status={sim.status}
+              frame={sim.frame}
+              notify={notify}
+              height={drawerExpanded ? drawerMax : Math.min(drawerHeight, drawerMax)}
+              maxHeight={drawerMax}
+              onHeight={(h) => {
+                setDrawerExpanded(false);
+                setDrawerHeight(h);
+              }}
+              expanded={drawerExpanded}
+              onExpand={() => setDrawerExpanded((x) => !x)}
+            />
+          )}
+          </div>
           {focus.panels.right && (
             // Defter (v3): İncele, Örnek ve Mesajlar sekmeleri yerine tek liste.
             <aside
