@@ -112,6 +112,7 @@ function FileMenu({
   onImport,
   onShare,
   onKarta,
+  onTask,
   title,
 }: {
   onNew: () => void;
@@ -119,6 +120,7 @@ function FileMenu({
   onImport: () => void;
   onShare: () => void;
   onKarta: () => void;
+  onTask: () => void;
   /** Tablet: düğmede "Dosya" yerine devrenin adı (44 px). */
   title?: string;
 }) {
@@ -135,6 +137,7 @@ function FileMenu({
     { icon: 'upload', label: tr.file.importJson, note: tr.file.importNote, action: onImport },
     { icon: 'share', label: tr.file.share, note: tr.file.shareNote, action: onShare, divider: true },
     { icon: 'board', label: tr.karta.open, note: tr.karta.fileNote, action: onKarta },
+    { icon: 'target', label: tr.task.menu, note: tr.task.menuNote, action: onTask },
   ];
   return (
     <div ref={rootRef} className="relative shrink-0">
@@ -426,6 +429,8 @@ export interface DeskTopBarProps {
   readonly onImport: () => void;
   readonly onShare: () => void;
   readonly onKarta: () => void;
+  /** Görev oluştur (C1, N6). */
+  readonly onTask: () => void;
   readonly onExamples: () => void;
   /** Analiz çekmecesi (grafik, tablo, eğri izleyici, Bode): açık mı, aç / kapat. */
   readonly analysisOpen: boolean;
@@ -467,7 +472,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
     <header className="flex h-[60px] shrink-0 items-center gap-2 border-b border-line bg-panel pr-3 pl-4">
       <Logo />
       <h1 className="sr-only">{tr.site.name}</h1>
-      <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} onKarta={props.onKarta} />
+      <FileMenu title={props.title} onNew={props.onNew} onExport={props.onExport} onImport={props.onImport} onShare={props.onShare} onKarta={props.onKarta} onTask={props.onTask} />
       <button type="button" onClick={props.onExamples} className={`flex shrink-0 items-center rounded-md px-3 text-sm font-medium text-ink hover:bg-app ${touch ? 'h-11' : 'h-10'}`}>
         {tr.examples.button}
       </button>

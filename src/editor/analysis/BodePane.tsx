@@ -47,15 +47,21 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   const bode = api.bode;
   const touch = useTouchUi();
   // Kendiliğinden ölçüm: sekme açılınca ve ayarlar değişince (aynı ayarlarla bir kez).
+  // Bağımlılıklar yalnız değerler: simülasyon çalışırken sayfa her karede yeniden çizilir, nesneye
+  // bağlı efekt bekleme süresini her karede sıfırlardı (ölçüm hiç başlamazdı).
   const tried = useRef('');
+  const runRef = useRef(bode.run);
+  runRef.current = bode.run;
+  const busy = bode.progress !== null;
   useEffect(() => {
-    if (!bode.key || bode.progress || bode.resultKey === bode.key || tried.current === bode.key) return undefined;
+    if (!bode.key || busy || bode.resultKey === bode.key || tried.current === bode.key) return undefined;
+    const key = bode.key;
     const timer = window.setTimeout(() => {
-      tried.current = bode.key;
-      bode.run();
+      tried.current = key;
+      runRef.current();
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [bode]);
+  }, [bode.key, bode.resultKey, busy]);
   const [cursor, setCursor] = useState<number | null>(null);
   const field = `w-0 min-w-0 flex-1 rounded-lg border border-line-2 bg-panel px-2 font-mono text-small ${touch ? 'h-11 text-[16px]' : 'h-8'}`;
   const select = `w-full rounded-lg border border-line-2 bg-panel px-2 text-small ${touch ? 'h-11 text-[16px]' : 'h-9'}`;

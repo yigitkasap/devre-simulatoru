@@ -1090,6 +1090,125 @@ try {
       small.join(', '));
     await page.context().close();
   }
+  // --- Görev (C1, N5 öğrenci, N6 hoca): bağlantı + dosya, hedefler canlı, kilitli parçalar, teslim ------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', acceptDownloads: true });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
+    const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    await dlg.getByRole('textbox', { name: 'Görev adı' }).fill('Deney 7 · BJT yükselteç tasarımı');
+    await dlg.getByRole('textbox', { name: 'Yönerge' }).fill('RB ve RC’yi seç. Kazanç 200 ± %10, V_{CE} yaklaşık 6 V olsun.');
+    await dlg.getByRole('button', { name: 'RB', exact: true }).click();
+    await dlg.getByRole('button', { name: 'RC', exact: true }).click();
+    for (let i = 0; i < 3; i++) await dlg.getByRole('button', { name: 'Hedef ekle' }).click();
+    const sels = dlg.getByRole('combobox', { name: 'Hedefin büyüklüğü' });
+    const groups = await sels.first().locator('optgroup').evaluateAll((els) => els.map((e) => e.getAttribute('label')));
+    const nodeOptions = await sels.first().locator('optgroup[label="Düğüm gerilimi"] option').allTextContents();
+    const choose = async (n, text) => sels.nth(n).selectOption(await sels.nth(n).locator('option', { hasText: text }).first().getAttribute('value'));
+    await choose(0, 'VCE · Q1 (DC)'); await choose(1, 'Kazanç |çıkış / giriş|'); await choose(2, 'Üst kesim fH');
+    const vals = dlg.getByRole('textbox', { name: /: hedef değer$/ });
+    await vals.nth(0).fill('6 V'); await vals.nth(0).blur();
+    await vals.nth(1).fill('200'); await vals.nth(1).blur();
+    await dlg.getByRole('combobox', { name: /karşılaştırma/ }).nth(2).selectOption('ge');
+    await vals.nth(2).fill('500k'); await vals.nth(2).blur();
+    await page.waitForTimeout(200);
+    const url = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    const warning = (await dlg.getByRole('note').textContent()) ?? '';
+    const preview = await dlg.getByRole('link', { name: 'Öğrenci gibi önizle' }).getAttribute('target');
+    const [taskFile] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Görev dosyası (.json)' }).click()]);
+    const taskPath = await taskFile.path();
+    const sizeText = (await dlg.getByText(/^Bağlantı [\d,]+ KB$/).textContent().catch(() => '')) ?? '';
+    check('görev (hoca, N6): Dosya → "Görev oluştur"; ad, yönerge, değiştirilebilir parça çipleri, "Yeni parça eklenebilir", hedefler dört grupta (DC çalışma noktası, Bode, düğüm, parça); uyarı kutusu; #g= bağlantısı, önizleme yeni sekmede, görev dosyası',
+      url.startsWith(URL0) && url.includes('#g=') && warning.includes('öğrenci görebilir') && warning.includes('notlu sınav için değil') && preview === '_blank' &&
+      groups.join('|') === 'DC çalışma noktası|Bode|Düğüm gerilimi|Parça ölçümleri (canlı)' && nodeOptions.includes('V(Q1 kollektör)') && /^gorev-deney-7-.*\.json$/.test(taskFile.suggestedFilename()) && sizeText !== '' &&
+      (await dlg.getByRole('alert').count()) === 0,
+      `${url.length} karakter · ${sizeText} · ${taskFile.suggestedFilename()} · ${nodeOptions.join(', ')}`);
+    // 8 KB üstü: pencere söylüyor, dosyayı öneriyor (sıkışmayan uzun yönerge).
+    const noise = Array.from({ length: 2600 }, (_, i) => ((i * 7919) % 9973).toString(36)).join(' ');
+    await dlg.getByRole('textbox', { name: 'Yönerge' }).fill(noise); await page.waitForTimeout(200);
+    const longUrl = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    const alert = (await dlg.getByRole('alert').textContent().catch(() => '')) ?? '';
+    check('görev (hoca): bağlantı 8 KB’ı geçince pencere bunu söylüyor ve görev dosyasını öneriyor',
+      longUrl.length > 8192 && alert.includes('Bağlantı çok uzun') && alert.includes('Görev dosyasını (.json) kullan'), `${longUrl.length} karakter · ${alert.slice(0, 40)}`);
+    await dlg.getByRole('button', { name: 'Kapat' }).click();
+
+    // Öğrenci: bağlantıyla açılır.
+    const st = await ctx.newPage();
+    st.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await st.goto(url, { waitUntil: 'networkidle' }); await st.waitForTimeout(800);
+    const card = st.getByRole('region', { name: /^Görev: Deney 7/ });
+    const cardHtml = (await card.innerHTML().catch(() => '')) ?? '';
+    const chip = (await st.getByText(/^Görev kipi/).textContent().catch(() => '')) ?? '';
+    const pencil = await notebook(st).locator('[data-card]').filter({ has: st.locator('[title="değiştirilebilir"]') }).count();
+    const locks = await notebook(st).locator('[data-card]').filter({ has: st.locator('[title="kilitli"]') }).count();
+    const canvasLocks = await st.locator('svg.schematic g[aria-hidden="true"] circle[r="7.5"]').count();
+    check('görev (öğrenci, N5): defterin en üstünde görev kartı (0 / 3; adlar <sub> ile: VCE, fH; "not vermez"); "Görev kipi · yalnızca RB ve RC değişir"; defterde RB, RC kalemli, öbürleri kilitli; şemada kilit rozetleri',
+      (await card.count()) === 1 && /V<sub[^>]*>CE<\/sub>/.test(cardHtml) && /f<sub[^>]*>H<\/sub>/.test(cardHtml) && !cardHtml.includes('V_') && !cardHtml.includes('f_') && cardHtml.includes('not vermez') &&
+      chip === 'Görev kipi · yalnızca RB ve RC değişir' && pencil === 2 && locks >= 5 && canvasLocks >= 5 && (await card.getByLabel('3 hedefin 0 tanesi tuttu').count()) === 1,
+      `${chip} · kalem ${pencil}, kilit ${locks}, şemada ${canvasLocks}`);
+    // Kilitli Q1'in β'sı değişmiyor, bildirim çıkıyor.
+    const q1Card = notebook(st).locator('[data-card]').filter({ hasText: 'Q1' }).first();
+    await q1Card.click(); await st.waitForTimeout(300);
+    const beta = q1Card.locator('input').first();
+    await beta.fill('300').catch(() => {}); await beta.press('Enter').catch(() => {}); await st.waitForTimeout(400);
+    const toast = (await st.getByText('Bu parça görevde kilitli: değiştirilemez.').count()) > 0;
+    const q1 = await st.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).parts.find((p) => p.label === 'Q1').props.beta);
+    check('görev (öğrenci): kilitli parçanın değeri değiştirilemiyor (Q1 β = 200 kalıyor), "Bu parça görevde kilitli" bildirimi', q1 === 200 && toast, `β = ${q1}`);
+    await st.keyboard.press('Escape');
+    await st.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await st.waitForTimeout(1500);
+    const vce = ((await card.locator('li').first().textContent()) ?? '').replace(/\s+/g, ' ');
+    await card.getByRole('button', { name: 'Bode ile ölç' }).first().click();
+    await st.getByRole('region', { name: 'Analiz' }).getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
+    await st.waitForTimeout(400);
+    const rows = (await card.locator('li').allTextContents()).map((r) => r.replace(/\s+/g, ' '));
+    check('görev (öğrenci): Oynat’la VCE canlı (≈ 6 V, yeşil tik); "Bode ile ölç" Analiz → Bode’u açıp ölçüyor; kazanç ≈ 205,8 ve fH ≈ 1,08 MHz tutuyor (3 / 3); hedef "200 ± %10"',
+      /5,9\d V|6,0\d V/.test(vce) && (await card.getByLabel('3 hedefin 3 tanesi tuttu').count()) === 1 && (await card.getByLabel('Hedef tuttu').count()) === 3 &&
+      rows.some((r) => r.includes('Hedef 200 ± %10') && /20[4-7],\d/.test(r)) && rows.some((r) => /Hedef ≥ 500 kHz.*(0,9\d|1,\d\d) MHz/.test(r)),
+      rows.map((r) => r.slice(-22)).join(' | '));
+    const [sub] = await Promise.all([st.waitForEvent('download'), card.getByRole('button', { name: 'Teslim dosyası (.json)' }).click()]);
+    const subJson = JSON.parse(Buffer.concat(await (await sub.createReadStream()).toArray()).toString('utf8'));
+    check('görev (öğrenci): "Teslim dosyası (.json)" devreyi, görevi ve hedeflerin ölçülen değerlerini indiriyor',
+      /^teslim-deney-7-.*\.json$/.test(sub.suggestedFilename()) && subJson.parts?.length > 0 && subJson.teslim?.hedefler?.length === 3 && subJson.teslim.hedefler.every((h) => h.tuttu === true),
+      sub.suggestedFilename());
+    await card.getByRole('button', { name: 'Görevden çık' }).click(); await st.waitForTimeout(300);
+    const after = await st.evaluate(() => localStorage.getItem('devre-simulatoru:gorev'));
+    check('görev (öğrenci): "Görevden çık" kartı ve kilitleri kaldırıyor', (await card.count()) === 0 && after === null && (await st.getByText(/^Görev kipi/).count()) === 0);
+    // Görev dosyası Dosya → JSON dosyası içe aktar ile açılıyor.
+    await st.locator('input[type=file]').setInputFiles(taskPath); await st.waitForTimeout(600);
+    check('görev: görev dosyası Dosya → JSON dosyası içe aktar ile açılınca görev kartı geliyor', (await st.getByRole('region', { name: /^Görev: Deney 7/ }).count()) === 1);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'BC107 ile ortak emetörlü yükselteç');
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Dosya', exact: true }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('button', { name: /^Görev oluştur/ }).tap(); await page.waitForTimeout(400);
+    const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    await dlg.getByRole('button', { name: 'RC', exact: true }).tap();
+    await dlg.getByRole('button', { name: 'Hedef ekle' }).tap();
+    const sel = dlg.getByRole('combobox', { name: 'Hedefin büyüklüğü' }).first();
+    await sel.selectOption(await sel.locator('option', { hasText: 'Üst kesim fH' }).first().getAttribute('value'));
+    const small = await dlg.evaluate((root) => [...root.querySelectorAll('button, select, input, textarea, a')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height, fs: parseFloat(getComputedStyle(el).fontSize), tag: el.tagName }; })
+      .filter((r) => r.h > 0 && (r.h < 43.5 || (['INPUT', 'SELECT', 'TEXTAREA'].includes(r.tag) && r.fs < 16))).map((r) => `${r.n} ${Math.round(r.h)}/${r.fs}`));
+    const url = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    check('görev (telefon, N6): ⋯ → Dosya → Görev oluştur; hedefler ≥ 44 px, yazı alanları 16 px; sayfa kaymıyor', small.length === 0 && !(await pageScrolls(page)), small.join(', '));
+    // Yalnız # değişirse tarayıcı sayfayı yeniden yüklemez: önce boş sayfa.
+    await page.goto('about:blank'); await page.goto(url, { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const card = page.getByRole('region', { name: /^Görev:/ });
+    const bodeBox = await card.getByRole('button', { name: 'Bode ile ölç' }).boundingBox({ timeout: 5000 }).catch(() => null);
+    check('görev (telefon, N5): görev kartı defterin en üstünde; "Bode ile ölç" ≥ 44 px; yeni parça kapalıyken Kablo bağla ve Parça ekle yok; sayfa kaymıyor',
+      (await card.count()) === 1 && bodeBox !== null && bodeBox.height >= 44 && (await page.getByRole('button', { name: 'Kablo bağla' }).count()) === 0 &&
+      (await page.getByRole('button', { name: 'Parça ekle' }).count()) === 0 && !(await pageScrolls(page)),
+      `Bode ile ölç ${Math.round(bodeBox?.height ?? 0)} px`);
+    await page.context().close();
+  }
   // --- Ölçü aletinin okuması her yerde aynı: şema göstergesi, defter kartı, 3B etiketi, 3B ekranı ----
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });

@@ -21,6 +21,15 @@ import { AnalysisDrawer, AnalysisSheetBody, DEFAULT_DRAWER, MIN_DRAWER } from '.
 import { useAnalysis } from './analysis/useAnalysis';
 import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
+import { parseTask, respectsTask, targetMet, taskFromHash, type TaskDef } from '../model/task';
+import { toSerializable } from '../model/serialize';
+import { datedName, saveFile } from './analysis/format';
+import { plainText } from './Rich';
+import type { EditorAction } from './state';
+import { TaskCard, type TargetStatus } from './task/TaskCard';
+import { slug, TaskDialog } from './task/TaskDialog';
+import { goalText, measureTarget, targetName, targetParts } from './task/targets';
+import { Icon } from './icons';
 import { BottomSheet, SheetHeader, type SheetSize } from './BottomSheet';
 import { BenchView, ViewToggle, useViewMode } from './BenchView';
 import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type PhoneCanvas } from './Canvas';
@@ -62,12 +71,33 @@ import { useLayout } from './useLayout';
 import { useSimulation } from './useSimulation';
 
 /** Açılışta: adreste paylaşım bağlantısı varsa o devre, yoksa otomatik kayıt, o da yoksa boş devre. */
-function initialDoc(): { doc: CircuitDoc; analysis: AnalysisDoc; shared: 'loaded' | 'error' | null } {
-  const shared = docFromHash(window.location.hash);
+const TASK_KEY = 'devre-simulatoru:gorev';
+
+/** Kayıtlı devreyle birlikte açık olan görev (sayfa yenilenince görev kipi sürsün). */
+function loadSavedTask(): TaskDef | null {
+  try {
+    const raw = window.localStorage.getItem(TASK_KEY);
+    return raw ? parseTask(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function initialDoc(): { doc: CircuitDoc; analysis: AnalysisDoc; task: TaskDef | null; shared: 'loaded' | 'error' | 'task' | 'task-error' | null } {
+  // Görev bağlantısı (#g=…, C1): devre ve görev birlikte.
+  const fromTask = taskFromHash(window.location.hash);
+  if (fromTask !== undefined) clearHash();
+  if (fromTask) return { doc: fromTask.doc, analysis: EMPTY_ANALYSIS, task: fromTask.task, shared: 'task' };
+  const shared = fromTask === null ? undefined : docFromHash(window.location.hash);
   if (shared !== undefined) clearHash();
-  if (shared) return { doc: shared, analysis: EMPTY_ANALYSIS, shared: 'loaded' };
+  if (shared) return { doc: shared, analysis: EMPTY_ANALYSIS, task: null, shared: 'loaded' };
   const saved = loadSavedDoc();
-  return { doc: saved ?? emptyDoc(), analysis: saved ? loadSavedAnalysis() : EMPTY_ANALYSIS, shared: shared === null ? 'error' : null };
+  return {
+    doc: saved ?? emptyDoc(),
+    analysis: saved ? loadSavedAnalysis() : EMPTY_ANALYSIS,
+    task: saved ? loadSavedTask() : null,
+    shared: fromTask === null ? 'task-error' : shared === null ? 'error' : null,
+  };
 }
 
 /** Osiloskop ekranının bir taraması ≈ 0,2 s sürecek simülasyon hızı (en fazla ×1). */
@@ -80,7 +110,35 @@ const KartaAktarDialog = lazy(() => import('./KartaAktar'));
 
 export default function Simulator() {
   const [initial] = useState(initialDoc);
-  const [state, dispatch] = useReducer(editorReducer, initial.doc, initialEditorState);
+  const [state, rawDispatch] = useReducer(editorReducer, initial.doc, initialEditorState);
+  /** Görev (C1, öğrenci): kilitli parçalar değişmez; değiştiren düzenleme yapılmaz ve söylenir. */
+  const [task, setTask] = useState<TaskDef | null>(initial.task);
+  useEffect(() => {
+    try {
+      if (task) window.localStorage.setItem(TASK_KEY, JSON.stringify(task));
+      else window.localStorage.removeItem(TASK_KEY);
+    } catch {
+      // Depolama kapalı: görev yalnızca bu oturumda.
+    }
+  }, [task]);
+  const taskRef = useRef(task);
+  taskRef.current = task;
+  const docRef = useRef(state.doc);
+  docRef.current = state.doc;
+  const lockNotice = useRef<{ at: number; show: (message: string) => void }>({ at: 0, show: () => {} });
+  const dispatch = useCallback((action: EditorAction) => {
+    const t = taskRef.current;
+    if (t && (action.type === 'commit' || action.type === 'preview') && !respectsTask(docRef.current, action.doc, t)) {
+      const now = performance.now();
+      if (now - lockNotice.current.at > 1500) {
+        lockNotice.current.at = now;
+        const grows = action.doc.parts.length > docRef.current.parts.length || action.doc.wires.length > docRef.current.wires.length;
+        lockNotice.current.show(grows && !t.allowNew ? tr.task.lockedNew : tr.task.locked);
+      }
+      return;
+    }
+    rawDispatch(action);
+  }, []);
   const [settings, updateSettings] = useSettings();
   const theme = useTheme(settings.theme);
   const layout = useLayout();
@@ -121,6 +179,9 @@ export default function Simulator() {
   const [chainOff, setChainOff] = useState(false);
   const [partDragging, setPartDragging] = useState(false);
   const [toast, showToast, hideToast] = useToast();
+  lockNotice.current.show = (message) => showToast(message, 'error');
+  const [taskDialog, setTaskDialog] = useState(false);
+  const [taskDraft, setTaskDraft] = useState<TaskDef | null>(null);
   // İlk açılış (M01): hoş geldin yalnızca ilk ziyarette (kayıtlı devre ya da paylaşım bağlantısı yoksa).
   const [welcomeOpen, setWelcomeOpen] = useState(() => !welcomeSeen() && initialIsFresh());
   const [helpOpen, setHelpOpen] = useState(false);
@@ -169,23 +230,74 @@ export default function Simulator() {
   const watchedKey = [
     ...selection.parts.slice(0, 8),
     ...doc.parts.filter((p) => p.type === 'voltmeter' || p.type === 'ammeter').map((p) => p.id),
+    // Görev hedeflerinin parçaları (salınan değerin pencere özeti ve DC ortalaması için).
+    ...(task ? targetParts(task.targets) : []),
     ...(timeVarying && !phone ? doc.parts.filter((p) => CARD_WATCHED.has(p.type)).slice(0, 8).map((p) => p.id) : []),
   ].join(',');
   const watched = useMemo(() => (watchedKey ? [...new Set(watchedKey.split(','))] : []), [watchedKey]);
   /** Defterde kapalı kartı ölçüm gösterebilen parçalar (DC devrede hepsi). */
   const measuredParts = useMemo<ReadonlySet<string> | null>(() => (timeVarying ? new Set(watched) : null), [timeVarying, watched]);
   const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
+  // --- Görev (C1, N5): hedeflerin durumu, kart, kilitli / değiştirilebilir parçalar ------------------
+  const bodeFresh = analysis.bode.resultKey === analysis.bode.key;
+  const taskStatuses: TargetStatus[] = task
+    ? task.targets.map((target) => {
+        const { name, unit } = targetName(target.q, doc, analysis.idx);
+        const measured = measureTarget(target.q, sim.frame, doc, analysis.idx, bodeFresh ? analysis.bode.points : null);
+        const shortcut = measured !== null ? null : target.q.kind === 'bode' ? 'bode' : sim.status === 'stopped' ? 'play' : null;
+        return { id: target.id, name, unit, goal: goalText(target, unit), measured, met: targetMet(target, measured), shortcut };
+      })
+    : [];
+  const taskParts = useMemo(
+    () => (task ? { editable: new Set(task.editable), locked: new Set(doc.parts.filter((p) => !task.editable.includes(p.id)).map((p) => p.id)) } : null),
+    [task, doc.parts],
+  );
+  const editableLabels = task ? task.editable.map((id) => doc.parts.find((p) => p.id === id)?.label).filter(Boolean).join(tr.task.and) : '';
+  /** Teslim dosyası: devre (ve analiz) ile görevin hedefleri ve o anki ölçümleri. */
+  const submitTask = () => {
+    if (!task) return;
+    const body = {
+      ...toSerializable(doc, analysis.doc),
+      teslim: {
+        gorev: task.name,
+        tarih: new Date().toISOString(),
+        hedefler: taskStatuses.map((s) => ({ ad: plainText(s.name), hedef: s.goal, olculen: s.measured, birim: s.unit, tuttu: s.met })),
+      },
+    };
+    void saveFile(datedName(`${tr.task.submission}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
+  };
+  const taskCard = task ? (
+    <TaskCard
+      task={task}
+      statuses={taskStatuses}
+      onBode={() => {
+        analysis.setOpen(true);
+        analysis.setTab('bode');
+      }}
+      onPlay={sim.play}
+      onSubmit={submitTask}
+      onExit={() => {
+        setTask(null);
+        showToast(tr.task.exited);
+      }}
+    />
+  ) : null;
+
   const hasSelection = selection.parts.length > 0 || selection.wires.length > 0;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
   const singlePart = selectedParts.length === 1 && selection.wires.length === 0 ? selectedParts[0]! : null;
 
   // --- Yükleme (örnek, dosya, paylaşım bağlantısı, yeni devre) ---------------------------
   /** Yeni bir belge yükler; önceki belge geri alma geçmişinde kalır. */
-  const loadDoc = (next: CircuitDoc, message: string, example: ExampleId | null = null, nextAnalysis: AnalysisDoc = EMPTY_ANALYSIS) => {
-    dispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
+  const loadDoc = (next: CircuitDoc, message: string, example: ExampleId | null = null, nextAnalysis: AnalysisDoc = EMPTY_ANALYSIS, nextTask: TaskDef | null = null) => {
+    // Yeni devre görevin bekçisinden geçmez; görev kipi yalnızca görev dosyasıyla sürer.
+    rawDispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
     analysis.setDoc(nextAnalysis);
     analysis.cancelPick();
-    dispatch({ type: 'set-tool', tool: { kind: 'select' } });
+    const previousTask = task;
+    setTask(nextTask);
+    setTaskDraft(null);
+    rawDispatch({ type: 'set-tool', tool: { kind: 'select' } });
     setActiveExample(example);
     setConnect(null);
     // Telefonda örneğin kartı defterin üstünde: şema kutusu ve defter görünür.
@@ -200,6 +312,7 @@ export default function Simulator() {
       run: () => {
         dispatch({ type: 'undo' });
         setActiveExample(previousExample);
+        setTask(previousTask);
       },
     });
   };
@@ -212,6 +325,8 @@ export default function Simulator() {
   useEffect(() => {
     if (initial.shared === 'loaded') showToast(tr.file.sharedLoaded);
     if (initial.shared === 'error') showToast(tr.file.sharedError, 'error');
+    if (initial.shared === 'task' && initial.task) showToast(tr.task.opened(initial.task.name));
+    if (initial.shared === 'task-error') showToast(tr.task.openError, 'error');
   }, [initial, showToast]);
 
   // iOS Safari dokunuşları sayfaya yalnızca o olay türünü dinleyen bir öğenin alanında iletir. React ise
@@ -245,7 +360,8 @@ export default function Simulator() {
   const importFile = async (file: File | undefined) => {
     if (!file) return;
     const next = await readDocFile(file);
-    if (next) loadDoc(next.doc, tr.file.imported, null, next.analysis);
+    if (next?.task) loadDoc(next.doc, tr.task.opened(next.task.name), null, next.analysis, next.task);
+    else if (next) loadDoc(next.doc, tr.file.imported, null, next.analysis);
     else showToast(tr.file.importError, 'error');
   };
 
@@ -718,6 +834,7 @@ export default function Simulator() {
       issues={issues}
       example={exampleProps}
       devices={deviceHooks}
+      {...(task ? { taskCard, taskParts } : {})}
       {...(viewMode === 'bench'
         ? {
             onFocus3d: (partId: string) => {
@@ -804,6 +921,7 @@ export default function Simulator() {
       zeroPoints={zeroPoints}
       onExplain={explain}
       onPick={analysis.pick ? analysis.onPick : null}
+      taskParts={taskParts}
       {...(analysis.open ? { marks: analysis.marks } : {})}
     />
   );
@@ -1013,7 +1131,24 @@ export default function Simulator() {
     />
   );
 
+  const taskDialogEl = taskDialog && (
+    <TouchUi.Provider value={phone || tablet}>
+      <TaskDialog
+        doc={doc}
+        title={circuitTitle}
+        idx={analysis.idx}
+        traces={analysis.traces}
+        draft={taskDraft}
+        onDraft={setTaskDraft}
+        onClose={() => setTaskDialog(false)}
+        notify={notify}
+      />
+    </TouchUi.Provider>
+  );
+
   if (phone) {
+    // Görev yeni parça ve kablo değişikliğine kapalıysa telefonda Kablo bağla ve Parça ekle gösterilmez.
+    const taskFrozen = task !== null && !task.allowNew;
     const wiring = connect !== null;
     const big = wiring || schematicFull;
     const strip = schematicStrip && !big;
@@ -1058,6 +1193,10 @@ export default function Simulator() {
             onNew={() => {
               setModal(null);
               loadDoc(emptyDoc(), tr.file.newDone);
+            }}
+            onTask={() => {
+              setModal(null);
+              setTaskDialog(true);
             }}
             onExport={() => {
               setModal(null);
@@ -1146,7 +1285,7 @@ export default function Simulator() {
               {canvas}
               {!wiring && (
                 <SchematicButtons
-                  connect={sim.status === 'stopped' && doc.parts.length > 0 && viewMode === 'schematic'}
+                  connect={sim.status === 'stopped' && doc.parts.length > 0 && viewMode === 'schematic' && !taskFrozen}
                   full={schematicFull}
                   raised={schematicFull}
                   onConnect={startConnect}
@@ -1164,7 +1303,7 @@ export default function Simulator() {
             <WiringFooter canUndo={state.past.length > 0} hasStart={connect.start !== null} onUndo={() => dispatch({ type: 'undo' })} onClear={() => setConnect({ start: null })} />
           )}
           {!wiring && !addSheet && !analysis.open && (
-            <PhoneFabs status={sim.status} canAdd={sim.status === 'stopped'} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={sim.play} onPause={sim.pause} />
+            <PhoneFabs status={sim.status} canAdd={sim.status === 'stopped' && !taskFrozen} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={sim.play} onPause={sim.pause} />
           )}
           {addSheet && !wiring && (
             <BottomSheet
@@ -1207,6 +1346,7 @@ export default function Simulator() {
           )}
         </div>
         {modals}
+        {taskDialogEl}
         {overlays}
         <Toast toast={toast} offset={addSheet || analysis.open ? sheetHeight + 12 : wiring ? 92 : 96} onDone={hideToast} />
       </div>
@@ -1243,6 +1383,7 @@ export default function Simulator() {
           onImport={() => fileInputRef.current?.click()}
           onShare={() => setShareLink(shareUrl(doc, window.location.href))}
           onKarta={() => setKartaOpen(true)}
+          onTask={() => setTaskDialog(true)}
           onExamples={() => setExamplesOpen(true)}
           analysisOpen={analysis.open}
           onAnalysis={() => analysis.setOpen(!analysis.open)}
@@ -1259,6 +1400,12 @@ export default function Simulator() {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 min-w-0 flex-1">
             {canvas}
+            {task && (
+              <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft/95 px-3 py-1.5 text-small font-semibold text-accent-ink shadow-sm">
+                <Icon name="target" className="h-4 w-4" />
+                {tr.task.mode(editableLabels)}
+              </p>
+            )}
             {viewMode === 'schematic' &&
               (connect ? (
                 <WiringControls
@@ -1323,6 +1470,7 @@ export default function Simulator() {
           />
         )}
         {examplesDialog}
+        {taskDialogEl}
         {overlays}
         <Toast toast={toast} onDone={hideToast} />
       </div>

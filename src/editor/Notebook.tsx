@@ -74,6 +74,9 @@ export interface NotebookProps extends InspectTabProps {
   readonly onFocus3d?: (partId: string) => void;
   /** Cihaz kartlarının (osiloskop, üreteç, güç kaynağı, hazne) simülasyon bağlantıları. */
   readonly devices: DeviceHooks;
+  /** Görev (öğrenci): defterin en üstündeki kart ve kilitli / değiştirilebilir parçalar. */
+  readonly taskCard?: ReactNode;
+  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string> } | null;
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
@@ -253,6 +256,7 @@ export function Notebook(props: NotebookProps) {
       className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-panel-2 ${touch ? 'p-3' : 'p-4'}`}
       style={props.phone ? { paddingBottom: 'calc(104px + env(safe-area-inset-bottom))' } : undefined}
     >
+      {props.taskCard}
       <Problems {...props} listRef={listRef} />
       {props.example.id && <ExampleCard id={props.example.id} onOpen={props.example.onOpen} onClose={props.example.onClose} />}
       <div className="flex items-baseline justify-between px-0.5 pb-0.5">
@@ -604,9 +608,24 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
     </>
   );
 
+  // Görev: kilitli parçada kilit, değiştirilebilir parçada kalem simgesi ve mavi kenar.
+  const locked = props.taskParts?.locked.has(part.id) ?? false;
+  const editable = props.taskParts?.editable.has(part.id) ?? false;
+  const taskMark = locked ? (
+    <span title={tr.task.lockBadge} className="shrink-0 text-muted">
+      <Icon name="lock" className="h-4 w-4" />
+      <span className="sr-only">{` (${tr.task.lockBadge})`}</span>
+    </span>
+  ) : editable ? (
+    <span title={tr.task.editableBadge} className="shrink-0 text-accent-ink">
+      <Icon name="pencil" className="h-4 w-4" />
+      <span className="sr-only">{` (${tr.task.editableBadge})`}</span>
+    </span>
+  ) : null;
+
   if (!open) {
     return (
-      <div data-card={part.id} data-notebook="card" className="flex shrink-0 flex-col rounded-lg border border-line bg-panel hover:border-line-2">
+      <div data-card={part.id} data-notebook="card" className={`flex shrink-0 flex-col rounded-lg border bg-panel hover:border-line-2 ${editable ? 'border-accent-line shadow-[inset_3px_0_0_var(--color-accent)]' : 'border-line'}`}>
         <button
           type="button"
           data-nav
@@ -637,6 +656,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
           ) : (
             value && <span className={`shrink-0 text-[15px] ${/\d/.test(value) ? 'font-mono tabular' : 'text-ink-2'}`}>{value}</span>
           )}
+          {taskMark}
         </button>
         {sliderRows.length > 0 && <div className="flex flex-col gap-2 px-3.5 pb-3">{sliderRows}</div>}
       </div>

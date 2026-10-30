@@ -4,6 +4,8 @@
 import type { ReactNode } from 'react';
 
 export type IconName =
+  | 'target'
+  | 'pencil'
   | 'chart'
   | 'table'
   | 'curve'
@@ -70,6 +72,14 @@ export type IconName =
   | 'warning';
 
 const PATHS: Record<IconName, ReactNode> = {
+  target: (
+    <>
+      <circle cx="10" cy="10" r="7" />
+      <circle cx="10" cy="10" r="3.5" />
+      <circle cx="10" cy="10" r="0.6" />
+    </>
+  ),
+  pencil: <path d="M4 16l1-4 8.5-8.5a2.1 2.1 0 0 1 3 3L8 15z M12 5l3 3" />,
   chart: <path d="M3 3.5v13h14M5.5 13.5l3.5-5 3 2.5 4.5-6" />,
   table: (
     <>

@@ -153,7 +153,8 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
               <g key={`h${h.y}`}>
                 <line x1={m.l} x2={m.l + pw} y1={Y(h.y)} y2={Y(h.y)} stroke="var(--color-warn)" strokeDasharray="6 4" />
                 {h.label && (
-                  <text x={m.l + 6} y={Y(h.y) - 4} fontSize={10.5} fill="var(--color-warn)">
+                  // Çizginin altında: Bode'da (tek kullanım, −3 dB) eğri çizginin üstünde kalır.
+                  <text x={m.l + 6} y={Y(h.y) + 13} fontSize={10.5} fill="var(--color-warn)">
                     {h.label}
                   </text>
                 )}

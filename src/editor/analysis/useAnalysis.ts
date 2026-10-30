@@ -8,7 +8,7 @@ import { nextTraceColor, type AnalysisDoc, type TableRow, type TraceDef } from '
 import type { Connectivity } from '../../model/connectivity';
 import type { CircuitDoc, Point } from '../../model/types';
 import type { CanvasMark, PickTarget } from '../Canvas';
-import { liveTraces, netIndex, nodeName, traceColor, traceLabel, type TraceLabel } from './traces';
+import { liveTraces, netIndex, nodeName, traceColor, traceLabel, type NetIndex, type TraceLabel } from './traces';
 import { useBode, type BodeApi } from './useBode';
 import { useTracer, type TracerApi } from './useTracer';
 
@@ -50,6 +50,8 @@ export interface AnalysisApi {
   readonly tracer: TracerApi;
   /** Ölçülen Bode (A4). */
   readonly bode: BodeApi;
+  /** Devrenin düğüm dizini (görev hedeflerinin adları ve ölçümü). */
+  readonly idx: NetIndex;
 }
 
 const SEPARATOR_KEY = 'devre-simulatoru:csv-ayirici';
@@ -185,6 +187,7 @@ export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial
     setSeparator,
     tracer,
     bode,
+    idx,
   };
 }
 

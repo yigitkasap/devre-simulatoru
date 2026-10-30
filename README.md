@@ -2185,6 +2185,25 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   kaynağın sınırında kalır ve bu yazılır. Ayrıca periyot başına 64 örnekte 2 MHz kazancı geçmişe göre
   %3 oynuyordu (101,6 / 104,6 kat); 128 örnekte 105,5 kat (256'da 106,1). Tasarımın 2 MHz değeri
   (91,3 kat) ve ondan çıkan f_H ≈ 0,82 MHz büyük olasılıkla kaba örneklemedendir.
+- **Görev (C1, N5 öğrenci, N6 hoca):** Dosya (telefonda ⋯ → Dosya) → "Görev oluştur". Başlangıç şu
+  anki devredir. Alanlar: görev adı, yönerge (`V_{CE}` yazılırsa kartta alt indisle görünür),
+  değiştirilebilir parçalar (çipler), "Yeni parça eklenebilir" ve hedefler (büyüklük, ± / ≥ / ≤, değer,
+  tolerans). Hedef büyüklükleri dört grup: DC çalışma noktası (transistörün V<sub>CE</sub> / I<sub>C</sub>,
+  V<sub>DS</sub> / I<sub>D</sub>'si; pencerenin ortalaması), Bode (orta bant kazancı kat ya da dB,
+  f<sub>H</sub>), düğüm gerilimi (her düğüm toprağa göre; iki düğüm arası için Grafik'teki fark izi)
+  ve parça ölçümleri (canlı gerilim, akım, güç). Bağlantı ve dosya ikisi birden: bağlantı adreste
+  sıkıştırılmış JSON (`#g=`, lz-string; paylaşım bağlantısının `#d=`'si gibi), "Görev dosyası (.json)"
+  aynı içeriği indirir ve Dosya → JSON dosyası içe aktar ile açılır. Bağlantı 8 KB'ı geçerse pencere
+  bunu söyler ve dosyayı önerir. Uyarı kutusu: hedefler bağlantıda, öğrenci görebilir; notlu sınav için
+  değil. Öğrenci: defterin en üstünde görev kartı; hedefler canlı denetlenir (tutunca yeşil tik ve
+  ölçülen değer), ölçülemeyende kısa yol ("Oynat", "Bode ile ölç": Analiz → Bode'u açar, ölçüm
+  kendiliğinden başlar). Kilitli parçanın değeri, yeri ve uçları değişmez (değişiklik uygulanmaz,
+  "Bu parça görevde kilitli" bildirimi); anahtar, potansiyometre, LDR, NTC gibi kullanma denetimleri
+  ve ölçü aletlerinin ayarı serbesttir. Yeni parça kapalıyken kablolar da değişmez; telefonda Kablo
+  bağla ve Parça ekle gizlenir. Şemada kilitli parçalarda kilit rozeti, değiştirilebilenlerde mavi
+  çerçeve; defterde kilit ve kalem simgesi; tuvalin sol üstünde "Görev kipi · yalnızca RB ve RC
+  değişir". "Teslim dosyası (.json)": devre, analiz ve `teslim` alanında hedeflerin ölçülen değerleri.
+  Kart not vermediğini yazar. Görev bu tarayıcıda devreyle birlikte hatırlanır; "Görevden çık" kaldırır.
 - **Kayıt:** izler ve tablo devreyle birlikte kaydedilir (otomatik kayıt ve indirilen dosyada
   `analysis` alanı); devrenin yapı anahtarına ve geri alma geçmişine girmez, tablo yazarken simülasyon
   yeniden kurulmaz. Paylaşım bağlantısına girmez.
@@ -2194,4 +2213,6 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   çıkış ailesi referansla (`tests/veri/veri-bf245a.json`) bütün eğri boyunca %1 içinde (V_DS = 10 V'ta
   4,14 / 3,25 / 2,46 / 1,78 mA), transfer, diyot akım sınırı, BJT β, yük doğrusu (BC107: R_C, 12 V, Q
   doğrunun üstünde); `tests/analiz-bode.test.ts`: sinüs uydurması, BC107'de 1 kHz kazancı 205,5 kat
-  ± %2 ve faz ≈ −180°, referans veriden orta bant ve f_H; ios-kontrol "Analiz" maddeleri.
+  ± %2 ve faz ≈ −180°, referans veriden orta bant ve f_H; `tests/gorev.test.ts`: bağlantı ve dosya,
+  hedef değerlendirme, hedef seçenekleri, kilit kuralları; ios-kontrol "Analiz", "Bode" ve "görev"
+  maddeleri.

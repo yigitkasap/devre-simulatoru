@@ -76,15 +76,21 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
   const { part, params, result, progress } = tracer;
   const q = quantities(tracer);
   // Kendiliğinden tarama: parametreler değişince (kısa bir beklemeyle), aynı parametrelerle bir kez.
+  // Bağımlılıklar yalnız değerler (simülasyon çalışırken her karede yeniden çizilir; bkz. BodePane).
   const tried = useRef('');
+  const runRef = useRef(tracer.run);
+  runRef.current = tracer.run;
+  const busy = progress !== null;
+  const partId = part?.id ?? null;
   useEffect(() => {
-    if (!part || progress || result?.key === tracer.key || tried.current === tracer.key) return undefined;
+    if (!partId || busy || result?.key === tracer.key || tried.current === tracer.key) return undefined;
+    const key = tracer.key;
     const timer = window.setTimeout(() => {
-      tried.current = tracer.key;
-      tracer.run();
+      tried.current = key;
+      runRef.current();
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [part, progress, result?.key, tracer]);
+  }, [partId, busy, result?.key, tracer.key]);
   const [cursor, setCursor] = useState<number | null>(null);
   const [showLoad, setShowLoad] = useState(true);
   const [adding, setAdding] = useState(false);

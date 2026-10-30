@@ -209,6 +209,8 @@ export interface CanvasProps {
   readonly onPick?: ((target: PickTarget) => void) | null;
   /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
   readonly marks?: readonly CanvasMark[];
+  /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli. */
+  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string> } | null;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -343,6 +345,7 @@ export function Canvas({
   onExplain,
   onPick,
   marks,
+  taskParts,
   ref,
 }: CanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1676,6 +1679,13 @@ export function Canvas({
               )}
             </g>
           )}
+          {taskParts &&
+            doc.parts
+              .filter((p) => taskParts.editable.has(p.id))
+              .map((p) => {
+                const b = partBounds(p);
+                return <rect key={`te${p.id}`} x={b.x * GRID - 5} y={b.y * GRID - 5} width={b.w * GRID + 10} height={b.h * GRID + 10} rx={7} fill="var(--color-accent-soft)" fillOpacity={0.5} stroke="var(--color-accent)" strokeWidth={1.5} pointerEvents="none" />;
+              })}
           {/* Bağla kipinde parçalar soluklaşır, uçlar öne çıkar (P03). */}
           <g opacity={bagla ? 0.38 : 1}>
           {doc.parts.map((part) => {
@@ -1718,6 +1728,18 @@ export function Canvas({
             </g>
           ))}
 
+          {taskParts &&
+            doc.parts
+              .filter((p) => taskParts.locked.has(p.id) && p.type !== 'ground')
+              .map((p) => {
+                const b = partBounds(p);
+                return (
+                  <g key={`tl${p.id}`} transform={`translate(${(b.x + b.w) * GRID + 3} ${b.y * GRID - 3})`} pointerEvents="none" aria-hidden="true">
+                    <circle r={7.5} fill="var(--color-panel)" stroke="var(--color-line-2)" strokeWidth={1} />
+                    <path d="M-2.8 -0.2h5.6v3.6h-5.6z M-1.7 -0.2v-1.5a1.7 1.7 0 0 1 3.4 0v1.5" fill="none" stroke="var(--color-muted)" strokeWidth={1.1} strokeLinejoin="round" />
+                  </g>
+                );
+              })}
           {marks?.map((mark) => {
             const x = mark.at.x * GRID;
             const y = mark.at.y * GRID;

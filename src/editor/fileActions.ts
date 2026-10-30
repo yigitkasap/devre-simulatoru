@@ -1,7 +1,8 @@
 // JSON dışa/içe aktarma ve adres çubuğundaki paylaşım bağlantısı.
 
 import { tr } from '../i18n/tr';
-import { parseAnalysis, type AnalysisDoc } from '../model/analysis';
+import { EMPTY_ANALYSIS, parseAnalysis, type AnalysisDoc } from '../model/analysis';
+import { parseTaskPayload, type TaskDef } from '../model/task';
 import { parseDoc, toSerializable } from '../model/serialize';
 import type { CircuitDoc } from '../model/types';
 
@@ -20,10 +21,12 @@ export function downloadDoc(doc: CircuitDoc, analysis?: AnalysisDoc): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Seçilen dosyayı okur (devre ve analiz bölümü); geçerli bir devre değilse null. */
-export async function readDocFile(file: File): Promise<{ doc: CircuitDoc; analysis: AnalysisDoc } | null> {
+/** Seçilen dosyayı okur (devre ve analiz bölümü; görev dosyasıysa görev); geçerli bir devre değilse null. */
+export async function readDocFile(file: File): Promise<{ doc: CircuitDoc; analysis: AnalysisDoc; task?: TaskDef } | null> {
   try {
     const value: unknown = JSON.parse(await file.text());
+    const task = parseTaskPayload(value);
+    if (task) return { doc: task.doc, analysis: EMPTY_ANALYSIS, task: task.task };
     const doc = parseDoc(value);
     return doc ? { doc, analysis: parseAnalysis((value as { analysis?: unknown }).analysis) } : null;
   } catch {
