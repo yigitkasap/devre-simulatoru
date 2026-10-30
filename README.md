@@ -2147,9 +2147,27 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   tablo verir (Excel / Word'e yapıştırılır). CSV menüsü: ayırıcı noktalı virgül (Türkçe Excel; ondalık
   virgül) ya da virgül (uluslararası; ondalık nokta), bu tarayıcıda hatırlanır; iki dosya: tablo ve
   grafik verisi. Telefonda tablo kartlar hâlinde, girdiler 44 px ve 16 px yazı (iOS yakınlaştırmaz).
+- **Eğri izleyici (A3, N3):** seçili parça (yoksa ilk taranabilen) devreden ayrı, ideal kaynaklı bir
+  test devresinde DC taranır (`analysis/sweep.ts`): diyot, zener, LED'de I–V; JFET ve MOSFET'te çıkış
+  ailesi (V_DS taranır, basamak V_GS) ya da transfer (V_GS taranır, basamak V_DS); BJT'de çıkış ailesi
+  (V_CE taranır, basamak I_B: 100 V'luk pil ve (100 − 0,7) / I_B'lik dirençle verilir, gerçek I_B
+  ölçülüp eğrinin adına yazılır). P tipi parçalarda gerilim ve akımlar ters işaretli taranır,
+  büyüklükleri (−V_DS, −I_D) çizilir. Her nokta bir öncekinin çözümünden başlar (motorun `update()`'i
+  durumu korur); eklem kapasitesi olan modelde nokta 1 ms oturtulur; akım 0,5 A'i aşınca eğri biter.
+  Aralık ve adım yazılır; basamaklar renkli çipler (+ ile eklenir, en çok 6). Eğri adları sağ uçta,
+  imleç değerleri eğrilerin altında tek satırda. Yük doğrusu ve Q noktası yalnız devrede yük direnci
+  varsa (taranan parçanın drain / kollektör düğümünde direnç; source / emetörde toprağa direnç varsa
+  eklenir): Q, AC kaynakların genliği sıfırlanıp devre en çok 1 s oturtularak bulunur; yoksa anahtar
+  soluk ve "Devrede R_D yok". Şemada taranan parça kesikli halka ve "Taranan parça: J1" etiketiyle.
+  Tarama Web Worker'da (`sweep.worker.ts`, Vite `worker.format: 'es'`; ≈ 120 kB, yalnız tarama
+  başlayınca yüklenir): arayüz donmaz, İptal iş parçacığını sonlandırır; parametre değişince
+  kendiliğinden yeniden taranır. CSV: x ve her basamağın akımı.
 - **Kayıt:** izler ve tablo devreyle birlikte kaydedilir (otomatik kayıt ve indirilen dosyada
   `analysis` alanı); devrenin yapı anahtarına ve geri alma geçmişine girmez, tablo yazarken simülasyon
   yeniden kurulmaz. Paylaşım bağlantısına girmez.
 - Testler `tests/analiz-grafik.test.ts`: RC dolmada kayıt tasarımın referans verisiyle
   (`tests/veri/veri-rc-dolma.json`) %0,1 içinde; `tests/analiz-tablo.test.ts`: teorik değer okuma,
-  % hata, RC'de ln uydurmasından τ ≈ 100 ms (R² > 0,9999), CSV; ios-kontrol "Analiz" maddeleri.
+  % hata, RC'de ln uydurmasından τ ≈ 100 ms (R² > 0,9999), CSV; `tests/analiz-egri.test.ts`: BF245A
+  çıkış ailesi referansla (`tests/veri/veri-bf245a.json`) bütün eğri boyunca %1 içinde (V_DS = 10 V'ta
+  4,14 / 3,25 / 2,46 / 1,78 mA), transfer, diyot akım sınırı, BJT β, yük doğrusu (BC107: R_C, 12 V, Q
+  doğrunun üstünde); ios-kontrol "Analiz" maddeleri.

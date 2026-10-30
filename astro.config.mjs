@@ -19,5 +19,8 @@ export default defineConfig({
     // lz-string (CommonJS) açılışta hazırlansın; sonradan keşfedilirse geliştirme sunucusu
     // yapılandırma değişikliğinden sonra "Outdated Optimize Dep" (504) verip sayfayı yükleyemiyor.
     optimizeDeps: { include: ['lz-string'] },
+    // Analizin taramaları (eğri izleyici, Bode) Web Worker'da: simülatör kodu dinamik içe aktarma
+    // içerdiği için iş parçacığı ES modülü olarak paketlenir (IIFE kod bölmeyi desteklemez).
+    worker: { format: 'es' },
   },
 });

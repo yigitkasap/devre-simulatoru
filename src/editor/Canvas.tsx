@@ -222,6 +222,8 @@ export interface CanvasMark {
   /** CSS rengi (tema belirteci). */
   readonly color: string;
   readonly kind: 'pill' | 'ring';
+  /** Halkanın yarıçapı (px; taranan parça için büyük). */
+  readonly r?: number;
 }
 
 type Hit =
@@ -1720,7 +1722,7 @@ export function Canvas({
             const x = mark.at.x * GRID;
             const y = mark.at.y * GRID;
             if (mark.kind === 'ring') {
-              return <circle key={`r${mark.text}`} cx={x} cy={y} r={9} fill="none" stroke={mark.color} strokeWidth={2} strokeDasharray="4 3" pointerEvents="none" />;
+              return <circle key={`r${mark.text}`} cx={x} cy={y} r={mark.r ?? 9} fill="none" stroke={mark.color} strokeWidth={2} strokeDasharray="4 3" pointerEvents="none" />;
             }
             const w = mark.text.length * 6 + 14;
             return (

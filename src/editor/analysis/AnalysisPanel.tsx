@@ -12,6 +12,7 @@ import { Chart, cursorTime, recordSpan, timeUnit, type ChartTrace } from './Char
 import { datedName, saveFile, svgToPng, tickText, toCsv } from './format';
 import type { TraceRecorder } from './recorder';
 import { tableCsv, tableTsv } from './table';
+import { CurvePane, curveSummary, saveCurves } from './CurvePane';
 import { TablePane } from './TablePane';
 import { traceColor } from './traces';
 import { ANALYSIS_TABS, type AnalysisApi, type AnalysisTab } from './useAnalysis';
@@ -203,6 +204,25 @@ export function AnalysisDrawer(
           {tr.analysis.graph.csv}
         </button>
       </>
+    ) : api.tab === 'curve' ? (
+      <>
+        <span className="mr-1 text-label text-muted" aria-live="polite">{curveSummary(api.tracer)}</span>
+        {api.tracer.progress ? (
+          <button type="button" onClick={api.tracer.cancel} className={`${btn} border border-line bg-panel px-3 text-ink hover:bg-panel-2`}>
+            <Icon name="stop" className="h-4 w-4" />
+            {tr.analysis.curve.cancel}
+          </button>
+        ) : (
+          <button type="button" onClick={api.tracer.run} disabled={!api.tracer.part} className={`${btn} border border-line bg-panel px-3 text-ink hover:bg-panel-2 disabled:opacity-50`}>
+            <Icon name="undo" className="h-4 w-4" />
+            {tr.analysis.curve.rerun}
+          </button>
+        )}
+        <button type="button" onClick={() => saveCurves(api.tracer, api.separator, false)} disabled={!api.tracer.result} className={`${btn} bg-accent px-3.5 text-white hover:brightness-105 disabled:opacity-50`}>
+          <Icon name="download" className="h-4 w-4" />
+          {tr.analysis.curve.csv}
+        </button>
+      </>
     ) : api.tab === 'table' ? (
       <>
         <button type="button" onClick={() => void g.copyTable()} className={`${btn} border border-line bg-panel px-3 text-ink hover:bg-panel-2`}>
@@ -248,7 +268,7 @@ export function AnalysisDrawer(
         </button>
       </div>
       <div role="tabpanel" id={`${idBase}-panel`} aria-labelledby={`${idBase}-${api.tab}`} className="flex min-h-0 flex-1 flex-col">
-        {api.tab === 'graph' ? <GraphDesk {...props} g={g} touch={touch} /> : api.tab === 'table' ? <TablePane api={api} recorder={props.recorder} version={g.version} title={props.title} /> : <Soon />}
+        {api.tab === 'graph' ? <GraphDesk {...props} g={g} touch={touch} /> : api.tab === 'table' ? <TablePane api={api} recorder={props.recorder} version={g.version} title={props.title} /> : api.tab === 'curve' ? <CurvePane tracer={api.tracer} /> : <Soon />}
       </div>
     </section>
   );
@@ -448,10 +468,31 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
           </>
         ) : api.tab === 'table' ? (
           <TablePane api={api} recorder={recorder} version={g.version} title={props.title} compact />
+        ) : api.tab === 'curve' ? (
+          <CurvePane tracer={api.tracer} compact />
         ) : (
           <Soon />
         )}
       </div>
+      {api.tab === 'curve' && (
+        <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
+          {api.tracer.progress ? (
+            <button type="button" onClick={api.tracer.cancel} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold">
+              <Icon name="stop" className="h-4 w-4" />
+              {`${tr.analysis.curve.cancel} · ${api.tracer.progress.done} / ${api.tracer.progress.total}`}
+            </button>
+          ) : (
+            <button type="button" onClick={api.tracer.run} disabled={!api.tracer.part} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
+              <Icon name="undo" className="h-4 w-4" />
+              {tr.analysis.curve.rerun}
+            </button>
+          )}
+          <button type="button" onClick={() => saveCurves(api.tracer, api.separator, true)} disabled={!api.tracer.result} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
+            <Icon name="share" className="h-4 w-4" />
+            {tr.analysis.graph.csvShare}
+          </button>
+        </div>
+      )}
       {api.tab === 'table' && (
         <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
           <button type="button" onClick={() => void g.copyTable()} disabled={api.doc.rows.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">

@@ -976,6 +976,69 @@ try {
       `${Math.round(inputBox?.height ?? 0)} px · ${inputFont} px`);
     await page.context().close();
   }
+  // --- Analiz → Eğri izleyici (A3, N3): Worker'da DC tarama, basamaklar, transfer, yük doğrusu, iptal ----
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    let workers = 0;
+    page.on('worker', () => (workers += 1));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /BF245A: çıkış ve transfer/ }).first().click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(200);
+    const drawer = page.getByRole('region', { name: 'Analiz' });
+    await drawer.getByRole('tab', { name: 'Eğri izleyici' }).click();
+    const summary = drawer.getByText(/noktalık DC tarama$/);
+    await summary.waitFor({ timeout: 30000 }).catch(() => {});
+    const pill = ((await drawer.locator('p.rounded-full').textContent()) ?? '').replace(/\s+/g, ' ');
+    const loadSwitch = drawer.getByRole('switch', { name: /Yük doğrusu ve Q noktası/ });
+    const marks = await page.locator('svg.schematic text').allTextContents();
+    const chips = await drawer.getByRole('button', { name: /basamağını kaldır$/ }).count();
+    check('eğri izleyici (N3): BF245A çıkış ailesi Worker’da taranıyor (4 × 31); V_DS = 10 V’ta I_D 4,14 / 3,25 / 2,46 / 1,78 mA; R_D yokken yük doğrusu soluk; şemada "Taranan parça: J1"',
+      (await summary.textContent()) === '4 × 31 noktalık DC tarama' && /4,14.*3,25.*2,46.*1,78/.test(pill) && workers >= 1 && (await loadSwitch.isDisabled()) && ((await loadSwitch.textContent()) ?? '').includes('Devrede RD yok') &&
+      marks.includes('Taranan parça: J1') && chips === 4 && (await drawer.getByRole('img', { name: 'Eğri izleyici: J1, 4 eğri' }).count()) === 1,
+      `${await summary.textContent()} · ${pill.slice(0, 70)} · iş parçacığı ${workers}`);
+    await drawer.getByRole('button', { name: 'Basamak ekle' }).click();
+    await drawer.getByRole('textbox', { name: /Yeni basamak değeri/ }).fill('-0,8'); await page.keyboard.press('Enter');
+    await page.getByText('5 × 31 noktalık DC tarama').waitFor({ timeout: 30000 }).catch(() => {});
+    const five = await drawer.getByText(/noktalık DC tarama$/).textContent().catch(() => '');
+    await drawer.getByRole('radio', { name: 'Transfer' }).click();
+    await page.getByText(/^1 × \d+ noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
+    const transfer = await drawer.getByText(/noktalık DC tarama$/).textContent().catch(() => '');
+    await drawer.getByRole('button', { name: 'Yeniden tara' }).click();
+    const cancelVisible = await drawer.getByRole('button', { name: 'İptal' }).isVisible().catch(() => false);
+    if (cancelVisible) await drawer.getByRole('button', { name: 'İptal' }).click();
+    await page.waitForTimeout(200);
+    check('eğri izleyici: + ile basamak eklenince yeniden taranıyor (5 eğri); Transfer tek eğri; Yeniden tara ve İptal',
+      five === '5 × 31 noktalık DC tarama' && /^1 × \d+ noktalık DC tarama$/.test(transfer ?? '') && (await drawer.getByRole('button', { name: 'Yeniden tara' }).isVisible()), `${five} · ${transfer} · iptal ${cancelVisible}`);
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await drawer.getByText(/noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    const bjtSwitch = drawer.getByRole('switch', { name: /Yük doğrusu ve Q noktası/ });
+    const qText = await drawer.getByRole('img', { name: /^Eğri izleyici: Q1/ }).locator('text', { hasText: /^Q$/ }).count();
+    check('eğri izleyici: BC107 yükselteçte basamak I_B (µA), yük doğrusu R_C · 12 V ve Q noktası çiziliyor',
+      !(await bjtSwitch.isDisabled()) && (await bjtSwitch.getAttribute('aria-checked')) === 'true' && ((await bjtSwitch.textContent()) ?? '').includes('RC · kaynak 12,0 V') && qText === 1 &&
+      (await drawer.getByRole('button', { name: '10 µA basamağını kaldır' }).count()) === 1, ((await bjtSwitch.textContent()) ?? '').slice(0, 60));
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'BF245A: çıkış ve transfer karakteristiği');
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(400);
+    const sheet = page.getByRole('region', { name: 'Analiz' });
+    await sheet.getByRole('tab', { name: 'Eğri' }).tap();
+    await sheet.locator('p.rounded-full').waitFor({ timeout: 30000 }).catch(() => {});
+    const pill = ((await sheet.locator('p.rounded-full').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab], [role=radio], select, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
+    check('eğri izleyici (telefon): alt sayfada eğriler ve imleç satırı; denetimler ≥ 44 px; altta Yeniden tara ve CSV paylaş',
+      /4,14.*1,78/.test(pill) && small.length === 0 && (await sheet.getByRole('button', { name: 'Yeniden tara' }).count()) === 1 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1,
+      small.join(', ') || pill.slice(0, 50));
+    await page.context().close();
+  }
   // --- Ölçü aletinin okuması her yerde aynı: şema göstergesi, defter kartı, 3B etiketi, 3B ekranı ----
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });

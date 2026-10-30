@@ -141,7 +141,7 @@ export default function Simulator() {
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
   // Analiz (grafik, tablo, eğri izleyici, Bode): izler ve tablo devreyle birlikte kaydedilir.
   const notify = useCallback((message: string) => showToast(message), [showToast]);
-  const analysis = useAnalysis(doc, connectivity, initial.analysis, notify);
+  const analysis = useAnalysis(doc, connectivity, initial.analysis, notify, selection.parts.length === 1 && selection.wires.length === 0 ? selection.parts[0]! : null);
   const saveState = useAutosave(doc, analysis.doc);
   /** Analiz çekmecesinin yüksekliği (masaüstü) ve Büyüt. */
   const [drawerHeight, setDrawerHeight] = useState(DEFAULT_DRAWER);

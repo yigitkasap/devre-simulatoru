@@ -9,6 +9,7 @@ import type { Connectivity } from '../../model/connectivity';
 import type { CircuitDoc, Point } from '../../model/types';
 import type { CanvasMark, PickTarget } from '../Canvas';
 import { liveTraces, netIndex, nodeName, traceColor, traceLabel, type TraceLabel } from './traces';
+import { useTracer, type TracerApi } from './useTracer';
 
 export type AnalysisTab = 'graph' | 'table' | 'curve' | 'bode';
 export const ANALYSIS_TABS: readonly AnalysisTab[] = ['graph', 'table', 'curve', 'bode'];
@@ -44,6 +45,8 @@ export interface AnalysisApi {
   /** CSV ayırıcısı (bu tarayıcıda hatırlanır): noktalı virgül (Türkçe Excel) ya da virgül. */
   readonly separator: CsvSeparator;
   readonly setSeparator: (sep: CsvSeparator) => void;
+  /** Eğri izleyici (A3). */
+  readonly tracer: TracerApi;
 }
 
 const SEPARATOR_KEY = 'devre-simulatoru:csv-ayirici';
@@ -56,7 +59,7 @@ function readSeparator(): CsvSeparator {
   }
 }
 
-export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial: AnalysisDoc, notify: (message: string) => void): AnalysisApi {
+export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial: AnalysisDoc, notify: (message: string) => void, selected: string | null = null): AnalysisApi {
   const [analysis, setDoc] = useState(initial);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<AnalysisTab>('graph');
@@ -72,6 +75,7 @@ export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial
     }
   }, []);
   const idx = useMemo(() => netIndex(doc, connectivity), [doc, connectivity]);
+  const tracer = useTracer(doc, connectivity, selected);
   const live = useMemo(() => liveTraces(analysis.traces, doc, idx), [analysis.traces, doc, idx]);
   // Kimlikler değişmedikçe aynı dizi (kayıt her belge değişikliğinde yeniden kurulmasın).
   const liveKey = live.map((t) => t.id).join(',');
@@ -133,8 +137,14 @@ export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial
       }
     }
     if (pick?.stage === 'second') out.push({ at: pick.at, text: `pick-${pick.key}`, color: 'var(--color-accent)', kind: 'ring' });
+    // Eğri izleyicide taranan parça: kesikli halka ve etiket.
+    if (tab === 'curve' && tracer.part) {
+      const p = tracer.part;
+      out.push({ at: { x: p.x, y: p.y }, text: `scan-${p.id}`, color: 'var(--color-accent)', kind: 'ring', r: 30 });
+      out.push({ at: { x: p.x, y: p.y - 2 }, text: tr.analysis.curve.scanned(p.label), color: 'var(--color-accent)', kind: 'pill' });
+    }
     return out;
-  }, [traces, labels, doc.parts, pick]);
+  }, [traces, labels, doc.parts, pick, tab, tracer.part]);
 
   const addRows = useCallback((rows: readonly Omit<TableRow, 'id'>[]) => {
     setDoc((a) => ({ ...a, rows: [...a.rows, ...rows.map((r) => ({ ...r, id: newId('r') }))] }));
@@ -164,6 +174,7 @@ export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial
     setCursor,
     separator,
     setSeparator,
+    tracer,
   };
 }
 
