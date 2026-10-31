@@ -10,9 +10,11 @@ import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
 import { maskFrame } from './fault/mask';
 import { FaultCard } from './fault/FaultCard';
+import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
+import { FoundCard, ReportCard } from './fault/ReportCards';
 import { defaultBlack, measureResistance, METER_ID, meterPart, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
 import { MultimeterPanel, type MeterReading } from './fault/MultimeterPanel';
-import { addEntry, entryName, NEW_SESSION, parseSession, type FaultSession } from './fault/session';
+import { addEntry, entryName, NEW_SESSION, parseSession, type FaultSession, type Place } from './fault/session';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { partBounds, pinPositions } from '../model/geometry';
@@ -26,6 +28,7 @@ import { AnalysisDrawer, AnalysisSheetBody, DEFAULT_DRAWER, MIN_DRAWER, TALL_DRA
 import { useAnalysis } from './analysis/useAnalysis';
 import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
+import type { FaultKind } from '../model/faults';
 import { NO_PREDICTIONS, parsePredictions, REASON_LIMIT, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
 import { parseEmbedParams, type EmbedOptions } from '../model/embed';
 import { toSerializable } from '../model/serialize';
@@ -218,6 +221,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       // Depolama kapalı: oturum yalnızca bu sekmede.
     }
   }, [embed, task, faultSession]);
+  /** Arızayı bildir (R2): seçilen yer ve şemadaki noktası, tür, gerekçe ölçümleri; son bildirim yanlış mıydı. */
+  const [reporting, setReporting] = useState<{ place: Place | null; at: { x: number; y: number } | null; kind: FaultKind | null; evidence: readonly string[] } | null>(null);
+  const [wrongReport, setWrongReport] = useState(false);
+  useEffect(() => {
+    setReporting(null);
+    setWrongReport(false);
+  }, [task]);
   /** Tahminler kaydedilmeden simülasyon ve ölçüm kapalı (B1): Oynat'ta ve Analiz'de söylenen yazı. */
   const gate = task?.predict && !predictions.locked ? tr.task.gate : null;
   const docRef = useRef(state.doc);
@@ -305,6 +315,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // Arıza bulma (B2): şema, mesajlar, rozetler ve analizin düğüm dizini sağlam devreden (arızayı ele
   // vermesin); simülasyon arızalı devreden (arıza netlist kurulurken uygulanır).
   const fault = task?.fault ?? null;
+  /** Arızanın uygulandığı hâl: "Onar ve çalıştır"dan sonra devre sağlam çalışır (R3). */
+  const repaired = fault !== null && faultSession.repaired;
+  const activeFaults = useMemo(() => (fault && !repaired ? fault.faults : []), [fault, repaired]);
   /** Multimetre (R1): kip, iki ucun yeri ve şemaya koyulan uç. Görev değişince siyah uç toprakta, kırmızı boşta. */
   const [meter, setMeter] = useState<{ mode: MeterMode; red: Probe | null; black: Probe | null; placing: ProbeColor | null }>(() => ({ mode: 'dc', red: null, black: defaultBlack(state.doc), placing: null }));
   useEffect(() => {
@@ -314,11 +327,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const simDoc = useMemo(() => (fault ? { ...doc, parts: [...doc.parts, meterPart(meter.mode)] } : doc), [doc, fault, meter.mode]);
   const simConnectivity = useMemo(() => {
     if (!fault) return connectivity;
-    const c = buildConnectivity(simDoc, fault.faults);
+    const c = buildConnectivity(simDoc, activeFaults);
     return { ...c, netlist: wireMeter(c.netlist, meter.mode, meter.red, meter.black) };
-  }, [fault, simDoc, connectivity, meter.mode, meter.red, meter.black]);
+  }, [fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black]);
   /** Otomatik göstergeler kapalı: kablo renkleri, akım noktaları, düğüm etiketleri, kartlardaki canlı değerler. */
-  const hideLive = fault !== null && fault.hideIndicators;
+  const hideLive = fault !== null && fault.hideIndicators && !repaired;
   const shownSettings = useMemo(() => (hideLive ? { ...settings, nodeVoltages: false, currentDots: false, magneticField: false } : settings), [hideLive, settings]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
   // Analiz (grafik, tablo, eğri izleyici, Bode): izler ve tablo devreyle birlikte kaydedilir.
@@ -418,13 +431,102 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     };
     void saveFile(datedName(`${tr.task.submission}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
   };
-  const taskCard = task?.fault ? (
+  /** Arıza bulmada bütün arızalar doğru bildirildi (R3). */
+  const allFound = fault !== null && fault.faults.length > 0 && fault.faults.every((_, i) => faultSession.found.includes(i));
+  const submitReport = () => {
+    const r = reporting;
+    if (!fault || !r?.place || !r.kind) return;
+    const place = r.place;
+    const kind = r.kind;
+    const hit = fault.faults.findIndex((f, i) => !faultSession.found.includes(i) && placeMatches(f, place, kind, doc, analysis.idx));
+    const found = hit >= 0 ? [...faultSession.found, hit] : faultSession.found;
+    setFaultSession((s) => ({ ...s, reports: [...s.reports, { place, kind, evidence: r.evidence, correct: hit >= 0 }], found }));
+    setReporting(null);
+    setWrongReport(hit < 0);
+    const left = fault.faults.length - found.length;
+    if (hit >= 0 && left > 0) showToast(tr.fault.report.more(left));
+  };
+  /** Onar ve çalıştır: arıza kalkar, devre çalışır (göstergeler geri gelir). */
+  const repairFault = () => {
+    setFaultSession((s) => ({ ...s, repaired: true }));
+    if (sim.status === 'stopped') sim.play();
+  };
+  /** Rapor (.json): devre, günlük, bildirimler, ipuçları. */
+  const downloadReport = () => {
+    if (!task || !fault) return;
+    const name = (key: string) => faultSession.log.find((e) => e.key === key)?.name ?? key;
+    const body = {
+      ...toSerializable(doc, analysis.doc),
+      rapor: {
+        gorev: task.name,
+        tarih: new Date().toISOString(),
+        belirti: fault.symptom,
+        olcumler: faultSession.log.map((e, i) => ({
+          sira: i + 1,
+          olcum: e.name,
+          kip: tr.fault.meter.modes[e.mode],
+          okunan: e.text,
+          deger: e.value,
+          ...(fault.askExpected ? { beklenen: e.expected ?? null } : {}),
+        })),
+        bildirimler: faultSession.reports.map((r) => ({ yer: placeLabel(r.place, doc, analysis.idx), tur: tr.fault.kinds[r.kind], gerekce: r.evidence.map(name), dogru: r.correct })),
+        ipuclari: faultSession.hints,
+        bulundu: allFound,
+        onarildi: faultSession.repaired,
+      },
+    };
+    void saveFile(datedName(`${tr.fault.found.file}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
+  };
+  /** Yeni arıza dene: aynı devreye rastgele başka bir arıza (oturum sıfırlanır). */
+  const tryAgain = () => {
+    if (!task || !fault) return;
+    const next = randomFault(doc, analysis.idx, Math.random, fault.faults[0]);
+    if (!next) {
+      showToast(tr.fault.found.noCandidate, 'info');
+      return;
+    }
+    sim.stop();
+    setTask({ ...task, fault: { ...fault, faults: [next] } });
+    showToast(tr.fault.found.newFault);
+  };
+  const lastCorrect = [...faultSession.reports].reverse().find((r) => r.correct);
+  const foundExplain = allFound && fault ? faultExplain(fault.faults[0]!, doc, analysis.idx) : null;
+  const taskCard = reporting ? (
+    <ReportCard
+      where={reporting.place ? placeLabel(reporting.place, doc, analysis.idx) : null}
+      kind={reporting.kind}
+      evidence={reporting.evidence}
+      log={faultSession.log}
+      onKind={(kind) => setReporting((r) => (r ? { ...r, kind } : r))}
+      onEvidence={(key, on) => setReporting((r) => (r ? { ...r, evidence: on ? [...r.evidence, key] : r.evidence.filter((k) => k !== key) } : r))}
+      onSubmit={submitReport}
+      onCancel={() => setReporting(null)}
+    />
+  ) : foundExplain ? (
+    <FoundCard
+      title={foundExplain.title}
+      text={foundExplain.text}
+      decisive={lastCorrect && lastCorrect.evidence.length > 0 ? tr.fault.found.evidence(lastCorrect.evidence.map((k) => faultSession.log.find((e) => e.key === k)).filter((e) => e !== undefined).map((e) => `${e.name} ${e.text}`).join(' · ')) : null}
+      counts={{ log: faultSession.log.length, reports: faultSession.reports.length, hints: faultSession.hints, evidence: lastCorrect?.evidence.length ?? 0 }}
+      repaired={faultSession.repaired}
+      onRepair={repairFault}
+      onReport={downloadReport}
+      onAgain={tryAgain}
+    />
+  ) : task?.fault ? (
     <FaultCard
       title={taskTitle(task) ?? tr.fault.card.kicker}
       symptom={task.fault.symptom}
       session={faultSession}
       askExpected={task.fault.askExpected}
       hideIndicators={task.fault.hideIndicators}
+      wrong={wrongReport}
+      onReport={() => {
+        setWrongReport(false);
+        setMeter((m) => ({ ...m, placing: null }));
+        setReporting({ place: null, at: null, kind: null, evidence: [] });
+      }}
+      onHint={() => setFaultSession((s) => ({ ...s, hints: Math.min(tr.fault.hints.list.length, s.hints + 1) }))}
       onExpected={(key, value) =>
         setFaultSession((s) => ({
           ...s,
@@ -1078,6 +1180,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
 
   // --- Arıza bulma: multimetrenin uçları ve okuması (R1) -----------------------------------
   const probeLabel = (probe: Probe | null) => (probe ? spotLabel(probe.spot, doc, analysis.idx) : null);
+  const spotOrPlaceLabel = (place: Place) => ('part' in place && place.pin === undefined ? (doc.parts.find((p) => p.id === place.part)?.label ?? '?') : spotLabel('wire' in place ? place : { part: place.part, pin: place.pin! }, doc, analysis.idx));
   const redLabel = probeLabel(meter.red);
   const blackLabel = probeLabel(meter.black);
   const [meterPanelHeight, setMeterPanelHeight] = useState(0);
@@ -1094,8 +1197,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     observer.observe(el);
     meterPanelRef.current = observer;
   }, []);
+  /** Ölçme hâli: bildirmiyor ve (bulunduysa) onarıldı. Multimetre ve uçlar yalnızca o zaman. */
+  const measuring = fault !== null && reporting === null && (!allFound || repaired);
   const probeView =
-    fault && viewMode === 'schematic'
+    measuring && viewMode === 'schematic'
       ? {
           red: meter.red && redLabel ? { at: meter.red.at, label: redLabel } : null,
           black: meter.black && blackLabel ? { at: meter.black.at, label: blackLabel } : null,
@@ -1116,8 +1221,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   /** Ω: simülasyon durmuşken, uçlar ya da arıza değişince bir kez hesaplanır. */
   const ohms = useMemo(() => {
     if (!fault || meter.mode !== 'ohm' || sim.status !== 'stopped' || !meter.red || !meter.black) return undefined;
-    return measureResistance(buildConnectivity(doc, fault.faults).netlist, spotKey(meter.red.spot), spotKey(meter.black.spot));
-  }, [fault, doc, meter.mode, meter.red, meter.black, sim.status]);
+    return measureResistance(buildConnectivity(doc, activeFaults).netlist, spotKey(meter.red.spot), spotKey(meter.black.spot));
+  }, [fault, doc, activeFaults, meter.mode, meter.red, meter.black, sim.status]);
   const meterText = sim.frame?.meterTexts.get(METER_ID) ?? null;
   const meterReading = useMemo<MeterReading>(() => {
     const t = tr.fault.meter;
@@ -1208,6 +1313,24 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       onExplain={explain}
       onPick={analysis.pick ? analysis.onPick : null}
       probes={probeView}
+      onLocate={reporting ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r)) : null}
+      placeMarks={
+        reporting
+          ? {
+              marks: reporting.place && reporting.at ? [{ at: reporting.at, label: tr.fault.report.selected(spotOrPlaceLabel(reporting.place)), tone: 'accent' as const }] : [],
+              hint: touchUi ? tr.fault.report.whereHintTouch : tr.fault.report.whereHint,
+            }
+          : allFound && fault && !repaired
+            ? {
+                marks: fault.faults.flatMap((f) => {
+                  const at = faultPoint(f, doc);
+                  const what = f.kind === 'open' && 'wire' in f.at ? tr.fault.found.marker.openWire : tr.fault.found.marker[f.kind];
+                  return at ? [{ at, label: tr.fault.found.here(what), tone: 'ok' as const }] : [];
+                }),
+                hint: null,
+              }
+            : null
+      }
       cornerPanel={probeView && !phone && meterPanelHeight > 0 ? { w: 300, h: meterPanelHeight } : null}
       onProbe={meter.placing ? (probe) => setMeter((m) => (m.placing ? { ...m, [m.placing]: probe, placing: null } : m)) : null}
       taskParts={taskParts}
@@ -1747,7 +1870,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 min-w-0 flex-1">
             {canvas}
-            {fault && viewMode === 'schematic' && (
+            {measuring && viewMode === 'schematic' && (
               <div ref={measureMeterPanel} className="absolute bottom-4 left-4 z-20">
                 <MultimeterPanel
                   mode={meter.mode}

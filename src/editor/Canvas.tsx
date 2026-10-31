@@ -57,7 +57,8 @@ import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
 import { visibleLive } from './fault/mask';
 import type { Probe } from './fault/meter';
-import { ProbeLayer, type ProbeView } from './fault/ProbeLayer';
+import { PlaceMarks, ProbeLayer, type PlaceMark, type ProbeView } from './fault/ProbeLayer';
+import type { Place } from './fault/session';
 import { routeAround } from './phoneTools';
 import { HintText } from './HintStrip';
 import { SymbolIcon } from './symbols';
@@ -227,6 +228,10 @@ export interface CanvasProps {
   readonly cornerPanel?: { readonly w: number; readonly h: number } | null;
   /** Uç koyulurken: tıklanan bacak ya da kablo (parçanın gövdesinde en yakın bacağı). */
   readonly onProbe?: ((probe: Probe) => void) | null;
+  /** Arızayı bildirirken yer seçimi: bacak, parçanın kendisi ya da kablo (R2). */
+  readonly onLocate?: ((place: Place, at: Point) => void) | null;
+  /** Şemadaki halkalar (seçilen yer, bulunan arıza) ve alttaki yönerge. */
+  readonly placeMarks?: { readonly marks: readonly PlaceMark[]; readonly hint: string | null } | null;
   /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
   readonly marks?: readonly CanvasMark[];
   /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli. */
@@ -368,6 +373,8 @@ export function Canvas({
   probes = null,
   cornerPanel = null,
   onProbe = null,
+  onLocate = null,
+  placeMarks = null,
   marks,
   taskParts,
   ref,
@@ -988,6 +995,20 @@ export function Canvas({
     }
     if (pointers.current.size > 2) return;
 
+    // Arıza bulma → Arızayı bildir: arızanın yeri seçilir.
+    if (onLocate && e.button === 0) {
+      const g = toGrid(e.clientX, e.clientY);
+      const hit = hitTest(g);
+      if (hit?.kind === 'pin') onLocate({ part: hit.partId, pin: hit.index }, hit.pos);
+      else if (hit?.kind === 'part') onLocate({ part: hit.partId }, g);
+      else if (hit?.kind === 'wire') {
+        const wire = doc.wires.find((w) => w.id === hit.wireId)!;
+        onLocate({ wire: wire.id }, snapToSegment(g, wire.points[hit.segment]!, wire.points[hit.segment + 1]!));
+      }
+      e.preventDefault();
+      return;
+    }
+
     // Arıza bulma: multimetrenin ucu bacağa ya da kabloya koyulur.
     if (onProbe && e.button === 0) {
       const g = toGrid(e.clientX, e.clientY);
@@ -1602,7 +1623,7 @@ export function Canvas({
     <div className="absolute inset-0 overflow-hidden bg-paper">
       <svg
         ref={svgRef}
-        className={`schematic block h-full w-full ${onPick || onProbe ? 'cursor-crosshair' : cursorClass}`}
+        className={`schematic block h-full w-full ${onPick || onProbe || onLocate ? 'cursor-crosshair' : cursorClass}`}
         // iOS/WebKit, touch-action: none bölgesini üstüne binen katmanlara da uygulayabiliyor; o zaman
         // tuvalin üstündeki çekmece ya da pencere parmakla kaydırılamıyor. Katman açıkken kapatılır.
         style={overlayOpen ? { touchAction: 'auto' } : undefined}
@@ -2022,6 +2043,9 @@ export function Canvas({
         </div>
       )}
 
+      {placeMarks && !phone?.strip && (
+        <PlaceMarks marks={placeMarks.marks} hint={placeMarks.hint} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />
+      )}
       {probes && !phone?.strip && (
         <ProbeLayer probes={probes} size={size} touch={phone !== null} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />
       )}

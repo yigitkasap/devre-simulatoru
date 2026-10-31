@@ -1513,7 +1513,7 @@ try {
   }
   // --- Arıza bulma (B2, R1–R5): gizli arıza, otomatik göstergeler kapalı, multimetre, günlük, bildir ------
   {
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', acceptDownloads: true });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
@@ -1582,6 +1582,41 @@ try {
     const bodeGate = ((await drawer.textContent()) ?? '').includes('Eğri izleyici ve Bode kapalı');
     check('arıza (B2, 2. aşama): açık kartta canlı değer yok ("ölçü aletiyle ölç"); Analiz’de serbest iz eklenmiyor, Eğri izleyici ve Bode kapalı',
       q1.includes('Arıza bulmada canlı değerler gizli') && !/V_?BE|VBE|I_?C\b/.test(q1) && graphGate && bodeGate, q1.slice(0, 80));
+    // 5. aşama (R2, R3): ipucu, yanlış bildirim, doğru bildirim → Arıza bulundu, rapor, Onar ve çalıştır.
+    {
+      await page.getByRole('button', { name: 'Analiz', exact: true }).first().click(); await page.waitForTimeout(300);
+      const card = () => page.locator('[data-notebook="task"]').first();
+      await card().getByRole('button', { name: 'İpucu' }).click(); await page.waitForTimeout(150);
+      const hint = ((await card().textContent()) ?? '').includes('Beslemeden başla');
+      await card().getByRole('button', { name: 'Arızayı bildir' }).click(); await page.waitForTimeout(300);
+      const where = await page.getByText('Arızanın yerini şemada seç: parça, bacak ya da kablo').count();
+      const panelHidden = (await page.getByRole('region', { name: 'Multimetre' }).count()) === 0;
+      let p = await screen(page, 42, 4); await page.mouse.click(p.x + 8, p.y); await page.waitForTimeout(200);
+      const q1Place = ((await card().textContent()) ?? '').includes('Q1 · NPN transistör');
+      await card().getByRole('radio', { name: 'Yanlış değerli parça' }).click();
+      await card().getByRole('button', { name: 'Bildir', exact: true }).click(); await page.waitForTimeout(300);
+      const wrong = await page.getByRole('alert').filter({ hasText: 'Bu değil, ölçmeye devam et.' }).count();
+      check('arıza (B2, 5. aşama, R2): İpucu genel ipucu açıyor; Arızayı bildir: multimetre gizli, "Arızanın yerini şemada seç", yer şemadan (Q1), tür; yanlış bildirimde "Bu değil, ölçmeye devam et."',
+        hint && where === 1 && panelHidden && q1Place && wrong === 1, `${hint} ${where} ${panelHidden} ${q1Place} ${wrong}`);
+      await card().getByRole('button', { name: 'Arızayı bildir' }).click(); await page.waitForTimeout(300);
+      p = await screen(page, 44, -4); await page.mouse.click(p.x, p.y); await page.waitForTimeout(200);
+      const rcPlace = ((await card().textContent()) ?? '').includes('RC · Q1 kollektör tarafındaki bacak') && (await page.getByText('Seçili · RC alt bacağı', { exact: true }).count()) === 1;
+      await card().getByRole('radio', { name: /^Kopuk bağlantı/ }).click();
+      await card().getByRole('checkbox').first().check();
+      await card().getByRole('button', { name: 'Bildir', exact: true }).click(); await page.waitForTimeout(400);
+      const found = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
+      const here = await page.getByText('Arıza burada: kopuk bacak', { exact: true }).count();
+      const [dl] = await Promise.all([page.waitForEvent('download'), card().getByRole('button', { name: 'Rapor (.json)' }).click()]);
+      const rapor = JSON.parse(Buffer.concat(await (await dl.createReadStream()).toArray()).toString('utf8')).rapor;
+      check('arıza (B2, 5. aşama, R3): doğru bildirimde "Arıza bulundu" (açıklama, gerekçe ölçümleri, ölçüm · bildirim · ipucu · gerekçe), şemada "Arıza burada: kopuk bacak"; Rapor (.json) günlük, bildirimler (yanlış, doğru) ve ipucuyla',
+        rcPlace && found.startsWith('Arıza bulundu') && found.includes('Seni buraya götüren ölçümler') && /Bildirim2İpucu1Gerekçe1 ölçüm/.test(found) && here === 1 &&
+        /^ariza-raporu-.*\.json$/.test(dl.suggestedFilename()) && rapor.olcumler.length >= 4 && rapor.bildirimler.map((b) => b.dogru).join(',') === 'false,true' && rapor.ipuclari === 1 && rapor.bulundu === true,
+        `${found.slice(0, 70)} · ${dl.suggestedFilename()}`);
+      await card().getByRole('button', { name: 'Onar ve çalıştır' }).click(); await page.waitForTimeout(2000);
+      const strokes = await page.evaluate(() => new Set([...document.querySelectorAll('svg.schematic polyline')].map((x) => x.getAttribute('stroke'))).size);
+      check('arıza (B2, 5. aşama): Onar ve çalıştır → arıza kalkıyor, devre çalışıyor, otomatik göstergeler (kablo renkleri) geri geliyor',
+        ((await card().textContent()) ?? '').includes('Onarıldı · devre çalışıyor') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 0 && strokes > 2, `${strokes} renk`);
+    }
     await ctx.close();
   }
   {

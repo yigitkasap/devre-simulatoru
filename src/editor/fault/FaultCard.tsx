@@ -1,7 +1,7 @@
 // Arıza bulma kartı (B2, R1): defterin en üstünde, hedefli görevin kartı yerine. Belirti, ölçüm
 // günlüğü (kendiliğinden yazılır; hoca istediyse her satırda "Beklenen"), Arızayı bildir ve İpucu.
 
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { tr } from '../../i18n/tr';
 import { formatSI } from '../../sim/units';
 import { parseTheory } from '../analysis/table';
@@ -16,7 +16,9 @@ export function FaultCard({
   askExpected,
   hideIndicators,
   onExpected,
-  actions,
+  wrong,
+  onReport,
+  onHint,
 }: {
   title: string;
   symptom: string;
@@ -24,8 +26,10 @@ export function FaultCard({
   askExpected: boolean;
   hideIndicators: boolean;
   onExpected: (key: string, value: number | null) => void;
-  /** Kartın altındaki düğmeler ve bildirim/sonuç bölümü. */
-  actions?: ReactNode;
+  /** Son bildirim yanlıştı: "Bu değil, ölçmeye devam et." */
+  wrong: boolean;
+  onReport: () => void;
+  onHint: () => void;
 }) {
   const t = tr.fault.card;
   const touch = useTouchUi();
@@ -55,7 +59,42 @@ export function FaultCard({
           ))}
         </ol>
       )}
-      {actions}
+      {session.hints > 0 && (
+        <ol aria-label={tr.fault.hints.label} className="m-0 flex list-none flex-col gap-1.5 rounded-lg bg-accent-soft p-2.5">
+          {tr.fault.hints.list.slice(0, session.hints).map((hint) => (
+            <li key={hint} className="flex gap-2 text-small leading-snug text-accent-ink">
+              <Icon name="bulb" className="mt-0.5 h-4 w-4 shrink-0" />
+              {hint}
+            </li>
+          ))}
+        </ol>
+      )}
+      {wrong && (
+        <p role="alert" className="m-0 flex items-center gap-1.5 rounded-lg bg-warn-soft px-3 py-2 text-small font-semibold text-warn">
+          <Icon name="warning" className="h-4 w-4 shrink-0" />
+          {tr.fault.report.wrong}
+        </p>
+      )}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onReport}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-accent text-small font-semibold text-white hover:brightness-110 ${touch ? 'h-11' : 'h-[42px]'}`}
+        >
+          <Icon name="flag" className="h-4 w-4" />
+          {tr.fault.report.open}
+        </button>
+        <button
+          type="button"
+          onClick={onHint}
+          disabled={session.hints >= tr.fault.hints.list.length}
+          title={session.hints >= tr.fault.hints.list.length ? tr.fault.hints.none : undefined}
+          className={`flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-line-2 px-3 text-small font-medium hover:bg-panel-2 disabled:opacity-50 ${touch ? 'h-11' : 'h-[42px]'}`}
+        >
+          <Icon name="bulb" className="h-4 w-4" />
+          {tr.fault.hints.button}
+        </button>
+      </div>
       {hideIndicators && (
         <p className="m-0 flex gap-1.5 text-label leading-snug text-muted">
           <Icon name="info" className="mt-px h-3.5 w-3.5 shrink-0" />

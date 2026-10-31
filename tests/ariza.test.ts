@@ -14,6 +14,8 @@ import { CircuitSimulator } from '../src/sim';
 import { maskFrame, visibleLive } from '../src/editor/fault/mask';
 import { legLabel, measureResistance, METER_ID, meterPart, wireMeter } from '../src/editor/fault/meter';
 import { addEntry, entryName, NEW_SESSION, parseSession } from '../src/editor/fault/session';
+import { faultCandidates, faultExplain, placeLabel, placeMatches, randomFault } from '../src/editor/fault/judge';
+import { netIndex } from '../src/editor/analysis/traces';
 import type { SimFrame } from '../src/editor/useSimulation';
 import { parseTask, parseTaskPayload } from '../src/model/task';
 import { toSerializable } from '../src/model/serialize';
@@ -229,6 +231,50 @@ describe('Ölçüm günlüğü (4. aşama)', () => {
     ]);
     expect(back.hints).toBe(2);
     expect(parseSession('bozuk')).toEqual(NEW_SESSION);
+  });
+});
+
+describe('Bildirim ve "Bulundu" (5. aşama)', () => {
+  const doc = exampleDoc('bjt-yukseltec')!;
+  const idx = netIndex(doc, buildConnectivity(doc));
+  const id = (label: string) => doc.parts.find((p) => p.label === label)!.id;
+  const [RC, Q1] = [id('RC'), id('Q1')];
+  const open: Fault = { kind: 'open', at: { part: RC, pin: 1 } };
+  const collectorWire = doc.wires.find((w) => w.points.some((p) => p.x === 44 && p.y === 0))!;
+
+  it('yerin adı: iki bacaklı parçada bacağın bağlı olduğu düğüm, transistörde uç adı, parçanın kendisi, kablo', () => {
+    expect(placeLabel({ part: RC, pin: 1 }, doc, idx)).toBe('RC · Q1 kollektör tarafındaki bacak');
+    expect(placeLabel({ part: Q1, pin: 1 }, doc, idx)).toBe('Q1 · baz bacağı');
+    expect(placeLabel({ part: Q1 }, doc, idx)).toBe('Q1 · NPN transistör');
+    expect(placeLabel({ wire: collectorWire.id }, doc, idx)).toBe('Kablo · Q1 kollektör');
+  });
+
+  it('kopuk bacak: o bacak ya da aynı noktadaki kablo ucu doğru; tür yanlışsa, öbür bacak ya da parçanın kendisi yanlış', () => {
+    expect(placeMatches(open, { part: RC, pin: 1 }, 'open', doc, idx)).toBe(true);
+    expect(placeMatches(open, { wire: collectorWire.id }, 'open', doc, idx)).toBe(true);
+    expect(placeMatches(open, { part: RC, pin: 1 }, 'value', doc, idx)).toBe(false);
+    expect(placeMatches(open, { part: RC, pin: 0 }, 'open', doc, idx)).toBe(false);
+    expect(placeMatches(open, { part: RC }, 'open', doc, idx)).toBe(false);
+  });
+
+  it('kısa devre: iki düğümden birine dokunan yer; parçanın kendisi iki düğüme birden dokunmalı. Değer: parça ya da bacağı', () => {
+    const short: Fault = { kind: 'short', at: { part: Q1, pin: 0 }, to: { part: Q1, pin: 2 } };
+    expect(placeMatches(short, { part: Q1 }, 'short', doc, idx)).toBe(true);
+    expect(placeMatches(short, { wire: collectorWire.id }, 'short', doc, idx)).toBe(true);
+    expect(placeMatches(short, { part: id('RB') }, 'short', doc, idx)).toBe(false);
+    const value: Fault = { kind: 'value', part: RC, value: 560 };
+    expect(placeMatches(value, { part: RC }, 'value', doc, idx)).toBe(true);
+    expect(placeMatches(value, { part: RC, pin: 0 }, 'value', doc, idx)).toBe(true);
+    expect(faultExplain(value, doc, idx).title).toBe('RC şemadaki 5,6 kΩ yerine 560 Ω');
+  });
+
+  it('rastgele arıza: adayların hepsi belgeyle uyumlu; ölçü aletlerine, kaynaklara ve toprağa arıza konmaz; öncekinden farklı', () => {
+    const all = faultCandidates(doc, idx);
+    expect(all.length).toBeGreaterThan(5);
+    expect(all.every((f) => faultValid(f, doc))).toBe(true);
+    const banned = new Set(doc.parts.filter((p) => ['oscilloscope', 'funcgen', 'dcsupply', 'ground'].includes(p.type)).map((p) => p.id));
+    expect(all.some((f) => ('part' in f && banned.has(f.part)) || (f.kind === 'open' && 'part' in f.at && banned.has(f.at.part)))).toBe(false);
+    expect(randomFault(doc, idx, () => 0, all[0])).not.toEqual(all[0]);
   });
 });
 

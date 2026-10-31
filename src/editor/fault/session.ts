@@ -2,8 +2,7 @@
 // Sayfa yenilenince kayıtlı görevle birlikte geri gelir; yeni bir görev ya da görevden çıkış sıfırlar.
 // Rapor (.json) bunun içeriğidir.
 
-import type { FaultKind, Spot } from '../../model/faults';
-import { parseSpot } from '../../model/faults';
+import type { FaultKind } from '../../model/faults';
 import type { MeterMode } from './meter';
 
 /** Günlüğün bir satırı: her kararlı okuma kendiliğinden yazılır; aynı nokta ve kip bir kez. */
@@ -21,9 +20,12 @@ export interface LogEntry {
   readonly expected?: number;
 }
 
+/** Bildirimde arızanın yeri (R2): parça bacağı, parçanın kendisi (bacak yok) ya da kablo. */
+export type Place = { readonly part: string; readonly pin?: number } | { readonly wire: string };
+
 /** Öğrencinin bildirimi (R2): yer, tür, onu buraya götüren ölçümler; doğru mu. */
 export interface FaultReport {
-  readonly spot: Spot;
+  readonly place: Place;
   readonly kind: FaultKind;
   /** Günlükten işaretlenen satırlar (anahtar). */
   readonly evidence: readonly string[];
@@ -35,13 +37,13 @@ export interface FaultSession {
   readonly reports: readonly FaultReport[];
   /** Kullanılan ipucu sayısı (0–3). */
   readonly hints: number;
-  /** Arıza bulundu (doğru bildirim). */
-  readonly found: boolean;
+  /** Doğru bildirilen arızalar (görevdeki sırası); hepsi bulununca "Arıza bulundu" (R3). */
+  readonly found: readonly number[];
   /** "Onar ve çalıştır": arıza kalktı. */
   readonly repaired: boolean;
 }
 
-export const NEW_SESSION: FaultSession = { log: [], reports: [], hints: 0, found: false, repaired: false };
+export const NEW_SESSION: FaultSession = { log: [], reports: [], hints: 0, found: [], repaired: false };
 /** Günlüğün en uzun hâli (satır). */
 export const LOG_LIMIT = 200;
 
@@ -61,6 +63,13 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+export function parsePlace(v: unknown): Place | null {
+  if (!isRecord(v)) return null;
+  if (typeof v.part === 'string') return typeof v.pin === 'number' && Number.isInteger(v.pin) ? { part: v.part, pin: v.pin } : { part: v.part };
+  if (typeof v.wire === 'string') return { wire: v.wire };
+  return null;
+}
+
 const MODES: readonly MeterMode[] = ['dc', 'ac', 'ohm'];
 const KINDS: readonly FaultKind[] = ['open', 'short', 'value', 'reversed', 'burnt'];
 
@@ -76,11 +85,12 @@ export function parseSession(v: unknown): FaultSession {
   const reports: FaultReport[] = [];
   for (const raw of Array.isArray(v.reports) ? v.reports.slice(0, 50) : []) {
     if (!isRecord(raw)) continue;
-    const spot = parseSpot(raw.spot);
-    if (!spot || !KINDS.includes(raw.kind as FaultKind)) continue;
+    const place = parsePlace(raw.place);
+    if (!place || !KINDS.includes(raw.kind as FaultKind)) continue;
     const evidence = Array.isArray(raw.evidence) ? raw.evidence.filter((x): x is string => typeof x === 'string') : [];
-    reports.push({ spot, kind: raw.kind as FaultKind, evidence, correct: raw.correct === true });
+    reports.push({ place, kind: raw.kind as FaultKind, evidence, correct: raw.correct === true });
   }
   const hints = typeof v.hints === 'number' ? Math.max(0, Math.min(3, Math.round(v.hints))) : 0;
-  return { log, reports, hints, found: v.found === true, repaired: v.repaired === true };
+  const found = Array.isArray(v.found) ? [...new Set(v.found.filter((x): x is number => typeof x === 'number' && Number.isInteger(x) && x >= 0))] : [];
+  return { log, reports, hints, found, repaired: v.repaired === true };
 }

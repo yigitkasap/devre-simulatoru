@@ -73,3 +73,36 @@ export function ProbeLayer({ probes, toScreen, size, touch }: { probes: ProbeVie
     </>
   );
 }
+
+/** Şemada bir yerin halkası: bildirimde seçilen yer (mavi) ya da bulunan arıza (yeşil; R2, R3). */
+export interface PlaceMark {
+  readonly at: Point;
+  readonly label: string;
+  readonly tone: 'accent' | 'ok';
+}
+
+export function PlaceMarks({ marks, hint, toScreen }: { marks: readonly PlaceMark[]; hint: string | null; toScreen: (g: Point) => { x: number; y: number } }) {
+  return (
+    <>
+      {marks.map((m) => {
+        const p = toScreen(m.at);
+        const ok = m.tone === 'ok';
+        return (
+          <span key={`${m.at.x},${m.at.y},${m.tone}`} className="pointer-events-none absolute top-0 left-0" style={{ transform: `translate(${p.x}px, ${p.y}px)` }}>
+            <span className={`absolute h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 ${ok ? 'border-ok bg-ok/15' : 'border-accent bg-accent/15'}`} />
+            <span className={`absolute top-0 left-7 flex -translate-y-1/2 items-center gap-1.5 rounded-full px-2.5 py-1 text-label font-semibold whitespace-nowrap text-white shadow-sm ${ok ? 'bg-ok' : 'bg-accent'}`}>
+              {ok && <Icon name="check" className="h-3.5 w-3.5" />}
+              {m.label}
+            </span>
+          </span>
+        );
+      })}
+      {hint && (
+        <p className="pointer-events-none absolute bottom-4 left-1/2 m-0 flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-4 py-2 text-small font-medium whitespace-nowrap text-panel shadow-md">
+          <Icon name="flag" className="h-4 w-4" />
+          {hint}
+        </p>
+      )}
+    </>
+  );
+}
