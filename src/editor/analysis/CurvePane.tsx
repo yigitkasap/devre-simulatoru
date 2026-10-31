@@ -14,6 +14,7 @@ import { FAMILY, isP, sweepValues, type Curve } from './sweep';
 import { traceColor } from './traces';
 import type { TracerApi } from './useTracer';
 import { valueAt, XYChart } from './XYChart';
+import { SettingsSummary, useSettingsEditing } from './SettingsSummary';
 
 /** Eksen ve basamak adları (alt simgeli: "V_{DS}"); P tipinde başında eksi. */
 export function quantities(tracer: TracerApi): { x: string; y: string; step: string; stepUnit: 'V' | 'A'; load: string } {
@@ -81,6 +82,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
   const runRef = useRef(tracer.run);
   runRef.current = tracer.run;
   const busy = progress !== null;
+  const [editing, setEditing] = useSettingsEditing(busy);
   const partId = part?.id ?? null;
   useEffect(() => {
     if (!partId || busy || result?.key === tracer.key || tried.current === tracer.key) return undefined;
@@ -283,9 +285,19 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
     />
   );
 
+  // Telefonda tarama bitince ayarlar tek satırlık özete kapanır, grafik öne çıkar (analiz düzeltmeleri, 7).
+  const collapsed = compact && !editing && !busy && fresh !== null && curves.length > 0;
+  const summary = t.settingsSummary(
+    part.label,
+    t.modes[params.mode],
+    q.x,
+    formatNumber(params.from, 3).replace(/,?0+$/, ''),
+    formatNumber(params.to, 3).replace(/,?0+$/, ''),
+    family === 'diode' ? 0 : curves.length,
+  );
   return compact ? (
     <div className="flex flex-col gap-3">
-      {controls}
+      {collapsed ? <SettingsSummary text={summary} onEdit={() => setEditing(true)} /> : controls}
       {chart}
     </div>
   ) : (

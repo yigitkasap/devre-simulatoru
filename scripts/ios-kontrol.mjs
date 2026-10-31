@@ -1059,6 +1059,13 @@ try {
     await sheet.getByRole('tab', { name: 'Eğri' }).tap();
     await sheet.locator('p.rounded-full').waitFor({ timeout: 30000 }).catch(() => {});
     const pill = ((await sheet.locator('p.rounded-full').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    const curveEdit = sheet.getByRole('button', { name: /^Ayarları düzenle: / });
+    const curveSummary = ((await curveEdit.getAttribute('aria-label').catch(() => '')) ?? '').replace('Ayarları düzenle: ', '');
+    const curveBox = await sheet.getByRole('img', { name: /^Eğri izleyici/ }).boundingBox();
+    check('eğri izleyici (telefon, analiz düzeltmeleri 7): tarama bitince ayarlar tek satıra kapanıyor ("J1 · Çıkış ailesi · VDS 0–15 V · 4 basamak · Düzenle"), grafik kaydırmadan görünüyor',
+      /^J1 · Çıkış ailesi · VDS 0–15 V · \d basamak$/.test(curveSummary) && curveBox !== null && curveBox.y + curveBox.height <= ((await sheet.getByRole('button', { name: 'Yeniden tara' }).boundingBox())?.y ?? 0),
+      `${curveSummary} · grafik altı ${Math.round((curveBox?.y ?? 0) + (curveBox?.height ?? 0))}`);
+    await curveEdit.tap(); await page.waitForTimeout(200);
     const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab], [role=radio], select, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
     check('eğri izleyici (telefon): alt sayfada eğriler ve imleç satırı; denetimler ≥ 44 px; altta Yeniden tara ve CSV paylaş',
       /4,14.*1,78/.test(pill) && small.length === 0 && (await sheet.getByRole('button', { name: 'Yeniden tara' }).count()) === 1 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1,
@@ -1150,7 +1157,17 @@ try {
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(400);
     const sheet = page.getByRole('region', { name: 'Analiz' });
     await sheet.getByRole('tab', { name: 'Bode' }).tap();
-    await sheet.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
+    // Ölçüm bitince ayarlar tek satırlık özete kapanır, grafik öne çıkar (analiz düzeltmeleri, 7).
+    const edit = sheet.getByRole('button', { name: /^Ayarları düzenle: / });
+    await edit.waitFor({ timeout: 60000 }).catch(() => {});
+    const summary = ((await edit.getAttribute('aria-label').catch(() => '')) ?? '').replace('Ayarları düzenle: ', '');
+    const gainBox = await sheet.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox();
+    // Alttaki sabit düğmelerin (Yeniden ölç, CSV paylaş) üstünde kalmalı.
+    const viewH = (await sheet.getByRole('button', { name: 'Yeniden ölç' }).boundingBox())?.y ?? page.viewportSize().height;
+    check('Bode (telefon, analiz düzeltmeleri 7): ölçüm bitince ayarlar tek satıra kapanıyor ("FG1 → Q1 kollektör · 20 Hz–2 MHz · 16 nokta · Düzenle"), kazanç grafiği kaydırmadan görünüyor; Düzenle ayarları açıyor',
+      summary === 'FG1 → Q1 kollektör · 20 Hz–2 MHz · 16 nokta' && gainBox !== null && gainBox.y + gainBox.height <= viewH && (await sheet.getByText('✓ Ölçüm bitti').count()) === 0,
+      `${summary} · grafik ${Math.round(gainBox?.y ?? 0)}–${Math.round((gainBox?.y ?? 0) + (gainBox?.height ?? 0))} / ${viewH}`);
+    await edit.tap(); await page.waitForTimeout(200);
     const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab], select, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
     const note = await sheet.getByText(/iki ölçüm noktası arasında doğrusal ara değer/).count();
     const theoryChip = ((await sheet.getByRole('button', { name: 'Teori eğrisini göster' }).textContent().catch(() => '')) ?? '');

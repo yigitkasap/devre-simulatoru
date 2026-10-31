@@ -14,6 +14,7 @@ import { bodeSummary, toDb, type BodePoint } from './bode';
 import type { TheoryPoint, TheoryResult } from './bodeTheory';
 import { datedName, saveFile, toCsv, type CsvSeparator } from './format';
 import type { BodeApi } from './useBode';
+import { SettingsSummary, useSettingsEditing } from './SettingsSummary';
 import type { AnalysisApi } from './useAnalysis';
 import { InfoTip } from './InfoTip';
 import { MIN_CHART, valueAt, XYChart } from './XYChart';
@@ -71,6 +72,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   const runRef = useRef(bode.run);
   runRef.current = bode.run;
   const busy = bode.progress !== null;
+  const [editing, setEditing] = useSettingsEditing(busy);
   useEffect(() => {
     if (!bode.key || busy || bode.resultKey === bode.key || tried.current === bode.key) return undefined;
     const key = bode.key;
@@ -237,7 +239,8 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   const theoryOn = bode.showTheory && theory.length > 0;
   const theoryValueId = `${chartsId}-teori`;
   const strip = (
-    <div className={`flex items-center gap-2 text-label ${compact ? 'flex-wrap' : 'shrink-0 overflow-x-auto overscroll-contain whitespace-nowrap'}`}>
+    // Telefonda da tek satır (yana kayar): grafik öne çıksın (analiz düzeltmeleri, 7).
+    <div className="flex shrink-0 items-center gap-2 overflow-x-auto overscroll-contain text-label whitespace-nowrap">
       <span className="flex shrink-0 items-center gap-1.5 text-muted">
         <svg width="22" height="8" aria-hidden="true">
           <line x1="1" x2="21" y1="4" y2="4" stroke="var(--color-tr-1)" strokeWidth="2" />
@@ -287,10 +290,10 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
       </button>
       {info}
       {phaseToggle}
-      {/* f_H'nin ara değer olduğu: masaüstünde çipin ipucunda, telefonda görünür satırda. */}
-      {around && compact && <span className="basis-full text-muted">{t.fHNote(around[0]!, around[1]!)}</span>}
     </div>
   );
+  // f_H'nin ara değer olduğu: masaüstünde çipin ipucunda, telefonda grafiklerin altında görünür satırda.
+  const fhNote = around && compact ? <p className="m-0 text-label text-muted">{t.fHNote(around[0]!, around[1]!)}</p> : null;
 
   const footer =
     cur !== null && points.length > 0 ? (
@@ -340,14 +343,24 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   );
 
   if (compact) {
+    // Ölçüm bitince ayarlar tek satırlık özete kapanır, grafik öne çıkar (analiz düzeltmeleri, 7).
+    const collapsed = !editing && !busy && fresh && points.length > 0 && bode.output !== null;
     return (
       <div className="flex flex-col gap-3">
-        {controls}
+        {collapsed ? (
+          <SettingsSummary
+            text={t.settingsSummary(bode.input.short, bode.output!.short, hz(bode.range.from), hz(bode.range.to), bode.range.points)}
+            onEdit={() => setEditing(true)}
+          />
+        ) : (
+          controls
+        )}
         {strip}
         <div ref={chartsBox} className="flex flex-col gap-1">
           {gainChart(200)}
           {phaseChart(220)}
         </div>
+        {fhNote}
       </div>
     );
   }

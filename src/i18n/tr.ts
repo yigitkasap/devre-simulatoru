@@ -2929,6 +2929,8 @@ export const tr = {
   analysis: {
     button: 'Analiz',
     title: 'Analiz',
+    editSettings: 'Düzenle',
+    editSettingsLabel: (summary: string) => `Ayarları düzenle: ${summary}`,
     tabs: { graph: 'Grafik', table: 'Tablo', curve: 'Eğri izleyici', bode: 'Bode' },
     tabsShort: { graph: 'Grafik', table: 'Tablo', curve: 'Eğri', bode: 'Bode' },
     tabsLabel: 'Analiz sekmeleri',
@@ -3017,7 +3019,9 @@ export const tr = {
       part: 'Parça',
       partOption: (label: string, model: string, kind: string) => `${label} · ${model ? `${model}, ` : ''}${kind}`,
       none: 'Devrede taranacak parça yok: diyot, zener, LED, JFET, MOSFET ya da BJT ekle.',
-      modes: { output: 'Çıkış ailesi', transfer: 'Transfer' },
+      modes: { output: 'Çıkış ailesi', transfer: 'Transfer', diode: 'I–V eğrisi' },
+      settingsSummary: (part: string, mode: string, x: string, from: string, to: string, steps: number) =>
+        `${part} · ${mode} · ${x} ${from}–${to} V${steps > 0 ? ` · ${steps} basamak` : ''}`,
       modeLabel: 'Eğri türü',
       swept: 'Taranan',
       stepsLabel: 'Basamak',
@@ -3054,6 +3058,7 @@ export const tr = {
       to: 'Bitiş frekansı (Hz)',
       points: 'Nokta sayısı (logaritmik)',
       rangeText: (a: string, b: string, n: number) => `${a} → ${b} · ${n} nokta`,
+      settingsSummary: (input: string, output: string, from: string, to: string, n: number) => `${input} → ${output} · ${from}–${to} · ${n} nokta`,
       method: 'Her noktada oturmayı bekler, 2 periyot ölçer.',
       limit: (max: string) => `Kaynak en çok ${max} verir; aralık bu sınırda kalır.`,
       measuring: 'Ölçülüyor',
