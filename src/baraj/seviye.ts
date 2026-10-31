@@ -187,6 +187,12 @@ export function katDevreleri(doc: CircuitDoc, frame: FrameData | null, wet: read
 /** Devre tamamlandı mı: probdan baz direncine akım geçiyor (su devreyi kapatıyor). */
 export const circuitClosed = (kat: KatDevresi) => kat.currents !== null && kat.currents.probe > PATH_CURRENT;
 
+/**
+ * Kuru prob notuna girer mi: prob kuru ve devresi de tamamlanmamış. Su probun ucuna değince akım,
+ * prob "ıslak" sayılmadan (ıslanma bandının yarısı) başlar; o arada kat tamamlandı yazılır, kuru yazılmaz.
+ */
+export const dryOpen = (kat: KatDevresi) => !kat.wet && !circuitClosed(kat);
+
 /** Bir dal vurgulanır mı: simülasyon var ve akım eşiğin üstünde. */
 export const carries = (current: number | null | undefined) => current !== null && current !== undefined && current > PATH_CURRENT;
 

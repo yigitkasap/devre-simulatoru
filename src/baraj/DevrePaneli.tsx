@@ -14,7 +14,7 @@ import { useId, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, ty
 import { Icon } from '../editor/icons';
 import { tr } from '../i18n/tr';
 import { formatNumber, formatSI } from '../sim/units';
-import { carries, circuitClosed, conducting, LEVEL_COLORS, milliamps, type KatDevresi, type LevelNo, type Region } from './seviye';
+import { carries, circuitClosed, conducting, dryOpen, LEVEL_COLORS, milliamps, type KatDevresi, type LevelNo, type Region } from './seviye';
 import { FloorsIcon } from './simgeler';
 
 export type CircuitTab = LevelNo | 'all';
@@ -159,7 +159,7 @@ function floorAria(kat: KatDevresi): string {
 function allAria(katlar: readonly KatDevresi[], battery: string): string {
   const t = tr.baraj.panel;
   const parts = katlar.filter(circuitClosed).map((k) => `${t.closed(k.level)} ${loopChain(k, battery).join(' → ')}.`);
-  const dry = katlar.filter((k) => !k.wet).map((k) => k.level);
+  const dry = katlar.filter(dryOpen).map((k) => k.level);
   if (dry.length > 0) parts.push(`${t.dryNote(dry)}.`);
   return t.allLabel(parts);
 }
@@ -720,7 +720,7 @@ export function DevrePaneli({ variant, katlar, tab, onTab, level, supply, batter
   }
 
   const closed = katlar.filter(circuitClosed);
-  const dry = katlar.filter((k) => !k.wet).map((k) => k.level);
+  const dry = katlar.filter(dryOpen).map((k) => k.level);
   const anySim = katlar.some((k) => k.currents !== null);
   const textSize = big ? 'text-[16px]' : 'text-body';
 
@@ -792,7 +792,8 @@ export function DevrePaneli({ variant, katlar, tab, onTab, level, supply, batter
       {tab === 'all' && (
         // Durum alanının yüksekliği sabit: su doldukça ya da alçaldıkça satır sayısı değişir, çizim
         // aşağı yukarı oynamasın diye en uzun hâl (bütün katlar tamamlandı) aynı hücrede görünmez yer
-        // tutar. Tamamlanan katlar ve kuru prob notu birlikte kat sayısını geçmez, not satırı da bir
+        // tutar. Bir kat ya tamamlandı ya da kuru notunda yazılır (dryOpen), ikisi birden olmaz: satırlar
+        // birlikte kat sayısını geçmez, not satırı da bir
         // tamamlandı satırından kısadır. Yer tutucunun yazısı CSS'le (attr) çizilir: sayfanın metnine
         // ve ekran okuyucuya girmez, satırları gerçeğiyle aynı genişlikte kırılır.
         <div className={`grid shrink-0 border-b border-line bg-panel-2 ${sheet ? 'px-4 py-2.5 text-small' : `px-5 py-2.5 ${textSize}`}`}>

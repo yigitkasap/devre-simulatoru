@@ -7,6 +7,7 @@ import {
   bandOf,
   carries,
   circuitClosed,
+  dryOpen,
   flowToward,
   katDevreleri,
   milliamps,
@@ -95,6 +96,16 @@ describe('Baraj sayfası: seviye mantığı', () => {
       expect(circuitClosed(k)).toBe(false);
       expect(carries(k.currents!.led)).toBe(false);
     }
+  });
+
+  it('çubuk gösterge %87: su Prob 3’ün ucuna değdi, akım geçiyor; kat tamamlandı sayılır, kuru notuna girmez', () => {
+    const doc = load('baraj-cubuk', { level: 87, mode: 'stop' });
+    const sim = simOf(doc);
+    sim.runUntil(2);
+    const k3 = katDevreleri(doc, frameOf(sim, doc), wetOf(sim, doc))[2]!;
+    expect(k3.wet).toBe(false);
+    expect(circuitClosed(k3)).toBe(true);
+    expect(dryOpen(k3)).toBe(false);
   });
 
   it('çubuk gösterge: su probun altına inince prob yolu kesiliyor, bazı bir süre kondansatör besliyor', () => {
