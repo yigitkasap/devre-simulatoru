@@ -1,6 +1,6 @@
 // Çözüm motorunun genel API'si. Arayüz motoru yalnızca bu dosya üzerinden kullanır.
 
-export { CircuitSimulator, type AdvanceResult, type SimulatorOptions } from './engine';
+export { CircuitSimulator, type AdvanceResult, type Linearized, type SimulatorOptions } from './engine';
 export { ARDUINO, ARDUINO_IO, ArduinoDevice, arduinoPinLabel } from './devices/arduino';
 export { METER_MODES, type MeterMode } from './averager';
 export { mergeStats, type KeyStats, type WatchKind } from './watch';

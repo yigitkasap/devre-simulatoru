@@ -1,6 +1,7 @@
 // Ölçülen Bode paneli (A4, N4): solda giriş ve çıkış, frekans aralığı ve nokta sayısı, ilerleme; sağda
 // kazanç (dB) ve faz (°) alt alta, aynı logaritmik frekans ekseninde, ölçüm noktaları nokta olarak.
 // Orta bant ve −3 dB noktası kendiliğinden: kesikli −3 dB çizgisi, f_H'de dikey işaret, çipler.
+// Teori eğrisi (A5, küçük sinyal AC) kesikli, aynı renkte; "Teori" düğmesiyle gizlenir.
 
 import { useEffect, useRef, useState } from 'react';
 import { tr } from '../../i18n/tr';
@@ -8,6 +9,7 @@ import { formatNumber, formatSI } from '../../sim/units';
 import { Rich } from '../Rich';
 import { useTouchUi } from '../touchUi';
 import { bodeSummary, toDb, type BodePoint } from './bode';
+import type { TheoryPoint, TheoryResult } from './bodeTheory';
 import { datedName, saveFile, toCsv, type CsvSeparator } from './format';
 import type { BodeApi } from './useBode';
 import type { AnalysisApi } from './useAnalysis';
@@ -17,13 +19,21 @@ const hz = (f: number) => formatSI(f, 'Hz', { digits: 3, trim: true });
 /** Frekans kutusundaki yazı: "20", "1k", "2M" (k ve M ile yazılabilir). */
 const hzShort = (f: number) => formatSI(f, '', { digits: 3, trim: true }).replace(/\s/g, '');
 
-export function bodeCsv(points: readonly BodePoint[], sep: CsvSeparator): Blob {
-  const rows = points.map((p) => [p.f, p.inAmp, p.outAmp, p.gain, toDb(p.gain), p.phase, p.settled ? 1 : 0]);
+/** Ölçüm noktasıyla aynı frekanstaki teori noktası (teori bu frekanslarda da hesaplanır). */
+const theoryAt = (theory: readonly TheoryPoint[], f: number) => theory.find((p) => Math.abs(p.f / f - 1) < 1e-6) ?? null;
+
+export function bodeCsv(points: readonly BodePoint[], sep: CsvSeparator, theory: readonly TheoryPoint[] = []): Blob {
+  const rows = points.map((p) => {
+    const t = theoryAt(theory, p.f);
+    return [p.f, p.inAmp, p.outAmp, p.gain, toDb(p.gain), p.phase, p.settled ? 1 : 0, t?.gain ?? '', t?.phase ?? ''];
+  });
   return new Blob([toCsv(tr.analysis.bode.csvHeader, rows, sep)], { type: 'text/csv;charset=utf-8' });
 }
 
+const theoryPoints = (theory: TheoryResult | null): readonly TheoryPoint[] => (theory?.ok ? theory.points : []);
+
 export function saveBode(bode: BodeApi, sep: CsvSeparator, share: boolean): void {
-  if (bode.points.length > 0) void saveFile(datedName(tr.analysis.bode.file, 'csv'), bodeCsv(bode.points, sep), share);
+  if (bode.points.length > 0) void saveFile(datedName(tr.analysis.bode.file, 'csv'), bodeCsv(bode.points, sep, theoryPoints(bode.theory)), share);
 }
 
 /** Orta bant kazancı (kat ve dB) ve −3 dB frekanslarını tabloya aktarır. */
@@ -73,11 +83,20 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   const unsettled = points.filter((p) => !p.settled).length;
   const fs = points.map((p) => p.f);
   const cur = points.length > 0 ? Math.min(fs[fs.length - 1]!, Math.max(fs[0]!, cursor ?? s?.mid.f ?? fs[0]!)) : null;
-  const gainSeries = [{ id: 'g', color: 0, points: points.map((p) => [p.f, toDb(p.gain)] as const), dots: true }];
-  const phaseSeries = [{ id: 'p', color: 3, points: points.map((p) => [p.f, p.phase] as const), dots: true }];
+  const theory = fresh ? theoryPoints(bode.theory) : [];
+  const showTheory = bode.showTheory && theory.length > 0;
+  const ts = theory.length > 0 ? bodeSummary(theory.map((p) => ({ ...p, inAmp: 1, outAmp: p.gain, settled: true }))) : null;
+  const gainSeries = [
+    { id: 'g', color: 0, points: points.map((p) => [p.f, toDb(p.gain)] as const), dots: true },
+    ...(showTheory ? [{ id: 'gt', color: 0, points: theory.map((p) => [p.f, toDb(p.gain)] as const), dashed: true }] : []),
+  ];
+  const phaseSeries = [
+    { id: 'p', color: 3, points: points.map((p) => [p.f, p.phase] as const), dots: true },
+    ...(showTheory ? [{ id: 'pt', color: 3, points: theory.map((p) => [p.f, p.phase] as const), dashed: true }] : []),
+  ];
   const target = s ? toDb(s.mid.gain) - 3 : null;
-  // Kazanç ekseni sıfırdan değil, ölçülenin biraz altından başlar (tasarım: 20 … 50 dB).
-  const dbs = points.map((p) => toDb(p.gain));
+  // Kazanç ekseni sıfırdan değil, ölçülenin (ve teorinin) biraz altından başlar (tasarım: 20 … 50 dB).
+  const dbs = [...points.map((p) => toDb(p.gain)), ...(showTheory ? theory.map((p) => toDb(p.gain)) : [])];
   const gainRange = dbs.length > 0 ? ([Math.floor(Math.min(...dbs) - 5), Math.ceil(Math.max(...dbs) + 3)] as const) : undefined;
   const vLines = s?.fH ? [{ x: s.fH }] : [];
   // f_H'nin iki yanındaki ölçüm noktaları (ipucu).
@@ -143,6 +162,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
         </span>
         <span className="font-mono text-ink">{t.rangeText(hz(bode.range.from), hz(bode.range.to), bode.range.points)}</span>
         <span>{t.method}</span>
+        <span>{t.theoryNote}</span>
         {bode.limits && <span>{t.limit(hz(bode.limits.max))}</span>}
       </div>
       <div className="flex flex-col gap-1">
@@ -188,6 +208,14 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
           <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fL)}`}</b>
         </span>
       )}
+      {showTheory && ts && (
+        <span className="flex flex-col rounded-lg border border-dashed border-line-2 bg-panel px-2.5 py-1">
+          <span className="text-muted">{t.theory}</span>
+          <b className="font-mono font-semibold tabular">
+            <Rich text={t.theoryValue(formatNumber(ts.mid.gain, 1), ts.fH !== null ? hz(ts.fH) : null)} />
+          </b>
+        </span>
+      )}
       {/* f_H'nin ara değer olduğu: masaüstünde çipin ipucunda, telefonda görünür satırda. */}
       {around && compact && <span className="self-center text-muted">{t.fHNote(around[0]!, around[1]!)}</span>}
     </div>
@@ -195,14 +223,47 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
 
   const footer =
     cur !== null && points.length > 0 ? (
-      <p className="m-0 mx-auto mt-1 rounded-full border border-line bg-panel px-3 py-1 font-mono text-label">
+      <p className="m-0 mx-auto mt-1 rounded-full border border-line bg-panel px-3 py-1 text-center font-mono text-label">
         {t.cursor(hz(cur), formatNumber(10 ** (valueAt(gainSeries[0]!.points, cur) / 20), 1), formatNumber(valueAt(gainSeries[0]!.points, cur), 2), formatNumber(valueAt(phaseSeries[0]!.points, cur), 1))}
+        {showTheory && (
+          <span className="text-muted">
+            {` · ${t.theoryCursor(formatNumber(10 ** (valueAt(gainSeries[1]!.points, cur) / 20), 1), formatNumber(valueAt(phaseSeries[1]!.points, cur), 1))}`}
+          </span>
+        )}
       </p>
     ) : null;
+
+  // Gösterge: ölçülen (çizgi ve nokta) ve Teori düğmesi (kesikli); teori hesaplanamadıysa nedeni.
+  const legend = (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-label text-muted">
+      <span className="flex items-center gap-1.5">
+        <svg width="22" height="8" aria-hidden="true">
+          <line x1="1" x2="21" y1="4" y2="4" stroke="var(--color-ink-2)" strokeWidth="2" />
+          <circle cx="11" cy="4" r="2.5" fill="var(--color-ink-2)" />
+        </svg>
+        {t.measured}
+      </span>
+      <button
+        type="button"
+        aria-pressed={bode.showTheory}
+        aria-label={t.theoryToggleLabel}
+        disabled={theory.length === 0}
+        onClick={() => bode.setShowTheory(!bode.showTheory)}
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 disabled:opacity-50 ${touch ? 'h-11' : 'h-7'} ${bode.showTheory ? 'border-accent-line bg-accent-soft text-accent-ink' : 'border-line-2 text-muted'}`}
+      >
+        <svg width="22" height="8" aria-hidden="true">
+          <line x1="1" x2="21" y1="4" y2="4" stroke="currentColor" strokeWidth="1.75" strokeDasharray="5 3" />
+        </svg>
+        {t.theory}
+      </button>
+      {fresh && bode.theory && !bode.theory.ok && <span className="text-warn">{t.theoryFailed[bode.theory.reason]}</span>}
+    </div>
+  );
 
   const charts = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
       {chips}
+      {legend}
       <XYChart
         series={gainSeries}
         xLabel=""
@@ -211,7 +272,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
         cursor={cur}
         onCursor={setCursor}
         cursorText={(f) => hz(f)}
-        ariaLabel={t.gainLabel(points.length)}
+        ariaLabel={t.gainLabel(points.length, showTheory)}
         hLines={target !== null ? [{ y: target, label: t.minus3(formatNumber(target, 1)) }] : []}
         {...(gainRange ? { yRange: gainRange } : {})}
         vLines={vLines}
@@ -226,7 +287,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
         cursor={cur}
         onCursor={setCursor}
         cursorText={(f) => hz(f)}
-        ariaLabel={t.phaseLabel(points.length)}
+        ariaLabel={t.phaseLabel(points.length, showTheory)}
         vLines={vLines}
         compact={compact}
         footer={footer}

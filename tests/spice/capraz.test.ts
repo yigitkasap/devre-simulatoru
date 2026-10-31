@@ -8,6 +8,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { CircuitSimulator, type Netlist } from '../../src/sim';
 import { circuit } from '../helpers';
+import { theoryBode } from '../../src/editor/analysis/bodeTheory';
 import { spiceNode, toSpice } from './netlist';
 import { complexValues, realValues, spiceEngine } from './run';
 
@@ -231,6 +232,55 @@ suite('Fizik 6: ngspice ile AC karşılaştırması (.ac, en fazla %1)', () => {
     record('RC süzgeç (AC)', 'faz (°)', refPhase, phase, dPhase, 1e-2);
     expect(dAmp).toBeLessThanOrEqual(1e-2);
     expect(dPhase).toBeLessThanOrEqual(1e-2);
+  });
+});
+
+suite('Küçük sinyal AC (A5): Bode Teori eğrisi ngspice .ac ile', () => {
+  it('BC107 ortak emetörlü yükselteç: orta bant kazancı %1, faz 1°, üst kesim %5 içinde', async () => {
+    const net: Netlist = {
+      elements: [
+        { id: 'S', type: 'acsource', props: { waveform: 'sine', amplitude: 0.001, frequency: 1000, offset: 0, internalResistance: 0 }, pins: ['in', 'g'] },
+        { id: 'Cin', type: 'capacitor', props: { capacitance: 10e-6, kind: 'film' }, pins: ['in', 'b'] },
+        { id: 'RB', type: 'resistor', props: { resistance: 2.2e6 }, pins: ['vcc', 'b'] },
+        { id: 'RC', type: 'resistor', props: { resistance: 5600 }, pins: ['vcc', 'c'] },
+        { id: 'Q', type: 'npn', props: { model: 'BC107', beta: 200 }, pins: ['c', 'b', 'g'] },
+        { id: 'V', type: 'battery', props: { voltage: 12, internalResistance: 0 }, pins: ['vcc', 'g'] },
+        { id: 'G', type: 'ground', props: {}, pins: ['g'] },
+      ],
+      links: [],
+    };
+    const sp = toSpice(net, { acMagnitude: true });
+    const result = await run(['* BC107 OE yükselteç', ...sp.lines, '.ac dec 4 10 1e8', '.end'].join('\n'));
+    const freqs = complexValues(result, 'frequency').map((v) => v.real);
+    const ref = complexValues(result, `v(${spiceNode(sp.compiled, 'c')})`);
+    const theory = theoryBode({ netlist: net, source: 'S', input: { a: 'in', b: 'g' }, output: { a: 'c', b: 'g' }, from: 10, to: 1e8, points: freqs.length }, freqs);
+    expect(theory.ok).toBe(true);
+    if (!theory.ok) return;
+    const refGain = ref.map((h) => Math.hypot(h.real, h.img));
+    const refPhase = ref.map((h) => (Math.atan2(h.img, h.real) * 180) / Math.PI);
+    const mid = freqs.findIndex((f) => f >= 1000);
+    const dGain = Math.abs(theory.points[mid]!.gain - refGain[mid]!) / refGain[mid]!;
+    const dPhase = Math.abs(((theory.points[mid]!.phase - refPhase[mid]! + 540) % 360) - 180);
+    record('Küçük sinyal AC', '|H| (1 kHz)', refGain[mid]!, theory.points[mid]!.gain, dGain, 1e-2);
+    record('Küçük sinyal AC', 'faz (1 kHz, °)', refPhase[mid]!, theory.points[mid]!.phase, dPhase / 180, 1e-2);
+    // Üst kesim: kazancın orta banttan 3 dB düştüğü ilk frekans (dB – log f ara değeri).
+    const cutoff = (gains: readonly number[]) => {
+      const target = gains[mid]! / Math.SQRT2;
+      for (let i = mid; i + 1 < gains.length; i++) {
+        if (gains[i + 1]! < target) {
+          const t = (20 * Math.log10(gains[i]! / target)) / (20 * Math.log10(gains[i]! / gains[i + 1]!));
+          return 10 ** (Math.log10(freqs[i]!) + t * (Math.log10(freqs[i + 1]!) - Math.log10(freqs[i]!)));
+        }
+      }
+      return Number.NaN;
+    };
+    const fhRef = cutoff(refGain);
+    const fh = cutoff(theory.points.map((p) => p.gain));
+    const dFh = Math.abs(fh - fhRef) / fhRef;
+    record('Küçük sinyal AC', 'f_H (Hz)', fhRef, fh, dFh, 5e-2);
+    expect(dGain).toBeLessThanOrEqual(1e-2);
+    expect(dPhase).toBeLessThanOrEqual(1);
+    expect(dFh).toBeLessThanOrEqual(5e-2);
   });
 });
 

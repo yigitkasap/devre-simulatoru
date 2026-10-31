@@ -31,6 +31,15 @@ import { ZenerDevice } from '../../src/sim/devices/zener';
 
 const GROUND = -1;
 
+/** Bir eklemin yük parametreleri (bjt.ts → NPN_CHARGES). */
+interface ChargeCard {
+  readonly cj0: number;
+  readonly vj: number;
+  readonly m: number;
+  readonly tt: number;
+  readonly fc: number;
+}
+
 /** SPICE'ta bir düğümün adı: toprak 0, öbürleri n<indeks>. */
 export const nodeName = (node: number): string => (node === GROUND ? '0' : `n${node}`);
 
@@ -149,6 +158,11 @@ export function toSpice(netlist: Netlist, options: { acMagnitude?: boolean } = {
             NF: 1,
             NR: 1,
           };
+      // Eklem yükleri (BC107): boşluk kapasiteleri ve geçiş süresi (küçük sinyal AC karşılaştırması için).
+      const charges = (device as unknown as { charges: { be: ChargeCard; bc: ChargeCard } | null }).charges;
+      if (charges) {
+        Object.assign(params, { CJE: charges.be.cj0, VJE: charges.be.vj, MJE: charges.be.m, TF: charges.be.tt, CJC: charges.bc.cj0, VJC: charges.bc.vj, MJC: charges.bc.m, FC: charges.be.fc });
+      }
       models.set(name, `.model ${name} ${device.type === 'npn' ? 'NPN' : 'PNP'}(${Object.entries(params).map(([k, v]) => `${k}=${num(v)}`).join(' ')})`);
       lines.push(`Q${id} ${n(device, 0)} ${n(device, 1)} ${n(device, 2)} ${name}`);
     } else if (device.type === 'nmos') {

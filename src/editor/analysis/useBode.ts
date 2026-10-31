@@ -12,6 +12,7 @@ import { sourceLimits, type BodePoint, type Probe } from './bode';
 import type { TraceLabel } from './traces';
 import { nodeName, type NetIndex } from './traces';
 import type { WorkerReply, WorkerRequest } from './sweep.worker';
+import type { TheoryResult } from './bodeTheory';
 
 export interface BodeOption {
   readonly key: string;
@@ -44,6 +45,10 @@ export interface BodeApi {
   readonly key: string;
   readonly progress: { readonly done: number; readonly total: number } | null;
   readonly error: string | null;
+  /** Teori eğrisi (küçük sinyal AC, A5): ölçümle aynı çalıştırmada, ölçümden önce gelir. */
+  readonly theory: TheoryResult | null;
+  readonly showTheory: boolean;
+  readonly setShowTheory: (on: boolean) => void;
   readonly run: () => void;
   readonly cancel: () => void;
 }
@@ -96,6 +101,8 @@ export function useBode(doc: CircuitDoc, connectivity: Connectivity, idx: NetInd
   const [resultKey, setResultKey] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [theory, setTheory] = useState<TheoryResult | null>(null);
+  const [showTheory, setShowTheory] = useState(true);
   const worker = useRef<Worker | null>(null);
   const cancel = useCallback(() => {
     worker.current?.terminate();
@@ -111,6 +118,7 @@ export function useBode(doc: CircuitDoc, connectivity: Connectivity, idx: NetInd
     if (!i || !o) return;
     setError(null);
     setPoints([]);
+    setTheory(null);
     setResultKey(k);
     setProgress({ done: 0, total: r.points });
     const w = new Worker(new URL('./sweep.worker.ts', import.meta.url), { type: 'module' });
@@ -118,7 +126,9 @@ export function useBode(doc: CircuitDoc, connectivity: Connectivity, idx: NetInd
     const collected: BodePoint[] = [];
     w.onmessage = (ev: MessageEvent<WorkerReply>) => {
       const reply = ev.data;
-      if (reply.type === 'bodePoint') {
+      if (reply.type === 'theory') {
+        setTheory(reply.result);
+      } else if (reply.type === 'bodePoint') {
         collected.push(reply.point);
         setPoints([...collected]);
         setProgress({ done: reply.done, total: reply.total });
@@ -138,5 +148,5 @@ export function useBode(doc: CircuitDoc, connectivity: Connectivity, idx: NetInd
     w.postMessage({ kind: 'bode', request: { netlist: conn.netlist, source: i.source, input: i.probe, output: o.probe, from: r.from, to: r.to, points: r.points } } satisfies WorkerRequest);
   }, []);
   const setRange = useCallback((patch: Partial<BodeRange>) => setRangeState((r) => ({ ...r, ...patch })), []);
-  return { inputs, outputs, input, output, setInput, setOutput, range, setRange, limits, points, resultKey, key, progress, error, run, cancel };
+  return { inputs, outputs, input, output, setInput, setOutput, range, setRange, limits, points, resultKey, key, progress, error, theory, showTheory, setShowTheory, run, cancel };
 }

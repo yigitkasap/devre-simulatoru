@@ -2,7 +2,8 @@
 // parçacığı sonlandırılarak yapılır (tarama yarıda kalır, sonuç gönderilmez).
 
 import type { Netlist } from '../../sim';
-import { measureBode, type BodePoint, type BodeRequest } from './bode';
+import { logFrequencies, measureBode, sourceLimits, type BodePoint, type BodeRequest } from './bode';
+import { theoryAt, type TheoryResult } from './bodeTheory';
 import { loadLine, runSweep, type SweepRequest } from './sweep';
 
 export type WorkerRequest =
@@ -12,9 +13,23 @@ export type WorkerRequest =
 export type WorkerReply =
   | { readonly type: 'progress'; readonly done: number; readonly total: number }
   | { readonly type: 'curves'; readonly curves: ReturnType<typeof runSweep>; readonly load: ReturnType<typeof loadLine> }
+  | { readonly type: 'theory'; readonly result: TheoryResult }
   | { readonly type: 'bodePoint'; readonly point: BodePoint; readonly done: number; readonly total: number }
   | { readonly type: 'bodeDone'; readonly points: readonly BodePoint[] }
   | { readonly type: 'error'; readonly message: string };
+
+/**
+ * Teorinin frekansları: ölçümünkiler (CSV'de aynı satırda) ve aralığı sık örnekleyen 80 nokta;
+ * ölçülenle aynı aralık (kaynağın sınırına kırpılmış).
+ */
+function theoryFrequencies(req: BodeRequest): number[] {
+  const type = req.netlist.elements.find((e) => e.id === req.source)?.type ?? 'funcgen';
+  const { min, max } = sourceLimits(type);
+  const clamp = (f: number) => Math.min(max, Math.max(min, f));
+  const [from, to] = [clamp(req.from), clamp(req.to)];
+  const all = [...logFrequencies(from, to, req.points), ...logFrequencies(from, to, 80)].sort((a, b) => a - b);
+  return all.filter((f, i) => i === 0 || f / all[i - 1]! > 1 + 1e-9);
+}
 
 const post = (reply: WorkerReply) => (self as unknown as { postMessage: (m: WorkerReply) => void }).postMessage(reply);
 
@@ -33,7 +48,19 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
       const load = msg.netlist && msg.request.mode === 'output' ? loadLine(msg.netlist, msg.dutId, msg.labels) : null;
       post({ type: 'curves', curves, load });
     } else if (msg.kind === 'bode') {
-      const points = measureBode(msg.request, (point, i, total) => post({ type: 'bodePoint', point, done: i + 1, total }));
+      // Teori (küçük sinyal, A5): ölçüm DC'de oturur oturmaz aynı simülatörden; ölçülen noktalar üstüne gelir.
+      const request = msg.request;
+      let theory = false;
+      const points = measureBode(
+        request,
+        (point, i, total) => post({ type: 'bodePoint', point, done: i + 1, total }),
+        undefined,
+        (sim) => {
+          theory = true;
+          post({ type: 'theory', result: theoryAt(sim, request, theoryFrequencies(request)) });
+        },
+      );
+      if (!theory) post({ type: 'theory', result: { ok: false, reason: 'run' } });
       post({ type: 'bodeDone', points });
     }
   } catch (err) {

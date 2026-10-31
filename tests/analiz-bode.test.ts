@@ -42,7 +42,8 @@ describe('Analiz: ölçülen Bode', () => {
     expect(Math.abs(p!.phase + 180)).toBeLessThan(3);
     expect(p!.settled).toBe(true);
     expect(p!.inAmp).toBeCloseTo(0.0099, 4);
-  });
+    // Önce DC çalışma noktası çözülür (atOperatingPoint); paralel çalıştırmada 5 s'yi aşabiliyor.
+  }, 60000);
 
   it('orta bant ve f_H referans veriden: ≈ 205,5 kat (46,3 dB), f_H ≈ 0,82 MHz', () => {
     const points: BodePoint[] = (bode.satirlar as number[][]).map(([f, inAmp, outAmp, gain, phase]) => ({ f: f!, inAmp: inAmp!, outAmp: outAmp!, gain: gain!, phase: phase!, settled: true }));

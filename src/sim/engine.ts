@@ -64,6 +64,21 @@ export interface SimulatorOptions {
   readonly homotopy?: 'auto' | 'none' | 'gmin' | 'source';
 }
 
+/**
+ * Çalışma noktasında doğrusallaştırılmış devre (küçük sinyal AC çözümlemesi için): her frekansta
+ * Y(jω) = G + jω·C. Matrisler satır öncelikli, size × size; bilinmeyenler motorunkiyle aynı (düğüm
+ * gerilimleri, sonra kaynak akımları).
+ */
+export interface Linearized {
+  readonly size: number;
+  readonly G: Float64Array;
+  readonly C: Float64Array;
+  /** Anahtarın (uç ya da kablo) düğümünün bilinmeyen indeksi; toprak −1, devrede yoksa null. */
+  readonly nodeOf: (key: string) => number | null;
+  /** Bileşenin k. akım bilinmeyeni (gerilim kaynağının satırı); yoksa null. */
+  readonly branchOf: (id: string, k?: number) => number | null;
+}
+
 export interface AdvanceResult {
   readonly ok: boolean;
   /** Bu çağrıda yapılan zaman adımı sayısı. */
@@ -98,6 +113,11 @@ const GROUND_RETURN_MIN = 1e-6;
 const GROUND_RETURN_FRACTION = 0.01;
 /** Kare ortalamaları için periyot başına alınan örnek (her adımda değil; hesap yükünü azaltır). */
 const AVERAGE_SAMPLES_PER_PERIOD = 25;
+/**
+ * linearize()'ın adım boyları (h, 2h, 4h): C/h terimi G'ye göre ne çok küçük (yuvarlama) ne çok büyük
+ * (G'nin kaybolması) olsun diye 1 µs (100 µF'ta C/h = 100 S, 1 pF'ta 1 µS).
+ */
+const LINEARIZE_STEP = 1e-6;
 
 export class CircuitSimulator {
   private circuit: CompiledCircuit;
@@ -590,6 +610,48 @@ export class CircuitSimulator {
     const node = this.circuit.nodeOfRoot.get(this.circuit.nets.findKey(key));
     if (node === undefined) return null;
     return node < 0 ? 0 : this.x[node]!;
+  }
+
+  /**
+   * Küçük sinyal (AC) çözümlemesi için şu anki çözümde (çalışma noktası) doğrusallaştırılmış sistem.
+   * Newton'un kullandığı katkılar (bileşenlerin Jacobian'ı) geri Euler'le üç adım boyunda kurulur:
+   * yük depolayan her öğe A(h) = G + C/h biçiminde katkı yapar. İki h'nin farkından C, birinden G
+   * çıkar; üçüncü h bu biçimi doğrular (uymayan bir katkı varsa null). Yalnızca okur: çözüm, adım ve
+   * bileşenlerin durumu değişmez (katkılar yeni bir sisteme yazılır).
+   */
+  linearize(): Linearized | null {
+    const n = this.circuit.size;
+    const at = (h: number): Float64Array => {
+      const sys = new MnaSystem(n);
+      const ctx: StepContext = { h, trap: false, sourceScale: 1, time: this.time, window: this.window };
+      for (const node of this.floating) sys.add(node, node, GMIN);
+      for (const device of this.circuit.devices) device.stampStatic(sys, ctx);
+      for (const device of this.nonlinearDevices) device.stampNonlinear(sys, ctx);
+      return sys.A;
+    };
+    const [h1, h2, h3] = [LINEARIZE_STEP, 2 * LINEARIZE_STEP, 4 * LINEARIZE_STEP];
+    const a1 = at(h1);
+    const a2 = at(h2);
+    const a3 = at(h3);
+    const G = new Float64Array(n * n);
+    const C = new Float64Array(n * n);
+    const k = 1 / h1 - 1 / h2;
+    for (let i = 0; i < n * n; i++) {
+      const c = (a1[i]! - a2[i]!) / k;
+      const g = a1[i]! - c / h1;
+      const scale = Math.max(Math.abs(a1[i]!), Math.abs(a2[i]!), Math.abs(a3[i]!));
+      if (Math.abs(g + c / h3 - a3[i]!) > 1e-9 * scale + 1e-18) return null;
+      G[i] = g;
+      C[i] = c;
+    }
+    const { nets, nodeOfRoot, deviceById } = this.circuit;
+    return {
+      size: n,
+      G,
+      C,
+      nodeOf: (key) => (nets.has(key) ? (nodeOfRoot.get(nets.findKey(key)) ?? null) : null),
+      branchOf: (id, index = 0) => deviceById.get(id)?.branches[index] ?? null,
+    };
   }
 
   /** Bir anahtarın bağlı olduğu elektriksel düğümün kök anahtarı. */

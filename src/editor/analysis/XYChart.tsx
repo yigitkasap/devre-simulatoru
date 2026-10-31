@@ -15,6 +15,8 @@ export interface XYSeries {
   readonly label?: string;
   /** Ölçüm noktaları ayrıca nokta olarak (Bode). */
   readonly dots?: boolean;
+  /** Kesikli ve ince (Bode'un Teori eğrisi). */
+  readonly dashed?: boolean;
 }
 
 export interface XYChartProps {
@@ -177,7 +179,12 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
             </defs>
             <g fill="none" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" clipPath={`url(#${clipId})`}>
               {series.map((s) => (
-                <path key={s.id} d={s.points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${X(x).toFixed(1)} ${Y(y * yScale).toFixed(1)}`).join('')} stroke={traceColor(s.color)} />
+                <path
+                  key={s.id}
+                  d={s.points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${X(x).toFixed(1)} ${Y(y * yScale).toFixed(1)}`).join('')}
+                  stroke={traceColor(s.color)}
+                  {...(s.dashed ? { strokeDasharray: '6 4', strokeWidth: 1.75 } : {})}
+                />
               ))}
             </g>
             {series

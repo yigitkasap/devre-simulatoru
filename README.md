@@ -2190,6 +2190,31 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   kaynağın sınırında kalır ve bu yazılır. Ayrıca periyot başına 64 örnekte 2 MHz kazancı geçmişe göre
   %3 oynuyordu (101,6 / 104,6 kat); 128 örnekte 105,5 kat (256'da 106,1). Tasarımın 2 MHz değeri
   (91,3 kat) ve ondan çıkan f_H ≈ 0,82 MHz büyük olasılıkla kaba örneklemedendir.
+- **Teori eğrisi (A5, küçük sinyal AC, 2026-10-31):** Bode'da ölçülen eğrinin üstünde kesikli "Teori"
+  (aynı renk, ince); "Teori (küçük sinyal)" çipinde orta bant ve f<sub>H</sub>, imleç satırında teori
+  değeri, gösterge satırında "Teori" düğmesi (`aria-pressed`) eğriyi gizler; CSV'ye teori kazanç ve faz
+  sütunları. Tablo'nun "Teorik (sen gir)" sütununa yazılmaz: o sütun öğrencinin kendi hesabı içindir.
+  Hesap: motorun salt okunur `linearize()`'ı (kullanıcı onayıyla motora eklendi; geçici çözümü
+  değiştirmez, testle denetlenir) bileşenlerin Newton katkılarını çalışma noktasında geri Euler'le üç
+  adım boyunda (1, 2, 4 µs) kurar: yük depolayan her öğe A(h) = G + C/h biçimindedir; iki h'den G ve C
+  ayrılır, üçüncüsü biçimi doğrular. Her frekansta (G + jωC)·x = b karmaşık yoğun LU ile çözülür
+  (`src/sim/ac.ts`); b, giriş kaynağının satırında 1 V. Parça modelleri ölçülenle aynıdır (BC107
+  Gummel-Poon ve eklem yükleri, osiloskobun girişi, üretecin 50 Ω'u). Teori, ölçülen Bode'un DC'de
+  oturttuğu simülatörden hesaplanır (`measureBode` → `onSettled`): ek süre yok, iki eğri aynı çalışma
+  noktasında. Osiloskobun AC kuplajı matrisin dışında bir durumdur ve saniyelerce oturur; oturmadan
+  doğrusallaştırmak orta bandı %0,1 kaydırıyordu.
+  Çalışma noktası (`atOperatingPoint`, SPICE'taki .op gibi): kondansatörler çıkarılır, bobinler kısa
+  devre yapılır, devre oturtulur ve her kondansatör o gerilimle başlatılır. Ölçülen Bode da artık buradan
+  başlar: yalnız çıkışa bakan oturtma, büyük zaman sabitli devrede (10 µF kuplaj ve 2,2 MΩ baz direnci,
+  τ = 22 s) transistör henüz kesimdeyken çıkışı sabit görüp duruyordu (kazanç ≈ 0 çıkıyordu).
+  Doğrulama: RC alçak geçirende analitik 1 / (1 + jωRC) ile aynı; ngspice `.ac` ile BC107 ortak
+  emetörlü yükselteçte 1 kHz kazancı %0,006, faz 0,0°, f<sub>H</sub> (18,15 MHz) %0,001 içinde (test
+  yardımcısının BJT kartına CJE, VJE, MJE, TF, CJC, VJC, MJC, FC eklendi). Föy örneğinde (BC107, 20 mVpp)
+  teori orta bant 209,8 kat (46,4 dB), f<sub>H</sub> ≈ 1,16 MHz. Ölçülen orta bant 205,8 kat: %2 düşük,
+  çünkü 20 mVpp'de transistör doğrusal değil (büyük sinyal); üreteç 2 mVpp'ye indirilince ölçülen 209,8
+  kat olur. Bu, Teori eğrisinin bulduğu iki şeyi de gösterir: ölçülen noktalar teoriden %0,6'ya kadar
+  sapar (oturma ölçütünün payı; 200 Hz'te 211,0 / 209,8 kat) ve ölçülenin f<sub>H</sub>'si (1,08 MHz) 16
+  noktalı ara değerdir; teori sık örneklendiği için 1,16 MHz daha doğrudur.
 - **Görev (C1, N5 öğrenci, N6 hoca):** Dosya (telefonda ⋯ → Dosya) → "Görev oluştur". Başlangıç şu
   anki devredir. Alanlar: görev adı, yönerge (`V_{CE}` yazılırsa kartta alt indisle görünür),
   değiştirilebilir parçalar (çipler), "Yeni parça eklenebilir" ve hedefler (büyüklük, ± / ≥ / ≤, değer,
@@ -2232,7 +2257,10 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   çıkış ailesi referansla (`tests/veri/veri-bf245a.json`) bütün eğri boyunca %1 içinde (V_DS = 10 V'ta
   4,14 / 3,25 / 2,46 / 1,78 mA), transfer, diyot akım sınırı, BJT β, yük doğrusu (BC107: R_C, 12 V, Q
   doğrunun üstünde); `tests/analiz-bode.test.ts`: sinüs uydurması, BC107'de 1 kHz kazancı 205,5 kat
-  ± %2 ve faz ≈ −180°, referans veriden orta bant ve f_H; `tests/gorev.test.ts`: bağlantı ve dosya,
+  ± %2 ve faz ≈ −180°, referans veriden orta bant ve f_H; `tests/kucuk-sinyal.test.ts`: RC'de analitik
+  teori, `linearize`'ın yalnızca okuduğu, BC107'de küçük genlikte ölçülenle teorinin örtüşmesi, ölçülen
+  Bode içinden ve bağımsız hesaplanan teorinin aynılığı; `tests/spice` (npm run test:spice): ngspice .ac
+  karşılaştırması; `tests/gorev.test.ts`: bağlantı ve dosya,
   hedef değerlendirme, hedef seçenekleri, kilit kuralları; `tests/gomme.test.ts`: gömme adresi ve
   iframe kodu, adres ayarları, salt okunur kural; ios-kontrol "Analiz", "Bode", "görev" ve "gömme"
   maddeleri.

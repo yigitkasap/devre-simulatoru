@@ -81,15 +81,44 @@ export function sineFit(samples: readonly number[], times: readonly number[], f:
 const read = (sim: CircuitSimulator, p: Probe) => (sim.voltageAt(p.a) ?? 0) - (p.b === null ? 0 : (sim.voltageAt(p.b) ?? 0));
 
 /** Kaynağın frekansı değiştirilmiş netlist. */
-function withFrequency(netlist: Netlist, source: string, f: number, quiet = false): Netlist {
+export function withFrequency(netlist: Netlist, source: string, f: number, quiet = false): Netlist {
   return { ...netlist, elements: netlist.elements.map((e) => (e.id === source ? { ...e, props: { ...e.props, frequency: f, ...(quiet ? { amplitude: 0 } : {}) } } : e)) };
+}
+
+/**
+ * DC çalışma noktası (SPICE'taki .op gibi): kondansatörler çıkarılır (açık devre), bobinler kısa
+ * devre (bağlantı) yapılır, devre oturtulur ve her kondansatörün uç gerilimi okunur. Dönen netlist'te
+ * kondansatörler bu gerilimle başlar. Böylece büyük zaman sabitli devre de (ör. 10 µF kuplaj ve
+ * 2,2 MΩ baz direnci, τ = 22 s) hemen çalışma noktasındadır; yalnız çıkışa bakan oturtma, transistör
+ * henüz kesimdeyken çıkışı sabit görüp erken durabiliyordu. Bulunamazsa netlist olduğu gibi döner.
+ */
+export function atOperatingPoint(netlist: Netlist, cancelled?: () => boolean): Netlist {
+  const caps = netlist.elements.filter((e) => e.type === 'capacitor');
+  if (caps.length === 0) return netlist;
+  const dc: Netlist = {
+    elements: netlist.elements.filter((e) => e.type !== 'capacitor' && e.type !== 'inductor'),
+    links: [...netlist.links, ...netlist.elements.filter((e) => e.type === 'inductor').map((e) => ({ a: e.pins[0]!, b: e.pins[1]! }))],
+  };
+  const sim = new CircuitSimulator(dc);
+  if (!sim.canRun) return netlist;
+  const read = () => caps.map((c) => (sim.voltageAt(c.pins[0]!) ?? 0) - (sim.voltageAt(c.pins[1]!) ?? 0));
+  let previous = read();
+  let settled = false;
+  for (let dt = 1e-3; dt <= 20 && !settled; dt *= 2) {
+    if (cancelled?.() || !sim.runUntil(sim.time + dt).ok) return netlist;
+    const v = read();
+    settled = v.every((x, i) => Math.abs(x - previous[i]!) < 1e-6 * Math.max(1, Math.abs(x)));
+    previous = v;
+  }
+  const initial = new Map(caps.map((c, i) => [c.id, previous[i]!]));
+  return { ...netlist, elements: netlist.elements.map((e) => (initial.has(e.id) ? { ...e, props: { ...e.props, initialVoltage: initial.get(e.id)! } } : e)) };
 }
 
 /**
  * DC'de oturtma (kaynağın genliği sıfır): çıkışın gerilimi, iki katına çıkan aralıklarla (1 ms'den
  * en çok 20 s'ye) bakıldığında artık değişmiyorsa (1 µV'tan az) durulur.
  */
-function settleDc(sim: CircuitSimulator, req: BodeRequest, cancelled?: () => boolean): boolean {
+export function settleDc(sim: CircuitSimulator, req: BodeRequest, cancelled?: () => boolean): boolean {
   let previous = read(sim, req.output);
   for (let dt = 1e-3; dt <= 20; dt *= 2) {
     if (cancelled?.()) return false;
@@ -172,7 +201,13 @@ const wrap = (deg: number) => deg - 360 * Math.round(deg / 360);
  * (−360, 0] aralığına alınır (eviren yükselteç −180°), sonra ardışık noktalar arasında 360°'lik
  * sıçramalar açılır.
  */
-export function measureBode(req: BodeRequest, onPoint?: (p: BodePoint, i: number, total: number) => void, cancelled?: () => boolean): BodePoint[] {
+export function measureBode(
+  req: BodeRequest,
+  onPoint?: (p: BodePoint, i: number, total: number) => void,
+  cancelled?: () => boolean,
+  /** DC'de oturur oturmaz aynı simülatörle (çalışma noktası) çağrılır: Teori eğrisi (bodeTheory.ts). */
+  onSettled?: (sim: CircuitSimulator) => void,
+): BodePoint[] {
   // Kaynağın sınırı dışında motor frekansı kırpar (üreteç 2 MHz'ten fazlasını vermez); ölçüm istenen
   // frekansta uydurma yaptığı için aralık kaynağın sınırına alınır.
   const type = req.netlist.elements.find((e) => e.id === req.source)?.type ?? 'funcgen';
@@ -188,8 +223,9 @@ export function measureBode(req: BodeRequest, onPoint?: (p: BodePoint, i: number
     if (!sim) {
       // İlk frekans: önce sinyalsiz oturtulur, sonra sinyal açılır. Motorun en büyük adımı kaynağın
       // periyoduna bağlı: sinyalsiz oturtma düşük frekansta (en çok 10 Hz) yapılır, adımlar büyük kalır.
-      sim = new CircuitSimulator(withFrequency(req.netlist, req.source, Math.min(f, 10), true));
+      sim = new CircuitSimulator(atOperatingPoint(withFrequency(req.netlist, req.source, Math.min(f, 10), true), cancelled));
       if (!sim.canRun || !settleDc(sim, req, cancelled)) break;
+      onSettled?.(sim);
       sim.update(netlist);
     } else {
       sim.update(netlist);
