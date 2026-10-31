@@ -5,7 +5,7 @@
 // Çipler ve gösterge grafik alanının dışında, üstte tek satırda; iki grafik de en az 140 px'e sığmıyorsa
 // faz gizlenir ("Fazı göster"). Yöntemin ve teorinin açıklaması "ⓘ" ipucunda.
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { tr } from '../../i18n/tr';
 import { formatNumber, formatSI } from '../../sim/units';
 import { Rich } from '../Rich';
@@ -155,7 +155,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
 
   // Yöntem ve teori açıklaması "ⓘ" ipucunda (sol sütun taşmasın).
   const info = (
-    <InfoTip label={t.infoLabel} inline={compact} touch={touch}>
+    <InfoTip label={t.infoLabel} closeLabel={t.infoClose} sheet={compact} touch={touch}>
       <span className="flex flex-col gap-1.5">
         <span>{t.method}</span>
         <span>{t.theoryNote}</span>
@@ -235,12 +235,25 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
 
   // Sonuç çipleri ve gösterge tek satırda (masaüstünde başlık satırının altında, grafik alanının dışında):
   // ölçülenin işareti, orta bant, f_H, f_L ve Teori (düğme: eğriyi gizler / gösterir), ⓘ.
-  const chip = `flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 ${touch ? 'min-h-11 py-1' : 'h-7'}`;
+  const chip = `flex shrink-0 items-center gap-1.5 rounded-lg border whitespace-nowrap ${compact ? 'px-2' : 'px-2.5'} ${touch ? 'min-h-11 py-1' : 'h-7'}`;
+  // Telefonda çipin etiketi üstte, değeri altta: şerit iki satıra sığar (analiz düzeltmeleri, ikinci tur).
+  const pair = (label: ReactNode, value: ReactNode) =>
+    compact ? (
+      <span className="flex flex-col items-start leading-tight">
+        {label}
+        {value}
+      </span>
+    ) : (
+      <>
+        {label}
+        {value}
+      </>
+    );
   const theoryOn = bode.showTheory && theory.length > 0;
   const theoryValueId = `${chartsId}-teori`;
   const strip = (
-    // Telefonda da tek satır (yana kayar): grafik öne çıksın (analiz düzeltmeleri, 7).
-    <div className="flex shrink-0 items-center gap-2 overflow-x-auto overscroll-contain text-label whitespace-nowrap">
+    // Masaüstünde tek satır; telefonda sarılır (iki satır), bütün değerler kaydırmadan okunur.
+    <div className={`flex shrink-0 items-center gap-2 text-label ${compact ? 'flex-wrap' : 'overflow-x-auto overscroll-contain whitespace-nowrap'}`}>
       <span className="flex shrink-0 items-center gap-1.5 text-muted">
         <svg width="22" height="8" aria-hidden="true">
           <line x1="1" x2="21" y1="4" y2="4" stroke="var(--color-tr-1)" strokeWidth="2" />
@@ -250,24 +263,30 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
       </span>
       {s && (
         <span className={`${chip} border-line bg-panel`}>
-          <span className="text-muted">{t.mid(hz(s.mid.f))}</span>
-          <b className="font-mono font-semibold tabular">{t.midValue(formatNumber(s.mid.gain, 1), formatNumber(toDb(s.mid.gain), 1))}</b>
+          {pair(
+            <span className="text-muted">{t.mid(hz(s.mid.f))}</span>,
+            <b className="font-mono font-semibold tabular">{t.midValue(formatNumber(s.mid.gain, 1), formatNumber(toDb(s.mid.gain), 1))}</b>,
+          )}
         </span>
       )}
       {s && s.fH !== null && (
         <span className={`${chip} border-line bg-panel`} title={around ? t.fHNote(around[0]!, around[1]!) : undefined}>
-          <span className="text-muted">
-            <Rich text={t.fH} />
-          </span>
-          <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fH)}`}</b>
+          {pair(
+            <span className="text-muted">
+              <Rich text={t.fH} />
+            </span>,
+            <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fH)}`}</b>,
+          )}
         </span>
       )}
       {s && s.fL !== null && (
         <span className={`${chip} border-line bg-panel`}>
-          <span className="text-muted">
-            <Rich text={t.fL} />
-          </span>
-          <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fL)}`}</b>
+          {pair(
+            <span className="text-muted">
+              <Rich text={t.fL} />
+            </span>,
+            <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fL)}`}</b>,
+          )}
         </span>
       )}
       <button
@@ -283,10 +302,12 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
         <svg width="22" height="8" aria-hidden="true">
           <line x1="1" x2="21" y1="4" y2="4" stroke={THEORY_STROKE} strokeWidth="1.75" strokeDasharray="5 3" />
         </svg>
-        <span>{t.theoryShort}</span>
-        <b id={theoryValueId} className={`font-mono font-semibold tabular ${theoryFailed ? 'text-warn' : ''}`}>
-          {ts ? <Rich text={t.theoryValue(formatNumber(ts.mid.gain, 1), ts.fH !== null ? hz(ts.fH) : null)} /> : theoryFailed ? t.theoryFailedShort : '—'}
-        </b>
+        {pair(
+          <span>{t.theoryShort}</span>,
+          <b id={theoryValueId} className={`font-mono font-semibold tabular ${theoryFailed ? 'text-warn' : ''}`}>
+            {ts ? <Rich text={t.theoryValue(formatNumber(ts.mid.gain, 1), ts.fH !== null ? hz(ts.fH) : null)} /> : theoryFailed ? t.theoryFailedShort : '—'}
+          </b>,
+        )}
       </button>
       {info}
       {phaseToggle}

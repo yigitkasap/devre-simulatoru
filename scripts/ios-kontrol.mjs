@@ -1171,7 +1171,12 @@ try {
       const longText = await drawer.getByText(/^Kesikli çizgi teoridir/).count();
       await drawer.getByRole('button', { name: 'Ölçüm yöntemi ve teori eğrisi' }).click(); await page.waitForTimeout(150);
       const note = ((await page.getByRole('note', { name: 'Ölçüm yöntemi ve teori eğrisi' }).textContent().catch(() => '')) ?? '');
+      const noteBox = await page.getByRole('note', { name: 'Ölçüm yöntemi ve teori eğrisi' }).boundingBox();
       await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+      // İkinci tur, 4: kutu grafiklerin dışında (düğmenin üstünde), kazanç grafiğinin eksen yazılarını örtmüyor.
+      const apart = noteBox !== null && gainBox !== null && (noteBox.y + noteBox.height <= gainBox.y || noteBox.x >= gainBox.x + gainBox.width);
+      check('Bode (masaüstü, analiz düzeltmeleri ikinci tur 4): ⓘ kutusu grafiklerin dışında açılıyor, kazanç grafiğine binmiyor',
+        apart, `kutu ${Math.round(noteBox?.x ?? 0)},${Math.round(noteBox?.y ?? 0)} ${Math.round(noteBox?.width ?? 0)}×${Math.round(noteBox?.height ?? 0)} · grafik üst ${Math.round(gainBox?.y ?? 0)}`);
       check('Bode (düzen): çekmece ≥ 560 px; çipler ve gösterge sekmelerin altında tek satırda, grafiklerin üstünde; kazanç ve faz ≥ 140 px; sol sütun taşmıyor; teori açıklaması ⓘ ipucunda',
         dH >= 559 && tabsBox !== null && midBox !== null && tBox !== null && gainBox !== null && phaseBox !== null && midBox.y > tabsBox.y + tabsBox.height && Math.abs(midBox.y + midBox.height / 2 - (tBox.y + tBox.height / 2)) < 3 &&
         midBox.y + midBox.height <= gainBox.y && gainBox.height >= 140 && phaseBox.height >= 140 && column === 0 && longText === 0 && note.includes('Kesikli çizgi teoridir') && note.includes('2 periyot'),
@@ -1218,6 +1223,27 @@ try {
     check('Bode (telefon, analiz düzeltmeleri 7): ölçüm bitince ayarlar tek satıra kapanıyor ("FG1 → Q1 kollektör · 20 Hz–2 MHz · 16 nokta · Düzenle"), kazanç grafiği kaydırmadan görünüyor; Düzenle ayarları açıyor',
       summary === 'FG1 → Q1 kollektör · 20 Hz–2 MHz · 16 nokta' && gainBox !== null && gainBox.y + gainBox.height <= viewH && (await sheet.getByText('✓ Ölçüm bitti').count()) === 0,
       `${summary} · grafik ${Math.round(gainBox?.y ?? 0)}–${Math.round((gainBox?.y ?? 0) + (gainBox?.height ?? 0))} / ${viewH}`);
+    {
+      const info = sheet.getByRole('button', { name: 'Ölçüm yöntemi ve teori eğrisi' });
+      const strip = await info.evaluate((el) => { const s = el.parentElement; return { over: s.scrollWidth - s.clientWidth, h: Math.round(s.getBoundingClientRect().height), right: Math.max(...[...s.children].map((c) => c.getBoundingClientRect().right)) }; });
+      const fhText = ((await sheet.getByText(/^≈ \d/).first().textContent().catch(() => '')) ?? '');
+      const vw = page.viewportSize().width;
+      check('Bode (telefon, analiz düzeltmeleri ikinci tur 2): ölçü şeridi iki satıra sarılıyor, yana kaymıyor; f_H değeri tam okunuyor',
+        strip.over === 0 && strip.h <= 100 && strip.right <= vw && /≈ 1,\d+ MHz/.test(fhText), `${strip.h} px · taşma ${strip.over} · ${fhText}`);
+      const before = (await sheet.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox())?.y ?? 0;
+      await info.tap(); await page.waitForTimeout(300);
+      const note = page.getByRole('note', { name: 'Ölçüm yöntemi ve teori eğrisi' });
+      const nb = await note.boundingBox();
+      const after = (await sheet.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox())?.y ?? 0;
+      const vh = page.viewportSize().height;
+      const text = ((await note.textContent()) ?? '');
+      const close = note.getByRole('button', { name: 'Açıklamayı kapat' });
+      const closeH = (await close.boundingBox())?.height ?? 0;
+      await close.tap(); await page.waitForTimeout(200);
+      check('Bode (telefon, analiz düzeltmeleri ikinci tur 1): ⓘ metni alttan açılan sayfada görünüyor, yalnızca metin kadar yer kaplıyor, grafikleri itmiyor; Kapat ≥ 44 px',
+        nb !== null && nb.x >= 0 && nb.x + nb.width <= vw + 0.5 && Math.abs(nb.y + nb.height - vh) < 1 && nb.height < 260 && text.includes('Kesikli çizgi teoridir') && Math.abs(after - before) < 1 && closeH >= 43.5 && (await note.count()) === 0,
+        `sayfa ${Math.round(nb?.y ?? 0)}–${Math.round((nb?.y ?? 0) + (nb?.height ?? 0))} / ${vh} · grafik ${Math.round(before)} → ${Math.round(after)}`);
+    }
     await edit.tap(); await page.waitForTimeout(200);
     const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab], select, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
     const note = await sheet.getByText(/iki ölçüm noktası arasında doğrusal ara değer/).count();

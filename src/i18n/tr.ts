@@ -3090,6 +3090,7 @@ export const tr = {
       theoryToggleLabel: 'Teori eğrisini göster',
       theoryFailedShort: 'hesaplanamadı',
       infoLabel: 'Ölçüm yöntemi ve teori eğrisi',
+      infoClose: 'Açıklamayı kapat',
       showPhase: 'Fazı göster',
       hidePhase: 'Fazı gizle',
       theoryValue: (g: string, fh: string | null) => (fh ? `${g} kat · f_{H} ≈ ${fh}` : `${g} kat`),
