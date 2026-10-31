@@ -62,7 +62,9 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
   }, []);
   const clipId = `xy-${useId().replace(/:/g, '')}`;
   const labelled = series.some((s) => s.label);
-  const m = compact ? { l: 36, r: labelled ? 48 : 12, t: 18, b: 32 } : { l: 48, r: labelled ? 64 : 16, t: 22, b: 40 };
+  // Sağdaki adlar sığsın ("Q · 5,17 µA"): 11 px eş aralıklı yazıda harf başına ≈ 6,7 px.
+  const labelWidth = Math.max(0, ...series.map((s) => s.label?.length ?? 0)) * 6.7 + 10;
+  const m = compact ? { l: 36, r: labelled ? Math.max(48, labelWidth) : 12, t: 18, b: 32 } : { l: 48, r: labelled ? Math.max(64, labelWidth) : 16, t: 22, b: 40 };
   const pw = Math.max(10, size.w - m.l - m.r);
   const ph = Math.max(10, size.h - m.t - m.b);
 

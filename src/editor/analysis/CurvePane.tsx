@@ -51,7 +51,8 @@ export function stepValueText(v: number, unit: 'V' | 'A'): string {
 }
 
 export function stepText(curve: Curve, unit: 'V' | 'A'): string {
-  return stepValueText(curve.measuredStep ?? curve.step, unit);
+  const text = stepValueText(curve.measuredStep ?? curve.step, unit);
+  return curve.q ? `${tr.analysis.curve.q} · ${text}` : text;
 }
 
 /** Eğrilerin CSV'si: x ve her basamağın akımı. */
@@ -60,7 +61,7 @@ export function curvesCsv(tracer: TracerApi, sep: CsvSeparator): Blob | null {
   const p = tracer.params;
   if (!r || !p) return null;
   const q = quantities(tracer);
-  const xs = sweepValues(p.from, p.to, p.step);
+  const xs = sweepValues(p.from, r.to, p.step);
   const header = [`${plain(q.x)} (V)`, ...r.curves.map((c) => `${plain(q.y)} (A)${q.step ? ` [${plain(q.step)} = ${stepText(c, q.stepUnit)}]` : ''}`)];
   const rows = xs.map((x, i) => [x, ...r.curves.map((c) => c.points[i]?.[1] ?? '')]);
   return new Blob([toCsv(header, rows, sep)], { type: 'text/csv;charset=utf-8' });
@@ -94,7 +95,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
     return () => window.clearTimeout(timer);
   }, [partId, busy, result?.key, tracer.key]);
   const [cursor, setCursor] = useState<number | null>(null);
-  const [showLoad, setShowLoad] = useState(true);
+  const showLoad = params?.load ?? true;
   const [adding, setAdding] = useState(false);
   if (!part || !params) return <p className="m-0 px-4 py-6 text-small text-muted">{t.none}</p>;
 
@@ -104,10 +105,12 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
   let maxI = 0;
   for (const c of curves) for (const [, y] of c.points) maxI = Math.max(maxI, Math.abs(y));
   const unit = axisUnit(maxI, 'A');
-  const lo = Math.min(params.from, params.to);
-  const hi = Math.max(params.from, params.to);
+  // Taramanın gerçek üst sınırı: yük doğrusu açıkken beslemeye uzamış olabilir (analiz düzeltmeleri, 9).
+  const to = fresh?.to ?? params.to;
+  const lo = Math.min(params.from, to);
+  const hi = Math.max(params.from, to);
   const cur = Math.min(hi, Math.max(lo, cursor ?? lo + ((hi - lo) * 2) / 3));
-  const series = curves.map((c, i) => ({ id: `c${i}`, color: i % 6, points: c.points, ...(q.step ? { label: stepText(c, q.stepUnit) } : {}) }));
+  const series = curves.map((c, i) => ({ id: `c${i}`, color: i % 6, points: c.points, ...(q.step ? { label: stepText(c, q.stepUnit) } : {}), ...(c.q ? { strong: true } : {}) }));
   const load = fresh?.load ?? null;
   const loadAllowed = family !== 'diode' && params.mode === 'output';
   const field = `w-0 min-w-0 flex-1 rounded-lg border border-line-2 bg-panel px-2 font-mono text-small ${touch ? 'h-11 text-[16px]' : 'h-8'}`;
@@ -180,7 +183,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
         <span className="flex items-center gap-1.5">
           {num(t.from, params.from, (v) => tracer.setParams({ from: v }))}
           <span aria-hidden="true">→</span>
-          {num(t.to, params.to, (v) => tracer.setParams({ to: v }))}
+          {num(t.to, to, (v) => tracer.setParams({ to: v, toAuto: false }))}
           <span aria-hidden="true">·</span>
           {num(t.step, params.step, (v) => v > 0 && tracer.setParams({ step: v }))}
         </span>
@@ -242,7 +245,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
           role="switch"
           aria-checked={Boolean(load) && showLoad}
           disabled={!load}
-          onClick={() => setShowLoad((s) => !s)}
+          onClick={() => tracer.setParams({ load: !showLoad })}
           className={`flex w-full items-center gap-2 rounded-lg text-left ${touch ? 'min-h-11' : 'min-h-9'} ${load ? '' : 'opacity-60'}`}
         >
           <span className="flex min-w-0 flex-1 flex-col text-small">
@@ -315,5 +318,5 @@ export function curveSummary(tracer: TracerApi): string {
   if (tracer.progress) return t.progress(tracer.progress.done, tracer.progress.total);
   const p = tracer.params;
   if (!p || !tracer.result) return '';
-  return t.summary(tracer.result.curves.length, sweepValues(p.from, p.to, p.step).length);
+  return t.summary(tracer.result.curves.length, sweepValues(p.from, tracer.result.to, p.step).length);
 }

@@ -3,7 +3,7 @@
 // I_DSS'ye çıkar; diyotta akım sınırı; BJT'de I_C ≈ β · I_B; P tipinde büyüklükler pozitif.
 
 import { describe, expect, it } from 'vitest';
-import { curveAt, defaultRequest, loadLine, runSweep, sweepValues, type SweepRequest } from '../src/editor/analysis/sweep';
+import { curveAt, defaultRequest, loadLine, runSweep, supplyTo, sweepValues, type SweepRequest } from '../src/editor/analysis/sweep';
 import { buildConnectivity } from '../src/model/connectivity';
 import { exampleDoc } from '../src/examples';
 import bf245a from './veri/veri-bf245a.json';
@@ -70,5 +70,47 @@ describe('Analiz: eğri izleyici', () => {
     expect(Math.abs(line.supply - ic * line.r - vce)).toBeLessThan(0.01);
     const lab = exampleDoc('jfet-karakteristik')!;
     expect(loadLine(buildConnectivity(lab).netlist, jfet.id, {})).toBeNull();
+  });
+  it('Q basamağı (analiz düzeltmeleri, 9): BC107’de Q’daki gerçek I_B ≈ 5 µA ayrı bir eğri, öbür basamaklar aynı; aralık beslemeye (12 V) kadar', () => {
+    const amp = exampleDoc('bjt-yukseltec')!;
+    const q1 = amp.parts.find((p) => p.label === 'Q1')!;
+    const line = loadLine(buildConnectivity(amp).netlist, q1.id, {})!;
+    // RB = 2,2 MΩ, V_BE ≈ 0,64 V: I_B = (12 − 0,64) / 2,2 MΩ ≈ 5,16 µA.
+    expect(line.qStep!).toBeGreaterThan(4.5e-6);
+    expect(line.qStep!).toBeLessThan(5.5e-6);
+    expect(supplyTo(line.supply, 0.1)).toBe(12);
+    const base = defaultRequest('npn', q1.props, 'output');
+    const req: SweepRequest = { type: 'npn', props: q1.props, ...base, to: supplyTo(line.supply, base.step), step: 0.5, qStep: line.qStep! };
+    let total = 0;
+    const curves = runSweep(req, (_, t) => (total = t));
+    expect(total).toBe(5 * sweepValues(0, 12, 0.5).length);
+    expect(curves.map((c) => c.step)).toEqual([...base.steps, line.qStep]);
+    expect(curves.map((c) => c.q === true)).toEqual([false, false, false, false, true]);
+    const qc = curves[4]!;
+    expect(qc.measuredStep!).toBeCloseTo(line.qStep!, 8);
+    expect(qc.points[qc.points.length - 1]![0]).toBeCloseTo(12, 6);
+    // Q noktası Q eğrisinin üstünde (sıcaklıkla birkaç yüzde).
+    expect(Math.abs(curveAt(qc, line.q[0]) / line.q[1] - 1)).toBeLessThan(0.05);
+  });
+
+  it('Q basamağı JFET ve MOSFET’te Q’daki V_GS: BF245A yükselteçte 0 V, IRF510 yükselteçte ≈ 3,85 V; aralık 15 V', () => {
+    const fet = exampleDoc('fet-yukseltec')!;
+    const j1 = fet.parts.find((p) => p.type === 'njfet')!;
+    const jl = loadLine(buildConnectivity(fet).netlist, j1.id, {})!;
+    expect(Math.abs(jl.qStep!)).toBeLessThan(0.01);
+    expect(supplyTo(jl.supply, 0.5)).toBe(15);
+    const mos = exampleDoc('mosfet-yukseltec')!;
+    const m1 = mos.parts.find((p) => p.type === 'nmos')!;
+    const ml = loadLine(buildConnectivity(mos).netlist, m1.id, {})!;
+    // Kapı FG1'in 4,55 V ofsetinde, R_S = 1 kΩ: V_GS = 4,55 − R_S · k (V_GS − V_T)², V_T = 3,83 V,
+    // k = 1,24 A/V² → V_GS = 3,8537 V (simülatörde ölçülen 3,853 V).
+    expect(ml.qStep!).toBeGreaterThan(3.84);
+    expect(ml.qStep!).toBeLessThan(3.87);
+    expect(supplyTo(ml.supply, 0.25)).toBe(15);
+    const curves = runSweep({ type: 'nmos', props: m1.props, ...defaultRequest('nmos', m1.props, 'output'), to: 15, step: 1, qStep: ml.qStep! });
+    expect(curves).toHaveLength(5);
+    expect(curves[4]!.q).toBe(true);
+    // Q noktası (V_DS, I_D) Q eğrisinin üstünde.
+    expect(Math.abs(curveAt(curves[4]!, ml.q[0]) / ml.q[1] - 1)).toBeLessThan(0.05);
   });
 });

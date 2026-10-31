@@ -13,6 +13,10 @@ export interface TracerParams {
   readonly to: number;
   readonly step: number;
   readonly steps: readonly number[];
+  /** Yük doğrusu ve Q noktası açık mı (varsayılan açık; açıkken Q basamağı eklenir). */
+  readonly load?: boolean;
+  /** Bitiş kullanıcı değiştirmedikçe yük doğrusu açıkken beslemeye uzar (varsayılan). */
+  readonly toAuto?: boolean;
 }
 
 export interface TracerResult {
@@ -20,6 +24,8 @@ export interface TracerResult {
   readonly key: string;
   readonly curves: readonly Curve[];
   readonly load: LoadLine | null;
+  /** Taramanın gerçek üst sınırı (yük doğrusu açıkken beslemeye uzamış olabilir). */
+  readonly to: number;
 }
 
 export interface TracerApi {
@@ -78,7 +84,7 @@ export function useTracer(doc: CircuitDoc, connectivity: Connectivity, selected:
       const reply = ev.data;
       if (reply.type === 'progress') setProgress({ done: reply.done, total: reply.total });
       else {
-        if (reply.type === 'curves') setResult({ key: k, curves: reply.curves, load: reply.load });
+        if (reply.type === 'curves') setResult({ key: k, curves: reply.curves, load: reply.load, to: reply.to });
         else if (reply.type === 'error') setError(reply.message);
         setProgress(null);
         w.terminate();
@@ -91,9 +97,10 @@ export function useTracer(doc: CircuitDoc, connectivity: Connectivity, selected:
       w.terminate();
       if (worker.current === w) worker.current = null;
     };
-    const request: SweepRequest = { type: p.type, props: p.props, ...e };
+    const { load, toAuto, ...sweep } = e as TracerParams;
+    const request: SweepRequest = { type: p.type, props: p.props, ...sweep };
     const labels = Object.fromEntries(d.parts.map((x) => [x.id, x.label]));
-    w.postMessage({ kind: 'curve', request, netlist: conn.netlist, dutId: p.id, labels } satisfies WorkerRequest);
+    w.postMessage({ kind: 'curve', request, netlist: conn.netlist, dutId: p.id, labels, load: load ?? true, toAuto: toAuto ?? true } satisfies WorkerRequest);
   }, []);
 
   const setPart = useCallback((id: string) => {

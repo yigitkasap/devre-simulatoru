@@ -4,15 +4,24 @@
 import type { Netlist } from '../../sim';
 import { logFrequencies, measureBode, sourceLimits, type BodePoint, type BodeRequest } from './bode';
 import { theoryAt, type TheoryResult } from './bodeTheory';
-import { loadLine, runSweep, type SweepRequest } from './sweep';
+import { loadLine, runSweep, supplyTo, type SweepRequest } from './sweep';
 
 export type WorkerRequest =
-  | { readonly kind: 'curve'; readonly request: SweepRequest; readonly netlist: Netlist | null; readonly dutId: string; readonly labels: Readonly<Record<string, string>> }
+  | {
+      readonly kind: 'curve';
+      readonly request: SweepRequest;
+      readonly netlist: Netlist | null;
+      readonly dutId: string;
+      readonly labels: Readonly<Record<string, string>>;
+      /** Yük doğrusu açık: Q basamağı eklenir; toAuto ise aralık beslemeye kadar. */
+      readonly load: boolean;
+      readonly toAuto: boolean;
+    }
   | { readonly kind: 'bode'; readonly request: BodeRequest };
 
 export type WorkerReply =
   | { readonly type: 'progress'; readonly done: number; readonly total: number }
-  | { readonly type: 'curves'; readonly curves: ReturnType<typeof runSweep>; readonly load: ReturnType<typeof loadLine> }
+  | { readonly type: 'curves'; readonly curves: ReturnType<typeof runSweep>; readonly load: ReturnType<typeof loadLine>; readonly to: number }
   | { readonly type: 'theory'; readonly result: TheoryResult }
   | { readonly type: 'bodePoint'; readonly point: BodePoint; readonly done: number; readonly total: number }
   | { readonly type: 'bodeDone'; readonly points: readonly BodePoint[] }
@@ -37,16 +46,22 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   try {
     const msg = e.data;
     if (msg.kind === 'curve') {
+      // Yük doğrusu (çalışma noktası) önce: açıksa Q'daki basamak eklenir ve aralık beslemeye uzar
+      // (analiz düzeltmeleri, 9).
+      const load = msg.netlist && msg.request.mode === 'output' ? loadLine(msg.netlist, msg.dutId, msg.labels) : null;
+      let request = msg.request;
+      if (msg.load && load) {
+        request = { ...request, ...(load.qStep !== null ? { qStep: load.qStep } : {}), ...(msg.toAuto ? { to: supplyTo(load.supply, request.step) } : {}) };
+      }
       let last = 0;
-      const curves = runSweep(msg.request, (done, total) => {
+      const curves = runSweep(request, (done, total) => {
         const now = Date.now();
         if (now - last > 50 || done === total) {
           last = now;
           post({ type: 'progress', done, total });
         }
       });
-      const load = msg.netlist && msg.request.mode === 'output' ? loadLine(msg.netlist, msg.dutId, msg.labels) : null;
-      post({ type: 'curves', curves, load });
+      post({ type: 'curves', curves, load, to: request.to });
     } else if (msg.kind === 'bode') {
       // Teori (küçük sinyal, A5): ölçüm DC'de oturur oturmaz aynı simülatörden; ölçülen noktalar üstüne gelir.
       const request = msg.request;

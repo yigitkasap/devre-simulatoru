@@ -1067,6 +1067,22 @@ try {
     check('eğri izleyici: BC107 yükselteçte basamak I_B (µA), yük doğrusu R_C · 12 V ve Q noktası çiziliyor',
       !(await bjtSwitch.isDisabled()) && (await bjtSwitch.getAttribute('aria-checked')) === 'true' && ((await bjtSwitch.textContent()) ?? '').includes('RC · kaynak 12,0 V') && qText === 1 &&
       (await drawer.getByRole('button', { name: '10 µA basamağını kaldır' }).count()) === 1, ((await bjtSwitch.textContent()) ?? '').slice(0, 60));
+    // Q basamağı (analiz düzeltmeleri, 9): yük doğrusu açıkken Q'daki gerçek I_B ayrı, kalın ve "Q · …"
+    // etiketli eğri; öbür basamaklar aynı; aralık beslemeye (12 V) kadar. Kapatınca Q eğrisi ve uzama kalkar.
+    const ends = async () => drawer.getByRole('img', { name: /^Eğri izleyici: Q1/ }).locator('text').allTextContents();
+    const qLabel = (await ends()).find((x) => x.startsWith('Q · ')) ?? '';
+    const qStrong = await drawer.getByRole('img', { name: /^Eğri izleyici: Q1/ }).locator('path[stroke-width="3.5"]').count();
+    const toValue = await drawer.getByRole('textbox', { name: 'Bitiş' }).inputValue();
+    const summaryOn = (await drawer.getByText(/noktalık DC tarama$/).textContent()) ?? '';
+    await bjtSwitch.click();
+    await drawer.getByText(/^4 × \d+ noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
+    const offLabels = await ends();
+    const toOff = await drawer.getByRole('textbox', { name: 'Bitiş' }).inputValue();
+    await bjtSwitch.click();
+    check('eğri izleyici (analiz düzeltmeleri 9): yük doğrusu açıkken Q’daki gerçek I_B ayrı kalın eğri ("Q · 5,1 µA" civarı), 10–40 µA aynı; aralık 12 V’a kadar; kapatınca Q eğrisi yok, aralık 10 V',
+      /^Q · (4,[89]|5,[0-4])\d* µA$/.test(qLabel) && qStrong === 1 && toValue === '12' && /^5 × 121 noktalık DC tarama$/.test(summaryOn) &&
+      !offLabels.some((x) => x.startsWith('Q · ')) && toOff === '10',
+      `${qLabel} · bitiş ${toValue} / ${toOff} · ${summaryOn}`);
     await ctx.close();
   }
   {
