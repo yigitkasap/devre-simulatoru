@@ -12,6 +12,7 @@ import { pinPositions } from '../src/model/geometry';
 import type { CircuitDoc } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
 import { maskFrame, visibleLive } from '../src/editor/fault/mask';
+import { legLabel, measureResistance, METER_ID, meterPart, wireMeter } from '../src/editor/fault/meter';
 import type { SimFrame } from '../src/editor/useSimulation';
 import { parseTask, parseTaskPayload } from '../src/model/task';
 import { toSerializable } from '../src/model/serialize';
@@ -166,6 +167,43 @@ describe('Arıza bulma görevi: bağlantıdan okuma ve otomatik göstergeler', (
 
   it('şemadaki görseller: LED ışığı ve motor kalır; kondansatörün dolması, direncin ısınması, manyetik alan gider', () => {
     expect(visibleLive({ brightness: 0.8, charge: 0.4, powerRatio: 2, field: 0.1, angle: 1 })).toEqual({ brightness: 0.8, angle: 1 });
+  });
+});
+
+describe('Multimetre (R1): uçların adları, Ω, simülasyondaki yeri', () => {
+  const doc = exampleDoc('bjt-yukseltec')!;
+  const part = (label: string) => doc.parts.find((p) => p.label === label)!;
+  const RC = part('RC').id;
+  const collector = doc.wires.find((w) => w.points.some((p) => p.x === 44 && p.y === 0))!;
+
+  it('bacak adları: iki bacaklı dirençte konum, transistörde uç adı, kaynakta "ucu", toprakta adı', () => {
+    expect(legLabel(part('RC'), 1)).toBe('RC alt bacağı');
+    expect(legLabel(part('RC'), 0)).toBe('RC üst bacağı');
+    expect(legLabel(part('Q1'), 0)).toBe('Q1 kollektör bacağı');
+    expect(legLabel(part('C1'), 0)).toBe('C1 + bacağı');
+    expect(legLabel(part('PS1'), 0)).toBe('PS1 1+ ucu');
+    expect(legLabel(part('GND1'), 0)).toBe('GND1');
+  });
+
+  it('Ω (güç kapalı): RC’nin iki bacağı ≈ 5,6 kΩ (devrenin geri kalanı ≈ 4,3 MΩ paralel); RC kopukken üst bacak ile kollektör arası MΩ’lar', () => {
+    const healthy = buildConnectivity(doc).netlist;
+    expect(measureResistance(healthy, pinKey(RC, 0), pinKey(RC, 1))!).toBeCloseTo(5600, -2);
+    expect(measureResistance(healthy, pinKey(RC, 0), wireKey(collector.id))!).toBeCloseTo(5600, -2);
+    const faulty = buildConnectivity(doc, [{ kind: 'open', at: { part: RC, pin: 1 } }]).netlist;
+    expect(measureResistance(faulty, pinKey(RC, 0), pinKey(RC, 1))!).toBeCloseTo(5600, -2);
+    expect(measureResistance(faulty, pinKey(RC, 0), wireKey(collector.id))!).toBeGreaterThan(1e6);
+  });
+
+  it('simülasyonda görünmez voltmetre: iç direnç 10 MΩ, uçları kırmızı ve siyah ucun yerine bağlanır', () => {
+    const mm = meterPart('ac');
+    expect(mm).toMatchObject({ id: METER_ID, type: 'voltmeter', props: { mode: 'ac', resistance: 10e6, ideal: false } });
+    const netlist = buildConnectivity({ ...doc, parts: [...doc.parts, mm] }).netlist;
+    const red = { spot: { part: RC, pin: 1 }, at: { x: 44, y: -4 } };
+    const black = { spot: { wire: collector.id }, at: { x: 44, y: -2 } };
+    expect(wireMeter(netlist, 'dc', red, black).elements.find((e) => e.id === METER_ID)!.pins).toEqual([pinKey(RC, 1), wireKey(collector.id)]);
+    // Ω kipinde ya da uç eksikken boşta kalır.
+    expect(wireMeter(netlist, 'ohm', red, black)).toBe(netlist);
+    expect(wireMeter(netlist, 'dc', red, null)).toBe(netlist);
   });
 });
 

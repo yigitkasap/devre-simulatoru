@@ -56,6 +56,8 @@ import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
 import { visibleLive } from './fault/mask';
+import type { Probe } from './fault/meter';
+import { ProbeLayer, type ProbeView } from './fault/ProbeLayer';
 import { routeAround } from './phoneTools';
 import { HintText } from './HintStrip';
 import { SymbolIcon } from './symbols';
@@ -219,6 +221,12 @@ export interface CanvasProps {
    * (seçim, kablo çekme) bu sırada yapılmaz.
    */
   readonly onPick?: ((target: PickTarget) => void) | null;
+  /** Arıza bulma (B2): multimetrenin uçları (halka, etiket, kablo). */
+  readonly probes?: ProbeView | null;
+  /** Masaüstünde sol alt köşedeki panel (multimetre, px): sığdırırken renk ölçeği kutusunun yerine bundan kaçınılır. */
+  readonly cornerPanel?: { readonly w: number; readonly h: number } | null;
+  /** Uç koyulurken: tıklanan bacak ya da kablo (parçanın gövdesinde en yakın bacağı). */
+  readonly onProbe?: ((probe: Probe) => void) | null;
   /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
   readonly marks?: readonly CanvasMark[];
   /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli. */
@@ -357,6 +365,9 @@ export function Canvas({
   zeroPoints,
   onExplain,
   onPick,
+  probes = null,
+  cornerPanel = null,
+  onProbe = null,
   marks,
   taskParts,
   ref,
@@ -404,6 +415,7 @@ export function Canvas({
   const shapes = useMemo(() => circuitShapes(doc), [doc]);
   // Kutu tuvalin sol alt köşesinde (bottom-3 left-3): tuvalin koordinatlarında.
   const legendRect: Rect | null = phone ? null : { x: 12, y: size.height - 12 - legendSize.h, w: legendSize.w, h: legendSize.h };
+  const avoidRect: Rect | null = cornerPanel && !phone ? { x: 16, y: size.height - 16 - cornerPanel.h, w: cornerPanel.w, h: cornerPanel.h } : legendRect;
   const phoneTimers = useRef({ hold: 0, long: 0 });
   const phoneLongFired = useRef(false);
   const lastEmptyTap = useRef(0);
@@ -516,7 +528,7 @@ export function Canvas({
     // Masaüstünde sol alttaki "Kablo gerilimi" kutusu da görünür alanın dışında sayılır.
     const fitted = phone
       ? fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top), 20)
-      : fitAvoiding(shapes, bounds, Math.max(1, size.width), Math.max(1, size.height), 48, legendRect);
+      : fitAvoiding(shapes, bounds, Math.max(1, size.width), Math.max(1, size.height), 48, avoidRect);
     setView({ ...fitted, y: fitted.y + top });
   };
 
@@ -975,6 +987,24 @@ export function Canvas({
       return;
     }
     if (pointers.current.size > 2) return;
+
+    // Arıza bulma: multimetrenin ucu bacağa ya da kabloya koyulur.
+    if (onProbe && e.button === 0) {
+      const g = toGrid(e.clientX, e.clientY);
+      const hit = hitTest(g);
+      if (hit?.kind === 'pin') onProbe({ spot: { part: hit.partId, pin: hit.index }, at: hit.pos });
+      else if (hit?.kind === 'part') {
+        const part = doc.parts.find((p) => p.id === hit.partId)!;
+        const pins = pinPositions(part);
+        const pin = pins.reduce((best, p, i) => (Math.hypot(p.x - g.x, p.y - g.y) < Math.hypot(pins[best]!.x - g.x, pins[best]!.y - g.y) ? i : best), 0);
+        onProbe({ spot: { part: part.id, pin }, at: pins[pin]! });
+      } else if (hit?.kind === 'wire') {
+        const wire = doc.wires.find((w) => w.id === hit.wireId)!;
+        onProbe({ spot: { wire: wire.id }, at: snapToSegment(g, wire.points[hit.segment]!, wire.points[hit.segment + 1]!) });
+      }
+      e.preventDefault();
+      return;
+    }
 
     // Analiz → İz ekle: parça akımı ya da düğüm gerilimi seçilir.
     if (onPick && e.button === 0) {
@@ -1572,7 +1602,7 @@ export function Canvas({
     <div className="absolute inset-0 overflow-hidden bg-paper">
       <svg
         ref={svgRef}
-        className={`schematic block h-full w-full ${onPick ? 'cursor-crosshair' : cursorClass}`}
+        className={`schematic block h-full w-full ${onPick || onProbe ? 'cursor-crosshair' : cursorClass}`}
         // iOS/WebKit, touch-action: none bölgesini üstüne binen katmanlara da uygulayabiliyor; o zaman
         // tuvalin üstündeki çekmece ya da pencere parmakla kaydırılamıyor. Katman açıkken kapatılır.
         style={overlayOpen ? { touchAction: 'auto' } : undefined}
@@ -1992,6 +2022,9 @@ export function Canvas({
         </div>
       )}
 
+      {probes && !phone?.strip && (
+        <ProbeLayer probes={probes} size={size} touch={phone !== null} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />
+      )}
       {frame &&
         !phone?.strip &&
         (!phone && legendRect && circuitHits(shapes, view, legendRect) ? (

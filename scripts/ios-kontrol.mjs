@@ -1532,6 +1532,38 @@ try {
     check('arıza (B2, 2. aşama): şerit "Arıza bulma · otomatik göstergeler kapalı"; çalışırken kablolar renksiz, akım noktası ve düğüm etiketi yok; defterde "canlı değerler gizli"; osiloskop kartı ölçmeye devam ediyor',
       banner === 1 && strokes.every((x) => x === 'var(--color-symbol)' || x === 'currentColor') && dots === 0 && legend === 0 && hidden === 1 && problemsShown === 0 && /mVpp/.test(osc),
       `${strokes.join(',')} · ${osc.slice(0, 40)}`);
+    // 3. aşama (R1): multimetre paneli, uçlar bacağa ya da kabloya; bacak ile düğüm ayrı okunur; Ω durmuşken.
+    {
+      const panel = page.getByRole('region', { name: 'Multimetre' });
+      const reading = async () => ((await panel.getByRole('img').getAttribute('aria-label')) ?? '').replace('Multimetrenin okuması: ', '');
+      const place = async (color, gx, gy) => {
+        await panel.getByRole('button', { name: new RegExp(`^${color} u`) }).click(); await page.waitForTimeout(150);
+        const p = await screen(page, gx, gy); await page.mouse.click(p.x, p.y); await page.waitForTimeout(1500);
+      };
+      const start = ((await panel.textContent()) ?? '').replace(/\s+/g, ' ');
+      await panel.getByRole('button', { name: /^Kırmızı ucu şemaya koy/ }).click(); await page.waitForTimeout(150);
+      const hint = await page.getByText('Kırmızı ucu koy: şemada bir bacağa ya da kabloya tıkla').count();
+      await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+      await place('Kırmızı', 44, -4);
+      const leg = await reading();
+      const tag = await page.getByText('Kırmızı uç · RC alt bacağı', { exact: true }).count();
+      await place('Kırmızı', 44, -2);
+      const node = await reading();
+      check('arıza (B2, 3. aşama, R1): multimetre paneli (iç direnç 10 MΩ, V ⎓ · V ∿ · Ω), siyah uç toprakta; kırmızı uç RC’nin kopuk bacağında 11,99 V, hemen yanındaki kollektör kablosunda mV (bacak ile düğüm ayrı)',
+        start.includes('iç direnç 10 MΩ') && start.includes('GND1') && hint === 1 && leg === '11,99 V ⎓' && tag === 1 && /^\d+,\d+ mV ⎓$/.test(node), `${leg} · ${node}`);
+      await panel.getByRole('radio', { name: /^Direnç/ }).click(); await page.waitForTimeout(200);
+      const running = ((await panel.textContent()) ?? '').includes('Ω ölçmek için simülasyonu durdur');
+      await page.getByRole('button', { name: 'Durdur', exact: true }).first().click(); await page.waitForTimeout(400);
+      await place('Kırmızı', 44, -12); await place('Siyah', 44, -4);
+      const rc = await reading();
+      await place('Siyah', 44, -2);
+      const open = await reading();
+      check('arıza (B2, 3. aşama): Ω yalnızca simülasyon durmuşken; RC’nin iki bacağı ≈ 5,6 kΩ, RC üst bacağı ile kollektör arası MΩ (bacak kopuk)',
+        running && /^5,(59\d|600) kΩ$/.test(rc) && /MΩ$|^OL/.test(open), `${rc} · ${open}`);
+      await panel.getByRole('radio', { name: /^Doğru/ }).click();
+      await place('Siyah', 7, 16);
+      await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(1500);
+    }
     await page.locator('[data-card]').filter({ hasText: 'Q1' }).first().locator('[data-nav]').first().click(); await page.waitForTimeout(300);
     const q1 = ((await page.locator('[data-card]').filter({ hasText: 'Q1' }).first().textContent()) ?? '').replace(/\s+/g, ' ');
     await page.getByRole('button', { name: 'Analiz', exact: true }).first().click(); await page.waitForTimeout(300);

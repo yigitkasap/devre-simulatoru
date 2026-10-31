@@ -7,8 +7,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
-import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
+import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
 import { maskFrame } from './fault/mask';
+import { defaultBlack, measureResistance, METER_ID, meterPart, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
+import { MultimeterPanel, type MeterReading } from './fault/MultimeterPanel';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { partBounds, pinPositions } from '../model/geometry';
@@ -269,7 +271,18 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // Arıza bulma (B2): şema, mesajlar, rozetler ve analizin düğüm dizini sağlam devreden (arızayı ele
   // vermesin); simülasyon arızalı devreden (arıza netlist kurulurken uygulanır).
   const fault = task?.fault ?? null;
-  const simConnectivity = useMemo(() => (fault && fault.faults.length > 0 ? buildConnectivity(doc, fault.faults) : connectivity), [doc, fault, connectivity]);
+  /** Multimetre (R1): kip, iki ucun yeri ve şemaya koyulan uç. Görev değişince siyah uç toprakta, kırmızı boşta. */
+  const [meter, setMeter] = useState<{ mode: MeterMode; red: Probe | null; black: Probe | null; placing: ProbeColor | null }>(() => ({ mode: 'dc', red: null, black: defaultBlack(state.doc), placing: null }));
+  useEffect(() => {
+    if (fault) setMeter({ mode: fault.tools.voltage ? 'dc' : 'ohm', red: null, black: defaultBlack(docRef.current), placing: null });
+  }, [fault]);
+  // Multimetre simülasyona görünmez bir voltmetre olarak girer (iç direnç 10 MΩ; şemada yok).
+  const simDoc = useMemo(() => (fault ? { ...doc, parts: [...doc.parts, meterPart(meter.mode)] } : doc), [doc, fault, meter.mode]);
+  const simConnectivity = useMemo(() => {
+    if (!fault) return connectivity;
+    const c = buildConnectivity(simDoc, fault.faults);
+    return { ...c, netlist: wireMeter(c.netlist, meter.mode, meter.red, meter.black) };
+  }, [fault, simDoc, connectivity, meter.mode, meter.red, meter.black]);
   /** Otomatik göstergeler kapalı: kablo renkleri, akım noktaları, düğüm etiketleri, kartlardaki canlı değerler. */
   const hideLive = fault !== null && fault.hideIndicators;
   const shownSettings = useMemo(() => (hideLive ? { ...settings, nodeVoltages: false, currentDots: false, magneticField: false } : settings), [hideLive, settings]);
@@ -319,11 +332,12 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     // Görev hedeflerinin parçaları (salınan değerin pencere özeti ve DC ortalaması için).
     ...(task ? targetParts(task.targets) : []),
     ...(timeVarying && !phone ? doc.parts.filter((p) => CARD_WATCHED.has(p.type)).slice(0, 8).map((p) => p.id) : []),
+    ...(fault ? [METER_ID] : []),
   ].join(',');
   const watched = useMemo(() => (watchedKey ? [...new Set(watchedKey.split(','))] : []), [watchedKey]);
   /** Defterde kapalı kartı ölçüm gösterebilen parçalar (DC devrede hepsi). */
   const measuredParts = useMemo<ReadonlySet<string> | null>(() => (timeVarying ? new Set(watched) : null), [timeVarying, watched]);
-  const sim = useSimulation(doc, simConnectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
+  const sim = useSimulation(simDoc, simConnectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
   /** Oynat: görevde tahminler kaydedilmediyse (B1) çalışmaz, nedenini söyler. */
   const play = () => {
     if (gate) showToast(gate, 'error');
@@ -1010,6 +1024,67 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     setConnect({ start: null });
   };
 
+  // --- Arıza bulma: multimetrenin uçları ve okuması (R1) -----------------------------------
+  const probeLabel = (probe: Probe | null) => (probe ? spotLabel(probe.spot, doc, analysis.idx) : null);
+  const redLabel = probeLabel(meter.red);
+  const blackLabel = probeLabel(meter.black);
+  const [meterPanelHeight, setMeterPanelHeight] = useState(0);
+  const meterPanelRef = useRef<ResizeObserver | null>(null);
+  // Panel ilk görününce devre panelden kaçınarak yeniden sığdırılır.
+  const meterShown = meterPanelHeight > 0;
+  useEffect(() => {
+    if (meterShown) setFitRequest((n) => n + 1);
+  }, [meterShown]);
+  const measureMeterPanel = useCallback((el: HTMLDivElement | null) => {
+    meterPanelRef.current?.disconnect();
+    if (!el) return;
+    const observer = new ResizeObserver(() => setMeterPanelHeight(el.getBoundingClientRect().height));
+    observer.observe(el);
+    meterPanelRef.current = observer;
+  }, []);
+  const probeView =
+    fault && viewMode === 'schematic'
+      ? {
+          red: meter.red && redLabel ? { at: meter.red.at, label: redLabel } : null,
+          black: meter.black && blackLabel ? { at: meter.black.at, label: blackLabel } : null,
+          placing: meter.placing,
+          anchor: phone || meterPanelHeight === 0 ? null : { x: 16 + 150, bottom: 16 + meterPanelHeight },
+          onPick: (color: ProbeColor) => setMeter((m) => ({ ...m, placing: m.placing === color ? null : color })),
+        }
+      : null;
+  // Uç koyarken Esc vazgeçer.
+  useEffect(() => {
+    if (!meter.placing) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMeter((m) => ({ ...m, placing: null }));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [meter.placing]);
+  /** Ω: simülasyon durmuşken, uçlar ya da arıza değişince bir kez hesaplanır. */
+  const ohms = useMemo(() => {
+    if (!fault || meter.mode !== 'ohm' || sim.status !== 'stopped' || !meter.red || !meter.black) return undefined;
+    return measureResistance(buildConnectivity(doc, fault.faults).netlist, spotKey(meter.red.spot), spotKey(meter.black.spot));
+  }, [fault, doc, meter.mode, meter.red, meter.black, sim.status]);
+  const meterText = sim.frame?.meterTexts.get(METER_ID) ?? null;
+  const meterReading = useMemo<MeterReading>(() => {
+    const t = tr.fault.meter;
+    if (!meter.red || !meter.black) return { value: t.empty, unit: '', note: t.needProbes };
+    if (meter.mode === 'ohm') {
+      if (sim.status !== 'stopped') return { value: t.empty, unit: 'Ω', note: t.ohmRunning };
+      if (ohms === null || ohms === undefined) return { value: t.empty, unit: 'Ω', note: t.ohmFailed };
+      if (!Number.isFinite(ohms)) return { value: t.over, unit: 'Ω' };
+      const text = formatSI(ohms, 'Ω', { digits: 4 });
+      const cut = text.lastIndexOf(' ');
+      return { value: text.slice(0, cut), unit: text.slice(cut + 1) };
+    }
+    if (sim.status === 'stopped' || !meterText) return { value: t.empty, unit: `V ${t.units[meter.mode]}`, note: sim.status === 'stopped' ? t.needPlay : undefined };
+    // Okuma devredeki voltmetreyle aynı biçimde ("11,99 V", salınıyorsa "≈ …", AC'de sonda "~").
+    const text = meterText.replace(/^≈ /, '').replace(/~$/, '');
+    const cut = text.lastIndexOf(' ');
+    return { value: text.slice(0, cut), unit: `${text.slice(cut + 1)} ${t.units[meter.mode]}` };
+  }, [meter.red, meter.black, meter.mode, sim.status, ohms, meterText]);
+
   const overlayOpen = share !== null || examplesOpen || modal !== null || stopAsk || kartaOpen;
   const schematic = (
     <Canvas
@@ -1067,6 +1142,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       zeroPoints={zeroPoints}
       onExplain={explain}
       onPick={analysis.pick ? analysis.onPick : null}
+      probes={probeView}
+      cornerPanel={probeView && !phone && meterPanelHeight > 0 ? { w: 300, h: meterPanelHeight } : null}
+      onProbe={meter.placing ? (probe) => setMeter((m) => (m.placing ? { ...m, [m.placing]: probe, placing: null } : m)) : null}
       taskParts={taskParts}
       {...(analysis.open ? { marks: analysis.marks } : {})}
     />
@@ -1604,6 +1682,20 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 min-w-0 flex-1">
             {canvas}
+            {fault && viewMode === 'schematic' && (
+              <div ref={measureMeterPanel} className="absolute bottom-4 left-4 z-20">
+                <MultimeterPanel
+                  mode={meter.mode}
+                  onMode={(mode) => setMeter((m) => ({ ...m, mode }))}
+                  reading={meterReading}
+                  red={redLabel}
+                  black={blackLabel}
+                  placing={meter.placing}
+                  onPlace={(placing) => setMeter((m) => ({ ...m, placing }))}
+                  tools={fault.tools}
+                />
+              </div>
+            )}
             {fault ? (
               <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-warn-line bg-warn-soft/95 px-3 py-1.5 text-small font-semibold text-warn shadow-sm">
                 <Icon name="wrench" className="h-4 w-4" />
