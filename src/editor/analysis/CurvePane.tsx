@@ -144,7 +144,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
     ) : null;
 
   const controls = (
-    <div className={`flex flex-col gap-2.5 ${compact ? '' : 'w-[236px] shrink-0 overflow-y-auto overscroll-contain'}`}>
+    <div className={`flex flex-col gap-2.5 ${compact ? '' : 'min-h-0 w-[236px] shrink-0 overflow-y-auto overscroll-contain'}`}>
       <label className="flex flex-col gap-1 text-label text-muted">
         {t.part}
         <select value={part.id} onChange={(e) => tracer.setPart(e.target.value)} className={`${field} w-full flex-none font-sans text-ink`}>
@@ -291,7 +291,8 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
   ) : (
     <div className="flex min-h-0 flex-1 gap-5 px-4 pb-3">
       {controls}
-      {chart}
+      {/* Grafik en az 140 px: çekmece daha alçaksa bu sütun kayar. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">{chart}</div>
     </div>
   );
 }

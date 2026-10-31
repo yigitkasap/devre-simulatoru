@@ -17,7 +17,14 @@ export interface XYSeries {
   readonly dots?: boolean;
   /** Kesikli ve ince (Bode'un Teori eğrisi). */
   readonly dashed?: boolean;
+  /** Rengin yerine (tema belirteci): Teori eğrisi gri, Q basamağı uyarı renginde. */
+  readonly stroke?: string;
+  /** Kalın çizgi (eğri izleyicide Q noktasının basamağı). */
+  readonly strong?: boolean;
 }
+
+/** Bir grafiğin en az yüksekliği (px): daha alçakta eksen yazıları üst üste biner. */
+export const MIN_CHART = 140;
 
 export interface XYChartProps {
   readonly series: readonly XYSeries[];
@@ -125,7 +132,7 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={height ? { height, flex: 'none' } : undefined}>
-      <div ref={box} className="relative min-h-0 flex-1">
+      <div ref={box} className="relative min-h-0 flex-1" style={{ minHeight: MIN_CHART }}>
         {size.w > 0 && (
           <svg width={size.w} height={size.h} role="img" aria-label={ariaLabel} className="absolute inset-0 block select-none" style={{ fontFamily: 'var(--font-mono)' }}>
             <rect x={m.l} y={m.t} width={pw} height={ph} fill="var(--color-panel)" stroke="var(--color-line)" />
@@ -182,8 +189,8 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
                 <path
                   key={s.id}
                   d={s.points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${X(x).toFixed(1)} ${Y(y * yScale).toFixed(1)}`).join('')}
-                  stroke={traceColor(s.color)}
-                  {...(s.dashed ? { strokeDasharray: '6 4', strokeWidth: 1.75 } : {})}
+                  stroke={s.stroke ?? traceColor(s.color)}
+                  {...(s.dashed ? { strokeDasharray: '6 4', strokeWidth: 1.75 } : s.strong ? { strokeWidth: 3.5 } : {})}
                 />
               ))}
             </g>
@@ -198,7 +205,7 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
               ))}
             {overlay?.(X, Y)}
             {ends.map(({ s, y }) => (
-              <text key={`e${s.id}`} x={m.l + pw + 6} y={y + 3.5} fontSize={11} fill={traceColor(s.color)}>
+              <text key={`e${s.id}`} x={m.l + pw + 6} y={y + 3.5} fontSize={11} fontWeight={s.strong ? 700 : undefined} fill={s.stroke ?? traceColor(s.color)}>
                 {s.label}
               </text>
             ))}
@@ -207,7 +214,7 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
                 <line x1={cx} x2={cx} y1={m.t} y2={m.t + ph} stroke="var(--color-ink)" strokeDasharray="4 3" />
                 {series.map((s) => {
                   const v = valueAt(s.points, cursor);
-                  return Number.isFinite(v) ? <circle key={s.id} cx={cx} cy={Y(v * yScale)} r={4} fill={traceColor(s.color)} stroke="var(--color-panel)" strokeWidth={1.5} /> : null;
+                  return Number.isFinite(v) ? <circle key={s.id} cx={cx} cy={Y(v * yScale)} r={4} fill={s.stroke ?? traceColor(s.color)} stroke="var(--color-panel)" strokeWidth={1.5} /> : null;
                 })}
               </g>
             )}

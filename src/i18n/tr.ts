@@ -3074,7 +3074,12 @@ export const tr = {
       phaseLabel: (n: number, theory = false) => `Bode faz grafiği, ${n} ölçüm noktası${theory ? ' ve kesikli teori eğrisi' : ''}`,
       measured: 'Ölçülen',
       theory: 'Teori (küçük sinyal)',
+      theoryShort: 'Teori',
       theoryToggleLabel: 'Teori eğrisini göster',
+      theoryFailedShort: 'hesaplanamadı',
+      infoLabel: 'Ölçüm yöntemi ve teori eğrisi',
+      showPhase: 'Fazı göster',
+      hidePhase: 'Fazı gizle',
       theoryValue: (g: string, fh: string | null) => (fh ? `${g} kat · f_{H} ≈ ${fh}` : `${g} kat`),
       theoryNote:
         'Kesikli çizgi teoridir: devre çalışma noktasında doğrusallaştırılır (küçük sinyal AC), parça modelleri ölçümle aynı. Genlik büyükse ölçülen kazanç teoriden ayrılır (transistör doğrusal değil).',

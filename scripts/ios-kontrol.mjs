@@ -1063,17 +1063,36 @@ try {
       selects[0] === 'FG1 çıkışı (OUT − COM)' && /OSC1 B$/.test(selects[1] ?? '') && progress === '16' && /20[4-7],\d kat · 46,\d dB/.test(mid) && /≈ (0,9\d|1,\d\d) MHz/.test(fhText) &&
       charts.includes('Bode kazanç grafiği, 16 ölçüm noktası ve kesikli teori eğrisi') && charts.includes('Bode faz grafiği, 16 ölçüm noktası ve kesikli teori eğrisi') && marks.includes('Giriş') && marks.includes('Çıkış'),
       `${selects.join(' / ')} · ${mid} · ${fhText}`);
-    // Teori (A5, küçük sinyal AC): kesikli eğri, çip, gösterge düğmesi, imleç satırı.
-    const theoryChip = ((await drawer.getByText('Teori (küçük sinyal)', { exact: true }).first().locator('..').textContent()) ?? '').replace(/\s+/g, ' ');
+    // Teori (A5, küçük sinyal AC): kesikli eğri, çip (gösterge düğmesi), imleç satırı.
     const toggle = drawer.getByRole('button', { name: 'Teori eğrisini göster' });
+    const theoryChip = ((await toggle.textContent()) ?? '').replace(/\s+/g, ' ');
     const dashed = await drawer.locator('svg path[stroke-dasharray="6 4"]').count();
     const cursorLine = (await drawer.getByText(/^f = /).textContent().catch(() => '')) ?? '';
     await toggle.click(); await page.waitForTimeout(150);
     const hidden = (await drawer.locator('svg path[stroke-dasharray="6 4"]').count()) === 0 && (await drawer.getByRole('img', { name: 'Bode kazanç grafiği, 16 ölçüm noktası' }).count()) === 1;
     await toggle.click(); await page.waitForTimeout(150);
-    check('Bode (A5): kesikli Teori eğrisi (küçük sinyal AC) kazanç ve fazda; "Teori" çipinde orta bant ≈ 209,8 kat ve f_H; imleç satırında teori; Teori düğmesi (aria-pressed) gizleyip gösteriyor',
-      dashed === 2 && /209,8 kat/.test(theoryChip) && /≈ 1,\d+ MHz/.test(theoryChip) && cursorLine.includes('teori') && hidden && (await toggle.getAttribute('aria-pressed')) === 'true',
+    check('Bode (A5): kesikli Teori eğrisi (küçük sinyal AC) kazanç ve fazda; "Teori" çipinde orta bant ≈ 209,8 kat ve f_H; imleç satırında teori; Teori çipi (düğme, aria-pressed) gizleyip gösteriyor',
+      dashed === 2 && theoryChip.startsWith('Teori') && /209,8 kat/.test(theoryChip) && /≈ 1,\d+ MHz/.test(theoryChip) && cursorLine.includes('teori') && hidden && (await toggle.getAttribute('aria-pressed')) === 'true',
       `${theoryChip} · ${cursorLine.slice(-30)}`);
+    // Düzen (analiz düzeltmeleri, 1): çekmece en az 560 px; çipler ve gösterge başlık satırının altında tek
+    // satırda, grafik alanının dışında; her grafik ≥ 140 px; sol sütun taşmıyor; açıklama "ⓘ" ipucunda.
+    {
+      const dH = (await drawer.boundingBox())?.height ?? 0;
+      const tabsBox = await drawer.getByRole('tablist').boundingBox();
+      const midBox = await drawer.getByText(/^Orta bant \(/).boundingBox();
+      const tBox = await toggle.boundingBox();
+      const gainBox = await drawer.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox();
+      const phaseBox = await drawer.getByRole('img', { name: /^Bode faz grafiği/ }).boundingBox();
+      const column = await drawer.getByRole('combobox').first().evaluate((el) => { const c = el.closest('.overflow-y-auto'); return c ? c.scrollHeight - c.clientHeight : -1; });
+      const longText = await drawer.getByText(/^Kesikli çizgi teoridir/).count();
+      await drawer.getByRole('button', { name: 'Ölçüm yöntemi ve teori eğrisi' }).click(); await page.waitForTimeout(150);
+      const note = ((await page.getByRole('note', { name: 'Ölçüm yöntemi ve teori eğrisi' }).textContent().catch(() => '')) ?? '');
+      await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+      check('Bode (düzen): çekmece ≥ 560 px; çipler ve gösterge sekmelerin altında tek satırda, grafiklerin üstünde; kazanç ve faz ≥ 140 px; sol sütun taşmıyor; teori açıklaması ⓘ ipucunda',
+        dH >= 559 && tabsBox !== null && midBox !== null && tBox !== null && gainBox !== null && phaseBox !== null && midBox.y > tabsBox.y + tabsBox.height && Math.abs(midBox.y + midBox.height / 2 - (tBox.y + tBox.height / 2)) < 3 &&
+        midBox.y + midBox.height <= gainBox.y && gainBox.height >= 140 && phaseBox.height >= 140 && column === 0 && longText === 0 && note.includes('Kesikli çizgi teoridir') && note.includes('2 periyot'),
+        `${Math.round(dH)} px · kazanç ${Math.round(gainBox?.height ?? 0)}, faz ${Math.round(phaseBox?.height ?? 0)} px · sütun taşması ${column}`);
+    }
     await drawer.getByRole('button', { name: 'Tabloya aktar' }).click(); await page.waitForTimeout(200);
     const [csv] = await Promise.all([page.waitForEvent('download'), drawer.getByRole('button', { name: 'CSV indir' }).click()]);
     const csvText = Buffer.concat(await (await csv.createReadStream()).toArray()).toString('utf8');
@@ -1084,6 +1103,18 @@ try {
       saved.some((r) => r.name === 'Orta bant kazancı' && r.measured > 200) && saved.some((r) => r.name === 'f_{H} (−3 dB)' && r.unit === 'Hz') &&
       /^bode-.*\.csv$/.test(csv.suggestedFilename()) && csvText.startsWith('﻿f (Hz);giriş genliği (V);çıkış genliği (V);kazanç (kat);kazanç (dB);faz (°);oturdu;teori kazanç (kat);teori faz (°)') && csvText.split('\r\n').length >= 17,
       `${saved.length} satır · ${csv.suggestedFilename()}`);
+    // Çekmece alçalınca (tutamak): iki grafik 140 px'e sığmıyor → faz gizli, "Fazı göster" ile geliyor.
+    const sep = drawer.getByRole('separator', { name: 'Analiz çekmecesinin yüksekliği' });
+    await sep.focus(); for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(300);
+    const lowH = (await drawer.boundingBox())?.height ?? 0;
+    const phaseHidden = (await drawer.getByRole('img', { name: /^Bode faz grafiği/ }).count()) === 0;
+    const lowGain = (await drawer.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox())?.height ?? 0;
+    await drawer.getByRole('button', { name: 'Fazı göster' }).click(); await page.waitForTimeout(200);
+    const phaseShown = (await drawer.getByRole('img', { name: /^Bode faz grafiği/ }).boundingBox())?.height ?? 0;
+    check('Bode (düzen): kullanıcının verdiği boy kalıyor; alçak çekmecede faz gizli, "Fazı göster" ile ≥ 140 px geliyor; kazanç ≥ 140 px',
+      lowH < 400 && phaseHidden && lowGain >= 140 && phaseShown >= 140 && (await drawer.getByRole('button', { name: 'Fazı gizle' }).count()) === 1,
+      `${Math.round(lowH)} px · kazanç ${Math.round(lowGain)} · faz ${Math.round(phaseShown)}`);
     await ctx.close();
   }
   {
@@ -1096,8 +1127,9 @@ try {
     await sheet.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
     const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab], select, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
     const note = await sheet.getByText(/iki ölçüm noktası arasında doğrusal ara değer/).count();
-    check('Bode (telefon): alt sayfada ölçüm biter; f_H’nin ara değer olduğu yazıyor; Teori düğmesi ve çipi; denetimler ≥ 44 px; altta Yeniden ölç ve CSV paylaş',
-      (await sheet.getByText('✓ Ölçüm bitti').count()) === 1 && note === 1 && (await sheet.getByRole('button', { name: 'Teori eğrisini göster' }).count()) === 1 && (await sheet.getByText('Teori (küçük sinyal)', { exact: true }).count()) >= 1 && small.length === 0 && (await sheet.getByRole('button', { name: 'Yeniden ölç' }).count()) === 1 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1,
+    const theoryChip = ((await sheet.getByRole('button', { name: 'Teori eğrisini göster' }).textContent().catch(() => '')) ?? '');
+    check('Bode (telefon): alt sayfada ölçüm biter; f_H’nin ara değer olduğu yazıyor; Teori çipi (düğme) değeriyle; denetimler ≥ 44 px; altta Yeniden ölç ve CSV paylaş',
+      (await sheet.getByText('✓ Ölçüm bitti').count()) === 1 && note === 1 && theoryChip.startsWith('Teori') && /209,8 kat/.test(theoryChip) && small.length === 0 && (await sheet.getByRole('button', { name: 'Yeniden ölç' }).count()) === 1 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1,
       small.join(', '));
     await page.context().close();
   }

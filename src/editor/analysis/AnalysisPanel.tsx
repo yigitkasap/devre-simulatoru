@@ -317,6 +317,8 @@ export function AnalysisDrawer(
 
 export const MIN_DRAWER = 220;
 export const DEFAULT_DRAWER = 380;
+/** Eğri izleyici ve Bode sekmesinde çekmecenin en az boyu (kullanıcı tutamakla boy vermediyse). */
+export const TALL_DRAWER = 560;
 
 function Tabs({ api, idBase, touch, full = false, short = false }: { api: AnalysisApi; idBase: string; touch: boolean; full?: boolean; short?: boolean }) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});

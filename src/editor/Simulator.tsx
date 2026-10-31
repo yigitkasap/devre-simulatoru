@@ -17,7 +17,7 @@ import { compileNetlist, scopeSettings, type CompiledCircuit, type Diagnostic } 
 import { loadArduinoRuntime } from '../sim/arduino/runtime';
 import { numProp, type DeviceType, type PropValue } from '../sim/netlist';
 import { formatSI } from '../sim/units';
-import { AnalysisDrawer, AnalysisSheetBody, DEFAULT_DRAWER, MIN_DRAWER } from './analysis/AnalysisPanel';
+import { AnalysisDrawer, AnalysisSheetBody, DEFAULT_DRAWER, MIN_DRAWER, TALL_DRAWER } from './analysis/AnalysisPanel';
 import { useAnalysis } from './analysis/useAnalysis';
 import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
@@ -273,6 +273,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const saveState = useAutosave(doc, analysis.doc, embed === null);
   /** Analiz çekmecesinin yüksekliği (masaüstü) ve Büyüt. */
   const [drawerHeight, setDrawerHeight] = useState(DEFAULT_DRAWER);
+  /** Kullanıcı tutamakla boy verdiyse o boy kalır; vermediyse Eğri ve Bode sekmesinde çekmece en az 560 px. */
+  const [drawerSized, setDrawerSized] = useState(false);
   const [drawerExpanded, setDrawerExpanded] = useState(false);
   const [analysisSheet, setAnalysisSheet] = useState<SheetSize>('half');
   const [windowHeight, setWindowHeight] = useState(() => window.innerHeight);
@@ -1592,10 +1594,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               frame={sim.frame}
               notify={notify}
               title={circuitTitle}
-              height={drawerExpanded ? drawerMax : Math.min(drawerHeight, drawerMax)}
+              height={drawerExpanded ? drawerMax : Math.min(!drawerSized && (analysis.tab === 'curve' || analysis.tab === 'bode') ? Math.max(TALL_DRAWER, drawerHeight) : drawerHeight, drawerMax)}
               maxHeight={drawerMax}
               onHeight={(h) => {
                 setDrawerExpanded(false);
+                setDrawerSized(true);
                 setDrawerHeight(h);
               }}
               expanded={drawerExpanded}
