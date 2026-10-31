@@ -900,6 +900,22 @@ try {
     const endValue = ((await drawer.locator('.shadow-lg').first().textContent()) ?? '').replace(/\s+/g, ' ');
     check('analiz: kayıt yalnız seçili izler, 5 ms aralıkla; grafik role="img" açıklamalı; imleç klavyeyle sona gidiyor, değer kutusunda V(C1) ≈ 9,9 V',
       /Aralık ?5 ms · \d{2,} nokta/.test(info) && chartLabel.startsWith('Grafik: V(C1), I(R1)') && /V\(C1\) ?9,[89]\d\d V/.test(endValue), `${info} · ${endValue.slice(0, 60)}`);
+    // Kablo gerilimi kutusu (analiz düzeltmeleri, 2): çekmece açıkken ve çalışırken toprak sembolüne ve
+    // alt kabloya binmiyor (Sığdır kutuyu dışarıda bırakır); yakınlaşınca devreye değen kutu tek satır.
+    {
+      const legendBox = async () => page.locator('main').getByRole('note', { name: 'Gösterim' }).boundingBox();
+      const lb = await legendBox();
+      const a = await screen(page, 0, 8);
+      const b = await screen(page, 44, 8);
+      const covers = lb !== null && a.y >= lb.y - 4 && a.y <= lb.y + lb.height + 4 && Math.max(a.x, b.x) >= lb.x && Math.min(a.x, b.x) <= lb.x + lb.width;
+      await page.getByRole('button', { name: 'Yakınlaştır' }).click(); await page.getByRole('button', { name: 'Yakınlaştır' }).click(); await page.waitForTimeout(250);
+      const zoomed = await legendBox();
+      await page.getByRole('button', { name: 'Devreyi ekrana sığdır' }).click(); await page.waitForTimeout(250);
+      const back = await legendBox();
+      check('kablo gerilimi kutusu: çekmece açık ve çalışırken RC dolmada toprağa ve alt kabloya binmiyor; yakınlaşınca tek satıra küçülüyor, Sığdır’la geri geliyor',
+        lb !== null && lb.height > 60 && !covers && zoomed !== null && zoomed.height <= 40 && back !== null && back.height > 60,
+        `kutu ${Math.round(lb?.width ?? 0)}×${Math.round(lb?.height ?? 0)} · alt kablo y ${Math.round(a.y)} · yakın ${Math.round(zoomed?.height ?? 0)} px`);
+    }
     await drawer.getByRole('button', { name: 'Tabloya ekle' }).click(); await page.waitForTimeout(200);
     const [csv] = await Promise.all([page.waitForEvent('download'), drawer.getByRole('button', { name: 'CSV indir' }).click()]);
     const csvText = Buffer.concat(await (await csv.createReadStream()).toArray()).toString('utf8');
