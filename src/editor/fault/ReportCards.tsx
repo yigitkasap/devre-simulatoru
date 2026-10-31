@@ -59,7 +59,7 @@ export function ReportCard({
               <span className="shrink-0 text-label text-muted">{t.fromSchematic}</span>
             </>
           ) : (
-            <span className="text-muted">{t.notChosen}</span>
+            <span className="text-muted">{touch ? t.notChosenTouch : t.notChosen}</span>
           )}
         </span>
       </Step>

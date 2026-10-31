@@ -2044,7 +2044,7 @@ export function Canvas({
       )}
 
       {placeMarks && !phone?.strip && (
-        <PlaceMarks marks={placeMarks.marks} hint={placeMarks.hint} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />
+        <PlaceMarks marks={placeMarks.marks} hint={placeMarks.hint} touch={phone !== null} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />
       )}
       {probes && !phone?.strip && (
         <ProbeLayer probes={probes} size={size} touch={phone !== null} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />

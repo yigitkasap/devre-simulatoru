@@ -105,7 +105,7 @@ export function FaultCard({
   );
 }
 
-function LogRow({ n, entry, askExpected, touch, onExpected }: { n: number; entry: LogEntry; askExpected: boolean; touch: boolean; onExpected: (v: number | null) => void }) {
+export function LogRow({ n, entry, askExpected, touch, onExpected }: { n: number; entry: LogEntry; askExpected: boolean; touch: boolean; onExpected: (v: number | null) => void }) {
   const t = tr.fault.card;
   const unit = entry.mode === 'ohm' ? 'Ω' : 'V';
   const [invalid, setInvalid] = useState(false);

@@ -1670,6 +1670,27 @@ try {
     const vw = page.viewportSize().width;
     check('arıza (telefon, R5): şemanın sağ üstünde "Arıza bulma" çipi; sayfa kaymıyor',
       chip !== null && chip.x + chip.width <= vw && chip.y < 140 && !(await pageScrolls(page)), `${Math.round(chip?.x ?? 0)},${Math.round(chip?.y ?? 0)}`);
+    // 7. aşama (R5): defterin yerinde arıza sayfası; önce ucu seç, sonra şemada dokun; altta İpucu ve Arızayı bildir.
+    const sheet = page.getByRole('region', { name: /^Arıza bul:/ });
+    const connect = await page.getByRole('button', { name: /Kablo bağla/ }).count();
+    await page.locator('[data-tour="play"]').tap(); await page.waitForTimeout(1200);
+    await sheet.getByRole('button', { name: /^Kırmızı u/ }).tap(); await page.waitForTimeout(200);
+    const pt = await screen(page, 44, -4); await page.touchscreen.tap(pt.x, pt.y); await page.waitForTimeout(2200);
+    const reading = (await sheet.getByRole('img').getAttribute('aria-label')) ?? '';
+    const rows = await sheet.locator('ol li').count();
+    const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
+    const bar = await sheet.getByRole('button', { name: 'Arızayı bildir' }).boundingBox();
+    const fab = await page.locator('[data-tour="play"]').boundingBox();
+    check('arıza (telefon, 7. aşama, R5): defterin yerinde arıza sayfası (büyük okuma, kip, iki uç düğmesi, günlük); Kablo bağla yok; ucu seç → şemada dokun: RC bacağında 11,99 V, günlükte; altta İpucu ve Arızayı bildir, Oynat üstünde; denetimler ≥ 44 px; sayfa kaymıyor',
+      connect === 0 && reading.endsWith('11,99 V ⎓') && rows === 1 && small.length === 0 && bar !== null && fab !== null && fab.y + fab.height <= bar.y && !(await pageScrolls(page)),
+      `${reading} · ${rows} satır · ${small.join(', ')}`);
+    await sheet.getByRole('button', { name: 'Arızayı bildir' }).tap(); await page.waitForTimeout(300);
+    const report = page.getByRole('region', { name: 'Arızayı bildir' });
+    const hint = await page.getByText('Arızanın yerini şemada seç: parçaya, bacağa ya da kabloya dokun').boundingBox();
+    await page.touchscreen.tap(pt.x, pt.y); await page.waitForTimeout(300);
+    const where = ((await report.textContent()) ?? '').includes('RC · Q1 kollektör tarafındaki bacak');
+    check('arıza (telefon, R5): Arızayı bildir kartı defterde, yer şemaya dokunarak seçiliyor; yönerge ekrana sığıyor',
+      (await report.count()) === 1 && where && hint !== null && hint.x >= 0 && hint.x + hint.width <= vw, `${where} · ${Math.round(hint?.x ?? -1)}–${Math.round((hint?.x ?? 0) + (hint?.width ?? 0))}`);
     await page.context().close();
   }
   // --- Gömme (C4, C5, C8; N7, N8): Paylaş → Sayfaya göm, /embed/ sade görünüm, salt okunur, Moodle ------

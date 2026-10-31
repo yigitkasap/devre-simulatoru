@@ -2021,6 +2021,7 @@ export const tr = {
       whereHintTouch: 'Arızanın yerini şemada seç: parçaya, bacağa ya da kabloya dokun',
       fromSchematic: 'şemadan',
       notChosen: 'Şemada parçaya, bacağa ya da kabloya tıkla.',
+      notChosenTouch: 'Şemada parçaya, bacağa ya da kabloya dokun.',
       kind: 'Ne tür arıza?',
       evidence: 'Hangi ölçümler seni buraya götürdü?',
       noLog: 'Günlükte ölçüm yok.',
@@ -2103,6 +2104,11 @@ export const tr = {
       visible: 'Arıza bağlantının içinde durur; arayan bir öğrenci bulabilir. Alıştırma içindir, not vermez. Teslim dosyasında ölçüm günlüğü ve bildirimler olur.',
       pickHint: 'Arızanın yerini şemada seç: bacak, parça ya da kablo (Esc: vazgeç)',
       pickHintTouch: 'Arızanın yerini şemada seç: bacağa, parçaya ya da kabloya dokun',
+    },
+    phone: {
+      title: (n: number) => `Arıza bul · ${n} ölçüm`,
+      symptom: 'Belirti',
+      tap: 'dokun, taşı',
     },
     card: {
       label: (name: string) => `Arıza bul: ${name}`,

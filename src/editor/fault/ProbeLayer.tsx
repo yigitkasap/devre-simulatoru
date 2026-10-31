@@ -1,6 +1,6 @@
 // Multimetrenin uçları şemada (B2, R1): halka ve etiket ("Kırmızı uç · RC alt bacağı"), uçlardan
 // paneline giden kablolar; uç koyulurken altta yönerge. Tuvalin üstünde ekran koordinatlarında çizilir
-// (yakınlaştırınca yazılar büyümez). Halkaya tıklayınca o uç taşınır.
+// (yakınlaştırınca yazılar büyümez). Halkaya tıklayınca o uç taşınır. Telefonda etiket yok (R5).
 
 import { tr } from '../../i18n/tr';
 import type { Point } from '../../model/types';
@@ -56,17 +56,20 @@ export function ProbeLayer({ probes, toScreen, size, touch }: { probes: ProbeVie
               <span className="h-2 w-2 rounded-full" style={{ background: INK[color] }} />
             </span>
           </button>
-          <span
-            className={`absolute top-0 left-4 -translate-y-1/2 rounded-full px-2.5 py-1 text-label font-semibold whitespace-nowrap shadow-sm ${color === 'red' ? 'bg-danger text-white' : 'bg-ink text-panel'}`}
-          >
-            {`${color === 'red' ? t.redTip : t.blackTip} · ${mark.label}`}
-          </span>
+          {/* Telefonda (R5) yer, alt sayfadaki uç düğmelerinde yazar; şemada yalnız halka. */}
+          {!touch && (
+            <span
+              className={`absolute top-0 left-4 -translate-y-1/2 rounded-full px-2.5 py-1 text-label font-semibold whitespace-nowrap shadow-sm ${color === 'red' ? 'bg-danger text-white' : 'bg-ink text-panel'}`}
+            >
+              {`${color === 'red' ? t.redTip : t.blackTip} · ${mark.label}`}
+            </span>
+          )}
         </span>
       ))}
       {probes.placing && (
         // Masaüstünde panel sol altta: yönerge panelin sağında; telefonda ortada.
-        <p className={`pointer-events-none absolute bottom-4 m-0 flex items-center gap-2 ${anchor ? 'left-[336px]' : 'left-1/2 -translate-x-1/2'} rounded-full bg-ink px-4 py-2 text-small font-medium whitespace-nowrap text-panel shadow-md`}>
-          <Icon name="multimeter" className="h-4 w-4" />
+        <p className={`pointer-events-none absolute m-0 flex items-center gap-2 bg-ink text-panel shadow-md ${hintPlace(touch, anchor ? 'left-[336px]' : 'left-1/2 -translate-x-1/2')}`}>
+          <Icon name="multimeter" className="h-4 w-4 shrink-0" />
           {t.placing(probes.placing === 'red' ? t.red : t.black, touch)}
         </p>
       )}
@@ -81,7 +84,12 @@ export interface PlaceMark {
   readonly tone: 'accent' | 'ok';
 }
 
-export function PlaceMarks({ marks, hint, toScreen }: { marks: readonly PlaceMark[]; hint: string | null; toScreen: (g: Point) => { x: number; y: number } }) {
+/** Alttaki yönergenin yeri: masaüstünde tek satır; telefonda kırılır, sağ alttaki düğmeye yer kalır. */
+function hintPlace(touch: boolean, desk: string): string {
+  return touch ? 'right-16 bottom-2.5 left-2.5 rounded-xl px-3 py-2 text-label leading-snug font-medium' : `bottom-4 ${desk} rounded-full px-4 py-2 text-small font-medium whitespace-nowrap`;
+}
+
+export function PlaceMarks({ marks, hint, toScreen, touch }: { marks: readonly PlaceMark[]; hint: string | null; toScreen: (g: Point) => { x: number; y: number }; touch: boolean }) {
   return (
     <>
       {marks.map((m) => {
@@ -98,8 +106,8 @@ export function PlaceMarks({ marks, hint, toScreen }: { marks: readonly PlaceMar
         );
       })}
       {hint && (
-        <p className="pointer-events-none absolute bottom-4 left-1/2 m-0 flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink px-4 py-2 text-small font-medium whitespace-nowrap text-panel shadow-md">
-          <Icon name="flag" className="h-4 w-4" />
+        <p className={`pointer-events-none absolute m-0 flex items-center gap-2 bg-ink text-panel shadow-md ${hintPlace(touch, 'left-1/2 -translate-x-1/2')}`}>
+          <Icon name="flag" className="h-4 w-4 shrink-0" />
           {hint}
         </p>
       )}

@@ -11,6 +11,7 @@ import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivi
 import { maskFrame } from './fault/mask';
 import { FaultCard } from './fault/FaultCard';
 import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
+import { PhoneFaultSheet } from './fault/PhoneFaultSheet';
 import { FoundCard, ReportCard } from './fault/ReportCards';
 import { faultFromPlace } from './task/faultRows';
 import { defaultBlack, measureResistance, METER_ID, meterPart, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
@@ -503,6 +504,21 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     showToast(tr.fault.found.newFault);
   };
   const lastCorrect = [...faultSession.reports].reverse().find((r) => r.correct);
+  const startReport = () => {
+    setWrongReport(false);
+    setMeter((m) => ({ ...m, placing: null }));
+    setReporting({ place: null, at: null, kind: null, evidence: [] });
+  };
+  /** Günlükte bir satırın beklenen değeri (boşsa silinir). */
+  const setExpected = (key: string, value: number | null) =>
+    setFaultSession((s) => ({
+      ...s,
+      log: s.log.map((e) => {
+        if (e.key !== key) return e;
+        const { expected: _old, ...rest } = e;
+        return value === null ? rest : { ...rest, expected: value };
+      }),
+    }));
   const foundExplain = allFound && fault ? faultExplain(fault.faults[0]!, doc, analysis.idx) : null;
   const taskCard = reporting ? (
     <ReportCard
@@ -534,22 +550,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       askExpected={task.fault.askExpected}
       hideIndicators={task.fault.hideIndicators}
       wrong={wrongReport}
-      onReport={() => {
-        setWrongReport(false);
-        setMeter((m) => ({ ...m, placing: null }));
-        setReporting({ place: null, at: null, kind: null, evidence: [] });
-      }}
+      onReport={startReport}
       onHint={() => setFaultSession((s) => ({ ...s, hints: Math.min(tr.fault.hints.list.length, s.hints + 1) }))}
-      onExpected={(key, value) =>
-        setFaultSession((s) => ({
-          ...s,
-          log: s.log.map((e) => {
-            if (e.key !== key) return e;
-            const { expected: _old, ...rest } = e;
-            return value === null ? rest : { ...rest, expected: value };
-          }),
-        }))
-      }
+      onExpected={setExpected}
     />
   ) : task ? (
     <TaskCard
@@ -1212,8 +1215,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   }, []);
   /** Ölçme hâli: bildirmiyor ve (bulunduysa) onarıldı. Multimetre ve uçlar yalnızca o zaman. */
   const measuring = fault !== null && reporting === null && (!allFound || repaired);
+  /** Telefonda multimetre arıza sayfasında (R5); bulunup onarılınca defter geri gelir. */
+  const phoneFaultSheet = phone && fault !== null && reporting === null && !allFound;
   const probeView =
-    measuring && viewMode === 'schematic'
+    measuring && viewMode === 'schematic' && (!phone || phoneFaultSheet)
       ? {
           red: meter.red && redLabel ? { at: meter.red.at, label: redLabel } : null,
           black: meter.black && blackLabel ? { at: meter.black.at, label: blackLabel } : null,
@@ -1789,7 +1794,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               {canvas}
               {!wiring && (
                 <SchematicButtons
-                  connect={sim.status === 'stopped' && doc.parts.length > 0 && viewMode === 'schematic' && !taskFrozen}
+                  connect={sim.status === 'stopped' && doc.parts.length > 0 && viewMode === 'schematic' && !taskFrozen && !fault}
                   full={schematicFull}
                   raised={schematicFull}
                   onConnect={startConnect}
@@ -1800,14 +1805,36 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           )}
           {!big && (
             <section data-tour="inspect" aria-label={tr.notebook.label} className="flex min-h-0 flex-1 flex-col">
-              <TouchUi.Provider value>{notebook}</TouchUi.Provider>
+              <TouchUi.Provider value>
+                {phoneFaultSheet && fault ? (
+                  <PhoneFaultSheet
+                    symptom={fault.symptom}
+                    session={faultSession}
+                    askExpected={fault.askExpected}
+                    mode={meter.mode}
+                    onMode={(mode) => setMeter((m) => ({ ...m, mode }))}
+                    reading={meterReading}
+                    red={redLabel}
+                    black={blackLabel}
+                    placing={meter.placing}
+                    onPlace={(placing) => setMeter((m) => ({ ...m, placing }))}
+                    tools={fault.tools}
+                    wrong={wrongReport}
+                    onExpected={setExpected}
+                    onHint={() => setFaultSession((s) => ({ ...s, hints: Math.min(tr.fault.hints.list.length, s.hints + 1) }))}
+                    onReport={startReport}
+                  />
+                ) : (
+                  notebook
+                )}
+              </TouchUi.Provider>
             </section>
           )}
           {wiring && (
             <WiringFooter canUndo={state.past.length > 0} hasStart={connect.start !== null} onUndo={() => dispatch({ type: 'undo' })} onClear={() => setConnect({ start: null })} />
           )}
           {!wiring && !addSheet && !analysis.open && (
-            <PhoneFabs status={sim.status} canAdd={sim.status === 'stopped' && !taskFrozen} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={play} onPause={sim.pause} />
+            <PhoneFabs lift={phoneFaultSheet ? 70 : 0} status={sim.status} canAdd={sim.status === 'stopped' && !taskFrozen} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={play} onPause={sim.pause} />
           )}
           {addSheet && !wiring && (
             <BottomSheet
