@@ -6,10 +6,12 @@ import { tr } from '../../i18n/tr';
 import { formatSI } from '../../sim/units';
 import { parseTheory } from '../analysis/table';
 import { Icon } from '../icons';
+import { Rich } from '../Rich';
 import { useTouchUi } from '../touchUi';
 import type { FaultSession, LogEntry } from './session';
 
 export function FaultCard({
+  kicker,
   title,
   symptom,
   session,
@@ -20,6 +22,8 @@ export function FaultCard({
   onReport,
   onHint,
 }: {
+  /** "Arıza bul" ya da hazır senaryoda "Arıza bul · Deney 7". */
+  kicker: string;
   title: string;
   symptom: string;
   session: FaultSession;
@@ -37,14 +41,15 @@ export function FaultCard({
     <section data-notebook="task" aria-label={t.label(title)} className="flex shrink-0 flex-col gap-2.5 rounded-xl border border-warn-line bg-panel p-4">
       <div className="flex items-center gap-2 text-label">
         <Icon name="wrench" className="h-4 w-4 text-warn" />
-        <span className="font-semibold text-warn">{t.kicker}</span>
+        <span className="font-semibold text-warn">{kicker}</span>
         <span className="flex-1" />
         <span className="font-mono text-ink-2">{t.count(session.log.length)}</span>
       </div>
-      <h2 className="m-0 text-[18px] font-semibold">{title}</h2>
+      <h2 className="m-0 text-[18px] font-semibold">
+        <Rich text={title} />
+      </h2>
       <p className="m-0 text-small leading-snug text-ink-2">
-        {symptom ? `${symptom} ` : ''}
-        {t.intro}
+        <Rich text={symptom ? `${symptom} ${t.intro}` : t.intro} />
       </p>
       <div className="flex items-baseline justify-between gap-2 pt-1">
         <span className="text-label font-semibold tracking-wide text-muted uppercase">{t.log}</span>

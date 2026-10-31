@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { tr } from '../../i18n/tr';
 import { FAULT_KINDS, type FaultKind } from '../../model/faults';
 import { Icon } from '../icons';
+import { Rich } from '../Rich';
 import { useTouchUi } from '../touchUi';
 import type { LogEntry } from './session';
 
@@ -151,9 +152,17 @@ export function FoundCard({
         <Icon name="check" className="h-4 w-4" />
         {t.kicker}
       </span>
-      <h2 className="m-0 text-[18px] leading-snug font-semibold">{title}</h2>
-      <p className="m-0 text-small leading-relaxed text-ink-2">{text}</p>
-      {decisive && <p className="m-0 text-small leading-relaxed text-ink-2">{decisive}</p>}
+      <h2 className="m-0 text-[18px] leading-snug font-semibold">
+        <Rich text={title} />
+      </h2>
+      <p className="m-0 text-small leading-relaxed text-ink-2">
+        <Rich text={text} />
+      </p>
+      {decisive && (
+        <p className="m-0 text-small leading-relaxed text-ink-2">
+          <Rich text={decisive} />
+        </p>
+      )}
       <span className="flex gap-2">
         {tile(t.stats.log, String(counts.log))}
         {tile(t.stats.reports, String(counts.reports))}

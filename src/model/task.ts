@@ -61,6 +61,8 @@ export interface FaultTask {
   readonly hideIndicators: boolean;
   /** Önce beklenen değeri sor: ölçüm günlüğünde "Beklenen" sütunu. */
   readonly askExpected: boolean;
+  /** Hazır senaryo (Örnekler → Arıza bul): kartta deney, "Bulundu"da kendi açıklaması. */
+  readonly scenario?: string;
 }
 
 export interface TaskDef {
@@ -182,6 +184,7 @@ function parseFaultTask(v: unknown): FaultTask | null {
     tools: { voltage: flag('voltage'), resistance: flag('resistance'), scope: flag('scope'), ammeter: flag('ammeter') },
     hideIndicators: v.hideIndicators !== false,
     askExpected: v.askExpected === true,
+    ...(typeof v.scenario === 'string' && v.scenario ? { scenario: v.scenario.slice(0, 40) } : {}),
   };
 }
 

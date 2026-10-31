@@ -17,6 +17,10 @@ import { addEntry, entryName, NEW_SESSION, parseSession } from '../src/editor/fa
 import { faultCandidates, faultExplain, placeLabel, placeMatches, randomFault } from '../src/editor/fault/judge';
 import { netIndex } from '../src/editor/analysis/traces';
 import { faultFromPlace, kindsFor, makeFault, placeOptions, rowKey } from '../src/editor/task/faultRows';
+import { FAULT_SCENARIOS } from '../src/examples/faultScenarios';
+import { scenarioTask } from '../src/editor/fault/scenarios';
+import { BURNT_PROP, faultedLook } from '../src/editor/fault/look';
+import { tr } from '../src/i18n/tr';
 import type { SimFrame } from '../src/editor/useSimulation';
 import { parseTask, parseTaskPayload } from '../src/model/task';
 import { toSerializable } from '../src/model/serialize';
@@ -308,6 +312,102 @@ describe('Görev oluştur → Arıza bulma (6. aşama, R4)', () => {
     expect(faultFromPlace({ wire: w.id }, { x: 44, y: -0.5 }, doc, undefined, 'at')).toEqual({ kind: 'open', at: { wire: w.id, end: 1 } });
     const short = { kind: 'short' as const, at: { part: RC, pin: 0 }, to: { part: RC, pin: 1 } };
     expect(faultFromPlace({ wire: w.id }, { x: 44, y: -4 }, doc, short, 'to')).toEqual({ ...short, to: { wire: w.id, end: 0 } });
+  });
+});
+
+describe('Hazır senaryolar (8. aşama): açıklamadaki sayılar simülatörde', () => {
+  /** Multimetre (10 MΩ) iki nokta arasında; devredeki ölçü aletlerinin okumaları da. */
+  function measure(ex: ExampleId, faults: readonly Fault[], a: string, b: string, t: number, op = false) {
+    const doc = exampleDoc(ex)!;
+    const netlist = buildConnectivity(doc, faults).netlist;
+    const withMeter = { ...netlist, elements: [...netlist.elements, { id: 'olcum', type: 'voltmeter' as const, props: { mode: 'dc', resistance: 10e6 }, pins: [a, b] }] };
+    const sim = new CircuitSimulator(op ? atOperatingPoint(withMeter) : withMeter);
+    expect(sim.runUntil(t).ok).toBe(true);
+    const meters = Object.fromEntries(doc.parts.filter((p) => p.type === 'voltmeter' || p.type === 'ammeter').map((p) => [p.label, reading(sim, p.id)]));
+    return { mm: reading(sim, 'olcum'), ...meters } as Record<string, number>;
+  }
+  const s = Object.fromEntries(FAULT_SCENARIOS.map((x) => [x.id, x]));
+  const pin = (ex: ExampleId, label: string, n: number) => pinKey(partId(exampleDoc(ex)!, label), n);
+
+  it('her senaryonun metni var, görevi geçerli (belgeyle uyumlu arıza, belirti, kimlik)', () => {
+    expect(Object.keys(tr.fault.scenarios).sort()).toEqual(FAULT_SCENARIOS.map((x) => x.id).sort());
+    for (const x of FAULT_SCENARIOS) {
+      const { doc, task } = scenarioTask(x.id)!;
+      expect(task.fault!.faults.every((f) => faultValid(f, doc))).toBe(true);
+      expect(task.fault!.scenario).toBe(x.id);
+      expect(task.fault!.symptom.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('LED yanmış: anot 5,00 V (sağlam 1,78 V), R1 iki ucu 0 V (sağlam 3,2 V)', () => {
+    const ex = 'led-on-direnc';
+    const f = s['ariza-led']!.faults;
+    const g = pin(ex, 'GND1', 0);
+    expect(measure(ex, f, pin(ex, 'LED1', 0), g, 0.05).mm).toBeCloseTo(5.0, 2);
+    expect(measure(ex, [], pin(ex, 'LED1', 0), g, 0.05).mm).toBeCloseTo(1.78, 2);
+    expect(Math.abs(measure(ex, f, pin(ex, 'R1', 0), pin(ex, 'R1', 1), 0.05).mm)).toBeLessThan(1e-6);
+    expect(measure(ex, [], pin(ex, 'R1', 0), pin(ex, 'R1', 1), 0.05).mm).toBeCloseTo(3.2, 1);
+  });
+
+  it('diyot ters: V1 5,00 V (sağlam 0,56 V), R1 iki ucu 0,6 mV (sağlam 4,4 V)', () => {
+    const ex = 'diyot-dc';
+    const f = s['ariza-diyot']!.faults;
+    const r1 = [pin(ex, 'R1', 0), pin(ex, 'R1', 1)] as const;
+    expect(measure(ex, f, ...r1, 0.05).V1).toBeCloseTo(5.0, 2);
+    expect(measure(ex, [], ...r1, 0.05).V1).toBeCloseTo(0.56, 2);
+    expect(measure(ex, f, ...r1, 0.05).mm * 1000).toBeCloseTo(0.6, 1);
+    expect(measure(ex, [], ...r1, 0.05).mm).toBeCloseTo(4.4, 1);
+  });
+
+  it('köprüde D2 anot kopuk: R_L ortalaması 3,14 V (sağlam 5,73 V); anot bacağı −2,24 V, bağlı olduğu düğüm 0 V', () => {
+    const ex = 'kopru-dogrultmac';
+    const f = s['ariza-dogrultucu']!.faults;
+    const rl = [pin(ex, 'RL', 0), pin(ex, 'RL', 1)] as const;
+    expect(measure(ex, f, ...rl, 0.2).mm).toBeCloseTo(3.14, 2);
+    expect(measure(ex, [], ...rl, 0.2).mm).toBeCloseTo(5.73, 2);
+    const g = pin(ex, 'GND1', 0);
+    expect(measure(ex, f, pin(ex, 'D2', 0), g, 0.2).mm).toBeCloseTo(-2.24, 2);
+    const node = exampleDoc(ex)!.wires.find((w) => w.points.some((p) => p.x === 50 && p.y === -4))!;
+    expect(Math.abs(measure(ex, f, wireKey(node.id), g, 0.2).mm)).toBeLessThan(1e-6);
+  });
+
+  it('JFET source kopuk: A1 ≈ 1 µA (sağlam 4,1 mA), V1 10,0 V; source bacağı 1,73 V (V_P = −1,74 V)', () => {
+    const ex = 'jfet-karakteristik';
+    const f = s['ariza-jfet']!.faults;
+    const g = pin(ex, 'GND1', 0);
+    const healthy = measure(ex, [], pin(ex, 'J1', 0), g, 0.05);
+    expect(healthy.A1! * 1000).toBeCloseTo(4.1, 1);
+    const faulty = measure(ex, f, pin(ex, 'J1', 0), g, 0.05);
+    expect(faulty.V1).toBeCloseTo(10.0, 2);
+    expect(faulty.A1!).toBeLessThan(2.5e-6);
+    expect(measure(ex, f, pin(ex, 'J1', 2), g, 0.05).mm).toBeCloseTo(1.73, 2);
+  });
+
+  it('BJT: RC kopuk; kollektör 6,4 mV, RC ucu 11,99 V, baz 0,55 V', () => {
+    const ex = 'bjt-yukseltec';
+    const f = s['ariza-bjt']!.faults;
+    const g = pin(ex, 'GND1', 0);
+    const w = exampleDoc(ex)!.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === 0))!;
+    expect(measure(ex, f, wireKey(w.id), g, 0.2, true).mm * 1000).toBeCloseTo(6.4, 1);
+    expect(measure(ex, f, pin(ex, 'RC', 1), g, 0.2, true).mm).toBeCloseTo(11.99, 2);
+    expect(measure(ex, f, pin(ex, 'Q1', 1), g, 0.2, true).mm).toBeCloseTo(0.55, 2);
+  });
+});
+
+describe('3B’de gözle görülen arızalar (karar 1)', () => {
+  it('ters takılmış parça 180° döner, yanlış değerli direncin değeri (renk bantları) değişir, yanmış LED yanık; kopuk bağlantı görünmez', () => {
+    const doc = exampleDoc('led-on-direnc')!;
+    const led = doc.parts.find((p) => p.label === 'LED1')!;
+    const r1 = doc.parts.find((p) => p.label === 'R1')!;
+    expect(faultedLook(doc, [{ kind: 'open', at: { part: r1.id, pin: 0 } }])).toBe(doc);
+    const look = faultedLook(doc, [{ kind: 'reversed', part: led.id }, { kind: 'value', part: r1.id, value: 3300 }]);
+    expect(look.parts.find((p) => p.id === led.id)!.rotation).toBe((led.rotation + 180) % 360);
+    expect(look.parts.find((p) => p.id === r1.id)!.props.resistance).toBe(3300);
+    expect(faultedLook(doc, [{ kind: 'burnt', part: led.id }]).parts.find((p) => p.id === led.id)!.props[BURNT_PROP]).toBe(true);
+    // Uçlar aynı noktalarda kalır (kablolar yerinde).
+    const before = pinPositions(led).map((p) => `${p.x},${p.y}`).sort();
+    const after = pinPositions(look.parts.find((p) => p.id === led.id)!).map((p) => `${p.x},${p.y}`).sort();
+    expect(after).toEqual(before);
   });
 });
 

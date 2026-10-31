@@ -11,7 +11,9 @@ import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivi
 import { maskFrame } from './fault/mask';
 import { FaultCard } from './fault/FaultCard';
 import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
+import { faultedLook } from './fault/look';
 import { PhoneFaultSheet } from './fault/PhoneFaultSheet';
+import { nextScenario, scenarioTask, scenarioTexts } from './fault/scenarios';
 import { FoundCard, ReportCard } from './fault/ReportCards';
 import { faultFromPlace } from './task/faultRows';
 import { defaultBlack, measureResistance, METER_ID, meterPart, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
@@ -31,6 +33,7 @@ import { useAnalysis } from './analysis/useAnalysis';
 import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
 import type { FaultKind } from '../model/faults';
+import type { FaultScenarioId } from '../examples/faultScenarios';
 import { NO_PREDICTIONS, parsePredictions, REASON_LIMIT, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
 import { parseEmbedParams, type EmbedOptions } from '../model/embed';
 import { toSerializable } from '../model/serialize';
@@ -346,6 +349,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   }, [fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black]);
   /** Otomatik göstergeler kapalı: kablo renkleri, akım noktaları, düğüm etiketleri, kartlardaki canlı değerler. */
   const hideLive = fault !== null && fault.hideIndicators && !repaired;
+  /** Tezgâhta gözle görülen arızalar (karar 1): ters takılmış, yanlış değerli, yanmış parça. */
+  const benchLook = useMemo(() => faultedLook(doc, activeFaults), [doc, activeFaults]);
   const shownSettings = useMemo(() => (hideLive ? { ...settings, nodeVoltages: false, currentDots: false, magneticField: false } : settings), [hideLive, settings]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
   // Analiz (grafik, tablo, eğri izleyici, Bode): izler ve tablo devreyle birlikte kaydedilir.
@@ -474,7 +479,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       rapor: {
         gorev: task.name,
         tarih: new Date().toISOString(),
-        belirti: fault.symptom,
+        belirti: plainText(fault.symptom),
         olcumler: faultSession.log.map((e, i) => ({
           sira: i + 1,
           olcum: e.name,
@@ -491,9 +496,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     };
     void saveFile(datedName(`${tr.fault.found.file}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
   };
-  /** Yeni arıza dene: aynı devreye rastgele başka bir arıza (oturum sıfırlanır). */
+  /** Yeni arıza dene: hazır senaryoda sıradaki senaryo, öbür görevlerde aynı devreye rastgele başka bir arıza (oturum sıfırlanır). */
   const tryAgain = () => {
     if (!task || !fault) return;
+    if (scenarioTexts(fault.scenario)) {
+      loadScenario(nextScenario(fault.scenario!));
+      return;
+    }
     const next = randomFault(doc, analysis.idx, Math.random, fault.faults[0]);
     if (!next) {
       showToast(tr.fault.found.noCandidate, 'info');
@@ -519,7 +528,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         return value === null ? rest : { ...rest, expected: value };
       }),
     }));
-  const foundExplain = allFound && fault ? faultExplain(fault.faults[0]!, doc, analysis.idx) : null;
+  const scenario = scenarioTexts(fault?.scenario);
+  const foundExplain = allFound && fault ? (scenario?.found ?? faultExplain(fault.faults[0]!, doc, analysis.idx)) : null;
   const taskCard = reporting ? (
     <ReportCard
       where={reporting.place ? placeLabel(reporting.place, doc, analysis.idx) : null}
@@ -535,7 +545,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     <FoundCard
       title={foundExplain.title}
       text={foundExplain.text}
-      decisive={lastCorrect && lastCorrect.evidence.length > 0 ? tr.fault.found.evidence(lastCorrect.evidence.map((k) => faultSession.log.find((e) => e.key === k)).filter((e) => e !== undefined).map((e) => `${e.name} ${e.text}`).join(' · ')) : null}
+      decisive={scenario ? tr.fault.found.decisive(scenario.found.decisive) : lastCorrect && lastCorrect.evidence.length > 0 ? tr.fault.found.evidence(lastCorrect.evidence.map((k) => faultSession.log.find((e) => e.key === k)).filter((e) => e !== undefined).map((e) => `${e.name} ${e.text}`).join(' · ')) : null}
       counts={{ log: faultSession.log.length, reports: faultSession.reports.length, hints: faultSession.hints, evidence: lastCorrect?.evidence.length ?? 0 }}
       repaired={faultSession.repaired}
       onRepair={repairFault}
@@ -544,6 +554,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     />
   ) : task?.fault ? (
     <FaultCard
+      kicker={scenario ? `${tr.fault.card.kicker} · ${scenario.experiment}` : tr.fault.card.kicker}
       title={taskTitle(task) ?? tr.fault.card.kicker}
       symptom={task.fault.symptom}
       session={faultSession}
@@ -633,6 +644,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const loadExample = (id: ExampleId) => {
     const next = exampleDoc(id);
     if (next) loadDoc(next, tr.examples.loaded, id);
+  };
+  /** Hazır arıza senaryosu (Örnekler → Arıza bul): devre arıza göreviyle açılır. */
+  const loadScenario = (id: FaultScenarioId) => {
+    const s = scenarioTask(id);
+    if (s) loadDoc(s.doc, tr.fault.loaded(s.task.name), null, EMPTY_ANALYSIS, s.task);
   };
 
   useEffect(() => {
@@ -1381,6 +1397,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           doc={doc}
           connectivity={connectivity}
           frame={sim.frame}
+          {...(benchLook !== doc ? { look: benchLook } : {})}
           {...(hideLive ? { labelFrame: shownFrame } : {})}
           active={sim.status !== 'stopped'}
           running={sim.status === 'running'}
@@ -1575,6 +1592,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       onLoad={(id) => {
         setExamplesOpen(false);
         loadExample(id);
+      }}
+      activeFault={fault?.scenario ?? null}
+      onFault={(id) => {
+        setExamplesOpen(false);
+        loadScenario(id);
       }}
     />
   );

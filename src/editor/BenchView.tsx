@@ -96,6 +96,8 @@ function store(key: string, on: boolean): void {
 
 export interface BenchViewProps {
   readonly doc: CircuitDoc;
+  /** Tezgâhtaki parçaların görünüşü (arıza bulmada gözle görülen arızalarla); verilmezse doc. Etiketler doc'tan. */
+  readonly look?: CircuitDoc;
   readonly connectivity: Connectivity;
   readonly frame: SimFrame | null;
   /** Etiketlerin gördüğü kare (arıza bulmada yalnızca ölçü aletleri; verilmezse frame). */
@@ -209,7 +211,7 @@ export function BenchView(props: BenchViewProps) {
         }
       >
         <Bench3D
-          doc={doc}
+          doc={props.look ?? doc}
           frame={frame}
           active={props.active}
           running={props.running}

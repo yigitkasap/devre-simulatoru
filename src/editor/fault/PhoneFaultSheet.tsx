@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { tr } from '../../i18n/tr';
 import type { FaultTools } from '../../model/task';
 import { Icon } from '../icons';
+import { Rich } from '../Rich';
 import { LogRow } from './FaultCard';
 import type { MeterMode, ProbeColor } from './meter';
 import { MeterDisplay, MeterModes, type MeterReading } from './MultimeterPanel';
@@ -76,8 +77,7 @@ export function PhoneFaultSheet({
         </div>
         {showSymptom && (
           <p className="m-0 rounded-lg bg-panel-2 px-3 py-2 text-small leading-snug text-ink-2">
-            {symptom ? `${symptom} ` : ''}
-            {t.card.intro}
+            <Rich text={symptom ? `${symptom} ${t.card.intro}` : t.card.intro} />
           </p>
         )}
         <MeterDisplay reading={reading} big />

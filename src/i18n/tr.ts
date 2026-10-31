@@ -11,6 +11,7 @@
 import { SITE_NAME } from '../config';
 import type { Diagnostic } from '../sim/diagnostics';
 import type { ExampleGroupId, ExampleId } from '../examples';
+import type { FaultScenarioId } from '../examples/faultScenarios';
 import type { DeviceType } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
 import { ek, toDative } from './ek';
@@ -621,6 +622,71 @@ export interface ExampleTexts {
   /** Günlük hayatta nerelerde kullanıldığı. */
   readonly everyday: string;
 }
+
+/**
+ * Hazır arıza senaryoları (B2, Örnekler → Arıza bul): başlık, kartın üstündeki deney, belirti ve
+ * "Arıza bulundu" açıklaması. Sayılar simülatörde ölçüldü (multimetre 10 MΩ; tests/ariza.test.ts).
+ */
+export interface FaultScenarioTexts {
+  readonly title: string;
+  /** Kartta "Arıza bul · …" (föydeki deney). */
+  readonly experiment: string;
+  readonly symptom: string;
+  readonly found: { readonly title: string; readonly text: string; readonly decisive: string };
+}
+
+const FAULT_SCENARIO_TEXTS: Record<FaultScenarioId, FaultScenarioTexts> = {
+  'ariza-led': {
+    title: 'LED yanmıyor',
+    experiment: 'Temel devre',
+    symptom: 'LED ışık vermiyor, A1 akım göstermiyor.',
+    found: {
+      title: 'LED1 yanmıştı',
+      text: 'Yanmış LED’in içi açık devredir: akım geçmez, R1’in üstüne gerilim düşmez ve pilin bütün gerilimi LED’in uçlarında kalır.',
+      decisive: 'LED1’in anodu topraktan 5,00 V yukarıda (sağlam devrede 1,78 V); R1’in iki ucu arası 0 V (sağlamda 3,2 V): devreden akım geçmiyor, gerilim LED’de kalıyor.',
+    },
+  },
+  'ariza-diyot': {
+    title: 'Diyot akım geçirmiyor',
+    experiment: 'Deney 1',
+    symptom: 'A1 neredeyse sıfır gösteriyor; diyodun iletmesi gerekirdi.',
+    found: {
+      title: 'D1 ters takılmıştı',
+      text: 'Katot beslemeye bakıyordu: ters kutuplanan diyot iletmez. Akım yalnızca voltmetrenin 10 MΩ’undan ve diyodun sızıntısından geçer (µA’lar); besleme geriliminin hepsi diyodun üstüne düşer.',
+      decisive: 'V1 diyodun üstünde 5,00 V okuyor (sağlam devrede 0,56 V); R1’in iki ucu arası 0,6 mV (sağlamda 4,4 V): akım yok, gerilim diyotta kalıyor.',
+    },
+  },
+  'ariza-dogrultucu': {
+    title: 'Köprü yarım dalga veriyor',
+    experiment: 'Deney 2',
+    symptom: 'Osiloskopta çıkışın tepeleri iki kat seyrek: köprü doğrultmaç yarım dalga doğrultucu gibi çalışıyor.',
+    found: {
+      title: 'D2’nin anot bacağı temas etmiyordu',
+      text: 'Köprünün D2’li kolu iletmez: girişin bir yarısında R_{L}’den akım geçmez, çıkış yarım dalgaya döner. R_{L}’deki ortalama gerilim 5,73 V yerine 3,14 V (V ⎓).',
+      decisive: 'D2’nin anot bacağı −2,24 V ⎓ okurken bağlı olduğu düğüm 0 V: aynı noktada iki farklı gerilim, bağlantının orada koptuğunu gösterir.',
+    },
+  },
+  'ariza-jfet': {
+    title: 'JFET’ten akım geçmiyor',
+    experiment: 'Deney 5',
+    symptom: 'A1 neredeyse sıfır gösteriyor; V_{GS} = 0 V’ta I_{D} yaklaşık 4,1 mA olmalıydı.',
+    found: {
+      title: 'J1’in source bacağı temas etmiyordu',
+      text: 'Drain akımının dönüş yolu kopuk: akım J1’den toprağa ulaşamaz. A1 yalnızca V1’in 10 MΩ’undan geçen akımı gösterir (≈ 1 µA); V1 10,0 V okumaya devam eder, bu yüzden V_{DS} doğru görünür.',
+      decisive: 'J1’in source bacağı topraktan 1,73 V yukarıda, bağlı olduğu toprak düğümü 0 V. Kapı 0 V’ta olduğundan V_{GS} ≈ −1,73 V, yani kısılma geriliminde (V_{P} = −1,74 V): kanal kapanır.',
+    },
+  },
+  'ariza-bjt': {
+    title: 'Yükselteçte çıkış yok',
+    experiment: 'Deney 7',
+    symptom: 'Osiloskobun B kanalında sinyal yok.',
+    found: {
+      title: 'RC’nin kollektör tarafındaki bacağı temas etmiyordu',
+      text: 'RC kopukken kollektöre besleme akımı gelemez; Q1 doyuma girer ve kollektör 6,4 mV’ta kalır, çıkışta sinyal oluşmaz. Baz 0,55 V’ta (sağlam devrede 0,64 V).',
+      decisive: 'RC’nin ucunda 11,99 V, hemen yanındaki kollektör düğümünde 6,4 mV. Aynı kabloda iki farklı gerilim, bağlantının tam arada koptuğunu gösterir. 11,99 V’un 12 V’tan az olması multimetrenin 10 MΩ iç direncinden.',
+    },
+  },
+};
 
 /** Şemada kaçınılmaz bir kablo kesişmesi olan örneklerde açıklamanın sonuna eklenir. */
 const CROSSING = 'Dolu nokta olmayan kablo kesişmeleri bağlı değildir.';
@@ -2105,6 +2171,10 @@ export const tr = {
       pickHint: 'Arızanın yerini şemada seç: bacak, parça ya da kablo (Esc: vazgeç)',
       pickHintTouch: 'Arızanın yerini şemada seç: bacağa, parçaya ya da kabloya dokun',
     },
+    scenarios: FAULT_SCENARIO_TEXTS,
+    group: 'Arıza bul',
+    groupNote: 'Devre şemadaki gibi kurulmuş ama bir yerde gizli arıza var: multimetreyle ölçerek bul.',
+    loaded: (title: string) => `Arıza bul: ${title}`,
     phone: {
       title: (n: number) => `Arıza bul · ${n} ölçüm`,
       symptom: 'Belirti',

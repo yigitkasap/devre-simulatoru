@@ -1663,6 +1663,34 @@ try {
       cardText.includes('Osiloskobun B kanalında sinyal yok.') && reading.endsWith('11,99 V ⎓') && expected === 1, `${reading} · ${expected}`);
     await ctx.close();
   }
+  // 8. aşama: Örnekler → "Arıza bul" grubu; hazır senaryo (föy deneyi), kendi açıklaması, Yeni arıza dene.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    const dlg = page.getByRole('dialog');
+    const scenarios = await dlg.getByRole('button', { name: /^Arıza bul: / }).allInnerTexts();
+    await dlg.getByRole('button', { name: 'Arıza bul: Yükselteçte çıkış yok' }).click(); await page.waitForTimeout(600);
+    const card = () => page.locator('[data-notebook="task"]').first();
+    const head = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
+    check('arıza (B2, 8. aşama): Örnekler’de "Arıza bul" grubu (5 hazır senaryo: temel devre, Deney 1, 2, 5, 7); BJT senaryosu kartta "Arıza bul · Deney 7", "Yükselteçte çıkış yok", belirti',
+      scenarios.length === 5 && head.startsWith('Arıza bul · Deney 7') && head.includes('Yükselteçte çıkış yok') && head.includes('Osiloskobun B kanalında sinyal yok.') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 1,
+      `${scenarios.length} · ${head.slice(0, 60)}`);
+    await card().getByRole('button', { name: 'Arızayı bildir' }).click(); await page.waitForTimeout(300);
+    const pt = await screen(page, 44, -4); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    await card().getByRole('radio', { name: /^Kopuk bağlantı/ }).click();
+    await card().getByRole('button', { name: 'Bildir', exact: true }).click(); await page.waitForTimeout(400);
+    const found = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
+    await card().getByRole('button', { name: 'Yeni arıza dene' }).click(); await page.waitForTimeout(600);
+    const next = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
+    check('arıza (B2, 8. aşama): senaryonun kendi açıklaması ("RC’nin kollektör tarafındaki bacağı temas etmiyordu", belirleyici ölçüm 11,99 V ve 6,4 mV); Yeni arıza dene sıradaki senaryoyu açıyor',
+      found.includes('RC’nin kollektör tarafındaki bacağı temas etmiyordu') && found.includes('Belirleyici ölçüm: RC’nin ucunda 11,99 V') && next.startsWith('Arıza bul · Temel devre') && next.includes('LED yanmıyor'),
+      `${found.slice(0, 60)} → ${next.slice(0, 40)}`);
+    await ctx.close();
+  }
   {
     const { page } = await phone();
     await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
