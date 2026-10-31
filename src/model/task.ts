@@ -57,19 +57,47 @@ export function taskTitle(task: TaskDef): string | null {
   return task.name.trim() || task.circuit?.trim() || null;
 }
 
-/** Öğrencinin tahminleri (hedef kimliği → değer) ve kaydedildi mi. */
+/** Tahmindeki güven (araştırmadaki üç aşamalı sorunun üçüncüsü): tahmin ettim · emin değilim · eminim. */
+export type Confidence = 'guess' | 'unsure' | 'sure';
+export const CONFIDENCES: readonly Confidence[] = ['guess', 'unsure', 'sure'];
+/** Gerekçenin en uzun hâli (karakter). */
+export const REASON_LIMIT = 200;
+
+/**
+ * Öğrencinin tahminleri (hedef kimliği → değer), isteğe bağlı gerekçeleri, güvenleri (kaydetmek için
+ * her hedefte zorunlu) ve kaydedildi mi.
+ */
 export interface Predictions {
   readonly values: Readonly<Record<string, number>>;
+  readonly reasons: Readonly<Record<string, string>>;
+  readonly confidence: Readonly<Record<string, Confidence>>;
   readonly locked: boolean;
 }
 
-export const NO_PREDICTIONS: Predictions = { values: {}, locked: false };
+export const NO_PREDICTIONS: Predictions = { values: {}, reasons: {}, confidence: {}, locked: false };
 
 export function parsePredictions(v: unknown): Predictions {
   if (!isRecord(v) || !isRecord(v.values)) return NO_PREDICTIONS;
   const values: Record<string, number> = {};
   for (const [k, x] of Object.entries(v.values)) if (typeof x === 'number' && Number.isFinite(x)) values[k] = x;
-  return { values, locked: v.locked === true };
+  const reasons: Record<string, string> = {};
+  if (isRecord(v.reasons)) for (const [k, x] of Object.entries(v.reasons)) if (typeof x === 'string' && x.trim() !== '') reasons[k] = x.slice(0, REASON_LIMIT);
+  const confidence: Record<string, Confidence> = {};
+  if (isRecord(v.confidence)) for (const [k, x] of Object.entries(v.confidence)) if ((CONFIDENCES as readonly unknown[]).includes(x)) confidence[k] = x as Confidence;
+  return { values, reasons, confidence, locked: v.locked === true };
+}
+
+/**
+ * "Eminim" denip ölçülenden uzak kalan tahmin (kavram yanılgısı işareti; kullanıcı kararı): ± hedefte
+ * tahminin ölçülenden farkı hedefin toleransından büyük; ≥ ve ≤ hedefte tahmin ile ölçülen sınırın
+ * farklı yanında. Ölçülen yoksa false.
+ */
+export function confidentMiss(target: Target, prediction: number, measured: number | null, confidence: Confidence | undefined): boolean {
+  if (confidence !== 'sure' || measured === null) return false;
+  if (target.op === 'ge') return prediction >= target.value !== measured >= target.value;
+  if (target.op === 'le') return prediction <= target.value !== measured <= target.value;
+  const error = predictionError(prediction, measured);
+  return error !== null && error > target.tol;
 }
 
 /** Tahminin ölçülenden farkı (%, ölçülene göre); ölçülen yoksa ya da 0 ise null. */

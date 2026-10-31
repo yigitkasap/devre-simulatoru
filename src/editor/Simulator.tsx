@@ -21,7 +21,7 @@ import { AnalysisDrawer, AnalysisSheetBody, DEFAULT_DRAWER, MIN_DRAWER, TALL_DRA
 import { useAnalysis } from './analysis/useAnalysis';
 import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
-import { NO_PREDICTIONS, parsePredictions, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
+import { NO_PREDICTIONS, parsePredictions, REASON_LIMIT, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
 import { parseEmbedParams, type EmbedOptions } from '../model/embed';
 import { toSerializable } from '../model/serialize';
 import { datedName, saveFile } from './analysis/format';
@@ -338,7 +338,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         hedefler: taskStatuses.map((s) => ({
           ad: plainText(s.name),
           hedef: s.goal,
-          ...(task.predict ? { tahmin: predictions.values[s.id] ?? null } : {}),
+          ...(task.predict
+            ? {
+                tahmin: predictions.values[s.id] ?? null,
+                gerekce: predictions.reasons[s.id] ?? '',
+                guven: predictions.confidence[s.id] ? tr.task.card.confidence[predictions.confidence[s.id]!] : null,
+              }
+            : {}),
           olculen: s.measured,
           birim: s.unit,
           tuttu: s.met,
@@ -358,9 +364,19 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           const values = { ...p.values };
           if (value === null) delete values[id];
           else values[id] = value;
-          return { values, locked: false };
+          return { ...p, values };
         })
       }
+      onReason={(id, text) =>
+        setPredictions((p) => {
+          if (p.locked) return p;
+          const reasons = { ...p.reasons };
+          if (text.trim() === '') delete reasons[id];
+          else reasons[id] = text.slice(0, REASON_LIMIT);
+          return { ...p, reasons };
+        })
+      }
+      onConfidence={(id, confidence) => setPredictions((p) => (p.locked ? p : { ...p, confidence: { ...p.confidence, [id]: confidence } }))}
       onLock={() => {
         setPredictions((p) => ({ ...p, locked: true }));
         showToast(tr.task.card.locked);

@@ -1323,6 +1323,20 @@ try {
     check('tahmin (öğrenci, B1): kart "Önce tahmin et", her hedefe tahmin alanı, ölçülen gizli; kaydetmeden Oynat ve Analiz → Bode kapalı (nedeni yazıyor); "Tahminleri kaydet" hepsi yazılınca etkin',
       before.startsWith('Önce tahmin et') && (await inputs.count()) === 2 && !/5,9\d V/.test(before) && blockedPlay && blockedBode && !(await lock.isEnabled()),
       before.slice(0, 60));
+    // Gerekçe ve güven (analiz düzeltmeleri, 6): güven seçilmeden kaydedilemez; gerekçe en çok 200 karakter.
+    const reasons = card.getByRole('textbox', { name: /: neden\? \(isteğe bağlı\)$/ });
+    const groups = card.getByRole('radiogroup', { name: /: ne kadar eminsin\?$/ });
+    const reasonMax = await reasons.first().getAttribute('maxlength');
+    await inputs.nth(0).fill('6 V'); await inputs.nth(1).fill('180'); await st.waitForTimeout(100);
+    const noConfidenceDisabled = !(await lock.isEnabled()) && ((await card.textContent()) ?? '').includes('ne kadar emin olduğunu seç');
+    await groups.nth(0).getByRole('radio', { name: 'Eminim' }).click();
+    await groups.nth(1).getByRole('radio', { name: 'Eminim' }).click();
+    await reasons.nth(0).fill('RC ile RB, VCE’yi beslemenin yarısına getirecek seçildi');
+    const options = await groups.first().getByRole('radio').allTextContents();
+    check('tahmin (öğrenci, analiz düzeltmeleri 6): her hedefte isteğe bağlı "Neden?" (en çok 200 karakter) ve zorunlu güven seçimi (Tahmin ettim · Emin değilim · Eminim); güven seçilmeden kaydedilemiyor',
+      reasonMax === '200' && options.join('|') === 'Tahmin ettim|Emin değilim|Eminim' && noConfidenceDisabled && (await groups.nth(0).getByRole('radio', { name: 'Eminim' }).getAttribute('aria-checked')) === 'true',
+      `${options.join('|')} · max ${reasonMax}`);
+    await inputs.nth(1).fill('');
     // Yazarken sayılır (analiz düzeltmeleri, 5): son kutudan çıkmadan sayaç 2 / 2, düğme etkin; geçersiz
     // yazı sayılmaz ama uyarısı ancak kutudan çıkınca.
     await inputs.nth(0).fill('6 V'); await inputs.nth(0).blur();
@@ -1344,15 +1358,20 @@ try {
     await drawer.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
     await st.waitForTimeout(400);
     const rows = (await card.locator('li').allTextContents()).map((r) => r.replace(/\s+/g, ' '));
-    check('tahmin (öğrenci): kaydedince Oynat ve Bode çalışıyor; satırda "Tahmin 6 V · fark %0,2" ve ölçülen 5,99 V, kazançta "Tahmin 180 · fark %13" ve 205,8',
-      enabled && (await st.getByRole('button', { name: 'Duraklat' }).count()) === 1 && rows.some((r) => /Tahmin 6 V · fark %0,\d/.test(r) && /5,9\d V/.test(r)) && rows.some((r) => r.includes('Tahmin 180 · fark %1') && /20[4-7],\d/.test(r)),
-      rows.map((r) => r.slice(-40)).join(' | '));
+    check('tahmin (öğrenci): kaydedince Oynat ve Bode çalışıyor; satırda "Tahmin 6 V · fark %0,2 · Eminim" ve ölçülen 5,99 V, kazançta "Tahmin 180 · fark %13 · Eminim" ve 205,8',
+      enabled && (await st.getByRole('button', { name: 'Duraklat' }).count()) === 1 && rows.some((r) => /Tahmin 6 V · fark %0,\d · Eminim/.test(r) && /5,9\d V/.test(r)) && rows.some((r) => r.includes('Tahmin 180 · fark %1') && r.includes('· Eminim') && /20[4-7],\d/.test(r)),
+      rows.map((r) => r.slice(0, 90)).join(' | '));
+    const lockedInputs = (await card.getByRole('textbox').count()) + (await card.getByRole('radiogroup').count());
+    check('tahmin (öğrenci, 6): kaydedince gerekçe ve güven de kilitli (alan yok); gerekçe satırda; "Eminim" deyip ölçülenden toleranstan çok uzak kalan kazanç tahmininde "Emindin ama sonuç farklı" notu, tutan VCE tahmininde yok',
+      lockedInputs === 0 && rows.some((r) => r.includes('Neden: RC ile RB') && !r.includes('Emindin')) && rows.some((r) => r.includes('Tahmin 180') && r.includes('Emindin ama sonuç farklı: nedenini düşün.')),
+      `${lockedInputs} alan`);
     const [sub] = await Promise.all([st.waitForEvent('download'), card.getByRole('button', { name: 'Teslim dosyası (.json)' }).click()]);
     const subJson = JSON.parse(Buffer.concat(await (await sub.createReadStream()).toArray()).toString('utf8'));
     await st.reload({ waitUntil: 'networkidle' }); await st.waitForTimeout(600);
     const kept = ((await st.getByRole('region', { name: /^Görev:/ }).textContent()) ?? '').includes('Tahmin 6 V');
-    check('tahmin (öğrenci): teslim dosyasında her hedefin tahmini; sayfa yenilenince tahminler kaydedilmiş hâliyle duruyor',
-      subJson.teslim.hedefler.map((h) => h.tahmin).join(',') === '6,180' && kept);
+    check('tahmin (öğrenci): teslim dosyasında her hedefin tahmini, gerekçesi ve güveni; sayfa yenilenince tahminler kaydedilmiş hâliyle duruyor',
+      subJson.teslim.hedefler.map((h) => h.tahmin).join(',') === '6,180' && subJson.teslim.hedefler.map((h) => h.guven).join(',') === 'Eminim,Eminim' &&
+      subJson.teslim.hedefler[0].gerekce.startsWith('RC ile RB') && subJson.teslim.hedefler[1].gerekce === '' && kept);
     await ctx.close();
   }
   {
