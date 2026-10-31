@@ -8,11 +8,10 @@ import { useState } from 'react';
 import { tr } from '../../i18n/tr';
 import { predictionError, type Predictions, type TaskDef } from '../../model/task';
 import { formatNumber } from '../../sim/units';
-import { parseTheory } from '../analysis/table';
 import { Icon } from '../icons';
 import { plainText, Rich } from '../Rich';
 import { useTouchUi } from '../touchUi';
-import { valueText } from './targets';
+import { readPrediction, valueText } from './targets';
 
 export interface TargetStatus {
   readonly id: string;
@@ -152,29 +151,33 @@ export function TaskCard({
   );
 }
 
-/** Tahmin alanı: "6 V", "5,9", "500k"; birim hedefin birimi (dB'de birimsiz). */
+/**
+ * Tahmin alanı: "6 V", "5,9", "500k"; birim hedefinki (dB'de birimsiz). Yazarken geçerli sayı hemen
+ * sayılır (sayaç ve "Tahminleri kaydet"); geçersiz yazı uyarısı kutudan çıkınca gösterilir.
+ */
 function PredictionInput({ status, value, touch, onValue }: { status: TargetStatus; value: number | undefined; touch: boolean; onValue: (v: number | null) => void }) {
   const t = tr.task.card;
+  const [text, setText] = useState(() => (value !== undefined ? valueText(value, status.unit) : ''));
   const [invalid, setInvalid] = useState(false);
   return (
     <span className="flex w-28 shrink-0 flex-col items-end gap-0.5">
       <input
-        key={value ?? 'bos'}
         aria-label={t.predictLabel(plainText(status.name))}
         aria-invalid={invalid}
         placeholder={status.unit || '–'}
         inputMode="decimal"
-        defaultValue={value !== undefined ? valueText(value, status.unit) : ''}
-        onBlur={(e) => {
-          const text = e.target.value.trim();
-          if (text === '') {
-            setInvalid(false);
-            onValue(null);
-            return;
-          }
-          const v = parseTheory(text, status.unit === 'dB' ? '' : status.unit);
-          setInvalid(v === null);
-          if (v !== null) onValue(v);
+        value={text}
+        onChange={(e) => {
+          const next = e.target.value;
+          setText(next);
+          const read = readPrediction(next, status.unit);
+          onValue(read.value);
+          if (!read.invalid) setInvalid(false);
+        }}
+        onBlur={() => {
+          const read = readPrediction(text, status.unit);
+          setInvalid(read.invalid);
+          if (read.value !== null) setText(valueText(read.value, status.unit));
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') (e.target as HTMLInputElement).blur();

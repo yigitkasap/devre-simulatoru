@@ -1323,7 +1323,19 @@ try {
     check('tahmin (öğrenci, B1): kart "Önce tahmin et", her hedefe tahmin alanı, ölçülen gizli; kaydetmeden Oynat ve Analiz → Bode kapalı (nedeni yazıyor); "Tahminleri kaydet" hepsi yazılınca etkin',
       before.startsWith('Önce tahmin et') && (await inputs.count()) === 2 && !/5,9\d V/.test(before) && blockedPlay && blockedBode && !(await lock.isEnabled()),
       before.slice(0, 60));
+    // Yazarken sayılır (analiz düzeltmeleri, 5): son kutudan çıkmadan sayaç 2 / 2, düğme etkin; geçersiz
+    // yazı sayılmaz ama uyarısı ancak kutudan çıkınca.
     await inputs.nth(0).fill('6 V'); await inputs.nth(0).blur();
+    await inputs.nth(1).fill('180'); await st.waitForTimeout(100);
+    const typedCount = ((await card.textContent()) ?? '').includes('2 hedefin 2 tanesine tahmin yazıldı');
+    const typedEnabled = await lock.isEnabled();
+    await inputs.nth(1).fill('18x'); await st.waitForTimeout(100);
+    const typingWarn = await card.getByText('Sayı değil').count();
+    const invalidDisabled = !(await lock.isEnabled());
+    await inputs.nth(1).blur(); await st.waitForTimeout(100);
+    const blurWarn = await card.getByText('Sayı değil').count();
+    check('tahmin (öğrenci): yazarken geçerli sayı hemen sayılıyor (son kutudan çıkmadan 2 / 2, "Tahminleri kaydet" etkin); geçersiz yazı sayılmıyor, uyarısı kutudan çıkınca',
+      typedCount && typedEnabled && typingWarn === 0 && invalidDisabled && blurWarn === 1, `sayaç ${typedCount} · etkin ${typedEnabled} · uyarı ${typingWarn}/${blurWarn}`);
     await inputs.nth(1).fill('180'); await inputs.nth(1).blur();
     await st.waitForTimeout(150);
     const enabled = await lock.isEnabled();

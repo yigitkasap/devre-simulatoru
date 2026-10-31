@@ -7,7 +7,7 @@ import { exampleDoc } from '../src/examples';
 import { LINK_LIMIT, NO_PREDICTIONS, parsePredictions, parseTask, parseTaskPayload, predictionError, respectsTask, targetMet, taskFromHash, taskPayload, taskTitle, taskUrl, type TaskDef } from '../src/model/task';
 import { buildConnectivity } from '../src/model/connectivity';
 import { netIndex } from '../src/editor/analysis/traces';
-import { goalText, targetOptions } from '../src/editor/task/targets';
+import { goalText, readPrediction, targetOptions } from '../src/editor/task/targets';
 import { plainText } from '../src/editor/Rich';
 
 const amp = exampleDoc('bjt-yukseltec')!;
@@ -87,6 +87,15 @@ describe('Görev', () => {
     expect(predictionError(6, 5.99)).toBeCloseTo(0.167, 2);
     expect(predictionError(200, 205.8)).toBeCloseTo(2.818, 2);
     expect(predictionError(6, null)).toBeNull();
+  });
+
+  it('tahmin kutusu (analiz düzeltmeleri, 5): yazarken okunur; boş değer yok, geçersiz yazı ayrı', () => {
+    expect(readPrediction('6 V', 'V')).toEqual({ value: 6, invalid: false });
+    expect(readPrediction('5,9', 'V')).toEqual({ value: 5.9, invalid: false });
+    expect(readPrediction('500k', 'Hz')).toEqual({ value: 5e5, invalid: false });
+    expect(readPrediction('46,3', 'dB')).toEqual({ value: 46.3, invalid: false });
+    expect(readPrediction('  ', 'V')).toEqual({ value: null, invalid: false });
+    expect(readPrediction('18x', '')).toEqual({ value: null, invalid: true });
   });
 
   it('kilit: RB değişebilir, Q1 ve PS1 değişmez; osiloskop ayarı değişebilir; yeni parça ve kablo eklenemez', () => {
