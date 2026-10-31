@@ -77,6 +77,8 @@ export interface NotebookProps extends InspectTabProps {
   /** Görev (öğrenci): defterin en üstündeki kart ve kilitli / değiştirilebilir parçalar. */
   readonly taskCard?: ReactNode;
   readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string> } | null;
+  /** Arıza bulma (B2): canlı değerler gizli (kare ölçü aletleri dışında boş gelir). */
+  readonly liveHidden?: boolean;
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
@@ -262,8 +264,14 @@ export function Notebook(props: NotebookProps) {
       <div className="flex items-baseline justify-between px-0.5 pb-0.5">
         <h2 className="text-[17px] font-semibold">{t.title}</h2>
         <span className="text-small text-muted">
-          {t.count(doc.parts.length)}
-          {status !== 'stopped' && !props.messages.some((m) => m.severity !== 'info') ? ` · ${t.noProblems}` : ''}
+          {props.liveHidden ? (
+            t.liveHidden
+          ) : (
+            <>
+              {t.count(doc.parts.length)}
+              {status !== 'stopped' && !props.messages.some((m) => m.severity !== 'info') ? ` · ${t.noProblems}` : ''}
+            </>
+          )}
         </span>
       </div>
       {openId === null && others > 0 && (
@@ -692,6 +700,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
             <PrimaryControl {...props} values={values} />
             {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
             <LiveTiles part={part} frame={frame} />
+            {props.liveHidden && status !== 'stopped' && <p className="m-0 text-label leading-snug text-muted">{t.liveHiddenNote}</p>}
           </>
         )}
         <MoreSettings {...props} values={values} />

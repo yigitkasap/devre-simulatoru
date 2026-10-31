@@ -54,6 +54,8 @@ export interface AnalysisApi {
   readonly idx: NetIndex;
   /** Görevde tahmin kaydedilmeden (B1) ölçüm yapılmaz: Eğri izleyici ve Bode yerine bu yazı. */
   readonly gate: string | null;
+  /** Arıza bulmada (B2) serbest iz eklenmez: Grafik'te "İz ekle" yerine bu yazı. */
+  readonly traceGate: string | null;
 }
 
 const SEPARATOR_KEY = 'devre-simulatoru:csv-ayirici';
@@ -73,6 +75,7 @@ export function useAnalysis(
   notify: (message: string) => void,
   selected: string | null = null,
   gate: string | null = null,
+  traceGate: string | null = null,
 ): AnalysisApi {
   const [analysis, setDoc] = useState(initial);
   const [open, setOpen] = useState(false);
@@ -198,6 +201,7 @@ export function useAnalysis(
     bode,
     idx,
     gate,
+    traceGate,
   };
 }
 

@@ -83,3 +83,39 @@ export function faultValid(fault: Fault, doc: CircuitDoc): boolean {
     }
   }
 }
+
+// --- Bağlantıdan ve dosyadan okuma -------------------------------------------------------------
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+export function parseSpot(v: unknown): Spot | null {
+  if (!isRecord(v)) return null;
+  if (typeof v.part === 'string' && typeof v.pin === 'number' && Number.isInteger(v.pin)) return { part: v.part, pin: v.pin };
+  if (typeof v.wire === 'string') return v.end === 0 || v.end === 1 ? { wire: v.wire, end: v.end } : { wire: v.wire };
+  return null;
+}
+
+/** Biçimi doğru arıza; belgeyle uyumu ayrıca denetlenir (faultValid). */
+export function parseFault(v: unknown): Fault | null {
+  if (!isRecord(v)) return null;
+  switch (v.kind) {
+    case 'open': {
+      const at = parseSpot(v.at);
+      return at ? { kind: 'open', at } : null;
+    }
+    case 'short': {
+      const at = parseSpot(v.at);
+      const to = parseSpot(v.to);
+      return at && to ? { kind: 'short', at, to } : null;
+    }
+    case 'value':
+      return typeof v.part === 'string' && typeof v.value === 'number' && Number.isFinite(v.value) ? { kind: 'value', part: v.part, value: v.value } : null;
+    case 'reversed':
+    case 'burnt':
+      return typeof v.part === 'string' ? { kind: v.kind, part: v.part } : null;
+    default:
+      return null;
+  }
+}

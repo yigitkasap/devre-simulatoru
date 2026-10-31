@@ -9,6 +9,8 @@
 // Uyarı: öykünme gerçek iOS Safari'nin her davranışını yakalamaz (ör. dokunma alanı hatası burada
 // görünmüyordu); bu yüzden ilk bölüm iOS için konan kuralların yerinde durduğunu doğrudan denetler.
 // Dokunmatik davranışı değiştiren işlerde gerçek bir iPhone'da da denenmelidir.
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -91,6 +93,19 @@ const selectedCount = (page) => page.locator('svg.schematic rect[data-selected]'
 /** Masaüstünde sağdaki defter (v3). */
 const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
 /** Sayfa (belge) kayıyor mu (dikey ya da yatay). */
+/**
+ * Arıza bulma görevi bağlantısı (B2): BC107 yükselteç, verilen gizli arızalarla. Örnek devre
+ * src/examples'tan okunur; bağlantı uygulamanınkiyle aynı biçimde (lz-string, #g=).
+ */
+const lz = createRequire(import.meta.url)('lz-string');
+const faultUrl = (fault, base = URL0) => {
+  const devre = JSON.parse(readFileSync(new URL('../src/examples/bjt-yukseltec.json', import.meta.url), 'utf8'));
+  const gorev = {
+    name: 'Deney 7 · arıza bul', instruction: '', editable: [], allowNew: false, targets: [], predict: false, circuit: 'BC107 ile ortak emetörlü yükselteç',
+    fault: { symptom: 'Osiloskobun B kanalında sinyal yok.', faults: [{ kind: 'open', at: { part: 'p3', pin: 1 } }], tools: { voltage: true, resistance: true, scope: true, ammeter: false }, hideIndicators: true, askExpected: false, ...fault },
+  };
+  return `${base.split('#')[0]}#g=${lz.compressToEncodedURIComponent(JSON.stringify({ format: 1, gorev, devre }))}`;
+};
 const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);
 /**
  * Bir yazının ekrandaki kontrastı (WCAG): öğenin ekran görüntüsünde en sık görülen renk zemin,
@@ -1494,6 +1509,47 @@ try {
       .filter((r) => r.h > 0 && (r.h < 43.5 || (r.tag === 'INPUT' && r.fs < 16))).map((r) => `${r.n} ${Math.round(r.h)}/${r.fs}`));
     check('tahmin (telefon, B1): kartta tahmin alanı ve "Tahminleri kaydet" ≥ 44 px, yazı 16 px; sayfa kaymıyor',
       (await card.getByRole('textbox', { name: /: tahminin$/ }).count()) === 1 && small.length === 0 && !(await pageScrolls(page)), small.join(', '));
+    await page.context().close();
+  }
+  // --- Arıza bulma (B2, R1–R5): gizli arıza, otomatik göstergeler kapalı, multimetre, günlük, bildir ------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    // Düğüm gerilimleri ve akım noktaları açık olsa da arıza kipinde görünmez.
+    await page.evaluate(() => localStorage.setItem('devre-simulatoru:ayarlar', JSON.stringify({ nodeVoltages: true, currentDots: true })));
+    await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(2500);
+    const strokes = await page.evaluate(() => [...new Set([...document.querySelectorAll('svg.schematic polyline')].map((p) => p.getAttribute('stroke')))]);
+    const dots = await page.evaluate(() => document.querySelectorAll('svg.schematic line[stroke-dasharray^="0 "]').length);
+    const banner = await page.getByText('Arıza bulma · otomatik göstergeler kapalı', { exact: true }).count();
+    const hidden = await page.getByText('canlı değerler gizli', { exact: true }).count();
+    const problemsShown = await page.locator('#defter [data-notebook="problem"]').count();
+    const legend = await page.getByRole('note', { name: 'Gösterim' }).count();
+    const osc = ((await page.locator('[data-card]').filter({ hasText: 'OSC1' }).first().textContent()) ?? '').replace(/\s+/g, ' ');
+    check('arıza (B2, 2. aşama): şerit "Arıza bulma · otomatik göstergeler kapalı"; çalışırken kablolar renksiz, akım noktası ve düğüm etiketi yok; defterde "canlı değerler gizli"; osiloskop kartı ölçmeye devam ediyor',
+      banner === 1 && strokes.every((x) => x === 'var(--color-symbol)' || x === 'currentColor') && dots === 0 && legend === 0 && hidden === 1 && problemsShown === 0 && /mVpp/.test(osc),
+      `${strokes.join(',')} · ${osc.slice(0, 40)}`);
+    await page.locator('[data-card]').filter({ hasText: 'Q1' }).first().locator('[data-nav]').first().click(); await page.waitForTimeout(300);
+    const q1 = ((await page.locator('[data-card]').filter({ hasText: 'Q1' }).first().textContent()) ?? '').replace(/\s+/g, ' ');
+    await page.getByRole('button', { name: 'Analiz', exact: true }).first().click(); await page.waitForTimeout(300);
+    const drawer = page.getByRole('region', { name: 'Analiz' });
+    const graphGate = ((await drawer.textContent()) ?? '').includes('Arıza bulmada serbest iz eklenmez') && (await drawer.getByRole('button', { name: /İz ekle/ }).count()) === 0;
+    await drawer.getByRole('tab', { name: 'Bode' }).click(); await page.waitForTimeout(300);
+    const bodeGate = ((await drawer.textContent()) ?? '').includes('Eğri izleyici ve Bode kapalı');
+    check('arıza (B2, 2. aşama): açık kartta canlı değer yok ("ölçü aletiyle ölç"); Analiz’de serbest iz eklenmiyor, Eğri izleyici ve Bode kapalı',
+      q1.includes('Arıza bulmada canlı değerler gizli') && !/V_?BE|VBE|I_?C\b/.test(q1) && graphGate && bodeGate, q1.slice(0, 80));
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const chip = await page.getByText('Arıza bulma', { exact: true }).boundingBox();
+    const vw = page.viewportSize().width;
+    check('arıza (telefon, R5): şemanın sağ üstünde "Arıza bulma" çipi; sayfa kaymıyor',
+      chip !== null && chip.x + chip.width <= vw && chip.y < 140 && !(await pageScrolls(page)), `${Math.round(chip?.x ?? 0)},${Math.round(chip?.y ?? 0)}`);
     await page.context().close();
   }
   // --- Gömme (C4, C5, C8; N7, N8): Paylaş → Sayfaya göm, /embed/ sade görünüm, salt okunur, Moodle ------

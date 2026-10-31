@@ -55,6 +55,7 @@ import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
+import { visibleLive } from './fault/mask';
 import { routeAround } from './phoneTools';
 import { HintText } from './HintStrip';
 import { SymbolIcon } from './symbols';
@@ -102,6 +103,8 @@ export interface PhoneCanvas {
   readonly onEditAttempt: () => void;
   /** "Devre kilitli · dokun: incele" bilgisi gösterilsin mi. */
   readonly lockChip: boolean;
+  /** Arıza bulma (B2, R5): şemanın sağ üstünde "Arıza bulma" çipi. */
+  readonly faultChip?: boolean;
   readonly onLockChipClose: () => void;
   /** Tuval, tam boy alt sayfanın üstünde ince bir şerit: bilgi katmanları gizlenir. */
   readonly strip?: boolean;
@@ -168,6 +171,12 @@ export interface CanvasProps {
   readonly simActive: boolean;
   /** Son simülasyon karesi; simülasyon durdurulmuşsa null. */
   readonly frame: SimFrame | null;
+  /**
+   * Otomatik göstergeler (varsayılan açık). Arıza bulmada (B2) kapalı: kablo renkleri, akım noktaları,
+   * manyetik alan, renk ölçeği, kısa devre yanıp sönmesi ve yanan LED balonu çizilmez; ölçü aletlerinin
+   * ekranı ve LED'in ışığı (gerçekte de görülür) kalır.
+   */
+  readonly indicators?: boolean;
   readonly highlight: Highlight | null;
   /** Yanmış LED'i onar. */
   readonly onRepair: (partId: string) => void;
@@ -328,7 +337,8 @@ export function Canvas({
   keyboardEnabled,
   flowGraph,
   simActive,
-  frame,
+  frame: liveFrame,
+  indicators = true,
   highlight,
   onRepair,
   onRotate,
@@ -351,6 +361,8 @@ export function Canvas({
   taskParts,
   ref,
 }: CanvasProps) {
+  // Göstergeler kapalıysa kablo renkleri ve öbür göstergeler simülasyon yokmuş gibi çizilir.
+  const frame = indicators ? liveFrame : null;
   const svgRef = useRef<SVGSVGElement>(null);
   const sceneId = `scene-${useId().replace(/:/g, '')}`;
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -1716,14 +1728,15 @@ export function Canvas({
           {/* Bağla kipinde parçalar soluklaşır, uçlar öne çıkar (P03). */}
           <g opacity={bagla ? 0.38 : 1}>
           {doc.parts.map((part) => {
-            const live = frame?.live.get(part.id);
+            const raw = liveFrame?.live.get(part.id);
+            const live = raw && !indicators ? visibleLive(raw) : raw;
             return (
               <PartView
                 key={part.id}
                 part={part}
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
-                meterText={frame?.meterTexts.get(part.id) ?? null}
+                meterText={liveFrame?.meterTexts.get(part.id) ?? null}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
                 hideValue={lod && !selectedParts.has(part.id)}
@@ -2185,17 +2198,23 @@ export function Canvas({
           aria-label={tr.toolbar.fit}
           title={tr.toolbar.fit}
           className={`absolute right-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-panel/95 text-ink shadow-sm ${
-            phone.mode === 'olc' && phone.lockChip ? 'top-[100px]' : 'top-11'
+            phone.mode === 'olc' && phone.lockChip ? 'top-[100px]' : phone.faultChip ? 'top-[76px]' : 'top-11'
           }`}
         >
           <Icon name="fit" />
         </button>
       )}
+      {phone?.faultChip && !bagla && !phone.strip && (
+        <p className="pointer-events-none absolute top-2.5 right-2.5 z-10 m-0 flex items-center gap-1.5 rounded-full border border-warn-line bg-warn-soft/95 px-2.5 py-1 text-label font-semibold text-warn shadow-sm">
+          <Icon name="wrench" className="h-3.5 w-3.5" />
+          {tr.fault.bannerShort}
+        </p>
+      )}
       {/* Telefon: uzaklaşınca değerler gizlenir; masaüstünde yakınlık üst çubukta. */}
       {lod && !bagla && !phone?.strip && (
         <p
           className={`pointer-events-none absolute right-2.5 rounded-md bg-panel/90 px-1.5 py-0.5 font-mono text-label font-medium text-muted tabular ${
-            phone?.mode === 'olc' && phone.lockChip ? 'top-[64px]' : 'top-2.5'
+            phone?.mode === 'olc' && phone.lockChip ? 'top-[64px]' : phone?.faultChip ? 'top-[46px]' : 'top-2.5'
           }`}
         >
           {tr.phone.lod(Math.round(view.scale * 100))}

@@ -71,7 +71,11 @@ export type IconName =
   | 'shield'
   | 'copy'
   | 'check'
-  | 'warning';
+  | 'warning'
+  | 'wrench'
+  | 'flag'
+  | 'bulb'
+  | 'multimeter';
 
 const PATHS: Record<IconName, ReactNode> = {
   target: (
@@ -339,6 +343,17 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M10 3l7.5 13.5h-15z" />
       <path d="M10 8.5v3.5M10 14.3v.1" />
+    </>
+  ),
+  // Arıza bulma (B2, R1–R5).
+  wrench: <path d="M12.5 3.5a4 4 0 0 0-4.6 5.3L3.5 13.2a1.6 1.6 0 0 0 2.3 2.3l4.4-4.4a4 4 0 0 0 5.3-4.6l-2.3 2.3-2-.5-.5-2z" />,
+  flag: <path d="M5 17V3.5M5 4h9l-2 3.5 2 3.5H5" />,
+  bulb: <path d="M7 14h6M8 17h4M10 3a5 5 0 0 0-3 9c.6.5 1 1.2 1 2h4c0-.8.4-1.5 1-2a5 5 0 0 0-3-9z" />,
+  multimeter: (
+    <>
+      <rect x="4" y="2.5" width="12" height="15" rx="2" />
+      <rect x="6.5" y="5" width="7" height="4" rx=".8" />
+      <circle cx="10" cy="13" r="2" />
     </>
   ),
 };

@@ -98,6 +98,8 @@ export interface BenchViewProps {
   readonly doc: CircuitDoc;
   readonly connectivity: Connectivity;
   readonly frame: SimFrame | null;
+  /** Etiketlerin gördüğü kare (arıza bulmada yalnızca ölçü aletleri; verilmezse frame). */
+  readonly labelFrame?: SimFrame | null;
   readonly active: boolean;
   /** Simülasyon ilerliyor (duraklatılınca akım noktaları durur). */
   readonly running: boolean;
@@ -134,7 +136,7 @@ export function BenchView(props: BenchViewProps) {
   const [zoom, setZoom] = useState({ n: 0, factor: 1 });
   const [labels, setLabels] = useState(() => readStored(LABELS_KEY, true));
   const [overlay, setOverlay] = useState<HTMLDivElement | null>(null);
-  const slow = useSlowFrame(props.active ? frame : null);
+  const slow = useSlowFrame(props.active ? (props.labelFrame === undefined ? frame : props.labelFrame) : null);
   const single = selection.length === 1 ? selection[0]! : null;
 
   // Küçük şema yalnızca yer varken (sağ alttaki denetimlerle çakışmasın).

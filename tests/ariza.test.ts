@@ -11,6 +11,10 @@ import { faultFits, faultValid, type Fault } from '../src/model/faults';
 import { pinPositions } from '../src/model/geometry';
 import type { CircuitDoc } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
+import { maskFrame, visibleLive } from '../src/editor/fault/mask';
+import type { SimFrame } from '../src/editor/useSimulation';
+import { parseTask, parseTaskPayload } from '../src/model/task';
+import { toSerializable } from '../src/model/serialize';
 
 const partId = (doc: CircuitDoc, label: string) => doc.parts.find((p) => p.label === label)!.id;
 
@@ -122,3 +126,46 @@ describe('Arıza bulma: arıza netlist kurulurken uygulanır', () => {
     expect(faultValid({ kind: 'value', part: RC, value: -1 }, doc)).toBe(false);
   });
 });
+
+describe('Arıza bulma görevi: bağlantıdan okuma ve otomatik göstergeler', () => {
+  const doc = exampleDoc('bjt-yukseltec')!;
+  const base = { name: 'Deney 7 · arıza bul', instruction: '', editable: [], allowNew: false, targets: [], predict: false };
+
+  it('görev: belirti, arızalar, ölçü aletleri; eksik alanlarda varsayılan (göstergeler gizli, aletler V Ω osiloskop)', () => {
+    const t = parseTask({ ...base, fault: { symptom: 'Çıkış yok', faults: [{ kind: 'open', at: { part: 'p3', pin: 1 } }, { kind: 'uydurma' }] } })!;
+    expect(t.fault).toEqual({
+      symptom: 'Çıkış yok',
+      faults: [{ kind: 'open', at: { part: 'p3', pin: 1 } }],
+      tools: { voltage: true, resistance: true, scope: true, ammeter: false },
+      hideIndicators: true,
+      askExpected: false,
+    });
+    // Eski (hedefli) görevde arıza yok.
+    expect(parseTask(base)!.fault).toBeUndefined();
+  });
+
+  it('belgeyle uyuşmayan arıza (olmayan parça, uygun olmayan tür) atlanır', () => {
+    const payload = {
+      format: 1,
+      gorev: { ...base, fault: { symptom: '', faults: [{ kind: 'open', at: { part: 'yok', pin: 0 } }, { kind: 'burnt', part: 'p3' }, { kind: 'value', part: 'p3', value: 560 }] } },
+      devre: toSerializable(doc),
+    };
+    expect(parseTaskPayload(payload)!.task.fault!.faults).toEqual([{ kind: 'value', part: 'p3', value: 560 }]);
+  });
+
+  it('defterin karesi: yalnızca ölçü aletleri ve cihazlar; kablo gerilimleri ve uyarılar yok', () => {
+    const ids = (type: string) => doc.parts.filter((p) => p.type === type).map((p) => p.id);
+    const all = new Map(doc.parts.map((p) => [p.id, { voltage: 1, current: 1, power: 1 }]));
+    const frame = { wireVoltages: new Map([['w1', 12]]), wireSummaries: new Map(), partFlows: new Map(), pinFlows: new Map(), live: new Map(), measurements: all, statuses: new Map(), summaries: new Map(), meterTexts: new Map(), runtime: [{ code: 'short-circuit' }], alarms: new Set(['p1']) } as unknown as SimFrame;
+    const masked = maskFrame(frame, doc);
+    expect([...masked.measurements.keys()].sort()).toEqual([...ids('oscilloscope'), ...ids('funcgen'), ...ids('dcsupply')].sort());
+    expect(masked.wireVoltages.size).toBe(0);
+    expect(masked.runtime).toEqual([]);
+    expect(masked.alarms.size).toBe(0);
+  });
+
+  it('şemadaki görseller: LED ışığı ve motor kalır; kondansatörün dolması, direncin ısınması, manyetik alan gider', () => {
+    expect(visibleLive({ brightness: 0.8, charge: 0.4, powerRatio: 2, field: 0.1, angle: 1 })).toEqual({ brightness: 0.8, angle: 1 });
+  });
+});
+

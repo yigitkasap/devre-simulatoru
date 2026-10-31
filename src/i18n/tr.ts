@@ -1991,6 +1991,12 @@ export const tr = {
     wireVarying: 'Gerilim salınıyor: son 0,4 saniyenin ortalaması, en düşük ve en yüksek değeri.',
     repair: 'Onar',
   },
+  fault: {
+    banner: 'Arıza bulma · otomatik göstergeler kapalı',
+    bannerShort: 'Arıza bulma',
+    traceGate: 'Arıza bulmada serbest iz eklenmez: ölçü aletiyle ölç.',
+    analysisGate: 'Arıza bulmada Eğri izleyici ve Bode kapalı: ölçü aletiyle ölç.',
+  },
   notebook: {
     label: 'Defter: devredeki parçalar',
     title: 'Devredeki parçalar',
@@ -1998,6 +2004,8 @@ export const tr = {
     openCard: (label: string, type: string) => `${label} · ${type}: kartı aç`,
     collapse: 'Kartı küçült',
     floating: (n: number) => `${n} uç boşta`,
+    liveHidden: 'canlı değerler gizli',
+    liveHiddenNote: 'Arıza bulmada canlı değerler gizli: ölçü aletiyle ölç.',
     burned: 'Yandı',
     lit: 'Yanıyor',
     more: 'Diğer ayarlar',

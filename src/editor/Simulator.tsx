@@ -8,6 +8,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, us
 import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, wireKey } from '../model/connectivity';
+import { maskFrame } from './fault/mask';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { partBounds, pinPositions } from '../model/geometry';
@@ -265,10 +266,26 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     if (hasArduino) void loadArduinoRuntime();
   }, [hasArduino]);
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
+  // Arıza bulma (B2): şema, mesajlar, rozetler ve analizin düğüm dizini sağlam devreden (arızayı ele
+  // vermesin); simülasyon arızalı devreden (arıza netlist kurulurken uygulanır).
+  const fault = task?.fault ?? null;
+  const simConnectivity = useMemo(() => (fault && fault.faults.length > 0 ? buildConnectivity(doc, fault.faults) : connectivity), [doc, fault, connectivity]);
+  /** Otomatik göstergeler kapalı: kablo renkleri, akım noktaları, düğüm etiketleri, kartlardaki canlı değerler. */
+  const hideLive = fault !== null && fault.hideIndicators;
+  const shownSettings = useMemo(() => (hideLive ? { ...settings, nodeVoltages: false, currentDots: false, magneticField: false } : settings), [hideLive, settings]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
   // Analiz (grafik, tablo, eğri izleyici, Bode): izler ve tablo devreyle birlikte kaydedilir.
   const notify = useCallback((message: string) => showToast(message), [showToast]);
-  const analysis = useAnalysis(doc, connectivity, initial.analysis, notify, selection.parts.length === 1 && selection.wires.length === 0 ? selection.parts[0]! : null, gate);
+  // Arıza bulmada öğrenci yalnızca ölçü aletleriyle ölçer: serbest iz, Eğri izleyici ve Bode kapalı.
+  const analysis = useAnalysis(
+    doc,
+    connectivity,
+    initial.analysis,
+    notify,
+    selection.parts.length === 1 && selection.wires.length === 0 ? selection.parts[0]! : null,
+    fault ? tr.fault.analysisGate : gate,
+    fault ? tr.fault.traceGate : null,
+  );
   // Gömülü görünüm kaydetmez: aynı sitedeki asıl devreye (otomatik kayıt) dokunmasın.
   const saveState = useAutosave(doc, analysis.doc, embed === null);
   /** Analiz çekmecesinin yüksekliği (masaüstü) ve Büyüt. */
@@ -306,7 +323,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const watched = useMemo(() => (watchedKey ? [...new Set(watchedKey.split(','))] : []), [watchedKey]);
   /** Defterde kapalı kartı ölçüm gösterebilen parçalar (DC devrede hepsi). */
   const measuredParts = useMemo<ReadonlySet<string> | null>(() => (timeVarying ? new Set(watched) : null), [timeVarying, watched]);
-  const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
+  const sim = useSimulation(doc, simConnectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
   /** Oynat: görevde tahminler kaydedilmediyse (B1) çalışmaz, nedenini söyler. */
   const play = () => {
     if (gate) showToast(gate, 'error');
@@ -518,7 +535,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const earthTrap = useMemo(() => (compiled ? findEarthTrap(compiled) : null), [compiled]);
 
   const messages = useMemo<MessageItem[]>(() => {
-    const list: Diagnostic[] = [...(compiled?.diagnostics ?? []), ...(sim.frame?.runtime ?? [])];
+    // Arıza bulmada simülasyon sırasındaki uyarılar (kısa devre, yanan LED…) arızayı ele verir.
+    const list: Diagnostic[] = [...(compiled?.diagnostics ?? []), ...(fault ? [] : (sim.frame?.runtime ?? []))];
     if (sim.notice?.kind === 'error') list.push(sim.notice.diagnostic);
     const seen = new Set<string>();
     const items: MessageItem[] = [];
@@ -534,7 +552,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     // Önce hatalar, sonra uyarılar, en son bilgiler (kendi içlerinde sıra korunur).
     const rank = { error: 0, warning: 1, info: 2 } as const;
     return items.sort((a, b) => rank[a.severity] - rank[b.severity]);
-  }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc]);
+  }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc, fault]);
 
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
 
@@ -547,7 +565,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
 
   /** Ayarlar → "Düğüm gerilimlerini yaz": her düğümün en uzun kablo parçasının ortasında gerilim. */
   const nodeLabels = useMemo(() => {
-    if (!settings.nodeVoltages || !sim.frame || !compiled) return undefined;
+    if (!shownSettings.nodeVoltages || !sim.frame || !compiled) return undefined;
     const best = new Map<string, { at: { x: number; y: number }; length: number; text: string }>();
     for (const wire of doc.wires) {
       const key = wireKey(wire.id);
@@ -567,7 +585,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       }
     }
     return [...best.values()].map((n) => ({ at: n.at, text: n.text }));
-  }, [settings.nodeVoltages, sim.frame, compiled, doc.wires]);
+  }, [shownSettings.nodeVoltages, sim.frame, compiled, doc.wires]);
 
   /** Bir mesajın vurgulayacağı parçalar ve kablolar. */
   const highlightOf = (d: MessageItem): Highlight => {
@@ -900,10 +918,12 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     onOpen: loadExample,
     onClose: () => setActiveExample(null),
   };
+  // Arıza bulmada defterin gördüğü kare: yalnızca ölçü aletleri ve cihazlar (kablo ve parça değerleri yok).
+  const shownFrame = useMemo(() => (hideLive && sim.frame ? maskFrame(sim.frame, doc) : sim.frame), [hideLive, sim.frame, doc]);
   const inspectProps = {
     doc,
     selection,
-    frame: sim.frame,
+    frame: shownFrame,
     status: sim.status,
     settings,
     focusRequest,
@@ -958,6 +978,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       example={exampleProps}
       devices={deviceHooks}
       {...(task ? { taskCard, taskParts } : {})}
+      {...(hideLive ? { liveHidden: true } : {})}
       {...(viewMode === 'bench'
         ? {
             onFocus3d: (partId: string) => {
@@ -996,7 +1017,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       doc={doc}
       selection={selection}
       tool={tool}
-      settings={settings}
+      settings={shownSettings}
       connectivity={connectivity}
       dispatch={dispatch}
       libraryDragType={libraryDragType}
@@ -1005,6 +1026,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       flowGraph={flowGraph}
       simActive={sim.status !== 'stopped'}
       frame={sim.frame}
+      indicators={!hideLive}
       highlight={flash ?? highlight}
       onRepair={sim.repair}
       onRotate={rotateSelection}
@@ -1031,6 +1053,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               ...(phone && connect ? { connectHeader: true } : {}),
               ...(phone && addSheet === 'full' ? { strip: true } : {}),
               ...(tablet ? { emptyHint: tr.canvas.empty } : {}),
+              ...(phone && fault ? { faultChip: true } : {}),
             }
           : null
       }
@@ -1057,6 +1080,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           doc={doc}
           connectivity={connectivity}
           frame={sim.frame}
+          {...(hideLive ? { labelFrame: shownFrame } : {})}
           active={sim.status !== 'stopped'}
           running={sim.status === 'running'}
           selection={selection.parts}
@@ -1064,7 +1088,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           touch={touchUi}
           phone={phone}
           dark={theme === 'dark'}
-          settings={settings}
+          settings={shownSettings}
           onSettings={updateSettings}
           measured={measuredParts}
           onSchematic={() => setViewMode('schematic')}
@@ -1580,11 +1604,18 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <main className="relative min-h-0 min-w-0 flex-1">
             {canvas}
-            {(task || readOnly) && (
-              <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft/95 px-3 py-1.5 text-small font-semibold text-accent-ink shadow-sm">
-                <Icon name={task ? 'target' : 'lock'} className="h-4 w-4" />
-                {task ? tr.task.mode(editableLabels) : tr.embed.mode}
+            {fault ? (
+              <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-warn-line bg-warn-soft/95 px-3 py-1.5 text-small font-semibold text-warn shadow-sm">
+                <Icon name="wrench" className="h-4 w-4" />
+                {hideLive ? tr.fault.banner : tr.fault.bannerShort}
               </p>
+            ) : (
+              (task || readOnly) && (
+                <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft/95 px-3 py-1.5 text-small font-semibold text-accent-ink shadow-sm">
+                  <Icon name={task ? 'target' : 'lock'} className="h-4 w-4" />
+                  {task ? tr.task.mode(editableLabels) : tr.embed.mode}
+                </p>
+              )
             )}
             {viewMode === 'schematic' &&
               (connect ? (
