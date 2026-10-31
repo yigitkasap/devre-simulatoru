@@ -92,6 +92,33 @@ export function fitPoints(rec: TraceRecorder, spec: FitSpec): { xs: number[]; ys
   return { xs, ys };
 }
 
+/** Uydurmanın doğru sayılması için R² sınırı: altında sonuç alanında uyarı çıkar (analiz düzeltmeleri, 3). */
+export const R2_LIMIT = 0.9;
+
+/** Veri doğruya benziyor mu (R² ≥ 0,9). */
+export const fitLooksLinear = (fit: LineFit): boolean => fit.r2 >= R2_LIMIT;
+
+/**
+ * İzin değişmeye başladığı an (uydurma aralığının varsayılan başı): ilk değerden farkı kaydın toplam
+ * değişiminin %1'ini aşan ilk örnekten bir önceki örneğin zamanı. Kaydın başından değişiyorsa ya da
+ * hiç değişmiyorsa null (aralık kaydın başından).
+ */
+export function changeStart(rec: TraceRecorder, id: string): number | null {
+  const v = rec.values.get(id);
+  if (!v) return null;
+  let i0 = -1;
+  for (let i = 0; i < rec.count && i0 < 0; i++) if (Number.isFinite(v[i]!)) i0 = i;
+  if (i0 < 0) return null;
+  const y0 = v[i0]!;
+  let span = 0;
+  for (let i = i0; i < rec.count; i++) if (Number.isFinite(v[i]!)) span = Math.max(span, Math.abs(v[i]! - y0));
+  if (!(span > 0)) return null;
+  for (let i = i0 + 1; i < rec.count; i++) {
+    if (Number.isFinite(v[i]!) && Math.abs(v[i]! - y0) > span * 0.01) return i - 1 > i0 ? rec.times[i - 1]! : null;
+  }
+  return null;
+}
+
 /** Uydurmadan çıkan zaman sabiti: x zaman ve y = ln(a − V) ise τ = −1 / eğim. */
 export function fitTau(spec: FitSpec, fit: LineFit | null): number | null {
   if (!fit || spec.x !== 't' || spec.lnOffset === null || fit.slope >= 0) return null;

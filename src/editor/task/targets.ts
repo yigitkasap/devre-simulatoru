@@ -9,6 +9,7 @@ import type { Target, TargetQuantity } from '../../model/task';
 import type { TraceDef } from '../../model/analysis';
 import { formatNumber, formatSI } from '../../sim/units';
 import { bodeSummary, toDb, type BodePoint } from '../analysis/bode';
+import { parseTheory } from '../analysis/table';
 import { nodeName, type NetIndex } from '../analysis/traces';
 import { stableValue } from '../liveReadout';
 import type { SimFrame } from '../useSimulation';
@@ -91,6 +92,16 @@ export function valueText(v: number, unit: string): string {
   if (unit === '') return formatNumber(v, Math.abs(v) >= 100 ? 1 : 2).replace(/,0+$/, '');
   if (unit === 'dB') return `${formatNumber(v, 1)} dB`;
   return formatSI(v, unit, { digits: 3, trim: true });
+}
+
+/**
+ * Tahmin kutusundaki yazı ("6 V", "5,9", "500k"; birim hedefinki, dB'de birimsiz): boşsa değer yok,
+ * okunamıyorsa geçersiz. Yazarken her harfte okunur (analiz düzeltmeleri, 5).
+ */
+export function readPrediction(text: string, unit: string): { value: number | null; invalid: boolean } {
+  if (text.trim() === '') return { value: null, invalid: false };
+  const v = parseTheory(text, unit === 'dB' ? '' : unit);
+  return v === null ? { value: null, invalid: true } : { value: v, invalid: false };
 }
 
 /** "Hedef 6 V ± %10", "Hedef ≥ 500 kHz". */

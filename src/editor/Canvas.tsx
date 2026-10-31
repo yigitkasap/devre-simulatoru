@@ -3,10 +3,12 @@
 // hangi öğeye tıklandığı geometriyle (isabet testi) bulunur.
 
 import {
+  useCallback,
   useEffect,
   useId,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -59,6 +61,7 @@ import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
 import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from './state';
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
+import { circuitHits, circuitShapes, fitAvoiding, type Rect } from './legendFit';
 import { clampScale, fitView, screenToGrid, snap, zoomAt, type View } from './view';
 
 export interface CanvasHandle {
@@ -368,6 +371,27 @@ export function Canvas({
   const [picker, setPicker] = useState<{ x: number; y: number; options: readonly PickOption[] } | null>(null);
   const [magnifier, setMagnifier] = useState<{ x: number; y: number; g: Point } | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  /**
+   * Masaüstünde "Kablo gerilimi" kutusunun son ölçülen boyu: Sığdır kutunun yerini görünür alanın
+   * dışında sayar; kutu devreye değerse tek satıra küçülür (analiz düzeltmeleri, 2).
+   */
+  const [legendSize, setLegendSize] = useState({ w: 206, h: 100 });
+  const legendObserver = useRef<ResizeObserver | null>(null);
+  const legendBoxRef = useCallback((el: HTMLDivElement | null) => {
+    legendObserver.current?.disconnect();
+    legendObserver.current = null;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w > 0 && h > 0) setLegendSize((s) => (Math.abs(s.w - w) < 0.5 && Math.abs(s.h - h) < 0.5 ? s : { w, h }));
+    });
+    ro.observe(el);
+    legendObserver.current = ro;
+  }, []);
+  const shapes = useMemo(() => circuitShapes(doc), [doc]);
+  // Kutu tuvalin sol alt köşesinde (bottom-3 left-3): tuvalin koordinatlarında.
+  const legendRect: Rect | null = phone ? null : { x: 12, y: size.height - 12 - legendSize.h, w: legendSize.w, h: legendSize.h };
   const phoneTimers = useRef({ hold: 0, long: 0 });
   const phoneLongFired = useRef(false);
   const lastEmptyTap = useRef(0);
@@ -477,7 +501,10 @@ export function Canvas({
       phone && ((phone.mode === 'bagla' && !phone.connectHeader) || (phone.mode === 'olc' && phone.lockChip))
         ? Math.min(phone.mode === 'bagla' ? 84 : 48, size.height / 4)
         : 0;
-    const fitted = fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top), phone ? 20 : 48);
+    // Masaüstünde sol alttaki "Kablo gerilimi" kutusu da görünür alanın dışında sayılır.
+    const fitted = phone
+      ? fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top), 20)
+      : fitAvoiding(shapes, bounds, Math.max(1, size.width), Math.max(1, size.height), 48, legendRect);
     setView({ ...fitted, y: fitted.y + top });
   };
 
@@ -1954,7 +1981,18 @@ export function Canvas({
 
       {frame &&
         !phone?.strip &&
-        (phone && !legendOpen ? (
+        (!phone && legendRect && circuitHits(shapes, view, legendRect) ? (
+          // Kutu devreye değiyor (yakınlaştırılmış ya da kaydırılmış görünüm): tek satır, renk çubuğu ve ±V.
+          <div
+            role="note"
+            aria-label={tr.sim.legendTitle}
+            className="pointer-events-none absolute bottom-3 left-3 flex h-8 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 font-mono text-[11.5px] text-ink-2 tabular shadow-sm"
+          >
+            <span>−{formatSI(frame.vmax, 'V', { trim: true })}</span>
+            <i className="block h-2 w-16 rounded-full" style={{ background: voltageGradient(settings.wireScale) }} aria-hidden="true" />
+            <span>+{formatSI(frame.vmax, 'V', { trim: true })}</span>
+          </div>
+        ) : phone && !legendOpen ? (
           <button
             type="button"
             onClick={() => setLegendOpen(true)}
@@ -1974,6 +2012,7 @@ export function Canvas({
             ions={doc.parts.some((p) => p.type === 'tank')}
             field={settings.magneticField}
             onClose={phone ? () => setLegendOpen(false) : undefined}
+            {...(phone ? {} : { boxRef: legendBoxRef })}
           />
         ))}
 
@@ -2537,6 +2576,7 @@ function VoltageLegend({
   ions,
   field,
   onClose,
+  boxRef,
 }: {
   vmax: number;
   scale: WireScale;
@@ -2549,10 +2589,13 @@ function VoltageLegend({
   field: boolean;
   /** Telefon: dokununca küçük düğmeye döner. */
   onClose?: () => void;
+  /** Masaüstü: kutunun boyu ölçülür (Sığdır onu dışarıda bırakır). */
+  boxRef?: (el: HTMLDivElement | null) => void;
 }) {
   const label = formatSI(vmax, 'V', { trim: true });
   return (
     <div
+      ref={boxRef}
       role="note"
       aria-label={tr.sim.legendTitle}
       onClick={onClose}

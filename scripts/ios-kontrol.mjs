@@ -900,6 +900,41 @@ try {
     const endValue = ((await drawer.locator('.shadow-lg').first().textContent()) ?? '').replace(/\s+/g, ' ');
     check('analiz: kayıt yalnız seçili izler, 5 ms aralıkla; grafik role="img" açıklamalı; imleç klavyeyle sona gidiyor, değer kutusunda V(C1) ≈ 9,9 V',
       /Aralık ?5 ms · \d{2,} nokta/.test(info) && chartLabel.startsWith('Grafik: V(C1), I(R1)') && /V\(C1\) ?9,[89]\d\d V/.test(endValue), `${info} · ${endValue.slice(0, 60)}`);
+    // İmleç değer kutusu (analiz düzeltmeleri, 8): eğrilerle en az çakışan yere; sondaki imleçte kutunun
+    // içine eğrilerin hiçbir noktası düşmüyor (RC dolmada üstteki düzlüğü örtmüyor).
+    const covered = await drawer.evaluate((root) => {
+      const boxEl = root.querySelector('.shadow-lg');
+      const svg = root.querySelector('svg[role=img]');
+      if (!boxEl || !svg) return -1;
+      const b = boxEl.getBoundingClientRect();
+      const s = svg.getBoundingClientRect();
+      let n = 0;
+      for (const path of svg.querySelectorAll('path[stroke^="var(--color-tr"]')) {
+        for (const m of (path.getAttribute('d') ?? '').matchAll(/[ML]([\d.]+) ([\d.]+)/g)) {
+          const x = s.left + Number(m[1]);
+          const y = s.top + Number(m[2]);
+          if (x > b.left && x < b.right && y > b.top && y < b.bottom) n++;
+        }
+      }
+      return n;
+    });
+    check('analiz (analiz düzeltmeleri 8): imleç sondayken değer kutusu eğrilere binmiyor (kutunun içinde eğri noktası yok)', covered === 0, `${covered} nokta`);
+    // Kablo gerilimi kutusu (analiz düzeltmeleri, 2): çekmece açıkken ve çalışırken toprak sembolüne ve
+    // alt kabloya binmiyor (Sığdır kutuyu dışarıda bırakır); yakınlaşınca devreye değen kutu tek satır.
+    {
+      const legendBox = async () => page.locator('main').getByRole('note', { name: 'Gösterim' }).boundingBox();
+      const lb = await legendBox();
+      const a = await screen(page, 0, 8);
+      const b = await screen(page, 44, 8);
+      const covers = lb !== null && a.y >= lb.y - 4 && a.y <= lb.y + lb.height + 4 && Math.max(a.x, b.x) >= lb.x && Math.min(a.x, b.x) <= lb.x + lb.width;
+      await page.getByRole('button', { name: 'Yakınlaştır' }).click(); await page.getByRole('button', { name: 'Yakınlaştır' }).click(); await page.waitForTimeout(250);
+      const zoomed = await legendBox();
+      await page.getByRole('button', { name: 'Devreyi ekrana sığdır' }).click(); await page.waitForTimeout(250);
+      const back = await legendBox();
+      check('kablo gerilimi kutusu: çekmece açık ve çalışırken RC dolmada toprağa ve alt kabloya binmiyor; yakınlaşınca tek satıra küçülüyor, Sığdır’la geri geliyor',
+        lb !== null && lb.height > 60 && !covers && zoomed !== null && zoomed.height <= 40 && back !== null && back.height > 60,
+        `kutu ${Math.round(lb?.width ?? 0)}×${Math.round(lb?.height ?? 0)} · alt kablo y ${Math.round(a.y)} · yakın ${Math.round(zoomed?.height ?? 0)} px`);
+    }
     await drawer.getByRole('button', { name: 'Tabloya ekle' }).click(); await page.waitForTimeout(200);
     const [csv] = await Promise.all([page.waitForEvent('download'), drawer.getByRole('button', { name: 'CSV indir' }).click()]);
     const csvText = Buffer.concat(await (await csv.createReadStream()).toArray()).toString('utf8');
@@ -928,14 +963,24 @@ try {
       heads.slice(0, 4).join('|') === 'Büyüklük|Teorik (sen gir)|Ölçülen (simülasyon)|% Hata' && /^0,\d\d$/.test(errText) && labHead === 1 && /imleç/.test(newRow),
       `${heads.join('|')} · hata ${errText} · ${newRow.slice(0, 40)}`);
     const fitPanel = drawer.getByRole('region', { name: 'Doğru uydur' });
+    // Varsayılan (analiz düzeltmeleri, 3): aralık sinyalin değişmeye başladığı andan; dönüşümsüz doğru
+    // R² < 0,9 → uyarı, "Tabloya ekle" yine görünür; ln ile uyarı kalkıyor.
+    const autoFrom = Number(((await fitPanel.getByRole('textbox', { name: 'x en az' }).inputValue()) ?? '').replace(',', '.'));
+    const warnBefore = ((await fitPanel.getByRole('status').textContent().catch(() => '')) ?? '');
+    const addBefore = await fitPanel.getByRole('button', { name: 'Eğimi tabloya ekle' }).count();
     await fitPanel.getByRole('combobox', { name: 'y dönüşümü' }).selectOption('ln'); await page.waitForTimeout(200);
+    const warnAfter = await fitPanel.getByRole('status').count();
+    const tauText = ((await fitPanel.locator('dl').textContent()) ?? '').replace(/\s+/g, ' ');
+    check('analiz (Tablo): doğru uydurmanın aralığı sinyalin değişmeye başladığı andan; R² < 0,9’da "Veri doğruya benzemiyor" uyarısı (Tabloya ekle görünür); ln ile τ ≈ 100 ms ve uyarı yok',
+      autoFrom > 0.05 && warnBefore.startsWith('Veri doğruya benzemiyor. Üstel bir değişimse ln dönüşümünü dene.') && addBefore === 1 && warnAfter === 0 && /τ = −1 \/ eğim(9\d,\d+|10\d,\d+) ms/.test(tauText),
+      `başlangıç ${autoFrom} s · ${tauText.slice(0, 70)}`);
     const fitText = ((await fitPanel.locator('dl').textContent()) ?? '').replace(/\s+/g, ' ');
     const fitChart = (await fitPanel.getByRole('img').getAttribute('aria-label')) ?? '';
     const rowsBefore = await drawer.locator('tbody tr').count();
     await fitPanel.getByRole('button', { name: 'τ’yu tabloya ekle' }).click(); await page.waitForTimeout(150);
     const tauRow = ((await drawer.locator('tbody tr').last().textContent()) ?? '').replace(/\s+/g, ' ');
     check('analiz (Tablo): doğru uydur y = ln(a − V(C1)), x = t → eğim, τ = −1 / eğim, R²; grafik role="img"; "τ’yu tabloya ekle"',
-      /Eğim−\d/.test(fitText) && /τ = −1 \/ eğim\d/.test(fitText) && /R²0,\d{4} · \d+ nokta/.test(fitText) && fitChart.startsWith('Doğru uydurma: ln(10') &&
+      /Eğim−\d/.test(fitText) && /τ = −1 \/ eğim\d/.test(fitText) && /R²(0,\d{4}|1,0000) · \d+ nokta/.test(fitText) && fitChart.startsWith('Doğru uydurma: ln(10') &&
       (await drawer.locator('tbody tr').count()) === rowsBefore + 1 && tauRow.includes('τ (uydurma)') && tauRow.includes('doğru uydurma'), `${fitText.slice(0, 80)} · ${tauRow.slice(0, 40)}`);
     await drawer.getByRole('button', { name: 'CSV seçenekleri' }).click(); await page.waitForTimeout(150);
     const radios = await page.getByRole('menuitemradio').evaluateAll((els) => els.map((e) => `${e.textContent.trim()}=${e.getAttribute('aria-checked')}`));
@@ -1022,6 +1067,38 @@ try {
     check('eğri izleyici: BC107 yükselteçte basamak I_B (µA), yük doğrusu R_C · 12 V ve Q noktası çiziliyor',
       !(await bjtSwitch.isDisabled()) && (await bjtSwitch.getAttribute('aria-checked')) === 'true' && ((await bjtSwitch.textContent()) ?? '').includes('RC · kaynak 12,0 V') && qText === 1 &&
       (await drawer.getByRole('button', { name: '10 µA basamağını kaldır' }).count()) === 1, ((await bjtSwitch.textContent()) ?? '').slice(0, 60));
+    // Q basamağı (analiz düzeltmeleri, 9): yük doğrusu açıkken Q'daki gerçek I_B ayrı, kalın ve "Q · …"
+    // etiketli eğri; öbür basamaklar aynı; aralık beslemeye (12 V) kadar. Kapatınca Q eğrisi ve uzama kalkar.
+    const ends = async () => drawer.getByRole('img', { name: /^Eğri izleyici: Q1/ }).locator('text').allTextContents();
+    const qLabel = (await ends()).find((x) => x.startsWith('Q · ')) ?? '';
+    const qStrong = await drawer.getByRole('img', { name: /^Eğri izleyici: Q1/ }).locator('path[stroke-width="3.5"]').count();
+    const toValue = await drawer.getByRole('textbox', { name: 'Bitiş' }).inputValue();
+    const summaryOn = (await drawer.getByText(/noktalık DC tarama$/).textContent()) ?? '';
+    await bjtSwitch.click();
+    await drawer.getByText(/^4 × \d+ noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
+    const offLabels = await ends();
+    const toOff = await drawer.getByRole('textbox', { name: 'Bitiş' }).inputValue();
+    await bjtSwitch.click();
+    check('eğri izleyici (analiz düzeltmeleri 9): yük doğrusu açıkken Q’daki gerçek I_B ayrı kalın eğri ("Q · 5,1 µA" civarı), 10–40 µA aynı; aralık 12 V’a kadar; kapatınca Q eğrisi yok, aralık 10 V',
+      /^Q · (4,[89]|5,[0-4])\d* µA$/.test(qLabel) && qStrong === 1 && toValue === '12' && /^5 × 121 noktalık DC tarama$/.test(summaryOn) &&
+      !offLabels.some((x) => x.startsWith('Q · ')) && toOff === '10',
+      `${qLabel} · bitiş ${toValue} / ${toOff} · ${summaryOn}`);
+    // MOSFET (kullanıcı kararı): yük doğrusu açıkken varsayılan basamaklar Q'daki V_GS'nin çevresinde;
+    // kullanıcı bir basamağı silince onun seçtiği basamaklar kalır.
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /IRF510 ile ortak kaynaklı yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    // M1'in taraması bitene kadar (önceki parçanın sonucu ekranda kalabilir).
+    await drawer.getByRole('button', { name: '3,83 V basamağını kaldır' }).waitFor({ timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(200);
+    const stepChips = async () => (await drawer.getByRole('button', { name: / basamağını kaldır$/ }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label').replace(' basamağını kaldır', ''))));
+    const mosChips = await stepChips();
+    const mosQ = (await drawer.getByRole('img', { name: /^Eğri izleyici: M1/ }).locator('text').allTextContents()).find((x) => x.startsWith('Q · ')) ?? '';
+    await drawer.getByRole('button', { name: '3,83 V basamağını kaldır' }).click();
+    await drawer.getByText(/^4 × \d+ noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
+    const userChips = await stepChips();
+    check('eğri izleyici (MOSFET, kullanıcı kararı): yük doğrusu açıkken basamaklar Q’nun çevresinde (3,83 / 3,84 / 3,86 / 3,87 V, Q · 3,854 V); bir basamak silinince kullanıcının basamakları kalıyor',
+      mosChips.join('|') === '3,83 V|3,84 V|3,86 V|3,87 V' && /^Q · 3,85\d V$/.test(mosQ) && userChips.join('|') === '3,84 V|3,86 V|3,87 V',
+      `${mosChips.join(', ')} · ${mosQ} · ${userChips.join(', ')}`);
     await ctx.close();
   }
   {
@@ -1033,6 +1110,13 @@ try {
     await sheet.getByRole('tab', { name: 'Eğri' }).tap();
     await sheet.locator('p.rounded-full').waitFor({ timeout: 30000 }).catch(() => {});
     const pill = ((await sheet.locator('p.rounded-full').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    const curveEdit = sheet.getByRole('button', { name: /^Ayarları düzenle: / });
+    const curveSummary = ((await curveEdit.getAttribute('aria-label').catch(() => '')) ?? '').replace('Ayarları düzenle: ', '');
+    const curveBox = await sheet.getByRole('img', { name: /^Eğri izleyici/ }).boundingBox();
+    check('eğri izleyici (telefon, analiz düzeltmeleri 7): tarama bitince ayarlar tek satıra kapanıyor ("J1 · Çıkış ailesi · VDS 0–15 V · 4 basamak · Düzenle"), grafik kaydırmadan görünüyor',
+      /^J1 · Çıkış ailesi · VDS 0–15 V · \d basamak$/.test(curveSummary) && curveBox !== null && curveBox.y + curveBox.height <= ((await sheet.getByRole('button', { name: 'Yeniden tara' }).boundingBox())?.y ?? 0),
+      `${curveSummary} · grafik altı ${Math.round((curveBox?.y ?? 0) + (curveBox?.height ?? 0))}`);
+    await curveEdit.tap(); await page.waitForTimeout(200);
     const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab], [role=radio], select, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
     check('eğri izleyici (telefon): alt sayfada eğriler ve imleç satırı; denetimler ≥ 44 px; altta Yeniden tara ve CSV paylaş',
       /4,14.*1,78/.test(pill) && small.length === 0 && (await sheet.getByRole('button', { name: 'Yeniden tara' }).count()) === 1 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1,
@@ -1063,17 +1147,41 @@ try {
       selects[0] === 'FG1 çıkışı (OUT − COM)' && /OSC1 B$/.test(selects[1] ?? '') && progress === '16' && /20[4-7],\d kat · 46,\d dB/.test(mid) && /≈ (0,9\d|1,\d\d) MHz/.test(fhText) &&
       charts.includes('Bode kazanç grafiği, 16 ölçüm noktası ve kesikli teori eğrisi') && charts.includes('Bode faz grafiği, 16 ölçüm noktası ve kesikli teori eğrisi') && marks.includes('Giriş') && marks.includes('Çıkış'),
       `${selects.join(' / ')} · ${mid} · ${fhText}`);
-    // Teori (A5, küçük sinyal AC): kesikli eğri, çip, gösterge düğmesi, imleç satırı.
-    const theoryChip = ((await drawer.getByText('Teori (küçük sinyal)', { exact: true }).first().locator('..').textContent()) ?? '').replace(/\s+/g, ' ');
+    // Teori (A5, küçük sinyal AC): kesikli eğri, çip (gösterge düğmesi), imleç satırı.
     const toggle = drawer.getByRole('button', { name: 'Teori eğrisini göster' });
+    const theoryChip = ((await toggle.textContent()) ?? '').replace(/\s+/g, ' ');
     const dashed = await drawer.locator('svg path[stroke-dasharray="6 4"]').count();
     const cursorLine = (await drawer.getByText(/^f = /).textContent().catch(() => '')) ?? '';
     await toggle.click(); await page.waitForTimeout(150);
     const hidden = (await drawer.locator('svg path[stroke-dasharray="6 4"]').count()) === 0 && (await drawer.getByRole('img', { name: 'Bode kazanç grafiği, 16 ölçüm noktası' }).count()) === 1;
     await toggle.click(); await page.waitForTimeout(150);
-    check('Bode (A5): kesikli Teori eğrisi (küçük sinyal AC) kazanç ve fazda; "Teori" çipinde orta bant ≈ 209,8 kat ve f_H; imleç satırında teori; Teori düğmesi (aria-pressed) gizleyip gösteriyor',
-      dashed === 2 && /209,8 kat/.test(theoryChip) && /≈ 1,\d+ MHz/.test(theoryChip) && cursorLine.includes('teori') && hidden && (await toggle.getAttribute('aria-pressed')) === 'true',
+    check('Bode (A5): kesikli Teori eğrisi (küçük sinyal AC) kazanç ve fazda; "Teori" çipinde orta bant ≈ 209,8 kat ve f_H; imleç satırında teori; Teori çipi (düğme, aria-pressed) gizleyip gösteriyor',
+      dashed === 2 && theoryChip.startsWith('Teori') && /209,8 kat/.test(theoryChip) && /≈ 1,\d+ MHz/.test(theoryChip) && cursorLine.includes('teori') && hidden && (await toggle.getAttribute('aria-pressed')) === 'true',
       `${theoryChip} · ${cursorLine.slice(-30)}`);
+    // Düzen (analiz düzeltmeleri, 1): çekmece en az 560 px; çipler ve gösterge başlık satırının altında tek
+    // satırda, grafik alanının dışında; her grafik ≥ 140 px; sol sütun taşmıyor; açıklama "ⓘ" ipucunda.
+    {
+      const dH = (await drawer.boundingBox())?.height ?? 0;
+      const tabsBox = await drawer.getByRole('tablist').boundingBox();
+      const midBox = await drawer.getByText(/^Orta bant \(/).boundingBox();
+      const tBox = await toggle.boundingBox();
+      const gainBox = await drawer.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox();
+      const phaseBox = await drawer.getByRole('img', { name: /^Bode faz grafiği/ }).boundingBox();
+      const column = await drawer.getByRole('combobox').first().evaluate((el) => { const c = el.closest('.overflow-y-auto'); return c ? c.scrollHeight - c.clientHeight : -1; });
+      const longText = await drawer.getByText(/^Kesikli çizgi teoridir/).count();
+      await drawer.getByRole('button', { name: 'Ölçüm yöntemi ve teori eğrisi' }).click(); await page.waitForTimeout(150);
+      const note = ((await page.getByRole('note', { name: 'Ölçüm yöntemi ve teori eğrisi' }).textContent().catch(() => '')) ?? '');
+      const noteBox = await page.getByRole('note', { name: 'Ölçüm yöntemi ve teori eğrisi' }).boundingBox();
+      await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+      // İkinci tur, 4: kutu grafiklerin dışında (düğmenin üstünde), kazanç grafiğinin eksen yazılarını örtmüyor.
+      const apart = noteBox !== null && gainBox !== null && (noteBox.y + noteBox.height <= gainBox.y || noteBox.x >= gainBox.x + gainBox.width);
+      check('Bode (masaüstü, analiz düzeltmeleri ikinci tur 4): ⓘ kutusu grafiklerin dışında açılıyor, kazanç grafiğine binmiyor',
+        apart, `kutu ${Math.round(noteBox?.x ?? 0)},${Math.round(noteBox?.y ?? 0)} ${Math.round(noteBox?.width ?? 0)}×${Math.round(noteBox?.height ?? 0)} · grafik üst ${Math.round(gainBox?.y ?? 0)}`);
+      check('Bode (düzen): çekmece ≥ 560 px; çipler ve gösterge sekmelerin altında tek satırda, grafiklerin üstünde; kazanç ve faz ≥ 140 px; sol sütun taşmıyor; teori açıklaması ⓘ ipucunda',
+        dH >= 559 && tabsBox !== null && midBox !== null && tBox !== null && gainBox !== null && phaseBox !== null && midBox.y > tabsBox.y + tabsBox.height && Math.abs(midBox.y + midBox.height / 2 - (tBox.y + tBox.height / 2)) < 3 &&
+        midBox.y + midBox.height <= gainBox.y && gainBox.height >= 140 && phaseBox.height >= 140 && column === 0 && longText === 0 && note.includes('Kesikli çizgi teoridir') && note.includes('2 periyot'),
+        `${Math.round(dH)} px · kazanç ${Math.round(gainBox?.height ?? 0)}, faz ${Math.round(phaseBox?.height ?? 0)} px · sütun taşması ${column}`);
+    }
     await drawer.getByRole('button', { name: 'Tabloya aktar' }).click(); await page.waitForTimeout(200);
     const [csv] = await Promise.all([page.waitForEvent('download'), drawer.getByRole('button', { name: 'CSV indir' }).click()]);
     const csvText = Buffer.concat(await (await csv.createReadStream()).toArray()).toString('utf8');
@@ -1084,6 +1192,18 @@ try {
       saved.some((r) => r.name === 'Orta bant kazancı' && r.measured > 200) && saved.some((r) => r.name === 'f_{H} (−3 dB)' && r.unit === 'Hz') &&
       /^bode-.*\.csv$/.test(csv.suggestedFilename()) && csvText.startsWith('﻿f (Hz);giriş genliği (V);çıkış genliği (V);kazanç (kat);kazanç (dB);faz (°);oturdu;teori kazanç (kat);teori faz (°)') && csvText.split('\r\n').length >= 17,
       `${saved.length} satır · ${csv.suggestedFilename()}`);
+    // Çekmece alçalınca (tutamak): iki grafik 140 px'e sığmıyor → faz gizli, "Fazı göster" ile geliyor.
+    const sep = drawer.getByRole('separator', { name: 'Analiz çekmecesinin yüksekliği' });
+    await sep.focus(); for (let i = 0; i < 12; i++) await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(300);
+    const lowH = (await drawer.boundingBox())?.height ?? 0;
+    const phaseHidden = (await drawer.getByRole('img', { name: /^Bode faz grafiği/ }).count()) === 0;
+    const lowGain = (await drawer.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox())?.height ?? 0;
+    await drawer.getByRole('button', { name: 'Fazı göster' }).click(); await page.waitForTimeout(200);
+    const phaseShown = (await drawer.getByRole('img', { name: /^Bode faz grafiği/ }).boundingBox())?.height ?? 0;
+    check('Bode (düzen): kullanıcının verdiği boy kalıyor; alçak çekmecede faz gizli, "Fazı göster" ile ≥ 140 px geliyor; kazanç ≥ 140 px',
+      lowH < 400 && phaseHidden && lowGain >= 140 && phaseShown >= 140 && (await drawer.getByRole('button', { name: 'Fazı gizle' }).count()) === 1,
+      `${Math.round(lowH)} px · kazanç ${Math.round(lowGain)} · faz ${Math.round(phaseShown)}`);
     await ctx.close();
   }
   {
@@ -1093,11 +1213,43 @@ try {
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(400);
     const sheet = page.getByRole('region', { name: 'Analiz' });
     await sheet.getByRole('tab', { name: 'Bode' }).tap();
-    await sheet.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
+    // Ölçüm bitince ayarlar tek satırlık özete kapanır, grafik öne çıkar (analiz düzeltmeleri, 7).
+    const edit = sheet.getByRole('button', { name: /^Ayarları düzenle: / });
+    await edit.waitFor({ timeout: 60000 }).catch(() => {});
+    const summary = ((await edit.getAttribute('aria-label').catch(() => '')) ?? '').replace('Ayarları düzenle: ', '');
+    const gainBox = await sheet.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox();
+    // Alttaki sabit düğmelerin (Yeniden ölç, CSV paylaş) üstünde kalmalı.
+    const viewH = (await sheet.getByRole('button', { name: 'Yeniden ölç' }).boundingBox())?.y ?? page.viewportSize().height;
+    check('Bode (telefon, analiz düzeltmeleri 7): ölçüm bitince ayarlar tek satıra kapanıyor ("FG1 → Q1 kollektör · 20 Hz–2 MHz · 16 nokta · Düzenle"), kazanç grafiği kaydırmadan görünüyor; Düzenle ayarları açıyor',
+      summary === 'FG1 → Q1 kollektör · 20 Hz–2 MHz · 16 nokta' && gainBox !== null && gainBox.y + gainBox.height <= viewH && (await sheet.getByText('✓ Ölçüm bitti').count()) === 0,
+      `${summary} · grafik ${Math.round(gainBox?.y ?? 0)}–${Math.round((gainBox?.y ?? 0) + (gainBox?.height ?? 0))} / ${viewH}`);
+    {
+      const info = sheet.getByRole('button', { name: 'Ölçüm yöntemi ve teori eğrisi' });
+      const strip = await info.evaluate((el) => { const s = el.parentElement; return { over: s.scrollWidth - s.clientWidth, h: Math.round(s.getBoundingClientRect().height), right: Math.max(...[...s.children].map((c) => c.getBoundingClientRect().right)) }; });
+      const fhText = ((await sheet.getByText(/^≈ \d/).first().textContent().catch(() => '')) ?? '');
+      const vw = page.viewportSize().width;
+      check('Bode (telefon, analiz düzeltmeleri ikinci tur 2): ölçü şeridi iki satıra sarılıyor, yana kaymıyor; f_H değeri tam okunuyor',
+        strip.over === 0 && strip.h <= 100 && strip.right <= vw && /≈ 1,\d+ MHz/.test(fhText), `${strip.h} px · taşma ${strip.over} · ${fhText}`);
+      const before = (await sheet.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox())?.y ?? 0;
+      await info.tap(); await page.waitForTimeout(300);
+      const note = page.getByRole('note', { name: 'Ölçüm yöntemi ve teori eğrisi' });
+      const nb = await note.boundingBox();
+      const after = (await sheet.getByRole('img', { name: /^Bode kazanç grafiği/ }).boundingBox())?.y ?? 0;
+      const vh = page.viewportSize().height;
+      const text = ((await note.textContent()) ?? '');
+      const close = note.getByRole('button', { name: 'Açıklamayı kapat' });
+      const closeH = (await close.boundingBox())?.height ?? 0;
+      await close.tap(); await page.waitForTimeout(200);
+      check('Bode (telefon, analiz düzeltmeleri ikinci tur 1): ⓘ metni alttan açılan sayfada görünüyor, yalnızca metin kadar yer kaplıyor, grafikleri itmiyor; Kapat ≥ 44 px',
+        nb !== null && nb.x >= 0 && nb.x + nb.width <= vw + 0.5 && Math.abs(nb.y + nb.height - vh) < 1 && nb.height < 260 && text.includes('Kesikli çizgi teoridir') && Math.abs(after - before) < 1 && closeH >= 43.5 && (await note.count()) === 0,
+        `sayfa ${Math.round(nb?.y ?? 0)}–${Math.round((nb?.y ?? 0) + (nb?.height ?? 0))} / ${vh} · grafik ${Math.round(before)} → ${Math.round(after)}`);
+    }
+    await edit.tap(); await page.waitForTimeout(200);
     const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab], select, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
     const note = await sheet.getByText(/iki ölçüm noktası arasında doğrusal ara değer/).count();
-    check('Bode (telefon): alt sayfada ölçüm biter; f_H’nin ara değer olduğu yazıyor; Teori düğmesi ve çipi; denetimler ≥ 44 px; altta Yeniden ölç ve CSV paylaş',
-      (await sheet.getByText('✓ Ölçüm bitti').count()) === 1 && note === 1 && (await sheet.getByRole('button', { name: 'Teori eğrisini göster' }).count()) === 1 && (await sheet.getByText('Teori (küçük sinyal)', { exact: true }).count()) >= 1 && small.length === 0 && (await sheet.getByRole('button', { name: 'Yeniden ölç' }).count()) === 1 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1,
+    const theoryChip = ((await sheet.getByRole('button', { name: 'Teori eğrisini göster' }).textContent().catch(() => '')) ?? '');
+    check('Bode (telefon): alt sayfada ölçüm biter; f_H’nin ara değer olduğu yazıyor; Teori çipi (düğme) değeriyle; denetimler ≥ 44 px; altta Yeniden ölç ve CSV paylaş',
+      (await sheet.getByText('✓ Ölçüm bitti').count()) === 1 && note === 1 && theoryChip.startsWith('Teori') && /209,8 kat/.test(theoryChip) && small.length === 0 && (await sheet.getByRole('button', { name: 'Yeniden ölç' }).count()) === 1 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1,
       small.join(', '));
     await page.context().close();
   }
@@ -1140,6 +1292,9 @@ try {
       groups.join('|') === 'DC çalışma noktası|Bode|Düğüm gerilimi|Parça ölçümleri (canlı)' && nodeOptions.includes('V(Q1 kollektör)') && /^gorev-deney-7-.*\.json$/.test(taskFile.suggestedFilename()) && sizeText !== '' &&
       (await dlg.getByRole('alert').count()) === 0,
       `${url.length} karakter · ${sizeText} · ${taskFile.suggestedFilename()} · ${nodeOptions.join(', ')}`);
+    check('görev (analiz düzeltmeleri 10): düğüm adları anlaşılır sırayla: kaynağın ucu (V(PS1 +), V(FG1 OUT)), transistörün ucu (V(Q1 baz), V(Q1 kollektör)); "RB 1. uç", "C1 − uç" gibi adlar yok',
+      ['V(PS1 +)', 'V(FG1 OUT)', 'V(Q1 baz)', 'V(Q1 kollektör)'].every((x) => nodeOptions.includes(x)) && !nodeOptions.some((x) => /RB 1\. uç|C1 − uç/.test(x)),
+      nodeOptions.join(', '));
     // 8 KB üstü: pencere söylüyor, dosyayı öneriyor (sıkışmayan uzun yönerge).
     const noise = Array.from({ length: 2600 }, (_, i) => ((i * 7919) % 9973).toString(36)).join(' ');
     await dlg.getByRole('textbox', { name: 'Yönerge' }).fill(noise); await page.waitForTimeout(200);
@@ -1157,10 +1312,11 @@ try {
     const cardHtml = (await card.innerHTML().catch(() => '')) ?? '';
     const chip = (await st.getByText(/^Görev kipi/).textContent().catch(() => '')) ?? '';
     const pencil = await notebook(st).locator('[data-card]').filter({ has: st.locator('[title="değiştirilebilir"]') }).count();
+    const titleButton = await st.getByRole('button', { name: 'Dosya ve örnekler: Deney 7 · BJT yükselteç tasarımı' }).count();
     const locks = await notebook(st).locator('[data-card]').filter({ has: st.locator('[title="kilitli"]') }).count();
     const canvasLocks = await st.locator('svg.schematic g[aria-hidden="true"] circle[r="7.5"]').count();
-    check('görev (öğrenci, N5): defterin en üstünde görev kartı (0 / 3; adlar <sub> ile: VCE, fH; "not vermez"); "Görev kipi · yalnızca RB ve RC değişir"; defterde RB, RC kalemli, öbürleri kilitli; şemada kilit rozetleri',
-      (await card.count()) === 1 && /V<sub[^>]*>CE<\/sub>/.test(cardHtml) && /f<sub[^>]*>H<\/sub>/.test(cardHtml) && !cardHtml.includes('V_') && !cardHtml.includes('f_') && cardHtml.includes('not vermez') &&
+    check('görev (öğrenci, N5): defterin en üstünde görev kartı (0 / 3; adlar <sub> ile: VCE, fH; "not vermez"); "Görev kipi · yalnızca RB ve RC değişir"; defterde RB, RC kalemli, öbürleri kilitli; şemada kilit rozetleri; üst çubukta görevin adı ("Devrem" değil)',
+      titleButton === 1 && (await card.count()) === 1 && /V<sub[^>]*>CE<\/sub>/.test(cardHtml) && /f<sub[^>]*>H<\/sub>/.test(cardHtml) && !cardHtml.includes('V_') && !cardHtml.includes('f_') && cardHtml.includes('not vermez') &&
       chip === 'Görev kipi · yalnızca RB ve RC değişir' && pencil === 2 && locks >= 5 && canvasLocks >= 5 && (await card.getByLabel('3 hedefin 0 tanesi tuttu').count()) === 1,
       `${chip} · kalem ${pencil}, kilit ${locks}, şemada ${canvasLocks}`);
     // Kilitli Q1'in β'sı değişmiyor, bildirim çıkıyor.
@@ -1264,24 +1420,62 @@ try {
     check('tahmin (öğrenci, B1): kart "Önce tahmin et", her hedefe tahmin alanı, ölçülen gizli; kaydetmeden Oynat ve Analiz → Bode kapalı (nedeni yazıyor); "Tahminleri kaydet" hepsi yazılınca etkin',
       before.startsWith('Önce tahmin et') && (await inputs.count()) === 2 && !/5,9\d V/.test(before) && blockedPlay && blockedBode && !(await lock.isEnabled()),
       before.slice(0, 60));
+    // Gerekçe ve güven (analiz düzeltmeleri, 6): güven seçilmeden kaydedilemez; gerekçe en çok 200 karakter.
+    const reasons = card.getByRole('textbox', { name: /: neden\? \(isteğe bağlı\)$/ });
+    const groups = card.getByRole('radiogroup', { name: /: ne kadar eminsin\?$/ });
+    const reasonMax = await reasons.first().getAttribute('maxlength');
+    await inputs.nth(0).fill('6 V'); await inputs.nth(1).fill('180'); await st.waitForTimeout(100);
+    const noConfidenceDisabled = !(await lock.isEnabled()) && ((await card.textContent()) ?? '').includes('ne kadar emin olduğunu seç');
+    await groups.nth(0).getByRole('radio', { name: 'Eminim' }).click();
+    await groups.nth(1).getByRole('radio', { name: 'Eminim' }).click();
+    await reasons.nth(0).fill('RC ile RB, VCE’yi beslemenin yarısına getirecek seçildi');
+    const options = await groups.first().getByRole('radio').allTextContents();
+    check('tahmin (öğrenci, analiz düzeltmeleri 6): her hedefte isteğe bağlı "Neden?" (en çok 200 karakter) ve zorunlu güven seçimi (Tahmin ettim · Emin değilim · Eminim); güven seçilmeden kaydedilemiyor',
+      reasonMax === '200' && options.join('|') === 'Tahmin ettim|Emin değilim|Eminim' && noConfidenceDisabled && (await groups.nth(0).getByRole('radio', { name: 'Eminim' }).getAttribute('aria-checked')) === 'true',
+      `${options.join('|')} · max ${reasonMax}`);
+    await inputs.nth(1).fill('');
+    // Yazarken sayılır (analiz düzeltmeleri, 5): son kutudan çıkmadan sayaç 2 / 2, düğme etkin; geçersiz
+    // yazı sayılmaz ama uyarısı ancak kutudan çıkınca.
     await inputs.nth(0).fill('6 V'); await inputs.nth(0).blur();
+    await inputs.nth(1).fill('180'); await st.waitForTimeout(100);
+    const typedCount = ((await card.textContent()) ?? '').includes('2 hedefin 2 tanesine tahmin yazıldı');
+    const typedEnabled = await lock.isEnabled();
+    await inputs.nth(1).fill('18x'); await st.waitForTimeout(100);
+    const typingWarn = await card.getByText('Sayı değil').count();
+    const invalidDisabled = !(await lock.isEnabled());
+    await inputs.nth(1).blur(); await st.waitForTimeout(100);
+    const blurWarn = await card.getByText('Sayı değil').count();
+    check('tahmin (öğrenci): yazarken geçerli sayı hemen sayılıyor (son kutudan çıkmadan 2 / 2, "Tahminleri kaydet" etkin); geçersiz yazı sayılmıyor, uyarısı kutudan çıkınca',
+      typedCount && typedEnabled && typingWarn === 0 && invalidDisabled && blurWarn === 1, `sayaç ${typedCount} · etkin ${typedEnabled} · uyarı ${typingWarn}/${blurWarn}`);
     await inputs.nth(1).fill('180'); await inputs.nth(1).blur();
     await st.waitForTimeout(150);
     const enabled = await lock.isEnabled();
     await lock.click(); await st.waitForTimeout(300);
-    await st.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await st.waitForTimeout(1500);
+    const savedLine = await card.getByText('Tahminler kaydedildi. Şimdi Oynat’a bas ve ölç.').count();
+    await st.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await st.waitForTimeout(300);
+    const measuringLine = await card.getByText('Ölçülüyor…').count();
+    await st.waitForTimeout(1200);
     await drawer.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
     await st.waitForTimeout(400);
+    const cardText = ((await card.textContent()) ?? '').replace(/\s+/g, ' ');
+    check('tahmin (öğrenci, analiz düzeltmeleri ikinci tur 3): kaydedince "Şimdi Oynat’a bas", devre çalışınca "Ölçülüyor…", hedeflerin hepsi ölçülünce bu satır kalkıyor ve karşılaştırma görünüyor ("2 tahminin 1 tanesi ölçülenle uyuştu")',
+      savedLine === 1 && measuringLine === 1 && !cardText.includes('Tahminler kaydedildi') && !cardText.includes('Ölçülüyor') && cardText.includes('Karşılaştırma: 2 tahminin 1 tanesi ölçülenle uyuştu.'),
+      `${savedLine}/${measuringLine} · ${cardText.match(/Karşılaştırma[^.]*\./)?.[0] ?? '—'}`);
     const rows = (await card.locator('li').allTextContents()).map((r) => r.replace(/\s+/g, ' '));
-    check('tahmin (öğrenci): kaydedince Oynat ve Bode çalışıyor; satırda "Tahmin 6 V · fark %0,2" ve ölçülen 5,99 V, kazançta "Tahmin 180 · fark %13" ve 205,8',
-      enabled && (await st.getByRole('button', { name: 'Duraklat' }).count()) === 1 && rows.some((r) => /Tahmin 6 V · fark %0,\d/.test(r) && /5,9\d V/.test(r)) && rows.some((r) => r.includes('Tahmin 180 · fark %1') && /20[4-7],\d/.test(r)),
-      rows.map((r) => r.slice(-40)).join(' | '));
+    check('tahmin (öğrenci): kaydedince Oynat ve Bode çalışıyor; satırda "Tahmin 6 V · fark %0,2 · Eminim" ve ölçülen 5,99 V, kazançta "Tahmin 180 · fark %13 · Eminim" ve 205,8',
+      enabled && (await st.getByRole('button', { name: 'Duraklat' }).count()) === 1 && rows.some((r) => /Tahmin 6 V · fark %0,\d · Eminim/.test(r) && /5,9\d V/.test(r)) && rows.some((r) => r.includes('Tahmin 180 · fark %1') && r.includes('· Eminim') && /20[4-7],\d/.test(r)),
+      rows.map((r) => r.slice(0, 90)).join(' | '));
+    const lockedInputs = (await card.getByRole('textbox').count()) + (await card.getByRole('radiogroup').count());
+    check('tahmin (öğrenci, 6): kaydedince gerekçe ve güven de kilitli (alan yok); gerekçe satırda; "Eminim" deyip ölçülenden toleranstan çok uzak kalan kazanç tahmininde "Emindin ama sonuç farklı" notu, tutan VCE tahmininde yok',
+      lockedInputs === 0 && rows.some((r) => r.includes('Neden: RC ile RB') && !r.includes('Emindin')) && rows.some((r) => r.includes('Tahmin 180') && r.includes('Emindin ama sonuç farklı: nedenini düşün.')),
+      `${lockedInputs} alan`);
     const [sub] = await Promise.all([st.waitForEvent('download'), card.getByRole('button', { name: 'Teslim dosyası (.json)' }).click()]);
     const subJson = JSON.parse(Buffer.concat(await (await sub.createReadStream()).toArray()).toString('utf8'));
     await st.reload({ waitUntil: 'networkidle' }); await st.waitForTimeout(600);
     const kept = ((await st.getByRole('region', { name: /^Görev:/ }).textContent()) ?? '').includes('Tahmin 6 V');
-    check('tahmin (öğrenci): teslim dosyasında her hedefin tahmini; sayfa yenilenince tahminler kaydedilmiş hâliyle duruyor',
-      subJson.teslim.hedefler.map((h) => h.tahmin).join(',') === '6,180' && kept);
+    check('tahmin (öğrenci): teslim dosyasında her hedefin tahmini, gerekçesi ve güveni; sayfa yenilenince tahminler kaydedilmiş hâliyle duruyor',
+      subJson.teslim.hedefler.map((h) => h.tahmin).join(',') === '6,180' && subJson.teslim.hedefler.map((h) => h.guven).join(',') === 'Eminim,Eminim' &&
+      subJson.teslim.hedefler[0].gerekce.startsWith('RC ile RB') && subJson.teslim.hedefler[1].gerekce === '' && kept);
     await ctx.close();
   }
   {

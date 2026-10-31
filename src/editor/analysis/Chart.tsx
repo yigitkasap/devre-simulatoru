@@ -2,7 +2,7 @@
 // dikey imleç ve imlecin yanındaki değer kutusu. SVG piksel boyunda çizilir (yazılar ölçeklenmez);
 // çok örnekte her piksel sütununa en küçük ve en büyük değer düşer.
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type Ref } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type Ref } from 'react';
 import { tr } from '../../i18n/tr';
 import { formatSI } from '../../sim/units';
 import { axisUnit, niceTicks, tickText } from './format';
@@ -40,6 +40,92 @@ export function cursorTime(rec: TraceRecorder, cursor: number | null): number | 
   const span = recordSpan(rec);
   if (!span) return null;
   return Math.min(span.t1, Math.max(span.t0, cursor ?? span.t0 + (span.t1 - span.t0) / 6));
+}
+
+/** Grafik alanının her piksel sütununda eğrilerin kapladığı y aralıkları (her eğri için bir aralık). */
+export type Occupancy = ReadonlyArray<ReadonlyArray<readonly [number, number]>>;
+
+export interface PlotBox {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/** Eğriler (piksel noktaları) → sütun sütun kapladıkları y aralıkları; sütun 0, x0'daki pikseldir. */
+export function occupancy(series: readonly (readonly (readonly [number, number])[])[], x0: number, w: number): Occupancy {
+  const n = Math.max(0, Math.ceil(w));
+  const cols: Array<Array<readonly [number, number]>> = Array.from({ length: n }, () => []);
+  for (const pts of series) {
+    const lo = new Float64Array(n).fill(Infinity);
+    const hi = new Float64Array(n).fill(-Infinity);
+    const mark = (c: number, y: number) => {
+      if (c < 0 || c >= n || !Number.isFinite(y)) return;
+      if (y < lo[c]!) lo[c] = y;
+      if (y > hi[c]!) hi[c] = y;
+    };
+    pts.forEach(([x, y], i) => {
+      mark(Math.floor(x - x0), y);
+      const next = pts[i + 1];
+      if (!next) return;
+      const [xb, yb] = next;
+      // Doğru parçasının geçtiği her sütunda, sütunun iki kenarındaki y değerleri.
+      const c0 = Math.floor(Math.min(x, xb) - x0);
+      const c1 = Math.floor(Math.max(x, xb) - x0);
+      for (let c = Math.max(0, c0); c <= Math.min(n - 1, c1); c++) {
+        for (const edge of [c, c + 1]) {
+          const px = Math.min(Math.max(x, xb), Math.max(Math.min(x, xb), x0 + edge));
+          const t = xb === x ? 0 : (px - x) / (xb - x);
+          mark(c, y + t * (yb - y));
+        }
+      }
+    });
+    for (let c = 0; c < n; c++) if (hi[c]! >= lo[c]!) cols[c]!.push([lo[c]!, hi[c]!]);
+  }
+  return cols;
+}
+
+/** Kutunun eğrilerle çakışması (piksel²; 2 px pay ile); 0: hiçbir eğriye binmiyor. */
+export function overlapCost(occ: Occupancy, x0: number, box: PlotBox): number {
+  let cost = 0;
+  const from = Math.max(0, Math.floor(box.x - x0));
+  const to = Math.min(occ.length, Math.ceil(box.x + box.w - x0));
+  for (let c = from; c < to; c++) {
+    for (const [lo, hi] of occ[c]!) {
+      const o = Math.min(hi + 2, box.y + box.h) - Math.max(lo - 2, box.y);
+      if (o > 0) cost += o;
+    }
+  }
+  return cost;
+}
+
+/**
+ * İmleç değer kutusunun yeri (analiz düzeltmeleri, 8): önce imlecin sağında ya da solunda, üstte ya da
+ * altta, eğrilere binmeyen ilk yer. Hepsi biniyorsa imleci örtmeyen üst köşeler de denenir, en az
+ * çakışan seçilir. Kutu grafik alanına (8 px payla) hiç sığmıyorsa null (eski yer).
+ */
+export function placeValueBox(occ: Occupancy, plot: PlotBox, cx: number, bw: number, bh: number): PlotBox | null {
+  const pad = 8;
+  const gap = 14;
+  const top = plot.y + pad;
+  const bottom = plot.y + plot.h - pad - bh;
+  const fits = (b: PlotBox) => b.x >= plot.x + pad - 0.5 && b.x + b.w <= plot.x + plot.w - pad + 0.5 && b.y >= top - 0.5 && b.y + b.h <= plot.y + plot.h - pad + 0.5;
+  const at = (x: number, y: number): PlotBox => ({ x, y, w: bw, h: bh });
+  const around = [at(cx + gap, top), at(cx - gap - bw, top), at(cx + gap, bottom), at(cx - gap - bw, bottom)].filter(fits);
+  const free = around.find((b) => overlapCost(occ, plot.x, b) === 0);
+  if (free) return free;
+  const coversCursor = (b: PlotBox) => cx >= b.x - 4 && cx <= b.x + b.w + 4;
+  const corners = [at(plot.x + pad, top), at(plot.x + plot.w - pad - bw, top)].filter((b) => fits(b) && !coversCursor(b));
+  let best: PlotBox | null = null;
+  let bestCost = Infinity;
+  for (const b of [...around, ...corners]) {
+    const cost = overlapCost(occ, plot.x, b);
+    if (cost < bestCost) {
+      best = b;
+      bestCost = cost;
+    }
+  }
+  return best;
 }
 
 /** Kaydın zaman aralığı; örnek yoksa null. */
@@ -164,6 +250,24 @@ export function Chart({ recorder: rec, traces, version, cursor, onCursor, compac
   const timeText = (t: number) => formatSI(t, 's', { digits: 4 });
   const label = tr.analysis.graph.chartLabel(traces.map((t) => t.name).join(', ') || '—', span ? `${timeText(span.t0)} – ${timeText(span.t1)}` : tr.analysis.graph.noData);
   const boxLeft = cx !== null && cx + 230 > size.w ? cx - 222 : (cx ?? 0) + 14;
+  // Değer kutusu eğrilerle en az çakışan yere (analiz düzeltmeleri, 8). Yükseklik satır sayısından.
+  const showBox = !compact && span !== null && cursor !== null && cx !== null && traces.length > 0;
+  const boxHeight = 36 + traces.length * 26 + (onToTable ? 46 : 0);
+  const occ = useMemo(() => {
+    if (!showBox) return null;
+    const lines: Array<Array<readonly [number, number]>> = [];
+    for (const t of traces) {
+      const v = rec.values.get(t.id);
+      const a = t.unit === 'V' ? vAxis : aAxis;
+      if (!v || !a) continue;
+      const pts: Array<readonly [number, number]> = [];
+      for (let i = 0; i < rec.count; i++) if (Number.isFinite(v[i]!)) pts.push([X(rec.times[i]!), Y(v[i]!, a)]);
+      lines.push(pts);
+    }
+    return occupancy(lines, m.l, pw);
+    // X, Y ve eksenler her çizimde yeniden kurulur; kayıt değişince (version) ve boyutla değişirler.
+  }, [showBox, version, size.w, size.h, traces, rec]);
+  const placed = showBox && occ && cx !== null ? placeValueBox(occ, { x: m.l, y: m.t, w: pw, h: ph }, cx, 208, boxHeight) : null;
 
   return (
     <div ref={box} className="relative min-h-0 min-w-0 flex-1">
@@ -276,7 +380,7 @@ export function Chart({ recorder: rec, traces, version, cursor, onCursor, compac
       {!compact && span && cursor !== null && cx !== null && traces.length > 0 && (
         <div
           className="absolute z-10 flex w-[208px] flex-col gap-1.5 rounded-xl border border-line bg-panel p-3 shadow-lg"
-          style={{ left: Math.max(m.l + 4, boxLeft), top: m.t + 8 }}
+          style={placed ? { left: placed.x, top: placed.y } : { left: Math.max(m.l + 4, boxLeft), top: m.t + 8 }}
         >
           <span className="font-mono text-label text-muted">{tr.analysis.graph.cursor(timeText(cursor))}</span>
           {traces.map((t) => {

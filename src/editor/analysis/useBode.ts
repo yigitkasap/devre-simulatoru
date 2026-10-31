@@ -17,6 +17,8 @@ import type { TheoryResult } from './bodeTheory';
 export interface BodeOption {
   readonly key: string;
   readonly label: string;
+  /** Kısa ad: "FG1", "Q1 kollektör" (telefondaki özet satırı). */
+  readonly short: string;
   readonly probe: Probe;
   /** Şemadaki etiketin yeri. */
   readonly at: Point | null;
@@ -63,6 +65,7 @@ export function useBode(doc: CircuitDoc, connectivity: Connectivity, idx: NetInd
           key: p.id,
           source: p.id,
           label: p.type === 'funcgen' ? t.funcgenInput(p.label) : t.acInput(p.label),
+          short: p.label,
           probe: { a: pinKey(p.id, 0), b: pinKey(p.id, p.type === 'funcgen' ? 2 : 1) },
           at: pinPositions(p)[0] ?? null,
         })),
@@ -75,12 +78,12 @@ export function useBode(doc: CircuitDoc, connectivity: Connectivity, idx: NetInd
       ([['B', 1], ['A', 0]] as const).forEach(([ch, i]) => {
         const key = pinKey(osc.id, i);
         if (idx.netOf(key) === undefined || idx.netOf(key) === idx.ground || connectivity.unconnectedPins.has(key)) return;
-        out.push({ key: `${osc.id}:${ch}`, label: t.scopeOutput(nodeName(key, idx), osc.label, ch), probe: { a: key, b: pinKey(osc.id, 2) }, at: pinPositions(osc)[i] ?? null });
+        out.push({ key: `${osc.id}:${ch}`, label: t.scopeOutput(nodeName(key, idx), osc.label, ch), short: nodeName(key, idx), probe: { a: key, b: pinKey(osc.id, 2) }, at: pinPositions(osc)[i] ?? null });
       });
     }
     for (const tr0 of traces) {
       if (tr0.kind !== 'voltage') continue;
-      out.push({ key: `trace:${tr0.id}`, label: labels.get(tr0.id)?.name ?? '?', probe: { a: tr0.node, b: tr0.ref }, at: tr0.at });
+      out.push({ key: `trace:${tr0.id}`, label: labels.get(tr0.id)?.name ?? '?', short: labels.get(tr0.id)?.name ?? '?', probe: { a: tr0.node, b: tr0.ref }, at: tr0.at });
     }
     return out;
   }, [doc.parts, idx, connectivity, traces, labels, t]);

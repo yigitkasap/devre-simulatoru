@@ -12,7 +12,7 @@ import { useTouchUi } from '../touchUi';
 import { cursorTime } from './Chart';
 import { niceTicks, tickText } from './format';
 import type { TraceRecorder } from './recorder';
-import { errorText, fitPoints, fitTau, linearFit, measuredText, parseTheory, percentError } from './table';
+import { changeStart, errorText, fitLooksLinear, fitPoints, fitTau, linearFit, measuredText, parseTheory, percentError } from './table';
 import { newId, type AnalysisApi } from './useAnalysis';
 
 export interface TablePaneProps {
@@ -213,6 +213,11 @@ interface FitState {
   readonly tau: number | null;
   /** y izinin kayıttaki en büyük değeri (ln(a − y)'de a'nın varsayılanı için). */
   readonly yMax: number;
+  /**
+   * Aralığın başı belirtilmemişse (x = t) kendiliğinden: sinyalin değişmeye başladığı an; değişim
+   * kaydın başındaysa null (analiz düzeltmeleri, 3).
+   */
+  readonly autoFrom: number | null;
 }
 
 /** Uydurmanın tanımı (kayıtlı ya da varsayılan: ilk gerilim izi, t'ye göre) ve sonucu. */
@@ -223,13 +228,14 @@ function useFit(api: AnalysisApi, rec: TraceRecorder, version: number): FitState
   const spec: FitSpec | null = valid ? saved : first ? { x: 't', y: first.id, lnOffset: null } : null;
   const key = spec ? `${spec.x}|${spec.y}|${spec.lnOffset}|${spec.from}|${spec.to}` : '';
   return useMemo(() => {
-    if (!spec) return { spec, xs: [], ys: [], result: null, tau: null, yMax: 0 };
-    const { xs, ys } = fitPoints(rec, spec);
+    if (!spec) return { spec, xs: [], ys: [], result: null, tau: null, yMax: 0, autoFrom: null };
+    const autoFrom = spec.x === 't' && spec.from === undefined ? changeStart(rec, spec.y) : null;
+    const { xs, ys } = fitPoints(rec, autoFrom !== null ? { ...spec, from: autoFrom } : spec);
     const result = linearFit(xs, ys);
     const yv = rec.values.get(spec.y);
     let yMax = 0;
     for (let i = 0; yv && i < rec.count; i++) if (Number.isFinite(yv[i]!) && Math.abs(yv[i]!) > Math.abs(yMax)) yMax = yv[i]!;
-    return { spec, xs, ys, result, tau: fitTau(spec, result), yMax };
+    return { spec, xs, ys, result, tau: fitTau(spec, result), yMax, autoFrom };
   }, [rec, key, version]);
 }
 
@@ -287,7 +293,7 @@ function FitPanel({ api, fit, touch, cursor, compact = false }: { api: AnalysisA
             )}
             <span>{f.range}</span>
             <span className="flex gap-1.5">
-              <RangeInput label={f.from} value={spec.from ?? null} field={field} onValue={(v) => setSpec({ from: v })} />
+              <RangeInput label={f.from} value={spec.from === undefined ? fit.autoFrom : spec.from} field={field} onValue={(v) => setSpec({ from: v })} />
               <RangeInput label={f.to} value={spec.to ?? null} field={field} onValue={(v) => setSpec({ to: v })} />
               {spec.x === 't' && cursor !== null && (
                 <button type="button" onClick={() => setSpec({ from: cursor })} aria-label={f.fromCursorLabel} title={f.fromCursorLabel} className={`${field} shrink-0 border-accent-line px-2 font-semibold text-accent-ink`}>
@@ -307,6 +313,7 @@ function FitPanel({ api, fit, touch, cursor, compact = false }: { api: AnalysisA
                 ))}
             </select>
           </div>
+          {fit.autoFrom !== null && <p className="m-0 text-label text-muted">{f.autoFrom}</p>}
           <FitChart fit={fit} yName={yName} xName={nameOf(spec.x)} height={compact ? 170 : 150} />
           {r ? (
             <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-small">
@@ -317,6 +324,13 @@ function FitPanel({ api, fit, touch, cursor, compact = false }: { api: AnalysisA
             </dl>
           ) : (
             <p className="m-0 text-small text-muted">{f.noData}</p>
+          )}
+          {/* R² 0,9'un altında: sonuç doğruya benzemiyor (tabloya ekleme yine de açık). */}
+          {r && !fitLooksLinear(r) && (
+            <p role="status" className="m-0 flex gap-2 rounded-lg border border-warn-line bg-warn-soft px-2.5 py-2 text-small leading-snug text-warn">
+              <Icon name="warning" className="mt-0.5 h-4 w-4 shrink-0" />
+              {spec.lnOffset === null ? f.notLinear : f.notLinearLn}
+            </p>
           )}
           {r && (
             <button
@@ -350,6 +364,8 @@ function RangeInput({ label, value, field, onValue }: { label: string; value: nu
       inputMode="decimal"
       defaultValue={value === null ? '' : formatNumber(value, 4)}
       onBlur={(e) => {
+        // Değiştirilmeden çıkılınca (ör. kendiliğinden başlangıç) bir şey yazılmaz.
+        if (e.target.value === e.target.defaultValue) return;
         const text = e.target.value.trim().replace(',', '.');
         if (text === '') onValue(null);
         else if (Number.isFinite(Number(text))) onValue(Number(text));

@@ -14,6 +14,7 @@ import { FAMILY, isP, sweepValues, type Curve } from './sweep';
 import { traceColor } from './traces';
 import type { TracerApi } from './useTracer';
 import { valueAt, XYChart } from './XYChart';
+import { SettingsSummary, useSettingsEditing } from './SettingsSummary';
 
 /** Eksen ve basamak adları (alt simgeli: "V_{DS}"); P tipinde başında eksi. */
 export function quantities(tracer: TracerApi): { x: string; y: string; step: string; stepUnit: 'V' | 'A'; load: string } {
@@ -46,11 +47,12 @@ const plain = (text: string) => text.replace(/_\{([^}]*)\}/g, '$1');
 /** Basamağın yazısı: gerilim volt cinsinden ("−0,2 V"), akım önekli ("10 µA"; BJT'de ölçülen). */
 export function stepValueText(v: number, unit: 'V' | 'A'): string {
   if (unit === 'A') return formatSI(v, 'A', { trim: true, digits: 3 });
-  return `${formatNumber(v, 2).replace(/,?0+$/, '').replace(/^-/, '−')} V`;
+  return `${formatNumber(v, 3).replace(/,?0+$/, '').replace(/^-/, '−')} V`;
 }
 
 export function stepText(curve: Curve, unit: 'V' | 'A'): string {
-  return stepValueText(curve.measuredStep ?? curve.step, unit);
+  const text = stepValueText(curve.measuredStep ?? curve.step, unit);
+  return curve.q ? `${tr.analysis.curve.q} · ${text}` : text;
 }
 
 /** Eğrilerin CSV'si: x ve her basamağın akımı. */
@@ -59,7 +61,7 @@ export function curvesCsv(tracer: TracerApi, sep: CsvSeparator): Blob | null {
   const p = tracer.params;
   if (!r || !p) return null;
   const q = quantities(tracer);
-  const xs = sweepValues(p.from, p.to, p.step);
+  const xs = sweepValues(p.from, r.to, p.step);
   const header = [`${plain(q.x)} (V)`, ...r.curves.map((c) => `${plain(q.y)} (A)${q.step ? ` [${plain(q.step)} = ${stepText(c, q.stepUnit)}]` : ''}`)];
   const rows = xs.map((x, i) => [x, ...r.curves.map((c) => c.points[i]?.[1] ?? '')]);
   return new Blob([toCsv(header, rows, sep)], { type: 'text/csv;charset=utf-8' });
@@ -81,6 +83,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
   const runRef = useRef(tracer.run);
   runRef.current = tracer.run;
   const busy = progress !== null;
+  const [editing, setEditing] = useSettingsEditing(busy);
   const partId = part?.id ?? null;
   useEffect(() => {
     if (!partId || busy || result?.key === tracer.key || tried.current === tracer.key) return undefined;
@@ -92,7 +95,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
     return () => window.clearTimeout(timer);
   }, [partId, busy, result?.key, tracer.key]);
   const [cursor, setCursor] = useState<number | null>(null);
-  const [showLoad, setShowLoad] = useState(true);
+  const showLoad = params?.load ?? true;
   const [adding, setAdding] = useState(false);
   if (!part || !params) return <p className="m-0 px-4 py-6 text-small text-muted">{t.none}</p>;
 
@@ -102,10 +105,14 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
   let maxI = 0;
   for (const c of curves) for (const [, y] of c.points) maxI = Math.max(maxI, Math.abs(y));
   const unit = axisUnit(maxI, 'A');
-  const lo = Math.min(params.from, params.to);
-  const hi = Math.max(params.from, params.to);
+  // Taramanın gerçek üst sınırı: yük doğrusu açıkken beslemeye uzamış olabilir (analiz düzeltmeleri, 9).
+  const to = fresh?.to ?? params.to;
+  // Gösterilen basamaklar taranan basamaklardır (MOSFET'te Q'nun çevresinde seçilmiş olabilir).
+  const shownSteps = fresh?.steps ?? params.steps;
+  const lo = Math.min(params.from, to);
+  const hi = Math.max(params.from, to);
   const cur = Math.min(hi, Math.max(lo, cursor ?? lo + ((hi - lo) * 2) / 3));
-  const series = curves.map((c, i) => ({ id: `c${i}`, color: i % 6, points: c.points, ...(q.step ? { label: stepText(c, q.stepUnit) } : {}) }));
+  const series = curves.map((c, i) => ({ id: `c${i}`, color: i % 6, points: c.points, ...(q.step ? { label: stepText(c, q.stepUnit) } : {}), ...(c.q ? { strong: true } : {}) }));
   const load = fresh?.load ?? null;
   const loadAllowed = family !== 'diode' && params.mode === 'output';
   const field = `w-0 min-w-0 flex-1 rounded-lg border border-line-2 bg-panel px-2 font-mono text-small ${touch ? 'h-11 text-[16px]' : 'h-8'}`;
@@ -144,7 +151,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
     ) : null;
 
   const controls = (
-    <div className={`flex flex-col gap-2.5 ${compact ? '' : 'w-[236px] shrink-0 overflow-y-auto overscroll-contain'}`}>
+    <div className={`flex flex-col gap-2.5 ${compact ? '' : 'min-h-0 w-[236px] shrink-0 overflow-y-auto overscroll-contain'}`}>
       <label className="flex flex-col gap-1 text-label text-muted">
         {t.part}
         <select value={part.id} onChange={(e) => tracer.setPart(e.target.value)} className={`${field} w-full flex-none font-sans text-ink`}>
@@ -178,7 +185,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
         <span className="flex items-center gap-1.5">
           {num(t.from, params.from, (v) => tracer.setParams({ from: v }))}
           <span aria-hidden="true">→</span>
-          {num(t.to, params.to, (v) => tracer.setParams({ to: v }))}
+          {num(t.to, to, (v) => tracer.setParams({ to: v, toAuto: false }))}
           <span aria-hidden="true">·</span>
           {num(t.step, params.step, (v) => v > 0 && tracer.setParams({ step: v }))}
         </span>
@@ -189,7 +196,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
             {t.stepsLabel}: <Rich text={q.step} />
           </span>
           <span className="flex flex-wrap gap-1.5">
-            {params.steps.map((s, i) => {
+            {shownSteps.map((s, i) => {
               const text = stepValueText(s, q.stepUnit);
               return (
                 <span key={`${s}${i}`} className={`flex items-center gap-1 rounded-full border border-line bg-panel pl-2.5 font-mono text-small text-ink ${touch ? 'h-11' : 'h-8'}`}>
@@ -197,8 +204,8 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
                   {text}
                   <button
                     type="button"
-                    disabled={params.steps.length <= 1}
-                    onClick={() => tracer.setParams({ steps: params.steps.filter((_, j) => j !== i) })}
+                    disabled={shownSteps.length <= 1}
+                    onClick={() => tracer.setParams({ steps: shownSteps.filter((_, j) => j !== i), stepsAuto: false })}
                     aria-label={t.removeStep(text)}
                     className={`flex items-center justify-center rounded-full text-muted hover:bg-app disabled:opacity-40 ${touch ? 'h-11 w-11' : 'h-8 w-8'}`}
                   >
@@ -219,13 +226,13 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
                   if (e.key !== 'Enter') return;
                   const raw = (e.target as HTMLInputElement).value.trim().replace(',', '.').replace('−', '-').replace(/µ$/, 'e-6').replace(/u$/, 'e-6').replace(/m$/, 'e-3');
                   const v = Number(raw);
-                  if (Number.isFinite(v) && params.steps.length < 6) tracer.setParams({ steps: [...params.steps, v] });
+                  if (Number.isFinite(v) && shownSteps.length < 6) tracer.setParams({ steps: [...shownSteps, v], stepsAuto: false });
                   setAdding(false);
                 }}
                 className={`${field} w-24 flex-none`}
               />
             ) : (
-              params.steps.length < 6 && (
+              shownSteps.length < 6 && (
                 <button type="button" onClick={() => setAdding(true)} aria-label={t.addStep} title={t.addStep} className={`flex items-center justify-center rounded-full border border-line text-ink hover:bg-panel-2 ${touch ? 'h-11 w-11' : 'h-8 w-8'}`}>
                   <Icon name="plus" className="h-4 w-4" />
                 </button>
@@ -240,7 +247,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
           role="switch"
           aria-checked={Boolean(load) && showLoad}
           disabled={!load}
-          onClick={() => setShowLoad((s) => !s)}
+          onClick={() => tracer.setParams({ load: !showLoad })}
           className={`flex w-full items-center gap-2 rounded-lg text-left ${touch ? 'min-h-11' : 'min-h-9'} ${load ? '' : 'opacity-60'}`}
         >
           <span className="flex min-w-0 flex-1 flex-col text-small">
@@ -283,15 +290,26 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
     />
   );
 
+  // Telefonda tarama bitince ayarlar tek satırlık özete kapanır, grafik öne çıkar (analiz düzeltmeleri, 7).
+  const collapsed = compact && !editing && !busy && fresh !== null && curves.length > 0;
+  const summary = t.settingsSummary(
+    part.label,
+    t.modes[params.mode],
+    q.x,
+    formatNumber(params.from, 3).replace(/,?0+$/, ''),
+    formatNumber(params.to, 3).replace(/,?0+$/, ''),
+    family === 'diode' ? 0 : curves.length,
+  );
   return compact ? (
     <div className="flex flex-col gap-3">
-      {controls}
+      {collapsed ? <SettingsSummary text={summary} onEdit={() => setEditing(true)} /> : controls}
       {chart}
     </div>
   ) : (
     <div className="flex min-h-0 flex-1 gap-5 px-4 pb-3">
       {controls}
-      {chart}
+      {/* Grafik en az 140 px: çekmece daha alçaksa bu sütun kayar. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain">{chart}</div>
     </div>
   );
 }
@@ -302,5 +320,5 @@ export function curveSummary(tracer: TracerApi): string {
   if (tracer.progress) return t.progress(tracer.progress.done, tracer.progress.total);
   const p = tracer.params;
   if (!p || !tracer.result) return '';
-  return t.summary(tracer.result.curves.length, sweepValues(p.from, p.to, p.step).length);
+  return t.summary(tracer.result.curves.length, sweepValues(p.from, tracer.result.to, p.step).length);
 }

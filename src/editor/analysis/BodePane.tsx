@@ -1,9 +1,11 @@
 // Ölçülen Bode paneli (A4, N4): solda giriş ve çıkış, frekans aralığı ve nokta sayısı, ilerleme; sağda
 // kazanç (dB) ve faz (°) alt alta, aynı logaritmik frekans ekseninde, ölçüm noktaları nokta olarak.
 // Orta bant ve −3 dB noktası kendiliğinden: kesikli −3 dB çizgisi, f_H'de dikey işaret, çipler.
-// Teori eğrisi (A5, küçük sinyal AC) kesikli, aynı renkte; "Teori" düğmesiyle gizlenir.
+// Teori eğrisi (A5, küçük sinyal AC) kesikli ve gri; "Teori" çipi düğmedir, eğriyi gizler.
+// Çipler ve gösterge grafik alanının dışında, üstte tek satırda; iki grafik de en az 140 px'e sığmıyorsa
+// faz gizlenir ("Fazı göster"). Yöntemin ve teorinin açıklaması "ⓘ" ipucunda.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { tr } from '../../i18n/tr';
 import { formatNumber, formatSI } from '../../sim/units';
 import { Rich } from '../Rich';
@@ -12,8 +14,15 @@ import { bodeSummary, toDb, type BodePoint } from './bode';
 import type { TheoryPoint, TheoryResult } from './bodeTheory';
 import { datedName, saveFile, toCsv, type CsvSeparator } from './format';
 import type { BodeApi } from './useBode';
+import { SettingsSummary, useSettingsEditing } from './SettingsSummary';
 import type { AnalysisApi } from './useAnalysis';
-import { valueAt, XYChart } from './XYChart';
+import { InfoTip } from './InfoTip';
+import { MIN_CHART, valueAt, XYChart } from './XYChart';
+
+/** Teori eğrisinin rengi: ölçülenden ayrılsın diye gri (kesikli). */
+const THEORY_STROKE = 'var(--color-ink-2)';
+/** İmleç satırının yüksekliği (px; satır ve üst boşluk). */
+const FOOTER_HEIGHT = 30;
 
 const hz = (f: number) => formatSI(f, 'Hz', { digits: 3, trim: true });
 /** Frekans kutusundaki yazı: "20", "1k", "2M" (k ve M ile yazılabilir). */
@@ -63,6 +72,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   const runRef = useRef(bode.run);
   runRef.current = bode.run;
   const busy = bode.progress !== null;
+  const [editing, setEditing] = useSettingsEditing(busy);
   useEffect(() => {
     if (!bode.key || busy || bode.resultKey === bode.key || tried.current === bode.key) return undefined;
     const key = bode.key;
@@ -73,6 +83,19 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
     return () => window.clearTimeout(timer);
   }, [bode.key, bode.resultKey, busy]);
   const [cursor, setCursor] = useState<number | null>(null);
+  // Grafik alanının yüksekliği: iki grafik de en az MIN_CHART px'e sığmıyorsa faz gizlenir ("Fazı göster").
+  const chartsBox = useRef<HTMLDivElement>(null);
+  const [chartsHeight, setChartsHeight] = useState(0);
+  const [showPhase, setShowPhase] = useState(false);
+  const hasInput = bode.input !== null;
+  useEffect(() => {
+    const el = chartsBox.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(() => setChartsHeight(el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [compact, hasInput]);
+  const chartsId = useId().replace(/:/g, '');
   const field = `w-0 min-w-0 flex-1 rounded-lg border border-line-2 bg-panel px-2 font-mono text-small ${touch ? 'h-11 text-[16px]' : 'h-8'}`;
   const select = `w-full rounded-lg border border-line-2 bg-panel px-2 text-small ${touch ? 'h-11 text-[16px]' : 'h-9'}`;
   if (!bode.input) return <p className="m-0 px-4 py-6 text-small text-muted">{t.noSource}</p>;
@@ -86,13 +109,14 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   const theory = fresh ? theoryPoints(bode.theory) : [];
   const showTheory = bode.showTheory && theory.length > 0;
   const ts = theory.length > 0 ? bodeSummary(theory.map((p) => ({ ...p, inAmp: 1, outAmp: p.gain, settled: true }))) : null;
+  // Teori kesikli ve gri: ölçülenle örtüştüğü orta bantta da ayırt edilir.
   const gainSeries = [
     { id: 'g', color: 0, points: points.map((p) => [p.f, toDb(p.gain)] as const), dots: true },
-    ...(showTheory ? [{ id: 'gt', color: 0, points: theory.map((p) => [p.f, toDb(p.gain)] as const), dashed: true }] : []),
+    ...(showTheory ? [{ id: 'gt', color: 0, stroke: THEORY_STROKE, points: theory.map((p) => [p.f, toDb(p.gain)] as const), dashed: true }] : []),
   ];
   const phaseSeries = [
     { id: 'p', color: 3, points: points.map((p) => [p.f, p.phase] as const), dots: true },
-    ...(showTheory ? [{ id: 'pt', color: 3, points: theory.map((p) => [p.f, p.phase] as const), dashed: true }] : []),
+    ...(showTheory ? [{ id: 'pt', color: 3, stroke: THEORY_STROKE, points: theory.map((p) => [p.f, p.phase] as const), dashed: true }] : []),
   ];
   const target = s ? toDb(s.mid.gain) - 3 : null;
   // Kazanç ekseni sıfırdan değil, ölçülenin (ve teorinin) biraz altından başlar (tasarım: 20 … 50 dB).
@@ -124,9 +148,34 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   const progress = bode.progress;
   const done = progress ? progress.done : points.length;
   const total = progress ? progress.total : bode.range.points;
+  const theoryFailed = fresh && bode.theory && !bode.theory.ok ? t.theoryFailed[bode.theory.reason] : null;
+  // İki grafik de en az MIN_CHART px'e sığıyor mu (araya 4 px, altta imleç satırı); sığmıyorsa faz gizli.
+  const fits = compact || chartsHeight === 0 || chartsHeight >= 2 * MIN_CHART + 4 + FOOTER_HEIGHT;
+  const phaseVisible = fits || showPhase;
+
+  // Yöntem ve teori açıklaması "ⓘ" ipucunda (sol sütun taşmasın).
+  const info = (
+    <InfoTip label={t.infoLabel} closeLabel={t.infoClose} sheet={compact} touch={touch}>
+      <span className="flex flex-col gap-1.5">
+        <span>{t.method}</span>
+        <span>{t.theoryNote}</span>
+        {theoryFailed && <span className="text-warn">{theoryFailed}</span>}
+      </span>
+    </InfoTip>
+  );
+  const phaseToggle = fits ? null : (
+    <button
+      type="button"
+      aria-pressed={showPhase}
+      onClick={() => setShowPhase((x) => !x)}
+      className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-label font-medium ${touch ? 'h-11' : 'h-7'} ${showPhase ? 'border-accent-line bg-accent-soft text-accent-ink' : 'border-line-2 text-ink hover:bg-panel-2'}`}
+    >
+      {showPhase ? t.hidePhase : t.showPhase}
+    </button>
+  );
 
   const controls = (
-    <div className={`flex flex-col gap-2.5 ${compact ? '' : 'w-[236px] shrink-0 overflow-y-auto overscroll-contain'}`}>
+    <div className={`flex flex-col gap-2.5 ${compact ? '' : 'min-h-0 w-[236px] shrink-0 overflow-y-auto overscroll-contain'}`}>
       <label className="flex flex-col gap-1 text-label text-muted">
         {t.input}
         <select value={bode.input.key} onChange={(e) => bode.setInput(e.target.value)} className={`${select} text-ink`}>
@@ -161,8 +210,6 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
           {num(t.points, bode.range.points, (v) => bode.setRange({ points: Math.max(2, Math.min(60, Math.round(v))) }))}
         </span>
         <span className="font-mono text-ink">{t.rangeText(hz(bode.range.from), hz(bode.range.to), bode.range.points)}</span>
-        <span>{t.method}</span>
-        <span>{t.theoryNote}</span>
         {bode.limits && <span>{t.limit(hz(bode.limits.max))}</span>}
       </div>
       <div className="flex flex-col gap-1">
@@ -186,44 +233,92 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
     </div>
   );
 
-  const chips = s ? (
-    <div className="flex flex-wrap items-stretch gap-2 text-label">
-      <span className="flex flex-col rounded-lg border border-line bg-panel px-2.5 py-1">
-        <span className="text-muted">{t.mid(hz(s.mid.f))}</span>
-        <b className="font-mono font-semibold tabular">{t.midValue(formatNumber(s.mid.gain, 1), formatNumber(toDb(s.mid.gain), 1))}</b>
+  // Sonuç çipleri ve gösterge tek satırda (masaüstünde başlık satırının altında, grafik alanının dışında):
+  // ölçülenin işareti, orta bant, f_H, f_L ve Teori (düğme: eğriyi gizler / gösterir), ⓘ.
+  const chip = `flex shrink-0 items-center gap-1.5 rounded-lg border whitespace-nowrap ${compact ? 'px-2' : 'px-2.5'} ${touch ? 'min-h-11 py-1' : 'h-7'}`;
+  // Telefonda çipin etiketi üstte, değeri altta: şerit iki satıra sığar (analiz düzeltmeleri, ikinci tur).
+  const pair = (label: ReactNode, value: ReactNode) =>
+    compact ? (
+      <span className="flex flex-col items-start leading-tight">
+        {label}
+        {value}
       </span>
-      {s.fH !== null && (
-        <span className="flex flex-col rounded-lg border border-line bg-panel px-2.5 py-1" title={around ? t.fHNote(around[0]!, around[1]!) : undefined}>
-          <span className="text-muted">
-            <Rich text={t.fH} />
-          </span>
-          <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fH)}`}</b>
+    ) : (
+      <>
+        {label}
+        {value}
+      </>
+    );
+  const theoryOn = bode.showTheory && theory.length > 0;
+  const theoryValueId = `${chartsId}-teori`;
+  const strip = (
+    // Masaüstünde tek satır; telefonda sarılır (iki satır), bütün değerler kaydırmadan okunur.
+    <div className={`flex shrink-0 items-center gap-2 text-label ${compact ? 'flex-wrap' : 'overflow-x-auto overscroll-contain whitespace-nowrap'}`}>
+      <span className="flex shrink-0 items-center gap-1.5 text-muted">
+        <svg width="22" height="8" aria-hidden="true">
+          <line x1="1" x2="21" y1="4" y2="4" stroke="var(--color-tr-1)" strokeWidth="2" />
+          <circle cx="11" cy="4" r="2.5" fill="var(--color-tr-1)" />
+        </svg>
+        {t.measured}
+      </span>
+      {s && (
+        <span className={`${chip} border-line bg-panel`}>
+          {pair(
+            <span className="text-muted">{t.mid(hz(s.mid.f))}</span>,
+            <b className="font-mono font-semibold tabular">{t.midValue(formatNumber(s.mid.gain, 1), formatNumber(toDb(s.mid.gain), 1))}</b>,
+          )}
         </span>
       )}
-      {s.fL !== null && (
-        <span className="flex flex-col rounded-lg border border-line bg-panel px-2.5 py-1">
-          <span className="text-muted">
-            <Rich text={t.fL} />
-          </span>
-          <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fL)}`}</b>
+      {s && s.fH !== null && (
+        <span className={`${chip} border-line bg-panel`} title={around ? t.fHNote(around[0]!, around[1]!) : undefined}>
+          {pair(
+            <span className="text-muted">
+              <Rich text={t.fH} />
+            </span>,
+            <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fH)}`}</b>,
+          )}
         </span>
       )}
-      {showTheory && ts && (
-        <span className="flex flex-col rounded-lg border border-dashed border-line-2 bg-panel px-2.5 py-1">
-          <span className="text-muted">{t.theory}</span>
-          <b className="font-mono font-semibold tabular">
-            <Rich text={t.theoryValue(formatNumber(ts.mid.gain, 1), ts.fH !== null ? hz(ts.fH) : null)} />
-          </b>
+      {s && s.fL !== null && (
+        <span className={`${chip} border-line bg-panel`}>
+          {pair(
+            <span className="text-muted">
+              <Rich text={t.fL} />
+            </span>,
+            <b className="font-mono font-semibold text-warn tabular">{`≈ ${hz(s.fL)}`}</b>,
+          )}
         </span>
       )}
-      {/* f_H'nin ara değer olduğu: masaüstünde çipin ipucunda, telefonda görünür satırda. */}
-      {around && compact && <span className="self-center text-muted">{t.fHNote(around[0]!, around[1]!)}</span>}
+      <button
+        type="button"
+        aria-pressed={bode.showTheory}
+        aria-label={t.theoryToggleLabel}
+        aria-describedby={theoryValueId}
+        title={theoryFailed ?? t.theory}
+        disabled={theory.length === 0}
+        onClick={() => bode.setShowTheory(!bode.showTheory)}
+        className={`${chip} border-dashed disabled:opacity-60 ${theoryOn ? 'border-accent-line bg-accent-soft text-accent-ink' : 'border-line-2 text-muted'}`}
+      >
+        <svg width="22" height="8" aria-hidden="true">
+          <line x1="1" x2="21" y1="4" y2="4" stroke={THEORY_STROKE} strokeWidth="1.75" strokeDasharray="5 3" />
+        </svg>
+        {pair(
+          <span>{t.theoryShort}</span>,
+          <b id={theoryValueId} className={`font-mono font-semibold tabular ${theoryFailed ? 'text-warn' : ''}`}>
+            {ts ? <Rich text={t.theoryValue(formatNumber(ts.mid.gain, 1), ts.fH !== null ? hz(ts.fH) : null)} /> : theoryFailed ? t.theoryFailedShort : '—'}
+          </b>,
+        )}
+      </button>
+      {info}
+      {phaseToggle}
     </div>
-  ) : null;
+  );
+  // f_H'nin ara değer olduğu: masaüstünde çipin ipucunda, telefonda grafiklerin altında görünür satırda.
+  const fhNote = around && compact ? <p className="m-0 text-label text-muted">{t.fHNote(around[0]!, around[1]!)}</p> : null;
 
   const footer =
     cur !== null && points.length > 0 ? (
-      <p className="m-0 mx-auto mt-1 rounded-full border border-line bg-panel px-3 py-1 text-center font-mono text-label">
+      <p className="m-0 mx-auto mt-1 shrink-0 rounded-full border border-line bg-panel px-3 py-1 text-center font-mono text-label">
         {t.cursor(hz(cur), formatNumber(10 ** (valueAt(gainSeries[0]!.points, cur) / 20), 1), formatNumber(valueAt(gainSeries[0]!.points, cur), 2), formatNumber(valueAt(phaseSeries[0]!.points, cur), 1))}
         {showTheory && (
           <span className="text-muted">
@@ -233,78 +328,84 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
       </p>
     ) : null;
 
-  // Gösterge: ölçülen (çizgi ve nokta) ve Teori düğmesi (kesikli); teori hesaplanamadıysa nedeni.
-  const legend = (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-label text-muted">
-      <span className="flex items-center gap-1.5">
-        <svg width="22" height="8" aria-hidden="true">
-          <line x1="1" x2="21" y1="4" y2="4" stroke="var(--color-ink-2)" strokeWidth="2" />
-          <circle cx="11" cy="4" r="2.5" fill="var(--color-ink-2)" />
-        </svg>
-        {t.measured}
-      </span>
-      <button
-        type="button"
-        aria-pressed={bode.showTheory}
-        aria-label={t.theoryToggleLabel}
-        disabled={theory.length === 0}
-        onClick={() => bode.setShowTheory(!bode.showTheory)}
-        className={`flex items-center gap-1.5 rounded-full border px-2.5 disabled:opacity-50 ${touch ? 'h-11' : 'h-7'} ${bode.showTheory ? 'border-accent-line bg-accent-soft text-accent-ink' : 'border-line-2 text-muted'}`}
-      >
-        <svg width="22" height="8" aria-hidden="true">
-          <line x1="1" x2="21" y1="4" y2="4" stroke="currentColor" strokeWidth="1.75" strokeDasharray="5 3" />
-        </svg>
-        {t.theory}
-      </button>
-      {fresh && bode.theory && !bode.theory.ok && <span className="text-warn">{t.theoryFailed[bode.theory.reason]}</span>}
-    </div>
+  const gainChart = (height?: number) => (
+    <XYChart
+      series={gainSeries}
+      xLabel={phaseVisible ? '' : t.freqAxis}
+      yLabel={t.gain}
+      logX
+      cursor={cur}
+      onCursor={setCursor}
+      cursorText={(f) => hz(f)}
+      ariaLabel={t.gainLabel(points.length, showTheory)}
+      hLines={target !== null ? [{ y: target, label: t.minus3(formatNumber(target, 1)) }] : []}
+      {...(gainRange ? { yRange: gainRange } : {})}
+      vLines={vLines}
+      compact={compact}
+      {...(phaseVisible ? {} : { footer })}
+      {...(height ? { height } : {})}
+    />
+  );
+  const phaseChart = (height?: number) => (
+    <XYChart
+      series={phaseSeries}
+      xLabel={t.freqAxis}
+      yLabel={t.phase}
+      logX
+      cursor={cur}
+      onCursor={setCursor}
+      cursorText={(f) => hz(f)}
+      ariaLabel={t.phaseLabel(points.length, showTheory)}
+      vLines={vLines}
+      compact={compact}
+      footer={footer}
+      {...(height ? { height } : {})}
+    />
   );
 
-  const charts = (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
-      {chips}
-      {legend}
-      <XYChart
-        series={gainSeries}
-        xLabel=""
-        yLabel={t.gain}
-        logX
-        cursor={cur}
-        onCursor={setCursor}
-        cursorText={(f) => hz(f)}
-        ariaLabel={t.gainLabel(points.length, showTheory)}
-        hLines={target !== null ? [{ y: target, label: t.minus3(formatNumber(target, 1)) }] : []}
-        {...(gainRange ? { yRange: gainRange } : {})}
-        vLines={vLines}
-        compact={compact}
-        {...(compact ? { height: 200 } : {})}
-      />
-      <XYChart
-        series={phaseSeries}
-        xLabel={t.freqAxis}
-        yLabel={t.phase}
-        logX
-        cursor={cur}
-        onCursor={setCursor}
-        cursorText={(f) => hz(f)}
-        ariaLabel={t.phaseLabel(points.length, showTheory)}
-        vLines={vLines}
-        compact={compact}
-        footer={footer}
-        {...(compact ? { height: 220 } : {})}
-      />
-    </div>
-  );
-
-  return compact ? (
-    <div className="flex flex-col gap-3">
-      {controls}
-      {charts}
-    </div>
-  ) : (
-    <div className="flex min-h-0 flex-1 gap-5 px-4 pb-3">
-      {controls}
-      {charts}
+  if (compact) {
+    // Ölçüm bitince ayarlar tek satırlık özete kapanır, grafik öne çıkar (analiz düzeltmeleri, 7).
+    const collapsed = !editing && !busy && fresh && points.length > 0 && bode.output !== null;
+    return (
+      <div className="flex flex-col gap-3">
+        {collapsed ? (
+          <SettingsSummary
+            text={t.settingsSummary(bode.input.short, bode.output!.short, hz(bode.range.from), hz(bode.range.to), bode.range.points)}
+            onEdit={() => setEditing(true)}
+          />
+        ) : (
+          controls
+        )}
+        {strip}
+        <div ref={chartsBox} className="flex flex-col gap-1">
+          {gainChart(200)}
+          {phaseChart(220)}
+        </div>
+        {fhNote}
+      </div>
+    );
+  }
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 pb-3">
+      {strip}
+      <div className="flex min-h-0 flex-1 gap-5">
+        {controls}
+        <div ref={chartsBox} className={`flex min-h-0 min-w-0 flex-1 flex-col gap-1 ${fits ? '' : 'overflow-y-auto overscroll-contain'}`}>
+          {fits ? (
+            <>
+              {gainChart()}
+              {phaseChart()}
+            </>
+          ) : phaseVisible ? (
+            <>
+              {gainChart(MIN_CHART)}
+              {phaseChart(MIN_CHART + FOOTER_HEIGHT)}
+            </>
+          ) : (
+            gainChart()
+          )}
+        </div>
+      </div>
     </div>
   );
 }

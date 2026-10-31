@@ -4,10 +4,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { exampleDoc } from '../src/examples';
-import { LINK_LIMIT, NO_PREDICTIONS, parsePredictions, parseTask, parseTaskPayload, predictionError, respectsTask, targetMet, taskFromHash, taskPayload, taskUrl, type TaskDef } from '../src/model/task';
+import { confidentMiss, LINK_LIMIT, NO_PREDICTIONS, parsePredictions, parseTask, parseTaskPayload, predictionAgrees, predictionError, respectsTask, targetMet, taskFromHash, taskPayload, taskTitle, taskUrl, type TaskDef } from '../src/model/task';
 import { buildConnectivity } from '../src/model/connectivity';
 import { netIndex } from '../src/editor/analysis/traces';
-import { goalText, targetOptions } from '../src/editor/task/targets';
+import { goalText, readPrediction, targetOptions } from '../src/editor/task/targets';
 import { plainText } from '../src/editor/Rich';
 
 const amp = exampleDoc('bjt-yukseltec')!;
@@ -36,6 +36,19 @@ describe('Görev', () => {
     expect(parseTaskPayload(JSON.parse(JSON.stringify(taskPayload(task, amp))))!.task).toEqual(task);
     expect(taskFromHash('#d=abc')).toBeUndefined();
     expect(taskFromHash('#g=bozuk')).toBeNull();
+  });
+
+  it('üst çubuktaki ad (analiz düzeltmeleri, 4): görevin adı, yoksa bağlantıdaki başlangıç devresinin adı; eski bağlantı da açılır', () => {
+    const withCircuit = { ...task, circuit: 'BC107 ile ortak emetörlü yükselteç' };
+    const back = taskFromHash(new URL(taskUrl(withCircuit, amp, 'https://yigitkasap.github.io/devre-simulatoru/')).hash)!.task;
+    expect(back.circuit).toBe('BC107 ile ortak emetörlü yükselteç');
+    expect(taskTitle(back)).toBe('Deney 7 · BJT yükselteç tasarımı');
+    expect(taskTitle({ ...back, name: '  ' })).toBe('BC107 ile ortak emetörlü yükselteç');
+    // Eski bağlantı (devre adı yok): görev adı; ikisi de yoksa null (üst çubukta "Devrem").
+    const old = taskFromHash(new URL(taskUrl(task, amp, 'https://yigitkasap.github.io/devre-simulatoru/')).hash)!.task;
+    expect(old.circuit).toBeUndefined();
+    expect(taskTitle(old)).toBe('Deney 7 · BJT yükselteç tasarımı');
+    expect(taskTitle({ ...old, name: '' })).toBeNull();
   });
 
   it('hedef: ± tolerans, ≥ ve ≤; ölçülemeyen hedef tutmaz', () => {
@@ -69,11 +82,41 @@ describe('Görev', () => {
     expect(taskFromHash(new URL(url).hash)!.task.predict).toBe(true);
     const { predict: _, ...old } = task;
     expect(parseTask(JSON.parse(JSON.stringify(old)))!.predict).toBe(false);
-    expect(parsePredictions({ values: { a: 6, b: 'x', c: 2e5 }, locked: true })).toEqual({ values: { a: 6, c: 2e5 }, locked: true });
+    expect(parsePredictions({ values: { a: 6, b: 'x', c: 2e5 }, locked: true })).toEqual({ values: { a: 6, c: 2e5 }, reasons: {}, confidence: {}, locked: true });
     expect(parsePredictions(null)).toEqual(NO_PREDICTIONS);
     expect(predictionError(6, 5.99)).toBeCloseTo(0.167, 2);
     expect(predictionError(200, 205.8)).toBeCloseTo(2.818, 2);
     expect(predictionError(6, null)).toBeNull();
+  });
+
+  it('tahmin kutusu (analiz düzeltmeleri, 5): yazarken okunur; boş değer yok, geçersiz yazı ayrı', () => {
+    expect(readPrediction('6 V', 'V')).toEqual({ value: 6, invalid: false });
+    expect(readPrediction('5,9', 'V')).toEqual({ value: 5.9, invalid: false });
+    expect(readPrediction('500k', 'Hz')).toEqual({ value: 5e5, invalid: false });
+    expect(readPrediction('46,3', 'dB')).toEqual({ value: 46.3, invalid: false });
+    expect(readPrediction('  ', 'V')).toEqual({ value: null, invalid: false });
+    expect(readPrediction('18x', '')).toEqual({ value: null, invalid: true });
+  });
+
+  it('gerekçe ve güven (analiz düzeltmeleri, 6): okunur, gerekçe en çok 200 karakter; "Eminim" ve ölçülenden uzak tahmin işaretlenir', () => {
+    const long = 'x'.repeat(250);
+    const p = parsePredictions({ values: { a: 6 }, reasons: { a: long, b: '  ', c: 3 }, confidence: { a: 'sure', b: 'belki' }, locked: false });
+    expect(p.reasons).toEqual({ a: 'x'.repeat(200) });
+    expect(p.confidence).toEqual({ a: 'sure' });
+    const [vce, gain, fh] = task.targets as [TaskDef['targets'][0], TaskDef['targets'][0], TaskDef['targets'][0]];
+    // ± hedef: fark toleransı (%10) aşınca; ölçülen yoksa ya da emin değilse işaret yok.
+    expect(confidentMiss(gain, 180, 205.8, 'sure')).toBe(true);
+    expect(confidentMiss(gain, 200, 205.8, 'sure')).toBe(false);
+    // Kartın karşılaştırması (ikinci tur, 3): uyuşma güvenden bağımsız; ölçülen yoksa uyuşmaz.
+    expect(predictionAgrees(gain, 180, 205.8)).toBe(false);
+    expect(predictionAgrees(gain, 200, 205.8)).toBe(true);
+    expect(predictionAgrees(vce, 6, null)).toBe(false);
+    expect(confidentMiss(gain, 180, 205.8, 'unsure')).toBe(false);
+    expect(confidentMiss(gain, 180, 205.8, undefined)).toBe(false);
+    expect(confidentMiss(vce, 6, null, 'sure')).toBe(false);
+    // ≥ hedef: tahmin ile ölçülen 500 kHz'in farklı yanında.
+    expect(confidentMiss(fh, 300e3, 1.08e6, 'sure')).toBe(true);
+    expect(confidentMiss(fh, 900e3, 1.08e6, 'sure')).toBe(false);
   });
 
   it('kilit: RB değişebilir, Q1 ve PS1 değişmez; osiloskop ayarı değişebilir; yeni parça ve kablo eklenemez', () => {

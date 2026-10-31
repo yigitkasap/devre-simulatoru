@@ -66,12 +66,42 @@ export function netIndex(doc: CircuitDoc, conn: Connectivity): NetIndex {
 const RANK: Partial<Record<Part['type'], number>> = { npn: 0, pnp: 0, njfet: 0, pjfet: 0, nmos: 0, pmos: 0, opamp: 0, timer555: 0, oscilloscope: 2, voltmeter: 2, ammeter: 2, funcgen: 2, dcsupply: 2, acsource: 2, battery: 2 };
 const byLabel = (a: { part: Part }, b: { part: Part }) => (RANK[a.part.type] ?? 1) - (RANK[b.part.type] ?? 1) || a.part.label.localeCompare(b.part.label, 'tr', { numeric: true });
 
-/** Düğümün adı ("C1" ya da "Q1 C"); toprak ağıysa "0". */
+/** Ad verirken önce gelen kaynaklar ve yarı iletkenler (entegreler dahil). */
+const SOURCES: ReadonlySet<string> = new Set(['battery', 'dcsupply', 'acsource', 'funcgen']);
+const ACTIVE: ReadonlySet<string> = new Set(['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos', 'opamp', 'timer555']);
+
+function pinName(p: { part: Part; pin: number }, idx: NetIndex): string {
+  let short = tr.devices.pinShort[p.part.type]?.[p.pin];
+  // İki çıkışlı güç kaynağının yalnız 1. çıkışı kullanılıyorsa "PS1 +" ("PS1 1+" değil).
+  if (p.part.type === 'dcsupply' && p.pin < 2 && short && !outputUsed(p.part, 2, idx)) short = short.slice(1);
+  // Kutup uçları işaretle: "B1 +", "C1 −" ("B1 + uç" değil); numaralı uçlar olduğu gibi ("R1 1. uç").
+  if (short === '+ uç' || short === '− uç') short = short.slice(0, 1);
+  return short ? `${p.part.label} ${short}` : `${p.part.label} ${p.pin + 1}`;
+}
+
+/** Güç kaynağının bir çıkışında (pin, pin + 1) başka bir parçanın ucu var mı. */
+function outputUsed(part: Part, pin: number, idx: NetIndex): boolean {
+  return [pin, pin + 1].some((k) => {
+    const net = idx.netOf(`${part.id}#${k}`);
+    return net !== undefined && idx.pins(net).some((q) => q.part.id !== part.id);
+  });
+}
+
+/**
+ * Düğümün adı; toprak ağıysa "0". Sıra (analiz düzeltmeleri, 10): kaynağın ucu ("PS1 +", "FG1 OUT"),
+ * transistörün ya da entegrenin ucu ("Q1 baz"), öbür ucu toprakta olan iki uçlu parça ("C1"), toprak
+ * dışındaki ilk parçanın adlandırılmış ucu ("R1 1. uç"). Grafik izleri, CSV başlıkları, Bode çıkışı
+ * ve görev hedefleri bu adı kullanır.
+ */
 export function nodeName(key: string, idx: NetIndex): string {
   const net = idx.netOf(key);
   if (net === undefined) return '?';
   if (net === idx.ground) return '0';
   const pins = idx.pins(net).filter((p) => p.part.type !== 'ground').sort(byLabel);
+  const source = pins.find((p) => SOURCES.has(p.part.type));
+  if (source) return pinName(source, idx);
+  const active = pins.find((p) => ACTIVE.has(p.part.type));
+  if (active) return pinName(active, idx);
   // Öbür ucu toprakta olan iki uçlu parça: V(C1).
   for (const p of pins) {
     if (pinCount(p.part, idx) !== 2) continue;
@@ -79,9 +109,7 @@ export function nodeName(key: string, idx: NetIndex): string {
     if (other !== undefined && other === idx.ground) return p.part.label;
   }
   const first = pins[0];
-  if (!first) return '?';
-  const short = tr.devices.pinShort[first.part.type]?.[first.pin];
-  return short ? `${first.part.label} ${short}` : `${first.part.label} ${first.pin + 1}`;
+  return first ? pinName(first, idx) : '?';
 }
 
 function pinCount(part: Part, idx: NetIndex): number {

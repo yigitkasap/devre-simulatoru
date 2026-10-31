@@ -7,6 +7,7 @@
 // Motor yalnızca var olan arabirimiyle kullanılır (update, advance, runUntil, measure).
 
 import { CircuitSimulator, type DeviceType, type Netlist, type NetlistElement, type PropValue } from '../../sim';
+import { atOperatingPoint } from './bode';
 
 export type TracerMode = 'diode' | 'output' | 'transfer';
 export type TracerFamily = 'diode' | 'fet' | 'bjt';
@@ -21,6 +22,11 @@ export interface SweepRequest {
   readonly step: number;
   /** Basamaklar (V_GS, V_DS ya da I_B; büyüklük). Diyotta tek eğri: [0]. */
   readonly steps: readonly number[];
+  /**
+   * Yük doğrusu açıkken Q noktasındaki gerçek basamak (BJT'de I_B, FET'te V_GS; büyüklük): en sona ayrı
+   * bir eğri olarak eklenir (analiz düzeltmeleri, 9).
+   */
+  readonly qStep?: number;
 }
 
 export interface Curve {
@@ -29,6 +35,8 @@ export interface Curve {
   readonly points: readonly (readonly [number, number])[];
   /** BJT: ölçülen gerçek I_B (A). */
   readonly measuredStep?: number;
+  /** Q noktasındaki basamağın eğrisi. */
+  readonly q?: boolean;
 }
 
 export const FAMILY: Partial<Record<DeviceType, TracerFamily>> = {
@@ -123,11 +131,13 @@ function settle(sim: CircuitSimulator): boolean {
  */
 export function runSweep(req: SweepRequest, onProgress?: (done: number, total: number) => void, cancelled?: () => boolean): Curve[] {
   const xs = sweepValues(req.from, req.to, req.step);
-  const total = xs.length * req.steps.length;
+  const steps = req.qStep !== undefined ? [...req.steps, req.qStep] : req.steps;
+  const total = xs.length * steps.length;
   const sign = isP(req.type) ? -1 : 1;
   const curves: Curve[] = [];
   let done = 0;
-  for (const s of req.steps) {
+  for (const [k, s] of steps.entries()) {
+    const isQ = req.qStep !== undefined && k === steps.length - 1;
     const points: [number, number][] = [];
     let sim: CircuitSimulator | null = null;
     let ib: number | undefined;
@@ -151,7 +161,7 @@ export function runSweep(req: SweepRequest, onProgress?: (done: number, total: n
       if (Math.abs(current) > CURRENT_LIMIT) break;
     }
     done = curves.length * xs.length + xs.length;
-    curves.push({ step: s, points, ...(ib !== undefined ? { measuredStep: ib } : {}) });
+    curves.push({ step: s, points, ...(ib !== undefined ? { measuredStep: ib } : {}), ...(isQ ? { q: true } : {}) });
   }
   return curves;
 }
@@ -177,6 +187,36 @@ export interface LoadLine {
   readonly label: string;
   readonly supply: number;
   readonly q: readonly [number, number];
+  /** Q noktasındaki basamak: BJT'de I_B (A), FET'te V_GS (V); büyüklük (P tipinde işaret çevrilmiş). */
+  readonly qStep: number | null;
+  /** MOSFET'in eşik gerilimi (büyüklük; Q çevresindeki basamaklar için); öbürlerinde null. */
+  readonly threshold: number | null;
+}
+
+/** x'e logaritmik olarak en yakın 1, 2, 5 × 10ⁿ. */
+function niceStep(x: number): number {
+  const e = 10 ** Math.floor(Math.log10(x));
+  const f = x / e;
+  const pick = [1, 2, 5, 10].reduce((best, c) => (Math.abs(Math.log(f / c)) < Math.abs(Math.log(f / best)) ? c : best), 1);
+  return pick * e;
+}
+
+/**
+ * MOSFET'te yük doğrusu açıkken varsayılan basamaklar (kullanıcı kararı): Q'daki V_GS'nin çevresinde,
+ * böylece Q eğrisi ve öbürleri aynı ölçekte. Adım (V_GS − V_T) / 2'nin 1-2-5 yuvarlanmışı (en az
+ * 5 mV); basamaklar Q'ya en yakın adım katının ±1 ve ±2 adımı (Q'nun kendisi ayrı eğri). IRF510
+ * yükselteçte V_GS = 3,854 V, V_T = 3,83 V → 3,83 / 3,84 / 3,86 / 3,87 V.
+ */
+export function qSteps(qVgs: number, threshold: number): number[] {
+  const step = niceStep(Math.max(0.005, (qVgs - Math.abs(threshold)) / 2));
+  const center = Math.round(qVgs / step) * step;
+  return [-2, -1, 1, 2].map((k) => Number((center + k * step).toFixed(6)));
+}
+
+/** Yük doğrusu açıkken taramanın üst sınırı: besleme, adımın tam katına yukarı yuvarlanmış. */
+export function supplyTo(supply: number, step: number): number {
+  const s = Math.abs(step) || 1;
+  return Math.round(Math.ceil(Math.abs(supply) / s - 1e-9) * s * 1e9) / 1e9;
 }
 
 /** Netlist'in düğümleri: anahtar → kök (pinler ve bağlantılar birleşik). */
@@ -200,8 +240,9 @@ function nodeRoots(netlist: Netlist): (key: string) => string {
 /**
  * Devredeki yük doğrusu: taranan parçanın drain / kollektör düğümüne bağlı direnç (öbür ucu başka bir
  * düğümde) yük direncidir; source / emetör düğümünde toprağa giden direnç varsa eklenir. Çalışma
- * noktası, AC kaynakların genliği sıfırlanıp devre oturtularak (en çok 1 s) bulunur. Yük direnci
- * yoksa null.
+ * noktası, AC kaynakların genliği sıfırlanıp devre DC çalışma noktasından (atOperatingPoint; büyük
+ * kuplajlı devre de) başlatılarak ve 1 s oturtularak bulunur. Q'daki gerçek I_B ya da V_GS de
+ * döner. Yük direnci yoksa null.
  */
 export function loadLine(netlist: Netlist, dutId: string, labels: Readonly<Record<string, string>>): LoadLine | null {
   const dut = netlist.elements.find((e) => e.id === dutId);
@@ -220,15 +261,20 @@ export function loadLine(netlist: Netlist, dutId: string, labels: Readonly<Recor
     ...netlist,
     elements: netlist.elements.map((e) => (e.type === 'acsource' || e.type === 'funcgen' ? { ...e, props: { ...e.props, amplitude: 0 } } : e)),
   };
-  const sim = new CircuitSimulator(quiet);
+  const sim = new CircuitSimulator(atOperatingPoint(quiet));
   if (!sim.canRun) return null;
   const ok = sim.isTransient ? sim.runUntil(1).ok : sim.advance(0).ok;
   const m = sim.measure(dutId);
+  const control = sim.status(dutId).control;
+  // MOSFET'in eşiği aygıtın kendisinden (modelin varsayılanı dahil).
+  const device = sim.device(dutId) as { readonly threshold?: number } | undefined;
+  const threshold = (dut.type === 'nmos' || dut.type === 'pmos') && typeof device?.threshold === 'number' ? Math.abs(device.threshold) : null;
   if (!ok || !m) return null;
   const sign = isP(dut.type) ? -1 : 1;
   const vFar = sim.voltageAt(far(rd, drain)!) ?? 0;
   const vLow = rs ? (sim.voltageAt(far(rs, source)!) ?? 0) : (sim.voltageAt(dut.pins[2]!) ?? 0);
   const r = Number(rd.props.resistance ?? 0) + (rs ? Number(rs.props.resistance ?? 0) : 0);
   if (!(r > 0)) return null;
-  return { r, label: labels[rd.id] ?? rd.id, supply: sign * (vFar - vLow), q: [sign * m.voltage, sign * m.current] };
+  const qStep = control ? sign * (FAMILY[dut.type] === 'bjt' ? control.current : control.voltage) : null;
+  return { r, label: labels[rd.id] ?? rd.id, supply: sign * (vFar - vLow), q: [sign * m.voltage, sign * m.current], qStep, threshold };
 }
