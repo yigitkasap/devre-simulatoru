@@ -9,8 +9,10 @@ import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
 import { maskFrame } from './fault/mask';
-import { defaultBlack, measureResistance, METER_ID, meterPart, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
+import { FaultCard } from './fault/FaultCard';
+import { defaultBlack, measureResistance, METER_ID, meterPart, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
 import { MultimeterPanel, type MeterReading } from './fault/MultimeterPanel';
+import { addEntry, entryName, NEW_SESSION, parseSession, type FaultSession } from './fault/session';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { partBounds, pinPositions } from '../model/geometry';
@@ -89,6 +91,21 @@ function loadSavedPredictions(): Predictions {
     return NO_PREDICTIONS;
   }
 }
+
+const FAULT_KEY = 'devre-simulatoru:ariza';
+
+/** Arıza bulma oturumu (günlük, bildirimler, ipuçları): kayıtlı arıza göreviyle birlikte geri gelir. */
+function loadSavedSession(): FaultSession {
+  try {
+    const raw = window.localStorage.getItem(FAULT_KEY);
+    return raw ? parseSession(JSON.parse(raw)) : NEW_SESSION;
+  } catch {
+    return NEW_SESSION;
+  }
+}
+
+/** Kararlı okuma: multimetrenin yazısı bu kadar değişmeden kalınca günlüğe yazılır (ms). */
+const STABLE_MS = 1200;
 
 /** Kayıtlı devreyle birlikte açık olan görev (sayfa yenilenince görev kipi sürsün). */
 function loadSavedTask(): TaskDef | null {
@@ -184,6 +201,23 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       // Depolama kapalı: tahminler yalnızca bu oturumda.
     }
   }, [embed, task, predictions]);
+  /** Arıza bulma oturumu (B2): yeni görev ya da görevden çıkış sıfırlar. */
+  const [faultSession, setFaultSession] = useState<FaultSession>(() => (initial.task?.fault && initial.shared !== 'task' ? loadSavedSession() : NEW_SESSION));
+  const sessionTask = useRef(task);
+  useEffect(() => {
+    if (sessionTask.current === task) return;
+    sessionTask.current = task;
+    setFaultSession(NEW_SESSION);
+  }, [task]);
+  useEffect(() => {
+    if (embed) return;
+    try {
+      if (task?.fault) window.localStorage.setItem(FAULT_KEY, JSON.stringify(faultSession));
+      else window.localStorage.removeItem(FAULT_KEY);
+    } catch {
+      // Depolama kapalı: oturum yalnızca bu sekmede.
+    }
+  }, [embed, task, faultSession]);
   /** Tahminler kaydedilmeden simülasyon ve ölçüm kapalı (B1): Oynat'ta ve Analiz'de söylenen yazı. */
   const gate = task?.predict && !predictions.locked ? tr.task.gate : null;
   const docRef = useRef(state.doc);
@@ -384,7 +418,25 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     };
     void saveFile(datedName(`${tr.task.submission}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
   };
-  const taskCard = task ? (
+  const taskCard = task?.fault ? (
+    <FaultCard
+      title={taskTitle(task) ?? tr.fault.card.kicker}
+      symptom={task.fault.symptom}
+      session={faultSession}
+      askExpected={task.fault.askExpected}
+      hideIndicators={task.fault.hideIndicators}
+      onExpected={(key, value) =>
+        setFaultSession((s) => ({
+          ...s,
+          log: s.log.map((e) => {
+            if (e.key !== key) return e;
+            const { expected: _old, ...rest } = e;
+            return value === null ? rest : { ...rest, expected: value };
+          }),
+        }))
+      }
+    />
+  ) : task ? (
     <TaskCard
       task={task}
       statuses={taskStatuses}
@@ -1084,6 +1136,19 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const cut = text.lastIndexOf(' ');
     return { value: text.slice(0, cut), unit: `${text.slice(cut + 1)} ${t.units[meter.mode]}` };
   }, [meter.red, meter.black, meter.mode, sim.status, ohms, meterText]);
+
+  // Ölçüm günlüğü (R1): kararlı her okuma kendiliğinden yazılır; aynı nokta ve kip bir kez.
+  const logKey = fault && meter.red && meter.black ? `${meter.mode}|${spotKey(meter.red.spot)}|${spotKey(meter.black.spot)}` : null;
+  const logText = meterReading.note === undefined && meterReading.value !== tr.fault.meter.empty ? (meter.mode === 'dc' ? `${meterReading.value} ${meterReading.unit.replace(/ ⎓$/, '')}` : `${meterReading.value} ${meterReading.unit}`) : null;
+  const meterValue = useRef<number | null>(null);
+  meterValue.current = meter.mode === 'ohm' ? (typeof ohms === 'number' && Number.isFinite(ohms) ? ohms : null) : (sim.frame?.statuses.get(METER_ID)?.reading ?? null);
+  const logName = logKey && redLabel && meter.black ? entryName(meter.mode, redLabel, onGround(meter.black, doc, analysis.idx) ? null : blackLabel) : null;
+  useEffect(() => {
+    if (!logKey || !logText || !logName) return undefined;
+    const mode = meter.mode;
+    const id = window.setTimeout(() => setFaultSession((s) => addEntry(s, { key: logKey, name: logName, mode, text: logText, value: meterValue.current })), mode === 'ohm' ? 300 : STABLE_MS);
+    return () => window.clearTimeout(id);
+  }, [logKey, logText, logName, meter.mode]);
 
   const overlayOpen = share !== null || examplesOpen || modal !== null || stopAsk || kartaOpen;
   const schematic = (

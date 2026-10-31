@@ -2000,6 +2000,18 @@ export const tr = {
     terminal: 'ucu',
     side: { top: 'üst', bottom: 'alt', left: 'sol', right: 'sağ' },
     ground: 'toprak',
+    card: {
+      label: (name: string) => `Arıza bul: ${name}`,
+      kicker: 'Arıza bul',
+      count: (n: number) => `${n} ölçüm`,
+      intro: 'Devre şemadaki gibi kurulmuş ama bir yerde arıza var. Ölçerek bul.',
+      log: 'Ölçüm günlüğü',
+      expectedHead: 'beklenen: senin tahminin',
+      expectedLabel: (name: string) => `${name}: beklediğin değer`,
+      expectedPlaceholder: 'beklenen',
+      empty: 'Henüz ölçüm yok. Multimetrenin uçlarını şemaya koy: kararlı okuma kendiliğinden buraya yazılır.',
+      note: 'Bu kipte kablo renkleri, düğüm gerilimleri ve kartlardaki ölçümler gizli. Yalnızca ölçü aletleriyle ölç.',
+    },
     meter: {
       title: 'Multimetre',
       internal: 'iç direnç 10 MΩ',

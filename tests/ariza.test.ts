@@ -13,6 +13,7 @@ import type { CircuitDoc } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
 import { maskFrame, visibleLive } from '../src/editor/fault/mask';
 import { legLabel, measureResistance, METER_ID, meterPart, wireMeter } from '../src/editor/fault/meter';
+import { addEntry, entryName, NEW_SESSION, parseSession } from '../src/editor/fault/session';
 import type { SimFrame } from '../src/editor/useSimulation';
 import { parseTask, parseTaskPayload } from '../src/model/task';
 import { toSerializable } from '../src/model/serialize';
@@ -204,6 +205,30 @@ describe('Multimetre (R1): uçların adları, Ω, simülasyondaki yeri', () => {
     // Ω kipinde ya da uç eksikken boşta kalır.
     expect(wireMeter(netlist, 'ohm', red, black)).toBe(netlist);
     expect(wireMeter(netlist, 'dc', red, null)).toBe(netlist);
+  });
+});
+
+describe('Ölçüm günlüğü (4. aşama)', () => {
+  const entry = { key: 'dc|p4#0|p2#0', name: entryName('dc', 'Q1 kollektör', null), mode: 'dc' as const, text: '6,442 mV', value: 0.006442 };
+
+  it('ad: siyah uç topraktaysa yalnız kırmızı ucun yeri; değilse ikisi; Ω’da R', () => {
+    expect(entry.name).toBe('V(Q1 kollektör)');
+    expect(entryName('ac', 'Q1 baz', 'Q1 emetör bacağı')).toBe('V(Q1 baz, Q1 emetör bacağı)');
+    expect(entryName('ohm', 'RC üst bacağı', 'RC alt bacağı')).toBe('R(RC üst bacağı, RC alt bacağı)');
+  });
+
+  it('aynı nokta ve kip tekrar yazılmaz; oturum kaydedilip okunur (beklenen değer dahil)', () => {
+    const once = addEntry(NEW_SESSION, entry);
+    expect(addEntry(once, { ...entry, text: '6,5 mV' })).toBe(once);
+    const two = addEntry(once, { ...entry, key: 'ohm|p3#0|p3#1', mode: 'ohm', name: 'R(RC üst bacağı, RC alt bacağı)', text: 'OL', value: null });
+    const saved = JSON.parse(JSON.stringify({ ...two, log: [{ ...two.log[0]!, expected: 6 }, two.log[1]!], hints: 2 }));
+    const back = parseSession(saved);
+    expect(back.log.map((e) => [e.name, e.text, e.value, e.expected])).toEqual([
+      ['V(Q1 kollektör)', '6,442 mV', 0.006442, 6],
+      ['R(RC üst bacağı, RC alt bacağı)', 'OL', null, undefined],
+    ]);
+    expect(back.hints).toBe(2);
+    expect(parseSession('bozuk')).toEqual(NEW_SESSION);
   });
 });
 

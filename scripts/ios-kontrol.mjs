@@ -1560,6 +1560,15 @@ try {
       const open = await reading();
       check('arıza (B2, 3. aşama): Ω yalnızca simülasyon durmuşken; RC’nin iki bacağı ≈ 5,6 kΩ, RC üst bacağı ile kollektör arası MΩ (bacak kopuk)',
         running && /^5,(59\d|600) kΩ$/.test(rc) && /MΩ$|^OL/.test(open), `${rc} · ${open}`);
+      // 4. aşama: ölçüm günlüğü kendiliğinden (uçlar taşınırken her kararlı okuma, Ω'da durunca hemen);
+      // aynı nokta ve kip bir kez (RC'nin iki bacağı yeniden ölçülünce yazılmaz); siyah uç toprakta değilse iki nokta.
+      await place('Kırmızı', 44, -12); await place('Siyah', 44, -4);
+      const log = (await page.getByRole('region', { name: /^Arıza bul:/ }).locator('ol li').allTextContents()).map((r) => r.replace(/\s+/g, ' ').trim());
+      const count = ((await page.getByRole('region', { name: /^Arıza bul:/ }).textContent()) ?? '').match(/(\d+) ölçüm/)?.[1];
+      check('arıza (B2, 4. aşama): ölçüm günlüğü kendiliğinden yazılıyor (sıra, nokta, değer); aynı ölçüm tekrar yazılmıyor; Ω’da iki nokta R(…, …)',
+        log.length === 6 && log[0] === '1V(RC alt bacağı)11,99 V' && /^2V\(Q1 kollektör\)\d+,\d+ mV$/.test(log[1] ?? '') && /^3R\(Q1 kollektör\)[\d,]+ MΩ$/.test(log[2] ?? '') &&
+          log[4] === '5R(RC üst bacağı, RC alt bacağı)5,600 kΩ' && /^6R\(RC üst bacağı, Q1 kollektör\)[\d,]+ MΩ$/.test(log[5] ?? '') && count === '6',
+        log.join(' | '));
       await panel.getByRole('radio', { name: /^Doğru/ }).click();
       await place('Siyah', 7, 16);
       await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(1500);

@@ -79,6 +79,13 @@ export function spotLabel(spot: Spot, doc: CircuitDoc, idx: NetIndex): string {
   return name === '0' ? (doc.parts.find((p) => p.type === 'ground')?.label ?? tr.fault.ground) : name;
 }
 
+/** Uç toprakta mı (toprak sembolünün ucu ya da toprak ağındaki kablo): ölçümün adında yazılmaz. */
+export function onGround(probe: Probe, doc: CircuitDoc, idx: NetIndex): boolean {
+  const spot = probe.spot;
+  if ('part' in spot) return doc.parts.find((p) => p.id === spot.part)?.type === 'ground';
+  return nodeName(spotKey(spot), idx) === '0';
+}
+
 /** Siyah ucun ilk yeri: toprak sembolü (yoksa boşta). */
 export function defaultBlack(doc: CircuitDoc): Probe | null {
   const ground = doc.parts.find((p) => p.type === 'ground');
