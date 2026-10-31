@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { TraceRecorder } from '../src/editor/analysis/recorder';
 import { defaultOffset } from '../src/editor/analysis/TablePane';
-import { fitPoints, fitTau, linearFit, parseTheory, percentError, tableCsv, tableTsv } from '../src/editor/analysis/table';
+import { changeStart, fitLooksLinear, fitPoints, fitTau, linearFit, parseTheory, percentError, tableCsv, tableTsv } from '../src/editor/analysis/table';
 import type { TableRow } from '../src/model/analysis';
 import rc from './veri/veri-rc-dolma.json';
 
@@ -56,6 +56,34 @@ describe('Analiz: tablo', () => {
     expect(ranged.xs.length).toBeGreaterThanOrEqual(49);
     expect(ranged.xs.length).toBeLessThanOrEqual(51);
     expect(defaultOffset(4.21)).toBeCloseTo(4.3, 12);
+  });
+
+  it('uydurmanın varsayılan aralığı sinyalin değişmeye başladığı andan başlar; düz başlangıç yoksa kaydın başı', () => {
+    // Referans kayıt t = 0'da dolmaya başlıyor: kaydın başı (sınır yok).
+    expect(changeStart(recorded(), 'v')).toBeNull();
+    // Anahtar 0,3 s'de kapanıyor: önce 0 V, sonra dolma.
+    const rec = new TraceRecorder();
+    rec.setTraces([{ id: 'v', color: 0, kind: 'voltage', node: 'x', at: { x: 0, y: 0 }, ref: null, refAt: null }]);
+    rec.reset(0, 1, false);
+    for (let i = 0; i < 60; i++) rec.sample({ time: i * 0.005, voltageAt: () => 0, measure: () => null });
+    for (const [t, v] of rc as number[][]) if (t! > 0) rec.sample({ time: 0.3 + t!, voltageAt: () => v!, measure: () => null });
+    const start = changeStart(rec, 'v')!;
+    expect(start).toBeCloseTo(0.295, 6);
+    // Bu aralıkta ln dönüşümüyle τ yine 100 ms; dönüşümsüz doğru R² < 0,9 (uyarı).
+    const lnPoints = fitPoints(rec, { x: 't', y: 'v', lnOffset: 10, from: start });
+    const ln = linearFit(lnPoints.xs, lnPoints.ys)!;
+    expect(fitTau({ x: 't', y: 'v', lnOffset: 10 }, ln)!).toBeCloseTo(0.1, 2);
+    expect(fitLooksLinear(ln)).toBe(true);
+    const plainPoints = fitPoints(rec, { x: 't', y: 'v', lnOffset: null, from: start });
+    const plain = linearFit(plainPoints.xs, plainPoints.ys)!;
+    expect(plain.r2).toBeLessThan(0.9);
+    expect(fitLooksLinear(plain)).toBe(false);
+    // Hiç değişmeyen iz: kaydın başı.
+    const flat = new TraceRecorder();
+    flat.setTraces([{ id: 'v', color: 0, kind: 'voltage', node: 'x', at: { x: 0, y: 0 }, ref: null, refAt: null }]);
+    flat.reset(0, 1, false);
+    for (let i = 0; i < 10; i++) flat.sample({ time: i * 0.005, voltageAt: () => 5, measure: () => null });
+    expect(changeStart(flat, 'v')).toBeNull();
   });
 
   it('düz bir doğruda eğim, kesişim ve R² = 1; tek noktada uydurma yok', () => {

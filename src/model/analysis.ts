@@ -46,7 +46,10 @@ export interface FitSpec {
   readonly y: string;
   /** ln(offset − y) dönüşümü: dolan kondansatörde ln(V − V_C(t)); null ise dönüşüm yok. */
   readonly lnOffset: number | null;
-  /** Uydurulan x aralığı (ör. dolmanın başladığı andan sonrası); null: sınır yok. */
+  /**
+   * Uydurulan x aralığı (ör. dolmanın başladığı andan sonrası); null: sınır yok. Başlangıç hiç
+   * verilmemişse (undefined) x = t'de sinyalin değişmeye başladığı andır (analiz düzeltmeleri, 3).
+   */
   readonly from?: number | null;
   readonly to?: number | null;
 }
@@ -111,7 +114,8 @@ export function parseAnalysis(value: unknown): AnalysisDoc {
   let fit: FitSpec | null = null;
   if (isRecord(value.fit) && typeof value.fit.x === 'string' && typeof value.fit.y === 'string') {
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-    fit = { x: value.fit.x, y: value.fit.y, lnOffset: num(value.fit.lnOffset), from: num(value.fit.from), to: num(value.fit.to) };
+    // Başlangıcı yazılmamış uydurma kendiliğinden başlangıcı korur (undefined), null ise sınır yok.
+    fit = { x: value.fit.x, y: value.fit.y, lnOffset: num(value.fit.lnOffset), ...('from' in value.fit ? { from: num(value.fit.from) } : {}), to: num(value.fit.to) };
   }
   return { traces, rows, labColumn: value.labColumn === true, fit };
 }

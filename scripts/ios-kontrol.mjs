@@ -944,14 +944,24 @@ try {
       heads.slice(0, 4).join('|') === 'Büyüklük|Teorik (sen gir)|Ölçülen (simülasyon)|% Hata' && /^0,\d\d$/.test(errText) && labHead === 1 && /imleç/.test(newRow),
       `${heads.join('|')} · hata ${errText} · ${newRow.slice(0, 40)}`);
     const fitPanel = drawer.getByRole('region', { name: 'Doğru uydur' });
+    // Varsayılan (analiz düzeltmeleri, 3): aralık sinyalin değişmeye başladığı andan; dönüşümsüz doğru
+    // R² < 0,9 → uyarı, "Tabloya ekle" yine görünür; ln ile uyarı kalkıyor.
+    const autoFrom = Number(((await fitPanel.getByRole('textbox', { name: 'x en az' }).inputValue()) ?? '').replace(',', '.'));
+    const warnBefore = ((await fitPanel.getByRole('status').textContent().catch(() => '')) ?? '');
+    const addBefore = await fitPanel.getByRole('button', { name: 'Eğimi tabloya ekle' }).count();
     await fitPanel.getByRole('combobox', { name: 'y dönüşümü' }).selectOption('ln'); await page.waitForTimeout(200);
+    const warnAfter = await fitPanel.getByRole('status').count();
+    const tauText = ((await fitPanel.locator('dl').textContent()) ?? '').replace(/\s+/g, ' ');
+    check('analiz (Tablo): doğru uydurmanın aralığı sinyalin değişmeye başladığı andan; R² < 0,9’da "Veri doğruya benzemiyor" uyarısı (Tabloya ekle görünür); ln ile τ ≈ 100 ms ve uyarı yok',
+      autoFrom > 0.05 && warnBefore.startsWith('Veri doğruya benzemiyor. Üstel bir değişimse ln dönüşümünü dene.') && addBefore === 1 && warnAfter === 0 && /τ = −1 \/ eğim(9\d,\d+|10\d,\d+) ms/.test(tauText),
+      `başlangıç ${autoFrom} s · ${tauText.slice(0, 70)}`);
     const fitText = ((await fitPanel.locator('dl').textContent()) ?? '').replace(/\s+/g, ' ');
     const fitChart = (await fitPanel.getByRole('img').getAttribute('aria-label')) ?? '';
     const rowsBefore = await drawer.locator('tbody tr').count();
     await fitPanel.getByRole('button', { name: 'τ’yu tabloya ekle' }).click(); await page.waitForTimeout(150);
     const tauRow = ((await drawer.locator('tbody tr').last().textContent()) ?? '').replace(/\s+/g, ' ');
     check('analiz (Tablo): doğru uydur y = ln(a − V(C1)), x = t → eğim, τ = −1 / eğim, R²; grafik role="img"; "τ’yu tabloya ekle"',
-      /Eğim−\d/.test(fitText) && /τ = −1 \/ eğim\d/.test(fitText) && /R²0,\d{4} · \d+ nokta/.test(fitText) && fitChart.startsWith('Doğru uydurma: ln(10') &&
+      /Eğim−\d/.test(fitText) && /τ = −1 \/ eğim\d/.test(fitText) && /R²(0,\d{4}|1,0000) · \d+ nokta/.test(fitText) && fitChart.startsWith('Doğru uydurma: ln(10') &&
       (await drawer.locator('tbody tr').count()) === rowsBefore + 1 && tauRow.includes('τ (uydurma)') && tauRow.includes('doğru uydurma'), `${fitText.slice(0, 80)} · ${tauRow.slice(0, 40)}`);
     await drawer.getByRole('button', { name: 'CSV seçenekleri' }).click(); await page.waitForTimeout(150);
     const radios = await page.getByRole('menuitemradio').evaluateAll((els) => els.map((e) => `${e.textContent.trim()}=${e.getAttribute('aria-checked')}`));
