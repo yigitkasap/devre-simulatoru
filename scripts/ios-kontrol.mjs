@@ -2289,6 +2289,19 @@ try {
       allBox !== null && Math.abs(allBox.width - 840) < 2 && sceneAll !== null && Math.abs(sceneAll.width - 600) < 2 &&
       allText.includes('Kat 1 devresi tamamlandı: B1 + → ortak prob → su → Prob 1 → RB1 → Q1 → toprak → B1 −') && allText.includes('Prob 2, 3 kuru: devre açık') && openMarks === 2,
       `${Math.round(allBox?.width ?? 0)}/${Math.round(sceneAll?.width ?? 0)} px · açık ×${openMarks}`);
+    // Su seviyesi değişince Tüm devrenin durum satırları (tamamlanan katlar, kuru prob notu) çizimi
+    // aşağı yukarı oynatmıyor: alanın yüksekliği sabit (kullanıcı isteği, 31 Ekim).
+    const drawingTop = async () => Math.round((await aside.locator('svg[role=img]').first().boundingBox())?.y ?? -1);
+    const top50 = await drawingTop();
+    await bp.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined));
+    await bp.keyboard.press('3'); const at95 = await waitLevel(bp, 95, 15000); await bp.waitForTimeout(1200);
+    const top95 = await drawingTop();
+    const rows95 = await aside.locator('svg[role=img]').count() > 0 ? ((await aside.textContent()) ?? '').match(/devresi tamamlandı/g)?.length ?? 0 : 0;
+    await bp.keyboard.press('r'); await waitLevel(bp, 20, 15000); await bp.waitForTimeout(800);
+    const top20 = await drawingTop();
+    await bp.keyboard.press('1'); await waitLevel(bp, 50, 15000); await bp.waitForTimeout(800);
+    check('baraj (masaüstü): Tüm devrede su doldukça ve alçaldıkça durum satırları değişse de çizim yerinde kalıyor (%20, %50, %95’te üst kenarı aynı)',
+      top50 > 0 && top50 === top95 && top50 === top20 && at95 === 95 && rows95 === 3, `üst ${top20} / ${top50} / ${top95} px · %${at95}’te ${rows95} satır`);
     const allView = await view3d();
     await aside.getByRole('button', { name: 'Devreyi tam ekran aç' }).click(); await bp.waitForTimeout(200);
     const wideBox = await aside.boundingBox();

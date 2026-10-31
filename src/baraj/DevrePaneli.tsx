@@ -593,6 +593,14 @@ export function loopChain(kat: KatDevresi, battery: string): string[] {
   return [`${battery} +`, t.chainCommon, t.waterShort, t.probe(kat.level), kat.labels.rb, via, t.ground, `${battery} −`];
 }
 
+/** Yer tutucu için halkanın en uzun yazısı: transistörün ya da susturucunun adı, hangisi uzunsa. */
+function longestChain(kat: KatDevresi, battery: string): string {
+  const chain = loopChain(kat, battery);
+  const via = [kat.labels.q, kat.silencer?.label ?? ''].reduce((a, b) => (b.length > a.length ? b : a));
+  chain[5] = via;
+  return chain.join(' → ');
+}
+
 function Tabs({ tab, onTab, touch, panelId, idBase }: { tab: CircuitTab; onTab: (t: CircuitTab) => void; touch: boolean; panelId: string; idBase: string }) {
   const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
     const i = TABS.indexOf(tab);
@@ -781,23 +789,43 @@ export function DevrePaneli({ variant, katlar, tab, onTab, level, supply, batter
         </div>
       )}
 
-      {tab === 'all' && anySim && (
-        <div className={`flex shrink-0 flex-col items-start gap-2 border-b border-line bg-panel-2 ${sheet ? 'px-4 py-2.5 text-small' : `px-5 py-2.5 ${textSize}`}`}>
-          {closed.map((k) => (
-            <span key={k.level} className="flex items-start gap-2 rounded-lg border border-ok-line bg-ok-soft px-3 py-1.5">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="var(--color-ok)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0">
-                <path d="M4.5 10.5l3.5 3.5 7.5-8" />
-              </svg>
-              <span>
-                <span className="font-semibold text-ok-ink">{t.closed(k.level)}</span> {loopChain(k, battery).join(' → ')}
+      {tab === 'all' && (
+        // Durum alanının yüksekliği sabit: su doldukça ya da alçaldıkça satır sayısı değişir, çizim
+        // aşağı yukarı oynamasın diye en uzun hâl (bütün katlar tamamlandı) aynı hücrede görünmez yer
+        // tutar. Tamamlanan katlar ve kuru prob notu birlikte kat sayısını geçmez, not satırı da bir
+        // tamamlandı satırından kısadır. Yer tutucunun yazısı CSS'le (attr) çizilir: sayfanın metnine
+        // ve ekran okuyucuya girmez, satırları gerçeğiyle aynı genişlikte kırılır.
+        <div className={`grid shrink-0 border-b border-line bg-panel-2 ${sheet ? 'px-4 py-2.5 text-small' : `px-5 py-2.5 ${textSize}`}`}>
+          <div aria-hidden="true" className="invisible col-start-1 row-start-1 flex flex-col items-start gap-2">
+            {katlar.map((k) => (
+              <span key={k.level} className="flex items-start gap-2 rounded-lg border border-ok-line px-3 py-1.5">
+                <span className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                  <span className="font-semibold before:content-[attr(data-text)]" data-text={t.closed(k.level)} />{' '}
+                  <span className="before:content-[attr(data-text)]" data-text={longestChain(k, battery)} />
+                </span>
               </span>
-            </span>
-          ))}
-          {dry.length > 0 && (
-            <span className="flex items-center gap-1.5 text-warn">
-              <span aria-hidden="true" className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-dashed border-warn" />
-              {t.dryNote(dry)}
-            </span>
+            ))}
+          </div>
+          {anySim && (
+            <div className="col-start-1 row-start-1 flex flex-col items-start gap-2">
+              {closed.map((k) => (
+                <span key={k.level} className="flex items-start gap-2 rounded-lg border border-ok-line bg-ok-soft px-3 py-1.5">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="var(--color-ok)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="mt-0.5 shrink-0">
+                    <path d="M4.5 10.5l3.5 3.5 7.5-8" />
+                  </svg>
+                  <span>
+                    <span className="font-semibold text-ok-ink">{t.closed(k.level)}</span> {loopChain(k, battery).join(' → ')}
+                  </span>
+                </span>
+              ))}
+              {dry.length > 0 && (
+                <span className="flex items-center gap-1.5 text-warn">
+                  <span aria-hidden="true" className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-dashed border-warn" />
+                  {t.dryNote(dry)}
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}
