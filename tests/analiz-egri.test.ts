@@ -3,7 +3,7 @@
 // I_DSS'ye çıkar; diyotta akım sınırı; BJT'de I_C ≈ β · I_B; P tipinde büyüklükler pozitif.
 
 import { describe, expect, it } from 'vitest';
-import { curveAt, defaultRequest, loadLine, runSweep, supplyTo, sweepValues, type SweepRequest } from '../src/editor/analysis/sweep';
+import { curveAt, defaultRequest, loadLine, qSteps, runSweep, supplyTo, sweepValues, type SweepRequest } from '../src/editor/analysis/sweep';
 import { buildConnectivity } from '../src/model/connectivity';
 import { exampleDoc } from '../src/examples';
 import bf245a from './veri/veri-bf245a.json';
@@ -112,5 +112,25 @@ describe('Analiz: eğri izleyici', () => {
     expect(curves[4]!.q).toBe(true);
     // Q noktası (V_DS, I_D) Q eğrisinin üstünde.
     expect(Math.abs(curveAt(curves[4]!, ml.q[0]) / ml.q[1] - 1)).toBeLessThan(0.05);
+  });
+  it('MOSFET’te yük doğrusu açıkken varsayılan basamaklar Q’nun çevresinde: IRF510 yükselteçte 3,83 / 3,84 / 3,86 / 3,87 V; eğriler yük doğrusuyla aynı ölçekte', () => {
+    const mos = exampleDoc('mosfet-yukseltec')!;
+    const m1 = mos.parts.find((p) => p.type === 'nmos')!;
+    const ml = loadLine(buildConnectivity(mos).netlist, m1.id, {})!;
+    expect(ml.threshold).toBeCloseTo(3.83, 6);
+    const steps = qSteps(ml.qStep!, ml.threshold!);
+    expect(steps).toEqual([3.83, 3.84, 3.86, 3.87]);
+    const curves = runSweep({ type: 'nmos', props: m1.props, mode: 'output', from: 0, to: 15, step: 0.25, steps, qStep: ml.qStep! });
+    // En büyük basamağın akımı yük doğrusunun en büyük akımıyla (15 V / 11 kΩ ≈ 1,36 mA) aynı ölçekte.
+    const top = Math.max(...curves[3]!.points.map(([, y]) => y));
+    expect(top).toBeGreaterThan(1e-3);
+    expect(top).toBeLessThan(3e-3);
+    // Q'daki akım (≈ 0,68 mA) 3,84 V ve 3,86 V eğrilerinin arasında.
+    const atQ = (c: number) => curveAt(curves[c]!, ml.q[0]);
+    expect(atQ(1)).toBeLessThan(ml.q[1]);
+    expect(atQ(2)).toBeGreaterThan(ml.q[1]);
+    // BJT ve JFET'te eşik yok: basamaklar değişmez.
+    const amp = exampleDoc('bjt-yukseltec')!;
+    expect(loadLine(buildConnectivity(amp).netlist, amp.parts.find((p) => p.label === 'Q1')!.id, {})!.threshold).toBeNull();
   });
 });

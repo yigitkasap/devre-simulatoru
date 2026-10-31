@@ -47,7 +47,7 @@ const plain = (text: string) => text.replace(/_\{([^}]*)\}/g, '$1');
 /** Basamağın yazısı: gerilim volt cinsinden ("−0,2 V"), akım önekli ("10 µA"; BJT'de ölçülen). */
 export function stepValueText(v: number, unit: 'V' | 'A'): string {
   if (unit === 'A') return formatSI(v, 'A', { trim: true, digits: 3 });
-  return `${formatNumber(v, 2).replace(/,?0+$/, '').replace(/^-/, '−')} V`;
+  return `${formatNumber(v, 3).replace(/,?0+$/, '').replace(/^-/, '−')} V`;
 }
 
 export function stepText(curve: Curve, unit: 'V' | 'A'): string {
@@ -107,6 +107,8 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
   const unit = axisUnit(maxI, 'A');
   // Taramanın gerçek üst sınırı: yük doğrusu açıkken beslemeye uzamış olabilir (analiz düzeltmeleri, 9).
   const to = fresh?.to ?? params.to;
+  // Gösterilen basamaklar taranan basamaklardır (MOSFET'te Q'nun çevresinde seçilmiş olabilir).
+  const shownSteps = fresh?.steps ?? params.steps;
   const lo = Math.min(params.from, to);
   const hi = Math.max(params.from, to);
   const cur = Math.min(hi, Math.max(lo, cursor ?? lo + ((hi - lo) * 2) / 3));
@@ -194,7 +196,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
             {t.stepsLabel}: <Rich text={q.step} />
           </span>
           <span className="flex flex-wrap gap-1.5">
-            {params.steps.map((s, i) => {
+            {shownSteps.map((s, i) => {
               const text = stepValueText(s, q.stepUnit);
               return (
                 <span key={`${s}${i}`} className={`flex items-center gap-1 rounded-full border border-line bg-panel pl-2.5 font-mono text-small text-ink ${touch ? 'h-11' : 'h-8'}`}>
@@ -202,8 +204,8 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
                   {text}
                   <button
                     type="button"
-                    disabled={params.steps.length <= 1}
-                    onClick={() => tracer.setParams({ steps: params.steps.filter((_, j) => j !== i) })}
+                    disabled={shownSteps.length <= 1}
+                    onClick={() => tracer.setParams({ steps: shownSteps.filter((_, j) => j !== i), stepsAuto: false })}
                     aria-label={t.removeStep(text)}
                     className={`flex items-center justify-center rounded-full text-muted hover:bg-app disabled:opacity-40 ${touch ? 'h-11 w-11' : 'h-8 w-8'}`}
                   >
@@ -224,13 +226,13 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
                   if (e.key !== 'Enter') return;
                   const raw = (e.target as HTMLInputElement).value.trim().replace(',', '.').replace('−', '-').replace(/µ$/, 'e-6').replace(/u$/, 'e-6').replace(/m$/, 'e-3');
                   const v = Number(raw);
-                  if (Number.isFinite(v) && params.steps.length < 6) tracer.setParams({ steps: [...params.steps, v] });
+                  if (Number.isFinite(v) && shownSteps.length < 6) tracer.setParams({ steps: [...shownSteps, v], stepsAuto: false });
                   setAdding(false);
                 }}
                 className={`${field} w-24 flex-none`}
               />
             ) : (
-              params.steps.length < 6 && (
+              shownSteps.length < 6 && (
                 <button type="button" onClick={() => setAdding(true)} aria-label={t.addStep} title={t.addStep} className={`flex items-center justify-center rounded-full border border-line text-ink hover:bg-panel-2 ${touch ? 'h-11 w-11' : 'h-8 w-8'}`}>
                   <Icon name="plus" className="h-4 w-4" />
                 </button>

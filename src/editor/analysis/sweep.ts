@@ -189,6 +189,28 @@ export interface LoadLine {
   readonly q: readonly [number, number];
   /** Q noktasındaki basamak: BJT'de I_B (A), FET'te V_GS (V); büyüklük (P tipinde işaret çevrilmiş). */
   readonly qStep: number | null;
+  /** MOSFET'in eşik gerilimi (büyüklük; Q çevresindeki basamaklar için); öbürlerinde null. */
+  readonly threshold: number | null;
+}
+
+/** x'e logaritmik olarak en yakın 1, 2, 5 × 10ⁿ. */
+function niceStep(x: number): number {
+  const e = 10 ** Math.floor(Math.log10(x));
+  const f = x / e;
+  const pick = [1, 2, 5, 10].reduce((best, c) => (Math.abs(Math.log(f / c)) < Math.abs(Math.log(f / best)) ? c : best), 1);
+  return pick * e;
+}
+
+/**
+ * MOSFET'te yük doğrusu açıkken varsayılan basamaklar (kullanıcı kararı): Q'daki V_GS'nin çevresinde,
+ * böylece Q eğrisi ve öbürleri aynı ölçekte. Adım (V_GS − V_T) / 2'nin 1-2-5 yuvarlanmışı (en az
+ * 5 mV); basamaklar Q'ya en yakın adım katının ±1 ve ±2 adımı (Q'nun kendisi ayrı eğri). IRF510
+ * yükselteçte V_GS = 3,854 V, V_T = 3,83 V → 3,83 / 3,84 / 3,86 / 3,87 V.
+ */
+export function qSteps(qVgs: number, threshold: number): number[] {
+  const step = niceStep(Math.max(0.005, (qVgs - Math.abs(threshold)) / 2));
+  const center = Math.round(qVgs / step) * step;
+  return [-2, -1, 1, 2].map((k) => Number((center + k * step).toFixed(6)));
 }
 
 /** Yük doğrusu açıkken taramanın üst sınırı: besleme, adımın tam katına yukarı yuvarlanmış. */
@@ -244,6 +266,9 @@ export function loadLine(netlist: Netlist, dutId: string, labels: Readonly<Recor
   const ok = sim.isTransient ? sim.runUntil(1).ok : sim.advance(0).ok;
   const m = sim.measure(dutId);
   const control = sim.status(dutId).control;
+  // MOSFET'in eşiği aygıtın kendisinden (modelin varsayılanı dahil).
+  const device = sim.device(dutId) as { readonly threshold?: number } | undefined;
+  const threshold = (dut.type === 'nmos' || dut.type === 'pmos') && typeof device?.threshold === 'number' ? Math.abs(device.threshold) : null;
   if (!ok || !m) return null;
   const sign = isP(dut.type) ? -1 : 1;
   const vFar = sim.voltageAt(far(rd, drain)!) ?? 0;
@@ -251,5 +276,5 @@ export function loadLine(netlist: Netlist, dutId: string, labels: Readonly<Recor
   const r = Number(rd.props.resistance ?? 0) + (rs ? Number(rs.props.resistance ?? 0) : 0);
   if (!(r > 0)) return null;
   const qStep = control ? sign * (FAMILY[dut.type] === 'bjt' ? control.current : control.voltage) : null;
-  return { r, label: labels[rd.id] ?? rd.id, supply: sign * (vFar - vLow), q: [sign * m.voltage, sign * m.current], qStep };
+  return { r, label: labels[rd.id] ?? rd.id, supply: sign * (vFar - vLow), q: [sign * m.voltage, sign * m.current], qStep, threshold };
 }

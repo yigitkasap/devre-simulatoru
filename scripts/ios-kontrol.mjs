@@ -1083,6 +1083,22 @@ try {
       /^Q · (4,[89]|5,[0-4])\d* µA$/.test(qLabel) && qStrong === 1 && toValue === '12' && /^5 × 121 noktalık DC tarama$/.test(summaryOn) &&
       !offLabels.some((x) => x.startsWith('Q · ')) && toOff === '10',
       `${qLabel} · bitiş ${toValue} / ${toOff} · ${summaryOn}`);
+    // MOSFET (kullanıcı kararı): yük doğrusu açıkken varsayılan basamaklar Q'daki V_GS'nin çevresinde;
+    // kullanıcı bir basamağı silince onun seçtiği basamaklar kalır.
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /IRF510 ile ortak kaynaklı yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    // M1'in taraması bitene kadar (önceki parçanın sonucu ekranda kalabilir).
+    await drawer.getByRole('button', { name: '3,83 V basamağını kaldır' }).waitFor({ timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(200);
+    const stepChips = async () => (await drawer.getByRole('button', { name: / basamağını kaldır$/ }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label').replace(' basamağını kaldır', ''))));
+    const mosChips = await stepChips();
+    const mosQ = (await drawer.getByRole('img', { name: /^Eğri izleyici: M1/ }).locator('text').allTextContents()).find((x) => x.startsWith('Q · ')) ?? '';
+    await drawer.getByRole('button', { name: '3,83 V basamağını kaldır' }).click();
+    await drawer.getByText(/^4 × \d+ noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
+    const userChips = await stepChips();
+    check('eğri izleyici (MOSFET, kullanıcı kararı): yük doğrusu açıkken basamaklar Q’nun çevresinde (3,83 / 3,84 / 3,86 / 3,87 V, Q · 3,854 V); bir basamak silinince kullanıcının basamakları kalıyor',
+      mosChips.join('|') === '3,83 V|3,84 V|3,86 V|3,87 V' && /^Q · 3,85\d V$/.test(mosQ) && userChips.join('|') === '3,84 V|3,86 V|3,87 V',
+      `${mosChips.join(', ')} · ${mosQ} · ${userChips.join(', ')}`);
     await ctx.close();
   }
   {
