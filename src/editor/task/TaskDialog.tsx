@@ -53,9 +53,12 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
     () => draft ?? { name: title, instruction: '', editable: [], allowNew: false, targets: [], predict: false },
   );
   useEffect(() => onDraft(task), [task, onDraft]);
+  // Bağlantıda başlangıç devresinin adı da (görev adı silinirse öğrencinin üst çubuğunda o görünür).
+  const named = title !== tr.phone.defaultName && title !== tr.phone.emptyName;
+  const payloadTask = useMemo<TaskDef>(() => (named ? { ...task, circuit: title } : task), [task, named, title]);
   const set = (patch: Partial<TaskDef>) => setTask((x) => ({ ...x, ...patch }));
   const setTarget = (id: string, patch: Partial<Target>) => set({ targets: task.targets.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
-  const url = useMemo(() => taskUrl(task, doc, window.location.href), [task, doc]);
+  const url = useMemo(() => taskUrl(payloadTask, doc, window.location.href), [payloadTask, doc]);
   const tooLong = url.length > LINK_LIMIT;
   const [copied, setCopied] = useState(false);
   const first = useRef<HTMLInputElement>(null);
@@ -70,7 +73,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
       notify(t.copyFailed);
     }
   };
-  const file = () => void saveFile(datedName(`gorev-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(taskPayload(task, doc), null, 2)}\n`], { type: 'application/json' }));
+  const file = () => void saveFile(datedName(`gorev-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(taskPayload(payloadTask, doc), null, 2)}\n`], { type: 'application/json' }));
   const field = `w-full min-w-0 rounded-lg border border-line-2 bg-panel px-3 ${touch ? 'h-11 text-[16px]' : 'h-10 text-sm'}`;
   const parts = doc.parts.filter((p) => p.type !== 'ground');
   const unitOf = (target: Target) => options.find((o) => o.key === quantityKey(target.q))?.unit ?? '';

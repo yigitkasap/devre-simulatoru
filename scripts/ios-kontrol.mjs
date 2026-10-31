@@ -1215,10 +1215,11 @@ try {
     const cardHtml = (await card.innerHTML().catch(() => '')) ?? '';
     const chip = (await st.getByText(/^Görev kipi/).textContent().catch(() => '')) ?? '';
     const pencil = await notebook(st).locator('[data-card]').filter({ has: st.locator('[title="değiştirilebilir"]') }).count();
+    const titleButton = await st.getByRole('button', { name: 'Dosya ve örnekler: Deney 7 · BJT yükselteç tasarımı' }).count();
     const locks = await notebook(st).locator('[data-card]').filter({ has: st.locator('[title="kilitli"]') }).count();
     const canvasLocks = await st.locator('svg.schematic g[aria-hidden="true"] circle[r="7.5"]').count();
-    check('görev (öğrenci, N5): defterin en üstünde görev kartı (0 / 3; adlar <sub> ile: VCE, fH; "not vermez"); "Görev kipi · yalnızca RB ve RC değişir"; defterde RB, RC kalemli, öbürleri kilitli; şemada kilit rozetleri',
-      (await card.count()) === 1 && /V<sub[^>]*>CE<\/sub>/.test(cardHtml) && /f<sub[^>]*>H<\/sub>/.test(cardHtml) && !cardHtml.includes('V_') && !cardHtml.includes('f_') && cardHtml.includes('not vermez') &&
+    check('görev (öğrenci, N5): defterin en üstünde görev kartı (0 / 3; adlar <sub> ile: VCE, fH; "not vermez"); "Görev kipi · yalnızca RB ve RC değişir"; defterde RB, RC kalemli, öbürleri kilitli; şemada kilit rozetleri; üst çubukta görevin adı ("Devrem" değil)',
+      titleButton === 1 && (await card.count()) === 1 && /V<sub[^>]*>CE<\/sub>/.test(cardHtml) && /f<sub[^>]*>H<\/sub>/.test(cardHtml) && !cardHtml.includes('V_') && !cardHtml.includes('f_') && cardHtml.includes('not vermez') &&
       chip === 'Görev kipi · yalnızca RB ve RC değişir' && pencil === 2 && locks >= 5 && canvasLocks >= 5 && (await card.getByLabel('3 hedefin 0 tanesi tuttu').count()) === 1,
       `${chip} · kalem ${pencil}, kilit ${locks}, şemada ${canvasLocks}`);
     // Kilitli Q1'in β'sı değişmiyor, bildirim çıkıyor.

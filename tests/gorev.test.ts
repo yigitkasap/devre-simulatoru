@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { exampleDoc } from '../src/examples';
-import { LINK_LIMIT, NO_PREDICTIONS, parsePredictions, parseTask, parseTaskPayload, predictionError, respectsTask, targetMet, taskFromHash, taskPayload, taskUrl, type TaskDef } from '../src/model/task';
+import { LINK_LIMIT, NO_PREDICTIONS, parsePredictions, parseTask, parseTaskPayload, predictionError, respectsTask, targetMet, taskFromHash, taskPayload, taskTitle, taskUrl, type TaskDef } from '../src/model/task';
 import { buildConnectivity } from '../src/model/connectivity';
 import { netIndex } from '../src/editor/analysis/traces';
 import { goalText, targetOptions } from '../src/editor/task/targets';
@@ -36,6 +36,19 @@ describe('Görev', () => {
     expect(parseTaskPayload(JSON.parse(JSON.stringify(taskPayload(task, amp))))!.task).toEqual(task);
     expect(taskFromHash('#d=abc')).toBeUndefined();
     expect(taskFromHash('#g=bozuk')).toBeNull();
+  });
+
+  it('üst çubuktaki ad (analiz düzeltmeleri, 4): görevin adı, yoksa bağlantıdaki başlangıç devresinin adı; eski bağlantı da açılır', () => {
+    const withCircuit = { ...task, circuit: 'BC107 ile ortak emetörlü yükselteç' };
+    const back = taskFromHash(new URL(taskUrl(withCircuit, amp, 'https://yigitkasap.github.io/devre-simulatoru/')).hash)!.task;
+    expect(back.circuit).toBe('BC107 ile ortak emetörlü yükselteç');
+    expect(taskTitle(back)).toBe('Deney 7 · BJT yükselteç tasarımı');
+    expect(taskTitle({ ...back, name: '  ' })).toBe('BC107 ile ortak emetörlü yükselteç');
+    // Eski bağlantı (devre adı yok): görev adı; ikisi de yoksa null (üst çubukta "Devrem").
+    const old = taskFromHash(new URL(taskUrl(task, amp, 'https://yigitkasap.github.io/devre-simulatoru/')).hash)!.task;
+    expect(old.circuit).toBeUndefined();
+    expect(taskTitle(old)).toBe('Deney 7 · BJT yükselteç tasarımı');
+    expect(taskTitle({ ...old, name: '' })).toBeNull();
   });
 
   it('hedef: ± tolerans, ≥ ve ≤; ölçülemeyen hedef tutmaz', () => {

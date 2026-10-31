@@ -21,7 +21,7 @@ import { AnalysisDrawer, AnalysisSheetBody, DEFAULT_DRAWER, MIN_DRAWER, TALL_DRA
 import { useAnalysis } from './analysis/useAnalysis';
 import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
-import { NO_PREDICTIONS, parsePredictions, parseTask, respectsTask, targetMet, taskFromHash, type Predictions, type TaskDef } from '../model/task';
+import { NO_PREDICTIONS, parsePredictions, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
 import { parseEmbedParams, type EmbedOptions } from '../model/embed';
 import { toSerializable } from '../model/serialize';
 import { datedName, saveFile } from './analysis/format';
@@ -817,7 +817,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     if (addOpen) setChainOff(false);
   }, [addOpen]);
 
-  const circuitTitle = activeExample
+  // Görevle açılan devre (bağlantı, dosya ya da kayıt): görevin adı, yoksa başlangıç devresinin adı.
+  const circuitTitle = task
+    ? (taskTitle(task) ?? tr.phone.defaultName)
+    : activeExample
     ? tr.examples.texts[activeExample].title
     : doc.parts.length === 0 && doc.wires.length === 0
       ? tr.phone.emptyName

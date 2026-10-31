@@ -45,6 +45,16 @@ export interface TaskDef {
    * ölçemez; sonra tahmin ve ölçülen yan yana. Eski bağlantılarda yok (false).
    */
   readonly predict: boolean;
+  /**
+   * Başlangıç devresinin adı (açık örneğin adı): görev adı boşsa üst çubukta bu görünür (analiz
+   * düzeltmeleri, 4). Eski bağlantılarda yok.
+   */
+  readonly circuit?: string;
+}
+
+/** Görevle açılan devrenin üst çubuktaki adı: görevin adı, yoksa başlangıç devresinin adı. */
+export function taskTitle(task: TaskDef): string | null {
+  return task.name.trim() || task.circuit?.trim() || null;
 }
 
 /** Öğrencinin tahminleri (hedef kimliği → değer) ve kaydedildi mi. */
@@ -104,6 +114,7 @@ export function parseTask(v: unknown): TaskDef | null {
     allowNew: v.allowNew === true,
     targets,
     predict: v.predict === true,
+    ...(str(v.circuit, 120).trim() ? { circuit: str(v.circuit, 120).trim() } : {}),
   };
 }
 
