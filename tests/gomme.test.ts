@@ -43,7 +43,7 @@ describe('Gömme', () => {
   });
 
   it('salt okunur: anahtar açılıp kapanır, ölçü aletinin ayarı değişir; parça değeri, silme ve kablo değişmez', () => {
-    const readOnly = { name: '', instruction: '', editable: [], allowNew: false, targets: [] };
+    const readOnly = { name: '', instruction: '', editable: [], allowNew: false, targets: [], predict: false };
     const change = (label: string, props: Record<string, number | string | boolean>) => ({ ...rc, parts: rc.parts.map((p) => (p.label === label ? { ...p, props: { ...p.props, ...props } } : p)) });
     expect(respectsTask(rc, change('S1', { closed: true }), readOnly)).toBe(true);
     expect(respectsTask(rc, change('R1', { resistance: 2200 }), readOnly)).toBe(false);

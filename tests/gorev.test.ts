@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { exampleDoc } from '../src/examples';
-import { LINK_LIMIT, parseTaskPayload, respectsTask, targetMet, taskFromHash, taskPayload, taskUrl, type TaskDef } from '../src/model/task';
+import { LINK_LIMIT, NO_PREDICTIONS, parsePredictions, parseTask, parseTaskPayload, predictionError, respectsTask, targetMet, taskFromHash, taskPayload, taskUrl, type TaskDef } from '../src/model/task';
 import { buildConnectivity } from '../src/model/connectivity';
 import { netIndex } from '../src/editor/analysis/traces';
 import { goalText, targetOptions } from '../src/editor/task/targets';
@@ -22,6 +22,7 @@ const task: TaskDef = {
     { id: 'b', q: { kind: 'bode', measure: 'gain' }, op: 'tol', value: 200, tol: 10 },
     { id: 'c', q: { kind: 'bode', measure: 'fH' }, op: 'ge', value: 500e3, tol: 0 },
   ],
+  predict: true,
 };
 
 describe('Görev', () => {
@@ -61,6 +62,18 @@ describe('Görev', () => {
     expect(goalText(vce, 'V')).toBe('Hedef 6 V ± %10');
     expect(goalText(gain, '')).toBe('Hedef 200 ± %10');
     expect(goalText(fh, 'Hz')).toBe('Hedef ≥ 500 kHz');
+  });
+
+  it('önce tahmin (B1): bağlantıda taşınır, eski bağlantıda kapalı; tahminler okunur; fark ölçülene göre', () => {
+    const url = taskUrl(task, amp, 'https://yigitkasap.github.io/devre-simulatoru/');
+    expect(taskFromHash(new URL(url).hash)!.task.predict).toBe(true);
+    const { predict: _, ...old } = task;
+    expect(parseTask(JSON.parse(JSON.stringify(old)))!.predict).toBe(false);
+    expect(parsePredictions({ values: { a: 6, b: 'x', c: 2e5 }, locked: true })).toEqual({ values: { a: 6, c: 2e5 }, locked: true });
+    expect(parsePredictions(null)).toEqual(NO_PREDICTIONS);
+    expect(predictionError(6, 5.99)).toBeCloseTo(0.167, 2);
+    expect(predictionError(200, 205.8)).toBeCloseTo(2.818, 2);
+    expect(predictionError(6, null)).toBeNull();
   });
 
   it('kilit: RB değişebilir, Q1 ve PS1 değişmez; osiloskop ayarı değişebilir; yeni parça ve kablo eklenemez', () => {

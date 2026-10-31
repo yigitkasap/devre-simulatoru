@@ -166,6 +166,16 @@ function CsvMenu({ api, g, touch }: { api: AnalysisApi; g: Graph; touch: boolean
 
 // --- Masaüstü çekmecesi -------------------------------------------------------------------------------
 
+/** Görevde tahminler kaydedilmeden ölçüm sekmelerinin yerine (B1). */
+function GateNote({ text }: { text: string }) {
+  return (
+    <p className="m-0 flex items-center gap-2 px-4 py-6 text-small text-ink-2">
+      <Icon name="target" className="h-4 w-4 shrink-0 text-accent-ink" />
+      {text}
+    </p>
+  );
+}
+
 export function AnalysisDrawer(
   props: AnalysisPanelProps & {
     readonly height: number;
@@ -205,7 +215,7 @@ export function AnalysisDrawer(
           {tr.analysis.graph.csv}
         </button>
       </>
-    ) : api.tab === 'curve' ? (
+    ) : api.gate && (api.tab === 'curve' || api.tab === 'bode') ? null : api.tab === 'curve' ? (
       <>
         <span className="mr-1 text-label text-muted" aria-live="polite">{curveSummary(api.tracer)}</span>
         {api.tracer.progress ? (
@@ -299,7 +309,7 @@ export function AnalysisDrawer(
         </button>
       </div>
       <div role="tabpanel" id={`${idBase}-panel`} aria-labelledby={`${idBase}-${api.tab}`} className="flex min-h-0 flex-1 flex-col">
-        {api.tab === 'graph' ? <GraphDesk {...props} g={g} touch={touch} /> : api.tab === 'table' ? <TablePane api={api} recorder={props.recorder} version={g.version} title={props.title} /> : api.tab === 'curve' ? <CurvePane tracer={api.tracer} /> : <BodePane api={api} />}
+        {api.tab === 'graph' ? <GraphDesk {...props} g={g} touch={touch} /> : api.tab === 'table' ? <TablePane api={api} recorder={props.recorder} version={g.version} title={props.title} /> : api.gate && (api.tab === 'curve' || api.tab === 'bode') ? <GateNote text={api.gate} /> : api.tab === 'curve' ? <CurvePane tracer={api.tracer} /> : <BodePane api={api} />}
       </div>
     </section>
   );
@@ -495,13 +505,15 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
           </>
         ) : api.tab === 'table' ? (
           <TablePane api={api} recorder={recorder} version={g.version} title={props.title} compact />
+        ) : api.gate && (api.tab === 'curve' || api.tab === 'bode') ? (
+          <GateNote text={api.gate} />
         ) : api.tab === 'curve' ? (
           <CurvePane tracer={api.tracer} compact />
         ) : (
           <BodePane api={api} compact />
         )}
       </div>
-      {api.tab === 'bode' && (
+      {api.tab === 'bode' && !api.gate && (
         <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
           {api.bode.progress ? (
             <button type="button" onClick={api.bode.cancel} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold">
@@ -520,7 +532,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
           </button>
         </div>
       )}
-      {api.tab === 'curve' && (
+      {api.tab === 'curve' && !api.gate && (
         <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
           {api.tracer.progress ? (
             <button type="button" onClick={api.tracer.cancel} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold">

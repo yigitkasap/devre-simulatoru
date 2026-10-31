@@ -40,6 +40,32 @@ export interface TaskDef {
   /** Yeni parça (ve kablo) eklenebilir mi. */
   readonly allowNew: boolean;
   readonly targets: readonly Target[];
+  /**
+   * Önce tahmin (B1): öğrenci her hedef için tahminini yazıp kaydetmeden simülasyonu çalıştıramaz ve
+   * ölçemez; sonra tahmin ve ölçülen yan yana. Eski bağlantılarda yok (false).
+   */
+  readonly predict: boolean;
+}
+
+/** Öğrencinin tahminleri (hedef kimliği → değer) ve kaydedildi mi. */
+export interface Predictions {
+  readonly values: Readonly<Record<string, number>>;
+  readonly locked: boolean;
+}
+
+export const NO_PREDICTIONS: Predictions = { values: {}, locked: false };
+
+export function parsePredictions(v: unknown): Predictions {
+  if (!isRecord(v) || !isRecord(v.values)) return NO_PREDICTIONS;
+  const values: Record<string, number> = {};
+  for (const [k, x] of Object.entries(v.values)) if (typeof x === 'number' && Number.isFinite(x)) values[k] = x;
+  return { values, locked: v.locked === true };
+}
+
+/** Tahminin ölçülenden farkı (%, ölçülene göre); ölçülen yoksa ya da 0 ise null. */
+export function predictionError(prediction: number, measured: number | null): number | null {
+  if (measured === null || measured === 0) return null;
+  return (Math.abs(prediction - measured) / Math.abs(measured)) * 100;
 }
 
 /** Bağlantı bu uzunluğu aşınca pencere uyarır ve görev dosyasını önerir (kullanıcı kararı: 8 KB). */
@@ -77,6 +103,7 @@ export function parseTask(v: unknown): TaskDef | null {
     editable: Array.isArray(v.editable) ? v.editable.filter((x): x is string => typeof x === 'string').slice(0, 500) : [],
     allowNew: v.allowNew === true,
     targets,
+    predict: v.predict === true,
   };
 }
 

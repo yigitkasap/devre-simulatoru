@@ -50,7 +50,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
   const touch = useTouchUi();
   const options = useMemo(() => targetOptions(doc, idx, traces), [doc, idx, traces]);
   const [task, setTask] = useState<TaskDef>(
-    () => draft ?? { name: title, instruction: '', editable: [], allowNew: false, targets: [] },
+    () => draft ?? { name: title, instruction: '', editable: [], allowNew: false, targets: [], predict: false },
   );
   useEffect(() => onDraft(task), [task, onDraft]);
   const set = (patch: Partial<TaskDef>) => setTask((x) => ({ ...x, ...patch }));
@@ -128,6 +128,21 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
             {t.allowNew}
             <span aria-hidden="true" className={`relative h-6 w-10 shrink-0 rounded-full ${task.allowNew ? 'bg-accent' : 'bg-line-2'}`}>
               <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-panel shadow ${task.allowNew ? 'left-[18px]' : 'left-0.5'}`} />
+            </span>
+          </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={task.predict}
+            onClick={() => set({ predict: !task.predict })}
+            className={`flex w-full items-center justify-between gap-3 text-left text-small ${touch ? 'min-h-11' : 'min-h-9'}`}
+          >
+            <span className="flex min-w-0 flex-col">
+              <span>{t.predict}</span>
+              {task.predict && <span className="text-label text-muted">{t.predictNote}</span>}
+            </span>
+            <span aria-hidden="true" className={`relative h-6 w-10 shrink-0 rounded-full ${task.predict ? 'bg-accent' : 'bg-line-2'}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-panel shadow ${task.predict ? 'left-[18px]' : 'left-0.5'}`} />
             </span>
           </button>
           <div className="flex flex-col gap-2">

@@ -1,11 +1,16 @@
 // Öğrenci görünümünde görev kartı (C1, N5): defterin en üstünde. Hedef satırları canlı kontrol edilir
 // (tutunca yeşil tik, ölçülen değer); ölçülemeyen hedefte kısa yol ("Bode ile ölç", "Oynat").
 // Kart "not vermez" diye yazar; "Teslim dosyası (.json)" devreyi indirir.
+// Önce tahmin (B1): görevde açıksa öğrenci önce her hedefe tahminini yazar ve kaydeder (ölçülenler o
+// zamana kadar gizli, simülasyon ve ölçüm kapalı); sonra satırda tahmin ve farkı ölçülenin yanında.
 
+import { useState } from 'react';
 import { tr } from '../../i18n/tr';
-import type { TaskDef } from '../../model/task';
+import { predictionError, type Predictions, type TaskDef } from '../../model/task';
+import { formatNumber } from '../../sim/units';
+import { parseTheory } from '../analysis/table';
 import { Icon } from '../icons';
-import { Rich } from '../Rich';
+import { plainText, Rich } from '../Rich';
 import { useTouchUi } from '../touchUi';
 import { valueText } from './targets';
 
@@ -23,6 +28,9 @@ export interface TargetStatus {
 export function TaskCard({
   task,
   statuses,
+  predictions,
+  onPredict,
+  onLock,
   onBode,
   onPlay,
   onSubmit,
@@ -30,6 +38,9 @@ export function TaskCard({
 }: {
   task: TaskDef;
   statuses: readonly TargetStatus[];
+  predictions: Predictions;
+  onPredict: (id: string, value: number | null) => void;
+  onLock: () => void;
   onBode: () => void;
   onPlay: () => void;
   onSubmit: () => void;
@@ -38,13 +49,16 @@ export function TaskCard({
   const t = tr.task.card;
   const touch = useTouchUi();
   const met = statuses.filter((s) => s.met).length;
+  // Tahmin aşaması: kaydedilene kadar ölçülenler ve kısa yollar gizli.
+  const predicting = task.predict && !predictions.locked;
+  const written = statuses.filter((s) => predictions.values[s.id] !== undefined).length;
   return (
     <section data-notebook="task" aria-label={t.label(task.name)} className="flex shrink-0 flex-col gap-2.5 rounded-xl border border-line bg-panel p-4">
       <div className="flex items-center gap-2 text-label">
         <Icon name="target" className="h-4 w-4 text-accent-ink" />
-        <span className="font-semibold text-accent-ink">{t.kicker}</span>
+        <span className="font-semibold text-accent-ink">{predicting ? t.predictTitle : t.kicker}</span>
         <span className="flex-1" />
-        {statuses.length > 0 && (
+        {statuses.length > 0 && !predicting && (
           <span className="font-mono text-muted" aria-label={t.progress(met, statuses.length)}>
             {`${met} / ${statuses.length}`}
           </span>
@@ -56,44 +70,77 @@ export function TaskCard({
           <Rich text={task.instruction} />
         </p>
       )}
+      {predicting && <p className="m-0 rounded-lg bg-accent-soft px-3 py-2 text-small leading-snug text-accent-ink">{t.predictIntro}</p>}
       {statuses.length > 0 && (
         <ul className="m-0 flex list-none flex-col p-0">
-          {statuses.map((s) => (
-            <li key={s.id} className="flex items-center gap-3 border-t border-line py-2.5">
-              <span
-                aria-label={s.met ? t.met : t.notMet}
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${s.met ? 'bg-ok-soft text-ok' : 'border-2 border-line-2'}`}
-              >
-                {s.met && <Icon name="check" className="h-3.5 w-3.5" />}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-small font-semibold">
-                  <Rich text={s.name} />
+          {statuses.map((s) => {
+            const prediction = predictions.values[s.id];
+            const error = prediction !== undefined ? predictionError(prediction, s.measured) : null;
+            return (
+              <li key={s.id} className="flex items-center gap-3 border-t border-line py-2.5">
+                {!predicting && (
+                  <span
+                    aria-label={s.met ? t.met : t.notMet}
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${s.met ? 'bg-ok-soft text-ok' : 'border-2 border-line-2'}`}
+                  >
+                    {s.met && <Icon name="check" className="h-3.5 w-3.5" />}
+                  </span>
+                )}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-small font-semibold">
+                    <Rich text={s.name} />
+                  </span>
+                  <span className="font-mono text-label text-muted">{s.goal}</span>
+                  {task.predict && !predicting && prediction !== undefined && (
+                    <span className="font-mono text-label text-ink-2">
+                      {t.prediction(valueText(prediction, s.unit))}
+                      {error !== null && ` · ${t.predictionError(formatNumber(error, error < 10 ? 1 : 0))}`}
+                    </span>
+                  )}
                 </span>
-                <span className="font-mono text-label text-muted">{s.goal}</span>
-              </span>
-              {s.measured !== null ? (
-                <b className={`shrink-0 font-mono text-small font-semibold tabular ${s.met ? 'text-ok-ink' : 'text-warn'}`}>{valueText(s.measured, s.unit)}</b>
-              ) : s.shortcut ? (
-                <button
-                  type="button"
-                  onClick={s.shortcut === 'bode' ? onBode : onPlay}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-3 text-label font-semibold text-accent-ink hover:brightness-95 ${touch ? 'h-11' : 'h-8'}`}
-                >
-                  <Icon name={s.shortcut === 'bode' ? 'bode' : 'play'} className="h-3.5 w-3.5" />
-                  {s.shortcut === 'bode' ? t.measureBode : t.play}
-                </button>
-              ) : (
-                <span className="shrink-0 text-label text-muted">—</span>
-              )}
-            </li>
-          ))}
+                {predicting ? (
+                  <PredictionInput status={s} value={prediction} touch={touch} onValue={(v) => onPredict(s.id, v)} />
+                ) : s.measured !== null ? (
+                  <b className={`shrink-0 font-mono text-small font-semibold tabular ${s.met ? 'text-ok-ink' : 'text-warn'}`}>{valueText(s.measured, s.unit)}</b>
+                ) : s.shortcut ? (
+                  <button
+                    type="button"
+                    onClick={s.shortcut === 'bode' ? onBode : onPlay}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-3 text-label font-semibold text-accent-ink hover:brightness-95 ${touch ? 'h-11' : 'h-8'}`}
+                  >
+                    <Icon name={s.shortcut === 'bode' ? 'bode' : 'play'} className="h-3.5 w-3.5" />
+                    {s.shortcut === 'bode' ? t.measureBode : t.play}
+                  </button>
+                ) : (
+                  <span className="shrink-0 text-label text-muted">—</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
-      <button type="button" onClick={onSubmit} className={`flex items-center justify-center gap-2 rounded-xl border border-line-2 text-small font-semibold hover:bg-panel-2 ${touch ? 'h-11' : 'h-10'}`}>
-        <Icon name="download" className="h-4 w-4" />
-        {t.submit}
-      </button>
+      {predicting ? (
+        <>
+          <span className="text-label text-muted">{t.predictCount(written, statuses.length)}</span>
+          <button
+            type="button"
+            disabled={written < statuses.length}
+            onClick={onLock}
+            className={`flex items-center justify-center gap-2 rounded-xl bg-accent text-small font-semibold text-white hover:brightness-110 disabled:opacity-50 ${touch ? 'h-11' : 'h-10'}`}
+          >
+            <Icon name="lock" className="h-4 w-4" />
+            {t.lock}
+          </button>
+        </>
+      ) : (
+        <>
+          {task.predict && <p className="m-0 text-label text-ok-ink">{t.locked}</p>}
+          <button type="button" onClick={onSubmit} className={`flex items-center justify-center gap-2 rounded-xl border border-line-2 text-small font-semibold hover:bg-panel-2 ${touch ? 'h-11' : 'h-10'}`}>
+            <Icon name="download" className="h-4 w-4" />
+            {t.submit}
+          </button>
+        </>
+      )}
       <p className="m-0 flex gap-1.5 text-label leading-snug text-muted">
         <Icon name="info" className="mt-px h-3.5 w-3.5 shrink-0" />
         {t.note}
@@ -102,5 +149,39 @@ export function TaskCard({
         {t.exit}
       </button>
     </section>
+  );
+}
+
+/** Tahmin alanı: "6 V", "5,9", "500k"; birim hedefin birimi (dB'de birimsiz). */
+function PredictionInput({ status, value, touch, onValue }: { status: TargetStatus; value: number | undefined; touch: boolean; onValue: (v: number | null) => void }) {
+  const t = tr.task.card;
+  const [invalid, setInvalid] = useState(false);
+  return (
+    <span className="flex w-28 shrink-0 flex-col items-end gap-0.5">
+      <input
+        key={value ?? 'bos'}
+        aria-label={t.predictLabel(plainText(status.name))}
+        aria-invalid={invalid}
+        placeholder={status.unit || '–'}
+        inputMode="decimal"
+        defaultValue={value !== undefined ? valueText(value, status.unit) : ''}
+        onBlur={(e) => {
+          const text = e.target.value.trim();
+          if (text === '') {
+            setInvalid(false);
+            onValue(null);
+            return;
+          }
+          const v = parseTheory(text, status.unit === 'dB' ? '' : status.unit);
+          setInvalid(v === null);
+          if (v !== null) onValue(v);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        }}
+        className={`w-full rounded-lg border bg-panel px-2 text-right font-mono ${invalid ? 'border-warn' : 'border-line-2'} ${touch ? 'h-11 text-[16px]' : 'h-9 text-sm'}`}
+      />
+      {invalid && <span className="text-label text-warn">{t.invalid}</span>}
+    </span>
   );
 }

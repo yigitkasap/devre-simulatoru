@@ -2234,6 +2234,17 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   çerçeve; defterde kilit ve kalem simgesi; tuvalin sol üstünde "Görev kipi · yalnızca RB ve RC
   değişir". "Teslim dosyası (.json)": devre, analiz ve `teslim` alanında hedeflerin ölçülen değerleri.
   Kart not vermediğini yazar. Görev bu tarayıcıda devreyle birlikte hatırlanır; "Görevden çık" kaldırır.
+- **Önce tahmin (B1, göreve bağlı, 2026-10-31):** kullanıcı kararı: tahmin görevin bir adımıdır,
+  örnek kartlarına soru geri dönmez (17 Ekim'de kaldırılmıştı). Hoca "Görev oluştur"da "Öğrenci önce
+  tahmin etsin" anahtarını açar (görevin bütün hedefleri için; bağlantıda `predict`, eski bağlantılarda
+  kapalı). Öğrencinin kartı "Önce tahmin et" diye açılır: her hedefe tahmin alanı ("6 V", "5,9",
+  "500k"; birim hedefinki), ölçülenler ve kısa yollar gizli. Tahminler kaydedilene kadar Oynat (üst
+  çubuk, telefon düğmesi, P kısayolu, Analiz) çalışmaz ve Analiz'de Eğri izleyici ile Bode ölçmez,
+  eylem düğmeleri de gizli; ikisi de "Önce görev kartında tahminlerini yaz ve kaydet." der. "Tahminleri
+  kaydet" bütün hedefler yazılınca etkinleşir; sonra tahminler değişmez. Satırda ölçülenin yanında
+  "Tahmin 180 · fark %13" (fark ölçülene göre). Tahminler görevle birlikte bu tarayıcıda hatırlanır
+  (`devre-simulatoru:gorev-tahmin`); yeni görev ya da "Görevden çık" sıfırlar. Teslim dosyasında her
+  hedefin `tahmin`'i de olur. Not: devre görünür olduğu için öğrenci elle hesaplayabilir; amaç da budur.
 - **Gömme (C4, C5, C8; N7, N8):** Dosya → "Paylaş…" (telefonda ⋯ → Dosya → Sayfaya göm) iki sekmeli
   pencere açar: "Bağlantı | Sayfaya göm". Gömme ayarları: Sade (ince üst şerit ve yalnız tezgâh) ya da
   Tam uygulama; Salt okunur (varsayılan açık), Oynat ve Başa al, Defter paneli, Tam ekranda aç

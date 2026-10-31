@@ -52,6 +52,8 @@ export interface AnalysisApi {
   readonly bode: BodeApi;
   /** Devrenin düğüm dizini (görev hedeflerinin adları ve ölçümü). */
   readonly idx: NetIndex;
+  /** Görevde tahmin kaydedilmeden (B1) ölçüm yapılmaz: Eğri izleyici ve Bode yerine bu yazı. */
+  readonly gate: string | null;
 }
 
 const SEPARATOR_KEY = 'devre-simulatoru:csv-ayirici';
@@ -64,7 +66,14 @@ function readSeparator(): CsvSeparator {
   }
 }
 
-export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial: AnalysisDoc, notify: (message: string) => void, selected: string | null = null): AnalysisApi {
+export function useAnalysis(
+  doc: CircuitDoc,
+  connectivity: Connectivity,
+  initial: AnalysisDoc,
+  notify: (message: string) => void,
+  selected: string | null = null,
+  gate: string | null = null,
+): AnalysisApi {
   const [analysis, setDoc] = useState(initial);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<AnalysisTab>('graph');
@@ -188,6 +197,7 @@ export function useAnalysis(doc: CircuitDoc, connectivity: Connectivity, initial
     tracer,
     bode,
     idx,
+    gate,
   };
 }
 

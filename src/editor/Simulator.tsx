@@ -21,7 +21,7 @@ import { AnalysisDrawer, AnalysisSheetBody, DEFAULT_DRAWER, MIN_DRAWER } from '.
 import { useAnalysis } from './analysis/useAnalysis';
 import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
-import { parseTask, respectsTask, targetMet, taskFromHash, type TaskDef } from '../model/task';
+import { NO_PREDICTIONS, parsePredictions, parseTask, respectsTask, targetMet, taskFromHash, type Predictions, type TaskDef } from '../model/task';
 import { parseEmbedParams, type EmbedOptions } from '../model/embed';
 import { toSerializable } from '../model/serialize';
 import { datedName, saveFile } from './analysis/format';
@@ -75,6 +75,18 @@ import { useSimulation } from './useSimulation';
 /** Açılışta: adreste paylaşım bağlantısı varsa o devre, yoksa otomatik kayıt, o da yoksa boş devre. */
 const TASK_KEY = 'devre-simulatoru:gorev';
 
+/** Görevin tahminleri (B1): görevle birlikte bu tarayıcıda. */
+const PREDICT_KEY = 'devre-simulatoru:gorev-tahmin';
+
+function loadSavedPredictions(): Predictions {
+  try {
+    const raw = window.localStorage.getItem(PREDICT_KEY);
+    return raw ? parsePredictions(JSON.parse(raw)) : NO_PREDICTIONS;
+  } catch {
+    return NO_PREDICTIONS;
+  }
+}
+
 /** Kayıtlı devreyle birlikte açık olan görev (sayfa yenilenince görev kipi sürsün). */
 function loadSavedTask(): TaskDef | null {
   try {
@@ -94,7 +106,7 @@ type Initial = {
 };
 
 /** Salt okunur gömülü görünümün kuralı: görevdeki kilit gibi (hiçbir parça değişmez, yeni parça ve kablo yok). */
-const READ_ONLY: TaskDef = { name: '', instruction: '', editable: [], allowNew: false, targets: [] };
+const READ_ONLY: TaskDef = { name: '', instruction: '', editable: [], allowNew: false, targets: [], predict: false };
 
 function initialDoc(embed: (EmbedOptions & { readonly example: string | null }) | null): Initial {
   // Gömülü görünüm (N8): devre adresten (?ornek=… ya da #d=…). Otomatik kayıt ve görev okunmaz, adres
@@ -149,6 +161,28 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   }, [embed, task]);
   const taskRef = useRef(task);
   taskRef.current = task;
+  /**
+   * Öğrencinin tahminleri (B1). Sayfa yenilenince kayıtlı görevle birlikte geri gelir; yeni bir görev
+   * (bağlantı, dosya) ya da görevden çıkış onları sıfırlar.
+   */
+  const [predictions, setPredictions] = useState<Predictions>(() => (initial.task && initial.shared !== 'task' ? loadSavedPredictions() : NO_PREDICTIONS));
+  const predictionsTask = useRef(task);
+  useEffect(() => {
+    if (predictionsTask.current === task) return;
+    predictionsTask.current = task;
+    setPredictions(NO_PREDICTIONS);
+  }, [task]);
+  useEffect(() => {
+    if (embed) return;
+    try {
+      if (task?.predict) window.localStorage.setItem(PREDICT_KEY, JSON.stringify(predictions));
+      else window.localStorage.removeItem(PREDICT_KEY);
+    } catch {
+      // Depolama kapalı: tahminler yalnızca bu oturumda.
+    }
+  }, [embed, task, predictions]);
+  /** Tahminler kaydedilmeden simülasyon ve ölçüm kapalı (B1): Oynat'ta ve Analiz'de söylenen yazı. */
+  const gate = task?.predict && !predictions.locked ? tr.task.gate : null;
   const docRef = useRef(state.doc);
   docRef.current = state.doc;
   const lockNotice = useRef<{ at: number; show: (message: string) => void }>({ at: 0, show: () => {} });
@@ -234,7 +268,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
   // Analiz (grafik, tablo, eğri izleyici, Bode): izler ve tablo devreyle birlikte kaydedilir.
   const notify = useCallback((message: string) => showToast(message), [showToast]);
-  const analysis = useAnalysis(doc, connectivity, initial.analysis, notify, selection.parts.length === 1 && selection.wires.length === 0 ? selection.parts[0]! : null);
+  const analysis = useAnalysis(doc, connectivity, initial.analysis, notify, selection.parts.length === 1 && selection.wires.length === 0 ? selection.parts[0]! : null, gate);
   // Gömülü görünüm kaydetmez: aynı sitedeki asıl devreye (otomatik kayıt) dokunmasın.
   const saveState = useAutosave(doc, analysis.doc, embed === null);
   /** Analiz çekmecesinin yüksekliği (masaüstü) ve Büyüt. */
@@ -271,6 +305,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   /** Defterde kapalı kartı ölçüm gösterebilen parçalar (DC devrede hepsi). */
   const measuredParts = useMemo<ReadonlySet<string> | null>(() => (timeVarying ? new Set(watched) : null), [timeVarying, watched]);
   const sim = useSimulation(doc, connectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
+  /** Oynat: görevde tahminler kaydedilmediyse (B1) çalışmaz, nedenini söyler. */
+  const play = () => {
+    if (gate) showToast(gate, 'error');
+    else sim.play();
+  };
   // --- Görev (C1, N5): hedeflerin durumu, kart, kilitli / değiştirilebilir parçalar ------------------
   const bodeFresh = analysis.bode.resultKey === analysis.bode.key;
   const taskStatuses: TargetStatus[] = task
@@ -294,7 +333,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       teslim: {
         gorev: task.name,
         tarih: new Date().toISOString(),
-        hedefler: taskStatuses.map((s) => ({ ad: plainText(s.name), hedef: s.goal, olculen: s.measured, birim: s.unit, tuttu: s.met })),
+        hedefler: taskStatuses.map((s) => ({
+          ad: plainText(s.name),
+          hedef: s.goal,
+          ...(task.predict ? { tahmin: predictions.values[s.id] ?? null } : {}),
+          olculen: s.measured,
+          birim: s.unit,
+          tuttu: s.met,
+        })),
       },
     };
     void saveFile(datedName(`${tr.task.submission}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
@@ -303,11 +349,25 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     <TaskCard
       task={task}
       statuses={taskStatuses}
+      predictions={predictions}
+      onPredict={(id, value) =>
+        setPredictions((p) => {
+          if (p.locked) return p;
+          const values = { ...p.values };
+          if (value === null) delete values[id];
+          else values[id] = value;
+          return { values, locked: false };
+        })
+      }
+      onLock={() => {
+        setPredictions((p) => ({ ...p, locked: true }));
+        showToast(tr.task.card.locked);
+      }}
       onBode={() => {
         analysis.setOpen(true);
         analysis.setTab('bode');
       }}
-      onPlay={sim.play}
+      onPlay={play}
       onSubmit={submitTask}
       onExit={() => {
         setTask(null);
@@ -1072,7 +1132,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     } else if ((e.key === 'p' || e.key === 'P') && !e.altKey) {
       e.preventDefault();
       if (sim.status === 'running') sim.pause();
-      else sim.play();
+      else play();
     }
   };
   useEffect(() => {
@@ -1206,7 +1266,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             controls={embed.controls}
             openHref={embed.fullLink ? openInSimulator : null}
             status={sim.status}
-            onPlay={sim.play}
+            onPlay={play}
             onPause={sim.pause}
             onReset={resetEmbed}
           />
@@ -1401,7 +1461,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             <WiringFooter canUndo={state.past.length > 0} hasStart={connect.start !== null} onUndo={() => dispatch({ type: 'undo' })} onClear={() => setConnect({ start: null })} />
           )}
           {!wiring && !addSheet && !analysis.open && (
-            <PhoneFabs status={sim.status} canAdd={sim.status === 'stopped' && !taskFrozen} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={sim.play} onPause={sim.pause} />
+            <PhoneFabs status={sim.status} canAdd={sim.status === 'stopped' && !taskFrozen} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={play} onPause={sim.pause} />
           )}
           {addSheet && !wiring && (
             <BottomSheet
@@ -1439,7 +1499,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               onSize={setAnalysisSheet}
               onClose={() => analysis.setOpen(false)}
             >
-              <AnalysisSheetBody api={analysis} recorder={sim.traceRecorder} status={sim.status} frame={sim.frame} notify={notify} title={circuitTitle} onClose={() => analysis.setOpen(false)} onPlay={sim.play} onPause={sim.pause} />
+              <AnalysisSheetBody api={analysis} recorder={sim.traceRecorder} status={sim.status} frame={sim.frame} notify={notify} title={circuitTitle} onClose={() => analysis.setOpen(false)} onPlay={play} onPause={sim.pause} />
             </BottomSheet>
           )}
         </div>
@@ -1471,7 +1531,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           onSettings={updateSettings}
           onUndo={() => dispatch({ type: 'undo' })}
           onRedo={() => dispatch({ type: 'redo' })}
-          onPlay={sim.play}
+          onPlay={play}
           onPause={sim.pause}
           onStop={sim.stop}
           onSpeed={sim.setSpeed}

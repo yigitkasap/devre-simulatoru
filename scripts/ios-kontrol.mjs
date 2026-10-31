@@ -1220,6 +1220,88 @@ try {
       `Bode ile ölç ${Math.round(bodeBox?.height ?? 0)} px`);
     await page.context().close();
   }
+  // --- Görevde önce tahmin (B1): tahminler kaydedilmeden Oynat ve ölçüm kapalı, sonra yan yana -------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', acceptDownloads: true });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
+    const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    await dlg.getByRole('textbox', { name: 'Görev adı' }).fill('Ön hazırlık: BJT yükselteç');
+    await dlg.getByRole('button', { name: 'RC', exact: true }).click();
+    const predictSwitch = dlg.getByRole('switch', { name: /Öğrenci önce tahmin etsin/ });
+    await predictSwitch.click();
+    const note = await dlg.getByText(/Oynat’a basamaz ve ölçüm alamaz/).count();
+    for (let i = 0; i < 2; i++) await dlg.getByRole('button', { name: 'Hedef ekle' }).click();
+    const sels = dlg.getByRole('combobox', { name: 'Hedefin büyüklüğü' });
+    const choose = async (n, text) => sels.nth(n).selectOption(await sels.nth(n).locator('option', { hasText: text }).first().getAttribute('value'));
+    await choose(0, 'VCE · Q1 (DC)'); await choose(1, 'Kazanç |çıkış / giriş|');
+    const vals = dlg.getByRole('textbox', { name: /: hedef değer$/ });
+    await vals.nth(0).fill('6 V'); await vals.nth(0).blur();
+    await vals.nth(1).fill('200'); await vals.nth(1).blur();
+    await page.waitForTimeout(200);
+    const url = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    check('tahmin (hoca, B1): görev penceresinde "Öğrenci önce tahmin etsin" anahtarı ve açıklaması', (await predictSwitch.getAttribute('aria-checked')) === 'true' && note === 1);
+
+    const st = await ctx.newPage();
+    st.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await st.goto(url, { waitUntil: 'networkidle' }); await st.waitForTimeout(800);
+    const card = st.getByRole('region', { name: /^Görev:/ });
+    const before = ((await card.textContent()) ?? '').replace(/\s+/g, ' ');
+    const inputs = card.getByRole('textbox', { name: /: tahminin$/ });
+    const lock = card.getByRole('button', { name: 'Tahminleri kaydet' });
+    await st.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await st.waitForTimeout(400);
+    const blockedPlay = (await st.getByText('Önce görev kartında tahminlerini yaz ve kaydet.').count()) >= 1 && (await st.getByRole('button', { name: 'Duraklat' }).count()) === 0;
+    await st.getByRole('button', { name: 'Analiz', exact: true }).click(); await st.waitForTimeout(200);
+    const drawer = st.getByRole('region', { name: 'Analiz' });
+    await drawer.getByRole('tab', { name: 'Bode' }).click(); await st.waitForTimeout(300);
+    const blockedBode = (await drawer.getByText('Önce görev kartında tahminlerini yaz ve kaydet.').count()) === 1 && (await drawer.getByRole('button', { name: 'Yeniden ölç' }).count()) === 0;
+    check('tahmin (öğrenci, B1): kart "Önce tahmin et", her hedefe tahmin alanı, ölçülen gizli; kaydetmeden Oynat ve Analiz → Bode kapalı (nedeni yazıyor); "Tahminleri kaydet" hepsi yazılınca etkin',
+      before.startsWith('Önce tahmin et') && (await inputs.count()) === 2 && !/5,9\d V/.test(before) && blockedPlay && blockedBode && !(await lock.isEnabled()),
+      before.slice(0, 60));
+    await inputs.nth(0).fill('6 V'); await inputs.nth(0).blur();
+    await inputs.nth(1).fill('180'); await inputs.nth(1).blur();
+    await st.waitForTimeout(150);
+    const enabled = await lock.isEnabled();
+    await lock.click(); await st.waitForTimeout(300);
+    await st.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await st.waitForTimeout(1500);
+    await drawer.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
+    await st.waitForTimeout(400);
+    const rows = (await card.locator('li').allTextContents()).map((r) => r.replace(/\s+/g, ' '));
+    check('tahmin (öğrenci): kaydedince Oynat ve Bode çalışıyor; satırda "Tahmin 6 V · fark %0,2" ve ölçülen 5,99 V, kazançta "Tahmin 180 · fark %13" ve 205,8',
+      enabled && (await st.getByRole('button', { name: 'Duraklat' }).count()) === 1 && rows.some((r) => /Tahmin 6 V · fark %0,\d/.test(r) && /5,9\d V/.test(r)) && rows.some((r) => r.includes('Tahmin 180 · fark %1') && /20[4-7],\d/.test(r)),
+      rows.map((r) => r.slice(-40)).join(' | '));
+    const [sub] = await Promise.all([st.waitForEvent('download'), card.getByRole('button', { name: 'Teslim dosyası (.json)' }).click()]);
+    const subJson = JSON.parse(Buffer.concat(await (await sub.createReadStream()).toArray()).toString('utf8'));
+    await st.reload({ waitUntil: 'networkidle' }); await st.waitForTimeout(600);
+    const kept = ((await st.getByRole('region', { name: /^Görev:/ }).textContent()) ?? '').includes('Tahmin 6 V');
+    check('tahmin (öğrenci): teslim dosyasında her hedefin tahmini; sayfa yenilenince tahminler kaydedilmiş hâliyle duruyor',
+      subJson.teslim.hedefler.map((h) => h.tahmin).join(',') === '6,180' && kept);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'BC107 ile ortak emetörlü yükselteç');
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Dosya', exact: true }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('button', { name: /^Görev oluştur/ }).tap(); await page.waitForTimeout(400);
+    const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    await dlg.getByRole('switch', { name: /Öğrenci önce tahmin etsin/ }).tap();
+    await dlg.getByRole('button', { name: 'Hedef ekle' }).tap();
+    const url = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    await page.goto('about:blank'); await page.goto(url, { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const card = page.getByRole('region', { name: /^Görev:/ });
+    const small = await card.evaluate((root) => [...root.querySelectorAll('button, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height, fs: parseFloat(getComputedStyle(el).fontSize), tag: el.tagName }; })
+      .filter((r) => r.h > 0 && (r.h < 43.5 || (r.tag === 'INPUT' && r.fs < 16))).map((r) => `${r.n} ${Math.round(r.h)}/${r.fs}`));
+    check('tahmin (telefon, B1): kartta tahmin alanı ve "Tahminleri kaydet" ≥ 44 px, yazı 16 px; sayfa kaymıyor',
+      (await card.getByRole('textbox', { name: /: tahminin$/ }).count()) === 1 && small.length === 0 && !(await pageScrolls(page)), small.join(', '));
+    await page.context().close();
+  }
   // --- Gömme (C4, C5, C8; N7, N8): Paylaş → Sayfaya göm, /embed/ sade görünüm, salt okunur, Moodle ------
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
