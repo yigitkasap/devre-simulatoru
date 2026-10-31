@@ -100,6 +100,18 @@ export function confidentMiss(target: Target, prediction: number, measured: numb
   return error !== null && error > target.tol;
 }
 
+/**
+ * Tahmin ölçülenle uyuştu mu (görev kartındaki karşılaştırma): ± hedefte fark hedefin toleransı içinde;
+ * en az / en çok hedefte tahmin ölçülenle eşiğin aynı yanında. Ölçülen yoksa false.
+ */
+export function predictionAgrees(target: Target, prediction: number, measured: number | null): boolean {
+  if (measured === null) return false;
+  if (target.op === 'ge') return prediction >= target.value === measured >= target.value;
+  if (target.op === 'le') return prediction <= target.value === measured <= target.value;
+  const error = predictionError(prediction, measured);
+  return error !== null && error <= target.tol;
+}
+
 /** Tahminin ölçülenden farkı (%, ölçülene göre); ölçülen yoksa ya da 0 ise null. */
 export function predictionError(prediction: number, measured: number | null): number | null {
   if (measured === null || measured === 0) return null;

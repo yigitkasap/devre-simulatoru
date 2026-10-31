@@ -358,6 +358,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       task={task}
       statuses={taskStatuses}
       predictions={predictions}
+      started={sim.status !== 'stopped'}
       onPredict={(id, value) =>
         setPredictions((p) => {
           if (p.locked) return p;

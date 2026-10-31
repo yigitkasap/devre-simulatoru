@@ -8,7 +8,7 @@
 
 import { useState } from 'react';
 import { tr } from '../../i18n/tr';
-import { CONFIDENCES, confidentMiss, predictionError, REASON_LIMIT, type Confidence, type Predictions, type TaskDef } from '../../model/task';
+import { CONFIDENCES, confidentMiss, predictionAgrees, predictionError, REASON_LIMIT, type Confidence, type Predictions, type TaskDef } from '../../model/task';
 import { formatNumber } from '../../sim/units';
 import { Icon } from '../icons';
 import { plainText, Rich } from '../Rich';
@@ -30,6 +30,7 @@ export function TaskCard({
   task,
   statuses,
   predictions,
+  started,
   onPredict,
   onReason,
   onConfidence,
@@ -42,6 +43,8 @@ export function TaskCard({
   task: TaskDef;
   statuses: readonly TargetStatus[];
   predictions: Predictions;
+  /** Simülasyon başladı (çalışıyor ya da duraklatıldı). */
+  started: boolean;
   onPredict: (id: string, value: number | null) => void;
   onReason: (id: string, text: string) => void;
   onConfidence: (id: string, confidence: Confidence) => void;
@@ -184,7 +187,7 @@ export function TaskCard({
         </>
       ) : (
         <>
-          {task.predict && <p className="m-0 text-label text-ok-ink">{t.locked}</p>}
+          {task.predict && <PredictionStatus task={task} statuses={statuses} predictions={predictions} started={started} />}
           <button type="button" onClick={onSubmit} className={`flex items-center justify-center gap-2 rounded-xl border border-line-2 text-small font-semibold hover:bg-panel-2 ${touch ? 'h-11' : 'h-10'}`}>
             <Icon name="download" className="h-4 w-4" />
             {t.submit}
@@ -200,6 +203,23 @@ export function TaskCard({
       </button>
     </section>
   );
+}
+
+/**
+ * Tahminler kaydedildikten sonraki satır: "Oynat'a bas" → devre çalışınca "Ölçülüyor…" → hedeflerin
+ * hepsi ölçülünce karşılaştırma sonucu (kaç tahmin ölçülenle uyuştu).
+ */
+function PredictionStatus({ task, statuses, predictions, started }: { task: TaskDef; statuses: readonly TargetStatus[]; predictions: Predictions; started: boolean }) {
+  const t = tr.task.card;
+  if (statuses.length > 0 && statuses.every((s) => s.measured !== null)) {
+    const agreed = statuses.filter((s) => {
+      const target = task.targets.find((x) => x.id === s.id);
+      const prediction = predictions.values[s.id];
+      return target !== undefined && prediction !== undefined && predictionAgrees(target, prediction, s.measured);
+    }).length;
+    return <p className="m-0 text-small font-semibold text-ink">{t.compared(agreed, statuses.length)}</p>;
+  }
+  return <p className={`m-0 text-label ${started ? 'text-ink-2' : 'text-ok-ink'}`}>{started ? t.measuring : t.locked}</p>;
 }
 
 /**

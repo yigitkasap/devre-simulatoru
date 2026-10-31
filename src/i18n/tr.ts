@@ -2903,6 +2903,8 @@ export const tr = {
       predictCount: (n: number, total: number) => `${total} hedefin ${n} tanesine tahmin yazıldı`,
       lock: 'Tahminleri kaydet',
       locked: 'Tahminler kaydedildi. Şimdi Oynat’a bas ve ölç.',
+      measuring: 'Ölçülüyor…',
+      compared: (agreed: number, n: number) => `Karşılaştırma: ${n} tahminin ${agreed} tanesi ölçülenle uyuştu.`,
       prediction: (v: string) => `Tahmin ${v}`,
       predictionError: (p: string) => `fark %${p}`,
       invalid: 'Sayı değil',

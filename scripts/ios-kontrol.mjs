@@ -1451,9 +1451,16 @@ try {
     await st.waitForTimeout(150);
     const enabled = await lock.isEnabled();
     await lock.click(); await st.waitForTimeout(300);
-    await st.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await st.waitForTimeout(1500);
+    const savedLine = await card.getByText('Tahminler kaydedildi. Şimdi Oynat’a bas ve ölç.').count();
+    await st.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await st.waitForTimeout(300);
+    const measuringLine = await card.getByText('Ölçülüyor…').count();
+    await st.waitForTimeout(1200);
     await drawer.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
     await st.waitForTimeout(400);
+    const cardText = ((await card.textContent()) ?? '').replace(/\s+/g, ' ');
+    check('tahmin (öğrenci, analiz düzeltmeleri ikinci tur 3): kaydedince "Şimdi Oynat’a bas", devre çalışınca "Ölçülüyor…", hedeflerin hepsi ölçülünce bu satır kalkıyor ve karşılaştırma görünüyor ("2 tahminin 1 tanesi ölçülenle uyuştu")',
+      savedLine === 1 && measuringLine === 1 && !cardText.includes('Tahminler kaydedildi') && !cardText.includes('Ölçülüyor') && cardText.includes('Karşılaştırma: 2 tahminin 1 tanesi ölçülenle uyuştu.'),
+      `${savedLine}/${measuringLine} · ${cardText.match(/Karşılaştırma[^.]*\./)?.[0] ?? '—'}`);
     const rows = (await card.locator('li').allTextContents()).map((r) => r.replace(/\s+/g, ' '));
     check('tahmin (öğrenci): kaydedince Oynat ve Bode çalışıyor; satırda "Tahmin 6 V · fark %0,2 · Eminim" ve ölçülen 5,99 V, kazançta "Tahmin 180 · fark %13 · Eminim" ve 205,8',
       enabled && (await st.getByRole('button', { name: 'Duraklat' }).count()) === 1 && rows.some((r) => /Tahmin 6 V · fark %0,\d · Eminim/.test(r) && /5,9\d V/.test(r)) && rows.some((r) => r.includes('Tahmin 180 · fark %1') && r.includes('· Eminim') && /20[4-7],\d/.test(r)),

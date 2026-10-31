@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { exampleDoc } from '../src/examples';
-import { confidentMiss, LINK_LIMIT, NO_PREDICTIONS, parsePredictions, parseTask, parseTaskPayload, predictionError, respectsTask, targetMet, taskFromHash, taskPayload, taskTitle, taskUrl, type TaskDef } from '../src/model/task';
+import { confidentMiss, LINK_LIMIT, NO_PREDICTIONS, parsePredictions, parseTask, parseTaskPayload, predictionAgrees, predictionError, respectsTask, targetMet, taskFromHash, taskPayload, taskTitle, taskUrl, type TaskDef } from '../src/model/task';
 import { buildConnectivity } from '../src/model/connectivity';
 import { netIndex } from '../src/editor/analysis/traces';
 import { goalText, readPrediction, targetOptions } from '../src/editor/task/targets';
@@ -107,6 +107,10 @@ describe('Görev', () => {
     // ± hedef: fark toleransı (%10) aşınca; ölçülen yoksa ya da emin değilse işaret yok.
     expect(confidentMiss(gain, 180, 205.8, 'sure')).toBe(true);
     expect(confidentMiss(gain, 200, 205.8, 'sure')).toBe(false);
+    // Kartın karşılaştırması (ikinci tur, 3): uyuşma güvenden bağımsız; ölçülen yoksa uyuşmaz.
+    expect(predictionAgrees(gain, 180, 205.8)).toBe(false);
+    expect(predictionAgrees(gain, 200, 205.8)).toBe(true);
+    expect(predictionAgrees(vce, 6, null)).toBe(false);
     expect(confidentMiss(gain, 180, 205.8, 'unsure')).toBe(false);
     expect(confidentMiss(gain, 180, 205.8, undefined)).toBe(false);
     expect(confidentMiss(vce, 6, null, 'sure')).toBe(false);
