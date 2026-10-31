@@ -16,6 +16,7 @@ import { legLabel, measureResistance, METER_ID, meterPart, wireMeter } from '../
 import { addEntry, entryName, NEW_SESSION, parseSession } from '../src/editor/fault/session';
 import { faultCandidates, faultExplain, placeLabel, placeMatches, randomFault } from '../src/editor/fault/judge';
 import { netIndex } from '../src/editor/analysis/traces';
+import { faultFromPlace, kindsFor, makeFault, placeOptions, rowKey } from '../src/editor/task/faultRows';
 import type { SimFrame } from '../src/editor/useSimulation';
 import { parseTask, parseTaskPayload } from '../src/model/task';
 import { toSerializable } from '../src/model/serialize';
@@ -275,6 +276,38 @@ describe('Bildirim ve "Bulundu" (5. aşama)', () => {
     const banned = new Set(doc.parts.filter((p) => ['oscilloscope', 'funcgen', 'dcsupply', 'ground'].includes(p.type)).map((p) => p.id));
     expect(all.some((f) => ('part' in f && banned.has(f.part)) || (f.kind === 'open' && 'part' in f.at && banned.has(f.at.part)))).toBe(false);
     expect(randomFault(doc, idx, () => 0, all[0])).not.toEqual(all[0]);
+  });
+});
+
+describe('Görev oluştur → Arıza bulma (6. aşama, R4)', () => {
+  const doc = exampleDoc('bjt-yukseltec')!;
+  const idx = netIndex(doc, buildConnectivity(doc));
+  const id = (label: string) => doc.parts.find((p) => p.label === label)!.id;
+  const [RC, C1] = [id('RC'), id('C1')];
+
+  it('yerler: bacaklar, parçalar ve kablo uçları; ölçü aletlerine ve toprağa arıza konmaz', () => {
+    const opts = placeOptions(doc, idx);
+    expect(opts.find((o) => o.key === `p:${RC}:1`)!.label).toBe('RC · Q1 kollektör tarafındaki bacak');
+    expect(opts.some((o) => o.key === `p:${id('OSC1')}`)).toBe(false);
+    expect(opts.filter((o) => o.group === 'wire').length).toBe(doc.wires.length * 2);
+  });
+
+  it('türler yere göre; yer ve türden arıza, değer ve kısa devrenin öbür ucu korunur', () => {
+    expect(kindsFor(`p:${RC}:1`, doc)).toEqual(['open', 'short']);
+    expect(kindsFor(`p:${RC}`, doc)).toEqual(['value', 'short']);
+    expect(kindsFor(`p:${C1}`, doc)).toEqual(['value', 'reversed', 'short']);
+    expect(makeFault(`p:${RC}`, 'value', doc)).toEqual({ kind: 'value', part: RC, value: 56000 });
+    expect(makeFault(`p:${RC}`, 'value', doc, { kind: 'value', part: RC, value: 560 })).toEqual({ kind: 'value', part: RC, value: 560 });
+    const open = makeFault(`p:${RC}:1`, 'open', doc)!;
+    expect(rowKey(open)).toBe(`p:${RC}:1`);
+  });
+
+  it('şemadan seçilen yer: bacak → kopuk; kabloda yakın uç; kısa devrede "ile" öbür ucu değiştirir', () => {
+    expect(faultFromPlace({ part: RC, pin: 1 }, { x: 44, y: -4 }, doc, undefined, 'at')).toEqual({ kind: 'open', at: { part: RC, pin: 1 } });
+    const w = doc.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === 0))!;
+    expect(faultFromPlace({ wire: w.id }, { x: 44, y: -0.5 }, doc, undefined, 'at')).toEqual({ kind: 'open', at: { wire: w.id, end: 1 } });
+    const short = { kind: 'short' as const, at: { part: RC, pin: 0 }, to: { part: RC, pin: 1 } };
+    expect(faultFromPlace({ wire: w.id }, { x: 44, y: -4 }, doc, short, 'to')).toEqual({ ...short, to: { wire: w.id, end: 0 } });
   });
 });
 

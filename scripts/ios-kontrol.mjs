@@ -1619,6 +1619,50 @@ try {
     }
     await ctx.close();
   }
+  // 6. aşama (R4): hoca Görev oluştur'da "Arıza bulma"; yer şemadan da seçilir; bağlantı hedefli görevle aynı yapıda.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
+    let dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    await dlg.getByRole('radio', { name: 'Arıza bulma' }).click(); await page.waitForTimeout(150);
+    await dlg.getByRole('textbox', { name: 'Görev adı' }).fill('Deney 7 · arıza bul');
+    await dlg.getByRole('textbox', { name: /^Belirti/ }).fill('Osiloskobun B kanalında sinyal yok.');
+    const tools = await dlg.getByRole('button', { pressed: true }).allTextContents();
+    const parts = (await dlg.getByRole('button', { name: 'Arıza ekle' }).count()) === 1 && (await dlg.getByRole('button', { name: 'Rastgele seç' }).count()) === 1;
+    const note = ((await dlg.textContent()) ?? '').includes('Arıza bağlantının içinde durur');
+    if (OUT) await page.screenshot({ path: path.join(OUT, 'ariza-gorev-olustur.png') });
+    await dlg.getByRole('button', { name: 'Yeri şemadan seç' }).first().click(); await page.waitForTimeout(300);
+    const pickHint = await page.getByText('Arızanın yerini şemada seç: bacak, parça ya da kablo (Esc: vazgeç)').count();
+    const hidden = (await page.getByRole('dialog', { name: 'Görev oluştur' }).count()) === 0;
+    const p = await screen(page, 44, -4); await page.mouse.click(p.x, p.y); await page.waitForTimeout(300);
+    dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    const place = await dlg.getByRole('combobox', { name: '1. arızanın yeri' }).evaluate((el) => el.selectedOptions[0]?.textContent ?? '');
+    const kind = await dlg.getByRole('combobox', { name: '1. arızanın türü' }).evaluate((el) => el.selectedOptions[0]?.textContent ?? '');
+    await dlg.getByRole('switch', { name: /Önce beklenen değeri sor/ }).click();
+    const url = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    check('arıza (B2, 6. aşama, R4): Görev oluştur → "Hedefli görev | Arıza bulma"; ad, belirti, gizli arıza (yer ve tür), Arıza ekle, Rastgele seç, ölçü aletleri (V, Ω, osiloskop seçili), uyarı; yer şemadan seçiliyor (pencere kapanıp geri açılıyor); #g= bağlantısı',
+      tools.join('|') === 'Multimetre V|Multimetre Ω|Osiloskop (devrede)' && parts && note && pickHint === 1 && hidden && place === 'RC · Q1 kollektör tarafındaki bacak' && kind === 'Kopuk bağlantı' && /#g=/.test(url),
+      `${tools.join('|')} · ${place} · ${kind}`);
+    await page.goto('about:blank'); await page.goto(url, { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const card = page.getByRole('region', { name: 'Arıza bul: Deney 7 · arıza bul' });
+    const cardText = ((await card.textContent()) ?? '').replace(/\s+/g, ' ');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(1200);
+    const panel = page.getByRole('region', { name: 'Multimetre' });
+    await panel.getByRole('button', { name: /^Kırmızı u/ }).click(); await page.waitForTimeout(150);
+    const q = await screen(page, 44, -4); await page.mouse.click(q.x, q.y); await page.waitForTimeout(2000);
+    const reading = (await panel.getByRole('img').getAttribute('aria-label')) ?? '';
+    const expected = await card.getByRole('textbox', { name: /beklediğin değer$/ }).count();
+    check('arıza (B2, 6. aşama): bağlantı öğrencide arıza kipini açıyor (kart, belirti); seçilen arıza devrede (RC bacağında 11,99 V); "Önce beklenen değeri sor" günlükte beklenen alanı',
+      cardText.includes('Osiloskobun B kanalında sinyal yok.') && reading.endsWith('11,99 V ⎓') && expected === 1, `${reading} · ${expected}`);
+    await ctx.close();
+  }
   {
     const { page } = await phone();
     await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);

@@ -2,12 +2,13 @@
 // parçalar (çipler), "Yeni parça eklenebilir", hedefler (büyüklük, değer, tolerans; ±, ≥ ya da ≤).
 // Uyarı: hedefler bağlantının içinde, öğrenci görebilir; notlu sınav için değil. Altta bağlantı
 // (8 KB'yi aşarsa uyarı ve görev dosyası önerisi), Bağlantıyı kopyala, Görev dosyası (.json) ve
-// Öğrenci gibi önizle.
+// Öğrenci gibi önizle. Üstte "Hedefli görev | Arıza bulma" (B2, R4): arıza bulmada belirti, gizli
+// arızalar, ölçü aletleri; bağlantı ve dosya aynı yapıda (eski bağlantılar açılmaya devam eder).
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { tr } from '../../i18n/tr';
 import type { TraceDef } from '../../model/analysis';
-import { LINK_LIMIT, taskPayload, taskUrl, type Target, type TargetOp, type TaskDef } from '../../model/task';
+import { DEFAULT_FAULT_TOOLS, LINK_LIMIT, taskPayload, taskUrl, type FaultTask, type Target, type TargetOp, type TaskDef } from '../../model/task';
 import type { CircuitDoc } from '../../model/types';
 import { formatNumber } from '../../sim/units';
 import { datedName, saveFile } from '../analysis/format';
@@ -17,6 +18,8 @@ import { newId } from '../analysis/useAnalysis';
 import { Icon } from '../icons';
 import { plainText } from '../Rich';
 import { useTouchUi } from '../touchUi';
+import { firstFault } from './faultRows';
+import { FaultFields } from './FaultFields';
 import { quantityKey, targetOptions, valueText } from './targets';
 
 export interface TaskDialogProps {
@@ -29,6 +32,8 @@ export interface TaskDialogProps {
   readonly onDraft: (task: TaskDef) => void;
   readonly onClose: () => void;
   readonly notify: (message: string) => void;
+  /** Arıza bulma: satırın yerini şemadan seç (pencere kapanır, seçince taslakla geri açılır). */
+  readonly onPickPlace?: (row: number, which: 'at' | 'to') => void;
 }
 
 /** Görev adından dosya adı: küçük harf, Türkçe harfler sadeleştirilmiş, tire ile. */
@@ -44,7 +49,7 @@ export function slug(text: string): string {
   );
 }
 
-export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, notify }: TaskDialogProps) {
+export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, notify, onPickPlace }: TaskDialogProps) {
   const t = tr.task.dialog;
   const titleId = useId();
   const touch = useTouchUi();
@@ -52,10 +57,23 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
   const [task, setTask] = useState<TaskDef>(
     () => draft ?? { name: title, instruction: '', editable: [], allowNew: false, targets: [], predict: false },
   );
-  useEffect(() => onDraft(task), [task, onDraft]);
+  /** Hedefli görev ya da arıza bulma (R4); arıza taslağı kip değişse de durur. */
+  const [mode, setMode] = useState<'target' | 'fault'>(() => (draft?.fault ? 'fault' : 'target'));
+  const [fault, setFault] = useState<FaultTask>(() => {
+    const first = firstFault(doc, idx);
+    return draft?.fault ?? { symptom: '', faults: first ? [first] : [], tools: DEFAULT_FAULT_TOOLS, hideIndicators: true, askExpected: false };
+  });
+  useEffect(() => {
+    const { fault: _old, ...plain } = task;
+    onDraft(mode === 'fault' ? { ...plain, fault } : plain);
+  }, [task, fault, mode, onDraft]);
   // Bağlantıda başlangıç devresinin adı da (görev adı silinirse öğrencinin üst çubuğunda o görünür).
   const named = title !== tr.phone.defaultName && title !== tr.phone.emptyName;
-  const payloadTask = useMemo<TaskDef>(() => (named ? { ...task, circuit: title } : task), [task, named, title]);
+  const payloadTask = useMemo<TaskDef>(() => {
+    const { fault: _old, ...plain } = named ? { ...task, circuit: title } : task;
+    // Arıza bulmada devre kilitli (ampermetre eklenebiliyorsa yeni parça ve kablo açık); hedef ve tahmin yok.
+    return mode === 'fault' ? { ...plain, instruction: '', editable: [], targets: [], predict: false, allowNew: fault.tools.ammeter, fault } : plain;
+  }, [task, named, title, mode, fault]);
   const set = (patch: Partial<TaskDef>) => setTask((x) => ({ ...x, ...patch }));
   const setTarget = (id: string, patch: Partial<Target>) => set({ targets: task.targets.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
   const url = useMemo(() => taskUrl(payloadTask, doc, window.location.href), [payloadTask, doc]);
@@ -73,7 +91,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
       notify(t.copyFailed);
     }
   };
-  const file = () => void saveFile(datedName(`gorev-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(taskPayload(payloadTask, doc), null, 2)}\n`], { type: 'application/json' }));
+  const file = () => void saveFile(datedName(`${mode === 'fault' ? 'ariza' : 'gorev'}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(taskPayload(payloadTask, doc), null, 2)}\n`], { type: 'application/json' }));
   const field = `w-full min-w-0 rounded-lg border border-line-2 bg-panel px-3 ${touch ? 'h-11 text-[16px]' : 'h-10 text-sm'}`;
   const parts = doc.parts.filter((p) => p.type !== 'ground');
   const unitOf = (target: Target) => options.find((o) => o.key === quantityKey(target.q))?.unit ?? '';
@@ -94,10 +112,29 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
           </button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-6 pb-4">
+          <span role="radiogroup" aria-label={tr.fault.dialog.modeLabel} className="flex shrink-0 rounded-xl bg-app p-1">
+            {(['target', 'fault'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => setMode(m)}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] text-small ${touch ? 'h-11' : 'h-9'} ${mode === m ? 'bg-ink font-semibold text-panel' : 'text-ink-2 hover:text-ink'}`}
+              >
+                <Icon name={m === 'target' ? 'target' : 'wrench'} className="h-4 w-4" />
+                {tr.fault.dialog.modes[m]}
+              </button>
+            ))}
+          </span>
           <label className="flex flex-col gap-1.5 text-small font-semibold">
             {t.name}
             <input ref={first} value={task.name} onChange={(e) => set({ name: e.target.value })} className={`${field} font-normal`} />
           </label>
+          {mode === 'fault' ? (
+            <FaultFields doc={doc} idx={idx} value={fault} onChange={setFault} touch={touch} {...(onPickPlace ? { onPick: onPickPlace } : {})} />
+          ) : (
+          <>
           <label className="flex flex-col gap-1.5 text-small font-semibold">
             {t.instruction}
             <textarea value={task.instruction} onChange={(e) => set({ instruction: e.target.value })} rows={3} placeholder={t.instructionHint} className={`w-full rounded-lg border border-line-2 bg-panel px-3 py-2 font-normal ${touch ? 'text-[16px]' : 'text-sm'}`} />
@@ -173,6 +210,8 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
             <Icon name="warning" className="mt-px h-4 w-4 shrink-0" />
             {t.visible}
           </p>
+          </>
+          )}
         </div>
         <div className="flex shrink-0 flex-col gap-2 border-t border-line px-6 py-4">
           {tooLong && (

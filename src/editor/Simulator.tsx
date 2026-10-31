@@ -12,6 +12,7 @@ import { maskFrame } from './fault/mask';
 import { FaultCard } from './fault/FaultCard';
 import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
 import { FoundCard, ReportCard } from './fault/ReportCards';
+import { faultFromPlace } from './task/faultRows';
 import { defaultBlack, measureResistance, METER_ID, meterPart, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
 import { MultimeterPanel, type MeterReading } from './fault/MultimeterPanel';
 import { addEntry, entryName, NEW_SESSION, parseSession, type FaultSession, type Place } from './fault/session';
@@ -294,6 +295,18 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [toast, showToast, hideToast] = useToast();
   lockNotice.current.show = (message) => showToast(message, 'error');
   const [taskDialog, setTaskDialog] = useState(false);
+  /** Görev oluştur → Arıza bulma: satırın yeri şemadan seçiliyor (pencere kapalı; R4). */
+  const [faultPick, setFaultPick] = useState<{ row: number; which: 'at' | 'to' } | null>(null);
+  useEffect(() => {
+    if (!faultPick) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setFaultPick(null);
+      setTaskDialog(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [faultPick]);
   const [taskDraft, setTaskDraft] = useState<TaskDef | null>(null);
   // İlk açılış (M01): hoş geldin yalnızca ilk ziyarette (kayıtlı devre ya da paylaşım bağlantısı yoksa).
   const [welcomeOpen, setWelcomeOpen] = useState(() => !embed && !welcomeSeen() && initialIsFresh());
@@ -1313,9 +1326,26 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       onExplain={explain}
       onPick={analysis.pick ? analysis.onPick : null}
       probes={probeView}
-      onLocate={reporting ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r)) : null}
-      placeMarks={
+      onLocate={
         reporting
+          ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r))
+          : faultPick
+            ? (place, at) => {
+                const draft = taskDraft?.fault;
+                const next = draft ? faultFromPlace(place, at, doc, draft.faults[faultPick.row], faultPick.which) : null;
+                if (taskDraft && draft && next) {
+                  const faults = faultPick.row < draft.faults.length ? draft.faults.map((f, i) => (i === faultPick.row ? next : f)) : [...draft.faults, next];
+                  setTaskDraft({ ...taskDraft, fault: { ...draft, faults } });
+                }
+                setFaultPick(null);
+                setTaskDialog(true);
+              }
+            : null
+      }
+      placeMarks={
+        faultPick
+          ? { marks: [], hint: touchUi ? tr.fault.dialog.pickHintTouch : tr.fault.dialog.pickHint }
+          : reporting
           ? {
               marks: reporting.place && reporting.at ? [{ at: reporting.at, label: tr.fault.report.selected(spotOrPlaceLabel(reporting.place)), tone: 'accent' as const }] : [],
               hint: touchUi ? tr.fault.report.whereHintTouch : tr.fault.report.whereHint,
@@ -1555,6 +1585,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         onDraft={setTaskDraft}
         onClose={() => setTaskDialog(false)}
         notify={notify}
+        onPickPlace={(row, which) => {
+          setTaskDialog(false);
+          setFaultPick({ row, which });
+        }}
       />
     </TouchUi.Provider>
   );
