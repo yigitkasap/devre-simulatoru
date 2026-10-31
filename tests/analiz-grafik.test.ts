@@ -85,6 +85,28 @@ describe('Analiz: grafik kaydı', () => {
     expect(nodeName(pinKey(gnd.id, 0), idx)).toBe('0');
   });
 
+  it('düğüm adı (analiz düzeltmeleri, 10): kaynağın ucu, transistörün ucu, öbür ucu toprakta parça, adlı uç', () => {
+    const amp = exampleDoc('bjt-yukseltec')!;
+    const idx = netIndex(amp, buildConnectivity(amp));
+    const at = (label: string, pin: number) => nodeName(pinKey(amp.parts.find((p) => p.label === label)!.id, pin), idx);
+    // +12 V hattı (PS1 +, RB, RC): eskiden "RB 1. uç".
+    expect(at('RB', 0)).toBe('PS1 +');
+    expect(at('PS1', 0)).toBe('PS1 +');
+    // FG tarafı (FG1 OUT, C1 −): eskiden "C1 − uç".
+    expect(at('C1', 1)).toBe('FG1 OUT');
+    expect(at('Q1', 1)).toBe('Q1 baz');
+    expect(at('RC', 1)).toBe('Q1 kollektör');
+    const traceName = traceLabel({ id: 'x', color: 0, kind: 'voltage', node: pinKey(amp.parts.find((p) => p.label === 'RB')!.id, 0), at: { x: 0, y: 0 }, ref: null, refAt: null }, amp, idx).name;
+    expect(traceName).toBe('V(PS1 +)');
+    // RC dolma: pilin ucu, öbür ucu toprakta kondansatör; adsız uçlu parçalar arasında ilk parçanın ucu.
+    const rcd = exampleDoc('rc-dolma')!;
+    const rIdx = netIndex(rcd, buildConnectivity(rcd));
+    const rcAt = (label: string, pin: number) => nodeName(pinKey(rcd.parts.find((p) => p.label === label)!.id, pin), rIdx);
+    expect(rcAt('S1', 0)).toBe('B1 +');
+    expect(rcAt('C1', 0)).toBe('C1');
+    expect(rcAt('R1', 0)).toBe('R1 1. uç');
+  });
+
   it('analiz bölümü kaydedilip okunur; bozuk veri boş analize döner', () => {
     const a = { traces: [vTrace, iTrace], rows: [], labColumn: true, fit: null };
     expect(parseAnalysis(JSON.parse(JSON.stringify(serializeAnalysis(a))))).toEqual(a);

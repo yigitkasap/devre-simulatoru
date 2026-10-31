@@ -1250,6 +1250,9 @@ try {
       groups.join('|') === 'DC çalışma noktası|Bode|Düğüm gerilimi|Parça ölçümleri (canlı)' && nodeOptions.includes('V(Q1 kollektör)') && /^gorev-deney-7-.*\.json$/.test(taskFile.suggestedFilename()) && sizeText !== '' &&
       (await dlg.getByRole('alert').count()) === 0,
       `${url.length} karakter · ${sizeText} · ${taskFile.suggestedFilename()} · ${nodeOptions.join(', ')}`);
+    check('görev (analiz düzeltmeleri 10): düğüm adları anlaşılır sırayla: kaynağın ucu (V(PS1 +), V(FG1 OUT)), transistörün ucu (V(Q1 baz), V(Q1 kollektör)); "RB 1. uç", "C1 − uç" gibi adlar yok',
+      ['V(PS1 +)', 'V(FG1 OUT)', 'V(Q1 baz)', 'V(Q1 kollektör)'].every((x) => nodeOptions.includes(x)) && !nodeOptions.some((x) => /RB 1\. uç|C1 − uç/.test(x)),
+      nodeOptions.join(', '));
     // 8 KB üstü: pencere söylüyor, dosyayı öneriyor (sıkışmayan uzun yönerge).
     const noise = Array.from({ length: 2600 }, (_, i) => ((i * 7919) % 9973).toString(36)).join(' ');
     await dlg.getByRole('textbox', { name: 'Yönerge' }).fill(noise); await page.waitForTimeout(200);
