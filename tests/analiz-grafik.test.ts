@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { advanceRecorded, intervalForSpeed, niceInterval, TraceRecorder } from '../src/editor/analysis/recorder';
 import { axisUnit, niceTicks, tickText, toCsv } from '../src/editor/analysis/format';
+import { occupancy, overlapCost, placeValueBox } from '../src/editor/analysis/Chart';
 import { netIndex, nodeName, traceLabel } from '../src/editor/analysis/traces';
 import { parseAnalysis, serializeAnalysis, type TraceDef } from '../src/model/analysis';
 import { buildConnectivity, pinKey } from '../src/model/connectivity';
@@ -104,5 +105,31 @@ describe('Analiz: eksen ve CSV', () => {
   it('CSV: noktalı virgülde ondalık virgül, virgülde nokta; tırnaklanan hücreler', () => {
     expect(toCsv(['t (s)', 'V(C1) (V)'], [[0.1, 6.3209]], ';')).toBe('﻿t (s);V(C1) (V)\r\n0,1;6,3209\r\n');
     expect(toCsv(['a', 'b'], [[0.5, 'x,y']], ',')).toBe('﻿a,b\r\n0.5,"x,y"\r\n');
+  });
+});
+
+describe('Analiz: imleç değer kutusunun yeri (analiz düzeltmeleri, 8)', () => {
+  // Grafik alanı 600 × 300 px (sol üst 46, 22); kutu 208 × 120 px.
+  const plot = { x: 46, y: 22, w: 600, h: 300 };
+  it('RC dolma biçiminde eğri: sağ uçtaki imleçte kutu sola ve alta (üstteki düzlüğü örtmez)', () => {
+    const rc = [[46, 322], [200, 322], [300, 30], [646, 30]] as const;
+    const occ = occupancy([rc], plot.x, plot.w);
+    const box = placeValueBox(occ, plot, 600, 208, 120)!;
+    expect(box.x + box.w).toBeLessThanOrEqual(600);
+    expect(box.y).toBeGreaterThan(plot.y + plot.h / 2 - 120);
+    expect(overlapCost(occ, plot.x, box)).toBe(0);
+    // Eski yer (imlecin solunda, üstte) düzlüğü örtüyordu.
+    expect(overlapCost(occ, plot.x, { x: 600 - 222, y: plot.y + 8, w: 208, h: 120 })).toBeGreaterThan(0);
+  });
+
+  it('imlecin dört yanı da eğrilere biniyorsa kutu grafik alanının üst köşesine (imleci örtmeyen) sabitlenir', () => {
+    // Sağ yarıda üstte ve altta salınan iki eğri (x ≥ 280).
+    const zigzag = (a: number, b: number) => Array.from({ length: 92 }, (_, i) => [280 + i * 4, i % 2 ? a : b] as const);
+    const occ = occupancy([zigzag(40, 140), zigzag(200, 310)], plot.x, plot.w);
+    const box = placeValueBox(occ, plot, 400, 208, 120)!;
+    expect(box).toEqual({ x: plot.x + 8, y: plot.y + 8, w: 208, h: 120 });
+    expect(overlapCost(occ, plot.x, box)).toBe(0);
+    // Yer yoksa (çok dar grafik) null: kutu eski yerinde.
+    expect(placeValueBox(occ, { ...plot, w: 150 }, 100, 208, 120)).toBeNull();
   });
 });

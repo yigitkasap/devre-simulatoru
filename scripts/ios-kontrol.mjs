@@ -900,6 +900,25 @@ try {
     const endValue = ((await drawer.locator('.shadow-lg').first().textContent()) ?? '').replace(/\s+/g, ' ');
     check('analiz: kayıt yalnız seçili izler, 5 ms aralıkla; grafik role="img" açıklamalı; imleç klavyeyle sona gidiyor, değer kutusunda V(C1) ≈ 9,9 V',
       /Aralık ?5 ms · \d{2,} nokta/.test(info) && chartLabel.startsWith('Grafik: V(C1), I(R1)') && /V\(C1\) ?9,[89]\d\d V/.test(endValue), `${info} · ${endValue.slice(0, 60)}`);
+    // İmleç değer kutusu (analiz düzeltmeleri, 8): eğrilerle en az çakışan yere; sondaki imleçte kutunun
+    // içine eğrilerin hiçbir noktası düşmüyor (RC dolmada üstteki düzlüğü örtmüyor).
+    const covered = await drawer.evaluate((root) => {
+      const boxEl = root.querySelector('.shadow-lg');
+      const svg = root.querySelector('svg[role=img]');
+      if (!boxEl || !svg) return -1;
+      const b = boxEl.getBoundingClientRect();
+      const s = svg.getBoundingClientRect();
+      let n = 0;
+      for (const path of svg.querySelectorAll('path[stroke^="var(--color-tr"]')) {
+        for (const m of (path.getAttribute('d') ?? '').matchAll(/[ML]([\d.]+) ([\d.]+)/g)) {
+          const x = s.left + Number(m[1]);
+          const y = s.top + Number(m[2]);
+          if (x > b.left && x < b.right && y > b.top && y < b.bottom) n++;
+        }
+      }
+      return n;
+    });
+    check('analiz (analiz düzeltmeleri 8): imleç sondayken değer kutusu eğrilere binmiyor (kutunun içinde eğri noktası yok)', covered === 0, `${covered} nokta`);
     // Kablo gerilimi kutusu (analiz düzeltmeleri, 2): çekmece açıkken ve çalışırken toprak sembolüne ve
     // alt kabloya binmiyor (Sığdır kutuyu dışarıda bırakır); yakınlaşınca devreye değen kutu tek satır.
     {
