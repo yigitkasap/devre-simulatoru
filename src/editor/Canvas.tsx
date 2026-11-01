@@ -230,6 +230,11 @@ export interface CanvasProps {
   readonly onProbe?: ((probe: Probe) => void) | null;
   /** Arızayı bildirirken yer seçimi: bacak, parçanın kendisi ya da kablo (R2). */
   readonly onLocate?: ((place: Place, at: Point) => void) | null;
+  /**
+   * Kabloya ya da parçaya dokununca (fare ya da parmak kıpırdamadan kalkınca) açılan menü: arıza
+   * bulmada "Buraya ampermetre tak" / "Ampermetreyi kaldır". null dönerse olağan davranış sürer.
+   */
+  readonly tapMenu?: ((target: TapTarget) => { readonly label: string; readonly items: readonly MenuItem[] } | null) | null;
   /** Şemadaki halkalar (seçilen yer, bulunan arıza) ve alttaki yönerge. */
   readonly placeMarks?: { readonly marks: readonly PlaceMark[]; readonly hint: string | null } | null;
   /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
@@ -240,6 +245,9 @@ export interface CanvasProps {
 }
 
 /** "İz ekle"de tıklanan şey: parça (akım) ya da düğüm (gerilim; anahtar ve tıklanan ızgara noktası). */
+/** Dokunulan kablo (noktasıyla) ya da parça. */
+export type TapTarget = { readonly kind: 'wire'; readonly wireId: string; readonly at: Point } | { readonly kind: 'part'; readonly partId: string };
+
 export type PickTarget = { readonly kind: 'part'; readonly partId: string } | { readonly kind: 'node'; readonly key: string; readonly at: Point };
 
 /** Şemadaki iz etiketi (renkli hap ve nokta) ya da bekleyen seçimin halkası. */
@@ -375,6 +383,7 @@ export function Canvas({
   onProbe = null,
   onLocate = null,
   placeMarks = null,
+  tapMenu = null,
   marks,
   taskParts,
   ref,
@@ -964,7 +973,11 @@ export function Canvas({
   };
 
   // --- İşaretçi olayları ---------------------------------------------------------------
+  /** Menülü dokunuşun başladığı yer (tapMenu): kıpırdamadan kalkarsa menü açılır. */
+  const tapStart = useRef<{ id: number; x: number; y: number } | null>(null);
+  const [tapMenuState, setTapMenuState] = useState<{ x: number; y: number; label: string; items: readonly MenuItem[] } | null>(null);
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    tapStart.current = tapMenu && e.button === 0 && pointers.current.size === 0 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
     pointerType.current = e.pointerType;
     if (e.isPrimary) {
       // Yeni bir dokunuş ya da tıklama: kaçırılmış bir pointerup'tan (iOS'ta olabiliyor) kalan kayıtlar
@@ -1255,6 +1268,35 @@ export function Canvas({
   };
 
   const onPointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const start = tapStart.current;
+    tapStart.current = null;
+    let tapped: { x: number; y: number; label: string; items: readonly MenuItem[] } | null = null;
+    if (tapMenu && start && start.id === e.pointerId && e.type === 'pointerup' && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) {
+      const g = toGrid(e.clientX, e.clientY);
+      // Önce dokunulan parça (menüsü varsa, ör. takılı ampermetre), yoksa yakındaki kablo. Parmakla
+      // dokunurken parçaların gövdesi genişletildiği için kablonun yanındaki parça kabloyu örtmesin.
+      const partHit = hitTest(g, { pins: false, wires: false });
+      const partMenu = partHit?.kind === 'part' ? tapMenu({ kind: 'part', partId: partHit.partId }) : null;
+      const wireHit = partMenu ? null : hitTest(g, { pins: false, parts: false });
+      const wire = wireHit?.kind === 'wire' ? doc.wires.find((w) => w.id === wireHit.wireId) : undefined;
+      const menu =
+        partMenu ?? (wireHit?.kind === 'wire' && wire ? tapMenu({ kind: 'wire', wireId: wire.id, at: snapToSegment(g, wire.points[wireHit.segment]!, wire.points[wireHit.segment + 1]!) }) : null);
+      if (menu) {
+        const local = localPoint(e.clientX, e.clientY);
+        tapped = { x: local.x, y: local.y, ...menu };
+      }
+    }
+    handlePointerUp(e);
+    if (tapped) {
+      // Telefonda kalabalık noktada açılan seçici ve büyüteç menünün yerini almasın; masaüstünde
+      // menüyü açan tıklama yakındaki bacaktan kablo çizmeye başlamasın.
+      setPicker(null);
+      setMagnifier(null);
+      if (interactionRef.current.kind === 'wiring') setInteraction({ kind: 'idle' });
+      setTapMenuState(tapped);
+    }
+  };
+  const handlePointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
     pointers.current.delete(e.pointerId);
     const current = interactionRef.current;
     const longPressFired = longPress.current?.fired ?? false;
@@ -2198,6 +2240,9 @@ export function Canvas({
             );
           })}
 
+      {tapMenuState && (
+        <ContextMenu x={tapMenuState.x} y={tapMenuState.y} items={tapMenuState.items} area={size} label={tapMenuState.label} onClose={() => setTapMenuState(null)} touch={phone !== null} />
+      )}
       {menu && (() => {
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
@@ -2222,6 +2267,7 @@ export function Canvas({
             items={items}
             area={size}
             label={tr.contextMenu.menu(part.label)}
+            touch={phone !== null}
             onClose={() => {
               setMenu(null);
               setMagnifier(null);

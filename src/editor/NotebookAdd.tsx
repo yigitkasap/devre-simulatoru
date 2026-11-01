@@ -46,17 +46,20 @@ export interface AddPartRowProps {
   readonly chainTo: string | null;
   readonly onAdd: (type: DeviceType) => void;
   readonly onOpenExample: (id: ExampleId) => void;
+  /** Eklenebilen türler (arıza bulmada yalnızca ampermetre); verilmezse hepsi. Örnek önerileri de gizlenir. */
+  readonly allowed?: ReadonlySet<DeviceType> | null;
 }
 
-export function AddPartRow({ settings, chainTo, onAdd, onOpenExample }: AddPartRowProps) {
+export function AddPartRow({ settings, chainTo, onAdd, onOpenExample, allowed = null }: AddPartRowProps) {
+  const types = useMemo(() => (allowed ? ALL_TYPES.filter((type) => allowed.has(type)) : ALL_TYPES), [allowed]);
   const touch = useTouchUi();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const [gridOpen, setGridOpen] = useState(false);
   const listId = useId();
   const q = normalize(query.trim());
-  const parts = useMemo(() => (q ? ALL_TYPES.filter((type) => normalize(tr.devices.names[type]).includes(q)).slice(0, MAX_PARTS) : []), [q]);
-  const examples = useMemo(() => (parts[0] ? examplesWith(parts[0]).slice(0, MAX_EXAMPLES) : []), [parts]);
+  const parts = useMemo(() => (q ? types.filter((type) => normalize(tr.devices.names[type]).includes(q)).slice(0, MAX_PARTS) : []), [q, types]);
+  const examples = useMemo(() => (parts[0] && !allowed ? examplesWith(parts[0]).slice(0, MAX_EXAMPLES) : []), [parts, allowed]);
   const options = [...parts.map((type) => ({ kind: 'part' as const, type })), ...examples.map((id) => ({ kind: 'example' as const, id }))];
   useEffect(() => setActive(0), [q]);
 
@@ -153,12 +156,13 @@ export function AddPartRow({ settings, chainTo, onAdd, onOpenExample }: AddPartR
         className={`flex shrink-0 items-center gap-2 self-start px-1 text-small text-accent-ink hover:underline ${touch ? 'h-11' : 'h-10'}`}
       >
         <Icon name="parts" className="h-4 w-4" />
-        {t.browseAll(ALL_TYPES.length)}
+        {t.browseAll(types.length)}
       </button>
       {gridOpen && (
         <PartsGridDialog
           settings={settings}
           chainTo={chainTo}
+          allowed={allowed}
           onAdd={(type) => {
             setGridOpen(false);
             onAdd(type);
@@ -171,7 +175,19 @@ export function AddPartRow({ settings, chainTo, onAdd, onOpenExample }: AddPartR
 }
 
 /** Bütün parçalar: kategorili ızgara; tıklanan parça eklenir, pencere kapanır. */
-function PartsGridDialog({ settings, chainTo, onAdd, onClose }: { settings: Settings; chainTo: string | null; onAdd: (type: DeviceType) => void; onClose: () => void }) {
+function PartsGridDialog({
+  settings,
+  chainTo,
+  allowed,
+  onAdd,
+  onClose,
+}: {
+  settings: Settings;
+  chainTo: string | null;
+  allowed: ReadonlySet<DeviceType> | null;
+  onAdd: (type: DeviceType) => void;
+  onClose: () => void;
+}) {
   const touch = useTouchUi();
   const titleId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -205,7 +221,9 @@ function PartsGridDialog({ settings, chainTo, onAdd, onClose }: { settings: Sett
           </button>
         </header>
         <div className="flex min-h-0 flex-col gap-4 overflow-y-auto overscroll-contain px-5 py-4">
-          {CATEGORIES.map((c) => (
+          {CATEGORIES.map((c) => ({ ...c, types: c.types.filter((type) => !allowed || allowed.has(type)) }))
+            .filter((c) => c.types.length > 0)
+            .map((c) => (
             <section key={c.id} aria-label={tr.library.categories[c.id]} className="flex flex-col gap-2">
               <h3 className="text-label font-semibold text-muted">{tr.library.categories[c.id]}</h3>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">

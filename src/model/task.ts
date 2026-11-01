@@ -256,26 +256,36 @@ export function targetMet(t: Target, measured: number | null): boolean {
 }
 
 /**
- * Kilitli parçalar değişmedi mi (değeri, yeri, dönüşü, silinmesi). Anahtar ve potansiyometre gibi
- * kullanma denetimleri (OPERATE) kilitli parçada da değişebilir. Yeni parça eklenemiyorsa parça ve
- * kablo sayısı da değişmez (kablolar kilitli parçalar arasında).
+ * Görevde yeni eklenebilecek parça türü: arıza bulmada yalnızca ampermetre (hoca "Ampermetre
+ * eklenebilir"i seçtiyse), hedefli görevde "Yeni parça eklenebilir" açıksa hepsi. Parça panelleri ve
+ * görevin bekçisi (respectsTask) aynı kuralı kullanır.
  */
-export function respectsTask(before: CircuitDoc, after: CircuitDoc, task: TaskDef): boolean {
+export function canAddType(task: TaskDef, type: CircuitDoc['parts'][number]['type']): boolean {
+  if (task.fault) return task.fault.tools.ammeter && type === 'ammeter';
+  return task.allowNew;
+}
+
+/**
+ * Kilitli parçalar değişmedi mi (değeri, yeri, dönüşü, silinmesi). Anahtar ve potansiyometre gibi
+ * kullanma denetimleri (OPERATE) kilitli parçada da değişebilir. Yeni parça yalnızca eklenebilen
+ * türdense (canAddType) kabul edilir; yeni parça eklenemiyorsa kablolar da değişmez (kablolar
+ * kilitli parçalar arasında). `added`: öğrencinin sonradan eklediği parçalar (arıza bulmada takılan
+ * ampermetre): kilitli değildir, taşınır ve silinir, ama türü yine eklenebilen türde olmalı.
+ */
+export function respectsTask(before: CircuitDoc, after: CircuitDoc, task: TaskDef, added?: ReadonlySet<string>): boolean {
   const editable = new Set(task.editable);
   const next = new Map(after.parts.map((p) => [p.id, p]));
   for (const p of before.parts) {
-    if (editable.has(p.id)) continue;
+    if (editable.has(p.id) || added?.has(p.id)) continue;
     const q = next.get(p.id);
     if (!q || q.type !== p.type || q.x !== p.x || q.y !== p.y || q.rotation !== p.rotation || q.label !== p.label) return false;
     if (INSTRUMENTS.has(p.type)) continue;
     const keys = new Set([...Object.keys(p.props), ...Object.keys(q.props)]);
     for (const k of keys) if (!OPERATE.has(k) && p.props[k] !== q.props[k]) return false;
   }
-  if (!task.allowNew) {
-    const old = new Set(before.parts.map((p) => p.id));
-    if (after.parts.some((p) => !old.has(p.id))) return false;
-    if (JSON.stringify(before.wires) !== JSON.stringify(after.wires)) return false;
-  }
+  const old = new Set(before.parts.map((p) => p.id));
+  if (after.parts.some((p) => (!old.has(p.id) || added?.has(p.id)) && !canAddType(task, p.type))) return false;
+  if (!task.allowNew && JSON.stringify(before.wires) !== JSON.stringify(after.wires)) return false;
   return true;
 }
 

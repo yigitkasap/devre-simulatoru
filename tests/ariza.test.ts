@@ -20,6 +20,9 @@ import { faultFromPlace, kindsFor, makeFault, placeOptions, rowKey } from '../sr
 import { FAULT_SCENARIOS } from '../src/examples/faultScenarios';
 import { scenarioTask } from '../src/editor/fault/scenarios';
 import { BURNT_PROP, faultedLook } from '../src/editor/fault/look';
+import { insertAmmeter, remapFaults, removeAmmeter, removedMeters } from '../src/editor/fault/ammeter';
+import { addPart, removeItems } from '../src/model/docOps';
+import { canAddType, respectsTask, type TaskDef } from '../src/model/task';
 import { tr } from '../src/i18n/tr';
 import type { SimFrame } from '../src/editor/useSimulation';
 import { parseTask, parseTaskPayload } from '../src/model/task';
@@ -408,6 +411,84 @@ describe('3B’de gözle görülen arızalar (karar 1)', () => {
     const before = pinPositions(led).map((p) => `${p.x},${p.y}`).sort();
     const after = pinPositions(look.parts.find((p) => p.id === led.id)!).map((p) => `${p.x},${p.y}`).sort();
     expect(after).toEqual(before);
+  });
+});
+
+describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
+  const base: TaskDef = { name: 'Arıza', instruction: '', editable: [], allowNew: true, targets: [], predict: false };
+  const tools = { voltage: true, resistance: true, scope: true, ammeter: true };
+  const withAmmeter: TaskDef = { ...base, fault: { symptom: '', faults: [], tools, hideIndicators: true, askExpected: false } };
+  const noAmmeter: TaskDef = { ...base, allowNew: false, fault: { symptom: '', faults: [], tools: { ...tools, ammeter: false }, hideIndicators: true, askExpected: false } };
+
+  it('eklenebilen tür: arıza bulmada yalnızca ampermetre (izin varsa); hedefli görevde "Yeni parça eklenebilir"e göre hepsi', () => {
+    expect(canAddType(withAmmeter, 'ammeter')).toBe(true);
+    expect(canAddType(withAmmeter, 'resistor')).toBe(false);
+    expect(canAddType(noAmmeter, 'ammeter')).toBe(false);
+    expect(canAddType(base, 'resistor')).toBe(true);
+    expect(canAddType({ ...base, allowNew: false }, 'resistor')).toBe(false);
+  });
+
+  it('bekçi (ekleme işlevinin kendisi): panelden, yapıştırmayla ya da sürükle-bırakla gelen başka parça reddedilir; ampermetre kabul', () => {
+    const doc = exampleDoc('led-on-direnc')!;
+    const resistor = addPart(doc, 'resistor', { x: 40, y: 20 }, 0).doc;
+    const ammeter = addPart(doc, 'ammeter', { x: 40, y: 20 }, 0).doc;
+    // Yapıştırma: ampermetre ile birlikte bir direnç.
+    const pasted = addPart(ammeter, 'resistor', { x: 60, y: 20 }, 0).doc;
+    expect(respectsTask(doc, resistor, withAmmeter)).toBe(false);
+    expect(respectsTask(doc, ammeter, withAmmeter)).toBe(true);
+    expect(respectsTask(doc, pasted, withAmmeter)).toBe(false);
+    expect(respectsTask(doc, ammeter, noAmmeter)).toBe(false);
+    // Hedefli görevde (yeni parça eklenebilir) davranış değişmedi.
+    expect(respectsTask(doc, resistor, base)).toBe(true);
+  });
+
+  it('öğrencinin taktığı ampermetre kilitli değil (taşınır, silinir); devrenin kendi ampermetresi silinemez; eklenen parçanın türü değiştirilemez', () => {
+    const doc = exampleDoc('led-on-direnc')!;
+    const { doc: withA, id } = addPart(doc, 'ammeter', { x: 40, y: 20 }, 0);
+    const added = new Set([id]);
+    const moved = { ...withA, parts: withA.parts.map((p) => (p.id === id ? { ...p, x: 44 } : p)) };
+    expect(respectsTask(withA, moved, withAmmeter, added)).toBe(true);
+    expect(respectsTask(withA, removeItems(withA, [id], []), withAmmeter, added)).toBe(true);
+    const a1 = doc.parts.find((p) => p.label === 'A1')!.id;
+    expect(respectsTask(withA, removeItems(withA, [a1], []), withAmmeter, added)).toBe(false);
+    const swapped = { ...withA, parts: withA.parts.map((p) => (p.id === id ? { ...p, type: 'resistor' as const } : p)) };
+    expect(respectsTask(withA, swapped, withAmmeter, added)).toBe(false);
+  });
+
+  it('"Buraya ampermetre tak": kablo ikiye bölünür, ampermetre seri; kollektör akımını ölçer, devre değişmez; kaldırınca kablo eski hâline döner', () => {
+    const doc = exampleDoc('bjt-yukseltec')!;
+    const w = doc.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === 0))!;
+    const r = insertAmmeter(doc, w.id, { x: 44, y: -2 });
+    if ('error' in r) throw new Error(r.error);
+    expect(r.doc.parts.find((p) => p.id === r.meter.part)!.type).toBe('ammeter');
+    expect(r.doc.wires.length).toBe(doc.wires.length + 3);
+    // Bekçi kabul eder (yeni parça yalnızca ampermetre, öbür parçalar yerinde).
+    expect(respectsTask(doc, r.doc, withAmmeter)).toBe(true);
+    const meter = r.meter.part;
+    const sim = new CircuitSimulator(atOperatingPoint(buildConnectivity(r.doc).netlist));
+    sim.runUntil(0.2);
+    expect(Math.abs(reading(sim, meter)) * 1000).toBeCloseTo(1.08, 1);
+    expect(reading(run(r.doc, [], pinKey(partId(doc, 'Q1'), 0)), 'olcum')).toBeCloseTo(5.99, 1);
+    // Kaldırınca belge birebir eski hâline döner (silme yoluyla da: removedMeters).
+    expect(removeAmmeter(r.doc, r.meter)).toEqual(doc);
+    const deleted = removeItems(r.doc, [meter], []);
+    expect(removedMeters(r.doc, deleted, [r.meter])).toEqual([r.meter]);
+    expect(removeAmmeter(deleted, r.meter)).toEqual(doc);
+  });
+
+  it('kablo ucundaki arıza ikinci yarıya taşınır; kopuk RC bacağında ampermetre sıfıra yakın akım gösterir', () => {
+    const doc = exampleDoc('bjt-yukseltec')!;
+    const w = doc.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === 0))!;
+    const r = insertAmmeter(doc, w.id, { x: 44, y: -2 });
+    if ('error' in r) throw new Error(r.error);
+    expect(remapFaults([{ kind: 'open', at: { wire: w.id, end: 1 } }], [r.meter])).toEqual([{ kind: 'open', at: { wire: r.meter.half, end: 1 } }]);
+    expect(remapFaults([{ kind: 'open', at: { wire: w.id, end: 0 } }], [r.meter])).toEqual([{ kind: 'open', at: { wire: w.id, end: 0 } }]);
+    const sim = new CircuitSimulator(atOperatingPoint(buildConnectivity(r.doc, [{ kind: 'open', at: { part: partId(doc, 'RC'), pin: 1 } }]).netlist));
+    sim.runUntil(0.2);
+    expect(Math.abs(reading(sim, r.meter.part))).toBeLessThan(1e-6);
+    // Çok kısa kablo parçası: takılmaz.
+    const short = doc.wires.find((x) => x.points.length === 2 && Math.abs(x.points[0]!.x - x.points[1]!.x) + Math.abs(x.points[0]!.y - x.points[1]!.y) < 3);
+    if (short) expect(insertAmmeter(doc, short.id, short.points[0]!)).toEqual({ error: 'short' });
   });
 });
 

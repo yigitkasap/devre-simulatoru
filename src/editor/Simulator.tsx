@@ -9,6 +9,7 @@ import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
 import { maskFrame } from './fault/mask';
+import { insertAmmeter, remapFaults, removeAmmeter, removedMeters, type InsertedMeter } from './fault/ammeter';
 import { FaultCard } from './fault/FaultCard';
 import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
 import { faultedLook } from './fault/look';
@@ -34,7 +35,8 @@ import { loadSavedAnalysis, loadSavedDoc, useAutosave } from './autosave';
 import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
 import type { FaultKind } from '../model/faults';
 import type { FaultScenarioId } from '../examples/faultScenarios';
-import { NO_PREDICTIONS, parsePredictions, REASON_LIMIT, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
+import { CATEGORIES } from '../model/catalog';
+import { canAddType, NO_PREDICTIONS, parsePredictions, REASON_LIMIT, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
 import { parseEmbedParams, type EmbedOptions } from '../model/embed';
 import { toSerializable } from '../model/serialize';
 import { datedName, saveFile } from './analysis/format';
@@ -46,7 +48,7 @@ import { goalText, measureTarget, targetName, targetParts } from './task/targets
 import { Icon } from './icons';
 import { BottomSheet, SheetHeader, type SheetSize } from './BottomSheet';
 import { BenchView, ViewToggle, useViewMode } from './BenchView';
-import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type PhoneCanvas } from './Canvas';
+import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type PhoneCanvas, type TapTarget } from './Canvas';
 import { CanvasControls, WiringControls } from './CanvasControls';
 import type { DeviceHooks } from './DeviceCards';
 import { ExamplesDialog } from './ExamplesDialog';
@@ -210,12 +212,17 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     }
   }, [embed, task, predictions]);
   /** Arıza bulma oturumu (B2): yeni görev ya da görevden çıkış sıfırlar. */
-  const [faultSession, setFaultSession] = useState<FaultSession>(() => (initial.task?.fault && initial.shared !== 'task' ? loadSavedSession() : NEW_SESSION));
+  const [faultSession, setFaultSession] = useState<FaultSession>(() =>
+    initial.task?.fault && initial.shared !== 'task' ? loadSavedSession() : { ...NEW_SESSION, base: initial.doc.parts.map((p) => p.id) },
+  );
+  const faultSessionRef = useRef(faultSession);
+  faultSessionRef.current = faultSession;
   const sessionTask = useRef(task);
   useEffect(() => {
     if (sessionTask.current === task) return;
     sessionTask.current = task;
-    setFaultSession(NEW_SESSION);
+    // Görev açıldığındaki parçalar: sonradan eklenen (ampermetre) kilitli değildir.
+    setFaultSession({ ...NEW_SESSION, base: docRef.current.parts.map((p) => p.id) });
   }, [task]);
   useEffect(() => {
     if (embed) return;
@@ -242,7 +249,18 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const dispatch = useCallback(
     (action: EditorAction) => {
       const t = taskRef.current ?? (readOnly ? READ_ONLY : null);
-      if (t && (action.type === 'commit' || action.type === 'preview') && !respectsTask(docRef.current, action.doc, t)) {
+      const session = faultSessionRef.current;
+      if (t?.fault && action.type === 'commit') {
+        // Takılı ampermetre silindiyse bağlantı kabloları kalkar, kablo eski hâline döner.
+        const gone = removedMeters(docRef.current, action.doc, session.meters);
+        if (gone.length > 0) {
+          action = { ...action, doc: gone.reduce(removeAmmeter, action.doc) };
+          setFaultSession((s) => ({ ...s, meters: s.meters.filter((m) => !gone.includes(m)) }));
+        }
+      }
+      // Arıza bulmada öğrencinin sonradan eklediği parçalar (ampermetre) kilitli değildir.
+      const added = t?.fault && session.base.length > 0 ? new Set(docRef.current.parts.filter((p) => !session.base.includes(p.id)).map((p) => p.id)) : undefined;
+      if (t && (action.type === 'commit' || action.type === 'preview') && !respectsTask(docRef.current, action.doc, t, added)) {
         const now = performance.now();
         if (now - lockNotice.current.at > 1500) {
           lockNotice.current.at = now;
@@ -334,7 +352,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const fault = task?.fault ?? null;
   /** Arızanın uygulandığı hâl: "Onar ve çalıştır"dan sonra devre sağlam çalışır (R3). */
   const repaired = fault !== null && faultSession.repaired;
-  const activeFaults = useMemo(() => (fault && !repaired ? fault.faults : []), [fault, repaired]);
+  /** Görevin arızaları; takılı ampermetrenin böldüğü kablonun son ucundaki arıza ikinci yarıya taşınır. */
+  const effectiveFaults = useMemo(() => (fault ? remapFaults(fault.faults, faultSession.meters) : []), [fault, faultSession.meters]);
+  const activeFaults = useMemo(() => (fault && !repaired ? effectiveFaults : []), [fault, repaired, effectiveFaults]);
   /** Multimetre (R1): kip, iki ucun yeri ve şemaya koyulan uç. Görev değişince siyah uç toprakta, kırmızı boşta. */
   const [meter, setMeter] = useState<{ mode: MeterMode; red: Probe | null; black: Probe | null; placing: ProbeColor | null }>(() => ({ mode: 'dc', red: null, black: defaultBlack(state.doc), placing: null }));
   useEffect(() => {
@@ -419,10 +439,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         return { id: target.id, name, unit, goal: goalText(target, unit), measured, met: targetMet(target, measured), shortcut };
       })
     : [];
-  const taskParts = useMemo(
-    () => (task ? { editable: new Set(task.editable), locked: new Set(doc.parts.filter((p) => !task.editable.includes(p.id)).map((p) => p.id)) } : null),
-    [task, doc.parts],
-  );
+  const taskParts = useMemo(() => {
+    if (!task) return null;
+    const own = task.fault && faultSession.base.length > 0 ? new Set(faultSession.base) : null;
+    return { editable: new Set(task.editable), locked: new Set(doc.parts.filter((p) => !task.editable.includes(p.id) && (!own || own.has(p.id))).map((p) => p.id)) };
+  }, [task, doc.parts, faultSession.base]);
+  /** Arıza bulmada eklenebilen parça türleri (hoca izin verdiyse yalnızca ampermetre); öbür kiplerde süzgeç yok. */
+  const addable = useMemo(() => (task?.fault ? new Set<DeviceType>(CATEGORIES.flatMap((c) => c.types).filter((type) => canAddType(task, type))) : null), [task]);
   const editableLabels = task ? task.editable.map((id) => doc.parts.find((p) => p.id === id)?.label).filter(Boolean).join(tr.task.and) : '';
   /** Teslim dosyası: devre (ve analiz) ile görevin hedefleri ve o anki ölçümleri. */
   const submitTask = () => {
@@ -457,7 +480,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     if (!fault || !r?.place || !r.kind) return;
     const place = r.place;
     const kind = r.kind;
-    const hit = fault.faults.findIndex((f, i) => !faultSession.found.includes(i) && placeMatches(f, place, kind, doc, analysis.idx));
+    const hit = effectiveFaults.findIndex((f, i) => !faultSession.found.includes(i) && placeMatches(f, place, kind, doc, analysis.idx));
     const found = hit >= 0 ? [...faultSession.found, hit] : faultSession.found;
     setFaultSession((s) => ({ ...s, reports: [...s.reports, { place, kind, evidence: r.evidence, correct: hit >= 0 }], found }));
     setReporting(null);
@@ -509,6 +532,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       return;
     }
     sim.stop();
+    if (faultSession.meters.length > 0) rawDispatch({ type: 'commit', doc: faultSession.meters.reduce(removeAmmeter, doc), selection: EMPTY_SELECTION });
     setTask({ ...task, fault: { ...fault, faults: [next] } });
     showToast(tr.fault.found.newFault);
   };
@@ -529,7 +553,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       }),
     }));
   const scenario = scenarioTexts(fault?.scenario);
-  const foundExplain = allFound && fault ? (scenario?.found ?? faultExplain(fault.faults[0]!, doc, analysis.idx)) : null;
+  const foundExplain = allFound && fault ? (scenario?.found ?? faultExplain(effectiveFaults[0]!, doc, analysis.idx)) : null;
   const taskCard = reporting ? (
     <ReportCard
       where={reporting.place ? placeLabel(reporting.place, doc, analysis.idx) : null}
@@ -1022,7 +1046,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
 
   // --- Telefon ve tablet -----------------------------------------------------------------------
   // Tuvalin kipi: Bağla (kablo bağlarken), Ölç (çalışıyor ya da duraklatılmış; yapı kilitli) ya da Kur.
-  const canvasMode: PhoneCanvas['mode'] = connect ? 'bagla' : sim.status !== 'stopped' ? 'olc' : 'kur';
+  // Arıza bulmada telefon tuvali hep Ölç kipinde: bacağa dokunmak kablo başlatmaz (R5: Kablo bağla yok).
+  const canvasMode: PhoneCanvas['mode'] = connect ? 'bagla' : sim.status !== 'stopped' || fault ? 'olc' : 'kur';
   // Telefonda şema kutusunun boyu üst çubuğun altında kalan alandan hesaplanır.
   useEffect(() => {
     const el = phoneAreaRef.current;
@@ -1199,7 +1224,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               setSchematicStrip(false);
             },
           }
-        : { add: { chainTo: deskChainTo, onAdd: addFromNotebook, onOpenExample: loadExample } })}
+        : { add: { chainTo: deskChainTo, onAdd: addFromNotebook, onOpenExample: loadExample, allowed: addable } })}
     />
   );
   /** Kablo bağlamayı başlatır (telefonda tam ekran görünüm; 3B'den şemaya geçilir). */
@@ -1243,6 +1268,38 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           onPick: (color: ProbeColor) => setMeter((m) => ({ ...m, placing: m.placing === color ? null : color })),
         }
       : null;
+  // --- Arıza bulma: "Buraya ampermetre tak" (hoca izin verdiyse; masaüstünde ve telefonda) ------
+  const meterFree = fault !== null && fault.tools.ammeter && measuring && meter.placing === null && viewMode === 'schematic';
+  /** Kabloyu ikiye böler, ampermetreyi araya seri takar (kablo dokunulan yerde). */
+  const plugAmmeter = (wireId: string, at: { x: number; y: number }) => {
+    const r = insertAmmeter(doc, wireId, at);
+    if ('error' in r) {
+      showToast(tr.fault.ammeter.errors[r.error], 'error');
+      return;
+    }
+    const meterPart = r.doc.parts.find((p) => p.id === r.meter.part)!;
+    dispatch({ type: 'commit', doc: r.doc, selection: { parts: [r.meter.part], wires: [] } });
+    setFaultSession((s) => ({ ...s, meters: [...s.meters, r.meter] }));
+    showToast(tr.fault.ammeter.inserted(meterPart.label));
+  };
+  /** Takılı ampermetreyi kaldırır: silinince bekçi kabloyu eski hâline döndürür. */
+  const unplugAmmeter = (m: InsertedMeter) => {
+    dispatch({ type: 'commit', doc: removeItems(doc, [m.part], []), selection: EMPTY_SELECTION });
+    showToast(tr.fault.ammeter.removed);
+  };
+  const tapMenu = meterFree
+    ? (target: TapTarget) => {
+        const meters = faultSession.meters;
+        if (target.kind === 'part') {
+          const m = meters.find((x) => x.part === target.partId);
+          const label = doc.parts.find((p) => p.id === target.partId)?.label ?? '';
+          return m ? { label: tr.fault.ammeter.meterMenu(label), items: [{ label: tr.fault.ammeter.remove, tone: 'danger' as const, onSelect: () => unplugAmmeter(m) }] } : null;
+        }
+        // Takılı ampermetrenin kablolarına ikinci bir ampermetre takılmaz (kaldırınca kablo eski hâline dönebilsin).
+        if (meters.some((m) => m.wire === target.wireId || m.half === target.wireId || m.links.includes(target.wireId))) return null;
+        return { label: tr.fault.ammeter.wireMenu, items: [{ label: tr.fault.ammeter.insert, onSelect: () => plugAmmeter(target.wireId, target.at) }] };
+      }
+    : null;
   // Uç koyarken Esc vazgeçer.
   useEffect(() => {
     if (!meter.placing) return undefined;
@@ -1347,6 +1404,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       onExplain={explain}
       onPick={analysis.pick ? analysis.onPick : null}
       probes={probeView}
+      tapMenu={tapMenu}
       onLocate={
         reporting
           ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r))
@@ -1373,7 +1431,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             }
           : allFound && fault && !repaired
             ? {
-                marks: fault.faults.flatMap((f) => {
+                marks: effectiveFaults.flatMap((f) => {
                   const at = faultPoint(f, doc);
                   const what = f.kind === 'open' && 'wire' in f.at ? tr.fault.found.marker.openWire : tr.fault.found.marker[f.kind];
                   return at ? [{ at, label: tr.fault.found.here(what), tone: 'ok' as const }] : [];
@@ -1856,7 +1914,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             <WiringFooter canUndo={state.past.length > 0} hasStart={connect.start !== null} onUndo={() => dispatch({ type: 'undo' })} onClear={() => setConnect({ start: null })} />
           )}
           {!wiring && !addSheet && !analysis.open && (
-            <PhoneFabs lift={phoneFaultSheet ? 70 : 0} status={sim.status} canAdd={sim.status === 'stopped' && !taskFrozen} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={play} onPause={sim.pause} />
+            <PhoneFabs lift={phoneFaultSheet ? 70 : 0} status={sim.status} canAdd={sim.status === 'stopped' && !taskFrozen && !fault} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={play} onPause={sim.pause} />
           )}
           {addSheet && !wiring && (
             <BottomSheet
@@ -1878,6 +1936,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                 chainTo={chainTo}
                 onChainOff={() => setChainOff(true)}
                 onAdd={addFromSheet}
+                allowed={addable}
                 onDrop={(type, x, y) => canvasRef.current?.placeAtClient(type, x, y)}
                 onDragging={setPartDragging}
               />
@@ -1968,9 +2027,12 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               </div>
             )}
             {fault ? (
-              <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-warn-line bg-warn-soft/95 px-3 py-1.5 text-small font-semibold text-warn shadow-sm">
-                <Icon name="wrench" className="h-4 w-4" />
-                {hideLive ? tr.fault.banner : tr.fault.bannerShort}
+              <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex max-w-[calc(100%-24px)] flex-col gap-0.5 rounded-2xl border border-warn-line bg-warn-soft/95 px-3 py-1.5 text-small text-warn shadow-sm">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  <Icon name="wrench" className="h-4 w-4" />
+                  {hideLive ? tr.fault.banner : tr.fault.bannerShort}
+                </span>
+                <span className="pl-[22px] text-label">{tr.fault.analysisNote}</span>
               </p>
             ) : (
               (task || readOnly) && (

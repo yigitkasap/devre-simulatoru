@@ -3,6 +3,8 @@
 // Rapor (.json) bunun içeriğidir.
 
 import type { FaultKind } from '../../model/faults';
+import type { Point } from '../../model/types';
+import type { InsertedMeter } from './ammeter';
 import type { MeterMode } from './meter';
 
 /** Günlüğün bir satırı: her kararlı okuma kendiliğinden yazılır; aynı nokta ve kip bir kez. */
@@ -41,9 +43,13 @@ export interface FaultSession {
   readonly found: readonly number[];
   /** "Onar ve çalıştır": arıza kalktı. */
   readonly repaired: boolean;
+  /** Görev açıldığındaki parçalar: bunların dışındakileri öğrenci ekledi (ampermetre; kilitli değil). */
+  readonly base: readonly string[];
+  /** "Buraya ampermetre tak" ile takılan ampermetreler (kaldırınca kablo eski hâline döner). */
+  readonly meters: readonly InsertedMeter[];
 }
 
-export const NEW_SESSION: FaultSession = { log: [], reports: [], hints: 0, found: [], repaired: false };
+export const NEW_SESSION: FaultSession = { log: [], reports: [], hints: 0, found: [], repaired: false, base: [], meters: [] };
 /** Günlüğün en uzun hâli (satır). */
 export const LOG_LIMIT = 200;
 
@@ -92,5 +98,13 @@ export function parseSession(v: unknown): FaultSession {
   }
   const hints = typeof v.hints === 'number' ? Math.max(0, Math.min(3, Math.round(v.hints))) : 0;
   const found = Array.isArray(v.found) ? [...new Set(v.found.filter((x): x is number => typeof x === 'number' && Number.isInteger(x) && x >= 0))] : [];
-  return { log, reports, hints, found, repaired: v.repaired === true };
+  const base = Array.isArray(v.base) ? v.base.filter((x): x is string => typeof x === 'string').slice(0, 500) : [];
+  const meters: InsertedMeter[] = [];
+  for (const raw of Array.isArray(v.meters) ? v.meters.slice(0, 20) : []) {
+    if (!isRecord(raw) || typeof raw.part !== 'string' || typeof raw.wire !== 'string' || typeof raw.half !== 'string' || !Array.isArray(raw.links) || !Array.isArray(raw.points)) continue;
+    const links = raw.links.filter((x): x is string => typeof x === 'string');
+    const points = raw.points.filter((q): q is Point => isRecord(q) && typeof q.x === 'number' && typeof q.y === 'number').map((q) => ({ x: q.x, y: q.y }));
+    if (links.length === 2 && points.length >= 2) meters.push({ part: raw.part, wire: raw.wire, half: raw.half, links: [links[0]!, links[1]!], points });
+  }
+  return { log, reports, hints, found, repaired: v.repaired === true, base, meters };
 }

@@ -31,6 +31,7 @@ export function ContextMenu({
   area,
   label,
   onClose,
+  touch = false,
 }: {
   x: number;
   y: number;
@@ -39,6 +40,8 @@ export function ContextMenu({
   /** Erişilebilir ad ("D1 menüsü"). */
   label: string;
   onClose: () => void;
+  /** Dokunmatik: satırlar en az 44 px. */
+  touch?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -57,7 +60,7 @@ export function ContextMenu({
     };
   }, [onClose]);
   const width = 220;
-  const pos = place(x, y, width, items.length * 38 + 16, area, 2);
+  const pos = place(x, y, width, items.length * (touch ? 46 : 38) + 16, area, 2);
   return (
     <div
       ref={ref}
@@ -84,7 +87,7 @@ export function ContextMenu({
               item.onSelect();
               onClose();
             }}
-            className={`flex h-9 w-full items-center justify-between rounded-md px-2.5 text-left outline-none hover:bg-panel-2 focus-visible:bg-panel-2 ${
+            className={`flex w-full items-center justify-between rounded-md px-2.5 text-left ${touch ? 'h-11' : 'h-9'} outline-none hover:bg-panel-2 focus-visible:bg-panel-2 ${
               item.tone === 'danger'
                 ? 'text-danger'
                 : item.tone === 'accent'

@@ -45,9 +45,12 @@ export interface PartsSheetProps {
   readonly onDragging: (dragging: boolean) => void;
   /** Tablet (T02): kategori çipleri yerine başlıklı gruplar, hepsi alt alta. */
   readonly grouped?: boolean;
+  /** Eklenebilen türler (arıza bulmada yalnızca ampermetre); verilmezse hepsi. */
+  readonly allowed?: ReadonlySet<DeviceType> | null;
 }
 
-export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, onDrop, onDragging, grouped = false }: PartsSheetProps) {
+export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, onDrop, onDragging, grouped = false, allowed = null }: PartsSheetProps) {
+  const ok = (type: DeviceType) => !allowed || allowed.has(type);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<PartsCategory>('favorites');
   const [ghost, setGhost] = useState<{ type: DeviceType; x: number; y: number } | null>(null);
@@ -55,7 +58,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
   const suppressClick = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const favorites = useMemo(() => [...new Set([...recent, ...FAVORITES])].slice(0, 9), [recent]);
+  const favorites = useMemo(() => [...new Set([...recent, ...FAVORITES])].filter(ok).slice(0, 9), [recent, allowed]);
   const q = normalize(query.trim());
   const sections = useMemo(
     () =>
@@ -63,28 +66,30 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
         id: c.id,
         types: c.types.filter(
           (type) =>
-            q === '' ||
+            ok(type) &&
+            (q === '' ||
             normalize(tr.devices.names[type]).includes(q) ||
             normalize(tr.devices.descriptions[type]).includes(q) ||
-            normalize(tr.library.categories[c.id]).includes(q),
+            normalize(tr.library.categories[c.id]).includes(q)),
         ),
       })).filter((c) => c.types.length > 0),
-    [q],
+    [q, allowed],
   );
   const types = useMemo(() => {
     if (q) {
       return CATEGORIES.flatMap((c) =>
         c.types.filter(
           (type) =>
-            normalize(tr.devices.names[type]).includes(q) ||
+            ok(type) &&
+            (normalize(tr.devices.names[type]).includes(q) ||
             normalize(tr.devices.descriptions[type]).includes(q) ||
-            normalize(tr.library.categories[c.id]).includes(q),
+            normalize(tr.library.categories[c.id]).includes(q)),
         ),
       );
     }
     if (category === 'favorites') return favorites;
-    return CATEGORIES.find((c) => c.id === category)?.types ?? [];
-  }, [q, category, favorites]);
+    return (CATEGORIES.find((c) => c.id === category)?.types ?? []).filter(ok);
+  }, [q, category, favorites, allowed]);
 
   // Sürüklerken liste kaymasın (iOS: ilk touchmove'da varsayılanı engelle).
   useEffect(() => {
@@ -112,7 +117,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
 
   const categories: Array<{ id: PartsCategory; label: string }> = [
     { id: 'favorites', label: tr.phone.favorites },
-    ...CATEGORIES.map((c) => ({ id: c.id as PartsCategory, label: tr.library.categories[c.id] })),
+    ...CATEGORIES.filter((c) => c.types.some(ok)).map((c) => ({ id: c.id as PartsCategory, label: tr.library.categories[c.id] })),
   ];
 
   return (
