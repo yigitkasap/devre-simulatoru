@@ -591,6 +591,19 @@ function Meter({ letter, rotation }: { letter: string; rotation: Rotation }) {
   );
 }
 
+/** DC akım kaynağı: dairede ok; ok akımın çıktığı ucu (2. uç) gösterir. */
+function CurrentSource() {
+  return (
+    <g>
+      <Lead from={-40} to={-15} />
+      <Lead from={15} to={40} />
+      <circle cx={0} cy={0} r={15} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <line x1={-9} y1={0} x2={3} y2={0} stroke="currentColor" strokeWidth={2} />
+      <path d={arrowHead(10, 0, 1, 0, 8, 4.5)} fill="currentColor" />
+    </g>
+  );
+}
+
 /** Multimetre: dairede kipine göre V, A ya da Ω; altında doğru (⎓) ya da alternatif (∿) işareti. */
 function Multimeter({ mode, rotation }: { mode: MultimeterMode; rotation: Rotation }) {
   const mark = mode === 'ac' ? '∿' : mode === 'ohm' ? null : '⎓';
@@ -1123,6 +1136,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Meter letter="A" rotation={rotation} />;
     case 'multimeter':
       return <Multimeter mode={multimeterMode(props)} rotation={rotation} />;
+    case 'currentsource':
+      return <CurrentSource />;
   }
 }
 

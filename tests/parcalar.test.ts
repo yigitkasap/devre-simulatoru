@@ -71,3 +71,33 @@ describe('Multimetre (MM)', () => {
     expect(tr.devices.pinShort.multimeter).toEqual(['VΩ', 'COM']);
   });
 });
+
+describe('DC akım kaynağı (I)', () => {
+  it('1 mA, 1 kΩ dirençte 1 V (Ohm yasası); akım 2. uçtan çıkar, uçlarındaki gerilimi dış devre belirler', () => {
+    const sim = new CircuitSimulator(circuit().add('currentsource', 'I1', ['gnd', 'a'], { current: 1e-3 }).resistor('R1', 'a', 'gnd', 1000).ground('G1', 'gnd').build());
+    sim.advance(0);
+    expect(sim.voltageAt('a')).toBeCloseTo(1, 9);
+    expect(sim.measure('I1')!.current).toBeCloseTo(1e-3, 12);
+    expect(sim.measure('R1')!.current).toBeCloseTo(1e-3, 12);
+    expect(sim.topologyDiagnostics.map((d) => d.code)).not.toContain('current-source-open');
+    // Direnç iki katına çıkınca gerilim de iki katı (akım sabit).
+    const twice = new CircuitSimulator(circuit().add('currentsource', 'I1', ['gnd', 'a'], { current: 1e-3 }).resistor('R1', 'a', 'gnd', 2000).ground('G1', 'gnd').build());
+    twice.advance(0);
+    expect(twice.voltageAt('a')).toBeCloseTo(2, 9);
+  });
+
+  it('açık devrede uyarı; akım vermez, gerilim sonsuza gitmez', () => {
+    const sim = new CircuitSimulator(
+      circuit().add('currentsource', 'I1', ['gnd', 'a'], { current: 1e-3 }).resistor('R1', 'a', 'b', 1000).switch('S1', 'b', 'gnd', false).ground('G1', 'gnd').build(),
+    );
+    expect(sim.topologyDiagnostics.find((d) => d.code === 'current-source-open')?.elementIds).toEqual(['I1']);
+    expect(sim.advance(0).ok).toBe(true);
+    expect(sim.measure('I1')!.current).toBe(0);
+    expect(Math.abs(sim.voltageAt('a') ?? NaN)).toBeLessThan(1e-6);
+  });
+
+  it('Parça ekle: Kaynaklar grubunda, I öneki', () => {
+    expect(CATALOG.currentsource.labelPrefix).toBe('I');
+    expect(CATEGORIES.find((c) => c.id === 'sources')!.types).toContain('currentsource');
+  });
+});

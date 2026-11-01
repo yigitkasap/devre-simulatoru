@@ -1264,6 +1264,7 @@ export class CircuitSimulator {
       if (key !== this.topologyKey) {
         this.floating = this.floatingNodes(transient);
         this.zeroPins = this.findZeroPins(transient);
+        for (const device of this.circuit.devices) device.zeroCurrentPins(this.zeroPins.get(device.id));
         this.topologyKey = key;
       }
       this.topologyVersion = this.version;

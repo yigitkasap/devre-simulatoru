@@ -19,6 +19,7 @@ import {
 } from 'three';
 import { LED_COLORS, LED_MODELS } from '../sim/devices/led';
 import { boolProp, numProp, strProp } from '../sim/netlist';
+import { formatSI } from '../sim/units';
 import type { DeviceType, Props } from '../sim/netlist';
 import {
   LEAD_Y,
@@ -663,6 +664,47 @@ export function sourceBoxModel(type: 'acsource', title: string): PartModel {
   box.userData.ownsMaterial = true;
   root.add(box);
   const anchors = pins.map((_, i) => new Vector3(i === 0 ? -(w / 2 - 1.0) : w / 2 - 1.0, 2.5, 0));
+  anchors.forEach((a, i) => root.add(bananaJack(a, i === 0 ? '#c8312a' : '#1d1f23')));
+  return { root, anchors };
+}
+
+/** DC akım kaynağı: AC kaynakla aynı kutu ailesi; yüzde ok ve değer (tasarım: parcalar-3b/newParts.ts). */
+export function currentSourceModel(props: Props): PartModel {
+  const root = new Group();
+  const value = formatSI(numProp(props, 'current', 1e-3), 'A', { trim: true, digits: 4 });
+  const w = 9.6;
+  const d = 4.8;
+  const top = canvasTexture(w, d, (c, W, H) => {
+    c.fillStyle = '#e9ecef';
+    c.fillRect(0, 0, W, H);
+    const cx = W / 2;
+    const cy = H * 0.42;
+    const R = H * 0.28;
+    c.strokeStyle = '#1d2733';
+    c.lineWidth = H * 0.045;
+    c.beginPath();
+    c.arc(cx, cy, R, 0, Math.PI * 2);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(cx - R * 0.6, cy);
+    c.lineTo(cx + R * 0.45, cy);
+    c.stroke();
+    c.fillStyle = '#1d2733';
+    c.beginPath();
+    c.moveTo(cx + R * 0.7, cy);
+    c.lineTo(cx + R * 0.3, cy - R * 0.28);
+    c.lineTo(cx + R * 0.3, cy + R * 0.28);
+    c.fill();
+    c.fillStyle = '#5f6b7a';
+    c.font = `600 ${Math.round(H * 0.15)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.fillText(`AKIM KAYNAĞI · ${value}`, W / 2, H * 0.92);
+  });
+  const box = new Mesh(new BoxGeometry(w, 2.4, d), [M.white(), M.white(), new MeshStandardMaterial({ map: top, roughness: 0.6 }), M.white(), M.white(), M.white()]);
+  box.position.y = 1.2;
+  box.userData.ownsMaterial = true;
+  root.add(box);
+  const anchors = [new Vector3(-(w / 2 - 1.0), 2.5, 0), new Vector3(w / 2 - 1.0, 2.5, 0)];
   anchors.forEach((a, i) => root.add(bananaJack(a, i === 0 ? '#c8312a' : '#1d1f23')));
   return { root, anchors };
 }

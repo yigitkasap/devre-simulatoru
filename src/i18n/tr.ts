@@ -57,6 +57,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   fuse: 'Sigorta',
   voltmeter: 'Voltmetre',
   multimeter: 'Multimetre',
+  currentsource: 'Akım kaynağı',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
   tank: 'Su haznesi',
@@ -97,6 +98,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   fuse: 'sigortasının',
   voltmeter: 'voltmetresinin',
   multimeter: 'multimetresinin',
+  currentsource: 'akım kaynağının',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
   tank: 'su haznesinin',
@@ -136,6 +138,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   relay: ['sargısının 1. ucu', 'sargısının 2. ucu', 'kontağının ortak ucu (C)', 'normalde açık kontak ucu (NA)', 'normalde kapalı kontak ucu (NK)'],
   voltmeter: ['+ ucu', '− ucu'],
   multimeter: ['VΩ ucu (kırmızı)', 'COM ucu (siyah)'],
+  currentsource: ['1. ucu (akım girer)', '2. ucu (akım çıkar)'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
@@ -177,6 +180,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   fuse: ['1', '2'],
   voltmeter: ['+', '−'],
   multimeter: ['VΩ', 'COM'],
+  currentsource: ['1', '2'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
 };
@@ -217,6 +221,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   fuse: ['1. uç', '2. uç'],
   voltmeter: ['+ uç', '− uç'],
   multimeter: ['VΩ', 'COM'],
+  currentsource: ['1. uç', '2. uç'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
 };
@@ -269,6 +274,11 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'Ampermetre seri bağlanır; iç direnci çok küçük olduğu için paralel bağlanınca kısa devre olur.',
       };
     }
+    case 'current-source-open':
+      return {
+        title: 'Akım kaynağının akacak yolu yok',
+        detail: `${labels[0] ?? ''} akım kaynağının iki ucu arasında akımın dönebileceği bir yol yok (açık devre). Akım kaynağı akımını ancak kapalı bir devreye verebilir; bu yüzden şu an akım vermiyor.`,
+      };
     case 'multimeter-parallel': {
       const other = d.elementIds[1];
       const type = other ? ctx.type(other) : undefined;
@@ -510,6 +520,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   relay:
     'Elektromıknatısla çalışan anahtar: sargısından yeterli akım geçince demir paleti çeker ve kontağı değiştirir (C, NK’dan ayrılıp NA’ya değer). Küçük bir akımla, sargıdan yalıtılmış başka bir devreyi açıp kapatır.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
+  currentsource:
+    'Uçlarındaki gerilim ne olursa olsun sabit bir akım veren ideal kaynak. Akım ok yönünde 2. uçtan dış devreye çıkar, 1. uçtan geri girer; uçlarındaki gerilimi dış devre belirler (dirençte V = I · R).',
   multimeter:
     'El multimetresi: kipine göre doğru ya da alternatif gerilim (V ⎓, V ∿), akım (A) ya da direnç (Ω) ölçer. V kiplerinde ölçülen parçaya paralel (iç direnç 10 MΩ), A kipinde seri (iç direnç 0,1 Ω) bağlanır; Ω yalnızca simülasyon durmuşken (güç kapalı) ölçer.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
@@ -575,6 +587,7 @@ function fieldLabel(type: DeviceType, key: string): string {
     offset: 'DC kayma',
     voltage: 'Gerilim',
     internalResistance: 'İç direnç',
+    current: 'Akım',
     resistance: 'Direnç',
     capacitance: 'Kapasite',
     inductance: 'Endüktans',
@@ -1524,6 +1537,9 @@ export const tr = {
     closed: 'Kapalı',
     burned: 'Yanmış',
     voltageAcross: 'Uçları arasındaki gerilim',
+    currentSourceOpen: 'Akacak yol yok (açık devre): akım kaynağı akım vermiyor.',
+    currentSourceNote: (current: string, voltage: string) =>
+      `Kaynak ${current} veriyor; uçlarındaki ${voltage} gerilimi dış devre belirliyor (dirençte V = I · R). Akım ok yönünde 2. uçtan çıkar.`,
     reading: 'Gösterge',
     drawnCurrent: 'Devreden çektiği akım',
     voltageDrop: 'Üzerindeki gerilim düşümü',
@@ -2340,6 +2356,7 @@ export const tr = {
       fuse: 'Sigortalar',
       voltmeter: 'Voltmetreler',
       multimeter: 'Multimetreler',
+      currentsource: 'Akım kaynakları',
       ammeter: 'Ampermetreler',
       oscilloscope: 'Osiloskoplar',
       tank: 'Su hazneleri',
@@ -2687,6 +2704,8 @@ export const tr = {
         'Gerçek voltmetrelerin iç direnci sonludur. Ölçtüğün kaynağın iç direnci büyükse voltmetre gerçek değerden düşük okur (yükleme etkisi).',
       ammeter:
         'Gerçek ampermetrelerin de küçük bir iç direnci vardır; seri bağlandığı devrenin akımını biraz azaltır.',
+      currentsource:
+        'İdeal akım kaynağı: ayarlanan akımı verir, uçlarındaki gerilim dış devreye göre kendiliğinden oluşur. Akacak yol yoksa (açık devre) akım vermez ve uyarı çıkar: gerçek bir akım kaynağının gerilimi de sınırlıdır.',
       multimeter:
         'Arıza bulmadaki multimetreyle aynı alet: V kiplerinde iç direnç 10 MΩ, A kipinde 0,1 Ω; AC kaynaklı devrede V ⎓ ve A bir periyodun ortalamasını, V ∿ etkin değeri gösterir. Ω, simülasyon durmuşken (güç kapalı) uçlar arasına 0,3 V uygulayarak ölçer.',
       oscilloscope:

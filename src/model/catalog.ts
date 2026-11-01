@@ -32,6 +32,7 @@ import {
   PMOSFET_DEFAULTS,
   ZENER_DEFAULTS,
   CAPACITOR_DEFAULTS,
+  CURRENT_SOURCE_DEFAULTS,
   CAPACITOR_KINDS,
   CAPACITOR_LEGACY_KIND,
   INDUCTOR_DEFAULTS,
@@ -677,6 +678,17 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: true,
   },
+  currentsource: {
+    type: 'currentsource',
+    category: 'sources',
+    labelPrefix: 'I',
+    pins: TWO_PINS,
+    bounds: { x: -4, y: -1.7, w: 8, h: 3.4 },
+    defaultProps: { ...CURRENT_SOURCE_DEFAULTS },
+    propDefs: [{ kind: 'number', key: 'current', unit: 'A', min: { value: 0, exclusive: true } }],
+    showLabel: true,
+    polarized: true,
+  },
   multimeter: {
     type: 'multimeter',
     category: 'meters',
@@ -714,7 +726,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
 
 /** Kütüphane panelindeki sıra. */
 export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: readonly DeviceType[] }> = [
-  { id: 'sources', types: ['battery', 'acsource', 'ground'] },
+  { id: 'sources', types: ['battery', 'acsource', 'currentsource', 'ground'] },
   { id: 'passive', types: ['resistor', 'potentiometer', 'capacitor', 'inductor', 'transformer'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },

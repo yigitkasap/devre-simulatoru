@@ -321,6 +321,12 @@ export abstract class Device {
     return this.conductiveGroups(transient);
   }
 
+  /**
+   * Motor, akımı KCL gereği tam 0 olan uçları (findZeroPins) her topoloji değişiminde bildirir; yoksa
+   * undefined. İdeal akım kaynağı akacak yolu olmayınca akım vermez (açık devrede sonsuz gerilim olmasın).
+   */
+  zeroCurrentPins(_zero: readonly boolean[] | undefined): void {}
+
   /** Topoloji kontrolü için: bu bileşenin içindeki ideal gerilim dalları (düğüm çiftleri). */
   idealVoltageBranches(): Array<readonly [number, number]> {
     return [];

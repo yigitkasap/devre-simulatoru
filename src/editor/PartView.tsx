@@ -26,6 +26,8 @@ export function partValueText(part: Part): string {
   switch (part.type) {
     case 'battery':
       return formatSI(numProp(p, 'voltage', 0), 'V', { trim: true, digits: 4 });
+    case 'currentsource':
+      return formatSI(numProp(p, 'current', 0), 'A', { trim: true, digits: 4 });
     case 'acsource': {
       const peak = formatSI(numProp(p, 'amplitude', 0), 'V', { trim: true, digits: 4 });
       const offset = numProp(p, 'offset', 0);

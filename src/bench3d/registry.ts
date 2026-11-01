@@ -11,6 +11,7 @@ import {
   batteryModel,
   buzzerModel,
   capacitorModel,
+  currentSourceModel,
   diodeModel,
   fuseModel,
   groundModel,
@@ -95,6 +96,8 @@ function build(part: Part): PartModel {
       return batteryModel(p);
     case 'acsource':
       return sourceBoxModel('acsource', 'AC');
+    case 'currentsource':
+      return currentSourceModel(p);
     case 'ground':
       return groundModel();
     case 'voltmeter':

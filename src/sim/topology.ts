@@ -87,6 +87,7 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
   diagnostics.push(...findVoltageLoops(input));
   diagnostics.push(...findAmmetersAcrossBatteries(input));
   diagnostics.push(...findParallelMultimeters(input));
+  diagnostics.push(...findOpenCurrentSources(input));
   if (groundConnected) diagnostics.push(...floatingIslands(input));
   return diagnostics;
 }
@@ -203,6 +204,36 @@ function findAmmetersAcrossBatteries(input: TopologyInput): Diagnostic[] {
           netKeys: rootKeysOf(input, [b0!, b1!]),
         });
       }
+    }
+  }
+  return result;
+}
+
+/**
+ * Akım kaynağının akacak yolu yok: iki ucu öbür bileşenler üzerinden (akım taşıyabilecek her yol;
+ * kondansatör de) birbirine bağlı değil. Kaynak o zaman akım vermez (currentsource.ts).
+ */
+function findOpenCurrentSources(input: TopologyInput): Diagnostic[] {
+  const result: Diagnostic[] = [];
+  const sources = input.devices.filter((d) => d.type === 'currentsource');
+  for (const source of sources) {
+    const uf = new UnionFind();
+    const index = new Map<number, number>();
+    const at = (node: number) => {
+      let i = index.get(node);
+      if (i === undefined) {
+        i = uf.add();
+        index.set(node, i);
+      }
+      return i;
+    };
+    for (const d of input.devices) {
+      if (d === source) continue;
+      for (const group of d.possibleGroups(true)) for (const node of group) uf.union(at(group[0]!), at(node));
+    }
+    const [a, b] = source.nodes;
+    if (uf.find(at(a!)) !== uf.find(at(b!))) {
+      result.push({ severity: 'warning', code: 'current-source-open', elementIds: [source.id], netKeys: rootKeysOf(input, [a!, b!]) });
     }
   }
   return result;

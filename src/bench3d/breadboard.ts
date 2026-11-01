@@ -143,6 +143,7 @@ const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rota
   arduino: { side: 'left', w: 21, d: 27, rotation: 0 },
   battery: { side: 'left', w: 12, d: 5.4, rotation: 0 },
   acsource: { side: 'left', w: 10, d: 5, rotation: 0 },
+  currentsource: { side: 'left', w: 10, d: 5, rotation: 0 },
   dcsupply: { side: 'back', w: 11.6, d: 12.8, rotation: -90 },
   funcgen: { side: 'back', w: 8.6, d: 12.8, rotation: -90 },
   oscilloscope: { side: 'back', w: 8.6, d: 13.4, rotation: 90 },

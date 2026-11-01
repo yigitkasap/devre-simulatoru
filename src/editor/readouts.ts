@@ -479,6 +479,19 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
       };
     }
+    case 'currentsource': {
+      // Kaynağın verdiği akım ve uçlarındaki gerilim (2. uç − 1. uç: dış devre belirler).
+      const current = m.current;
+      return {
+        title,
+        rows: [
+          { label: t.current, value: a(current) },
+          { label: t.voltageAcross, value: v(-m.voltage) },
+          { label: t.powerDelivered, value: w(Math.abs(m.power)) },
+        ],
+        note: current === 0 ? t.currentSourceOpen : t.currentSourceNote(a(current), v(-m.voltage)),
+      };
+    }
     case 'voltmeter':
     case 'ammeter':
     case 'multimeter': {
