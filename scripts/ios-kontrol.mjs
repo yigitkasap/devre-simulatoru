@@ -1720,6 +1720,18 @@ try {
       manual.wires.length === before.wires.length && JSON.stringify(manual.wires) === JSON.stringify(before.wires) && psButtons.join(',') === '0,0' && steppers.length >= 4 && steppers.every(Boolean) &&
         lockedToast === 1 && deletedToast === 0 && kept && lockBadges === 0 && note === 1,
       `${manual.wires.length}/${before.wires.length} · ${psButtons} · ${steppers.length} · ${lockedToast}/${deletedToast}/${kept} · ${lockBadges} · ${note}`);
+    // Kilitli PS1 ve RC birlikte seçili (Shift): sağ panelde Döndür, Ters çevir ve Sil yok; sağ tık menüsünde de yok.
+    const rc = before.parts.find((x) => x.label === 'RC');
+    pt = await screen(page, ps1.x, ps1.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    pt = await screen(page, rc.x, rc.y); await page.keyboard.down('Shift'); await page.mouse.click(pt.x, pt.y); await page.keyboard.up('Shift'); await page.waitForTimeout(300);
+    const multi = page.locator('main').getByText('2 öğe seçili', { exact: true });
+    const multiBox = multi.locator('xpath=ancestor::div[contains(@class,"border-accent")][1]');
+    const multiButtons = (await multi.count()) === 1 ? await multiBox.getByRole('button').allTextContents() : ['(seçim yok)'];
+    await page.mouse.click(pt.x, pt.y, { button: 'right' }); await page.waitForTimeout(300);
+    const rcMenu = await page.getByRole('menuitem').allTextContents();
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    check('arıza (masaüstü): kilitli PS1 ve RC birlikte seçiliyken sağ panelde Döndür, Ters çevir ve Sil yok; kilitli parçanın sağ tık menüsünde yalnızca Özellikler',
+      multiButtons.length === 0 && rcMenu.length === 1 && /Özellikler/.test(rcMenu[0] ?? ''), `${multiButtons.join('|')} · ${rcMenu.join('|')}`);
     // Kollektörden OSC1 B'ye giden kablo: A1 kablonun üstünde, kablonun yönünde.
     pt = await screen(page, 51, -2.3); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
     const menu = await page.getByRole('menuitem').allTextContents();

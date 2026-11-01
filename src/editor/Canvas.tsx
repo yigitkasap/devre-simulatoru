@@ -54,6 +54,7 @@ import { FIELD_COLOR, MagneticField } from './MagneticField';
 import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
+import { selectionActions, type TaskParts } from './InspectTab';
 import { meterDisplayRect, meterFlipped, partValueText, PartView, type PartTone } from './PartView';
 import { visibleLive } from './fault/mask';
 import type { Probe } from './fault/meter';
@@ -240,7 +241,7 @@ export interface CanvasProps {
   /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
   readonly marks?: readonly CanvasMark[];
   /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli (lockMarks false: rozet yok, arıza bulmada her şey kilitli). */
-  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string>; readonly lockMarks?: boolean } | null;
+  readonly taskParts?: TaskParts | null;
   /**
    * Elle kablo çizilmez ve kablo taşınmaz (arıza bulma: kablolar yalnızca ampermetre takıp kaldırmakla
    * değişir). Uçlar kablo başlatmaz, kablo aracı (W) açılmaz; kabloya tıklamak onu seçer.
@@ -2252,18 +2253,24 @@ export function Canvas({
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
         const burned = frame?.statuses.get(part.id)?.burned === true;
+        // Görevde kilitli parçada Döndür, Ters çevir ve Sil yok (sağ paneldeki gibi).
+        const actions = selectionActions(taskParts, [part.id], 0);
         const items: MenuItem[] = [
           { label: phone ? tr.phone.value : tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
-          { label: tr.contextMenu.rotate, shortcut: 'R', onSelect: () => onRotate([part.id]) },
-          ...(CATALOG[part.type].polarized ? [{ label: tr.contextMenu.flip, shortcut: 'F', onSelect: () => onFlip([part.id]) }] : []),
+          ...(actions.rotate ? [{ label: tr.contextMenu.rotate, shortcut: 'R', onSelect: () => onRotate([part.id]) }] : []),
+          ...(actions.rotate && CATALOG[part.type].polarized ? [{ label: tr.contextMenu.flip, shortcut: 'F', onSelect: () => onFlip([part.id]) }] : []),
           ...(burned ? [{ label: tr.contextMenu.repair, onSelect: () => onRepair(part.id), tone: 'accent' as const, separatorBefore: true }] : []),
-          {
-            label: tr.contextMenu.remove,
-            shortcut: 'Delete',
-            onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
-            tone: 'danger',
-            separatorBefore: !burned,
-          },
+          ...(actions.remove
+            ? [
+                {
+                  label: tr.contextMenu.remove,
+                  shortcut: 'Delete',
+                  onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
+                  tone: 'danger' as const,
+                  separatorBefore: !burned,
+                },
+              ]
+            : []),
         ];
         return (
           <ContextMenu

@@ -473,12 +473,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const taskParts = useMemo(() => {
     if (!task) return null;
     // Takılı ampermetre kilitli değil (kaldırılır) ama yeri değişmez; arıza bulmada her şey kilitli, kilit simgesi yok.
+    // Kablolar arıza bulmada ve "Yeni parça eklenebilir" kapalıyken kilitli (bekçi her kablo değişikliğini reddeder).
     const own = new Set(plugged.map((m) => m.part));
     return {
       editable: new Set(task.editable),
       locked: new Set(doc.parts.filter((p) => !task.editable.includes(p.id) && !own.has(p.id)).map((p) => p.id)),
       plugged: own,
       lockMarks: !task.fault,
+      wiresLocked: !!task.fault || !task.allowNew,
     };
   }, [task, doc.parts, plugged]);
   /** Arıza bulmada eklenebilen parça türleri (hoca izin verdiyse yalnızca ampermetre); öbür kiplerde süzgeç yok. */

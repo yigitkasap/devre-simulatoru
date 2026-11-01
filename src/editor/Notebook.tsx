@@ -29,7 +29,7 @@ import { ArduinoCardBody } from './ArduinoPanel';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
 import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
-import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, useCommitField, WireDetails, type InspectTabProps, type PartPatch } from './InspectTab';
+import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, selectionActions, useCommitField, WireDetails, type InspectTabProps, type PartPatch, type TaskParts } from './InspectTab';
 import { stableReadout } from './liveReadout';
 import type { MessageItem } from './messages';
 import { SeverityMark, type MessageAction } from './MessagesTab';
@@ -80,9 +80,10 @@ export interface NotebookProps extends InspectTabProps {
   readonly taskCard?: ReactNode;
   /**
    * Görev: kilitli ve değiştirilebilir parçalar; takılı ampermetreler (arıza bulma: kaldırılır, yeri
-   * değişmez); lockMarks false ise kilit simgesi yok (arıza bulmada her şey kilitli).
+   * değişmez); lockMarks false ise kilit simgesi yok (arıza bulmada her şey kilitli); wiresLocked:
+   * kablolar değiştirilemez.
    */
-  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string>; readonly plugged?: ReadonlySet<string>; readonly lockMarks?: boolean } | null;
+  readonly taskParts?: TaskParts | null;
   /** Arıza bulma (B2): canlı değerler gizli (kare ölçü aletleri dışında boş gelir). */
   readonly liveHidden?: boolean;
 }
@@ -201,6 +202,7 @@ export function Notebook(props: NotebookProps) {
 
   const others = selection.parts.length + selection.wires.length;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
+  const actions = selectionActions(props.taskParts, selection.parts, selection.wires.length);
   // Kapalı kartlar seyrek karelerle ve sabit geri çağırmalarla bir kez kurulur: simülasyon her karede
   // defteri yeniden çizer, ama kapalı kartların alt ağaçları yalnızca seyrek karede güncellenir.
   const slow = useSlowFrame(frame);
@@ -290,9 +292,9 @@ export function Notebook(props: NotebookProps) {
       {openId === null && others > 0 && (
         <div className="flex flex-col gap-4 rounded-lg border-2 border-accent bg-panel px-3.5 py-3">
           {selection.parts.length === 0 && selection.wires.length === 1 ? (
-            <WireDetails wireId={selection.wires[0]!} {...props} />
+            <WireDetails wireId={selection.wires[0]!} removable={actions.remove} {...props} />
           ) : (
-            <MultiSelection count={others} parts={selectedParts} {...props} />
+            <MultiSelection count={others} parts={selectedParts} actions={actions} {...props} />
           )}
         </div>
       )}
