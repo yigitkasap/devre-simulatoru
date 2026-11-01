@@ -27,6 +27,7 @@ import {
   pushButtonModel,
   relayModel,
   resistorModel,
+  schottkyModel,
   sourceBoxModel,
   speakerModel,
   spdtModel,
@@ -90,6 +91,8 @@ function build(part: Part): PartModel {
       return spdtModel(p);
     case 'bridge':
       return bridgeModel(p);
+    case 'schottky':
+      return schottkyModel(p);
     case 'lamp':
       return lampModel();
     case 'speaker':

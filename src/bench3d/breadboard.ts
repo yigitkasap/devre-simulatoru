@@ -111,6 +111,7 @@ export interface BreadboardPlan {
 const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   resistor: { mount: 'axial', span: 4 },
   diode: { mount: 'axial', span: 4 },
+  schottky: { mount: 'axial', span: 4 },
   zener: { mount: 'axial', span: 3 },
   fuse: { mount: 'axial', span: 9 },
   capacitor: { mount: 'radial', span: 1 },

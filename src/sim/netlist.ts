@@ -45,7 +45,8 @@ export type DeviceType =
   | 'currentsource'
   | 'pushbutton'
   | 'spdt'
-  | 'bridge';
+  | 'bridge'
+  | 'schottky';
 
 export type PropValue = number | string | boolean;
 export type Props = Readonly<Record<string, PropValue>>;

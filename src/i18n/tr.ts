@@ -61,6 +61,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   pushbutton: 'Basmalı düğme',
   spdt: 'Çift yollu anahtar',
   bridge: 'Köprü diyot',
+  schottky: 'Schottky diyot',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
   tank: 'Su haznesi',
@@ -105,6 +106,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   pushbutton: 'basmalı düğmesinin',
   spdt: 'çift yollu anahtarının',
   bridge: 'köprü diyodunun',
+  schottky: 'Schottky diyodunun',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
   tank: 'su haznesinin',
@@ -148,6 +150,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   pushbutton: ['1. ucu', '2. ucu'],
   spdt: ['ortak ucu (C)', 'A ucu', 'B ucu'],
   bridge: ['üst ~ (AC) ucu', '+ (DC) ucu', 'alt ~ (AC) ucu', '− (DC) ucu'],
+  schottky: ['anot', 'katot'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
@@ -193,6 +196,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   pushbutton: ['1', '2'],
   spdt: ['C', 'A', 'B'],
   bridge: ['~', '+', '~', '−'],
+  schottky: ['A', 'K'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
 };
@@ -237,6 +241,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   pushbutton: ['1. uç', '2. uç'],
   spdt: ['C', 'A', 'B'],
   bridge: ['~ üst', '+', '~ alt', '−'],
+  schottky: ['anot', 'katot'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
 };
@@ -350,6 +355,14 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           detail:
             `${firstLabel}: LED ters yönde ${voltage} görüyor; gerçek bir LED en fazla ` +
             `${formatSI(p.limit ?? 5, 'V', { trim: true })}’a dayanır ve bozulabilir. LED’i çevir ya da ters gerilimi azalt.`,
+        };
+      }
+      if (first !== undefined && ctx.type(first) === 'schottky') {
+        return {
+          title: 'Schottky diyoda ters gerilim',
+          detail:
+            `${firstLabel}: 1N5819 ters yönde ${voltage} görüyor; veri sayfasına göre en fazla ` +
+            `${formatSI(p.limit ?? 40, 'V', { trim: true })}’a (V_{RRM}) dayanır. Schottky diyotların ters gerilimi düşüktür: daha yüksek gerilimde 1N4001 ailesini kullan.`,
         };
       }
       return {
@@ -535,6 +548,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   relay:
     'Elektromıknatısla çalışan anahtar: sargısından yeterli akım geçince demir paleti çeker ve kontağı değiştirir (C, NK’dan ayrılıp NA’ya değer). Küçük bir akımla, sargıdan yalıtılmış başka bir devreyi açıp kapatır.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
+  schottky:
+    'Metal-yarı iletken eklemli diyot: ileri gerilimi silisyum diyottan küçüktür (1N5819’da 0,1 A’de en çok 0,34 V) ve çok hızlı anahtarlanır; ters sızıntı akımı büyük, ters gerilimi düşüktür (40 V). Katot çizgisi S biçimlidir.',
   bridge:
     'Dört diyot tek pakette (tam dalga köprü doğrultmaç): iki ~ ucuna AC gerilim verilir, + ve − uçlarından tek yönlü (doğrultulmuş) gerilim alınır. Her yarım periyotta iki diyot iletir; çıkış, girişin tepesinden iki diyot gerilimi kadar düşük olur.',
   spdt:
@@ -2392,6 +2407,7 @@ export const tr = {
       pushbutton: 'Basmalı düğmeler',
       spdt: 'Çift yollu anahtarlar',
       bridge: 'Köprü diyotlar',
+      schottky: 'Schottky diyotlar',
       ammeter: 'Ampermetreler',
       oscilloscope: 'Osiloskoplar',
       tank: 'Su hazneleri',
@@ -2766,6 +2782,8 @@ export const tr = {
     } as Partial<Record<DeviceType, string>>,
     /** Parça modelinin notu (genel modellerde türün notu kullanılır). */
     modelNotes: {
+      '1N5819':
+        '1N5819: 1 A, 40 V Schottky diyot (DO-41). İleri gerilim veri sayfası tablosundaki en çok değerlere göre: 0,1 A’de 0,34 V, 1 A’de 0,60 V, 3 A’de 0,90 V (onsemi, Diodes). Ters sızıntı ≈ 0,88 mA (tablo: 40 V’ta en çok 1 mA). 1N4001 ile aynı gövde; ayırmak için gövdedeki yazıya bak.',
       KBP307:
         'KBP307: 3 A, 1000 V köprü diyot (dört diyot tek pakette; bacaklar + ~ ~ −). Her diyodun ileri gerilimi DOWO veri sayfasının tipik eğrisinden: 10 mA’de ≈ 0,64 V, 0,1 A’de ≈ 0,75 V, 1 A’de ≈ 0,93 V (tablo: 3 A’de en çok 1,1 V). Kapasite ve ters toparlanma hesaplanmaz.',
       '1N4001':

@@ -68,6 +68,7 @@ function polarity(part: Part): readonly string[] | null {
     case 'buzzer':
       return ['+', '−'];
     case 'diode':
+    case 'schottky':
     case 'zener':
       return ['A', 'K'];
     default:

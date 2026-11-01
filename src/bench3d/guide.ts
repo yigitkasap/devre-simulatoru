@@ -75,6 +75,8 @@ function describe(part: Part): { name: string; detail: string } {
     }
     case 'diode':
       return { name: 'Diyot 1N4001', detail: 'bantlı uç katot' };
+    case 'schottky':
+      return { name: 'Schottky diyot 1N5819', detail: 'bantlı uç katot; gövdede 1N5819 yazar' };
     case 'zener':
       return { name: `Zener diyot ${value}`, detail: 'bantlı uç katot' };
     case 'npn':
@@ -159,6 +161,7 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         steps.push({ group: 'axial', title: `${part.label} · ${material}`, holes: holes.join(' ↔ ') });
         break;
       case 'diode':
+      case 'schottky':
       case 'zener':
         steps.push({ group: 'axial', title: `${part.label} · ${material}`, holes: holes.join(' ↔ '), note: `Bantlı uç (katot) ${holes[1]} deliğine.` });
         break;

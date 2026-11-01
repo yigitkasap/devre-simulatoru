@@ -27,6 +27,7 @@ import { currentSourceModel } from './currentsource';
 import { pushbuttonModel } from './pushbutton';
 import { spdtModel } from './spdt';
 import { bridgeModel } from './bridge';
+import { schottkyModel } from './schottky';
 import { multimeterModel } from './multimeter';
 import { lampModel, ldrModel, ntcModel, potentiometerModel } from './sensors';
 import { buzzerModel, fuseModel, speakerModel } from './sound';
@@ -78,6 +79,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   pushbutton: pushbuttonModel,
   spdt: spdtModel,
   bridge: bridgeModel,
+  schottky: schottkyModel,
 };
 
 export * from './device';
@@ -217,6 +219,7 @@ export {
 export { VoltmeterDevice, VOLTMETER_DEFAULTS } from './voltmeter';
 export { CURRENT_SOURCE_DEFAULTS, CurrentSourceDevice } from './currentsource';
 export { BRIDGE_DEFAULTS, BRIDGE_MODELS, BridgeDevice } from './bridge';
+export { SCHOTTKY_DEFAULTS, SCHOTTKY_MODELS, SchottkyDevice } from './schottky';
 export { SPDT_DEFAULTS, SPDT_THROWS, SpdtDevice, spdtThrow, type SpdtThrow } from './spdt';
 export { PUSHBUTTON_CONTACTS, PUSHBUTTON_DEFAULTS, PushButtonDevice, pushbuttonClosed } from './pushbutton';
 export { MULTIMETER_DEFAULTS, MULTIMETER_MODES, multimeterMode, type MultimeterMode } from './multimeter';

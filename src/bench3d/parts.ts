@@ -239,6 +239,41 @@ export function diodeModel(): PartModel {
   return axial('diode', body, 1.03, 1.0);
 }
 
+/**
+ * Schottky diyot (DO-41, 1N5819): 1N4001 ile aynı gövde, gövdeye basılı yazıyla ayrılır (tasarım:
+ * parcalar-3b/newParts.ts). Doku silindirin çevresi boyunca; katot halkası +x (2. uç) tarafında.
+ */
+export function schottkyModel(props: Props): PartModel {
+  const text = typeof props.model === 'string' ? props.model : '1N5819';
+  const L = 2.05;
+  const R = 0.53;
+  const C = 2 * Math.PI * R;
+  const tex = canvasTexture(C, L, (c, W, H) => {
+    c.fillStyle = '#1c1d20';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = '#c8ccd0';
+    c.fillRect(0, H * 0.78, W, H * 0.14);
+    for (const cx of [W * 0.25, W * 0.75]) {
+      c.save();
+      c.translate(cx, H * 0.4);
+      c.rotate(Math.PI / 2);
+      c.fillStyle = '#d6dade';
+      c.font = `600 ${Math.round(W * 0.075)}px "IBM Plex Sans", system-ui, sans-serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(text, 0, 0);
+      c.restore();
+    }
+  }, 120);
+  const cap = mat('#1c1d20', 0.4);
+  const cyl = new Mesh(new CylinderGeometry(R, R, L, 28, 1, false), [new MeshStandardMaterial({ map: tex, roughness: 0.4 }), cap, cap]);
+  cyl.rotation.z = X_AXIS;
+  cyl.userData.ownsMaterial = true;
+  const body = new Group();
+  body.add(cyl);
+  return axial('schottky', body, 1.03, 1.0);
+}
+
 export function zenerModel(): PartModel {
   const body = new Group();
   body.add(axialCylinder(0.36, 1.5, mat('#d9792b', 0.05, 0, { transparent: true, opacity: 0.8 })));

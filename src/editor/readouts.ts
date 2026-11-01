@@ -402,6 +402,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
       };
     }
     case 'diode':
+    case 'schottky':
     case 'led': {
       const rows: ReadoutRow[] = [
         { label: t.forwardVoltage, value: v(m.voltage) },

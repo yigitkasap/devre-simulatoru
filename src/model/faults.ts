@@ -33,7 +33,7 @@ export const VALUE_PROP: Partial<Record<DeviceType, string>> = {
   inductor: 'inductance',
 };
 
-const REVERSIBLE: ReadonlySet<DeviceType> = new Set(['diode', 'zener', 'led']);
+const REVERSIBLE: ReadonlySet<DeviceType> = new Set(['diode', 'schottky', 'zener', 'led']);
 const BURNABLE: ReadonlySet<DeviceType> = new Set(['led', 'fuse']);
 
 /** Bu parçada bu tür arıza olabilir mi (açık ve kısa devre her bacakta olur). */

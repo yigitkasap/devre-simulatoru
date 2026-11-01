@@ -78,6 +78,7 @@ export function partValueText(part: Part): string {
     case 'zener':
       return formatSI(numProp(p, 'zenerVoltage', 5.1), 'V', { trim: true, digits: 4 });
     case 'diode':
+    case 'schottky':
     case 'bridge':
     case 'njfet':
     case 'nmos':

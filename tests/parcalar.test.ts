@@ -186,3 +186,31 @@ describe('Köprü diyot (KBP307)', () => {
     expect([cols[1]! + 1, cols[1]! + 2, cols[1]! + 3]).toEqual([cols[0], cols[2], cols[3]]);
   });
 });
+
+describe('Schottky diyot (1N5819)', () => {
+  const forward = (i: number) => {
+    const sim = new CircuitSimulator(circuit().add('currentsource', 'I1', ['gnd', 'a'], { current: i }).add('schottky', 'D1', ['a', 'gnd'], { model: '1N5819' }).ground('G1', 'gnd').build());
+    sim.advance(0);
+    return sim.voltageAt('a') ?? NaN;
+  };
+  it('ileri gerilim veri sayfası tablosundaki üç noktadan geçer (0,1 A 0,34 V, 1 A 0,60 V, 3 A 0,90 V)', () => {
+    expect(forward(0.1)).toBeCloseTo(0.34, 3);
+    expect(forward(1)).toBeCloseTo(0.6, 3);
+    expect(forward(3)).toBeCloseTo(0.9, 3);
+  });
+
+  it('10 mA’de 1N4001’den çok düşük (≈ 0,18 V ile ≈ 0,60 V); ters sızıntı ≈ 0,88 mA (tablo: en çok 1 mA)', () => {
+    expect(forward(0.01)).toBeCloseTo(0.176, 2);
+    const sim = new CircuitSimulator(circuit().battery('B1', 'k', 'gnd', 10).add('schottky', 'D1', ['gnd', 'k'], { model: '1N5819' }).ground('G1', 'gnd').build());
+    sim.advance(0);
+    const leak = -sim.measure('D1')!.current;
+    expect(leak).toBeGreaterThan(0.8e-3);
+    expect(leak).toBeLessThan(1e-3);
+  });
+
+  it('ters gerilim 40 V’u aşarsa uyarı', () => {
+    const sim = new CircuitSimulator(circuit().battery('B1', 'k', 'gnd', 45).add('schottky', 'D1', ['gnd', 'k'], { model: '1N5819' }).ground('G1', 'gnd').build());
+    sim.advance(0);
+    expect(sim.runtimeDiagnostics.map((d) => d.code)).toContain('reverse-voltage');
+  });
+});

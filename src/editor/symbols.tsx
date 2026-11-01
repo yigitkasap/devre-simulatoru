@@ -631,6 +631,18 @@ function Spdt({ to }: { to: SpdtThrow }) {
   );
 }
 
+/** Schottky diyot: diyot üçgeni, katot çizgisinin iki ucu S biçiminde kıvrık. */
+function Schottky() {
+  return (
+    <g>
+      <Lead from={-40} to={-9} />
+      <Lead from={9} to={40} />
+      <path d="M-9,-10 L-9,10 L9,0 Z" fill="currentColor" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <path d="M14,-6 L14,-10 L9,-10 L9,10 L4,10 L4,6" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinejoin="round" />
+    </g>
+  );
+}
+
 /** Kenar üstünde küçük diyot: (ax, ay) anottan (kx, ky) katoda; üçgen ve katot çizgisi kenarın ortasında. */
 function EdgeDiode({ ax, ay, kx, ky }: { ax: number; ay: number; kx: number; ky: number }) {
   const l = Math.hypot(kx - ax, ky - ay);
@@ -1220,6 +1232,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Spdt to={spdtThrow(props)} />;
     case 'bridge':
       return <Bridge />;
+    case 'schottky':
+      return <Schottky />;
   }
 }
 
