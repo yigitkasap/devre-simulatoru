@@ -93,6 +93,11 @@ export interface DeviceStatus {
     readonly loadPower: number;
     readonly heating: number;
   };
+  /**
+   * Gerilim regülatörü: giriş ve çıkış (7805'te GND'ye, LM317'de toprağa göre), verdiği akım, harcanan
+   * güç; giriş yetmiyor mu (bırakma gerilimiyle sınırlı).
+   */
+  readonly regulator?: { readonly input: number; readonly output: number; readonly current: number; readonly power: number; readonly dropout: boolean };
   /** Basmalı düğme: basılı tutuluyor mu? */
   readonly pressed?: boolean;
   /** Röle: palet çekili mi (NA kontağı kapalı)? */
@@ -163,7 +168,7 @@ export interface DeviceStatus {
 
 /** Gerçek parçanın sınırı aşıldı (Fizik 5): uyarı kodu ve ayrıntıları (gerilim, güç, sınır). */
 export interface RatingWarning {
-  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse' | 'motor-overload' | 'pin-overcurrent'>;
+  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse' | 'motor-overload' | 'pin-overcurrent' | 'regulator-dropout'>;
   readonly params: Readonly<Record<string, number>>;
 }
 

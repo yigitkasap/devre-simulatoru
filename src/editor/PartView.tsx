@@ -28,6 +28,8 @@ export function partValueText(part: Part): string {
       return formatSI(numProp(p, 'voltage', 0), 'V', { trim: true, digits: 4 });
     case 'currentsource':
       return formatSI(numProp(p, 'current', 0), 'A', { trim: true, digits: 4 });
+    case 'reg7805':
+      return '5 V';
     case 'acsource': {
       const peak = formatSI(numProp(p, 'amplitude', 0), 'V', { trim: true, digits: 4 });
       const offset = numProp(p, 'offset', 0);
@@ -237,6 +239,10 @@ export function labelLayout(part: Part, displayFlip: boolean): { anchor: 'middle
   if (part.type === 'opamp' && part.rotation === 0) {
     // İşlemsel yükselteç: üstte V+, sağda çıkış kablosu var; ad üçgenin sağ üst köşesinde.
     return { anchor: 'start', nameX: 8, nameY: -16, valueY: -16 };
+  }
+  if (part.type === 'reg7805' && part.rotation === 0) {
+    // Regülatör: altta GND / ADJ bacağı var; ad ve değer bacağın sağında.
+    return { anchor: 'start', nameX: 6, nameY: top - 5, valueY: bottom + 13 };
   }
   if (part.type === 'bridge') {
     // Köprü diyot: dört kenarda da bacak var; ad sol üstte, model sol altta (çapraz boşluklarda).

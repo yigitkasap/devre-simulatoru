@@ -9,6 +9,8 @@ import {
   AC_SOURCE_DEFAULTS,
   AMMETER_DEFAULTS,
   multimeterMode,
+  dropoutVoltage,
+  REG7805,
   pushbuttonClosed,
   spdtThrow,
   VOLTMETER_DEFAULTS,
@@ -494,6 +496,22 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
           { label: t.current, value: a(I) },
         ],
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
+      };
+    }
+    case 'reg7805': {
+      const r = status.regulator;
+      if (!r) return { title, rows: [] };
+      const needed = dropoutVoltage(REG7805, r.current);
+      return {
+        title,
+        rows: [
+          { label: t.regInput, value: v(r.input) },
+          { label: t.regOutput, value: v(r.output) },
+          { label: t.current, value: a(r.current) },
+          { label: t.powerUsed, value: w(r.power) },
+          { label: t.inputMinusOutput, value: v(r.input - r.output) },
+        ],
+        note: r.dropout ? t.regulatorDropout(vn(needed)) : t.reg7805Note(vn(needed)),
       };
     }
     case 'bridge':

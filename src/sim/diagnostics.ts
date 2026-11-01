@@ -20,6 +20,8 @@ export type DiagnosticCode =
   | 'multimeter-parallel'
   /** Akım kaynağının iki ucu arasında akımın dönebileceği yol yok (açık devre). */
   | 'current-source-open'
+  /** Regülatörün girişi çıkışın bırakma gerilimi kadar üstünde değil: çıkış ayarlanan değeri tutamıyor. */
+  | 'regulator-dropout'
   /**
    * Akım toprak hattı üzerinden dönüyor: aralarında kablo olmayan iki toprak noktası (toprak sembolü
    * ya da topraklı cihazın COM'u) binanın toprak hattıyla birbirine bağlı ve devrenin akımı oradan geçiyor.

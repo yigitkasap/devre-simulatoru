@@ -27,6 +27,9 @@ import { DISPLAY_WINDOW, LiveWindow, METER_REFRESH, NodeWindow, meterReadings, t
 import { buildScopeView, type ChannelStats, type ScopeView } from './scopeView';
 import type { LiveVisual } from './symbols';
 
+/** Gerilim regülatörleri: giriş yetmeyince sembolde turuncu çerçeve. */
+const REGULATORS: ReadonlySet<string> = new Set(['reg7805', 'lm317']);
+
 export type SimStatus = 'stopped' | 'running' | 'paused';
 
 const NO_TRACES: readonly TraceDef[] = [];
@@ -304,6 +307,8 @@ export function useSimulation(
         live.set(part.id, { charge: (averaged && a !== null && b !== null ? a - b : m.voltage) / vmax });
       } else if (part.type === 'resistor') {
         if (status.powerRatio !== undefined) live.set(part.id, { powerRatio: status.powerRatio });
+      } else if (REGULATORS.has(part.type)) {
+        if (status.regulator?.dropout) live.set(part.id, { dropout: true });
       } else if (part.type === 'relay') {
         live.set(part.id, { energized: status.energized ?? false, field: current });
       } else if (part.type === 'timer555') {

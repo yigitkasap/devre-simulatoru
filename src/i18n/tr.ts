@@ -65,6 +65,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
   tank: 'Su haznesi',
+  reg7805: 'Gerilim regülatörü',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -110,6 +111,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
   tank: 'su haznesinin',
+  reg7805: 'gerilim regülatörünün',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -154,6 +156,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
+  reg7805: ['giriş ucu (IN)', 'toprak ucu (GND)', 'çıkış ucu (OUT)'],
 };
 
 /** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
@@ -199,6 +202,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   schottky: ['A', 'K'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
+  reg7805: ['IN', 'GND', 'OUT'],
 };
 
 /** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
@@ -244,6 +248,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   schottky: ['anot', 'katot'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
+  reg7805: ['IN', 'GND', 'OUT'],
 };
 
 function list(labels: readonly string[]): string {
@@ -347,6 +352,15 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'Seri bir ön direnç ekle: R = (V_{kaynak} − V_{f}) / I. ' +
           `(Bu LED için V_{f} ≈ ${formatSI(p.forwardVoltage ?? 0, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`,
       };
+    case 'regulator-dropout': {
+      const v = (x: number | undefined) => formatSI(x ?? 0, 'V', { digits: 3 });
+      return {
+        title: 'Regülatörün girişi yetmiyor',
+        detail:
+          `${firstLabel}: giriş ${v(p.input)}, çıkış ${v(p.output)}. Çıkışın ayarlanan değeri tutabilmesi için giriş, çıkışın en az ` +
+          `${v(p.needed)} (bu akımda bırakma gerilimi) üstünde olmalı. Girişi yükselt ya da yük akımını azalt.`,
+      };
+    }
     case 'reverse-voltage': {
       const voltage = formatSI(p.voltage ?? 0, 'V', { trim: true });
       if (first !== undefined && ctx.type(first) === 'led') {
@@ -565,6 +579,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Su seviyesi probları olan hazne (baraj). Su bir proba ulaşınca o prob ile dipteki ortak prob arasında suyun direnci oluşur ve akımı sudaki iyonlar taşır; elektrotlarda ≈ 1,5–2 V elektrolize harcanır. Kuru prob açık devredir. Seviye elle ya da Doldur / Boşalt ile zamanla değişir.',
   oscilloscope:
     'Gerilimin zamanla nasıl değiştiğini çizer; iki kanal (A, B) ortak uca göre, DC/AC/GND kuplaj, ADD, INV ve X-Y. Girişi 1 MΩ, COM ucu şebeke toprağına bağlıdır.',
+  reg7805:
+    'Sabit 5 V çıkış veren doğrusal regülatör (7805): girişi çıkışın en az ≈ 2 V üstünde olduğu sürece çıkış 5 V’ta kalır, aradaki gerilim farkı ısı olarak harcanır. GND ucu toprağa bağlanır.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -1593,6 +1609,13 @@ export const tr = {
     switchClosedNote: (r: string) => `Kapalı anahtar ${r} değerinde bir dirençtir.`,
     pressed: 'basılı',
     dcOutput: 'DC çıkış (+ − −)',
+    regInput: 'Giriş',
+    regOutput: 'Çıkış',
+    inputMinusOutput: 'Giriş − çıkış',
+    regulatorDropout: (needed: string) =>
+      `Giriş yetmiyor: çıkışın ayarlanan değeri tutabilmesi için giriş, çıkışın en az ${needed} (bu akımda bırakma gerilimi) üstünde olmalı. Çıkış girişin ${needed} altında kalıyor.`,
+    reg7805Note: (needed: string) =>
+      `7805 çıkışı GND'ye göre 5 V'ta tutar; giriş çıkışın en az ${needed} (bu akımda bırakma gerilimi, ST veri sayfası) üstünde olmalı. Giriş − çıkış farkı ile akımın çarpımı ısı olarak harcanır.`,
     bridgeNote: 'Her yarım periyotta iki diyot seri iletir: çıkış, AC girişin anlık değerinden iki diyot gerilimi (KBP307’de 10 mA’de ≈ 0,64 V, 1 A’de ≈ 0,93 V her biri) kadar düşüktür.',
     spdtNote: (to: string, open: string, r: string) => `C ucu ${to} ucuna bağlı (kapalı kontak ${r}); ${open} ucu açıkta, ondan akım geçmez.`,
     released: 'bırakılmış',
@@ -2411,6 +2434,7 @@ export const tr = {
       ammeter: 'Ampermetreler',
       oscilloscope: 'Osiloskoplar',
       tank: 'Su hazneleri',
+      reg7805: 'Gerilim regülatörleri',
     } satisfies Record<DeviceType, string>,
   },
   file: {

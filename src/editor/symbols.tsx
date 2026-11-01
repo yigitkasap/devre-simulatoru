@@ -31,6 +31,8 @@ export interface LiveVisual {
   readonly ions?: IonView;
   /** Direnç: harcanan gücün güç sınırına oranı (1'i aşınca ısınıyormuş gibi çizilir). */
   readonly powerRatio?: number;
+  /** Gerilim regülatörü: giriş yetmiyor (bırakma gerilimiyle sınırlı): turuncu çerçeve. */
+  readonly dropout?: boolean;
   /** Röle: palet çekili mi? */
   readonly energized?: boolean;
   /** 555: çıkış yüksek mi? */
@@ -627,6 +629,22 @@ function Spdt({ to }: { to: SpdtThrow }) {
       <circle cx={-14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
       <circle cx={14} cy={-20} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
       <circle cx={14} cy={20} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+    </g>
+  );
+}
+
+/** Gerilim regülatörü: IN (sol), OUT (sağ), GND / ADJ (alt) uçlu kutu; giriş yetmiyorsa turuncu çerçeve. */
+function Regulator({ text, rotation, dropout }: { text: string; rotation: Rotation; dropout: boolean }) {
+  return (
+    <g>
+      <Lead from={-40} to={-24} />
+      <Lead from={24} to={40} />
+      <line x1={0} y1={16} x2={0} y2={30} stroke="currentColor" strokeWidth={2} />
+      {dropout && <rect x={-29} y={-21} width={58} height={42} rx={6} fill="none" stroke="var(--color-warn)" strokeWidth={3} />}
+      <rect x={-24} y={-16} width={48} height={32} rx={3} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <DeviceText x={0} y={0.5} rotation={rotation} size={text.length > 4 ? 12 : 14}>
+        {text}
+      </DeviceText>
     </g>
   );
 }
@@ -1234,6 +1252,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Bridge />;
     case 'schottky':
       return <Schottky />;
+    case 'reg7805':
+      return <Regulator text="7805" rotation={rotation} dropout={live?.dropout ?? false} />;
   }
 }
 

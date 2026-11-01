@@ -479,6 +479,46 @@ function inlineLegs(root: Group, anchors: readonly Vector3[], legs: readonly num
   legs.forEach((pin, k) => root.add(legDown(new Vector3((k - (legs.length - 1) / 2) * pitch, y0, z), toLocal(anchors[pin]!), 0.12)));
 }
 
+// --- TO-220 regülatörler (7805, LM317): siyah gövde, delikli metal tırnak, 3 bacak (newParts.ts) ----------
+
+export function to220Model(type: DeviceType, text: string, subtitle: string, legs: readonly number[]): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors(type);
+  const w = 3.94;
+  const h = 3.62;
+  const t = 1.77;
+  const y0 = 2.6;
+  const body = new Group();
+  const box = frontTexBox(w, h, t, mat('#18191c', 0.5), (c, W, H) => {
+    c.fillStyle = '#18191c';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = '#d6dade';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `600 ${Math.round(H * 0.17)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.fillText(text, W / 2, H * 0.42);
+    c.font = `500 ${Math.round(H * 0.11)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.fillStyle = '#9aa1a9';
+    c.fillText(subtitle, W / 2, H * 0.64);
+  }, 96);
+  box.position.set(0, y0 + h / 2, 0.25);
+  body.add(box);
+  // Metal tırnak (arkada, gövdenin üstüne uzanır), delikli.
+  const tab = new Shape();
+  tab.moveTo(-w / 2, 0);
+  tab.lineTo(w / 2, 0);
+  tab.lineTo(w / 2, h + 2.48);
+  tab.lineTo(-w / 2, h + 2.48);
+  tab.lineTo(-w / 2, 0);
+  tab.holes.push(new Shape().absarc(0, h + 1.25, 0.72, 0, Math.PI * 2, true));
+  const tabGeo = new ExtrudeGeometry(tab, { depth: 0.51, bevelEnabled: false, curveSegments: 24 });
+  body.add(mesh(tabGeo, mat('#c9ced3', 0.32, 1), 0, y0, -t / 2 + 0.25 - 0.51 + 0.02));
+  // Bacaklar 1 birim aralıkla gövdeden aşağı, gerçek sırayla.
+  inlineLegs(body, anchors, legs, 1, y0, 0.25);
+  root.add(body);
+  return { root, anchors };
+}
+
 // --- Köprü diyot (KBP tipi, düz sıralı 4 bacak: + ~ ~ −; tasarım: parcalar-3b/newParts.ts) -----------------
 
 export function bridgeModel(props: Props): PartModel {

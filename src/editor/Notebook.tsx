@@ -140,6 +140,8 @@ export function cardReading(part: Part, frame: SimFrame | null): { main: string;
   const rows = liveRows(part, frame)?.rows;
   if (!rows || rows.length === 0) return null;
   if (part.type === 'led' && rows[1]) return { main: rows[0]!.value, second: rows[1].value };
+  // Regülatör: çıkış gerilimi (satırlar giriş, çıkış, akım…).
+  if (part.type === 'reg7805' && rows[1]) return { main: rows[1].value };
   if (part.type === 'dcsupply') {
     // Güç kaynağı: akım veren çıkışlar (ikisi de boştaysa 1. çıkış); satırlar çıkış sırasında.
     const outputs = frame.statuses.get(part.id)?.outputs ?? [];

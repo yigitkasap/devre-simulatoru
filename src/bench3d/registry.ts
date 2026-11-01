@@ -30,6 +30,7 @@ import {
   schottkyModel,
   sourceBoxModel,
   speakerModel,
+  to220Model,
   spdtModel,
   switchModel,
   transformerModel,
@@ -93,6 +94,9 @@ function build(part: Part): PartModel {
       return bridgeModel(p);
     case 'schottky':
       return schottkyModel(p);
+    case 'reg7805':
+      // Bacak sırası IN, GND, OUT (ST L78 Şekil 2).
+      return to220Model('reg7805', 'L7805CV', '5 V · 1,5 A', [0, 1, 2]);
     case 'lamp':
       return lampModel();
     case 'speaker':

@@ -124,6 +124,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   pushbutton: { mount: 'button' },
   spdt: { mount: 'to92' },
   bridge: { mount: 'inline' },
+  reg7805: { mount: 'inline' },
   npn: { mount: 'to92' },
   pnp: { mount: 'to92' },
   njfet: { mount: 'to92' },
@@ -142,6 +143,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
 const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
   spdt: [1, 0, 2], // A, C, B: ortak uç ortada
   bridge: [1, 0, 2, 3], // KBP: + ~ ~ −
+  reg7805: [0, 1, 2], // TO-220: IN, GND, OUT
 };
 
 /** DIP-8: parça pin sırası → entegre bacak numarası (1–8). */

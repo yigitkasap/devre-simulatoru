@@ -214,3 +214,47 @@ describe('Schottky diyot (1N5819)', () => {
     expect(sim.runtimeDiagnostics.map((d) => d.code)).toContain('reverse-voltage');
   });
 });
+
+describe('Gerilim regülatörü 7805', () => {
+  const build = (vin: number, load: number) =>
+    new CircuitSimulator(circuit().battery('B1', 'in', 'gnd', vin).add('reg7805', 'U1', ['in', 'gnd', 'out']).resistor('RL', 'out', 'gnd', load).ground('G1', 'gnd').build());
+  it('12 V girişte 100 Ω yükte 5 V (RO 17 mΩ), 50 mA; GND ucundan bekleme akımı 4,2 mA; harcanan güç ≈ 0,40 W', () => {
+    const sim = build(12, 100);
+    sim.advance(0);
+    const r = sim.status('U1').regulator!;
+    expect(r.output).toBeCloseTo(5 - 0.017 * 0.05, 3);
+    expect(r.current).toBeCloseTo(0.05, 4);
+    expect(r.dropout).toBe(false);
+    const [iin, ignd, iout] = sim.pinCurrents('U1')!;
+    expect(iin).toBeCloseTo(r.current + 0.0042, 9);
+    expect(ignd).toBeCloseTo(-0.0042, 9);
+    expect(iout).toBeCloseTo(-r.current, 9);
+    expect(r.power).toBeCloseTo(7 * 0.05 + 12 * 0.0042, 3);
+    expect(sim.runtimeDiagnostics.map((d) => d.code)).not.toContain('regulator-dropout');
+  });
+
+  it('6 V girişte çıkış girişin bırakma gerilimi kadar altında (Şekil 28: 50 mA’de ≈ 1,51 V) ve uyarı', () => {
+    const sim = build(6, 100);
+    sim.advance(0);
+    const r = sim.status('U1').regulator!;
+    expect(r.dropout).toBe(true);
+    expect(6 - r.output).toBeCloseTo(1.514, 2);
+    expect(sim.runtimeDiagnostics.map((d) => d.code)).toContain('regulator-dropout');
+  });
+
+  it('yüksüz 5,000 V; girişsiz çıkış ≈ 0', () => {
+    const open = new CircuitSimulator(circuit().battery('B1', 'in', 'gnd', 9).add('reg7805', 'U1', ['in', 'gnd', 'out']).ground('G1', 'gnd').build());
+    open.advance(0);
+    expect(open.status('U1').regulator!.output).toBeCloseTo(5, 6);
+    const off = build(0, 100);
+    off.advance(0);
+    expect(Math.abs(off.status('U1').regulator!.output)).toBeLessThan(1e-3);
+  });
+
+  it("breadboard'da üç ardışık delik, gerçek sıra IN, GND, OUT", () => {
+    const doc = { version: 1 as const, parts: [{ id: 'u', type: 'reg7805' as const, label: 'U1', x: 0, y: 0, rotation: 0 as const, props: {} }], wires: [] };
+    const at = planBreadboard(doc).onBoard.get('u')!;
+    const cols = at.holes.map((h) => (h.kind === 'strip' ? h.col : -1));
+    expect([cols[0]! + 1, cols[0]! + 2]).toEqual([cols[1], cols[2]]);
+  });
+});
