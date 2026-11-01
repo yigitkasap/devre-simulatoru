@@ -312,6 +312,6 @@ export function operable(type: CircuitDoc['parts'][number]['type'], key: string)
 }
 
 /** Kilitli parçada da değişebilen (kullanma) özellikler: anahtar, potansiyometre konumu, ışık, sıcaklık, su seviyesi ve kipi. */
-const OPERATE: ReadonlySet<string> = new Set(['closed', 'position', 'illuminance', 'temperature', 'level', 'mode']);
+const OPERATE: ReadonlySet<string> = new Set(['closed', 'to', 'position', 'illuminance', 'temperature', 'level', 'mode']);
 /** Ayarları ölçmeye ait cihazlar (kilitliyken de ayarlanır, yeri değişmez): osiloskop ve ölçü aletleri. */
 const INSTRUMENTS: ReadonlySet<string> = new Set(['oscilloscope', 'voltmeter', 'ammeter', 'multimeter']);

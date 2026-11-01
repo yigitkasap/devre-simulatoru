@@ -548,8 +548,8 @@ export class BenchScene {
       group.position.set((a.x + b.x) / 2, BB.height, (a.z + b.z) / 2);
       group.rotation.y = Math.atan2(-(b.z - a.z), b.x - a.x);
     } else if (at.mount === 'to92') {
-      // Yerel z ekseni sütunlar boyunca: düz (yazılı) yüz izleyiciye bakar.
-      group.position.set(holes[1]!.x, BB.height, holes[1]!.z);
+      // Yerel z ekseni sütunlar boyunca: düz (yazılı) yüz izleyiciye bakar. Gövde üç deliğin ortasında.
+      group.position.set(center.x, BB.height, center.z);
       group.rotation.y = Math.PI / 2;
     } else {
       group.position.set(center.x, BB.height, center.z);

@@ -8,6 +8,7 @@ import { WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
 import { multimeterMode, type MultimeterMode } from '../sim/devices/multimeter';
 import { pushbuttonClosed } from '../sim/devices/pushbutton';
+import { spdtThrow, type SpdtThrow } from '../sim/devices/spdt';
 import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
@@ -611,6 +612,25 @@ function PushButton({ closed }: { closed: boolean }) {
   );
 }
 
+/**
+ * Çift yollu anahtar: C (−40, 0), A (40, −20), B (40, 20). Dil C'nin kontağında döner, bağlı olduğu
+ * ucun kontağına değer.
+ */
+function Spdt({ to }: { to: SpdtThrow }) {
+  const tipY = to === 'a' ? -20 : 20;
+  return (
+    <g>
+      <Lead from={-40} to={-14} />
+      <line x1={14} y1={-20} x2={40} y2={-20} stroke="currentColor" strokeWidth={2} />
+      <line x1={14} y1={20} x2={40} y2={20} stroke="currentColor" strokeWidth={2} />
+      <line x1={-14} y1={0} x2={12} y2={tipY} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+      <circle cx={-14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={14} cy={-20} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={14} cy={20} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+    </g>
+  );
+}
+
 /** DC akım kaynağı: dairede ok; ok akımın çıktığı ucu (2. uç) gösterir. */
 function CurrentSource() {
   return (
@@ -1160,6 +1180,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <CurrentSource />;
     case 'pushbutton':
       return <PushButton closed={pushbuttonClosed(props)} />;
+    case 'spdt':
+      return <Spdt to={spdtThrow(props)} />;
   }
 }
 

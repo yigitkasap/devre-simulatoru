@@ -10,6 +10,7 @@ import {
   AMMETER_DEFAULTS,
   multimeterMode,
   pushbuttonClosed,
+  spdtThrow,
   VOLTMETER_DEFAULTS,
   dcsupplySettings,
   funcgenSettings,
@@ -492,6 +493,18 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
           { label: t.current, value: a(I) },
         ],
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
+      };
+    }
+    case 'spdt': {
+      const to = spdtThrow(p);
+      const [on, off] = to === 'a' ? ['A', 'B'] : ['B', 'A'];
+      return {
+        title,
+        rows: [
+          { label: t.state, value: `C → ${on}` },
+          { label: t.current, value: a(I) },
+        ],
+        note: t.spdtNote(on, off, ohmValue(SWITCH_ON_RESISTANCE)),
       };
     }
     case 'currentsource': {

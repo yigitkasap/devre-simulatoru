@@ -13,6 +13,7 @@ import { insertAmmeter } from './fault/ammeter';
 import { METER_DISPLAY } from './PartView';
 import { nodeName } from './analysis/traces';
 import { multimeterMode } from '../sim/devices/multimeter';
+import { spdtThrow } from '../sim/devices/spdt';
 import { meterIntact, remapFaults, removedMeters, unplugAll, type InsertedMeter } from '../model/meters';
 import { FaultCard } from './fault/FaultCard';
 import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
@@ -1577,7 +1578,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
             onToggle: (id) => {
               const part = doc.parts.find((p) => p.id === id);
-              if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
+              if (part?.type === 'spdt') updatePartFromPanel(id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } });
+              else if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
             },
             onPress: pressButton,
             onKnob: (id, position, done) => {

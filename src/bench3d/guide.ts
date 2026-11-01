@@ -94,6 +94,8 @@ function describe(part: Part): { name: string; detail: string } {
       return { name: `Potansiyometre ${formatOhm(numProp(p, 'resistance', 10e3))}`, detail: 'dikey trimpot, 3 bacak' };
     case 'switch':
       return { name: 'Anahtar (iki konumlu)', detail: `başlangıçta ${boolProp(p, 'closed', false) ? 'kapalı' : 'açık'}` };
+    case 'spdt':
+      return { name: 'Çift yollu anahtar (SPDT)', detail: 'kollu, 3 bacak; ortak uç (C) ortada' };
     case 'pushbutton':
       return { name: 'Basmalı düğme 12 mm', detail: `4 bacak; ${p.contact === 'nc' ? 'normalde kapalı' : 'normalde açık'}` };
     case 'arduino':
@@ -199,6 +201,9 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         break;
       case 'potentiometer':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ') });
+        break;
+      case 'spdt':
+        steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Ortadaki bacak ortak uç (C).' });
         break;
       case 'pushbutton':
         steps.push({

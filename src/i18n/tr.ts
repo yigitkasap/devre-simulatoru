@@ -59,6 +59,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   multimeter: 'Multimetre',
   currentsource: 'Akım kaynağı',
   pushbutton: 'Basmalı düğme',
+  spdt: 'Çift yollu anahtar',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
   tank: 'Su haznesi',
@@ -101,6 +102,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   multimeter: 'multimetresinin',
   currentsource: 'akım kaynağının',
   pushbutton: 'basmalı düğmesinin',
+  spdt: 'çift yollu anahtarının',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
   tank: 'su haznesinin',
@@ -142,6 +144,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   multimeter: ['VΩ ucu (kırmızı)', 'COM ucu (siyah)'],
   currentsource: ['1. ucu (akım girer)', '2. ucu (akım çıkar)'],
   pushbutton: ['1. ucu', '2. ucu'],
+  spdt: ['ortak ucu (C)', 'A ucu', 'B ucu'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
@@ -185,6 +188,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   multimeter: ['VΩ', 'COM'],
   currentsource: ['1', '2'],
   pushbutton: ['1', '2'],
+  spdt: ['C', 'A', 'B'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
 };
@@ -227,6 +231,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   multimeter: ['VΩ', 'COM'],
   currentsource: ['1. uç', '2. uç'],
   pushbutton: ['1. uç', '2. uç'],
+  spdt: ['C', 'A', 'B'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
 };
@@ -525,6 +530,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   relay:
     'Elektromıknatısla çalışan anahtar: sargısından yeterli akım geçince demir paleti çeker ve kontağı değiştirir (C, NK’dan ayrılıp NA’ya değer). Küçük bir akımla, sargıdan yalıtılmış başka bir devreyi açıp kapatır.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
+  spdt:
+    'Çift yollu (SPDT) anahtar: ortak uç C, A ya da B ile birleşir; öbür uç açıkta kalır. Bir lambayı iki yerden yakıp söndürmek ya da bir sinyali iki yoldan birine vermek için kullanılır. Simülasyon sırasında şemada ya da 3B tezgâhta tıklanınca konum değişir.',
   pushbutton:
     'Yalnızca basılı tutulurken kontağı değişen düğme: normalde açık olanı basılınca kapanır, normalde kapalı olanı açılır; bırakınca eski hâline döner. Şemada, 3B tezgâhta ya da kartta basılı tutulur.',
   currentsource:
@@ -596,6 +603,7 @@ function fieldLabel(type: DeviceType, key: string): string {
     internalResistance: 'İç direnç',
     current: 'Akım',
     contact: 'Tür',
+    to: 'Konum',
     resistance: 'Direnç',
     capacitance: 'Kapasite',
     inductance: 'Endüktans',
@@ -624,6 +632,7 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   powerRating: { '0.125': '1/8 W (0,125 W)', '0.25': '1/4 W (0,25 W)', '0.5': '1/2 W (0,5 W)', '1': '1 W', '2': '2 W', '5': '5 W' },
   kind: { electrolytic: 'Elektrolitik (kutuplu, +)', film: 'Seramik / film (kutupsuz)' },
   contact: { no: 'Normalde açık', nc: 'Normalde kapalı' },
+  to: { a: 'C → A', b: 'C → B' },
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
   mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', a: 'Akım (A)', ohm: 'Direnç (Ω)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
   input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
@@ -1561,6 +1570,7 @@ export const tr = {
     ledLimits: (vf: string, max: string) => `20 mA’de ileri gerilim ≈ ${vf}; en fazla ${max}.`,
     switchClosedNote: (r: string) => `Kapalı anahtar ${r} değerinde bir dirençtir.`,
     pressed: 'basılı',
+    spdtNote: (to: string, open: string, r: string) => `C ucu ${to} ucuna bağlı (kapalı kontak ${r}); ${open} ucu açıkta, ondan akım geçmez.`,
     released: 'bırakılmış',
     switchOpenNote: 'Açık anahtar akım geçirmez; uçları arasındaki gerilim devrenin geri kalanına bağlıdır.',
     idealVoltmeter: 'İdeal voltmetre devreden hiç akım çekmez.',
@@ -2371,6 +2381,7 @@ export const tr = {
       multimeter: 'Multimetreler',
       currentsource: 'Akım kaynakları',
       pushbutton: 'Basmalı düğmeler',
+      spdt: 'Çift yollu anahtarlar',
       ammeter: 'Ampermetreler',
       oscilloscope: 'Osiloskoplar',
       tank: 'Su hazneleri',

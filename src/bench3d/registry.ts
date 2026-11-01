@@ -28,6 +28,7 @@ import {
   resistorModel,
   sourceBoxModel,
   speakerModel,
+  spdtModel,
   switchModel,
   transformerModel,
   transistorModel,
@@ -84,6 +85,8 @@ function build(part: Part): PartModel {
       return switchModel(p);
     case 'pushbutton':
       return pushButtonModel();
+    case 'spdt':
+      return spdtModel(p);
     case 'lamp':
       return lampModel();
     case 'speaker':

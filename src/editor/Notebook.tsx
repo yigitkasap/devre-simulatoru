@@ -27,6 +27,7 @@ import { formatEditable, formatSI } from '../sim/units';
 import { useThrottledText } from './a11y';
 import { ArduinoCardBody } from './ArduinoPanel';
 import { MultimeterCardBody } from './MultimeterCard';
+import { spdtThrow } from '../sim/devices/spdt';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
 import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
@@ -604,7 +605,14 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   const touch = useTouchUi();
   const bodyId = useId();
   const typeName = tr.devices.names[part.type];
-  const value = part.type === 'pushbutton' ? (props.pressed?.has(part.id) ? tr.readout.pressed : tr.readout.released) : partValueText(part);
+  const value =
+    part.type === 'pushbutton'
+      ? props.pressed?.has(part.id)
+        ? tr.readout.pressed
+        : tr.readout.released
+      : part.type === 'spdt'
+        ? spdtThrow(part.props).toUpperCase()
+        : partValueText(part);
   const device = RACK_DEVICES.has(part.type);
   const reading = device
     ? null

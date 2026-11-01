@@ -121,6 +121,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   buzzer: { mount: 'radial', span: 3 },
   switch: { mount: 'axial', span: 2 },
   pushbutton: { mount: 'button' },
+  spdt: { mount: 'to92' },
   npn: { mount: 'to92' },
   pnp: { mount: 'to92' },
   njfet: { mount: 'to92' },
@@ -130,6 +131,14 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   potentiometer: { mount: 'pot' },
   opamp: { mount: 'dip8' },
   timer555: { mount: 'dip8' },
+};
+
+/**
+ * Sıralı bacaklı parçalarda gerçek kılıftaki bacak sırası (soldan sağa, sütun sırasıyla) → pin. Yoksa
+ * pin sırası (BC547'de C-B-E).
+ */
+const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
+  spdt: [1, 0, 2], // A, C, B: ortak uç ortada
 };
 
 /** DIP-8: parça pin sırası → entegre bacak numarası (1–8). */
@@ -400,11 +409,12 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
     const span = pins === 3 ? 1 : spec.span!;
     const width = pins === 3 ? 3 : span + 1;
     const nets = Array.from({ length: pins }, (_, i) => net(part, i));
-    const ends = [nets[0]!, nets[pins - 1]!];
+    const physical = LEG_ORDER[part.type] ?? Array.from({ length: pins }, (_, i) => i);
+    const ends = [nets[physical[0]!]!, nets[physical[pins - 1]!]!];
     const { slot, start, shared } = findSlot(width, ends);
-    // Paylaşılan ağ son pindeyse parça ters takılır (o pin ilk sütuna).
-    const reversed = shared !== null && shared !== nets[0] && shared === nets[pins - 1];
-    const order = Array.from({ length: pins }, (_, i) => (reversed ? pins - 1 - i : i));
+    // Paylaşılan ağ son bacaktaysa parça ters takılır (o bacak ilk sütuna).
+    const reversed = shared !== null && shared !== ends[0] && shared === ends[1];
+    const order = reversed ? [...physical].reverse() : physical;
     const columns = pins === 3 ? [start, start + 1, start + 2] : [start, start + span];
     const columnStrips = columns.map((col, k) => takeStrip(slot.board, slot.half, col, nets[order[k]!]!));
     // Aynı satır (bütün şeritlerde boş) tercih edilir.

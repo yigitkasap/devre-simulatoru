@@ -55,6 +55,7 @@ import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { selectionActions, type TaskParts } from './InspectTab';
+import { spdtThrow } from '../sim/devices/spdt';
 import { METER_DISPLAY, meterDisplayRect, meterFlipped, partValueText, PartView, type PartTone } from './PartView';
 import { visibleLive } from './fault/mask';
 import type { Probe } from './fault/meter';
@@ -68,6 +69,9 @@ import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from '.
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
 import { circuitHits, circuitShapes, fitAvoiding, type Rect } from './legendFit';
 import { clampScale, fitView, screenToGrid, snap, zoomAt, type View } from './view';
+
+/** Simülasyon sırasında tıklanınca (ya da basılı tutulunca) kullanılan parçalar: imleç el olur. */
+const OPERATED: ReadonlySet<DeviceType> = new Set(['switch', 'spdt', 'pushbutton']);
 
 export interface CanvasHandle {
   zoomIn(): void;
@@ -901,6 +905,10 @@ export function Canvas({
         commit(updatePart(doc, part.id, { props: { ...part.props, closed: !boolProp(part.props, 'closed', false) } }));
         return;
       }
+      if (phone.mode === 'olc' && part?.type === 'spdt') {
+        commit(updatePart(doc, part.id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } }));
+        return;
+      }
       if (!selection.parts.includes(hit.partId) || selection.parts.length > 1 || selection.wires.length > 0) {
         dispatch({ type: 'select', selection: { parts: [hit.partId], wires: [] } });
       }
@@ -1143,6 +1151,11 @@ export function Canvas({
       if (simActive && part?.type === 'pushbutton' && !e.shiftKey) {
         // Simülasyon sırasında düğme basılı tutulur, bırakınca açılır.
         holdButton(part.id);
+        return;
+      }
+      if (simActive && part?.type === 'spdt' && !e.shiftKey) {
+        // Simülasyon sırasında çift yollu anahtara tıklamak C'yi öbür uca bağlar.
+        commit(updatePart(doc, part.id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } }));
         return;
       }
       if (simActive && part?.type === 'switch' && !e.shiftKey) {
@@ -1632,7 +1645,7 @@ export function Canvas({
         : tool.kind === 'place' || tool.kind === 'wire' || interaction.kind === 'wiring' || hoverPin
           ? 'cursor-crosshair'
           : hover?.kind === 'part'
-            ? simActive && doc.parts.find((p) => p.id === hover.partId)?.type === 'switch'
+            ? simActive && OPERATED.has(doc.parts.find((p) => p.id === hover.partId)?.type ?? 'ground')
               ? 'cursor-pointer'
               : 'cursor-move'
             : hover?.kind === 'wire'

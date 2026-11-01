@@ -18,6 +18,7 @@ import {
   Vector3,
 } from 'three';
 import { LED_COLORS, LED_MODELS } from '../sim/devices/led';
+import { spdtThrow } from '../sim/devices/spdt';
 import { boolProp, numProp, strProp } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import type { DeviceType, Props } from '../sim/netlist';
@@ -415,6 +416,49 @@ export function switchModel(props: Props): PartModel {
     interaction: 'toggle',
     update(ctx) {
       set(boolProp(ctx.props, 'closed', false));
+      return false;
+    },
+  };
+}
+
+// --- Çift yollu anahtar (SPDT): bugünkü kollu anahtarın gövdesi, üç bacak; kol bağlı ucun tersine yatar ---
+
+/**
+ * Tasarım: parcalar-3b/newParts.ts. Bacaklar gövdenin kenarında A, C, B sırasıyla (gerçek anahtardaki
+ * gibi ortak uç ortada); her bacak kendi ucuna (masada şema pinleri, breadboard'da delikler) iner.
+ */
+export function spdtModel(props: Props): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('spdt');
+  root.add(mesh(new BoxGeometry(4.4, 1.6, 2.6), mat('#22252a', 0.5), 0, 1.0, 0));
+  root.add(mesh(new CylinderGeometry(0.7, 0.7, 0.9, 20), M.steel(), 0, 2.2, 0));
+  const lever = new Group();
+  lever.userData.live = true;
+  lever.add(mesh(new CylinderGeometry(0.25, 0.32, 2.6, 14), M.steel(), 0, 1.3, 0));
+  lever.add(mesh(new SphereGeometry(0.34, 14, 10), M.steel(), 0, 2.6, 0));
+  lever.position.y = 2.5;
+  root.add(lever);
+  // A ve B'nin gövdedeki yanı: uçlarının z konumuna göre (C ortada).
+  const sideA = Math.sign(anchors[1]!.z - anchors[0]!.z) || -1;
+  const plateA = labelPlate('A', 0.8, 0.8, { fg: '#cfd3d8' });
+  plateA.position.set(1.6, 1.82, 0.75 * sideA);
+  const plateB = labelPlate('B', 0.8, 0.8, { fg: '#cfd3d8' });
+  plateB.position.set(1.6, 1.82, -0.75 * sideA);
+  root.add(plateA, plateB);
+  for (const [pin, z] of [[0, 0], [1, 0.9 * sideA], [2, -0.9 * sideA]] as const) {
+    root.add(mesh(new BoxGeometry(0.12, 0.6, 0.5), M.tin(), 1.6, 0.1, z));
+    const end = anchors[pin]!;
+    root.add(wirePath([new Vector3(1.6, 0.35, z), new Vector3(end.x, 0.35, z), new Vector3(end.x, 0.35, end.z), end], 0.13, M.tin(), 6));
+  }
+  // Kol, bağlı olduğu ucun TERSİNE yatar (gerçek kollu anahtardaki gibi).
+  const set = (to: string) => (lever.rotation.x = (to === 'b' ? -1 : 1) * sideA * -0.45);
+  set(spdtThrow(props));
+  return {
+    root,
+    anchors,
+    interaction: 'toggle',
+    update(ctx) {
+      set(spdtThrow(ctx.props));
       return false;
     },
   };

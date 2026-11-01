@@ -128,3 +128,29 @@ describe('Basmalı düğme (BT)', () => {
     expect(at.extraHoles!.map((h) => (h.kind === 'strip' ? [h.col - p0.col, h.row] : null))).toEqual([[2, 3], [2, 6]]);
   });
 });
+
+describe('Çift yollu anahtar (SPDT)', () => {
+  const build = (to: string) =>
+    new CircuitSimulator(
+      circuit().battery('B1', 'c', 'gnd', 5).ground('G1', 'gnd').add('spdt', 'S1', ['c', 'a', 'b'], { to }).resistor('RA', 'a', 'gnd', 1000).resistor('RB', 'b', 'gnd', 1000).build(),
+    );
+  it('C, A ya da B ile birleşir; öbür uçtan akım geçmez', () => {
+    for (const to of ['a', 'b']) {
+      const sim = build(to);
+      sim.advance(0);
+      expect(sim.measure('RA')!.current).toBeCloseTo(to === 'a' ? 5e-3 : 0, 6);
+      expect(sim.measure('RB')!.current).toBeCloseTo(to === 'b' ? 5e-3 : 0, 6);
+      const pins = sim.pinCurrents('S1')!;
+      expect(pins[to === 'a' ? 2 : 1]).toBe(0);
+    }
+  });
+
+  it("breadboard'da üç ardışık delik, gerçek bacak sırası A, C, B (ortak uç ortada)", () => {
+    const doc = { version: 1 as const, parts: [{ id: 's', type: 'spdt' as const, label: 'S1', x: 0, y: 0, rotation: 0 as const, props: { to: 'a' } }], wires: [] };
+    const at = planBreadboard(doc).onBoard.get('s')!;
+    const cols = at.holes.map((h) => (h.kind === 'strip' ? h.col : -1));
+    // Pin sırası C, A, B: A en solda, C ortada, B en sağda.
+    expect(cols[1]! + 1).toBe(cols[0]);
+    expect(cols[0]! + 1).toBe(cols[2]);
+  });
+});
