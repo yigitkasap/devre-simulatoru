@@ -383,6 +383,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const repaired = fault !== null && faultSession.repaired;
   /** Takılı ampermetreler: kayıtlardan belgede takıldığı gibi duranlar (Geri al ve Yinele de değiştirir). */
   const plugged = useMemo(() => (fault ? faultSession.meters.filter((m) => meterIntact(doc, m)) : []), [fault, faultSession.meters, doc]);
+  /** Takılı ampermetrelerin gösterge yanı (takarken seçildi; eski kayıtlarda yok). */
+  const meterFlips = useMemo(() => new Map(plugged.flatMap((m) => (m.flip === undefined ? [] : [[m.part, m.flip] as const]))), [plugged]);
   /** Görevin arızaları; takılı ampermetrenin böldüğü kablonun son ucundaki arıza ikinci yarıya taşınır. */
   const effectiveFaults = useMemo(() => (fault ? remapFaults(fault.faults, plugged) : []), [fault, plugged]);
   const activeFaults = useMemo(() => (fault && !repaired ? effectiveFaults : []), [fault, repaired, effectiveFaults]);
@@ -1328,7 +1330,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const meterFree = fault !== null && fault.tools.ammeter && measuring && meter.placing === null && viewMode === 'schematic';
   /** Kabloyu ikiye böler, ampermetreyi araya seri takar (kablo dokunulan yerde). */
   const plugAmmeter = (wireId: string, at: { x: number; y: number }) => {
-    const r = insertAmmeter(doc, wireId, at);
+    const r = insertAmmeter(doc, wireId, at, meterFlips);
     if ('error' in r) {
       showToast(tr.fault.ammeter.errors[r.error], 'error');
       return;
@@ -1461,6 +1463,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       probes={probeView}
       tapMenu={tapMenu}
       wiringLocked={fault !== null}
+      meterFlips={meterFlips}
       onLocate={
         reporting
           ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r))

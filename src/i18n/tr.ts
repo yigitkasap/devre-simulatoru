@@ -2080,7 +2080,7 @@ export const tr = {
         short: 'Bu kablo parçası ampermetre için kısa; daha uzun bir parçaya dokun.',
         junction: 'Burada başka bir bağlantı var; kablonun başka bir yerine dokun.',
         diagonal: 'Eğik kablo parçasına ampermetre takılamaz.',
-        crowded: 'Burada ampermetreye yer yok (başka kablo ve parçaların üstüne biner); aynı koldaki daha açık bir kabloya dokun.',
+        crowded: 'Burada ampermetreye yer yok (kablonun üstünde ve 3 birim yanında başka kablo, parça ya da yazı var); aynı koldaki daha açık bir kabloya dokun.',
       },
     },
     leg: 'bacağı',

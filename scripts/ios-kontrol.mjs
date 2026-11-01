@@ -1732,6 +1732,21 @@ try {
     await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     check('arıza (masaüstü): kilitli PS1 ve RC birlikte seçiliyken sağ panelde Döndür, Ters çevir ve Sil yok; kilitli parçanın sağ tık menüsünde yalnızca Özellikler',
       multiButtons.length === 0 && rcMenu.length === 1 && /Özellikler/.test(rcMenu[0] ?? ''), `${multiButtons.join('|')} · ${rcMenu.join('|')}`);
+    // Üst rayda RB bağlantısıyla köşe arasında: A1 kablonun üstünde, göstergesi altta (üstte OSC1 A kablosu); kaldırınca kablolar eski hâline.
+    pt = await screen(page, 40, -16); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
+    await page.getByRole('menuitem', { name: 'Buraya ampermetre tak' }).click(); await page.waitForTimeout(600);
+    const rail = (await saved()).parts.find((x) => x.type === 'ammeter');
+    const railFlip = (JSON.parse(await page.evaluate(() => localStorage.getItem('devre-simulatoru:ariza') ?? '{}')).meters ?? []).at(-1)?.flip;
+    if (rail) { pt = await screen(page, rail.x, rail.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300); await page.getByRole('menuitem', { name: 'Ampermetreyi kaldır' }).click(); await page.waitForTimeout(500); }
+    const railBack = JSON.stringify((await saved()).wires) === JSON.stringify(before.wires);
+    // RC'nin hemen üstündeki dikey parça: yanda da yer yok → "yer yok", kablolar değişmiyor.
+    pt = await screen(page, 44, -14); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
+    await page.getByRole('menuitem', { name: 'Buraya ampermetre tak' }).click(); await page.waitForTimeout(500);
+    const crowdedToast = await page.getByText(/^Burada ampermetreye yer yok/).count();
+    const unchanged = JSON.stringify((await saved()).wires) === JSON.stringify(before.wires);
+    check('arıza (ampermetre, masaüstü): üst rayda RB bağlantısının sağına tıkla → A1 kablonun üstünde (40, −16), göstergesi altta; RC’nin hemen üstündeki kısa dikey parçada "yer yok", kablolar değişmiyor',
+      rail?.x === 40 && rail?.y === -16 && rail?.rotation === 0 && railFlip === true && railBack && crowdedToast >= 1 && unchanged, `${rail?.x},${rail?.y} · ${railFlip} · ${railBack} · ${crowdedToast} · ${unchanged}`);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     // Kollektörden OSC1 B'ye giden kablo: A1 kablonun üstünde, kablonun yönünde.
     pt = await screen(page, 51, -2.3); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
     const menu = await page.getByRole('menuitem').allTextContents();

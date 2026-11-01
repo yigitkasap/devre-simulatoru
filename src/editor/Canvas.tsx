@@ -247,6 +247,8 @@ export interface CanvasProps {
    * değişir). Uçlar kablo başlatmaz, kablo aracı (W) açılmaz; kabloya tıklamak onu seçer.
    */
   readonly wiringLocked?: boolean;
+  /** Takılı ampermetrelerin gösterge yanı (arıza bulma; takarken seçildi). */
+  readonly meterFlips?: ReadonlyMap<string, boolean>;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -393,6 +395,7 @@ export function Canvas({
   marks,
   taskParts,
   wiringLocked = false,
+  meterFlips,
   ref,
 }: CanvasProps) {
   // Göstergeler kapalıysa kablo renkleri ve öbür göstergeler simülasyon yokmuş gibi çizilir.
@@ -1632,11 +1635,12 @@ export function Canvas({
     statusRef.current?.({ hint: JSON.parse(hintKey) as CanvasHint, scale: view.scale });
   }, [hintKey, view.scale]);
 
-  // Ölçü aleti ekranı başka bir parçanın üstüne biniyorsa ve öbür taraf boşsa, ekran öbür tarafa açılır.
+  // Ölçü aleti ekranı başka bir parçanın üstüne biniyorsa ve öbür taraf boşsa, ekran öbür tarafa açılır
+  // (takılı ampermetrede yanı takarken seçildi).
   const displayFlips = new Set<string>();
   for (const part of doc.parts) {
     if (part.type !== 'voltmeter' && part.type !== 'ammeter') continue;
-    if (meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)))) displayFlips.add(part.id);
+    if (meterFlips?.get(part.id) ?? meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)))) displayFlips.add(part.id);
   }
 
   const highlightTone = highlight?.severity === 'error' || highlight?.severity === 'warning' ? highlight.severity : 'selected';
