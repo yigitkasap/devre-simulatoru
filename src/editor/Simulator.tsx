@@ -9,7 +9,8 @@ import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
 import { maskFrame } from './fault/mask';
-import { insertAmmeter, remapFaults, removeAmmeter, removedMeters, type InsertedMeter } from './fault/ammeter';
+import { insertAmmeter } from './fault/ammeter';
+import { meterIntact, remapFaults, removedMeters, unplugAll, type InsertedMeter } from '../model/meters';
 import { FaultCard } from './fault/FaultCard';
 import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
 import { faultedLook } from './fault/look';
@@ -19,7 +20,7 @@ import { FoundCard, ReportCard } from './fault/ReportCards';
 import { faultFromPlace } from './task/faultRows';
 import { defaultBlack, measureResistance, METER_ID, meterPart, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
 import { MultimeterPanel, type MeterReading } from './fault/MultimeterPanel';
-import { addEntry, entryName, NEW_SESSION, parseSession, type FaultSession, type Place } from './fault/session';
+import { addEntry, entryName, METER_LIMIT, NEW_SESSION, parseSession, type FaultSession, type Place } from './fault/session';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { partBounds, pinPositions } from '../model/geometry';
@@ -36,7 +37,7 @@ import { EMPTY_ANALYSIS, type AnalysisDoc } from '../model/analysis';
 import type { FaultKind } from '../model/faults';
 import type { FaultScenarioId } from '../examples/faultScenarios';
 import { CATEGORIES } from '../model/catalog';
-import { canAddType, NO_PREDICTIONS, parsePredictions, REASON_LIMIT, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
+import { canAddType, type MeterChange, NO_PREDICTIONS, parsePredictions, REASON_LIMIT, parseTask, respectsTask, targetMet, taskFromHash, taskTitle, type Predictions, type TaskDef } from '../model/task';
 import { parseEmbedParams, type EmbedOptions } from '../model/embed';
 import { toSerializable } from '../model/serialize';
 import { datedName, saveFile } from './analysis/format';
@@ -135,6 +136,8 @@ type Initial = {
   shared: 'loaded' | 'error' | 'task' | 'task-error' | 'embed-error' | null;
 };
 
+/** Reddedilen değişikliğin nedeni (bildirimin yazısı). */
+type LockReason = 'blocked' | 'new' | 'locked' | 'wires' | 'plug';
 /** Salt okunur gömülü görünümün kuralı: görevdeki kilit gibi (hiçbir parça değişmez, yeni parça ve kablo yok). */
 const READ_ONLY: TaskDef = { name: '', instruction: '', editable: [], allowNew: false, targets: [], predict: false };
 
@@ -212,17 +215,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     }
   }, [embed, task, predictions]);
   /** Arıza bulma oturumu (B2): yeni görev ya da görevden çıkış sıfırlar. */
-  const [faultSession, setFaultSession] = useState<FaultSession>(() =>
-    initial.task?.fault && initial.shared !== 'task' ? loadSavedSession() : { ...NEW_SESSION, base: initial.doc.parts.map((p) => p.id) },
-  );
+  const [faultSession, setFaultSession] = useState<FaultSession>(() => (initial.task?.fault && initial.shared !== 'task' ? loadSavedSession() : NEW_SESSION));
   const faultSessionRef = useRef(faultSession);
   faultSessionRef.current = faultSession;
   const sessionTask = useRef(task);
   useEffect(() => {
     if (sessionTask.current === task) return;
     sessionTask.current = task;
-    // Görev açıldığındaki parçalar: sonradan eklenen (ampermetre) kilitli değildir.
-    setFaultSession({ ...NEW_SESSION, base: docRef.current.parts.map((p) => p.id) });
+    setFaultSession(NEW_SESSION);
   }, [task]);
   useEffect(() => {
     if (embed) return;
@@ -244,35 +244,60 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const gate = task?.predict && !predictions.locked ? tr.task.gate : null;
   const docRef = useRef(state.doc);
   docRef.current = state.doc;
-  const lockNotice = useRef<{ at: number; show: (message: string) => void }>({ at: 0, show: () => {} });
+  /** Reddedilen değişikliğin bildirimi (sürüklerken art arda gelmesin diye önizlemede seyrek). */
+  const lockNotice = useRef<{ at: number; show: (why: LockReason) => void }>({ at: 0, show: () => {} });
   const readOnly = embed?.readOnly ?? false;
-  const dispatch = useCallback(
-    (action: EditorAction) => {
+  /**
+   * Görevin bekçisinden geçen değişiklik; kabul edildiyse true. Arıza bulmada takılı ampermetre
+   * silinirse kablosu eski hâline döner; `plugged`: şimdi takılan ampermetre (Buraya ampermetre tak).
+   */
+  const guard = useCallback(
+    (action: EditorAction, plugged?: InsertedMeter): boolean => {
       const t = taskRef.current ?? (readOnly ? READ_ONLY : null);
-      const session = faultSessionRef.current;
-      if (t?.fault && action.type === 'commit') {
-        // Takılı ampermetre silindiyse bağlantı kabloları kalkar, kablo eski hâline döner.
-        const gone = removedMeters(docRef.current, action.doc, session.meters);
-        if (gone.length > 0) {
-          action = { ...action, doc: gone.reduce(removeAmmeter, action.doc) };
-          setFaultSession((s) => ({ ...s, meters: s.meters.filter((m) => !gone.includes(m)) }));
-        }
+      if (!t || (action.type !== 'commit' && action.type !== 'preview')) {
+        rawDispatch(action);
+        return true;
       }
-      // Arıza bulmada öğrencinin sonradan eklediği parçalar (ampermetre) kilitli değildir.
-      const added = t?.fault && session.base.length > 0 ? new Set(docRef.current.parts.filter((p) => !session.base.includes(p.id)).map((p) => p.id)) : undefined;
-      if (t && (action.type === 'commit' || action.type === 'preview') && !respectsTask(docRef.current, action.doc, t, added)) {
+      let edit = action;
+      let meters: MeterChange | undefined;
+      if (t.fault) {
+        const before = faultSessionRef.current.meters.filter((m) => meterIntact(docRef.current, m));
+        const gone = edit.type === 'commit' ? removedMeters(docRef.current, edit.doc, before) : [];
+        if (gone.length > 0) edit = { ...edit, doc: unplugAll(edit.doc, gone) };
+        meters = { before, after: [...before.filter((m) => !gone.includes(m)), ...(plugged ? [plugged] : [])] };
+      }
+      if (!respectsTask(docRef.current, edit.doc, t, meters)) {
         const now = performance.now();
-        if (now - lockNotice.current.at > 1500) {
+        if (edit.type === 'commit' || now - lockNotice.current.at > 1500) {
           lockNotice.current.at = now;
-          const grows = action.doc.parts.length > docRef.current.parts.length || action.doc.wires.length > docRef.current.wires.length;
-          lockNotice.current.show(!taskRef.current ? tr.embed.blocked : grows && !t.allowNew ? tr.task.lockedNew : tr.task.locked);
+          const before = docRef.current;
+          const after = edit.doc;
+          const grows = after.parts.length > before.parts.length || after.wires.length > before.wires.length;
+          const wiresOnly = JSON.stringify(before.parts) === JSON.stringify(after.parts);
+          lockNotice.current.show(
+            !taskRef.current
+              ? 'blocked'
+              : t.fault
+                ? after.parts.length > before.parts.length
+                  ? t.fault.tools.ammeter
+                    ? 'plug'
+                    : 'new'
+                  : wiresOnly
+                    ? 'wires'
+                    : 'locked'
+                : grows && !t.allowNew
+                  ? 'new'
+                  : 'locked',
+          );
         }
-        return;
+        return false;
       }
-      rawDispatch(action);
+      rawDispatch(edit);
+      return true;
     },
     [readOnly],
   );
+  const dispatch = useCallback((action: EditorAction) => guard(action), [guard]);
   const [settings, updateSettings] = useSettings();
   const theme = useTheme(settings.theme);
   const layout = useLayout();
@@ -315,7 +340,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [chainOff, setChainOff] = useState(false);
   const [partDragging, setPartDragging] = useState(false);
   const [toast, showToast, hideToast] = useToast();
-  lockNotice.current.show = (message) => showToast(message, 'error');
+  lockNotice.current.show = (why) =>
+    showToast(
+      why === 'blocked' ? tr.embed.blocked : why === 'new' ? tr.task.lockedNew : why === 'wires' ? tr.fault.wiresLocked : why === 'plug' ? tr.fault.ammeter.onlyPlug(touchUi) : tr.task.locked,
+      'error',
+    );
   const [taskDialog, setTaskDialog] = useState(false);
   /** Görev oluştur → Arıza bulma: satırın yeri şemadan seçiliyor (pencere kapalı; R4). */
   const [faultPick, setFaultPick] = useState<{ row: number; which: 'at' | 'to' } | null>(null);
@@ -352,8 +381,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const fault = task?.fault ?? null;
   /** Arızanın uygulandığı hâl: "Onar ve çalıştır"dan sonra devre sağlam çalışır (R3). */
   const repaired = fault !== null && faultSession.repaired;
+  /** Takılı ampermetreler: kayıtlardan belgede takıldığı gibi duranlar (Geri al ve Yinele de değiştirir). */
+  const plugged = useMemo(() => (fault ? faultSession.meters.filter((m) => meterIntact(doc, m)) : []), [fault, faultSession.meters, doc]);
   /** Görevin arızaları; takılı ampermetrenin böldüğü kablonun son ucundaki arıza ikinci yarıya taşınır. */
-  const effectiveFaults = useMemo(() => (fault ? remapFaults(fault.faults, faultSession.meters) : []), [fault, faultSession.meters]);
+  const effectiveFaults = useMemo(() => (fault ? remapFaults(fault.faults, plugged) : []), [fault, plugged]);
   const activeFaults = useMemo(() => (fault && !repaired ? effectiveFaults : []), [fault, repaired, effectiveFaults]);
   /** Multimetre (R1): kip, iki ucun yeri ve şemaya koyulan uç. Görev değişince siyah uç toprakta, kırmızı boşta. */
   const [meter, setMeter] = useState<{ mode: MeterMode; red: Probe | null; black: Probe | null; placing: ProbeColor | null }>(() => ({ mode: 'dc', red: null, black: defaultBlack(state.doc), placing: null }));
@@ -441,9 +472,15 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     : [];
   const taskParts = useMemo(() => {
     if (!task) return null;
-    const own = task.fault && faultSession.base.length > 0 ? new Set(faultSession.base) : null;
-    return { editable: new Set(task.editable), locked: new Set(doc.parts.filter((p) => !task.editable.includes(p.id) && (!own || own.has(p.id))).map((p) => p.id)) };
-  }, [task, doc.parts, faultSession.base]);
+    // Takılı ampermetre kilitli değil (kaldırılır) ama yeri değişmez; arıza bulmada her şey kilitli, kilit simgesi yok.
+    const own = new Set(plugged.map((m) => m.part));
+    return {
+      editable: new Set(task.editable),
+      locked: new Set(doc.parts.filter((p) => !task.editable.includes(p.id) && !own.has(p.id)).map((p) => p.id)),
+      plugged: own,
+      lockMarks: !task.fault,
+    };
+  }, [task, doc.parts, plugged]);
   /** Arıza bulmada eklenebilen parça türleri (hoca izin verdiyse yalnızca ampermetre); öbür kiplerde süzgeç yok. */
   const addable = useMemo(() => (task?.fault ? new Set<DeviceType>(CATEGORIES.flatMap((c) => c.types).filter((type) => canAddType(task, type))) : null), [task]);
   const editableLabels = task ? task.editable.map((id) => doc.parts.find((p) => p.id === id)?.label).filter(Boolean).join(tr.task.and) : '';
@@ -526,13 +563,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       loadScenario(nextScenario(fault.scenario!));
       return;
     }
-    const next = randomFault(doc, analysis.idx, Math.random, fault.faults[0]);
+    // Yeni arıza takılı ampermetrelerin kablolarına düşmesin: ampermetreler önce kaldırılır.
+    const next = randomFault(unplugAll(doc, plugged), analysis.idx, Math.random, fault.faults[0]);
     if (!next) {
       showToast(tr.fault.found.noCandidate, 'info');
       return;
     }
     sim.stop();
-    if (faultSession.meters.length > 0) rawDispatch({ type: 'commit', doc: faultSession.meters.reduce(removeAmmeter, doc), selection: EMPTY_SELECTION });
+    if (plugged.length > 0) rawDispatch({ type: 'commit', doc: unplugAll(doc, plugged), selection: EMPTY_SELECTION });
     setTask({ ...task, fault: { ...fault, faults: [next] } });
     showToast(tr.fault.found.newFault);
   };
@@ -733,8 +771,16 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const count = selection.parts.length + selection.wires.length;
     if (count === 0) return;
     const what = count === 1 && singlePart ? singlePart.label : tr.phone.items(count);
-    dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION });
-    showToast(tr.toast.deleted(what), 'info', { label: tr.toast.undo, run: () => dispatch({ type: 'undo' }) });
+    // Takılı ampermetre: kaldırılır, kablo eski hâline döner.
+    const meter = count === 1 ? plugged.find((m) => m.part === selection.parts[0]) : undefined;
+    if (meter) {
+      unplugAmmeter(meter);
+      return;
+    }
+    // Bildirim yalnızca silme kabul edilince (kilitli parçada bekçi "Bu parça görevde kilitli" der).
+    if (dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION })) {
+      showToast(tr.toast.deleted(what), 'info', { label: tr.toast.undo, run: () => dispatch({ type: 'undo' }) });
+    }
   };
 
   // --- Tanılama ve mesajlar ---------------------------------------------------------------
@@ -1117,6 +1163,12 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const deskChainPin = singlePart ? firstFreePin(singlePart.id, connectivity.unconnectedPins, doc) : null;
   const deskChainTo = singlePart && deskChainPin !== null ? tr.phone.pinOf(singlePart.label, tr.devices.pins[singlePart.type][deskChainPin] ?? '') : null;
   const addFromNotebook = (type: DeviceType) => {
+    // Arıza bulmada ampermetre panelden konmaz, kabloya takılır: şemaya geçilir, nasıl takılacağı söylenir.
+    if (task?.fault) {
+      if (viewMode !== 'schematic') setViewMode('schematic');
+      showToast(tr.fault.ammeter.howTo(touchUi));
+      return;
+    }
     if (singlePart && deskChainPin !== null) {
       const place = chainPlacement(doc, type, { partId: singlePart.id, pin: deskChainPin });
       if (place) {
@@ -1224,7 +1276,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               setSchematicStrip(false);
             },
           }
-        : { add: { chainTo: deskChainTo, onAdd: addFromNotebook, onOpenExample: loadExample, allowed: addable } })}
+        : addable && addable.size === 0
+          ? {}
+          : { add: { chainTo: deskChainTo, onAdd: addFromNotebook, onOpenExample: loadExample, allowed: addable } })}
     />
   );
   /** Kablo bağlamayı başlatır (telefonda tam ekran görünüm; 3B'den şemaya geçilir). */
@@ -1278,18 +1332,17 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       return;
     }
     const meterPart = r.doc.parts.find((p) => p.id === r.meter.part)!;
-    dispatch({ type: 'commit', doc: r.doc, selection: { parts: [r.meter.part], wires: [] } });
-    setFaultSession((s) => ({ ...s, meters: [...s.meters, r.meter] }));
+    if (!guard({ type: 'commit', doc: r.doc, selection: { parts: [r.meter.part], wires: [] } }, r.meter)) return;
+    setFaultSession((s) => ({ ...s, meters: [...s.meters, r.meter].slice(-METER_LIMIT) }));
     showToast(tr.fault.ammeter.inserted(meterPart.label));
   };
   /** Takılı ampermetreyi kaldırır: silinince bekçi kabloyu eski hâline döndürür. */
   const unplugAmmeter = (m: InsertedMeter) => {
-    dispatch({ type: 'commit', doc: removeItems(doc, [m.part], []), selection: EMPTY_SELECTION });
-    showToast(tr.fault.ammeter.removed);
+    if (dispatch({ type: 'commit', doc: removeItems(doc, [m.part], []), selection: EMPTY_SELECTION })) showToast(tr.fault.ammeter.removed);
   };
   const tapMenu = meterFree
     ? (target: TapTarget) => {
-        const meters = faultSession.meters;
+        const meters = plugged;
         if (target.kind === 'part') {
           const m = meters.find((x) => x.part === target.partId);
           const label = doc.parts.find((p) => p.id === target.partId)?.label ?? '';
@@ -1317,7 +1370,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const meterText = sim.frame?.meterTexts.get(METER_ID) ?? null;
   const meterReading = useMemo<MeterReading>(() => {
     const t = tr.fault.meter;
-    if (!meter.red || !meter.black) return { value: t.empty, unit: '', note: t.needProbes };
+    if (!meter.red || !meter.black) return { value: t.empty, unit: '', note: meter.red ? t.needBlack : meter.black ? t.needRed : t.needProbes };
     if (meter.mode === 'ohm') {
       if (sim.status !== 'stopped') return { value: t.empty, unit: 'Ω', note: t.ohmRunning };
       if (ohms === null || ohms === undefined) return { value: t.empty, unit: 'Ω', note: t.ohmFailed };
@@ -1405,6 +1458,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       onPick={analysis.pick ? analysis.onPick : null}
       probes={probeView}
       tapMenu={tapMenu}
+      wiringLocked={fault !== null}
       onLocate={
         reporting
           ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r))
@@ -1456,7 +1510,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           connectivity={connectivity}
           frame={sim.frame}
           {...(benchLook !== doc ? { look: benchLook } : {})}
-          {...(hideLive ? { labelFrame: shownFrame } : {})}
+          {...(hideLive ? { labelFrame: shownFrame, liveHidden: true } : {})}
           active={sim.status !== 'stopped'}
           running={sim.status === 'running'}
           selection={selection.parts}
@@ -2058,7 +2112,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   onFit={() => canvasRef.current?.fit()}
                   on3d={() => setViewMode('bench')}
                   touch={tablet}
-                  {...(tablet && sim.status === 'stopped' && doc.parts.length > 0 ? { onConnect: startConnect } : {})}
+                  {...(tablet && sim.status === 'stopped' && doc.parts.length > 0 && !fault ? { onConnect: startConnect } : {})}
                 />
               ))}
           </main>

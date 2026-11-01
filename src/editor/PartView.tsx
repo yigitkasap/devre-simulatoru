@@ -1,8 +1,8 @@
 // Tuvaldeki bir parça: döndürülmüş sembol, dik duran ad/değer yazıları, seçim çerçevesi.
 
 import { memo } from 'react';
-import { CATALOG } from '../model/catalog';
-import { rotatedBox } from '../model/geometry';
+import { CATALOG, type Box } from '../model/catalog';
+import { boxesIntersect, rotatedBox } from '../model/geometry';
 import { GRID, type Part } from '../model/types';
 import { tr } from '../i18n/tr';
 import { funcgenSettings } from '../sim/devices/funcgen';
@@ -145,39 +145,12 @@ export const PartView = memo(function PartView({
   const value = partValueText(part);
   const color = TONE_COLORS[tone];
 
-  // Yazıların konumu: yatay parçada ad üstte, değer altta; dikey parçada ikisi de sağda.
   // Ölçü aletinde ekran üstte (dikeyde sağda), ad karşı tarafta; displayFlip ile yer değiştirir.
   const display = isMeter ? meterDisplay(part.type === 'voltmeter' ? 'V' : 'A', meterText ?? null) : null;
   const displayRect = meterDisplayRect(part, displayFlip);
   const displayX = displayRect.x * GRID - part.x * GRID;
   const displayY = displayRect.y * GRID - part.y * GRID;
-  let nameX: number;
-  let nameY: number;
-  let valueY: number;
-  let anchor: 'middle' | 'start' | 'end';
-  if (part.type === 'opamp' && part.rotation === 0) {
-    // İşlemsel yükselteç: üstte V+, sağda çıkış kablosu var; ad üçgenin sağ üst köşesinde.
-    anchor = 'start';
-    nameX = 8;
-    nameY = -16;
-    valueY = -16;
-  } else if (def.labelRight && part.rotation === 0) {
-    // Transistör: üst ve alt uçlar kablolu olduğu için yazılar sağda (dönmüşse eski kurallar).
-    anchor = 'start';
-    nameX = right + 4;
-    nameY = cy - 3;
-    valueY = cy + 11;
-  } else if (horizontal) {
-    anchor = 'middle';
-    nameX = cx;
-    nameY = isMeter && !displayFlip ? bottom + 13 : top - 5;
-    valueY = bottom + 13;
-  } else {
-    anchor = isMeter && displayFlip ? 'end' : 'start';
-    nameX = anchor === 'end' ? left - 6 : right + 6;
-    nameY = isMeter ? cy + DISPLAY_H / 2 + 14 : cy - 3;
-    valueY = cy + 11;
-  }
+  const { anchor, nameX, nameY, valueY } = labelLayout(part, displayFlip);
 
   return (
     <g transform={`translate(${part.x * GRID} ${part.y * GRID})`} style={{ color }}>
@@ -241,6 +214,52 @@ export const PartView = memo(function PartView({
   );
 });
 
+/**
+ * Ad ve değer yazılarının yeri (px, parçanın konumuna göre): yatay parçada ad üstte, değer altta;
+ * dikey parçada ikisi de sağda. Ölçü aletinde ad ekranın karşı tarafında.
+ */
+export function labelLayout(part: Part, displayFlip: boolean): { anchor: 'middle' | 'start' | 'end'; nameX: number; nameY: number; valueY: number } {
+  const def = CATALOG[part.type];
+  const box = rotatedBox(def.bounds, part.rotation, { x: 0, y: 0 });
+  const left = box.x * GRID;
+  const top = box.y * GRID;
+  const right = (box.x + box.w) * GRID;
+  const bottom = (box.y + box.h) * GRID;
+  const cx = (left + right) / 2;
+  const cy = (top + bottom) / 2;
+  const isMeter = part.type === 'voltmeter' || part.type === 'ammeter';
+  if (part.type === 'opamp' && part.rotation === 0) {
+    // İşlemsel yükselteç: üstte V+, sağda çıkış kablosu var; ad üçgenin sağ üst köşesinde.
+    return { anchor: 'start', nameX: 8, nameY: -16, valueY: -16 };
+  }
+  if (def.labelRight && part.rotation === 0) {
+    // Transistör: üst ve alt uçlar kablolu olduğu için yazılar sağda (dönmüşse eski kurallar).
+    return { anchor: 'start', nameX: right + 4, nameY: cy - 3, valueY: cy + 11 };
+  }
+  if (part.rotation % 180 === 0) return { anchor: 'middle', nameX: cx, nameY: isMeter && !displayFlip ? bottom + 13 : top - 5, valueY: bottom + 13 };
+  const anchor = isMeter && displayFlip ? 'end' : 'start';
+  return { anchor, nameX: anchor === 'end' ? left - 6 : right + 6, nameY: isMeter ? cy + DISPLAY_H / 2 + 14 : cy - 3, valueY: cy + 11 };
+}
+
+/** Yazı kutusu için harf genişliği ve yazının boyu (px; 11 px yazıda yaklaşık, biraz geniş). */
+const CHAR_W = 6.4;
+const TEXT_ASCENT = 8.5;
+const TEXT_H = 11.5;
+
+/** Parçanın tuvaldeki yazılarının kutuları (ızgara birimi; harf sayısından yaklaşık genişlik). */
+export function partTextBoxes(part: Part, displayFlip: boolean): Box[] {
+  const def = CATALOG[part.type];
+  const { anchor, nameX, nameY, valueY } = labelLayout(part, displayFlip);
+  const isMeter = part.type === 'voltmeter' || part.type === 'ammeter';
+  const box = (text: string, x: number, baseline: number): Box => {
+    const w = text.length * CHAR_W;
+    const left = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
+    return { x: part.x + left / GRID, y: part.y + (baseline - TEXT_ASCENT) / GRID, w: w / GRID, h: TEXT_H / GRID };
+  };
+  const value = partValueText(part);
+  return [...(def.showLabel ? [box(part.label, nameX, nameY)] : []), ...(value && !isMeter ? [box(value, nameX, valueY)] : [])];
+}
+
 const CHARGE_LENGTH = 30;
 
 /**
@@ -282,6 +301,15 @@ export function meterDisplayRect(part: Part, flip: boolean): { x: number; y: num
   }
   const y = b.y + b.h / 2 - h / 2;
   return { x: flip ? b.x - gap - w : b.x + b.w + gap, y, w, h };
+}
+
+/** Ölçü aleti ekranı öbür tarafa açılır mı: ekran başka bir parçanın üstüne biniyor ve öbür taraf boş. */
+export function meterFlipped(part: Part, others: readonly Box[]): boolean {
+  const blocked = (flip: boolean) => {
+    const r = meterDisplayRect(part, flip);
+    return others.some((b) => boxesIntersect(b, r));
+  };
+  return blocked(false) && !blocked(true);
 }
 
 /** Ölçü aletinin küçük ekranı; uzun okuma ("≈ 230,0 V~") ekrana sığsın diye yazı küçülür. */

@@ -1335,14 +1335,18 @@ try {
       titleButton === 1 && (await card.count()) === 1 && /V<sub[^>]*>CE<\/sub>/.test(cardHtml) && /f<sub[^>]*>H<\/sub>/.test(cardHtml) && !cardHtml.includes('V_') && !cardHtml.includes('f_') && cardHtml.includes('not vermez') &&
       chip === 'Görev kipi · yalnızca RB ve RC değişir' && pencil === 2 && locks >= 5 && canvasLocks >= 5 && (await card.getByLabel('3 hedefin 0 tanesi tuttu').count()) === 1,
       `${chip} · kalem ${pencil}, kilit ${locks}, şemada ${canvasLocks}`);
-    // Kilitli Q1'in β'sı değişmiyor, bildirim çıkıyor.
+    // Kilitli Q1: kartta değer alanı ve − + devre dışı, Döndür ve Sil yok; Delete reddediliyor ("Bu parça görevde kilitli"), β değişmiyor.
     const q1Card = notebook(st).locator('[data-card]').filter({ hasText: 'Q1' }).first();
     await q1Card.click(); await st.waitForTimeout(300);
     const beta = q1Card.locator('input').first();
-    await beta.fill('300').catch(() => {}); await beta.press('Enter').catch(() => {}); await st.waitForTimeout(400);
+    const betaOff = await beta.isDisabled();
+    const stepOff = await q1Card.getByRole('button', { name: /azalt|artır/ }).evaluateAll((els) => els.length >= 2 && els.every((e) => e.disabled));
+    const cardActions = (await q1Card.getByRole('button', { name: 'Döndür', exact: true }).count()) + (await q1Card.getByRole('button', { name: 'Sil', exact: true }).count());
+    await st.keyboard.press('Delete'); await st.waitForTimeout(400);
     const toast = (await st.getByText('Bu parça görevde kilitli: değiştirilemez.').count()) > 0;
-    const q1 = await st.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).parts.find((p) => p.label === 'Q1').props.beta);
-    check('görev (öğrenci): kilitli parçanın değeri değiştirilemiyor (Q1 β = 200 kalıyor), "Bu parça görevde kilitli" bildirimi', q1 === 200 && toast, `β = ${q1}`);
+    const q1 = await st.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).parts.find((p) => p.label === 'Q1')?.props.beta);
+    check('görev (öğrenci): kilitli parçanın kartında değer alanı ve − + devre dışı, Döndür ve Sil yok; Delete → "Bu parça görevde kilitli" (başarı bildirimi yok); Q1 β = 200 kalıyor',
+      q1 === 200 && betaOff && stepOff && cardActions === 0 && toast && (await st.getByText('Q1 silindi.').count()) === 0, `β = ${q1} · ${betaOff} ${stepOff} ${cardActions} ${toast}`);
     await st.keyboard.press('Escape');
     await st.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await st.waitForTimeout(1500);
     const vce = ((await card.locator('li').first().textContent()) ?? '').replace(/\s+/g, ' ');
@@ -1615,8 +1619,9 @@ try {
         `${found.slice(0, 70)} · ${dl.suggestedFilename()}`);
       await card().getByRole('button', { name: 'Onar ve çalıştır' }).click(); await page.waitForTimeout(2000);
       const strokes = await page.evaluate(() => new Set([...document.querySelectorAll('svg.schematic polyline')].map((x) => x.getAttribute('stroke'))).size);
-      check('arıza (B2, 5. aşama): Onar ve çalıştır → arıza kalkıyor, devre çalışıyor, otomatik göstergeler (kablo renkleri) geri geliyor',
-        ((await card().textContent()) ?? '').includes('Onarıldı · devre çalışıyor') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 0 && strokes > 2, `${strokes} renk`);
+      const legend = await page.getByRole('note', { name: 'Gösterim' }).count();
+      check('arıza (B2, 5. aşama): Onar ve çalıştır → arıza kalkıyor, devre çalışıyor, otomatik göstergeler (kablo renkleri) geri geliyor; multimetre panelinin arkasında ikinci kutu (renk ölçeği) yok',
+        ((await card().textContent()) ?? '').includes('Onarıldı · devre çalışıyor') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 0 && strokes > 2 && legend === 0, `${strokes} renk · ${legend}`);
     }
     await ctx.close();
   }
@@ -1689,7 +1694,34 @@ try {
       banner && none === 0 && amp.length === 1 && /Ampermetre/.test(amp[0] ?? '') && grid.join(',') === 'ammeter', `${none} · ${amp.length} · ${grid.join(',')}`);
     await page.waitForTimeout(500);
     const before = await saved();
-    let pt = await screen(page, 44, -3.3); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
+    // Elle kablo kapalı: PS1'in uçlarından (boştaki 2+ dahil) sürükleyip bırakınca kablo eklenmiyor; W kablo aracını açmıyor.
+    const ps1 = before.parts.find((x) => x.label === 'PS1');
+    for (const gy of [-11, -9, -7, -5]) {
+      const a = await screen(page, ps1.x + 5, gy);
+      await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(a.x + 90, a.y + 40, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(150);
+      await page.mouse.click(a.x + 220, a.y + 140); await page.waitForTimeout(100);
+    }
+    await page.keyboard.press('w'); await page.waitForTimeout(100);
+    await page.keyboard.press('Escape');
+    const manual = await saved();
+    // Kilitli PS1: kartta Döndür ve Sil yok, − + devre dışı; Delete reddediliyor ("Bu parça görevde kilitli"), PS1 duruyor.
+    let pt = await screen(page, ps1.x, ps1.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(400);
+    const psCard = page.locator(`[data-card="${ps1.id}"]`);
+    const psButtons = [await psCard.getByRole('button', { name: 'Döndür', exact: true }).count(), await psCard.getByRole('button', { name: 'Sil', exact: true }).count()];
+    const steppers = await psCard.getByRole('button', { name: /^[−+]$|azalt|artır/i }).evaluateAll((els) => els.map((e) => e.disabled));
+    await page.keyboard.press('Delete'); await page.waitForTimeout(400);
+    const lockedToast = await page.getByText('Bu parça görevde kilitli: değiştirilemez.').count();
+    const deletedToast = await page.getByText('PS1 silindi.').count();
+    const kept = (await saved()).parts.some((x) => x.id === ps1.id);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    const lockBadges = await page.locator('svg.schematic path[d^="M-2.8 -0.2h5.6"]').count();
+    const note = await page.getByText('Kırmızı ucu şemaya koy.', { exact: true }).count();
+    check('arıza (masaüstü): elle kablo çizilmiyor (PS1 uçlarından sürükleme, W); kilitli PS1 kartında Döndür ve Sil yok, − + devre dışı; Delete → "Bu parça görevde kilitli", başarı bildirimi yok; kilit simgesi yok; siyah uç yerindeyken "Kırmızı ucu şemaya koy."',
+      manual.wires.length === before.wires.length && JSON.stringify(manual.wires) === JSON.stringify(before.wires) && psButtons.join(',') === '0,0' && steppers.length >= 4 && steppers.every(Boolean) &&
+        lockedToast === 1 && deletedToast === 0 && kept && lockBadges === 0 && note === 1,
+      `${manual.wires.length}/${before.wires.length} · ${psButtons} · ${steppers.length} · ${lockedToast}/${deletedToast}/${kept} · ${lockBadges} · ${note}`);
+    // Kollektörden OSC1 B'ye giden kablo: A1 kablonun üstünde, kablonun yönünde.
+    pt = await screen(page, 51, -2.3); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
     const menu = await page.getByRole('menuitem').allTextContents();
     await page.getByRole('menuitem', { name: 'Buraya ampermetre tak' }).click(); await page.waitForTimeout(700);
     const plugged = await saved();
@@ -1701,17 +1733,47 @@ try {
     const menu2 = await page.getByRole('menuitem').allTextContents();
     await page.getByRole('menuitem', { name: 'Ampermetreyi kaldır' }).click(); await page.waitForTimeout(700);
     const after = await saved();
-    check('arıza (ampermetre, masaüstü): kabloya tıkla → "Buraya ampermetre tak": kablo ikiye bölünüyor, ampermetre seri (gösterge çalışıyor); ampermetreye tıkla → "Ampermetreyi kaldır": kablolar birebir eski hâline dönüyor',
-      menu.join('|') === 'Buraya ampermetre tak' && meter !== undefined && plugged.parts.length === before.parts.length + 1 && plugged.wires.length === before.wires.length + 3 &&
+    check('arıza (ampermetre, masaüstü): kabloya tıkla → "Buraya ampermetre tak": A1 kablonun üstünde, kablonun yönünde (kablo ikiye bölünüyor, gösterge çalışıyor); ampermetreye tıkla → "Ampermetreyi kaldır": kablolar birebir eski hâline dönüyor',
+      menu.join('|') === 'Buraya ampermetre tak' && meter !== undefined && meter.y === -2 && meter.rotation === 0 && plugged.parts.length === before.parts.length + 1 && plugged.wires.length === before.wires.length + 1 &&
         shown.some((x) => /\d A$/.test(x)) && menu2.join('|') === 'Ampermetreyi kaldır' && JSON.stringify(after.wires) === JSON.stringify(before.wires) && after.parts.length === before.parts.length,
-      `${menu.join('|')} · ${plugged.parts?.length}/${plugged.wires?.length} · ${shown.join(',')} · ${menu2.join('|')}`);
+      `${menu.join('|')} · ${meter?.x},${meter?.y} · ${plugged.parts?.length}/${plugged.wires?.length} · ${shown.join(',')} · ${menu2.join('|')}`);
+    // 3B: etiketlerde yalnızca ölçü aletlerinin değeri (PS1, FG1 değersiz), Akım düğmesi yok; panelden ampermetre → şemaya dön, "Bir kabloya tıkla".
+    await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: '3B', exact: true }).first().click(); await page.waitForTimeout(3500);
+    const labels = (await page.locator('[data-anchor="part"]').allTextContents()).map((t) => t.replace(/\s+/g, ' '));
+    const dots = await page.getByRole('button', { name: 'Akım', exact: true }).count();
+    await page.getByRole('combobox', { name: /parça ekle/i }).fill('amper'); await page.waitForTimeout(200);
+    await page.getByRole('option').first().click(); await page.waitForTimeout(500);
+    const back = (await page.locator('svg.schematic').count()) === 1 && (await page.getByText('Bir kabloya tıkla: ampermetre oraya takılır.').count()) === 1;
+    const noLoose = (await saved()).parts.length === before.parts.length;
+    await page.getByRole('button', { name: 'Durdur', exact: true }).first().click(); await page.waitForTimeout(300);
+    check('arıza (3B): çalışırken etiketlerde canlı değer yok (PS1, FG1 yalnızca adı; 2B kartlarıyla aynı), Akım düğmesi yok; panelden ampermetre konmuyor: şemaya dönülüyor, "Bir kabloya tıkla"',
+      labels.some((t) => t === 'PS1 · DC güç kaynağı') && labels.some((t) => /^FG1 · [^0-9]*1 kHz · 20 mV t-t$/.test(t)) && !labels.some((t) => /^(PS1|FG1|RC|Q1|RB|C1) .*\d,\d{3}/.test(t)) && dots === 0 && back && noLoose,
+      `${labels.filter((t) => /^(PS1|FG1)/.test(t)).join(' | ')} · ${dots} · ${back} · ${noLoose}`);
+    await ctx.close();
+  }
+  // Ampermetre izni yoksa 3B'de Parça ekle yok.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const desk = await page.getByRole('combobox', { name: /parça ekle/i }).count();
+    await page.getByRole('button', { name: '3B', exact: true }).first().click(); await page.waitForTimeout(2500);
+    const bench = await page.getByRole('combobox', { name: /parça ekle/i }).count();
+    await page.getByRole('button', { name: 'Şema', exact: true }).first().click(); await page.waitForTimeout(300);
+    check('arıza (ampermetre izni yok): şemada ve 3B\'de sağ paneldeki Parça ekle yok', desk === 0 && bench === 0, `${desk} · ${bench}`);
     await ctx.close();
   }
   {
     const { page } = await phone();
     const tools = { voltage: true, resistance: true, scope: true, ammeter: true };
     await page.goto('about:blank'); await page.goto(faultUrl({ tools }), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
-    const pt = await screen(page, 44, -3.3); await page.touchscreen.tap(pt.x, pt.y); await page.waitForTimeout(400);
+    const chip = ((await page.locator('p').filter({ hasText: /^Arıza bulma/ }).first().textContent()) ?? '').replace(/\s+/g, ' ');
+    const percent = await page.getByText(/^%\d+ · değerler gizli$/).count();
+    check('arıza (telefon): yakınlaştırma yüzdesi kutusu yok; "değerler gizli" Arıza bulma çipinin içinde', percent === 0 && /^Arıza bulma ?· değerler gizli$/.test(chip), `${percent} · ${chip}`);
+    const pt = await screen(page, 51, -2.3); await page.touchscreen.tap(pt.x, pt.y); await page.waitForTimeout(400);
     const menu = await page.getByRole('menuitem').allTextContents();
     const itemH = (await page.getByRole('menuitem').first().boundingBox())?.height ?? 0;
     await page.getByRole('menuitem', { name: 'Buraya ampermetre tak' }).tap(); await page.waitForTimeout(700);
@@ -1753,7 +1815,7 @@ try {
   {
     const { page } = await phone();
     await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
-    const chip = await page.getByText('Arıza bulma', { exact: true }).boundingBox();
+    const chip = await page.locator('p').filter({ hasText: /^Arıza bulma/ }).first().boundingBox();
     const vw = page.viewportSize().width;
     check('arıza (telefon, R5): şemanın sağ üstünde "Arıza bulma" çipi; sayfa kaymıyor',
       chip !== null && chip.x + chip.width <= vw && chip.y < 140 && !(await pageScrolls(page)), `${Math.round(chip?.x ?? 0)},${Math.round(chip?.y ?? 0)}`);

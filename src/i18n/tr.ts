@@ -2063,6 +2063,8 @@ export const tr = {
     traceGate: 'Arıza bulmada serbest iz eklenmez: ölçü aletiyle ölç.',
     analysisGate: 'Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul.',
     analysisNote: 'Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul.',
+    /** Elle kablo değişikliği reddedilince (kablolar yalnızca ampermetre takıp kaldırmakla değişir). */
+    wiresLocked: 'Arıza bulmada kablolar kilitli: değiştirilemez.',
     ammeter: {
       insert: 'Buraya ampermetre tak',
       remove: 'Ampermetreyi kaldır',
@@ -2070,10 +2072,15 @@ export const tr = {
       meterMenu: (label: string) => `${label} menüsü`,
       inserted: (label: string) => `${label} kabloya seri takıldı`,
       removed: 'Ampermetre kaldırıldı; kablo eski hâline döndü',
+      /** Panelden ampermetre seçilince: parça konmaz, kabloya takılır. */
+      howTo: (touch: boolean) => (touch ? 'Bir kabloya dokun: ampermetre oraya takılır.' : 'Bir kabloya tıkla: ampermetre oraya takılır.'),
+      /** Yapıştırma ya da sürükle-bırakla gelen parça reddedilince. */
+      onlyPlug: (touch: boolean) => `Arıza bulmada ampermetre yalnızca kabloya takılır: ${touch ? 'kabloya dokun' : 'kabloya tıkla'}.`,
       errors: {
         short: 'Bu kablo parçası ampermetre için kısa; daha uzun bir parçaya dokun.',
         junction: 'Burada başka bir bağlantı var; kablonun başka bir yerine dokun.',
         diagonal: 'Eğik kablo parçasına ampermetre takılamaz.',
+        crowded: 'Burada ampermetreye yer yok (başka kablo ve parçaların üstüne biner); aynı koldaki daha açık bir kabloya dokun.',
       },
     },
     leg: 'bacağı',
@@ -2229,6 +2236,8 @@ export const tr = {
       ohmRunning: 'Ω ölçmek için simülasyonu durdur (güç kapalıyken ölçülür).',
       needPlay: 'Gerilim ölçmek için Oynat’a bas.',
       needProbes: 'İki ucu da şemaya koy.',
+      needRed: 'Kırmızı ucu şemaya koy.',
+      needBlack: 'Siyah ucu şemaya koy.',
       ohmFailed: 'Bu iki nokta arası ölçülemedi.',
     },
   },
@@ -2816,6 +2825,7 @@ export const tr = {
     stopAndEdit: 'Durdur ve düzenle',
     cancel: 'Vazgeç',
     lod: (percent: number) => `%${percent} · değerler gizli`,
+    lodHidden: 'değerler gizli',
     legendButton: 'Gösterim: kablo gerilimi ölçeği',
     // Panel sekmeleri
     tabs: { example: 'Örnek', circuit: 'Devre', measure: 'Ölçümler', messages: 'Mesajlar' },

@@ -102,6 +102,11 @@ export interface BenchViewProps {
   readonly frame: SimFrame | null;
   /** Etiketlerin gördüğü kare (arıza bulmada yalnızca ölçü aletleri; verilmezse frame). */
   readonly labelFrame?: SimFrame | null;
+  /**
+   * Arıza bulma (göstergeler kapalı): etiketlerde yalnızca ölçü aletlerinin okuması (defterin kartlarıyla
+   * aynı kural); akım noktaları kapalı, düğmesi yok.
+   */
+  readonly liveHidden?: boolean;
   readonly active: boolean;
   /** Simülasyon ilerliyor (duraklatılınca akım noktaları durur). */
   readonly running: boolean;
@@ -231,7 +236,7 @@ export function BenchView(props: BenchViewProps) {
           bir engeldir: sahnenin altında, düğmelerin üstünde; çakışan etiket ipucu kalkana kadar gizlenir. */}
       <div ref={setOverlay} className="pointer-events-none absolute inset-0 overflow-hidden">
         {labelled.map((part) => (
-          <BenchLabel key={part.id} part={part} frame={slow} measured={props.measured} selected={selection.includes(part.id)} />
+          <BenchLabel key={part.id} part={part} frame={slow && (!props.liveHidden || METERS.has(part.type)) ? slow : null} measured={props.measured} selected={selection.includes(part.id)} />
         ))}
         {lettered &&
           (tr.devices.pinTags[lettered.type] ?? []).map((letter, i) => (
@@ -291,7 +296,7 @@ export function BenchView(props: BenchViewProps) {
             return !on;
           });
         })}
-        {!phone && toggle('dots', tr.bench.current, settings.currentDots, () => props.onSettings({ currentDots: !settings.currentDots }))}
+        {!phone && !props.liveHidden && toggle('dots', tr.bench.current, settings.currentDots, () => props.onSettings({ currentDots: !settings.currentDots }))}
         <CameraMenu choice={cameraLabel} canFocus={single !== null} phone={phone} touch={touch} onPick={pickCamera} />
         {doc.parts.length > 0 && (
           <button type="button" onClick={props.onKarta} aria-label={phone ? tr.karta.open : undefined} title={tr.karta.open} className={button(false, iconOnly)}>

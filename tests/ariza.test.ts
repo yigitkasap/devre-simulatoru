@@ -20,8 +20,11 @@ import { faultFromPlace, kindsFor, makeFault, placeOptions, rowKey } from '../sr
 import { FAULT_SCENARIOS } from '../src/examples/faultScenarios';
 import { scenarioTask } from '../src/editor/fault/scenarios';
 import { BURNT_PROP, faultedLook } from '../src/editor/fault/look';
-import { insertAmmeter, remapFaults, removeAmmeter, removedMeters } from '../src/editor/fault/ammeter';
-import { addPart, removeItems } from '../src/model/docOps';
+import { insertAmmeter } from '../src/editor/fault/ammeter';
+import { meterIntact, remapFaults, removeAmmeter, removedMeters, unplugAll, type InsertedMeter } from '../src/model/meters';
+import { addPart, addWire, removeItems, replaceWirePoints } from '../src/model/docOps';
+import { boxesIntersect, partBounds } from '../src/model/geometry';
+import { meterDisplayRect, meterFlipped, partTextBoxes } from '../src/editor/PartView';
 import { canAddType, respectsTask, type TaskDef } from '../src/model/task';
 import { tr } from '../src/i18n/tr';
 import type { SimFrame } from '../src/editor/useSimulation';
@@ -419,6 +422,22 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
   const tools = { voltage: true, resistance: true, scope: true, ammeter: true };
   const withAmmeter: TaskDef = { ...base, fault: { symptom: '', faults: [], tools, hideIndicators: true, askExpected: false } };
   const noAmmeter: TaskDef = { ...base, allowNew: false, fault: { symptom: '', faults: [], tools: { ...tools, ammeter: false }, hideIndicators: true, askExpected: false } };
+  const none = { before: [], after: [] };
+  const plug = (doc: CircuitDoc, wire: string, at: { x: number; y: number }) => {
+    const r = insertAmmeter(doc, wire, at);
+    if ('error' in r) throw new Error(r.error);
+    return r;
+  };
+  /** Ampermetrenin tuvalde kapladığı yer: gövde, ekran ve ad. */
+  const footprint = (doc: CircuitDoc, id: string) => {
+    const part = doc.parts.find((p) => p.id === id)!;
+    const flip = meterFlipped(part, doc.parts.filter((p) => p.id !== id).map((p) => partBounds(p)));
+    return [partBounds(part), meterDisplayRect(part, flip), ...partTextBoxes(part, flip)];
+  };
+  /** Kutular gerçekten kesişiyor (kenara değmek sayılmaz). */
+  const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+    boxesIntersect(a, b) && Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1e-9 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1e-9;
+  const longWire = (doc: CircuitDoc) => doc.wires.find((x) => x.points.length === 2 && Math.abs(x.points[1]!.x - x.points[0]!.x) + Math.abs(x.points[1]!.y - x.points[0]!.y) >= 10) ?? doc.wires[0]!;
 
   it('eklenebilen tür: arıza bulmada yalnızca ampermetre (izin varsa); hedefli görevde "Yeni parça eklenebilir"e göre hepsi', () => {
     expect(canAddType(withAmmeter, 'ammeter')).toBe(true);
@@ -428,64 +447,128 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     expect(canAddType({ ...base, allowNew: false }, 'resistor')).toBe(false);
   });
 
-  it('bekçi (ekleme işlevinin kendisi): panelden, yapıştırmayla ya da sürükle-bırakla gelen başka parça reddedilir; ampermetre kabul', () => {
+  it('bekçi (ekleme işlevinin kendisi): panelden, yapıştırmayla ya da sürükle-bırakla gelen parça reddedilir; ampermetre yalnızca kabloya takılarak', () => {
     const doc = exampleDoc('led-on-direnc')!;
     const resistor = addPart(doc, 'resistor', { x: 40, y: 20 }, 0).doc;
-    const ammeter = addPart(doc, 'ammeter', { x: 40, y: 20 }, 0).doc;
-    // Yapıştırma: ampermetre ile birlikte bir direnç.
-    const pasted = addPart(ammeter, 'resistor', { x: 60, y: 20 }, 0).doc;
-    expect(respectsTask(doc, resistor, withAmmeter)).toBe(false);
-    expect(respectsTask(doc, ammeter, withAmmeter)).toBe(true);
-    expect(respectsTask(doc, pasted, withAmmeter)).toBe(false);
-    expect(respectsTask(doc, ammeter, noAmmeter)).toBe(false);
+    const loose = addPart(doc, 'ammeter', { x: 40, y: 20 }, 0).doc;
+    const pasted = addPart(loose, 'resistor', { x: 60, y: 20 }, 0).doc;
+    expect(respectsTask(doc, resistor, withAmmeter, none)).toBe(false);
+    expect(respectsTask(doc, loose, withAmmeter, none)).toBe(false);
+    expect(respectsTask(doc, pasted, withAmmeter, none)).toBe(false);
+    const w = longWire(doc);
+    const r = plug(doc, w.id, w.points[0]!);
+    expect(respectsTask(doc, r.doc, withAmmeter, { before: [], after: [r.meter] })).toBe(true);
+    expect(respectsTask(doc, r.doc, noAmmeter, { before: [], after: [r.meter] })).toBe(false);
+    // Kaydı olmayan (takılmamış) ampermetreyle aynı belge: reddedilir.
+    expect(respectsTask(doc, r.doc, withAmmeter, none)).toBe(false);
     // Hedefli görevde (yeni parça eklenebilir) davranış değişmedi.
     expect(respectsTask(doc, resistor, base)).toBe(true);
   });
 
-  it('öğrencinin taktığı ampermetre kilitli değil (taşınır, silinir); devrenin kendi ampermetresi silinemez; eklenen parçanın türü değiştirilemez', () => {
-    const doc = exampleDoc('led-on-direnc')!;
-    const { doc: withA, id } = addPart(doc, 'ammeter', { x: 40, y: 20 }, 0);
-    const added = new Set([id]);
-    const moved = { ...withA, parts: withA.parts.map((p) => (p.id === id ? { ...p, x: 44 } : p)) };
-    expect(respectsTask(withA, moved, withAmmeter, added)).toBe(true);
-    expect(respectsTask(withA, removeItems(withA, [id], []), withAmmeter, added)).toBe(true);
-    const a1 = doc.parts.find((p) => p.label === 'A1')!.id;
-    expect(respectsTask(withA, removeItems(withA, [a1], []), withAmmeter, added)).toBe(false);
-    const swapped = { ...withA, parts: withA.parts.map((p) => (p.id === id ? { ...p, type: 'resistor' as const } : p)) };
-    expect(respectsTask(withA, swapped, withAmmeter, added)).toBe(false);
+  it("elle kablo reddedilir (\"Yeni parça eklenebilir\" açık olsa da): kopuk bacağın yanına çekilen kablo, PS1'in boştaki 2+ ucundan çekilen kablo, kablo silme ve taşıma", () => {
+    const doc = exampleDoc('bjt-yukseltec')!;
+    const task: TaskDef = { ...withAmmeter, fault: { ...withAmmeter.fault!, faults: [{ kind: 'open', at: { part: partId(doc, 'RC'), pin: 1 } }] } };
+    // RC'nin kopuk bacağı (44, -4) ile kollektör düğümü arasına yandan kablo.
+    const bypass = addWire(doc, [{ x: 44, y: -4 }, { x: 47, y: -4 }, { x: 47, y: -2 }, { x: 44, y: -2 }]).doc;
+    expect(bypass.wires.length).toBe(doc.wires.length + 1);
+    expect(respectsTask(doc, bypass, task, none)).toBe(false);
+    const ps1 = doc.parts.find((p) => p.label === 'PS1')!;
+    const plus2 = pinPositions(ps1)[2]!;
+    const fromPs = addWire(doc, [plus2, { x: plus2.x, y: -16 }]).doc;
+    expect(fromPs.wires.length).toBe(doc.wires.length + 1);
+    expect(respectsTask(doc, fromPs, task, none)).toBe(false);
+    expect(respectsTask(doc, removeItems(doc, [], [doc.wires[2]!.id]), task, none)).toBe(false);
+    const w11 = doc.wires.find((w) => w.points[0]!.x === 44 && w.points[0]!.y === -2)!;
+    expect(respectsTask(doc, replaceWirePoints(doc, w11.id, w11.points.map((q) => ({ x: q.x, y: q.y - 1 }))), task, none)).toBe(false);
+    // Takılı ampermetrenin ucuna sonradan çekilen kablo da reddedilir (bölünmeden doğmadı).
+    const r = plug(doc, w11.id, { x: 50, y: -2 });
+    expect(respectsTask(doc, r.doc, task, { before: [], after: [r.meter] })).toBe(true);
+    const pin = pinPositions(r.doc.parts.find((p) => p.id === r.meter.part)!)[0]!;
+    const extra = addWire(r.doc, [pin, { x: pin.x, y: 4 }]).doc;
+    expect(respectsTask(r.doc, extra, task, { before: [r.meter], after: [r.meter] })).toBe(false);
   });
 
-  it('"Buraya ampermetre tak": kablo ikiye bölünür, ampermetre seri; kollektör akımını ölçer, devre değişmez; kaldırınca kablo eski hâline döner', () => {
+  it('takılı ampermetre: yeri değişmez (taşıma, döndürme reddedilir), kaldırılınca kablo eski hâline döner; devrenin kendi ampermetresi silinemez', () => {
+    const doc = exampleDoc('led-on-direnc')!;
+    const w = longWire(doc);
+    const r = plug(doc, w.id, w.points[0]!);
+    const m = { before: [r.meter], after: [r.meter] };
+    const moved = { ...r.doc, parts: r.doc.parts.map((p) => (p.id === r.meter.part ? { ...p, x: p.x + 2 } : p)) };
+    expect(respectsTask(r.doc, moved, withAmmeter, m)).toBe(false);
+    const turned = { ...r.doc, parts: r.doc.parts.map((p) => (p.id === r.meter.part ? { ...p, rotation: (p.rotation === 90 ? 0 : 90) as 0 | 90 } : p)) };
+    expect(respectsTask(r.doc, turned, withAmmeter, m)).toBe(false);
+    const swapped = { ...r.doc, parts: r.doc.parts.map((p) => (p.id === r.meter.part ? { ...p, type: 'resistor' as const } : p)) };
+    expect(respectsTask(r.doc, swapped, withAmmeter, m)).toBe(false);
+    // Ayarı (DC/AC) değişebilir.
+    const ac = { ...r.doc, parts: r.doc.parts.map((p) => (p.id === r.meter.part ? { ...p, props: { ...p.props, mode: 'ac' } } : p)) };
+    expect(respectsTask(r.doc, ac, withAmmeter, m)).toBe(true);
+    // Kaldırma (Sil): bekçinin önünde kablo eski hâline getirilir.
+    const deleted = removeItems(r.doc, [r.meter.part], []);
+    expect(removedMeters(r.doc, deleted, [r.meter])).toEqual([r.meter]);
+    expect(respectsTask(r.doc, unplugAll(deleted, [r.meter]), withAmmeter, { before: [r.meter], after: [] })).toBe(true);
+    expect(respectsTask(r.doc, deleted, withAmmeter, { before: [r.meter], after: [] })).toBe(false);
+    const a1 = doc.parts.find((p) => p.label === 'A1')!.id;
+    expect(respectsTask(r.doc, removeItems(r.doc, [a1], []), withAmmeter, m)).toBe(false);
+    // Geri al: ampermetresiz belgede kayıt takılı sayılmaz.
+    expect(meterIntact(r.doc, r.meter)).toBe(true);
+    expect(meterIntact(doc, r.meter)).toBe(false);
+  });
+
+  it('A1 tıklanan yerde kablonun üstünde, kablonun yönünde oturur; kollektör → OSC1 B kablosunda OSC1 A kablosuna ve RC yazısına binmez', () => {
     const doc = exampleDoc('bjt-yukseltec')!;
-    const w = doc.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === 0))!;
-    const r = insertAmmeter(doc, w.id, { x: 44, y: -2 });
-    if ('error' in r) throw new Error(r.error);
+    const w11 = doc.wires.find((w) => w.points[0]!.x === 44 && w.points[0]!.y === -2)!;
+    const w10 = doc.wires.find((w) => w.points.at(-1)!.x === 58 && w.points.at(-1)!.y === -4)!;
+    for (const x of [46, 50, 54, 57]) {
+      const r = plug(doc, w11.id, { x, y: -2 });
+      const a = r.doc.parts.find((p) => p.id === r.meter.part)!;
+      // Kablonun üstünde: yatay, uçları kablo üzerinde; kablo iki yarıya bölündü (bağlantı kablosu yok).
+      expect(a.rotation).toBe(0);
+      expect(a.y).toBe(-2);
+      expect(r.meter.links).toEqual([]);
+      expect(r.doc.wires.length).toBe(doc.wires.length + 1);
+      const [p0, p1] = pinPositions(a);
+      expect(r.doc.wires.find((w) => w.id === w11.id)!.points.at(-1)).toEqual(p0);
+      expect(r.doc.wires.find((w) => w.id === r.meter.half)!.points[0]).toEqual(p1);
+      // Gövde, ekran ve ad: başka parça, yazı ya da kablo yok.
+      const own = footprint(r.doc, a.id);
+      for (const p of doc.parts) for (const box of [partBounds(p), ...partTextBoxes(p, false)]) expect(own.some((b) => overlaps(b, box))).toBe(false);
+      for (let i = 1; i < w10.points.length; i++) {
+        const [q0, q1] = [w10.points[i - 1]!, w10.points[i]!];
+        expect(own.some((b) => Math.max(q0.x, q1.x) > b.x && Math.min(q0.x, q1.x) < b.x + b.w && Math.max(q0.y, q1.y) > b.y && Math.min(q0.y, q1.y) < b.y + b.h)).toBe(false);
+      }
+    }
+  });
+
+  it('"Buraya ampermetre tak": kısa kablo parçasında (RC’nin üst kablosu) yanına konur, iki bağlantı kablosu; kollektör akımını ölçer, devre değişmez; kaldırınca kablo eski hâline döner', () => {
+    const doc = exampleDoc('bjt-yukseltec')!;
+    const w = doc.wires.find((x) => x.points.at(-1)!.x === 44 && x.points.at(-1)!.y === -12)!;
+    const r = plug(doc, w.id, { x: 44, y: -14 });
     expect(r.doc.parts.find((p) => p.id === r.meter.part)!.type).toBe('ammeter');
+    expect(r.meter.links.length).toBe(2);
     expect(r.doc.wires.length).toBe(doc.wires.length + 3);
-    // Bekçi kabul eder (yeni parça yalnızca ampermetre, öbür parçalar yerinde).
-    expect(respectsTask(doc, r.doc, withAmmeter)).toBe(true);
-    const meter = r.meter.part;
+    expect(respectsTask(doc, r.doc, withAmmeter, { before: [], after: [r.meter] })).toBe(true);
     const sim = new CircuitSimulator(atOperatingPoint(buildConnectivity(r.doc).netlist));
     sim.runUntil(0.2);
-    expect(Math.abs(reading(sim, meter)) * 1000).toBeCloseTo(1.08, 1);
+    expect(Math.abs(reading(sim, r.meter.part)) * 1000).toBeCloseTo(1.08, 1);
     expect(reading(run(r.doc, [], pinKey(partId(doc, 'Q1'), 0)), 'olcum')).toBeCloseTo(5.99, 1);
-    // Kaldırınca belge birebir eski hâline döner (silme yoluyla da: removedMeters).
     expect(removeAmmeter(r.doc, r.meter)).toEqual(doc);
-    const deleted = removeItems(r.doc, [meter], []);
-    expect(removedMeters(r.doc, deleted, [r.meter])).toEqual([r.meter]);
-    expect(removeAmmeter(deleted, r.meter)).toEqual(doc);
+    expect(unplugAll(removeItems(r.doc, [r.meter.part], []), [r.meter])).toEqual(doc);
   });
 
-  it('kablo ucundaki arıza ikinci yarıya taşınır; kopuk RC bacağında ampermetre sıfıra yakın akım gösterir', () => {
+  it('kablo ucundaki arıza ikinci yarıya taşınır; kopuk RC bacağında ampermetre sıfıra yakın akım gösterir; kayıt saklanıp geri okunur', () => {
     const doc = exampleDoc('bjt-yukseltec')!;
-    const w = doc.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === 0))!;
-    const r = insertAmmeter(doc, w.id, { x: 44, y: -2 });
-    if ('error' in r) throw new Error(r.error);
+    const w = doc.wires.find((x) => x.points.at(-1)!.x === 44 && x.points.at(-1)!.y === -12)!;
+    const r = plug(doc, w.id, { x: 44, y: -14 });
     expect(remapFaults([{ kind: 'open', at: { wire: w.id, end: 1 } }], [r.meter])).toEqual([{ kind: 'open', at: { wire: r.meter.half, end: 1 } }]);
     expect(remapFaults([{ kind: 'open', at: { wire: w.id, end: 0 } }], [r.meter])).toEqual([{ kind: 'open', at: { wire: w.id, end: 0 } }]);
     const sim = new CircuitSimulator(atOperatingPoint(buildConnectivity(r.doc, [{ kind: 'open', at: { part: partId(doc, 'RC'), pin: 1 } }]).netlist));
     sim.runUntil(0.2);
     expect(Math.abs(reading(sim, r.meter.part))).toBeLessThan(1e-6);
+    const saved: readonly InsertedMeter[] = parseSession(JSON.parse(JSON.stringify({ ...NEW_SESSION, meters: [r.meter] }))).meters;
+    expect(saved).toEqual([r.meter]);
+    // Kollektör kablosu (RC ile Q1 arası, OSC1 B'ye T): ampermetreye çakışmasız yer yok, takılmaz.
+    const w3 = doc.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === 0))!;
+    expect(insertAmmeter(doc, w3.id, { x: 44, y: -3 })).toEqual({ error: 'crowded' });
     // Çok kısa kablo parçası: takılmaz.
     const short = doc.wires.find((x) => x.points.length === 2 && Math.abs(x.points[0]!.x - x.points[1]!.x) + Math.abs(x.points[0]!.y - x.points[1]!.y) < 3);
     if (short) expect(insertAmmeter(doc, short.id, short.points[0]!)).toEqual({ error: 'short' });

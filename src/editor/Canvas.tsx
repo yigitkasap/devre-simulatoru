@@ -54,7 +54,7 @@ import { FIELD_COLOR, MagneticField } from './MagneticField';
 import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
-import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
+import { meterDisplayRect, meterFlipped, partValueText, PartView, type PartTone } from './PartView';
 import { visibleLive } from './fault/mask';
 import type { Probe } from './fault/meter';
 import { PlaceMarks, ProbeLayer, type PlaceMark, type ProbeView } from './fault/ProbeLayer';
@@ -239,8 +239,13 @@ export interface CanvasProps {
   readonly placeMarks?: { readonly marks: readonly PlaceMark[]; readonly hint: string | null } | null;
   /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
   readonly marks?: readonly CanvasMark[];
-  /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli. */
-  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string> } | null;
+  /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli (lockMarks false: rozet yok, arıza bulmada her şey kilitli). */
+  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string>; readonly lockMarks?: boolean } | null;
+  /**
+   * Elle kablo çizilmez ve kablo taşınmaz (arıza bulma: kablolar yalnızca ampermetre takıp kaldırmakla
+   * değişir). Uçlar kablo başlatmaz, kablo aracı (W) açılmaz; kabloya tıklamak onu seçer.
+   */
+  readonly wiringLocked?: boolean;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -386,6 +391,7 @@ export function Canvas({
   tapMenu = null,
   marks,
   taskParts,
+  wiringLocked = false,
   ref,
 }: CanvasProps) {
   // Göstergeler kapalıysa kablo renkleri ve öbür göstergeler simülasyon yokmuş gibi çizilir.
@@ -798,7 +804,7 @@ export function Canvas({
     });
     // Her parçanın yalnızca parmağa en yakın ucu seçenek olur.
     const pins: PickOption[] = [];
-    if (phone.mode === 'kur') {
+    if (phone.mode === 'kur' && !wiringLocked) {
       for (const part of doc.parts) {
         let best: { index: number; pos: Point; d: number } | null = null;
         pinPositions(part).forEach((pos, index) => {
@@ -901,7 +907,7 @@ export function Canvas({
       }
       return;
     }
-    if (hit?.kind === 'pin' && phone.mode === 'kur') {
+    if (hit?.kind === 'pin' && phone.mode === 'kur' && !wiringLocked) {
       phone.onStartConnect({ point: hit.pos, partId: hit.partId, pin: hit.index });
       return;
     }
@@ -925,7 +931,7 @@ export function Canvas({
     capture(e.pointerId);
     const pointerId = e.pointerId;
     setInteraction({ kind: 'press', pointerId, sx: local.x, sy: local.y, view, hit, g });
-    if (mode === 'kur' && (hit?.kind === 'part' || hit?.kind === 'wire')) {
+    if (mode === 'kur' && (hit?.kind === 'part' || (hit?.kind === 'wire' && !wiringLocked))) {
       // 150 ms kıpırdamadan basılı tutulursa sürükleme başlar (öncesinde kayarsa tuval kayar).
       phoneTimers.current.hold = window.setTimeout(() => {
         const state = interactionRef.current;
@@ -1086,13 +1092,13 @@ export function Canvas({
       return;
     }
 
-    const hit = hitTest(g);
+    const hit = hitTest(g, wiringLocked ? { pins: false } : undefined);
     if (hit?.kind === 'pin') {
       capture(e.pointerId);
       startWiring(hit.pos, e);
       return;
     }
-    if (tool.kind === 'wire') {
+    if (tool.kind === 'wire' && !wiringLocked) {
       capture(e.pointerId);
       if (hit?.kind === 'wire') {
         const wire = doc.wires.find((w) => w.id === hit.wireId)!;
@@ -1163,6 +1169,7 @@ export function Canvas({
       if (!selection.wires.includes(hit.wireId) || selection.parts.length > 0 || selection.wires.length > 1) {
         dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
       }
+      if (wiringLocked) return;
       capture(e.pointerId);
       setInteraction({
         kind: 'drag-segment',
@@ -1262,7 +1269,7 @@ export function Canvas({
         break;
     }
     if (!phone && (current.kind === 'wiring' || tool.kind !== 'place')) {
-      const hit = hitTest(g, current.kind === 'wiring' ? { parts: false } : undefined);
+      const hit = hitTest(g, current.kind === 'wiring' ? { parts: false } : wiringLocked ? { pins: false } : undefined);
       setHover(hit);
     }
   };
@@ -1482,7 +1489,7 @@ export function Canvas({
         const polarized = doc.parts.filter((p) => selection.parts.includes(p.id) && CATALOG[p.type].polarized);
         if (polarized.length > 0) onFlip(polarized.map((p) => p.id));
       }
-    } else if (key === 'w' && !ctrl) {
+    } else if (key === 'w' && !ctrl && !wiringLocked) {
       setInteraction({ kind: 'idle' });
       dispatch({ type: 'set-tool', tool: tool.kind === 'wire' ? { kind: 'select' } : { kind: 'wire' } });
     }
@@ -1628,12 +1635,7 @@ export function Canvas({
   const displayFlips = new Set<string>();
   for (const part of doc.parts) {
     if (part.type !== 'voltmeter' && part.type !== 'ammeter') continue;
-    const others = doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p));
-    const blocked = (flip: boolean) => {
-      const r = meterDisplayRect(part, flip);
-      return others.some((b) => boxesIntersect(b, r));
-    };
-    if (blocked(false) && !blocked(true)) displayFlips.add(part.id);
+    if (meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)))) displayFlips.add(part.id);
   }
 
   const highlightTone = highlight?.severity === 'error' || highlight?.severity === 'warning' ? highlight.severity : 'selected';
@@ -1862,6 +1864,7 @@ export function Canvas({
           ))}
 
           {taskParts &&
+            taskParts.lockMarks !== false &&
             doc.parts
               .filter((p) => taskParts.locked.has(p.id) && p.type !== 'ground')
               .map((p) => {
@@ -2091,8 +2094,10 @@ export function Canvas({
       {probes && !phone?.strip && (
         <ProbeLayer probes={probes} size={size} touch={phone !== null} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />
       )}
+      {/* Sol alt köşede multimetre paneli varken (arıza bulma, masaüstü) renk ölçeği kutusu onun arkasında kalırdı: çizilmez. */}
       {frame &&
         !phone?.strip &&
+        !(cornerPanel && !phone) &&
         (!phone && legendRect && circuitHits(shapes, view, legendRect) ? (
           // Kutu devreye değiyor (yakınlaştırılmış ya da kaydırılmış görünüm): tek satır, renk çubuğu ve ±V.
           <div
@@ -2301,7 +2306,7 @@ export function Canvas({
           aria-label={tr.toolbar.fit}
           title={tr.toolbar.fit}
           className={`absolute right-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-panel/95 text-ink shadow-sm ${
-            phone.mode === 'olc' && phone.lockChip ? 'top-[100px]' : phone.faultChip ? 'top-[76px]' : 'top-11'
+            phone.mode === 'olc' && phone.lockChip ? 'top-[100px]' : phone.faultChip ? 'top-[46px]' : 'top-11'
           }`}
         >
           <Icon name="fit" />
@@ -2311,13 +2316,15 @@ export function Canvas({
         <p className="pointer-events-none absolute top-2.5 right-2.5 z-10 m-0 flex items-center gap-1.5 rounded-full border border-warn-line bg-warn-soft/95 px-2.5 py-1 text-label font-semibold text-warn shadow-sm">
           <Icon name="wrench" className="h-3.5 w-3.5" />
           {tr.fault.bannerShort}
+          {/* Uzaklaşınca değerler gizli: arıza bulmada çipin içinde (ayrı kutu kablolara binmesin). */}
+          {lod && <span className="font-medium">· {tr.phone.lodHidden}</span>}
         </p>
       )}
       {/* Telefon: uzaklaşınca değerler gizlenir; masaüstünde yakınlık üst çubukta. */}
-      {lod && !bagla && !phone?.strip && (
+      {lod && !bagla && !phone?.strip && !phone?.faultChip && (
         <p
           className={`pointer-events-none absolute right-2.5 rounded-md bg-panel/90 px-1.5 py-0.5 font-mono text-label font-medium text-muted tabular ${
-            phone?.mode === 'olc' && phone.lockChip ? 'top-[64px]' : phone?.faultChip ? 'top-[46px]' : 'top-2.5'
+            phone?.mode === 'olc' && phone.lockChip ? 'top-[64px]' : 'top-2.5'
           }`}
         >
           {tr.phone.lod(Math.round(view.scale * 100))}
