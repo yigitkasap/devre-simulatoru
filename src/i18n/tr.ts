@@ -11,6 +11,7 @@
 import { SITE_NAME } from '../config';
 import type { Diagnostic } from '../sim/diagnostics';
 import type { ExampleGroupId, ExampleId } from '../examples';
+import type { FaultScenarioId } from '../examples/faultScenarios';
 import type { DeviceType } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
 import { ek, toDative } from './ek';
@@ -621,6 +622,71 @@ export interface ExampleTexts {
   /** Günlük hayatta nerelerde kullanıldığı. */
   readonly everyday: string;
 }
+
+/**
+ * Hazır arıza senaryoları (B2, Örnekler → Arıza bul): başlık, kartın üstündeki deney, belirti ve
+ * "Arıza bulundu" açıklaması. Sayılar simülatörde ölçüldü (multimetre 10 MΩ; tests/ariza.test.ts).
+ */
+export interface FaultScenarioTexts {
+  readonly title: string;
+  /** Kartta "Arıza bul · …" (föydeki deney). */
+  readonly experiment: string;
+  readonly symptom: string;
+  readonly found: { readonly title: string; readonly text: string; readonly decisive: string };
+}
+
+const FAULT_SCENARIO_TEXTS: Record<FaultScenarioId, FaultScenarioTexts> = {
+  'ariza-led': {
+    title: 'LED yanmıyor',
+    experiment: 'Temel devre',
+    symptom: 'LED ışık vermiyor, A1 akım göstermiyor.',
+    found: {
+      title: 'LED1 yanmıştı',
+      text: 'Yanmış LED’in içi açık devredir: akım geçmez, R1’in üstüne gerilim düşmez ve pilin bütün gerilimi LED’in uçlarında kalır.',
+      decisive: 'LED1’in anodu topraktan 5,00 V yukarıda (sağlam devrede 1,78 V); R1’in iki ucu arası 0 V (sağlamda 3,2 V): devreden akım geçmiyor, gerilim LED’de kalıyor.',
+    },
+  },
+  'ariza-diyot': {
+    title: 'Diyot akım geçirmiyor',
+    experiment: 'Deney 1',
+    symptom: 'A1 neredeyse sıfır gösteriyor; diyodun iletmesi gerekirdi.',
+    found: {
+      title: 'D1 ters takılmıştı',
+      text: 'Katot beslemeye bakıyordu: ters kutuplanan diyot iletmez. Akım yalnızca voltmetrenin 10 MΩ’undan ve diyodun sızıntısından geçer (µA’lar); besleme geriliminin hepsi diyodun üstüne düşer.',
+      decisive: 'V1 diyodun üstünde 5,00 V okuyor (sağlam devrede 0,56 V); R1’in iki ucu arası 0,6 mV (sağlamda 4,4 V): akım yok, gerilim diyotta kalıyor.',
+    },
+  },
+  'ariza-dogrultucu': {
+    title: 'Köprü yarım dalga veriyor',
+    experiment: 'Deney 2',
+    symptom: 'Osiloskopta çıkışın tepeleri iki kat seyrek: köprü doğrultmaç yarım dalga doğrultucu gibi çalışıyor.',
+    found: {
+      title: 'D2’nin anot bacağı temas etmiyordu',
+      text: 'Köprünün D2’li kolu iletmez: girişin bir yarısında R_{L}’den akım geçmez, çıkış yarım dalgaya döner. R_{L}’deki ortalama gerilim 5,73 V yerine 3,14 V (V ⎓).',
+      decisive: 'D2’nin anot bacağı −2,24 V ⎓ okurken bağlı olduğu düğüm 0 V: aynı noktada iki farklı gerilim, bağlantının orada koptuğunu gösterir.',
+    },
+  },
+  'ariza-jfet': {
+    title: 'JFET’ten akım geçmiyor',
+    experiment: 'Deney 5',
+    symptom: 'A1 neredeyse sıfır gösteriyor; V_{GS} = 0 V’ta I_{D} yaklaşık 4,1 mA olmalıydı.',
+    found: {
+      title: 'J1’in source bacağı temas etmiyordu',
+      text: 'Drain akımının dönüş yolu kopuk: akım J1’den toprağa ulaşamaz. A1 yalnızca V1’in 10 MΩ’undan geçen akımı gösterir (≈ 1 µA); V1 10,0 V okumaya devam eder, bu yüzden V_{DS} doğru görünür.',
+      decisive: 'J1’in source bacağı topraktan 1,73 V yukarıda, bağlı olduğu toprak düğümü 0 V. Kapı 0 V’ta olduğundan V_{GS} ≈ −1,73 V, yani kısılma geriliminde (V_{P} = −1,74 V): kanal kapanır.',
+    },
+  },
+  'ariza-bjt': {
+    title: 'Yükselteçte çıkış yok',
+    experiment: 'Deney 7',
+    symptom: 'Osiloskobun B kanalında sinyal yok.',
+    found: {
+      title: 'RC’nin kollektör tarafındaki bacağı temas etmiyordu',
+      text: 'RC kopukken kollektöre besleme akımı gelemez; Q1 doyuma girer ve kollektör 6,4 mV’ta kalır, çıkışta sinyal oluşmaz. Baz 0,55 V’ta (sağlam devrede 0,64 V).',
+      decisive: 'RC’nin ucunda 11,99 V, hemen yanındaki kollektör düğümünde 6,4 mV. Aynı kabloda iki farklı gerilim, bağlantının tam arada koptuğunu gösterir. 11,99 V’un 12 V’tan az olması multimetrenin 10 MΩ iç direncinden.',
+    },
+  },
+};
 
 /** Şemada kaçınılmaz bir kablo kesişmesi olan örneklerde açıklamanın sonuna eklenir. */
 const CROSSING = 'Dolu nokta olmayan kablo kesişmeleri bağlı değildir.';
@@ -1991,6 +2057,190 @@ export const tr = {
     wireVarying: 'Gerilim salınıyor: son 0,4 saniyenin ortalaması, en düşük ve en yüksek değeri.',
     repair: 'Onar',
   },
+  fault: {
+    banner: 'Arıza bulma · otomatik göstergeler kapalı',
+    bannerShort: 'Arıza bulma',
+    traceGate: 'Arıza bulmada serbest iz eklenmez: ölçü aletiyle ölç.',
+    analysisGate: 'Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul.',
+    analysisNote: 'Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul.',
+    /** Elle kablo değişikliği reddedilince (kablolar yalnızca ampermetre takıp kaldırmakla değişir). */
+    wiresLocked: 'Arıza bulmada kablolar kilitli: değiştirilemez.',
+    ammeter: {
+      insert: 'Buraya ampermetre tak',
+      remove: 'Ampermetreyi kaldır',
+      wireMenu: 'Kablo menüsü',
+      meterMenu: (label: string) => `${label} menüsü`,
+      inserted: (label: string) => `${label} kabloya seri takıldı`,
+      removed: 'Ampermetre kaldırıldı; kablo eski hâline döndü',
+      /** Panelden ampermetre seçilince: parça konmaz, kabloya takılır. */
+      howTo: (touch: boolean) => (touch ? 'Bir kabloya dokun: ampermetre oraya takılır.' : 'Bir kabloya tıkla: ampermetre oraya takılır.'),
+      /** Yapıştırma ya da sürükle-bırakla gelen parça reddedilince. */
+      onlyPlug: (touch: boolean) => `Arıza bulmada ampermetre yalnızca kabloya takılır: ${touch ? 'kabloya dokun' : 'kabloya tıkla'}.`,
+      errors: {
+        short: 'Bu kablo parçası ampermetre için kısa; daha uzun bir parçaya dokun.',
+        junction: 'Burada başka bir bağlantı var; kablonun başka bir yerine dokun.',
+        diagonal: 'Eğik kablo parçasına ampermetre takılamaz.',
+        crowded: 'Burada ampermetreye yer yok (başka kablo ve parçaların üstüne biner); aynı koldaki daha açık bir kabloya dokun.',
+      },
+    },
+    leg: 'bacağı',
+    terminal: 'ucu',
+    side: { top: 'üst', bottom: 'alt', left: 'sol', right: 'sağ' },
+    ground: 'toprak',
+    kinds: {
+      open: 'Kopuk bağlantı ya da kötü temas',
+      short: 'Kısa devre',
+      value: 'Yanlış değerli parça',
+      reversed: 'Ters takılmış parça',
+      burnt: 'Yanmış parça',
+    },
+    place: {
+      side: (label: string, node: string) => `${label} · ${node} tarafındaki bacak`,
+      pin: (label: string, pin: string) => `${label} · ${pin}`,
+      part: (label: string, type: string) => `${label} · ${type}`,
+      wire: (node: string) => `Kablo · ${node}`,
+    },
+    report: {
+      open: 'Arızayı bildir',
+      title: 'Arızayı bildir',
+      where: 'Nerede?',
+      whereHint: 'Arızanın yerini şemada seç: parça, bacak ya da kablo',
+      whereHintTouch: 'Arızanın yerini şemada seç: parçaya, bacağa ya da kabloya dokun',
+      fromSchematic: 'şemadan',
+      notChosen: 'Şemada parçaya, bacağa ya da kabloya tıkla.',
+      notChosenTouch: 'Şemada parçaya, bacağa ya da kabloya dokun.',
+      kind: 'Ne tür arıza?',
+      evidence: 'Hangi ölçümler seni buraya götürdü?',
+      noLog: 'Günlükte ölçüm yok.',
+      submit: 'Bildir',
+      cancel: 'Vazgeç',
+      note: 'Yanlış bildirim günlüğe yazılır; ölçmeye devam edersin.',
+      wrong: 'Bu değil, ölçmeye devam et.',
+      more: (n: number) => `Doğru! Devrede ${n} arıza daha var; ölçmeye devam et.`,
+      selected: (label: string) => `Seçili · ${label}`,
+    },
+    hints: {
+      button: 'İpucu',
+      none: 'İpucu kalmadı',
+      label: 'İpuçları',
+      list: [
+        'Beslemeden başla: önce kaynağın ucunu ölç. Devreye gerçekten gerilim geliyor mu?',
+        'Devreyi yarıya böl: girişle çıkışın ortasındaki bir noktayı ölç; doğruysa arıza çıkış tarafında, yanlışsa giriş tarafındadır.',
+        'Aynı kablonun iki ucunu ya da bir bacağı ve hemen yanındaki düğümü ölç: ikisi farklıysa bağlantı orada kopuk.',
+      ],
+    },
+    found: {
+      kicker: 'Arıza bulundu',
+      marker: { open: 'kopuk bacak', openWire: 'kopuk kablo ucu', short: 'kısa devre', value: 'yanlış değer', reversed: 'ters takılmış', burnt: 'yanmış' },
+      here: (what: string) => `Arıza burada: ${what}`,
+      title: {
+        open: (place: string) => `Kopuk bağlantı: ${place}`,
+        short: (a: string, b: string) => `Kısa devre: ${a} ile ${b} arası`,
+        value: (label: string, drawn: string, actual: string) => `${label} şemadaki ${drawn} yerine ${actual}`,
+        reversed: (label: string) => `${label} ters takılmış`,
+        burnt: (label: string) => `${label} yanmış`,
+      },
+      text: {
+        open: 'Bacak ya da kablo ucu bağlı olduğu noktaya değmiyordu. Kopuk bağlantıda bacakta ve hemen yanındaki düğümde iki farklı gerilim okunur; aynı yerde iki farklı gerilim, bağlantının tam orada koptuğunu gösterir.',
+        short: 'İki nokta arasında kısa devre vardı: ikisinde de aynı gerilim okunur, güç kapalıyken aralarındaki direnç sıfıra yakındır.',
+        value: 'Parçanın değeri şemadakinden farklıydı: gerilimler hesaptan sapar. Güç kapalıyken parçanın iki bacağı arası Ω ile ölçülünce görülür.',
+        reversed: 'Parça ters takılmıştı: iletmesi gereken yönde iletmez, uçlarındaki gerilimler beklenenin tersine çıkar.',
+        burnt: 'Parça yanmıştı: iki ucu arası açık devre, üzerinden akım geçmez; uçları arasında besleme gerilimine yakın bir fark okunur.',
+      },
+      evidence: (list: string) => `Seni buraya götüren ölçümler: ${list}.`,
+      decisive: (text: string) => `Belirleyici ölçüm: ${text}`,
+      stats: { log: 'Ölçüm', reports: 'Bildirim', hints: 'İpucu', evidence: 'Gerekçe' },
+      evidenceCount: (n: number) => `${n} ölçüm`,
+      repair: 'Onar ve çalıştır',
+      repaired: 'Onarıldı · devre çalışıyor',
+      report: 'Rapor (.json)',
+      again: 'Yeni arıza dene',
+      file: 'ariza-raporu',
+      newFault: 'Yeni arıza gizlendi: ölçmeye başla.',
+      noCandidate: 'Bu devrede başka arıza denenemiyor.',
+    },
+    dialog: {
+      modeLabel: 'Görevin türü',
+      modes: { target: 'Hedefli görev', fault: 'Arıza bulma' },
+      symptom: 'Belirti',
+      symptomNote: '(öğrenci görür)',
+      symptomHint: 'Ör. Osiloskobun B kanalında sinyal yok.',
+      hidden: 'Gizli arıza',
+      hiddenNote: '(öğrenci görmez)',
+      none: 'En az bir arıza ekle.',
+      groups: { leg: 'Bacaklar', part: 'Parçalar', wire: 'Kablo uçları' },
+      kinds: { open: 'Kopuk bağlantı', short: 'Kısa devre', value: 'Yanlış değer', reversed: 'Ters takılmış', burnt: 'Yanmış' },
+      placeLabel: (n: number) => `${n}. arızanın yeri`,
+      kindLabel: (n: number) => `${n}. arızanın türü`,
+      toLabel: (n: number) => `${n}. kısa devrenin öbür ucu`,
+      valueLabel: (n: number) => `${n}. arızada takılı değer`,
+      remove: (n: number) => `${n}. arızayı kaldır`,
+      with: 'ile',
+      actual: 'Takılı değer',
+      pick: 'Yeri şemadan seç',
+      add: 'Arıza ekle',
+      random: 'Rastgele seç',
+      help: 'Yer, şemada tıklanarak da seçilir. Türler: kopuk bağlantı, kısa devre, yanlış değer, ters takılmış, yanmış parça.',
+      wireEnd: (where: string) => `Kablo ucu → ${where}`,
+      tools: 'Öğrencinin ölçü aletleri',
+      toolNames: { voltage: 'Multimetre V', resistance: 'Multimetre Ω', scope: 'Osiloskop (devrede)', ammeter: 'Ampermetre eklenebilir' },
+      hideIndicators: 'Otomatik göstergeleri gizle',
+      hideIndicatorsNote: 'Kablo renkleri, düğüm ve kart değerleri',
+      askExpected: 'Önce beklenen değeri sor',
+      askExpectedNote: 'Günlükte her ölçümün yanında',
+      visible: 'Arıza bağlantının içinde durur; arayan bir öğrenci bulabilir. Alıştırma içindir, not vermez. Teslim dosyasında ölçüm günlüğü ve bildirimler olur.',
+      pickHint: 'Arızanın yerini şemada seç: bacak, parça ya da kablo (Esc: vazgeç)',
+      pickHintTouch: 'Arızanın yerini şemada seç: bacağa, parçaya ya da kabloya dokun',
+    },
+    scenarios: FAULT_SCENARIO_TEXTS,
+    group: 'Arıza bul',
+    groupNote: 'Devre şemadaki gibi kurulmuş ama bir yerde gizli arıza var: multimetreyle ölçerek bul.',
+    loaded: (title: string) => `Arıza bul: ${title}`,
+    phone: {
+      title: (n: number) => `Arıza bul · ${n} ölçüm`,
+      symptom: 'Belirti',
+      tap: 'dokun, taşı',
+    },
+    card: {
+      label: (name: string) => `Arıza bul: ${name}`,
+      kicker: 'Arıza bul',
+      count: (n: number) => `${n} ölçüm`,
+      intro: 'Devre şemadaki gibi kurulmuş ama bir yerde arıza var. Ölçerek bul.',
+      log: 'Ölçüm günlüğü',
+      expectedHead: 'beklenen: senin tahminin',
+      expectedLabel: (name: string) => `${name}: beklediğin değer`,
+      expectedPlaceholder: 'beklenen',
+      empty: 'Henüz ölçüm yok. Multimetrenin uçlarını şemaya koy: kararlı okuma kendiliğinden buraya yazılır.',
+      note: 'Bu kipte kablo renkleri, düğüm gerilimleri ve kartlardaki ölçümler gizli. Yalnızca ölçü aletleriyle ölç.',
+    },
+    meter: {
+      title: 'Multimetre',
+      internal: 'iç direnç 10 MΩ',
+      modeLabel: 'Multimetrenin kipi',
+      modes: { dc: 'V ⎓', ac: 'V ∿', ohm: 'Ω' },
+      modeNames: { dc: 'Doğru gerilim (V ⎓)', ac: 'Alternatif gerilim, etkin değer (V ∿)', ohm: 'Direnç (Ω)' },
+      units: { dc: '⎓', ac: '∿' },
+      red: 'Kırmızı',
+      black: 'Siyah',
+      redTip: 'Kırmızı uç',
+      blackTip: 'Siyah uç',
+      unplaced: 'şemaya koy',
+      choose: 'şemada seç…',
+      place: (color: string, where: string | null) => (where ? `${color} uç: ${where} (taşımak için seç)` : `${color} ucu şemaya koy`),
+      move: (color: string, where: string) => `${color} uç: ${where}. Taşı`,
+      placing: (color: string, touch: boolean) => `${color} ucu koy: şemada bir bacağa ya da kabloya ${touch ? 'dokun' : 'tıkla'}`,
+      readingLabel: (text: string) => `Multimetrenin okuması: ${text}`,
+      empty: '– – –',
+      over: 'OL',
+      ohmNote: 'Ω için simülasyonu durdur: direnç güç kapalıyken ölçülür.',
+      ohmRunning: 'Ω ölçmek için simülasyonu durdur (güç kapalıyken ölçülür).',
+      needPlay: 'Gerilim ölçmek için Oynat’a bas.',
+      needProbes: 'İki ucu da şemaya koy.',
+      needRed: 'Kırmızı ucu şemaya koy.',
+      needBlack: 'Siyah ucu şemaya koy.',
+      ohmFailed: 'Bu iki nokta arası ölçülemedi.',
+    },
+  },
   notebook: {
     label: 'Defter: devredeki parçalar',
     title: 'Devredeki parçalar',
@@ -1998,6 +2248,8 @@ export const tr = {
     openCard: (label: string, type: string) => `${label} · ${type}: kartı aç`,
     collapse: 'Kartı küçült',
     floating: (n: number) => `${n} uç boşta`,
+    liveHidden: 'canlı değerler gizli',
+    liveHiddenNote: 'Arıza bulmada canlı değerler gizli: ölçü aletiyle ölç.',
     burned: 'Yandı',
     lit: 'Yanıyor',
     more: 'Diğer ayarlar',
@@ -2573,6 +2825,7 @@ export const tr = {
     stopAndEdit: 'Durdur ve düzenle',
     cancel: 'Vazgeç',
     lod: (percent: number) => `%${percent} · değerler gizli`,
+    lodHidden: 'değerler gizli',
     legendButton: 'Gösterim: kablo gerilimi ölçeği',
     // Panel sekmeleri
     tabs: { example: 'Örnek', circuit: 'Devre', measure: 'Ölçümler', messages: 'Mesajlar' },

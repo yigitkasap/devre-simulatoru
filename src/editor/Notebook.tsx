@@ -20,6 +20,7 @@ import type { ExampleId } from '../examples';
 import { ek } from '../i18n/ek';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { CATALOG, withProp, type NumberPropDef, type PropDef } from '../model/catalog';
+import { operable } from '../model/task';
 import type { Part } from '../model/types';
 import type { DeviceType, PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
@@ -37,6 +38,7 @@ import { notebookEntries, type NotebookEntry } from './notebookOrder';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, stepValue, validateNumber, valuePresets } from './propertyForm';
 import { PropSlider } from './PropSlider';
+import { ControlsLocked } from './RackControls';
 import type { ReadoutRow } from './readouts';
 import { plainText, Rich } from './Rich';
 import { SymbolIcon } from './symbols';
@@ -76,7 +78,13 @@ export interface NotebookProps extends InspectTabProps {
   readonly devices: DeviceHooks;
   /** Görev (öğrenci): defterin en üstündeki kart ve kilitli / değiştirilebilir parçalar. */
   readonly taskCard?: ReactNode;
-  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string> } | null;
+  /**
+   * Görev: kilitli ve değiştirilebilir parçalar; takılı ampermetreler (arıza bulma: kaldırılır, yeri
+   * değişmez); lockMarks false ise kilit simgesi yok (arıza bulmada her şey kilitli).
+   */
+  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string>; readonly plugged?: ReadonlySet<string>; readonly lockMarks?: boolean } | null;
+  /** Arıza bulma (B2): canlı değerler gizli (kare ölçü aletleri dışında boş gelir). */
+  readonly liveHidden?: boolean;
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
@@ -122,6 +130,13 @@ export function cardReading(part: Part, frame: SimFrame | null): { main: string;
   const rows = liveRows(part, frame)?.rows;
   if (!rows || rows.length === 0) return null;
   if (part.type === 'led' && rows[1]) return { main: rows[0]!.value, second: rows[1].value };
+  if (part.type === 'dcsupply') {
+    // Güç kaynağı: akım veren çıkışlar (ikisi de boştaysa 1. çıkış); satırlar çıkış sırasında.
+    const outputs = frame.statuses.get(part.id)?.outputs ?? [];
+    const used = outputs.flatMap((o, k) => (Math.abs(o.current) > 1e-9 && rows[k] ? [k] : []));
+    const [first = 0, second] = used;
+    return { main: rows[first]!.value, ...(second !== undefined ? { second: rows[second]!.value } : {}) };
+  }
   if (SOURCES.has(part.type) && rows[1]) return { main: rows[1].value };
   return { main: rows[0]!.value };
 }
@@ -262,8 +277,14 @@ export function Notebook(props: NotebookProps) {
       <div className="flex items-baseline justify-between px-0.5 pb-0.5">
         <h2 className="text-[17px] font-semibold">{t.title}</h2>
         <span className="text-small text-muted">
-          {t.count(doc.parts.length)}
-          {status !== 'stopped' && !props.messages.some((m) => m.severity !== 'info') ? ` · ${t.noProblems}` : ''}
+          {props.liveHidden ? (
+            t.liveHidden
+          ) : (
+            <>
+              {t.count(doc.parts.length)}
+              {status !== 'stopped' && !props.messages.some((m) => m.severity !== 'info') ? ` · ${t.noProblems}` : ''}
+            </>
+          )}
         </span>
       </div>
       {openId === null && others > 0 && (
@@ -611,7 +632,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   // Görev: kilitli parçada kilit, değiştirilebilir parçada kalem simgesi ve mavi kenar.
   const locked = props.taskParts?.locked.has(part.id) ?? false;
   const editable = props.taskParts?.editable.has(part.id) ?? false;
-  const taskMark = locked ? (
+  const taskMark = locked && props.taskParts?.lockMarks !== false ? (
     <span title={tr.task.lockBadge} className="shrink-0 text-muted">
       <Icon name="lock" className="h-4 w-4" />
       <span className="sr-only">{` (${tr.task.lockBadge})`}</span>
@@ -667,6 +688,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
     <section data-card={part.id} data-notebook="card" data-nav tabIndex={-1} aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 rounded-lg border-2 border-accent bg-panel px-3.5 pt-3 pb-3.5">
       <OpenCardHeader
         {...props}
+        fixed={locked ? 'locked' : props.taskParts?.plugged?.has(part.id) ? 'plugged' : null}
         badges={
           <>
             {part.type === 'oscilloscope' && <ScopeStatus part={part} view={props.devices.scopeView(part.id)} />}
@@ -678,7 +700,9 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
       />
       <div id={bodyId} className="flex flex-col gap-3">
         {device ? (
-          <DeviceControls part={part} devices={props.devices} />
+          <ControlsLocked.Provider value={locked && CATALOG[part.type].propDefs.every((p) => !operable(part.type, p.key))}>
+            <DeviceControls part={part} devices={props.devices} />
+          </ControlsLocked.Provider>
         ) : part.type === 'arduino' ? (
           <ArduinoCardBody
             part={part}
@@ -689,12 +713,13 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
           />
         ) : (
           <>
-            <PrimaryControl {...props} values={values} />
+            <PrimaryControl {...props} values={values} locked={locked} />
             {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
             <LiveTiles part={part} frame={frame} />
+            {props.liveHidden && status !== 'stopped' && <p className="m-0 text-label leading-snug text-muted">{t.liveHiddenNote}</p>}
           </>
         )}
-        <MoreSettings {...props} values={values} />
+        <MoreSettings {...props} values={values} locked={locked} />
       </div>
     </section>
   );
@@ -711,7 +736,8 @@ function OpenCardHeader({
   frame,
   onClose,
   onFocus3d,
-}: NotebookProps & { part: Part; badges: ReactNode; onClose: () => void; bodyId: string }) {
+  fixed,
+}: NotebookProps & { part: Part; badges: ReactNode; onClose: () => void; bodyId: string; fixed: 'locked' | 'plugged' | null }) {
   const touch = useTouchUi();
   const burned = frame?.statuses.get(part.id)?.burned === true;
   const size = touch ? 'h-11 w-11' : 'h-9 w-9';
@@ -748,11 +774,12 @@ function OpenCardHeader({
           </button>
         ))}
       {burned && status !== 'stopped' && action('saved', tr.inspector.repair, () => onRepair(part.id))}
-      {/* Dokunmatikte çalışırken devrenin yapısı kilitli (Ölç kipi; DP3): döndür ve sil yok. */}
+      {/* Dokunmatikte çalışırken devrenin yapısı kilitli (Ölç kipi; DP3): döndür ve sil yok. Görevde
+          kilitli parçada ikisi de yok; takılı ampermetre döndürülmez, kaldırılır (Sil). */}
       {!(touch && status !== 'stopped') && (
         <>
-          {action('rotate', tr.toolbar.rotate, () => onRotate([part.id]))}
-          {action('trash', tr.toolbar.remove, onDelete, true)}
+          {fixed === null && action('rotate', tr.toolbar.rotate, () => onRotate([part.id]))}
+          {fixed !== 'locked' && action('trash', tr.toolbar.remove, onDelete, true)}
         </>
       )}
       {action('chevronUp', t.collapse, onClose)}
@@ -761,13 +788,14 @@ function OpenCardHeader({
 }
 
 /** Ana ayar: sayıda −/+ adımlayıcı ve sık kullanılan değerler, seçenekte çipler. */
-function PrimaryControl({ part, values, focusRequest, status, onUpdatePart }: NotebookProps & { part: Part; values: Record<string, PropValue> }) {
+function PrimaryControl({ part, values, focusRequest, status, onUpdatePart, locked }: NotebookProps & { part: Part; values: Record<string, PropValue>; locked: boolean }) {
   const prop = primaryProp(part);
   if (!prop) return null;
   const commit = (value: PropValue) => onUpdatePart(part.id, { props: withProp(part.type, part.props, prop.key, value) });
   if (prop.kind === 'number') {
     const value = typeof values[prop.key] === 'number' ? (values[prop.key] as number) : 0;
-    const disabled = Boolean(prop.disabledWhen && values[prop.disabledWhen] === true);
+    // Görevde kilitli parçanın değeri değişmez (kullanma denetimleri ve ölçü aletleri değişir).
+    const disabled = Boolean(prop.disabledWhen && values[prop.disabledWhen] === true) || (locked && !operable(part.type, prop.key));
     return (
       <ValueStepper
         label={tr.properties.fieldLabel(part.type, prop.key)}
@@ -963,7 +991,7 @@ function LiveTiles({ part, frame }: { part: Part; frame: SimFrame | null }) {
 }
 
 /** Katlı: ad, öbür özellikler, ters çevir, parçanın ne yaptığı. */
-function MoreSettings({ part, doc, values, status, onUpdatePart, onFlip }: NotebookProps & { part: Part; values: Record<string, PropValue> }) {
+function MoreSettings({ part, doc, values, status, onUpdatePart, onFlip, locked }: NotebookProps & { part: Part; values: Record<string, PropValue>; locked: boolean }) {
   const touch = useTouchUi();
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -973,6 +1001,15 @@ function MoreSettings({ part, doc, values, status, onUpdatePart, onFlip }: Noteb
   const otherLabels = new Set(doc.parts.filter((p) => p.id !== part.id).map((p) => p.label));
   const note = RACK_DEVICES.has(part.type) ? undefined : partNote(part.type, values);
   const commit = (key: string) => (value: PropValue) => onUpdatePart(part.id, { props: withProp(part.type, part.props, key, value) });
+  /** Görevde kilitli parçanın adı ve değerleri değişmez: alan devre dışı görünür. */
+  const field = (key: string | null, node: ReactNode) =>
+    locked && (key === null || !operable(part.type, key)) ? (
+      <fieldset key={key ?? 'label'} disabled className="m-0 min-w-0 border-0 p-0 opacity-60">
+        {node}
+      </fieldset>
+    ) : (
+      node
+    );
   return (
     <div className="flex flex-col border-t border-line pt-1">
       <button
@@ -987,20 +1024,23 @@ function MoreSettings({ part, doc, values, status, onUpdatePart, onFlip }: Noteb
       </button>
       {open && (
         <div id={id} className="flex flex-col gap-3 pt-1">
-          <LabelField label={part.label} otherLabels={otherLabels} inputRef={undefined} onCommit={(label) => onUpdatePart(part.id, { label })} />
-          {rest.map((prop) => (
-            <PropField
-              key={prop.key}
-              part={part}
-              prop={prop}
-              values={values}
-              live={false}
-              inputRef={undefined}
-              onCommit={commit(prop.key)}
-              onSlide={(v, done) => done && commit(prop.key)(v)}
-            />
-          ))}
-          {def.polarized && (
+          {field(null, <LabelField label={part.label} otherLabels={otherLabels} inputRef={undefined} onCommit={(label) => onUpdatePart(part.id, { label })} />)}
+          {rest.map((prop) =>
+            field(
+              prop.key,
+              <PropField
+                key={prop.key}
+                part={part}
+                prop={prop}
+                values={values}
+                live={false}
+                inputRef={undefined}
+                onCommit={commit(prop.key)}
+                onSlide={(v, done) => done && commit(prop.key)(v)}
+              />,
+            ),
+          )}
+          {def.polarized && !locked && (
             <button
               type="button"
               onClick={() => onFlip([part.id])}

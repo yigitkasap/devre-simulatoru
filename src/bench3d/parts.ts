@@ -219,7 +219,8 @@ export function fuseModel(): PartModel {
     root,
     anchors,
     update(ctx) {
-      const blown = ctx.live?.burned ?? false;
+      // Arıza bulmada atmış sigorta (faultBurnt) simülasyon dururken de atmış görünür.
+      const blown = (ctx.live?.burned ?? false) || ctx.props.faultBurnt === true;
       element.visible = !blown;
       soot.visible = blown;
       return false;
@@ -279,9 +280,11 @@ export function ledModel(props: Props): PartModel {
   return {
     ...model,
     update(ctx) {
-      const b = ctx.active && !(ctx.live?.burned ?? false) ? (ctx.live?.brightness ?? 0) : 0;
+      // Arıza bulmada yanmış LED (faultBurnt) simülasyon dururken de yanık görünür.
+      const burned = (ctx.live?.burned ?? false) || ctx.props.faultBurnt === true;
+      const b = ctx.active && !burned ? (ctx.live?.brightness ?? 0) : 0;
       lens.emissiveIntensity = 0.1 + 2.4 * b;
-      lens.color.set(ctx.live?.burned ? '#3a3a3a' : light);
+      lens.color.set(burned ? '#3a3a3a' : light);
       glow.set(b);
       return false;
     },

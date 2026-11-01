@@ -4,6 +4,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { EXAMPLE_GROUPS, type ExampleId } from '../examples';
+import { FAULT_SCENARIOS, type FaultScenarioId } from '../examples/faultScenarios';
 import { tr } from '../i18n/tr';
 import { Icon } from './icons';
 import { Rich } from './Rich';
@@ -13,6 +14,10 @@ export interface ExamplesDialogProps {
   readonly phone: boolean;
   readonly activeExample: ExampleId | null;
   readonly onLoad: (id: ExampleId) => void;
+  /** Hazır arıza senaryosunu aç (Arıza bul grubu, B2). */
+  readonly onFault: (id: FaultScenarioId) => void;
+  /** Açık senaryo. */
+  readonly activeFault: string | null;
   readonly onClose: () => void;
 }
 
@@ -20,7 +25,7 @@ export function ExamplesDialog(props: ExamplesDialogProps) {
   return props.phone ? <PhoneExamples {...props} /> : <DesktopExamples {...props} />;
 }
 
-function DesktopExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps) {
+function DesktopExamples({ activeExample, onLoad, onFault, activeFault, onClose }: ExamplesDialogProps) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -103,6 +108,37 @@ function DesktopExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps
               {group.id === 'baraj' && <BarajLink />}
             </section>
           ))}
+          <section className="mb-1">
+            <h3 className="mb-0.5 text-xs font-semibold tracking-wide text-muted uppercase">{tr.fault.group}</h3>
+            <p className="m-0 mb-1.5 text-xs text-muted">{tr.fault.groupNote}</p>
+            <ul className="grid gap-2 md:grid-cols-2">
+              {FAULT_SCENARIOS.map((s) => {
+                const texts = tr.fault.scenarios[s.id];
+                const active = activeFault === s.id;
+                return (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onClick={() => onFault(s.id)}
+                      aria-pressed={active}
+                      aria-label={tr.fault.loaded(texts.title)}
+                      className={`flex h-full w-full items-start gap-2.5 rounded-lg border px-3 py-2 text-left ${active ? 'border-accent bg-accent-soft' : 'border-line hover:bg-app'}`}
+                    >
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warn-soft text-warn" aria-hidden="true">
+                        <Icon name="wrench" className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{texts.title}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-muted">
+                          {texts.experiment} · <Rich text={texts.symptom} />
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         </div>
       </div>
     </div>
@@ -140,7 +176,7 @@ function normalize(text: string): string {
     .replace(/ü/g, 'u');
 }
 
-function PhoneExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps) {
+function PhoneExamples({ activeExample, onLoad, onFault, activeFault, onClose }: ExamplesDialogProps) {
   const titleId = useId();
   const [query, setQuery] = useState('');
   const activeGroup = EXAMPLE_GROUPS.find((g) => (g.ids as readonly ExampleId[]).includes(activeExample as ExampleId))?.id;
@@ -161,6 +197,12 @@ function PhoneExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps) 
       return normalize(t.title).includes(q) || normalize(t.description).includes(q) || normalize(tr.examples.groups[g.id]).includes(q);
     }),
   })).filter((g) => g.ids.length > 0);
+  const faults = FAULT_SCENARIOS.filter((s) => {
+    if (!q) return true;
+    const t = tr.fault.scenarios[s.id];
+    return normalize(t.title).includes(q) || normalize(t.symptom).includes(q) || normalize(tr.fault.group).includes(q);
+  });
+  const faultsOpen = q !== '' || open.has('ariza') || activeFault !== null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -200,7 +242,7 @@ function PhoneExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps) 
         <span className="mt-2 block text-[13px] text-muted">{tr.phone.examplesHint}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
-        {groups.length === 0 && <p className="py-3 text-sm text-muted">{tr.phone.examplesNone}</p>}
+        {groups.length === 0 && faults.length === 0 && <p className="py-3 text-sm text-muted">{tr.phone.examplesNone}</p>}
         {groups.map((group) => {
           const expanded = q !== '' || open.has(group.id);
           return (
@@ -260,6 +302,54 @@ function PhoneExamples({ activeExample, onLoad, onClose }: ExamplesDialogProps) 
             </section>
           );
         })}
+        {faults.length > 0 && (
+          <section className="border-b border-app">
+            <button
+              type="button"
+              aria-expanded={faultsOpen}
+              onClick={() =>
+                setOpen((s) => {
+                  const next = new Set(s);
+                  if (next.has('ariza')) next.delete('ariza');
+                  else next.add('ariza');
+                  return next;
+                })
+              }
+              className="flex min-h-[52px] w-full items-center gap-2.5 text-left text-[15px] font-semibold"
+            >
+              <Icon name={faultsOpen ? 'chevronDown' : 'chevron'} className="h-[18px] w-[18px] shrink-0 text-muted" />
+              <span className="min-w-0 flex-1">{tr.fault.group}</span>
+              <span className="font-mono text-[13px] font-medium text-muted">{faults.length}</span>
+            </button>
+            {faultsOpen && (
+              <ul className="flex flex-col gap-2 pt-2 pb-3">
+                {faults.map((s) => {
+                  const texts = tr.fault.scenarios[s.id];
+                  const active = activeFault === s.id;
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => onFault(s.id)}
+                        aria-current={active || undefined}
+                        aria-label={tr.fault.loaded(texts.title)}
+                        className={`flex w-full items-start gap-3 rounded-xl text-left ${active ? 'border-2 border-accent bg-accent-soft/50 p-[11px]' : 'border border-line p-3 active:bg-app'}`}
+                      >
+                        <Icon name="wrench" className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+                        <span className="min-w-0">
+                          <b className="block text-[15px] font-semibold">{texts.title}</b>
+                          <span className="mt-0.5 line-clamp-2 block text-[13.5px] leading-snug text-muted">
+                            {texts.experiment} · <Rich text={texts.symptom} />
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

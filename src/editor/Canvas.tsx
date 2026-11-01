@@ -54,7 +54,11 @@ import { FIELD_COLOR, MagneticField } from './MagneticField';
 import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
-import { meterDisplayRect, partValueText, PartView, type PartTone } from './PartView';
+import { meterDisplayRect, meterFlipped, partValueText, PartView, type PartTone } from './PartView';
+import { visibleLive } from './fault/mask';
+import type { Probe } from './fault/meter';
+import { PlaceMarks, ProbeLayer, type PlaceMark, type ProbeView } from './fault/ProbeLayer';
+import type { Place } from './fault/session';
 import { routeAround } from './phoneTools';
 import { HintText } from './HintStrip';
 import { SymbolIcon } from './symbols';
@@ -102,6 +106,8 @@ export interface PhoneCanvas {
   readonly onEditAttempt: () => void;
   /** "Devre kilitli · dokun: incele" bilgisi gösterilsin mi. */
   readonly lockChip: boolean;
+  /** Arıza bulma (B2, R5): şemanın sağ üstünde "Arıza bulma" çipi. */
+  readonly faultChip?: boolean;
   readonly onLockChipClose: () => void;
   /** Tuval, tam boy alt sayfanın üstünde ince bir şerit: bilgi katmanları gizlenir. */
   readonly strip?: boolean;
@@ -168,6 +174,12 @@ export interface CanvasProps {
   readonly simActive: boolean;
   /** Son simülasyon karesi; simülasyon durdurulmuşsa null. */
   readonly frame: SimFrame | null;
+  /**
+   * Otomatik göstergeler (varsayılan açık). Arıza bulmada (B2) kapalı: kablo renkleri, akım noktaları,
+   * manyetik alan, renk ölçeği, kısa devre yanıp sönmesi ve yanan LED balonu çizilmez; ölçü aletlerinin
+   * ekranı ve LED'in ışığı (gerçekte de görülür) kalır.
+   */
+  readonly indicators?: boolean;
   readonly highlight: Highlight | null;
   /** Yanmış LED'i onar. */
   readonly onRepair: (partId: string) => void;
@@ -210,14 +222,37 @@ export interface CanvasProps {
    * (seçim, kablo çekme) bu sırada yapılmaz.
    */
   readonly onPick?: ((target: PickTarget) => void) | null;
+  /** Arıza bulma (B2): multimetrenin uçları (halka, etiket, kablo). */
+  readonly probes?: ProbeView | null;
+  /** Masaüstünde sol alt köşedeki panel (multimetre, px): sığdırırken renk ölçeği kutusunun yerine bundan kaçınılır. */
+  readonly cornerPanel?: { readonly w: number; readonly h: number } | null;
+  /** Uç koyulurken: tıklanan bacak ya da kablo (parçanın gövdesinde en yakın bacağı). */
+  readonly onProbe?: ((probe: Probe) => void) | null;
+  /** Arızayı bildirirken yer seçimi: bacak, parçanın kendisi ya da kablo (R2). */
+  readonly onLocate?: ((place: Place, at: Point) => void) | null;
+  /**
+   * Kabloya ya da parçaya dokununca (fare ya da parmak kıpırdamadan kalkınca) açılan menü: arıza
+   * bulmada "Buraya ampermetre tak" / "Ampermetreyi kaldır". null dönerse olağan davranış sürer.
+   */
+  readonly tapMenu?: ((target: TapTarget) => { readonly label: string; readonly items: readonly MenuItem[] } | null) | null;
+  /** Şemadaki halkalar (seçilen yer, bulunan arıza) ve alttaki yönerge. */
+  readonly placeMarks?: { readonly marks: readonly PlaceMark[]; readonly hint: string | null } | null;
   /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
   readonly marks?: readonly CanvasMark[];
-  /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli. */
-  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string> } | null;
+  /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli (lockMarks false: rozet yok, arıza bulmada her şey kilitli). */
+  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string>; readonly lockMarks?: boolean } | null;
+  /**
+   * Elle kablo çizilmez ve kablo taşınmaz (arıza bulma: kablolar yalnızca ampermetre takıp kaldırmakla
+   * değişir). Uçlar kablo başlatmaz, kablo aracı (W) açılmaz; kabloya tıklamak onu seçer.
+   */
+  readonly wiringLocked?: boolean;
   readonly ref?: Ref<CanvasHandle>;
 }
 
 /** "İz ekle"de tıklanan şey: parça (akım) ya da düğüm (gerilim; anahtar ve tıklanan ızgara noktası). */
+/** Dokunulan kablo (noktasıyla) ya da parça. */
+export type TapTarget = { readonly kind: 'wire'; readonly wireId: string; readonly at: Point } | { readonly kind: 'part'; readonly partId: string };
+
 export type PickTarget = { readonly kind: 'part'; readonly partId: string } | { readonly kind: 'node'; readonly key: string; readonly at: Point };
 
 /** Şemadaki iz etiketi (renkli hap ve nokta) ya da bekleyen seçimin halkası. */
@@ -328,7 +363,8 @@ export function Canvas({
   keyboardEnabled,
   flowGraph,
   simActive,
-  frame,
+  frame: liveFrame,
+  indicators = true,
   highlight,
   onRepair,
   onRotate,
@@ -347,10 +383,19 @@ export function Canvas({
   zeroPoints,
   onExplain,
   onPick,
+  probes = null,
+  cornerPanel = null,
+  onProbe = null,
+  onLocate = null,
+  placeMarks = null,
+  tapMenu = null,
   marks,
   taskParts,
+  wiringLocked = false,
   ref,
 }: CanvasProps) {
+  // Göstergeler kapalıysa kablo renkleri ve öbür göstergeler simülasyon yokmuş gibi çizilir.
+  const frame = indicators ? liveFrame : null;
   const svgRef = useRef<SVGSVGElement>(null);
   const sceneId = `scene-${useId().replace(/:/g, '')}`;
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -392,6 +437,7 @@ export function Canvas({
   const shapes = useMemo(() => circuitShapes(doc), [doc]);
   // Kutu tuvalin sol alt köşesinde (bottom-3 left-3): tuvalin koordinatlarında.
   const legendRect: Rect | null = phone ? null : { x: 12, y: size.height - 12 - legendSize.h, w: legendSize.w, h: legendSize.h };
+  const avoidRect: Rect | null = cornerPanel && !phone ? { x: 16, y: size.height - 16 - cornerPanel.h, w: cornerPanel.w, h: cornerPanel.h } : legendRect;
   const phoneTimers = useRef({ hold: 0, long: 0 });
   const phoneLongFired = useRef(false);
   const lastEmptyTap = useRef(0);
@@ -504,7 +550,7 @@ export function Canvas({
     // Masaüstünde sol alttaki "Kablo gerilimi" kutusu da görünür alanın dışında sayılır.
     const fitted = phone
       ? fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top), 20)
-      : fitAvoiding(shapes, bounds, Math.max(1, size.width), Math.max(1, size.height), 48, legendRect);
+      : fitAvoiding(shapes, bounds, Math.max(1, size.width), Math.max(1, size.height), 48, avoidRect);
     setView({ ...fitted, y: fitted.y + top });
   };
 
@@ -758,7 +804,7 @@ export function Canvas({
     });
     // Her parçanın yalnızca parmağa en yakın ucu seçenek olur.
     const pins: PickOption[] = [];
-    if (phone.mode === 'kur') {
+    if (phone.mode === 'kur' && !wiringLocked) {
       for (const part of doc.parts) {
         let best: { index: number; pos: Point; d: number } | null = null;
         pinPositions(part).forEach((pos, index) => {
@@ -861,7 +907,7 @@ export function Canvas({
       }
       return;
     }
-    if (hit?.kind === 'pin' && phone.mode === 'kur') {
+    if (hit?.kind === 'pin' && phone.mode === 'kur' && !wiringLocked) {
       phone.onStartConnect({ point: hit.pos, partId: hit.partId, pin: hit.index });
       return;
     }
@@ -885,7 +931,7 @@ export function Canvas({
     capture(e.pointerId);
     const pointerId = e.pointerId;
     setInteraction({ kind: 'press', pointerId, sx: local.x, sy: local.y, view, hit, g });
-    if (mode === 'kur' && (hit?.kind === 'part' || hit?.kind === 'wire')) {
+    if (mode === 'kur' && (hit?.kind === 'part' || (hit?.kind === 'wire' && !wiringLocked))) {
       // 150 ms kıpırdamadan basılı tutulursa sürükleme başlar (öncesinde kayarsa tuval kayar).
       phoneTimers.current.hold = window.setTimeout(() => {
         const state = interactionRef.current;
@@ -933,7 +979,11 @@ export function Canvas({
   };
 
   // --- İşaretçi olayları ---------------------------------------------------------------
+  /** Menülü dokunuşun başladığı yer (tapMenu): kıpırdamadan kalkarsa menü açılır. */
+  const tapStart = useRef<{ id: number; x: number; y: number } | null>(null);
+  const [tapMenuState, setTapMenuState] = useState<{ x: number; y: number; label: string; items: readonly MenuItem[] } | null>(null);
   const onPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    tapStart.current = tapMenu && e.button === 0 && pointers.current.size === 0 ? { id: e.pointerId, x: e.clientX, y: e.clientY } : null;
     pointerType.current = e.pointerType;
     if (e.isPrimary) {
       // Yeni bir dokunuş ya da tıklama: kaçırılmış bir pointerup'tan (iOS'ta olabiliyor) kalan kayıtlar
@@ -963,6 +1013,38 @@ export function Canvas({
       return;
     }
     if (pointers.current.size > 2) return;
+
+    // Arıza bulma → Arızayı bildir: arızanın yeri seçilir.
+    if (onLocate && e.button === 0) {
+      const g = toGrid(e.clientX, e.clientY);
+      const hit = hitTest(g);
+      if (hit?.kind === 'pin') onLocate({ part: hit.partId, pin: hit.index }, hit.pos);
+      else if (hit?.kind === 'part') onLocate({ part: hit.partId }, g);
+      else if (hit?.kind === 'wire') {
+        const wire = doc.wires.find((w) => w.id === hit.wireId)!;
+        onLocate({ wire: wire.id }, snapToSegment(g, wire.points[hit.segment]!, wire.points[hit.segment + 1]!));
+      }
+      e.preventDefault();
+      return;
+    }
+
+    // Arıza bulma: multimetrenin ucu bacağa ya da kabloya koyulur.
+    if (onProbe && e.button === 0) {
+      const g = toGrid(e.clientX, e.clientY);
+      const hit = hitTest(g);
+      if (hit?.kind === 'pin') onProbe({ spot: { part: hit.partId, pin: hit.index }, at: hit.pos });
+      else if (hit?.kind === 'part') {
+        const part = doc.parts.find((p) => p.id === hit.partId)!;
+        const pins = pinPositions(part);
+        const pin = pins.reduce((best, p, i) => (Math.hypot(p.x - g.x, p.y - g.y) < Math.hypot(pins[best]!.x - g.x, pins[best]!.y - g.y) ? i : best), 0);
+        onProbe({ spot: { part: part.id, pin }, at: pins[pin]! });
+      } else if (hit?.kind === 'wire') {
+        const wire = doc.wires.find((w) => w.id === hit.wireId)!;
+        onProbe({ spot: { wire: wire.id }, at: snapToSegment(g, wire.points[hit.segment]!, wire.points[hit.segment + 1]!) });
+      }
+      e.preventDefault();
+      return;
+    }
 
     // Analiz → İz ekle: parça akımı ya da düğüm gerilimi seçilir.
     if (onPick && e.button === 0) {
@@ -1010,13 +1092,13 @@ export function Canvas({
       return;
     }
 
-    const hit = hitTest(g);
+    const hit = hitTest(g, wiringLocked ? { pins: false } : undefined);
     if (hit?.kind === 'pin') {
       capture(e.pointerId);
       startWiring(hit.pos, e);
       return;
     }
-    if (tool.kind === 'wire') {
+    if (tool.kind === 'wire' && !wiringLocked) {
       capture(e.pointerId);
       if (hit?.kind === 'wire') {
         const wire = doc.wires.find((w) => w.id === hit.wireId)!;
@@ -1087,6 +1169,7 @@ export function Canvas({
       if (!selection.wires.includes(hit.wireId) || selection.parts.length > 0 || selection.wires.length > 1) {
         dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
       }
+      if (wiringLocked) return;
       capture(e.pointerId);
       setInteraction({
         kind: 'drag-segment',
@@ -1186,12 +1269,41 @@ export function Canvas({
         break;
     }
     if (!phone && (current.kind === 'wiring' || tool.kind !== 'place')) {
-      const hit = hitTest(g, current.kind === 'wiring' ? { parts: false } : undefined);
+      const hit = hitTest(g, current.kind === 'wiring' ? { parts: false } : wiringLocked ? { pins: false } : undefined);
       setHover(hit);
     }
   };
 
   const onPointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const start = tapStart.current;
+    tapStart.current = null;
+    let tapped: { x: number; y: number; label: string; items: readonly MenuItem[] } | null = null;
+    if (tapMenu && start && start.id === e.pointerId && e.type === 'pointerup' && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 6) {
+      const g = toGrid(e.clientX, e.clientY);
+      // Önce dokunulan parça (menüsü varsa, ör. takılı ampermetre), yoksa yakındaki kablo. Parmakla
+      // dokunurken parçaların gövdesi genişletildiği için kablonun yanındaki parça kabloyu örtmesin.
+      const partHit = hitTest(g, { pins: false, wires: false });
+      const partMenu = partHit?.kind === 'part' ? tapMenu({ kind: 'part', partId: partHit.partId }) : null;
+      const wireHit = partMenu ? null : hitTest(g, { pins: false, parts: false });
+      const wire = wireHit?.kind === 'wire' ? doc.wires.find((w) => w.id === wireHit.wireId) : undefined;
+      const menu =
+        partMenu ?? (wireHit?.kind === 'wire' && wire ? tapMenu({ kind: 'wire', wireId: wire.id, at: snapToSegment(g, wire.points[wireHit.segment]!, wire.points[wireHit.segment + 1]!) }) : null);
+      if (menu) {
+        const local = localPoint(e.clientX, e.clientY);
+        tapped = { x: local.x, y: local.y, ...menu };
+      }
+    }
+    handlePointerUp(e);
+    if (tapped) {
+      // Telefonda kalabalık noktada açılan seçici ve büyüteç menünün yerini almasın; masaüstünde
+      // menüyü açan tıklama yakındaki bacaktan kablo çizmeye başlamasın.
+      setPicker(null);
+      setMagnifier(null);
+      if (interactionRef.current.kind === 'wiring') setInteraction({ kind: 'idle' });
+      setTapMenuState(tapped);
+    }
+  };
+  const handlePointerUp = (e: ReactPointerEvent<SVGSVGElement>) => {
     pointers.current.delete(e.pointerId);
     const current = interactionRef.current;
     const longPressFired = longPress.current?.fired ?? false;
@@ -1377,7 +1489,7 @@ export function Canvas({
         const polarized = doc.parts.filter((p) => selection.parts.includes(p.id) && CATALOG[p.type].polarized);
         if (polarized.length > 0) onFlip(polarized.map((p) => p.id));
       }
-    } else if (key === 'w' && !ctrl) {
+    } else if (key === 'w' && !ctrl && !wiringLocked) {
       setInteraction({ kind: 'idle' });
       dispatch({ type: 'set-tool', tool: tool.kind === 'wire' ? { kind: 'select' } : { kind: 'wire' } });
     }
@@ -1523,12 +1635,7 @@ export function Canvas({
   const displayFlips = new Set<string>();
   for (const part of doc.parts) {
     if (part.type !== 'voltmeter' && part.type !== 'ammeter') continue;
-    const others = doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p));
-    const blocked = (flip: boolean) => {
-      const r = meterDisplayRect(part, flip);
-      return others.some((b) => boxesIntersect(b, r));
-    };
-    if (blocked(false) && !blocked(true)) displayFlips.add(part.id);
+    if (meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)))) displayFlips.add(part.id);
   }
 
   const highlightTone = highlight?.severity === 'error' || highlight?.severity === 'warning' ? highlight.severity : 'selected';
@@ -1560,7 +1667,7 @@ export function Canvas({
     <div className="absolute inset-0 overflow-hidden bg-paper">
       <svg
         ref={svgRef}
-        className={`schematic block h-full w-full ${onPick ? 'cursor-crosshair' : cursorClass}`}
+        className={`schematic block h-full w-full ${onPick || onProbe || onLocate ? 'cursor-crosshair' : cursorClass}`}
         // iOS/WebKit, touch-action: none bölgesini üstüne binen katmanlara da uygulayabiliyor; o zaman
         // tuvalin üstündeki çekmece ya da pencere parmakla kaydırılamıyor. Katman açıkken kapatılır.
         style={overlayOpen ? { touchAction: 'auto' } : undefined}
@@ -1716,14 +1823,15 @@ export function Canvas({
           {/* Bağla kipinde parçalar soluklaşır, uçlar öne çıkar (P03). */}
           <g opacity={bagla ? 0.38 : 1}>
           {doc.parts.map((part) => {
-            const live = frame?.live.get(part.id);
+            const raw = liveFrame?.live.get(part.id);
+            const live = raw && !indicators ? visibleLive(raw) : raw;
             return (
               <PartView
                 key={part.id}
                 part={part}
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
-                meterText={frame?.meterTexts.get(part.id) ?? null}
+                meterText={liveFrame?.meterTexts.get(part.id) ?? null}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
                 hideValue={lod && !selectedParts.has(part.id)}
@@ -1756,6 +1864,7 @@ export function Canvas({
           ))}
 
           {taskParts &&
+            taskParts.lockMarks !== false &&
             doc.parts
               .filter((p) => taskParts.locked.has(p.id) && p.type !== 'ground')
               .map((p) => {
@@ -1979,8 +2088,16 @@ export function Canvas({
         </div>
       )}
 
+      {placeMarks && !phone?.strip && (
+        <PlaceMarks marks={placeMarks.marks} hint={placeMarks.hint} touch={phone !== null} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />
+      )}
+      {probes && !phone?.strip && (
+        <ProbeLayer probes={probes} size={size} touch={phone !== null} toScreen={(g) => ({ x: g.x * GRID * view.scale + view.x, y: g.y * GRID * view.scale + view.y })} />
+      )}
+      {/* Sol alt köşede multimetre paneli varken (arıza bulma, masaüstü) renk ölçeği kutusu onun arkasında kalırdı: çizilmez. */}
       {frame &&
         !phone?.strip &&
+        !(cornerPanel && !phone) &&
         (!phone && legendRect && circuitHits(shapes, view, legendRect) ? (
           // Kutu devreye değiyor (yakınlaştırılmış ya da kaydırılmış görünüm): tek satır, renk çubuğu ve ±V.
           <div
@@ -2128,6 +2245,9 @@ export function Canvas({
             );
           })}
 
+      {tapMenuState && (
+        <ContextMenu x={tapMenuState.x} y={tapMenuState.y} items={tapMenuState.items} area={size} label={tapMenuState.label} onClose={() => setTapMenuState(null)} touch={phone !== null} />
+      )}
       {menu && (() => {
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
@@ -2152,6 +2272,7 @@ export function Canvas({
             items={items}
             area={size}
             label={tr.contextMenu.menu(part.label)}
+            touch={phone !== null}
             onClose={() => {
               setMenu(null);
               setMagnifier(null);
@@ -2185,14 +2306,22 @@ export function Canvas({
           aria-label={tr.toolbar.fit}
           title={tr.toolbar.fit}
           className={`absolute right-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-panel/95 text-ink shadow-sm ${
-            phone.mode === 'olc' && phone.lockChip ? 'top-[100px]' : 'top-11'
+            phone.mode === 'olc' && phone.lockChip ? 'top-[100px]' : phone.faultChip ? 'top-[46px]' : 'top-11'
           }`}
         >
           <Icon name="fit" />
         </button>
       )}
+      {phone?.faultChip && !bagla && !phone.strip && (
+        <p className="pointer-events-none absolute top-2.5 right-2.5 z-10 m-0 flex items-center gap-1.5 rounded-full border border-warn-line bg-warn-soft/95 px-2.5 py-1 text-label font-semibold text-warn shadow-sm">
+          <Icon name="wrench" className="h-3.5 w-3.5" />
+          {tr.fault.bannerShort}
+          {/* Uzaklaşınca değerler gizli: arıza bulmada çipin içinde (ayrı kutu kablolara binmesin). */}
+          {lod && <span className="font-medium">· {tr.phone.lodHidden}</span>}
+        </p>
+      )}
       {/* Telefon: uzaklaşınca değerler gizlenir; masaüstünde yakınlık üst çubukta. */}
-      {lod && !bagla && !phone?.strip && (
+      {lod && !bagla && !phone?.strip && !phone?.faultChip && (
         <p
           className={`pointer-events-none absolute right-2.5 rounded-md bg-panel/90 px-1.5 py-0.5 font-mono text-label font-medium text-muted tabular ${
             phone?.mode === 'olc' && phone.lockChip ? 'top-[64px]' : 'top-2.5'

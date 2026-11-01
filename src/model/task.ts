@@ -4,6 +4,8 @@
 // görev dosyası (.json). Hedefler bağlantının içindedir, öğrenci görebilir: onay alıştırma içindir.
 
 import * as lzModule from 'lz-string';
+import { faultValid, parseFault, type Fault } from './faults';
+import { meterEditOk, type InsertedMeter } from './meters';
 import { parseDoc, toSerializable } from './serialize';
 import type { CircuitDoc } from './types';
 
@@ -32,6 +34,38 @@ export interface Target {
   readonly tol: number;
 }
 
+/** Arıza bulmada öğrencinin ölçü aletleri (R4). */
+export interface FaultTools {
+  /** Multimetre V (⎓ ve ∿). */
+  readonly voltage: boolean;
+  /** Multimetre Ω (yalnızca simülasyon durmuşken). */
+  readonly resistance: boolean;
+  /** Devredeki osiloskop. */
+  readonly scope: boolean;
+  /** Öğrenci devreye ampermetre ekleyebilir. */
+  readonly ammeter: boolean;
+}
+
+export const DEFAULT_FAULT_TOOLS: FaultTools = { voltage: true, resistance: true, scope: true, ammeter: false };
+
+/**
+ * Arıza bulma görevi (B2, R4): öğrenci doğru çizilmiş şemayı görür, devre gizli arızalarla kurulur;
+ * ölçerek arızanın yerini ve türünü bildirir. Arızalar bağlantının içinde durur (arayan öğrenci
+ * bulabilir; alıştırma içindir, not vermez).
+ */
+export interface FaultTask {
+  /** Öğrencinin gördüğü belirti. */
+  readonly symptom: string;
+  readonly faults: readonly Fault[];
+  readonly tools: FaultTools;
+  /** Otomatik göstergeler gizli: kablo renkleri, akım noktaları, düğüm ve kart değerleri. */
+  readonly hideIndicators: boolean;
+  /** Önce beklenen değeri sor: ölçüm günlüğünde "Beklenen" sütunu. */
+  readonly askExpected: boolean;
+  /** Hazır senaryo (Örnekler → Arıza bul): kartta deney, "Bulundu"da kendi açıklaması. */
+  readonly scenario?: string;
+}
+
 export interface TaskDef {
   readonly name: string;
   readonly instruction: string;
@@ -50,6 +84,8 @@ export interface TaskDef {
    * düzeltmeleri, 4). Eski bağlantılarda yok.
    */
   readonly circuit?: string;
+  /** Arıza bulma görevi (B2); hedefli görevde yok. */
+  readonly fault?: FaultTask;
 }
 
 /** Görevle açılan devrenin üst çubuktaki adı: görevin adı, yoksa başlangıç devresinin adı. */
@@ -138,6 +174,21 @@ function parseQuantity(v: unknown): TargetQuantity | null {
   return null;
 }
 
+function parseFaultTask(v: unknown): FaultTask | null {
+  if (!isRecord(v)) return null;
+  const faults = (Array.isArray(v.faults) ? v.faults.slice(0, 10) : []).map(parseFault).filter((f): f is Fault => f !== null);
+  const tools = isRecord(v.tools) ? v.tools : {};
+  const flag = (key: keyof FaultTools) => (typeof tools[key] === 'boolean' ? (tools[key] as boolean) : DEFAULT_FAULT_TOOLS[key]);
+  return {
+    symptom: str(v.symptom, 500),
+    faults,
+    tools: { voltage: flag('voltage'), resistance: flag('resistance'), scope: flag('scope'), ammeter: flag('ammeter') },
+    hideIndicators: v.hideIndicators !== false,
+    askExpected: v.askExpected === true,
+    ...(typeof v.scenario === 'string' && v.scenario ? { scenario: v.scenario.slice(0, 40) } : {}),
+  };
+}
+
 export function parseTask(v: unknown): TaskDef | null {
   if (!isRecord(v)) return null;
   const targets: Target[] = [];
@@ -155,6 +206,10 @@ export function parseTask(v: unknown): TaskDef | null {
     targets,
     predict: v.predict === true,
     ...(str(v.circuit, 120).trim() ? { circuit: str(v.circuit, 120).trim() } : {}),
+    ...(() => {
+      const fault = parseFaultTask(v.fault);
+      return fault ? { fault } : {};
+    })(),
   };
 }
 
@@ -168,7 +223,10 @@ export function parseTaskPayload(v: unknown): { task: TaskDef; doc: CircuitDoc }
   if (!isRecord(v)) return null;
   const task = parseTask(v.gorev);
   const doc = parseDoc(v.devre);
-  return task && doc ? { task, doc } : null;
+  if (!task || !doc) return null;
+  // Belgeyle uyuşmayan arıza (silinmiş parça ya da kablo, uygun olmayan tür) atlanır.
+  if (task.fault) return { task: { ...task, fault: { ...task.fault, faults: task.fault.faults.filter((f) => faultValid(f, doc)) } }, doc };
+  return { task, doc };
 }
 
 export function taskUrl(task: TaskDef, doc: CircuitDoc, pageUrl: string): string {
@@ -199,27 +257,58 @@ export function targetMet(t: Target, measured: number | null): boolean {
 }
 
 /**
- * Kilitli parçalar değişmedi mi (değeri, yeri, dönüşü, silinmesi). Anahtar ve potansiyometre gibi
- * kullanma denetimleri (OPERATE) kilitli parçada da değişebilir. Yeni parça eklenemiyorsa parça ve
- * kablo sayısı da değişmez (kablolar kilitli parçalar arasında).
+ * Görevde yeni eklenebilecek parça türü: arıza bulmada yalnızca ampermetre (hoca "Ampermetre
+ * eklenebilir"i seçtiyse), hedefli görevde "Yeni parça eklenebilir" açıksa hepsi. Parça panelleri ve
+ * görevin bekçisi (respectsTask) aynı kuralı kullanır.
  */
-export function respectsTask(before: CircuitDoc, after: CircuitDoc, task: TaskDef): boolean {
+export function canAddType(task: TaskDef, type: CircuitDoc['parts'][number]['type']): boolean {
+  if (task.fault) return task.fault.tools.ammeter && type === 'ammeter';
+  return task.allowNew;
+}
+
+/** Arıza bulmada değişiklikten önce ve sonra takılı ampermetreler (kabloya "Buraya ampermetre tak"). */
+export interface MeterChange {
+  readonly before: readonly InsertedMeter[];
+  readonly after: readonly InsertedMeter[];
+}
+
+/**
+ * Kilitli parçalar değişmedi mi (değeri, yeri, dönüşü, silinmesi). Anahtar ve potansiyometre gibi
+ * kullanma denetimleri (OPERATE) kilitli parçada da değişebilir. Yeni parça yalnızca eklenebilen
+ * türdense (canAddType) kabul edilir; yeni parça eklenemiyorsa kablolar da değişmez (kablolar
+ * kilitli parçalar arasında). Arıza bulmada yeni parça yalnızca kabloya takılan ampermetredir ve
+ * kablolar yalnızca takıp kaldırmakla değişir ("Yeni parça eklenebilir" açık olsa da): başka her
+ * kablo ekleme, silme ve taşıma reddedilir.
+ */
+export function respectsTask(before: CircuitDoc, after: CircuitDoc, task: TaskDef, meters?: MeterChange): boolean {
   const editable = new Set(task.editable);
+  const plugged = new Set([...(meters?.before ?? []), ...(meters?.after ?? [])].map((m) => m.part));
   const next = new Map(after.parts.map((p) => [p.id, p]));
   for (const p of before.parts) {
-    if (editable.has(p.id)) continue;
+    if (editable.has(p.id) || plugged.has(p.id)) continue;
     const q = next.get(p.id);
     if (!q || q.type !== p.type || q.x !== p.x || q.y !== p.y || q.rotation !== p.rotation || q.label !== p.label) return false;
     if (INSTRUMENTS.has(p.type)) continue;
     const keys = new Set([...Object.keys(p.props), ...Object.keys(q.props)]);
     for (const k of keys) if (!OPERATE.has(k) && p.props[k] !== q.props[k]) return false;
   }
-  if (!task.allowNew) {
-    const old = new Set(before.parts.map((p) => p.id));
-    if (after.parts.some((p) => !old.has(p.id))) return false;
-    if (JSON.stringify(before.wires) !== JSON.stringify(after.wires)) return false;
+  const old = new Set(before.parts.map((p) => p.id));
+  if (task.fault) {
+    const placed = new Set((meters?.after ?? []).map((m) => m.part));
+    if (placed.size > 0 && !canAddType(task, 'ammeter')) return false;
+    if (after.parts.some((p) => !old.has(p.id) && !placed.has(p.id))) return false;
+    // Kaldırılan ampermetre belgede kalmamalı.
+    if ((meters?.before ?? []).some((m) => !placed.has(m.part) && next.has(m.part))) return false;
+    return meterEditOk(before, after, meters?.before ?? [], meters?.after ?? []);
   }
+  if (after.parts.some((p) => !old.has(p.id) && !canAddType(task, p.type))) return false;
+  if (!task.allowNew && JSON.stringify(before.wires) !== JSON.stringify(after.wires)) return false;
   return true;
+}
+
+/** Kilitli parçanın bu ayarı değişebilir mi: ölçü aletlerinin ayarları ve kullanma denetimleri. */
+export function operable(type: CircuitDoc['parts'][number]['type'], key: string): boolean {
+  return INSTRUMENTS.has(type) || OPERATE.has(key);
 }
 
 /** Kilitli parçada da değişebilen (kullanma) özellikler: anahtar, potansiyometre konumu, ışık, sıcaklık, su seviyesi ve kipi. */

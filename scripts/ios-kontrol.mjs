@@ -9,6 +9,8 @@
 // Uyarı: öykünme gerçek iOS Safari'nin her davranışını yakalamaz (ör. dokunma alanı hatası burada
 // görünmüyordu); bu yüzden ilk bölüm iOS için konan kuralların yerinde durduğunu doğrudan denetler.
 // Dokunmatik davranışı değiştiren işlerde gerçek bir iPhone'da da denenmelidir.
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -91,6 +93,20 @@ const selectedCount = (page) => page.locator('svg.schematic rect[data-selected]'
 /** Masaüstünde sağdaki defter (v3). */
 const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
 /** Sayfa (belge) kayıyor mu (dikey ya da yatay). */
+/**
+ * Arıza bulma görevi bağlantısı (B2): BC107 yükselteç, verilen gizli arızalarla. Örnek devre
+ * src/examples'tan okunur; bağlantı uygulamanınkiyle aynı biçimde (lz-string, #g=).
+ */
+const lz = createRequire(import.meta.url)('lz-string');
+const faultUrl = (fault = {}, base = URL0) => {
+  const devre = JSON.parse(readFileSync(new URL('../src/examples/bjt-yukseltec.json', import.meta.url), 'utf8'));
+  const gorev = {
+    // Görev oluştur'daki gibi: ampermetre eklenebiliyorsa yeni parça (yalnızca ampermetre) ve kablo açık.
+    name: 'Deney 7 · arıza bul', instruction: '', editable: [], allowNew: fault.tools?.ammeter === true, targets: [], predict: false, circuit: 'BC107 ile ortak emetörlü yükselteç',
+    fault: { symptom: 'Osiloskobun B kanalında sinyal yok.', faults: [{ kind: 'open', at: { part: 'p3', pin: 1 } }], tools: { voltage: true, resistance: true, scope: true, ammeter: false }, hideIndicators: true, askExpected: false, ...fault },
+  };
+  return `${base.split('#')[0]}#g=${lz.compressToEncodedURIComponent(JSON.stringify({ format: 1, gorev, devre }))}`;
+};
 const pageScrolls = (pg) => pg.evaluate(() => document.scrollingElement.scrollHeight > window.innerHeight + 1 || document.scrollingElement.scrollWidth > window.innerWidth + 1);
 /**
  * Bir yazının ekrandaki kontrastı (WCAG): öğenin ekran görüntüsünde en sık görülen renk zemin,
@@ -1319,14 +1335,18 @@ try {
       titleButton === 1 && (await card.count()) === 1 && /V<sub[^>]*>CE<\/sub>/.test(cardHtml) && /f<sub[^>]*>H<\/sub>/.test(cardHtml) && !cardHtml.includes('V_') && !cardHtml.includes('f_') && cardHtml.includes('not vermez') &&
       chip === 'Görev kipi · yalnızca RB ve RC değişir' && pencil === 2 && locks >= 5 && canvasLocks >= 5 && (await card.getByLabel('3 hedefin 0 tanesi tuttu').count()) === 1,
       `${chip} · kalem ${pencil}, kilit ${locks}, şemada ${canvasLocks}`);
-    // Kilitli Q1'in β'sı değişmiyor, bildirim çıkıyor.
+    // Kilitli Q1: kartta değer alanı ve − + devre dışı, Döndür ve Sil yok; Delete reddediliyor ("Bu parça görevde kilitli"), β değişmiyor.
     const q1Card = notebook(st).locator('[data-card]').filter({ hasText: 'Q1' }).first();
     await q1Card.click(); await st.waitForTimeout(300);
     const beta = q1Card.locator('input').first();
-    await beta.fill('300').catch(() => {}); await beta.press('Enter').catch(() => {}); await st.waitForTimeout(400);
+    const betaOff = await beta.isDisabled();
+    const stepOff = await q1Card.getByRole('button', { name: /azalt|artır/ }).evaluateAll((els) => els.length >= 2 && els.every((e) => e.disabled));
+    const cardActions = (await q1Card.getByRole('button', { name: 'Döndür', exact: true }).count()) + (await q1Card.getByRole('button', { name: 'Sil', exact: true }).count());
+    await st.keyboard.press('Delete'); await st.waitForTimeout(400);
     const toast = (await st.getByText('Bu parça görevde kilitli: değiştirilemez.').count()) > 0;
-    const q1 = await st.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).parts.find((p) => p.label === 'Q1').props.beta);
-    check('görev (öğrenci): kilitli parçanın değeri değiştirilemiyor (Q1 β = 200 kalıyor), "Bu parça görevde kilitli" bildirimi', q1 === 200 && toast, `β = ${q1}`);
+    const q1 = await st.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).parts.find((p) => p.label === 'Q1')?.props.beta);
+    check('görev (öğrenci): kilitli parçanın kartında değer alanı ve − + devre dışı, Döndür ve Sil yok; Delete → "Bu parça görevde kilitli" (başarı bildirimi yok); Q1 β = 200 kalıyor',
+      q1 === 200 && betaOff && stepOff && cardActions === 0 && toast && (await st.getByText('Q1 silindi.').count()) === 0, `β = ${q1} · ${betaOff} ${stepOff} ${cardActions} ${toast}`);
     await st.keyboard.press('Escape');
     await st.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await st.waitForTimeout(1500);
     const vce = ((await card.locator('li').first().textContent()) ?? '').replace(/\s+/g, ' ');
@@ -1494,6 +1514,332 @@ try {
       .filter((r) => r.h > 0 && (r.h < 43.5 || (r.tag === 'INPUT' && r.fs < 16))).map((r) => `${r.n} ${Math.round(r.h)}/${r.fs}`));
     check('tahmin (telefon, B1): kartta tahmin alanı ve "Tahminleri kaydet" ≥ 44 px, yazı 16 px; sayfa kaymıyor',
       (await card.getByRole('textbox', { name: /: tahminin$/ }).count()) === 1 && small.length === 0 && !(await pageScrolls(page)), small.join(', '));
+    await page.context().close();
+  }
+  // --- Arıza bulma (B2, R1–R5): gizli arıza, otomatik göstergeler kapalı, multimetre, günlük, bildir ------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', acceptDownloads: true });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    // Düğüm gerilimleri ve akım noktaları açık olsa da arıza kipinde görünmez.
+    await page.evaluate(() => localStorage.setItem('devre-simulatoru:ayarlar', JSON.stringify({ nodeVoltages: true, currentDots: true })));
+    await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(2500);
+    const strokes = await page.evaluate(() => [...new Set([...document.querySelectorAll('svg.schematic polyline')].map((p) => p.getAttribute('stroke')))]);
+    const dots = await page.evaluate(() => document.querySelectorAll('svg.schematic line[stroke-dasharray^="0 "]').length);
+    const banner = await page.getByText('Arıza bulma · otomatik göstergeler kapalı', { exact: true }).count();
+    const hidden = await page.getByText('canlı değerler gizli', { exact: true }).count();
+    const problemsShown = await page.locator('#defter [data-notebook="problem"]').count();
+    const legend = await page.getByRole('note', { name: 'Gösterim' }).count();
+    const osc = ((await page.locator('[data-card]').filter({ hasText: 'OSC1' }).first().textContent()) ?? '').replace(/\s+/g, ' ');
+    check('arıza (B2, 2. aşama): şerit "Arıza bulma · otomatik göstergeler kapalı"; çalışırken kablolar renksiz, akım noktası ve düğüm etiketi yok; defterde "canlı değerler gizli"; osiloskop kartı ölçmeye devam ediyor',
+      banner === 1 && strokes.every((x) => x === 'var(--color-symbol)' || x === 'currentColor') && dots === 0 && legend === 0 && hidden === 1 && problemsShown === 0 && /mVpp/.test(osc),
+      `${strokes.join(',')} · ${osc.slice(0, 40)}`);
+    // 3. aşama (R1): multimetre paneli, uçlar bacağa ya da kabloya; bacak ile düğüm ayrı okunur; Ω durmuşken.
+    {
+      const panel = page.getByRole('region', { name: 'Multimetre' });
+      const reading = async () => ((await panel.getByRole('img').getAttribute('aria-label')) ?? '').replace('Multimetrenin okuması: ', '');
+      const place = async (color, gx, gy) => {
+        await panel.getByRole('button', { name: new RegExp(`^${color} u`) }).click(); await page.waitForTimeout(150);
+        const p = await screen(page, gx, gy); await page.mouse.click(p.x, p.y); await page.waitForTimeout(1500);
+      };
+      const start = ((await panel.textContent()) ?? '').replace(/\s+/g, ' ');
+      await panel.getByRole('button', { name: /^Kırmızı ucu şemaya koy/ }).click(); await page.waitForTimeout(150);
+      const hint = await page.getByText('Kırmızı ucu koy: şemada bir bacağa ya da kabloya tıkla').count();
+      await page.keyboard.press('Escape'); await page.waitForTimeout(100);
+      await place('Kırmızı', 44, -4);
+      const leg = await reading();
+      const tag = await page.getByText('Kırmızı uç · RC alt bacağı', { exact: true }).count();
+      await place('Kırmızı', 44, -2);
+      const node = await reading();
+      check('arıza (B2, 3. aşama, R1): multimetre paneli (iç direnç 10 MΩ, V ⎓ · V ∿ · Ω), siyah uç toprakta; kırmızı uç RC’nin kopuk bacağında 11,99 V, hemen yanındaki kollektör kablosunda mV (bacak ile düğüm ayrı)',
+        start.includes('iç direnç 10 MΩ') && start.includes('GND1') && hint === 1 && leg === '11,99 V ⎓' && tag === 1 && /^\d+,\d+ mV ⎓$/.test(node), `${leg} · ${node}`);
+      await panel.getByRole('radio', { name: /^Direnç/ }).click(); await page.waitForTimeout(200);
+      const running = ((await panel.textContent()) ?? '').includes('Ω ölçmek için simülasyonu durdur');
+      await page.getByRole('button', { name: 'Durdur', exact: true }).first().click(); await page.waitForTimeout(400);
+      await place('Kırmızı', 44, -12); await place('Siyah', 44, -4);
+      const rc = await reading();
+      await place('Siyah', 44, -2);
+      const open = await reading();
+      check('arıza (B2, 3. aşama): Ω yalnızca simülasyon durmuşken; RC’nin iki bacağı ≈ 5,6 kΩ, RC üst bacağı ile kollektör arası MΩ (bacak kopuk)',
+        running && /^5,(59\d|600) kΩ$/.test(rc) && /MΩ$|^OL/.test(open), `${rc} · ${open}`);
+      // 4. aşama: ölçüm günlüğü kendiliğinden (uçlar taşınırken her kararlı okuma, Ω'da durunca hemen);
+      // aynı nokta ve kip bir kez (RC'nin iki bacağı yeniden ölçülünce yazılmaz); siyah uç toprakta değilse iki nokta.
+      await place('Kırmızı', 44, -12); await place('Siyah', 44, -4);
+      const log = (await page.getByRole('region', { name: /^Arıza bul:/ }).locator('ol li').allTextContents()).map((r) => r.replace(/\s+/g, ' ').trim());
+      const count = ((await page.getByRole('region', { name: /^Arıza bul:/ }).textContent()) ?? '').match(/(\d+) ölçüm/)?.[1];
+      check('arıza (B2, 4. aşama): ölçüm günlüğü kendiliğinden yazılıyor (sıra, nokta, değer); aynı ölçüm tekrar yazılmıyor; Ω’da iki nokta R(…, …)',
+        log.length === 6 && log[0] === '1V(RC alt bacağı)11,99 V' && /^2V\(Q1 kollektör\)\d+,\d+ mV$/.test(log[1] ?? '') && /^3R\(Q1 kollektör\)[\d,]+ MΩ$/.test(log[2] ?? '') &&
+          log[4] === '5R(RC üst bacağı, RC alt bacağı)5,600 kΩ' && /^6R\(RC üst bacağı, Q1 kollektör\)[\d,]+ MΩ$/.test(log[5] ?? '') && count === '6',
+        log.join(' | '));
+      await panel.getByRole('radio', { name: /^Doğru/ }).click();
+      await place('Siyah', 7, 16);
+      await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(1500);
+    }
+    await page.locator('[data-card]').filter({ hasText: 'Q1' }).first().locator('[data-nav]').first().click(); await page.waitForTimeout(300);
+    const q1 = ((await page.locator('[data-card]').filter({ hasText: 'Q1' }).first().textContent()) ?? '').replace(/\s+/g, ' ');
+    await page.getByRole('button', { name: 'Analiz', exact: true }).first().click(); await page.waitForTimeout(300);
+    const drawer = page.getByRole('region', { name: 'Analiz' });
+    const graphGate = ((await drawer.textContent()) ?? '').includes('Arıza bulmada serbest iz eklenmez') && (await drawer.getByRole('button', { name: /İz ekle/ }).count()) === 0;
+    await drawer.getByRole('tab', { name: 'Bode' }).click(); await page.waitForTimeout(300);
+    const bodeGate = ((await drawer.textContent()) ?? '').includes('Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul.');
+    check('arıza (B2, 2. aşama): açık kartta canlı değer yok ("ölçü aletiyle ölç"); Analiz’de serbest iz eklenmiyor, Eğri izleyici ve Bode kapalı',
+      q1.includes('Arıza bulmada canlı değerler gizli') && !/V_?BE|VBE|I_?C\b/.test(q1) && graphGate && bodeGate, q1.slice(0, 80));
+    // 5. aşama (R2, R3): ipucu, yanlış bildirim, doğru bildirim → Arıza bulundu, rapor, Onar ve çalıştır.
+    {
+      await page.getByRole('button', { name: 'Analiz', exact: true }).first().click(); await page.waitForTimeout(300);
+      const card = () => page.locator('[data-notebook="task"]').first();
+      await card().getByRole('button', { name: 'İpucu' }).click(); await page.waitForTimeout(150);
+      const hint = ((await card().textContent()) ?? '').includes('Beslemeden başla');
+      await card().getByRole('button', { name: 'Arızayı bildir' }).click(); await page.waitForTimeout(300);
+      const where = await page.getByText('Arızanın yerini şemada seç: parça, bacak ya da kablo').count();
+      const panelHidden = (await page.getByRole('region', { name: 'Multimetre' }).count()) === 0;
+      let p = await screen(page, 42, 4); await page.mouse.click(p.x + 8, p.y); await page.waitForTimeout(200);
+      const q1Place = ((await card().textContent()) ?? '').includes('Q1 · NPN transistör');
+      await card().getByRole('radio', { name: 'Yanlış değerli parça' }).click();
+      await card().getByRole('button', { name: 'Bildir', exact: true }).click(); await page.waitForTimeout(300);
+      const wrong = await page.getByRole('alert').filter({ hasText: 'Bu değil, ölçmeye devam et.' }).count();
+      check('arıza (B2, 5. aşama, R2): İpucu genel ipucu açıyor; Arızayı bildir: multimetre gizli, "Arızanın yerini şemada seç", yer şemadan (Q1), tür; yanlış bildirimde "Bu değil, ölçmeye devam et."',
+        hint && where === 1 && panelHidden && q1Place && wrong === 1, `${hint} ${where} ${panelHidden} ${q1Place} ${wrong}`);
+      await card().getByRole('button', { name: 'Arızayı bildir' }).click(); await page.waitForTimeout(300);
+      p = await screen(page, 44, -4); await page.mouse.click(p.x, p.y); await page.waitForTimeout(200);
+      const rcPlace = ((await card().textContent()) ?? '').includes('RC · Q1 kollektör tarafındaki bacak') && (await page.getByText('Seçili · RC alt bacağı', { exact: true }).count()) === 1;
+      await card().getByRole('radio', { name: /^Kopuk bağlantı/ }).click();
+      await card().getByRole('checkbox').first().check();
+      await card().getByRole('button', { name: 'Bildir', exact: true }).click(); await page.waitForTimeout(400);
+      const found = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
+      const here = await page.getByText('Arıza burada: kopuk bacak', { exact: true }).count();
+      const [dl] = await Promise.all([page.waitForEvent('download'), card().getByRole('button', { name: 'Rapor (.json)' }).click()]);
+      const rapor = JSON.parse(Buffer.concat(await (await dl.createReadStream()).toArray()).toString('utf8')).rapor;
+      check('arıza (B2, 5. aşama, R3): doğru bildirimde "Arıza bulundu" (açıklama, gerekçe ölçümleri, ölçüm · bildirim · ipucu · gerekçe), şemada "Arıza burada: kopuk bacak"; Rapor (.json) günlük, bildirimler (yanlış, doğru) ve ipucuyla',
+        rcPlace && found.startsWith('Arıza bulundu') && found.includes('Seni buraya götüren ölçümler') && /Bildirim2İpucu1Gerekçe1 ölçüm/.test(found) && here === 1 &&
+        /^ariza-raporu-.*\.json$/.test(dl.suggestedFilename()) && rapor.olcumler.length >= 4 && rapor.bildirimler.map((b) => b.dogru).join(',') === 'false,true' && rapor.ipuclari === 1 && rapor.bulundu === true,
+        `${found.slice(0, 70)} · ${dl.suggestedFilename()}`);
+      await card().getByRole('button', { name: 'Onar ve çalıştır' }).click(); await page.waitForTimeout(2000);
+      const strokes = await page.evaluate(() => new Set([...document.querySelectorAll('svg.schematic polyline')].map((x) => x.getAttribute('stroke'))).size);
+      const legend = await page.getByRole('note', { name: 'Gösterim' }).count();
+      check('arıza (B2, 5. aşama): Onar ve çalıştır → arıza kalkıyor, devre çalışıyor, otomatik göstergeler (kablo renkleri) geri geliyor; multimetre panelinin arkasında ikinci kutu (renk ölçeği) yok',
+        ((await card().textContent()) ?? '').includes('Onarıldı · devre çalışıyor') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 0 && strokes > 2 && legend === 0, `${strokes} renk · ${legend}`);
+    }
+    await ctx.close();
+  }
+  // 6. aşama (R4): hoca Görev oluştur'da "Arıza bulma"; yer şemadan da seçilir; bağlantı hedefli görevle aynı yapıda.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
+    let dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    await dlg.getByRole('radio', { name: 'Arıza bulma' }).click(); await page.waitForTimeout(150);
+    await dlg.getByRole('textbox', { name: 'Görev adı' }).fill('Deney 7 · arıza bul');
+    await dlg.getByRole('textbox', { name: /^Belirti/ }).fill('Osiloskobun B kanalında sinyal yok.');
+    const tools = await dlg.getByRole('button', { pressed: true }).allTextContents();
+    const parts = (await dlg.getByRole('button', { name: 'Arıza ekle' }).count()) === 1 && (await dlg.getByRole('button', { name: 'Rastgele seç' }).count()) === 1;
+    const note = ((await dlg.textContent()) ?? '').includes('Arıza bağlantının içinde durur');
+    if (OUT) await page.screenshot({ path: path.join(OUT, 'ariza-gorev-olustur.png') });
+    await dlg.getByRole('button', { name: 'Yeri şemadan seç' }).first().click(); await page.waitForTimeout(300);
+    const pickHint = await page.getByText('Arızanın yerini şemada seç: bacak, parça ya da kablo (Esc: vazgeç)').count();
+    const hidden = (await page.getByRole('dialog', { name: 'Görev oluştur' }).count()) === 0;
+    const p = await screen(page, 44, -4); await page.mouse.click(p.x, p.y); await page.waitForTimeout(300);
+    dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    const place = await dlg.getByRole('combobox', { name: '1. arızanın yeri' }).evaluate((el) => el.selectedOptions[0]?.textContent ?? '');
+    const kind = await dlg.getByRole('combobox', { name: '1. arızanın türü' }).evaluate((el) => el.selectedOptions[0]?.textContent ?? '');
+    await dlg.getByRole('switch', { name: /Önce beklenen değeri sor/ }).click();
+    const url = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    check('arıza (B2, 6. aşama, R4): Görev oluştur → "Hedefli görev | Arıza bulma"; ad, belirti, gizli arıza (yer ve tür), Arıza ekle, Rastgele seç, ölçü aletleri (V, Ω, osiloskop seçili), uyarı; yer şemadan seçiliyor (pencere kapanıp geri açılıyor); #g= bağlantısı',
+      tools.join('|') === 'Multimetre V|Multimetre Ω|Osiloskop (devrede)' && parts && note && pickHint === 1 && hidden && place === 'RC · Q1 kollektör tarafındaki bacak' && kind === 'Kopuk bağlantı' && /#g=/.test(url),
+      `${tools.join('|')} · ${place} · ${kind}`);
+    await page.goto('about:blank'); await page.goto(url, { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const card = page.getByRole('region', { name: 'Arıza bul: Deney 7 · arıza bul' });
+    const cardText = ((await card.textContent()) ?? '').replace(/\s+/g, ' ');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(1200);
+    const panel = page.getByRole('region', { name: 'Multimetre' });
+    await panel.getByRole('button', { name: /^Kırmızı u/ }).click(); await page.waitForTimeout(150);
+    const q = await screen(page, 44, -4); await page.mouse.click(q.x, q.y); await page.waitForTimeout(2000);
+    const reading = (await panel.getByRole('img').getAttribute('aria-label')) ?? '';
+    const expected = await card.getByRole('textbox', { name: /beklediğin değer$/ }).count();
+    check('arıza (B2, 6. aşama): bağlantı öğrencide arıza kipini açıyor (kart, belirti); seçilen arıza devrede (RC bacağında 11,99 V); "Önce beklenen değeri sor" günlükte beklenen alanı',
+      cardText.includes('Osiloskobun B kanalında sinyal yok.') && reading.endsWith('11,99 V ⎓') && expected === 1, `${reading} · ${expected}`);
+    await ctx.close();
+  }
+  // Ampermetre (hoca izin verdiyse): panelde yalnızca ampermetre; kabloya "Buraya ampermetre tak",
+  // kaldırınca kablo eski hâline döner; şeritte Bode ve Eğri izleyicinin kapalı olduğu yazar.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    const tools = { voltage: true, resistance: true, scope: true, ammeter: true };
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.goto('about:blank'); await page.goto(faultUrl({ tools }), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre') ?? '{}'));
+    const banner = ((await page.locator('main').getByText('Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul.').count()) === 1);
+    const add = page.getByRole('combobox', { name: /parça ekle/i });
+    await add.fill('direnç'); await page.waitForTimeout(150);
+    const none = await page.getByRole('option').count();
+    await add.fill('amper'); await page.waitForTimeout(150);
+    const amp = await page.getByRole('option').allTextContents();
+    await add.fill('');
+    await page.getByRole('button', { name: /^Bütün parçalara göz at/ }).click(); await page.waitForTimeout(200);
+    const grid = await page.getByRole('dialog').locator('button[data-part]').evaluateAll((els) => els.map((e) => e.getAttribute('data-part')));
+    await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    check('arıza (ampermetre): şeritte "Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul."; parça panelinde (arama ve Bütün parçalar) yalnızca ampermetre',
+      banner && none === 0 && amp.length === 1 && /Ampermetre/.test(amp[0] ?? '') && grid.join(',') === 'ammeter', `${none} · ${amp.length} · ${grid.join(',')}`);
+    await page.waitForTimeout(500);
+    const before = await saved();
+    // Elle kablo kapalı: PS1'in uçlarından (boştaki 2+ dahil) sürükleyip bırakınca kablo eklenmiyor; W kablo aracını açmıyor.
+    const ps1 = before.parts.find((x) => x.label === 'PS1');
+    for (const gy of [-11, -9, -7, -5]) {
+      const a = await screen(page, ps1.x + 5, gy);
+      await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(a.x + 90, a.y + 40, { steps: 6 }); await page.mouse.up(); await page.waitForTimeout(150);
+      await page.mouse.click(a.x + 220, a.y + 140); await page.waitForTimeout(100);
+    }
+    await page.keyboard.press('w'); await page.waitForTimeout(100);
+    await page.keyboard.press('Escape');
+    const manual = await saved();
+    // Kilitli PS1: kartta Döndür ve Sil yok, − + devre dışı; Delete reddediliyor ("Bu parça görevde kilitli"), PS1 duruyor.
+    let pt = await screen(page, ps1.x, ps1.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(400);
+    const psCard = page.locator(`[data-card="${ps1.id}"]`);
+    const psButtons = [await psCard.getByRole('button', { name: 'Döndür', exact: true }).count(), await psCard.getByRole('button', { name: 'Sil', exact: true }).count()];
+    const steppers = await psCard.getByRole('button', { name: /^[−+]$|azalt|artır/i }).evaluateAll((els) => els.map((e) => e.disabled));
+    await page.keyboard.press('Delete'); await page.waitForTimeout(400);
+    const lockedToast = await page.getByText('Bu parça görevde kilitli: değiştirilemez.').count();
+    const deletedToast = await page.getByText('PS1 silindi.').count();
+    const kept = (await saved()).parts.some((x) => x.id === ps1.id);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    const lockBadges = await page.locator('svg.schematic path[d^="M-2.8 -0.2h5.6"]').count();
+    const note = await page.getByText('Kırmızı ucu şemaya koy.', { exact: true }).count();
+    check('arıza (masaüstü): elle kablo çizilmiyor (PS1 uçlarından sürükleme, W); kilitli PS1 kartında Döndür ve Sil yok, − + devre dışı; Delete → "Bu parça görevde kilitli", başarı bildirimi yok; kilit simgesi yok; siyah uç yerindeyken "Kırmızı ucu şemaya koy."',
+      manual.wires.length === before.wires.length && JSON.stringify(manual.wires) === JSON.stringify(before.wires) && psButtons.join(',') === '0,0' && steppers.length >= 4 && steppers.every(Boolean) &&
+        lockedToast === 1 && deletedToast === 0 && kept && lockBadges === 0 && note === 1,
+      `${manual.wires.length}/${before.wires.length} · ${psButtons} · ${steppers.length} · ${lockedToast}/${deletedToast}/${kept} · ${lockBadges} · ${note}`);
+    // Kollektörden OSC1 B'ye giden kablo: A1 kablonun üstünde, kablonun yönünde.
+    pt = await screen(page, 51, -2.3); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
+    const menu = await page.getByRole('menuitem').allTextContents();
+    await page.getByRole('menuitem', { name: 'Buraya ampermetre tak' }).click(); await page.waitForTimeout(700);
+    const plugged = await saved();
+    const meter = plugged.parts.find((x) => x.type === 'ammeter');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(1500);
+    const shown = await page.locator('svg.schematic').getByText(/A$/).allTextContents();
+    await page.getByRole('button', { name: 'Durdur', exact: true }).first().click(); await page.waitForTimeout(300);
+    pt = await screen(page, meter.x, meter.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
+    const menu2 = await page.getByRole('menuitem').allTextContents();
+    await page.getByRole('menuitem', { name: 'Ampermetreyi kaldır' }).click(); await page.waitForTimeout(700);
+    const after = await saved();
+    check('arıza (ampermetre, masaüstü): kabloya tıkla → "Buraya ampermetre tak": A1 kablonun üstünde, kablonun yönünde (kablo ikiye bölünüyor, gösterge çalışıyor); ampermetreye tıkla → "Ampermetreyi kaldır": kablolar birebir eski hâline dönüyor',
+      menu.join('|') === 'Buraya ampermetre tak' && meter !== undefined && meter.y === -2 && meter.rotation === 0 && plugged.parts.length === before.parts.length + 1 && plugged.wires.length === before.wires.length + 1 &&
+        shown.some((x) => /\d A$/.test(x)) && menu2.join('|') === 'Ampermetreyi kaldır' && JSON.stringify(after.wires) === JSON.stringify(before.wires) && after.parts.length === before.parts.length,
+      `${menu.join('|')} · ${meter?.x},${meter?.y} · ${plugged.parts?.length}/${plugged.wires?.length} · ${shown.join(',')} · ${menu2.join('|')}`);
+    // 3B: etiketlerde yalnızca ölçü aletlerinin değeri (PS1, FG1 değersiz), Akım düğmesi yok; panelden ampermetre → şemaya dön, "Bir kabloya tıkla".
+    await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: '3B', exact: true }).first().click(); await page.waitForTimeout(3500);
+    const labels = (await page.locator('[data-anchor="part"]').allTextContents()).map((t) => t.replace(/\s+/g, ' '));
+    const dots = await page.getByRole('button', { name: 'Akım', exact: true }).count();
+    await page.getByRole('combobox', { name: /parça ekle/i }).fill('amper'); await page.waitForTimeout(200);
+    await page.getByRole('option').first().click(); await page.waitForTimeout(500);
+    const back = (await page.locator('svg.schematic').count()) === 1 && (await page.getByText('Bir kabloya tıkla: ampermetre oraya takılır.').count()) === 1;
+    const noLoose = (await saved()).parts.length === before.parts.length;
+    await page.getByRole('button', { name: 'Durdur', exact: true }).first().click(); await page.waitForTimeout(300);
+    check('arıza (3B): çalışırken etiketlerde canlı değer yok (PS1, FG1 yalnızca adı; 2B kartlarıyla aynı), Akım düğmesi yok; panelden ampermetre konmuyor: şemaya dönülüyor, "Bir kabloya tıkla"',
+      labels.some((t) => t === 'PS1 · DC güç kaynağı') && labels.some((t) => /^FG1 · [^0-9]*1 kHz · 20 mV t-t$/.test(t)) && !labels.some((t) => /^(PS1|FG1|RC|Q1|RB|C1) .*\d,\d{3}/.test(t)) && dots === 0 && back && noLoose,
+      `${labels.filter((t) => /^(PS1|FG1)/.test(t)).join(' | ')} · ${dots} · ${back} · ${noLoose}`);
+    await ctx.close();
+  }
+  // Ampermetre izni yoksa 3B'de Parça ekle yok.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const desk = await page.getByRole('combobox', { name: /parça ekle/i }).count();
+    await page.getByRole('button', { name: '3B', exact: true }).first().click(); await page.waitForTimeout(2500);
+    const bench = await page.getByRole('combobox', { name: /parça ekle/i }).count();
+    await page.getByRole('button', { name: 'Şema', exact: true }).first().click(); await page.waitForTimeout(300);
+    check('arıza (ampermetre izni yok): şemada ve 3B\'de sağ paneldeki Parça ekle yok', desk === 0 && bench === 0, `${desk} · ${bench}`);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    const tools = { voltage: true, resistance: true, scope: true, ammeter: true };
+    await page.goto('about:blank'); await page.goto(faultUrl({ tools }), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const chip = ((await page.locator('p').filter({ hasText: /^Arıza bulma/ }).first().textContent()) ?? '').replace(/\s+/g, ' ');
+    const percent = await page.getByText(/^%\d+ · değerler gizli$/).count();
+    check('arıza (telefon): yakınlaştırma yüzdesi kutusu yok; "değerler gizli" Arıza bulma çipinin içinde', percent === 0 && /^Arıza bulma ?· değerler gizli$/.test(chip), `${percent} · ${chip}`);
+    const pt = await screen(page, 51, -2.3); await page.touchscreen.tap(pt.x, pt.y); await page.waitForTimeout(400);
+    const menu = await page.getByRole('menuitem').allTextContents();
+    const itemH = (await page.getByRole('menuitem').first().boundingBox())?.height ?? 0;
+    await page.getByRole('menuitem', { name: 'Buraya ampermetre tak' }).tap(); await page.waitForTimeout(700);
+    const d = await page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre') ?? '{}'));
+    check('arıza (ampermetre, telefon): Kablo bağla açılmadan kabloya dokun → "Buraya ampermetre tak" (≥ 44 px) → ampermetre seri; Kablo bağla ve Parça ekle yok; sayfa kaymıyor',
+      menu.join('|') === 'Buraya ampermetre tak' && itemH >= 43.5 && d.parts.filter((x) => x.type === 'ammeter').length === 1 &&
+        (await page.getByRole('button', { name: /Kablo bağla/ }).count()) === 0 && (await page.getByRole('button', { name: 'Parça ekle', exact: true }).count()) === 0 && !(await pageScrolls(page)),
+      `${menu.join('|')} · ${Math.round(itemH)} px`);
+    await page.context().close();
+  }
+  // 8. aşama: Örnekler → "Arıza bul" grubu; hazır senaryo (föy deneyi), kendi açıklaması, Yeni arıza dene.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    const dlg = page.getByRole('dialog');
+    const scenarios = await dlg.getByRole('button', { name: /^Arıza bul: / }).allInnerTexts();
+    await dlg.getByRole('button', { name: 'Arıza bul: Yükselteçte çıkış yok' }).click(); await page.waitForTimeout(600);
+    const card = () => page.locator('[data-notebook="task"]').first();
+    const head = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
+    check('arıza (B2, 8. aşama): Örnekler’de "Arıza bul" grubu (5 hazır senaryo: temel devre, Deney 1, 2, 5, 7); BJT senaryosu kartta "Arıza bul · Deney 7", "Yükselteçte çıkış yok", belirti',
+      scenarios.length === 5 && head.startsWith('Arıza bul · Deney 7') && head.includes('Yükselteçte çıkış yok') && head.includes('Osiloskobun B kanalında sinyal yok.') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 1,
+      `${scenarios.length} · ${head.slice(0, 60)}`);
+    await card().getByRole('button', { name: 'Arızayı bildir' }).click(); await page.waitForTimeout(300);
+    const pt = await screen(page, 44, -4); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    await card().getByRole('radio', { name: /^Kopuk bağlantı/ }).click();
+    await card().getByRole('button', { name: 'Bildir', exact: true }).click(); await page.waitForTimeout(400);
+    const found = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
+    await card().getByRole('button', { name: 'Yeni arıza dene' }).click(); await page.waitForTimeout(600);
+    const next = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
+    check('arıza (B2, 8. aşama): senaryonun kendi açıklaması ("RC’nin kollektör tarafındaki bacağı temas etmiyordu", belirleyici ölçüm 11,99 V ve 6,4 mV); Yeni arıza dene sıradaki senaryoyu açıyor',
+      found.includes('RC’nin kollektör tarafındaki bacağı temas etmiyordu') && found.includes('Belirleyici ölçüm: RC’nin ucunda 11,99 V') && next.startsWith('Arıza bul · Temel devre') && next.includes('LED yanmıyor'),
+      `${found.slice(0, 60)} → ${next.slice(0, 40)}`);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await page.goto('about:blank'); await page.goto(faultUrl(), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const chip = await page.locator('p').filter({ hasText: /^Arıza bulma/ }).first().boundingBox();
+    const vw = page.viewportSize().width;
+    check('arıza (telefon, R5): şemanın sağ üstünde "Arıza bulma" çipi; sayfa kaymıyor',
+      chip !== null && chip.x + chip.width <= vw && chip.y < 140 && !(await pageScrolls(page)), `${Math.round(chip?.x ?? 0)},${Math.round(chip?.y ?? 0)}`);
+    // 7. aşama (R5): defterin yerinde arıza sayfası; önce ucu seç, sonra şemada dokun; altta İpucu ve Arızayı bildir.
+    const sheet = page.getByRole('region', { name: /^Arıza bul:/ });
+    const connect = await page.getByRole('button', { name: /Kablo bağla/ }).count();
+    await page.locator('[data-tour="play"]').tap(); await page.waitForTimeout(1200);
+    await sheet.getByRole('button', { name: /^Kırmızı u/ }).tap(); await page.waitForTimeout(200);
+    const pt = await screen(page, 44, -4); await page.touchscreen.tap(pt.x, pt.y); await page.waitForTimeout(2200);
+    const reading = (await sheet.getByRole('img').getAttribute('aria-label')) ?? '';
+    const rows = await sheet.locator('ol li').count();
+    const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, input')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 18), h: r.height }; }).filter((r) => r.h > 0 && r.h < 43.5).map((r) => `${r.n} ${Math.round(r.h)}`));
+    const bar = await sheet.getByRole('button', { name: 'Arızayı bildir' }).boundingBox();
+    const fab = await page.locator('[data-tour="play"]').boundingBox();
+    check('arıza (telefon, 7. aşama, R5): defterin yerinde arıza sayfası (büyük okuma, kip, iki uç düğmesi, günlük); Kablo bağla yok; ucu seç → şemada dokun: RC bacağında 11,99 V, günlükte; altta İpucu ve Arızayı bildir, Oynat üstünde; denetimler ≥ 44 px; sayfa kaymıyor',
+      connect === 0 && reading.endsWith('11,99 V ⎓') && rows === 1 && small.length === 0 && bar !== null && fab !== null && fab.y + fab.height <= bar.y && !(await pageScrolls(page)),
+      `${reading} · ${rows} satır · ${small.join(', ')}`);
+    await sheet.getByRole('button', { name: 'Arızayı bildir' }).tap(); await page.waitForTimeout(300);
+    const report = page.getByRole('region', { name: 'Arızayı bildir' });
+    const hint = await page.getByText('Arızanın yerini şemada seç: parçaya, bacağa ya da kabloya dokun').boundingBox();
+    await page.touchscreen.tap(pt.x, pt.y); await page.waitForTimeout(300);
+    const where = ((await report.textContent()) ?? '').includes('RC · Q1 kollektör tarafındaki bacak');
+    check('arıza (telefon, R5): Arızayı bildir kartı defterde, yer şemaya dokunarak seçiliyor; yönerge ekrana sığıyor',
+      (await report.count()) === 1 && where && hint !== null && hint.x >= 0 && hint.x + hint.width <= vw, `${where} · ${Math.round(hint?.x ?? -1)}–${Math.round((hint?.x ?? 0) + (hint?.width ?? 0))}`);
     await page.context().close();
   }
   // --- Gömme (C4, C5, C8; N7, N8): Paylaş → Sayfaya göm, /embed/ sade görünüm, salt okunur, Moodle ------

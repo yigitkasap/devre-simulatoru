@@ -2,8 +2,11 @@
 // markanın panelini kopyalamaz. Türkçe ad önde; laboratuvarda görülecek panel yazısı yanında küçük
 // mono (VOLTS/DIV). Döner düğme çizilmez: kademeli ayar (− değer +), tekerlek ve ↑/↓ tuşları.
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { tr } from '../i18n/tr';
+
+/** Kilitli parçanın kartı (görev): içindeki kademeli ayarlar (− değer +) devre dışı. */
+export const ControlsLocked = createContext(false);
 
 /** Ön panel yazısı: Türkçe ad ve yanında küçük panel yazısı. */
 export function PanelLabel({ children, panel, muted = false }: { children: ReactNode; panel?: string; muted?: boolean }) {
@@ -25,7 +28,7 @@ export function Stepper({
   onStep,
   canDown = true,
   canUp = true,
-  disabled = false,
+  disabled: disabledProp = false,
   downLabel,
   upLabel,
   downGlyph = '−',
@@ -58,6 +61,7 @@ export function Stepper({
     readonly up: { readonly glyph: string; readonly label: string; readonly disabled?: boolean; readonly onClick: () => void };
   };
 }) {
+  const disabled = useContext(ControlsLocked) || disabledProp;
   const [editing, setEditing] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
   const valueRef = useRef<HTMLSpanElement>(null);

@@ -372,6 +372,7 @@ function PickControls({ api, touch, compact = false }: { api: AnalysisApi; touch
   const t = tr.analysis.graph;
   const small = `rounded-lg px-3 text-small font-semibold ${touch ? 'h-11' : 'h-9'}`;
   if (!api.pick) {
+    if (api.traceGate) return compact ? null : <p className="m-0 rounded-lg bg-panel-2 px-3 py-2.5 text-small leading-snug text-ink-2">{api.traceGate}</p>;
     return compact ? null : (
       <button type="button" onClick={api.startPick} className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-accent-line text-small font-semibold text-accent-ink hover:bg-accent-soft ${touch ? 'h-11' : 'h-10'}`}>
         <Icon name="plus" className="h-4 w-4" />
@@ -477,7 +478,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                   </span>
                 );
               })}
-              {!api.pick && (
+              {!api.pick && !api.traceGate && (
                 <button type="button" onClick={api.startPick} aria-label={t.add} className="flex h-11 items-center gap-1 rounded-full border border-line px-3.5 text-small font-semibold text-accent-ink">
                   <Icon name="plus" className="h-4 w-4" />
                   {t.addShort}
@@ -485,7 +486,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
               )}
             </div>
             <PickControls api={api} touch compact />
-            {api.traces.length === 0 && !api.pick && <p className="m-0 text-small text-muted">{t.empty}</p>}
+            {api.traces.length === 0 && !api.pick && <p className="m-0 text-small text-muted">{api.traceGate ?? t.empty}</p>}
             <div className="flex h-[210px] shrink-0">
               <ChartMemo recorder={recorder} traces={g.chartTraces} version={g.version} cursor={g.cursor} onCursor={g.setCursor} compact svgRef={g.svg} />
             </div>

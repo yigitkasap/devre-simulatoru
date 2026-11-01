@@ -210,7 +210,24 @@ export function WiringFooter({ canUndo, hasStart, onUndo, onClear }: { canUndo: 
 }
 
 /** Yüzen düğmeler: sol altta Parça ekle (Kur kipinde), sağ altta 64 px Oynat / Duraklat. */
-export function PhoneFabs({ status, canAdd, addOpen, onAdd, onPlay, onPause }: { status: SimStatus; canAdd: boolean; addOpen: boolean; onAdd: () => void; onPlay: () => void; onPause: () => void }) {
+export function PhoneFabs({
+  status,
+  canAdd,
+  addOpen,
+  onAdd,
+  onPlay,
+  onPause,
+  lift = 0,
+}: {
+  status: SimStatus;
+  canAdd: boolean;
+  addOpen: boolean;
+  onAdd: () => void;
+  onPlay: () => void;
+  onPause: () => void;
+  /** Alttaki sabit çubuğun (arıza bulma: İpucu, Arızayı bildir) yüksekliği kadar yukarı (px). */
+  lift?: number;
+}) {
   const running = status === 'running';
   return (
     <>
@@ -236,7 +253,7 @@ export function PhoneFabs({ status, canAdd, addOpen, onAdd, onPlay, onPause }: {
         className={`absolute right-4 z-20 flex h-16 w-16 items-center justify-center rounded-full active:brightness-110 ${
           running ? 'bg-ink text-on-ink shadow-[0_6px_16px_rgba(29,39,51,0.3)]' : 'bg-ok text-white shadow-[0_6px_16px_rgba(27,125,68,0.3)]'
         }`}
-        style={{ bottom: 'calc(20px + env(safe-area-inset-bottom))' }}
+        style={{ bottom: `calc(${20 + lift}px + env(safe-area-inset-bottom))` }}
       >
         <Icon name={running ? 'pause' : 'play'} className="h-6 w-6" />
       </button>
