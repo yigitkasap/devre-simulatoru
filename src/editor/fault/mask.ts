@@ -8,7 +8,7 @@ import type { DeviceType } from '../../sim/netlist';
 import type { LiveVisual } from '../symbols';
 import type { SimFrame } from '../useSimulation';
 
-export const INSTRUMENTS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter', 'oscilloscope', 'funcgen', 'dcsupply']);
+export const INSTRUMENTS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter', 'multimeter', 'oscilloscope', 'funcgen', 'dcsupply']);
 
 export function maskFrame(frame: SimFrame, doc: CircuitDoc): SimFrame {
   const keep = new Set(doc.parts.filter((p) => INSTRUMENTS.has(p.type)).map((p) => p.id));

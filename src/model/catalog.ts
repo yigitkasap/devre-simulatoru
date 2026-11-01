@@ -46,6 +46,8 @@ import {
   TRANSFORMER_MAX_COUPLING,
   LED_COLORS,
   LED_DEFAULTS,
+  MULTIMETER_DEFAULTS,
+  MULTIMETER_MODES,
   OSCILLOSCOPE_DEFAULTS,
   RESISTOR_DEFAULTS,
   SWITCH_DEFAULTS,
@@ -675,6 +677,18 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: true,
   },
+  multimeter: {
+    type: 'multimeter',
+    category: 'meters',
+    labelPrefix: 'MM',
+    pins: TWO_PINS,
+    // Dairenin altında kip işareti (⎓ ya da ∿) da kutunun içinde.
+    bounds: { x: -4, y: -1.7, w: 8, h: 4.4 },
+    defaultProps: { ...MULTIMETER_DEFAULTS },
+    propDefs: [{ kind: 'select', key: 'mode', options: MULTIMETER_MODES }],
+    showLabel: true,
+    polarized: true,
+  },
   oscilloscope: {
     type: 'oscilloscope',
     category: 'instruments',
@@ -708,7 +722,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'switches', types: ['switch', 'relay', 'fuse'] },
   { id: 'outputs', types: ['lamp', 'motor', 'speaker', 'buzzer'] },
   { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },
-  { id: 'meters', types: ['voltmeter', 'ammeter'] },
+  { id: 'meters', types: ['voltmeter', 'ammeter', 'multimeter'] },
   { id: 'instruments', types: ['funcgen', 'dcsupply', 'oscilloscope'] },
 ];
 

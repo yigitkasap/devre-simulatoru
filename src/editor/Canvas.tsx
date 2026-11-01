@@ -55,7 +55,7 @@ import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
 import { selectionActions, type TaskParts } from './InspectTab';
-import { meterDisplayRect, meterFlipped, partValueText, PartView, type PartTone } from './PartView';
+import { METER_DISPLAY, meterDisplayRect, meterFlipped, partValueText, PartView, type PartTone } from './PartView';
 import { visibleLive } from './fault/mask';
 import type { Probe } from './fault/meter';
 import { PlaceMarks, ProbeLayer, type PlaceMark, type ProbeView } from './fault/ProbeLayer';
@@ -249,6 +249,8 @@ export interface CanvasProps {
   readonly wiringLocked?: boolean;
   /** Takılı ampermetrelerin gösterge yanı (arıza bulma; takarken seçildi). */
   readonly meterFlips?: ReadonlyMap<string, boolean>;
+  /** Multimetrelerin Ω okuması (simülasyon durmuşken). */
+  readonly ohmTexts?: ReadonlyMap<string, string>;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -396,6 +398,7 @@ export function Canvas({
   taskParts,
   wiringLocked = false,
   meterFlips,
+  ohmTexts,
   ref,
 }: CanvasProps) {
   // Göstergeler kapalıysa kablo renkleri ve öbür göstergeler simülasyon yokmuş gibi çizilir.
@@ -1639,7 +1642,7 @@ export function Canvas({
   // (takılı ampermetrede yanı takarken seçildi).
   const displayFlips = new Set<string>();
   for (const part of doc.parts) {
-    if (part.type !== 'voltmeter' && part.type !== 'ammeter') continue;
+    if (!METER_DISPLAY.has(part.type)) continue;
     if (meterFlips?.get(part.id) ?? meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)))) displayFlips.add(part.id);
   }
 
@@ -1836,7 +1839,7 @@ export function Canvas({
                 part={part}
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
-                meterText={liveFrame?.meterTexts.get(part.id) ?? null}
+                meterText={liveFrame?.meterTexts.get(part.id) ?? ohmTexts?.get(part.id) ?? null}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
                 hideValue={lod && !selectedParts.has(part.id)}
@@ -2804,7 +2807,7 @@ function docBounds(doc: CircuitDoc): Box | null {
   for (const part of doc.parts) {
     box = unionBox(box, partBounds(part));
     // Ölçü aleti ekranı da görünsün.
-    if (part.type === 'voltmeter' || part.type === 'ammeter') box = unionBox(box, meterDisplayRect(part, false));
+    if (METER_DISPLAY.has(part.type)) box = unionBox(box, meterDisplayRect(part, false));
   }
   for (const wire of doc.wires) {
     for (const p of wire.points) box = unionBox(box, { x: p.x, y: p.y, w: 0, h: 0 });

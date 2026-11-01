@@ -23,6 +23,7 @@ import { resistorModel } from './resistor';
 import { switchModel } from './switch';
 import { motorModel } from './motor';
 import { relayModel } from './relay';
+import { multimeterModel } from './multimeter';
 import { lampModel, ldrModel, ntcModel, potentiometerModel } from './sensors';
 import { buzzerModel, fuseModel, speakerModel } from './sound';
 import { opampModel } from './opamp';
@@ -68,6 +69,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   voltmeter: voltmeterModel,
   ammeter: ammeterModel,
   oscilloscope: oscilloscopeModel,
+  multimeter: multimeterModel,
 };
 
 export * from './device';
@@ -205,3 +207,4 @@ export {
   type TankSettings,
 } from './tank';
 export { VoltmeterDevice, VOLTMETER_DEFAULTS } from './voltmeter';
+export { MULTIMETER_DEFAULTS, MULTIMETER_MODES, multimeterMode, type MultimeterMode } from './multimeter';

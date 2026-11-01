@@ -3,9 +3,10 @@
 // Sıklık sınırına takılan değişiklik bekletilir (update true döner, sahne bir sonraki karede yeniden
 // dener): duraklatılınca ekran son değerde kalır, ilk açılıştaki "– – –"da kalmaz.
 
-import { BoxGeometry, CanvasTexture, CylinderGeometry, Group, Mesh, MeshStandardMaterial, SRGBColorSpace, Vector3 } from 'three';
+import { BoxGeometry, CanvasTexture, CylinderGeometry, ExtrudeGeometry, Group, Mesh, MeshStandardMaterial, Shape, SRGBColorSpace, Vector3 } from 'three';
 import { SCOPE_DIVISIONS_X, SCOPE_DIVISIONS_Y } from '../sim/scope';
 import { formatSI } from '../sim/units';
+import { multimeterMode, type MultimeterMode } from '../sim/devices/multimeter';
 import { numProp, strProp, type DeviceType } from '../sim/netlist';
 import { LEAD_Y, M, SPREAD, mat, mesh, ownMat, pinAnchors, wirePath } from './kit';
 import type { LiveContext, PartModel } from './model';
@@ -119,6 +120,119 @@ export function meterModel(type: 'voltmeter' | 'ammeter'): PartModel {
       return panel.redraw(text + mode, ctx.now, () => draw(text, `${type === 'voltmeter' ? 'VOLTMETRE' : 'AMPERMETRE'} · ${mode}`));
     },
     dispose: panel.dispose,
+  };
+}
+
+// --- El multimetresi (MM): sarı kılıf, döner seçici; ekran ve seçici kipe göre değişir ---------------------------
+
+/** Döner seçicinin kip yazıları ve açıları (derece; tasarım: parcalar-3b/newParts.ts). */
+const DIAL: ReadonlyArray<readonly [string, number, MultimeterMode | null]> = [
+  ['OFF', -150, null],
+  ['V⎓', -105, 'dc'],
+  ['V∿', -60, 'ac'],
+  ['Ω', -15, 'ohm'],
+  ['A', 30, 'a'],
+  ['mA', 75, null],
+];
+
+export function multimeterModel(): PartModel {
+  const root = new Group();
+  const w = 12;
+  const d = 20;
+  const h = 1.8;
+  // Sarı kılıf (kenarları yuvarlatılmış)
+  const s = new Shape();
+  const r = 1.4;
+  s.moveTo(-w / 2 + r, -d / 2);
+  s.lineTo(w / 2 - r, -d / 2);
+  s.quadraticCurveTo(w / 2, -d / 2, w / 2, -d / 2 + r);
+  s.lineTo(w / 2, d / 2 - r);
+  s.quadraticCurveTo(w / 2, d / 2, w / 2 - r, d / 2);
+  s.lineTo(-w / 2 + r, d / 2);
+  s.quadraticCurveTo(-w / 2, d / 2, -w / 2, d / 2 - r);
+  s.lineTo(-w / 2, -d / 2 + r);
+  s.quadraticCurveTo(-w / 2, -d / 2, -w / 2 + r, -d / 2);
+  const holster = new ExtrudeGeometry(s, { depth: h, bevelEnabled: true, bevelSize: 0.25, bevelThickness: 0.25, bevelSegments: 3, curveSegments: 10 });
+  holster.rotateX(-Math.PI / 2);
+  root.add(mesh(holster, mat('#f2b705', 0.62), 0, 0.25, 0));
+  // Ön yüz (koyu panel): ekran, kip yazıları ve soket yazıları; değer ya da kip değişince yeniden çizilir.
+  const fw = w - 1.6;
+  const fd = d - 1.8;
+  const face = panelBox(fw, fd, 0.12, mat('#26292e', 0.5), 40);
+  face.box.position.y = 0.25 + h + 0.3;
+  root.add(face.box);
+  const draw = (reading: string, mode: MultimeterMode) => {
+    const { ctx: c, W, H } = face;
+    const u = W / fw;
+    root.userData.screen = reading;
+    c.fillStyle = '#26292e';
+    c.fillRect(0, 0, W, H);
+    // LCD
+    c.fillStyle = '#b9c6a8';
+    c.fillRect(W * 0.08, H * 0.05, W * 0.84, H * 0.22);
+    c.strokeStyle = '#11140f';
+    c.lineWidth = u * 0.12;
+    c.strokeRect(W * 0.08, H * 0.05, W * 0.84, H * 0.22);
+    c.fillStyle = '#1b2016';
+    c.textAlign = 'right';
+    c.textBaseline = 'middle';
+    c.font = `500 ${Math.round(H * 0.11)}px ${FONT}`;
+    c.fillText(reading, W * 0.8, H * 0.165, W * 0.66);
+    c.font = `600 ${Math.round(H * 0.045)}px ${SANS}`;
+    c.fillText(mode === 'ohm' ? 'Ω' : mode === 'a' ? 'A' : 'V', W * 0.9, H * 0.19);
+    c.textAlign = 'left';
+    if (mode !== 'ohm') c.fillText(mode === 'ac' ? 'AC' : 'DC', W * 0.11, H * 0.09);
+    // Döner seçicinin çevresindeki kip yazıları (seçili olan sarı)
+    const cx = W / 2;
+    const cy = H * 0.55;
+    const R = W * 0.36;
+    c.font = `600 ${Math.round(H * 0.042)}px ${SANS}`;
+    c.textAlign = 'center';
+    for (const [t, a, m] of DIAL) {
+      const rad = (a * Math.PI) / 180;
+      c.fillStyle = m === mode ? '#f2b705' : '#e8ebef';
+      c.fillText(t, cx + R * Math.cos(rad), cy + R * Math.sin(rad) + H * 0.014);
+    }
+    // Soket yazıları
+    c.font = `600 ${Math.round(H * 0.038)}px ${SANS}`;
+    c.fillStyle = '#e8ebef';
+    c.fillText('VΩmA', W * 0.28, H * 0.865);
+    c.fillText('COM', W * 0.72, H * 0.865);
+    c.fillStyle = '#f2b705';
+    c.font = `700 ${Math.round(H * 0.04)}px ${SANS}`;
+    c.fillText('MULTİMETRE', W / 2, H * 0.31);
+  };
+  // Döner seçici
+  const knobY = 0.25 + h + 0.36;
+  const kz = -fd / 2 + fd * 0.55;
+  root.add(mesh(new CylinderGeometry(2.4, 2.5, 0.7, 40), mat('#1a1c20', 0.5), 0, knobY + 0.35, kz));
+  const pointer = new Group();
+  pointer.add(mesh(new BoxGeometry(4.4, 0.5, 0.8), mat('#2d3036', 0.45), 0, 0, 0));
+  pointer.add(mesh(new BoxGeometry(1.1, 0.06, 0.24), mat('#f2f2f2', 0.4), -1.6, 0.27, 0));
+  pointer.position.set(0, knobY + 0.95, kz);
+  pointer.userData.live = true;
+  root.add(pointer);
+  const turn = (mode: MultimeterMode) => {
+    const angle = DIAL.find(([, , m]) => m === mode)?.[1] ?? -105;
+    pointer.rotation.y = -(angle * Math.PI) / 180 + Math.PI;
+  };
+  // Muz soketleri (kablolar buraya): VΩmA kırmızı (pin 0), COM siyah (pin 1).
+  const jy = 0.25 + h + 0.42;
+  const anchors = [new Vector3(-fw * 0.22, jy, d / 2 - 1.9), new Vector3(fw * 0.22, jy, d / 2 - 1.9)];
+  root.add(bananaJack(anchors[0]!, '#c8312a'), bananaJack(anchors[1]!, '#1d1f23'));
+  draw('– – –', 'dc');
+  turn('dc');
+  return {
+    root,
+    anchors,
+    update(ctx: LiveContext) {
+      const mode = multimeterMode(ctx.props);
+      turn(mode);
+      // Şemadaki gösterge ve defter kartıyla aynı okuma.
+      const text = ctx.reading !== undefined && (ctx.active || mode === 'ohm') ? ctx.reading.replace(/^≈ /, '') : '– – –';
+      return face.redraw(text + mode, ctx.now, () => draw(text, mode));
+    },
+    dispose: face.dispose,
   };
 }
 

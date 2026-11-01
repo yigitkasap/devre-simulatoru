@@ -7,6 +7,9 @@ import { METER_MODES } from '../sim/averager';
 import {
   acRms,
   AC_SOURCE_DEFAULTS,
+  AMMETER_DEFAULTS,
+  multimeterMode,
+  VOLTMETER_DEFAULTS,
   dcsupplySettings,
   funcgenSettings,
   scopeSettings,
@@ -21,6 +24,17 @@ import { tankSettings } from '../sim/devices/tank';
 import { SWITCH_ON_RESISTANCE } from '../sim/constants';
 import { boolProp, numProp, strProp, type Props } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
+
+/**
+ * Ölçü aletinin şu anki işi: voltmetre gibi, ampermetre gibi ya da Ω (çalışırken okumaz); ölçü aleti
+ * değilse null. Multimetre kipine göre (A kipi DC ortalama).
+ */
+export function meterRole(part: Part): 'voltmeter' | 'ammeter' | 'ohm' | null {
+  if (part.type === 'voltmeter' || part.type === 'ammeter') return part.type;
+  if (part.type !== 'multimeter') return null;
+  const mode = multimeterMode(part.props);
+  return mode === 'a' ? 'ammeter' : mode === 'ohm' ? 'ohm' : 'voltmeter';
+}
 
 /** Ölçü aletinin kipi ve gösterdiği değer (durum yoksa anlık değer). */
 function meterValue(props: Props, instantaneous: number, status: DeviceStatus): { ac: boolean; value: number } {
@@ -466,10 +480,15 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
       };
     }
     case 'voltmeter':
-    case 'ammeter': {
-      const voltmeter = part.type === 'voltmeter';
-      const ideal = boolProp(p, 'ideal', false);
-      const R = numProp(p, 'resistance', voltmeter ? 10e6 : 0.1);
+    case 'ammeter':
+    case 'multimeter': {
+      const role = meterRole(part);
+      // Multimetrenin Ω kipi: simülasyon sırasında devreden çıkar, okumaz (Ω durmuşken ölçülür).
+      if (role === 'ohm') return { title, rows: [{ label: t.reading, value: tr.fault.meter.empty }], note: tr.fault.meter.ohmRunning };
+      const voltmeter = role === 'voltmeter';
+      const multimeter = part.type === 'multimeter';
+      const ideal = !multimeter && boolProp(p, 'ideal', false);
+      const R = multimeter ? (voltmeter ? VOLTMETER_DEFAULTS.resistance : AMMETER_DEFAULTS.resistance) : numProp(p, 'resistance', voltmeter ? 10e6 : 0.1);
       const instantaneous = voltmeter ? m.voltage : m.current;
       const { ac, value } = meterValue(p, instantaneous, status);
       // Gösterge anlık değerden ayrıysa (AC kaynaklı devre ya da AC kipi) ikisi de gösterilir.
@@ -494,8 +513,9 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
  * sonuna "~" eklenir (230 V~ gibi).
  */
 export function meterText(part: Part, m: Measurement, status: DeviceStatus = {}): string | null {
-  if (part.type !== 'voltmeter' && part.type !== 'ammeter') return null;
-  const voltmeter = part.type === 'voltmeter';
+  const role = meterRole(part);
+  if (role !== 'voltmeter' && role !== 'ammeter') return null;
+  const voltmeter = role === 'voltmeter';
   const { ac, value } = meterValue(part.props, voltmeter ? m.voltage : m.current, status);
   const text = formatSI(value, voltmeter ? 'V' : 'A', { digits: 4 });
   return ac ? `${text}~` : text;

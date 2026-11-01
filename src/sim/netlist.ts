@@ -40,7 +40,8 @@ export type DeviceType =
   | 'tank'
   | 'voltmeter'
   | 'ammeter'
-  | 'oscilloscope';
+  | 'oscilloscope'
+  | 'multimeter';
 
 export type PropValue = number | string | boolean;
 export type Props = Readonly<Record<string, PropValue>>;

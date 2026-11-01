@@ -56,6 +56,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   buzzer: 'Buzzer (aktif)',
   fuse: 'Sigorta',
   voltmeter: 'Voltmetre',
+  multimeter: 'Multimetre',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
   tank: 'Su haznesi',
@@ -95,6 +96,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   buzzer: 'buzzerının',
   fuse: 'sigortasının',
   voltmeter: 'voltmetresinin',
+  multimeter: 'multimetresinin',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
   tank: 'su haznesinin',
@@ -133,6 +135,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   fuse: ['1. ucu', '2. ucu'],
   relay: ['sargısının 1. ucu', 'sargısının 2. ucu', 'kontağının ortak ucu (C)', 'normalde açık kontak ucu (NA)', 'normalde kapalı kontak ucu (NK)'],
   voltmeter: ['+ ucu', '− ucu'],
+  multimeter: ['VΩ ucu (kırmızı)', 'COM ucu (siyah)'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
@@ -173,6 +176,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   buzzer: ['+', '−'],
   fuse: ['1', '2'],
   voltmeter: ['+', '−'],
+  multimeter: ['VΩ', 'COM'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
 };
@@ -212,6 +216,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   buzzer: ['+ uç', '− uç'],
   fuse: ['1. uç', '2. uç'],
   voltmeter: ['+ uç', '− uç'],
+  multimeter: ['VΩ', 'COM'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
 };
@@ -262,6 +267,16 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
         detail:
           `${labels[0] ?? ''} ampermetresi doğrudan ${labels[1] ?? ''} ${source} iki ucuna bağlanmış. ` +
           'Ampermetre seri bağlanır; iç direnci çok küçük olduğu için paralel bağlanınca kısa devre olur.',
+      };
+    }
+    case 'multimeter-parallel': {
+      const other = d.elementIds[1];
+      const type = other ? ctx.type(other) : undefined;
+      return {
+        title: 'Multimetre A kipinde paralel bağlanmış',
+        detail:
+          `${labels[0] ?? ''} multimetresi A kipinde ${labels[1] ?? ''}${type ? ` ${DEVICE_GENITIVE[type]}` : ''} iki ucuna bağlanmış. ` +
+          'A kipinde multimetre ölçtüğü parçaya seri bağlanır; iç direnci çok küçük (0,1 Ω) olduğu için paralel bağlanınca o parçayı kısa devre eder.',
       };
     }
     case 'ground-return': {
@@ -495,6 +510,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   relay:
     'Elektromıknatısla çalışan anahtar: sargısından yeterli akım geçince demir paleti çeker ve kontağı değiştirir (C, NK’dan ayrılıp NA’ya değer). Küçük bir akımla, sargıdan yalıtılmış başka bir devreyi açıp kapatır.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
+  multimeter:
+    'El multimetresi: kipine göre doğru ya da alternatif gerilim (V ⎓, V ∿), akım (A) ya da direnç (Ω) ölçer. V kiplerinde ölçülen parçaya paralel (iç direnç 10 MΩ), A kipinde seri (iç direnç 0,1 Ω) bağlanır; Ω yalnızca simülasyon durmuşken (güç kapalı) ölçer.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
   tank:
     'Su seviyesi probları olan hazne (baraj). Su bir proba ulaşınca o prob ile dipteki ortak prob arasında suyun direnci oluşur ve akımı sudaki iyonlar taşır; elektrotlarda ≈ 1,5–2 V elektrolize harcanır. Kuru prob açık devredir. Seviye elle ya da Doldur / Boşalt ile zamanla değişir.',
@@ -586,7 +603,7 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   powerRating: { '0.125': '1/8 W (0,125 W)', '0.25': '1/4 W (0,25 W)', '0.5': '1/2 W (0,5 W)', '1': '1 W', '2': '2 W', '5': '5 W' },
   kind: { electrolytic: 'Elektrolitik (kutuplu, +)', film: 'Seramik / film (kutupsuz)' },
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
-  mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
+  mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', a: 'Akım (A)', ohm: 'Direnç (Ω)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
   input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
   program: {
     blink: 'Yanıp sönen LED (Blink)',
@@ -2219,7 +2236,7 @@ export const tr = {
       modeLabel: 'Multimetrenin kipi',
       modes: { dc: 'V ⎓', ac: 'V ∿', ohm: 'Ω' },
       modeNames: { dc: 'Doğru gerilim (V ⎓)', ac: 'Alternatif gerilim, etkin değer (V ∿)', ohm: 'Direnç (Ω)' },
-      units: { dc: '⎓', ac: '∿' },
+      units: { dc: '⎓', ac: '∿', a: '⎓' },
       red: 'Kırmızı',
       black: 'Siyah',
       redTip: 'Kırmızı uç',
@@ -2240,6 +2257,22 @@ export const tr = {
       needBlack: 'Siyah ucu şemaya koy.',
       ohmFailed: 'Bu iki nokta arası ölçülemedi.',
     },
+  },
+  /** Multimetre parçasının kartı (Parça Dalga 1, Y3). */
+  multimeter: {
+    modes: { dc: 'V ⎓', ac: 'V ∿', a: 'A', ohm: 'Ω' },
+    modeNames: {
+      dc: 'Doğru gerilim (V ⎓)',
+      ac: 'Alternatif gerilim, etkin değer (V ∿)',
+      a: 'Akım (A, doğru akım ortalaması)',
+      ohm: 'Direnç (Ω)',
+    },
+    red: 'Kırmızı uç (VΩ)',
+    black: 'Siyah uç (COM)',
+    note: 'Ω kipi yalnızca simülasyon durmuşken ölçer (güç kapalı). A kipinde multimetre devreye seri bağlanır; paralel bağlanırsa uyarı çıkar.',
+    internalV: (value: string) => ({ label: 'İç direnç (V)', value }),
+    internalA: (value: string) => ({ label: 'İç direnç (A)', value }),
+    testVoltage: (value: string) => ({ label: 'Ω test gerilimi', value }),
   },
   notebook: {
     label: 'Defter: devredeki parçalar',
@@ -2306,6 +2339,7 @@ export const tr = {
       buzzer: 'Buzzer’lar',
       fuse: 'Sigortalar',
       voltmeter: 'Voltmetreler',
+      multimeter: 'Multimetreler',
       ammeter: 'Ampermetreler',
       oscilloscope: 'Osiloskoplar',
       tank: 'Su hazneleri',
@@ -2653,6 +2687,8 @@ export const tr = {
         'Gerçek voltmetrelerin iç direnci sonludur. Ölçtüğün kaynağın iç direnci büyükse voltmetre gerçek değerden düşük okur (yükleme etkisi).',
       ammeter:
         'Gerçek ampermetrelerin de küçük bir iç direnci vardır; seri bağlandığı devrenin akımını biraz azaltır.',
+      multimeter:
+        'Arıza bulmadaki multimetreyle aynı alet: V kiplerinde iç direnç 10 MΩ, A kipinde 0,1 Ω; AC kaynaklı devrede V ⎓ ve A bir periyodun ortalamasını, V ∿ etkin değeri gösterir. Ω, simülasyon durmuşken (güç kapalı) uçlar arasına 0,3 V uygulayarak ölçer.',
       oscilloscope:
         'Kanallar ortak uca (COM) göre gerilimi ölçer. Gerçek girişte her kanal COM’a 1 MΩ ‖ 25 pF ile bağlıdır (laboratuvardaki osiloskoplar gibi). COM şebeke toprağına bağlıysa devrenin toprağıyla aynı noktadır: köprü doğrultmaçta prob toprağını yük tarafına takmak bir diyodu kısa devre eder. Bölme, kuplaj, ADD ve INV ayarları tuvalin köşesindeki panelde.',
       funcgen:

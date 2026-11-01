@@ -5,7 +5,7 @@ import type { Part } from '../model/types';
 import { dipChipModel } from './breadboardModel';
 import { withAnchors } from './kit';
 import { arduinoModel } from './arduinoModel';
-import { dcsupplyModel, funcgenModel, meterModel, oscilloscopeModel, tankModel } from './instruments';
+import { dcsupplyModel, funcgenModel, meterModel, multimeterModel, oscilloscopeModel, tankModel } from './instruments';
 import type { PartModel } from './model';
 import {
   batteryModel,
@@ -100,6 +100,8 @@ function build(part: Part): PartModel {
     case 'voltmeter':
     case 'ammeter':
       return meterModel(part.type);
+    case 'multimeter':
+      return multimeterModel();
     case 'dcsupply':
       return dcsupplyModel();
     case 'funcgen':

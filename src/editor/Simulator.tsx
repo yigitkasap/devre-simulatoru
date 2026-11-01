@@ -10,6 +10,9 @@ import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
+import { METER_DISPLAY } from './PartView';
+import { nodeName } from './analysis/traces';
+import { multimeterMode } from '../sim/devices/multimeter';
 import { meterIntact, remapFaults, removedMeters, unplugAll, type InsertedMeter } from '../model/meters';
 import { FaultCard } from './fault/FaultCard';
 import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
@@ -18,7 +21,7 @@ import { PhoneFaultSheet } from './fault/PhoneFaultSheet';
 import { nextScenario, scenarioTask, scenarioTexts } from './fault/scenarios';
 import { FoundCard, ReportCard } from './fault/ReportCards';
 import { faultFromPlace } from './task/faultRows';
-import { defaultBlack, measureResistance, METER_ID, meterPart, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
+import { defaultBlack, measureResistance, METER_ID, meterPart, ohmText, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
 import { MultimeterPanel, type MeterReading } from './fault/MultimeterPanel';
 import { addEntry, entryName, METER_LIMIT, NEW_SESSION, parseSession, type FaultSession, type Place } from './fault/session';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
@@ -447,7 +450,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const timeVarying = doc.parts.some((p) => TIME_VARYING.has(p.type));
   const watchedKey = [
     ...selection.parts.slice(0, 8),
-    ...doc.parts.filter((p) => p.type === 'voltmeter' || p.type === 'ammeter').map((p) => p.id),
+    ...doc.parts.filter((p) => METER_DISPLAY.has(p.type)).map((p) => p.id),
     // Görev hedeflerinin parçaları (salınan değerin pencere özeti ve DC ortalaması için).
     ...(task ? targetParts(task.targets) : []),
     ...(timeVarying && !phone ? doc.parts.filter((p) => CARD_WATCHED.has(p.type)).slice(0, 8).map((p) => p.id) : []),
@@ -457,6 +460,25 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   /** Defterde kapalı kartı ölçüm gösterebilen parçalar (DC devrede hepsi). */
   const measuredParts = useMemo<ReadonlySet<string> | null>(() => (timeVarying ? new Set(watched) : null), [timeVarying, watched]);
   const sim = useSimulation(simDoc, simConnectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
+  /** Ucun bağlı olduğu düğümün adı (multimetre kartı); toprak ağında toprak sembolünün adı. */
+  const pinNode = useCallback(
+    (id: string, pin: number) => {
+      const name = nodeName(pinKey(id, pin), analysis.idx, id);
+      return name === '0' ? (doc.parts.find((p) => p.type === 'ground')?.label ?? tr.fault.ground) : name;
+    },
+    [analysis.idx, doc.parts],
+  );
+  /** Multimetre parçalarının Ω okuması: simülasyon durmuşken (güç kapalı; B2'deki multimetreyle aynı ölçüm). */
+  const ohmTexts = useMemo(() => {
+    const meters = doc.parts.filter((p) => p.type === 'multimeter' && multimeterMode(p.props) === 'ohm');
+    if (sim.status !== 'stopped' || meters.length === 0) return undefined;
+    const texts = new Map<string, string>();
+    for (const p of meters) {
+      const text = ohmText(measureResistance(simConnectivity.netlist, pinKey(p.id, 0), pinKey(p.id, 1)));
+      if (text) texts.set(p.id, text);
+    }
+    return texts;
+  }, [doc.parts, sim.status, simConnectivity]);
   /** Oynat: görevde tahminler kaydedilmediyse (B1) çalışmaz, nedenini söyler. */
   const play = () => {
     if (gate) showToast(gate, 'error');
@@ -1247,6 +1269,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const notebook = (
     <Notebook
       {...inspectProps}
+      {...(ohmTexts ? { ohmTexts } : {})}
+      pinNode={pinNode}
       floating={floatingParts}
       measured={measuredParts}
       onClearSelection={() => dispatch({ type: 'select', selection: EMPTY_SELECTION })}
@@ -1464,6 +1488,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       tapMenu={tapMenu}
       wiringLocked={fault !== null}
       meterFlips={meterFlips}
+      {...(ohmTexts ? { ohmTexts } : {})}
       onLocate={
         reporting
           ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r))
@@ -1514,6 +1539,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           doc={doc}
           connectivity={connectivity}
           frame={sim.frame}
+          {...(ohmTexts ? { ohmTexts } : {})}
           {...(benchLook !== doc ? { look: benchLook } : {})}
           {...(hideLive ? { labelFrame: shownFrame, liveHidden: true } : {})}
           active={sim.status !== 'stopped'}

@@ -18,7 +18,7 @@ import { addPart, addWire, nextLabel, replaceWirePoints } from '../../model/docO
 import { partBounds, pinPositions, samePoint } from '../../model/geometry';
 import type { InsertedMeter } from '../../model/meters';
 import type { CircuitDoc, Part, Point, Rotation } from '../../model/types';
-import { meterDisplayRect, meterFlipped, partTextBoxes } from '../PartView';
+import { METER_DISPLAY, meterDisplayRect, meterFlipped, partTextBoxes } from '../PartView';
 
 export type InsertError = 'short' | 'junction' | 'diagonal' | 'crowded';
 
@@ -210,7 +210,7 @@ export function insertAmmeter(
   const leads = cores.flatMap((c) => c.leads);
   const labels: Box[] = [];
   doc.parts.forEach((p, i) => {
-    const meter = p.type === 'voltmeter' || p.type === 'ammeter';
+    const meter = METER_DISPLAY.has(p.type);
     const flip = meter && (flips?.get(p.id) ?? meterFlipped(p, bounds.filter((_, j) => j !== i)));
     labels.push(...(meter ? [meterDisplayRect(p, flip)] : []), ...partTextBoxes(p, flip));
   });

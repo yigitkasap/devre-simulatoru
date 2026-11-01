@@ -26,6 +26,7 @@ import type { DeviceType, PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
 import { useThrottledText } from './a11y';
 import { ArduinoCardBody } from './ArduinoPanel';
+import { MultimeterCardBody } from './MultimeterCard';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
 import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
@@ -86,10 +87,14 @@ export interface NotebookProps extends InspectTabProps {
   readonly taskParts?: TaskParts | null;
   /** Arıza bulma (B2): canlı değerler gizli (kare ölçü aletleri dışında boş gelir). */
   readonly liveHidden?: boolean;
+  /** Multimetrelerin Ω okuması (simülasyon durmuşken). */
+  readonly ohmTexts?: ReadonlyMap<string, string>;
+  /** Ucun bağlı olduğu düğümün adı (multimetre kartı). */
+  readonly pinNode?: (partId: string, pin: number) => string;
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
-const METERS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter']);
+const METERS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter', 'multimeter']);
 
 function partValues(part: Part): Record<string, PropValue> {
   const values: Record<string, PropValue> = {};
@@ -598,7 +603,13 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   const typeName = tr.devices.names[part.type];
   const value = partValueText(part);
   const device = RACK_DEVICES.has(part.type);
-  const reading = device ? null : props.measured === null || props.measured.has(part.id) ? cardReading(part, frame) : null;
+  const reading = device
+    ? null
+    : part.type === 'multimeter' && props.ohmTexts?.has(part.id)
+      ? { main: props.ohmTexts.get(part.id)!, big: true }
+      : props.measured === null || props.measured.has(part.id)
+        ? cardReading(part, frame)
+        : null;
   const summary = device ? deviceSummary(part, frame ? props.devices.scopeView(part.id) : null) : null;
   const burned = frame?.statuses.get(part.id)?.burned === true;
   const lit = part.type === 'led' && !burned && (frame?.live.get(part.id)?.brightness ?? 0) > 0.05;
@@ -705,6 +716,15 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
           <ControlsLocked.Provider value={locked && CATALOG[part.type].propDefs.every((p) => !operable(part.type, p.key))}>
             <DeviceControls part={part} devices={props.devices} />
           </ControlsLocked.Provider>
+        ) : part.type === 'multimeter' ? (
+          <MultimeterCardBody
+            part={part}
+            frame={frame}
+            status={status}
+            ohm={props.ohmTexts?.get(part.id)}
+            pinNode={props.pinNode}
+            onMode={(next) => onUpdatePart(part.id, { props: next })}
+          />
         ) : part.type === 'arduino' ? (
           <ArduinoCardBody
             part={part}

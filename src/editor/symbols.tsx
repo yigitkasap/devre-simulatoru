@@ -6,6 +6,7 @@ import { CATALOG, partProp } from '../model/catalog';
 import { GRID } from '../model/types';
 import { WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
+import { multimeterMode, type MultimeterMode } from '../sim/devices/multimeter';
 import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
@@ -590,6 +591,31 @@ function Meter({ letter, rotation }: { letter: string; rotation: Rotation }) {
   );
 }
 
+/** Multimetre: dairede kipine göre V, A ya da Ω; altında doğru (⎓) ya da alternatif (∿) işareti. */
+function Multimeter({ mode, rotation }: { mode: MultimeterMode; rotation: Rotation }) {
+  const mark = mode === 'ac' ? '∿' : mode === 'ohm' ? null : '⎓';
+  return (
+    <g>
+      <Meter letter={mode === 'a' ? 'A' : mode === 'ohm' ? 'Ω' : 'V'} rotation={rotation} />
+      {mark && (
+        <text
+          x={0}
+          y={25}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={13}
+          fontWeight={700}
+          fill="currentColor"
+          transform={rotation ? `rotate(${-rotation} 0 25)` : undefined}
+          style={{ fontFamily: 'var(--font-sans)' }}
+        >
+          {mark}
+        </text>
+      )}
+    </g>
+  );
+}
+
 /** Dalga biçiminin küçük çizimi: (cx, cy) merkezli, genişliği 2·w, yüksekliği 2·h. */
 export function wavePath(waveform: Waveform, w: number, h: number, cx = 0, cy = 0): string {
   const p = (x: number, y: number) => `${(cx + x).toFixed(2)},${(cy + y).toFixed(2)}`;
@@ -1095,6 +1121,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Meter letter="V" rotation={rotation} />;
     case 'ammeter':
       return <Meter letter="A" rotation={rotation} />;
+    case 'multimeter':
+      return <Multimeter mode={multimeterMode(props)} rotation={rotation} />;
   }
 }
 

@@ -5,7 +5,7 @@
 import type { Box } from '../model/catalog';
 import { partBounds } from '../model/geometry';
 import { GRID, type CircuitDoc } from '../model/types';
-import { meterDisplayRect } from './PartView';
+import { METER_DISPLAY, meterDisplayRect } from './PartView';
 import { fitView, type View } from './view';
 
 /** Ekran dikdörtgeni (px, tuvalin sol üst köşesine göre). */
@@ -26,7 +26,7 @@ export function circuitShapes(doc: CircuitDoc): CircuitShapes {
   const boxes: Box[] = [];
   for (const part of doc.parts) {
     boxes.push(partBounds(part));
-    if (part.type === 'voltmeter' || part.type === 'ammeter') boxes.push(meterDisplayRect(part, false));
+    if (METER_DISPLAY.has(part.type)) boxes.push(meterDisplayRect(part, false));
   }
   const segments: [number, number, number, number][] = [];
   for (const wire of doc.wires) {

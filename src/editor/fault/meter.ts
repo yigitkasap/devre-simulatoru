@@ -14,6 +14,7 @@ import type { CircuitDoc, Part, Point } from '../../model/types';
 import { CircuitSimulator } from '../../sim';
 import type { DeviceType, Netlist } from '../../sim/netlist';
 import { VOLTMETER_DEFAULTS } from '../../sim/devices/voltmeter';
+import { formatSI } from '../../sim/units';
 import { nodeName, type NetIndex } from '../analysis/traces';
 
 export type ProbeColor = 'red' | 'black';
@@ -48,7 +49,7 @@ export function wireMeter(netlist: Netlist, mode: MeterMode, red: Probe | null, 
 // --- Adlar ------------------------------------------------------------------------------------
 
 /** Kaynak ve cihazların uçları "ucu", öbür parçalarınki "bacağı". */
-const TERMINALS: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'funcgen', 'dcsupply', 'voltmeter', 'ammeter', 'oscilloscope', 'tank', 'arduino']);
+const TERMINALS: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'funcgen', 'dcsupply', 'voltmeter', 'ammeter', 'multimeter', 'oscilloscope', 'tank', 'arduino']);
 
 /**
  * Bacağın adı: "RC alt bacağı" (numaralı uçlu iki bacaklı parçada şemadaki konumuna göre), "Q1 kollektör
@@ -119,4 +120,10 @@ export function measureResistance(netlist: Netlist, a: string, b: string): numbe
   const current = Math.abs(sim.measure(test.id)?.current ?? 0);
   const r = OHM_TEST_VOLTAGE / current;
   return r > OHM_LIMIT || !Number.isFinite(r) ? Infinity : r;
+}
+
+/** Ω okumasının gösterge metni ("4,700 kΩ", aralık dışıysa "OL Ω"); ölçülemediyse null. */
+export function ohmText(ohms: number | null): string | null {
+  if (ohms === null) return null;
+  return Number.isFinite(ohms) ? formatSI(ohms, 'Ω', { digits: 4 }) : `${tr.fault.meter.over} Ω`;
 }

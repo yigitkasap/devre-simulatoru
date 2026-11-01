@@ -220,7 +220,7 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
   if (doc.parts.some((p) => p.type === 'transformer' || p.type === 'acsource')) {
     warnings.push('Bu devrede şebeke (230 V) ya da AC kaynak var. Şebeke gerilimini delikli plakete ve breadboard\'a bağlama: yerine hazır bir AC ya da DC adaptörün düşük gerilim çıkışını kullan.');
   }
-  if (doc.parts.some((p) => p.type === 'oscilloscope' || p.type === 'funcgen' || p.type === 'dcsupply' || p.type === 'voltmeter' || p.type === 'ammeter')) {
+  if (doc.parts.some((p) => p.type === 'oscilloscope' || p.type === 'funcgen' || p.type === 'dcsupply' || p.type === 'voltmeter' || p.type === 'ammeter' || p.type === 'multimeter')) {
     warnings.push('Ölçü aletleri ve laboratuvar cihazları karta lehimlenmez: onların teli giden deliklere prob ya da timsah kıskaçla bağlanır.');
   }
   const half = plan.cols < 63;

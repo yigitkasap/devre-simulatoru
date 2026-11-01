@@ -174,6 +174,8 @@ export class BenchScene {
   private readonly table: Mesh;
   private readonly observer: ResizeObserver;
   private frame: SimFrame | null = null;
+  /** Multimetrelerin Ω okuması (simülasyon durmuşken). */
+  private ohmTexts: ReadonlyMap<string, string> | null = null;
   private active = false;
   private selection: readonly string[] = [];
   private dirty = true;
@@ -595,9 +597,10 @@ export class BenchScene {
 
   // --- Canlı değerler -----------------------------------------------------------------------------
 
-  setFrame(frame: SimFrame | null, active: boolean): void {
+  setFrame(frame: SimFrame | null, active: boolean, ohmTexts?: ReadonlyMap<string, string>): void {
     this.frame = frame;
     this.active = active;
+    this.ohmTexts = ohmTexts ?? null;
     this.applyFrame();
   }
 
@@ -611,7 +614,7 @@ export class BenchScene {
         live: this.frame?.live.get(id),
         status: this.frame?.statuses.get(id),
         measurement: this.frame?.measurements.get(id),
-        reading: this.frame?.meterTexts.get(id),
+        reading: this.frame?.meterTexts.get(id) ?? this.ohmTexts?.get(id),
         scope: this.frame?.scopes.get(id),
         props: placed.part.props,
         active: this.active && this.frame !== null,

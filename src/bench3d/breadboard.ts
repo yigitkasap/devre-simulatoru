@@ -148,6 +148,7 @@ const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rota
   oscilloscope: { side: 'back', w: 8.6, d: 13.4, rotation: 90 },
   voltmeter: { side: 'back', w: 11, d: 5.6, rotation: 0 },
   ammeter: { side: 'back', w: 11, d: 5.6, rotation: 0 },
+  multimeter: { side: 'back', w: 12.5, d: 20.5, rotation: 0 },
   lamp: { side: 'front', w: 9, d: 5, rotation: 0 },
   motor: { side: 'front', w: 12, d: 6, rotation: 0 },
   speaker: { side: 'front', w: 9, d: 6.5, rotation: 0 },

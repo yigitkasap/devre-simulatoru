@@ -16,6 +16,8 @@ export type DiagnosticCode =
   | 'floating-island'
   /** Ampermetre doğrudan bir pilin iki ucuna bağlanmış. */
   | 'ammeter-parallel'
+  /** A kipindeki multimetrenin iki ucuna doğrudan başka bir parça da bağlı (seri değil, paralel). */
+  | 'multimeter-parallel'
   /**
    * Akım toprak hattı üzerinden dönüyor: aralarında kablo olmayan iki toprak noktası (toprak sembolü
    * ya da topraklı cihazın COM'u) binanın toprak hattıyla birbirine bağlı ve devrenin akımı oradan geçiyor.

@@ -74,7 +74,7 @@ export function ViewToggle({ mode, onChange, touch }: { mode: ViewMode; onChange
   );
 }
 
-const METERS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter']);
+const METERS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter', 'multimeter']);
 /** Seçiliyken uç harfleri gösterilen parçalar (E-B-C, D-G-S). */
 const LETTERED: ReadonlySet<DeviceType> = new Set(['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos']);
 
@@ -102,6 +102,8 @@ export interface BenchViewProps {
   readonly frame: SimFrame | null;
   /** Etiketlerin gördüğü kare (arıza bulmada yalnızca ölçü aletleri; verilmezse frame). */
   readonly labelFrame?: SimFrame | null;
+  /** Multimetrelerin Ω okuması (simülasyon durmuşken). */
+  readonly ohmTexts?: ReadonlyMap<string, string>;
   /**
    * Arıza bulma (göstergeler kapalı): etiketlerde yalnızca ölçü aletlerinin okuması (defterin kartlarıyla
    * aynı kural); akım noktaları kapalı, düğmesi yok.
@@ -218,6 +220,7 @@ export function BenchView(props: BenchViewProps) {
         <Bench3D
           doc={props.look ?? doc}
           frame={frame}
+          {...(props.ohmTexts ? { ohmTexts: props.ohmTexts } : {})}
           active={props.active}
           running={props.running}
           selection={selection}
