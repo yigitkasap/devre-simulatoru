@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { measureResistance } from '../src/editor/fault/meter';
 import { meterRole, meterText } from '../src/editor/readouts';
 import { tr } from '../src/i18n/tr';
+import { planBreadboard } from '../src/bench3d/breadboard';
 import { CATALOG, CATEGORIES } from '../src/model/catalog';
 import { CircuitSimulator } from '../src/sim';
 import { circuit } from './helpers';
@@ -99,5 +100,31 @@ describe('DC akım kaynağı (I)', () => {
   it('Parça ekle: Kaynaklar grubunda, I öneki', () => {
     expect(CATALOG.currentsource.labelPrefix).toBe('I');
     expect(CATEGORIES.find((c) => c.id === 'sources')!.types).toContain('currentsource');
+  });
+});
+
+describe('Basmalı düğme (BT)', () => {
+  const build = (contact: string, pressed: boolean) =>
+    new CircuitSimulator(circuit().battery('B1', 'a', 'gnd', 5).ground('G1', 'gnd').add('pushbutton', 'BT1', ['a', 'b'], { contact, pressed }).resistor('R1', 'b', 'gnd', 1000).build());
+  it('normalde açık: basılıyken iletir; normalde kapalı: basılıyken açılır', () => {
+    for (const [contact, pressed, on] of [['no', false, false], ['no', true, true], ['nc', false, true], ['nc', true, false]] as const) {
+      const sim = build(contact, pressed);
+      sim.advance(0);
+      expect(sim.measure('R1')!.current, `${contact} ${pressed}`).toBeCloseTo(on ? 5 / 1000 : 0, 6);
+      expect(sim.status('BT1').pressed).toBe(pressed);
+    }
+  });
+
+  it("breadboard'da orta kanalın iki yanında: uçlar d ve g satırında aynı sütunda, ikizler iki sütun yanda", () => {
+    const doc = {
+      version: 1 as const,
+      parts: [{ id: 'bt', type: 'pushbutton' as const, label: 'BT1', x: 0, y: 0, rotation: 0 as const, props: { contact: 'no' } }],
+      wires: [],
+    };
+    const at = planBreadboard(doc).onBoard.get('bt')!;
+    expect(at.mount).toBe('button');
+    const [p0, p1] = at.holes.map((h) => (h.kind === 'strip' ? h : { col: -1, row: -1 })) as [{ col: number; row: number }, { col: number; row: number }];
+    expect([p0.row, p1.row, p0.col === p1.col]).toEqual([3, 6, true]);
+    expect(at.extraHoles!.map((h) => (h.kind === 'strip' ? [h.col - p0.col, h.row] : null))).toEqual([[2, 3], [2, 6]]);
   });
 });

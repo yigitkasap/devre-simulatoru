@@ -42,7 +42,8 @@ export type DeviceType =
   | 'ammeter'
   | 'oscilloscope'
   | 'multimeter'
-  | 'currentsource';
+  | 'currentsource'
+  | 'pushbutton';
 
 export type PropValue = number | string | boolean;
 export type Props = Readonly<Record<string, PropValue>>;

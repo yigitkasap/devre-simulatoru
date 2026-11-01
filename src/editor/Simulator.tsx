@@ -398,11 +398,23 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   }, [fault]);
   // Multimetre simülasyona görünmez bir voltmetre olarak girer (iç direnç 10 MΩ; şemada yok).
   const simDoc = useMemo(() => (fault ? { ...doc, parts: [...doc.parts, meterPart(meter.mode)] } : doc), [doc, fault, meter.mode]);
+  /** Basılı tutulan düğmeler: belgede durmaz (geçmişe ve kayda girmez), yalnızca simülasyonun devresine eklenir. */
+  const [pressed, setPressed] = useState<ReadonlySet<string>>(() => new Set());
+  const pressButton = useCallback((id: string, down: boolean) => {
+    setPressed((s) => {
+      if (s.has(id) === down) return s;
+      const next = new Set(s);
+      if (down) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
   const simConnectivity = useMemo(() => {
-    if (!fault) return connectivity;
-    const c = buildConnectivity(simDoc, activeFaults);
-    return { ...c, netlist: wireMeter(c.netlist, meter.mode, meter.red, meter.black) };
-  }, [fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black]);
+    const c = fault ? buildConnectivity(simDoc, activeFaults) : connectivity;
+    const netlist = fault ? wireMeter(c.netlist, meter.mode, meter.red, meter.black) : c.netlist;
+    const elements = pressed.size === 0 ? netlist.elements : netlist.elements.map((e) => (pressed.has(e.id) ? { ...e, props: { ...e.props, pressed: true } } : e));
+    return elements === c.netlist.elements ? c : { ...c, netlist: { ...netlist, elements } };
+  }, [fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black, pressed]);
   /** Otomatik göstergeler kapalı: kablo renkleri, akım noktaları, düğüm etiketleri, kartlardaki canlı değerler. */
   const hideLive = fault !== null && fault.hideIndicators && !repaired;
   /** Tezgâhta gözle görülen arızalar (karar 1): ters takılmış, yanlış değerli, yanmış parça. */
@@ -1271,6 +1283,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       {...inspectProps}
       {...(ohmTexts ? { ohmTexts } : {})}
       pinNode={pinNode}
+      pressed={pressed}
+      onPress={pressButton}
       floating={floatingParts}
       measured={measuredParts}
       onClearSelection={() => dispatch({ type: 'select', selection: EMPTY_SELECTION })}
@@ -1489,6 +1503,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       wiringLocked={fault !== null}
       meterFlips={meterFlips}
       {...(ohmTexts ? { ohmTexts } : {})}
+      pressed={pressed}
+      onPress={pressButton}
       onLocate={
         reporting
           ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r))
@@ -1563,6 +1579,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               const part = doc.parts.find((p) => p.id === id);
               if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
             },
+            onPress: pressButton,
             onKnob: (id, position, done) => {
               const part = doc.parts.find((p) => p.id === id);
               if (part) slidePartFromPanel(id, { props: { ...part.props, position } }, done);

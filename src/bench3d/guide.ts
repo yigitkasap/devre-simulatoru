@@ -94,6 +94,8 @@ function describe(part: Part): { name: string; detail: string } {
       return { name: `Potansiyometre ${formatOhm(numProp(p, 'resistance', 10e3))}`, detail: 'dikey trimpot, 3 bacak' };
     case 'switch':
       return { name: 'Anahtar (iki konumlu)', detail: `başlangıçta ${boolProp(p, 'closed', false) ? 'kapalı' : 'açık'}` };
+    case 'pushbutton':
+      return { name: 'Basmalı düğme 12 mm', detail: `4 bacak; ${p.contact === 'nc' ? 'normalde kapalı' : 'normalde açık'}` };
     case 'arduino':
       return { name: 'Arduino Uno', detail: `program: ${value}; USB kablosuyla beslenir` };
     default:
@@ -197,6 +199,14 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         break;
       case 'potentiometer':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ') });
+        break;
+      case 'pushbutton':
+        steps.push({
+          group: 'tall',
+          title: `${part.label} · ${material}`,
+          holes: `orta kanalın iki yanında, ${holes.join(' ↔ ')}`,
+          note: `İçten bağlı ikiz bacaklar ${(at.extraHoles ?? []).map(name).join(' ve ')} deliklerine; düğmeye basınca iki yan birleşir.`,
+        });
         break;
       default:
         steps.push({ group: 'radial', title: `${part.label} · ${material}`, holes: holes.join(' ↔ ') });

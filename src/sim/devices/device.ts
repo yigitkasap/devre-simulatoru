@@ -93,6 +93,8 @@ export interface DeviceStatus {
     readonly loadPower: number;
     readonly heating: number;
   };
+  /** Basmalı düğme: basılı tutuluyor mu? */
+  readonly pressed?: boolean;
   /** Röle: palet çekili mi (NA kontağı kapalı)? */
   readonly energized?: boolean;
   /** Potansiyometre: sürgünün 3. uca göre gerilimi ve iki bölümün direnci. */

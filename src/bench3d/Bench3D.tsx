@@ -45,6 +45,7 @@ export default function Bench3D(props: Bench3DProps) {
       onSelect: (id) => cb.current.onSelect(id),
       onToggle: (id) => cb.current.onToggle(id),
       onKnob: (id, position, done) => cb.current.onKnob(id, position, done),
+      onPress: (id, down) => cb.current.onPress(id, down),
       onCamera: () => cb.current.onCamera?.(),
     });
     scene.current = s;

@@ -420,6 +420,55 @@ export function switchModel(props: Props): PartModel {
   };
 }
 
+// --- Basmalı düğme: 12 mm dokunmatik anahtar, renkli yuvarlak başlık; 4 bacak, ikişer içten bağlı --------------
+
+/**
+ * Tasarım: parcalar-3b/newParts.ts. Bacak çiftleri uçlara göre yerleşir: her ucun yanındaki ikiz bacak
+ * (içten bağlı) uçtan uca doğrultuya dik 2 delik ötede. Masada ikizler masaya iner; breadboard'da orta
+ * kanalın iki yanındaki deliklere (breadboard.ts, 'button').
+ */
+export function pushButtonModel(boardTwins: readonly Vector3[] = []): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('pushbutton');
+  const [a, b] = anchors as [Vector3, Vector3];
+  const L = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+  // İkizler: breadboard'da verilen delikler, masada uçlardan 2 birim yanda.
+  const side = boardTwins[0] ? Math.sign((boardTwins[0].x - a.x) * -(b.z - a.z) + (boardTwins[0].z - a.z) * (b.x - a.x)) || 1 : 1;
+  const n = new Vector3((-(b.z - a.z) / L) * side, 0, ((b.x - a.x) / L) * side);
+  const twins = boardTwins.length === 2 ? boardTwins.map((p) => p.clone()) : anchors.map((p) => p.clone().addScaledVector(n, 2));
+  const center = [a, b, ...twins].reduce((c, p) => c.add(p), new Vector3()).multiplyScalar(0.25);
+  const body = 4.72;
+  const bh = 1.45;
+  const y0 = 0.9;
+  root.add(mesh(new BoxGeometry(body, bh, body), mat('#1c1d20', 0.6), center.x, y0 + bh / 2, center.z));
+  root.add(mesh(new BoxGeometry(body + 0.05, 0.12, body + 0.05), M.steel(), center.x, y0 + bh + 0.06, center.z));
+  for (const [x, z] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]] as const) {
+    root.add(mesh(new CylinderGeometry(0.22, 0.22, 0.14, 10), mat('#0f1012', 0.7), center.x + x, y0 + bh + 0.13, center.z + z));
+  }
+  const cap = new Group();
+  cap.add(mesh(new CylinderGeometry(1.5, 1.6, 0.9, 32), mat('#c8312a', 0.4), 0, 0.45, 0));
+  cap.add(mesh(new CylinderGeometry(0.75, 0.75, 0.6, 16), mat('#2b2d31', 0.5), 0, -0.2, 0));
+  cap.position.set(center.x, 0, center.z);
+  cap.userData.live = true;
+  root.add(cap);
+  const press = (pressed: boolean) => (cap.position.y = y0 + bh + 0.12 + (pressed ? 0.2 : 0.55));
+  press(false);
+  // Bacaklar gövdenin köşelerinden: uçların yanındakiler uçlara, öbürleri ikizlere.
+  const u = new Vector3((b.x - a.x) / L, 0, (b.z - a.z) / L);
+  const corner = (along: number, side: number) => center.clone().addScaledVector(u, along * 2.26).addScaledVector(n, side * 0.98).setY(y0);
+  root.add(legDown(corner(-1, -1), a, 0.12), legDown(corner(1, -1), b, 0.12));
+  root.add(legDown(corner(-1, 1), twins[0]!, 0.12), legDown(corner(1, 1), twins[1]!, 0.12));
+  return {
+    root,
+    anchors,
+    interaction: 'press',
+    update(ctx) {
+      press(ctx.active && ctx.status?.pressed === true);
+      return false;
+    },
+  };
+}
+
 // --- Akkor lamba (E10 duy) ---------------------------------------------------------------------------------
 
 export function lampModel(): PartModel {

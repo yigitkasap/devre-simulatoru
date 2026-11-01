@@ -9,6 +9,7 @@ import {
   AC_SOURCE_DEFAULTS,
   AMMETER_DEFAULTS,
   multimeterMode,
+  pushbuttonClosed,
   VOLTMETER_DEFAULTS,
   dcsupplySettings,
   funcgenSettings,
@@ -469,6 +470,20 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
     }
     case 'switch': {
       const closed = boolProp(p, 'closed', false);
+      return {
+        title,
+        rows: [
+          { label: t.state, value: closed ? t.closed : t.open },
+          { label: t.voltageAcross, value: v(V) },
+          { label: t.current, value: a(I) },
+        ],
+        note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
+      };
+    }
+    case 'pushbutton': {
+      // Basılı olup olmadığı simülasyonun durumundan (belgede durmaz).
+      const pressed = status.pressed === true;
+      const closed = pushbuttonClosed({ ...p, pressed });
       return {
         title,
         rows: [

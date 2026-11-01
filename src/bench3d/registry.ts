@@ -23,6 +23,7 @@ import {
   motorModel,
   ntcModel,
   potentiometerModel,
+  pushButtonModel,
   relayModel,
   resistorModel,
   sourceBoxModel,
@@ -39,6 +40,7 @@ import {
  */
 export function buildPartModel(part: Part, holes: readonly Vector3[] | null = null, extra: readonly Vector3[] = []): PartModel {
   if (holes && (part.type === 'opamp' || part.type === 'timer555')) return dipChipModel(part.type, holes, extra);
+  if (holes && part.type === 'pushbutton') return withAnchors(holes, () => pushButtonModel(extra));
   return withAnchors(holes, () => build(part));
 }
 
@@ -80,6 +82,8 @@ function build(part: Part): PartModel {
       return arduinoModel();
     case 'switch':
       return switchModel(p);
+    case 'pushbutton':
+      return pushButtonModel();
     case 'lamp':
       return lampModel();
     case 'speaker':

@@ -7,6 +7,7 @@ import { GRID } from '../model/types';
 import { WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
 import { multimeterMode, type MultimeterMode } from '../sim/devices/multimeter';
+import { pushbuttonClosed } from '../sim/devices/pushbutton';
 import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
@@ -591,6 +592,25 @@ function Meter({ letter, rotation }: { letter: string; rotation: Rotation }) {
   );
 }
 
+/**
+ * Basmalı düğme: iki kontak, üstünde basma çubuğu. Çubuk kontaklara değiyorsa kontak kapalı (normalde
+ * açık düğme basılıyken, normalde kapalı düğme bırakılmışken).
+ */
+function PushButton({ closed }: { closed: boolean }) {
+  const bar = closed ? -3 : -10;
+  return (
+    <g>
+      <Lead from={-40} to={-14} />
+      <Lead from={14} to={40} />
+      <line x1={-18} y1={bar} x2={18} y2={bar} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+      <line x1={0} y1={bar} x2={0} y2={-20} stroke="currentColor" strokeWidth={2} />
+      <line x1={-7} y1={-20} x2={7} y2={-20} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+      <circle cx={-14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+    </g>
+  );
+}
+
 /** DC akım kaynağı: dairede ok; ok akımın çıktığı ucu (2. uç) gösterir. */
 function CurrentSource() {
   return (
@@ -1138,6 +1158,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Multimeter mode={multimeterMode(props)} rotation={rotation} />;
     case 'currentsource':
       return <CurrentSource />;
+    case 'pushbutton':
+      return <PushButton closed={pushbuttonClosed(props)} />;
   }
 }
 

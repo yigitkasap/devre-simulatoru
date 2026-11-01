@@ -91,6 +91,9 @@ export interface NotebookProps extends InspectTabProps {
   readonly ohmTexts?: ReadonlyMap<string, string>;
   /** Ucun bağlı olduğu düğümün adı (multimetre kartı). */
   readonly pinNode?: (partId: string, pin: number) => string;
+  /** Basılı tutulan düğmeler ve basma / bırakma (basmalı düğme kartı). */
+  readonly pressed?: ReadonlySet<string>;
+  readonly onPress?: (partId: string, down: boolean) => void;
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
@@ -601,7 +604,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   const touch = useTouchUi();
   const bodyId = useId();
   const typeName = tr.devices.names[part.type];
-  const value = partValueText(part);
+  const value = part.type === 'pushbutton' ? (props.pressed?.has(part.id) ? tr.readout.pressed : tr.readout.released) : partValueText(part);
   const device = RACK_DEVICES.has(part.type);
   const reading = device
     ? null
@@ -735,6 +738,9 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
           />
         ) : (
           <>
+            {part.type === 'pushbutton' && (
+              <HoldButton pressed={props.pressed?.has(part.id) ?? false} onPress={(down) => props.onPress?.(part.id, down)} touch={touch} />
+            )}
             <PrimaryControl {...props} values={values} locked={locked} />
             {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
             <LiveTiles part={part} frame={frame} />
@@ -806,6 +812,34 @@ function OpenCardHeader({
       )}
       {action('chevronUp', t.collapse, onClose)}
     </div>
+  );
+}
+
+/** Basmalı düğmenin "Basılı tut"u: fare, parmak ya da Boşluk / Enter kalkana kadar basılı. */
+function HoldButton({ pressed, onPress, touch }: { pressed: boolean; onPress: (down: boolean) => void; touch: boolean }) {
+  const isKey = (key: string) => key === ' ' || key === 'Enter';
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        onPress(true);
+      }}
+      onPointerUp={() => onPress(false)}
+      onPointerCancel={() => onPress(false)}
+      onLostPointerCapture={() => onPress(false)}
+      onKeyDown={(e) => {
+        if (!isKey(e.key)) return;
+        e.preventDefault();
+        if (!e.repeat) onPress(true);
+      }}
+      onKeyUp={(e) => isKey(e.key) && onPress(false)}
+      onBlur={() => onPress(false)}
+      className={`flex select-none items-center justify-center rounded-[10px] text-[15px] font-semibold text-on-ink ${touch ? 'h-14' : 'h-12'} ${pressed ? 'bg-accent' : 'bg-ink'}`}
+    >
+      {pressed ? t.holding : t.hold}
+    </button>
   );
 }
 

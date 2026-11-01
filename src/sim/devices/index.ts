@@ -24,6 +24,7 @@ import { switchModel } from './switch';
 import { motorModel } from './motor';
 import { relayModel } from './relay';
 import { currentSourceModel } from './currentsource';
+import { pushbuttonModel } from './pushbutton';
 import { multimeterModel } from './multimeter';
 import { lampModel, ldrModel, ntcModel, potentiometerModel } from './sensors';
 import { buzzerModel, fuseModel, speakerModel } from './sound';
@@ -72,6 +73,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   oscilloscope: oscilloscopeModel,
   multimeter: multimeterModel,
   currentsource: currentSourceModel,
+  pushbutton: pushbuttonModel,
 };
 
 export * from './device';
@@ -210,4 +212,5 @@ export {
 } from './tank';
 export { VoltmeterDevice, VOLTMETER_DEFAULTS } from './voltmeter';
 export { CURRENT_SOURCE_DEFAULTS, CurrentSourceDevice } from './currentsource';
+export { PUSHBUTTON_CONTACTS, PUSHBUTTON_DEFAULTS, PushButtonDevice, pushbuttonClosed } from './pushbutton';
 export { MULTIMETER_DEFAULTS, MULTIMETER_MODES, multimeterMode, type MultimeterMode } from './multimeter';

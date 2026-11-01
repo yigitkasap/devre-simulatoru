@@ -59,7 +59,7 @@ export function holeXZ(h: Hole, cols: number): { x: number; z: number } {
     : { x: railX(h.k, cols), z: boardZ(h.board) + railZ(h.rail) };
 }
 
-export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8';
+export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8' | 'button';
 
 export interface BoardPart {
   readonly partId: string;
@@ -120,6 +120,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   ntc: { mount: 'radial', span: 1 },
   buzzer: { mount: 'radial', span: 3 },
   switch: { mount: 'axial', span: 2 },
+  pushbutton: { mount: 'button' },
   npn: { mount: 'to92' },
   pnp: { mount: 'to92' },
   njfet: { mount: 'to92' },
@@ -370,6 +371,29 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
         slot.cursor = start + 3 + GAP;
       }
       onBoard.set(part.id, { partId: part.id, mount: 'dip8', holes, extraHoles });
+      continue;
+    }
+    if (spec.mount === 'button') {
+      // 12 mm basmalı düğme orta kanalın iki yanında: uçlar d (üst yarı) ve g (alt yarı) satırında, aynı
+      // sütunda; içten bağlı ikiz bacaklar iki sütun yanda (şeritleri yalnızca düğmeye ayrılır).
+      let board = 0;
+      let start = 0;
+      for (; ; board++) {
+        if (board >= boards) boards = board + 1;
+        const [top, bottom] = slotsOf(board);
+        start = Math.max(top!.cursor, bottom!.cursor);
+        if (start + 2 <= cols - 1) break;
+      }
+      const [top, bottom] = slotsOf(board);
+      const pinStrip = [takeStrip(board, 0, start, net(part, 0)), takeStrip(board, 1, start, net(part, 1))];
+      pinStrip.forEach((s) => s.legs++);
+      const holes = [stripHole(pinStrip[0]!, 3), stripHole(pinStrip[1]!, 6)];
+      const extraHoles = [stripHole(takeStrip(board, 0, start + 2, null), 3), stripHole(takeStrip(board, 1, start + 2, null), 6)];
+      for (const slot of [top!, bottom!]) {
+        slot.frontier = 0;
+        slot.cursor = start + 2 + GAP;
+      }
+      onBoard.set(part.id, { partId: part.id, mount: 'button', holes, extraHoles });
       continue;
     }
     const pins = spec.mount === 'to92' || spec.mount === 'pot' ? 3 : 2;

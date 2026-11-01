@@ -251,6 +251,9 @@ export interface CanvasProps {
   readonly meterFlips?: ReadonlyMap<string, boolean>;
   /** Multimetrelerin Ω okuması (simülasyon durmuşken). */
   readonly ohmTexts?: ReadonlyMap<string, string>;
+  /** Basılı tutulan düğmeler (belgede durmaz) ve basma / bırakma. */
+  readonly pressed?: ReadonlySet<string>;
+  readonly onPress?: (partId: string, down: boolean) => void;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -399,6 +402,8 @@ export function Canvas({
   wiringLocked = false,
   meterFlips,
   ohmTexts,
+  pressed,
+  onPress,
   ref,
 }: CanvasProps) {
   // Göstergeler kapalıysa kablo renkleri ve öbür göstergeler simülasyon yokmuş gibi çizilir.
@@ -926,6 +931,18 @@ export function Canvas({
     if (selection.parts.length > 0 || selection.wires.length > 0) dispatch({ type: 'select', selection: EMPTY_SELECTION });
   };
 
+  /** Basmalı düğme: parmak ya da fare kalkana kadar basılı. */
+  const holdButton = (partId: string) => {
+    onPress?.(partId, true);
+    const release = () => {
+      onPress?.(partId, false);
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+  };
+
   const phonePointerDown = (e: ReactPointerEvent<SVGSVGElement>, mode: PhoneCanvas['mode']) => {
     const g = toGrid(e.clientX, e.clientY);
     const local = localPoint(e.clientX, e.clientY);
@@ -935,6 +952,10 @@ export function Canvas({
     phoneLongFired.current = false;
     clearPhoneTimers();
     const hit = mode === 'bagla' ? null : hitTest(g, mode === 'olc' ? { pins: false } : undefined);
+    if (mode === 'olc' && hit?.kind === 'part' && doc.parts.find((p) => p.id === hit.partId)?.type === 'pushbutton') {
+      holdButton(hit.partId);
+      return;
+    }
     capture(e.pointerId);
     const pointerId = e.pointerId;
     setInteraction({ kind: 'press', pointerId, sx: local.x, sy: local.y, view, hit, g });
@@ -1119,6 +1140,11 @@ export function Canvas({
     // Seçme aracı
     if (hit?.kind === 'part') {
       const part = doc.parts.find((p) => p.id === hit.partId);
+      if (simActive && part?.type === 'pushbutton' && !e.shiftKey) {
+        // Simülasyon sırasında düğme basılı tutulur, bırakınca açılır.
+        holdButton(part.id);
+        return;
+      }
       if (simActive && part?.type === 'switch' && !e.shiftKey) {
         // Simülasyon sırasında anahtara tıklamak onu açar/kapatır.
         const closed = boolProp(part.props, 'closed', false);
@@ -1840,6 +1866,7 @@ export function Canvas({
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
                 meterText={liveFrame?.meterTexts.get(part.id) ?? ohmTexts?.get(part.id) ?? null}
+                {...(part.type === 'pushbutton' && pressed?.has(part.id) ? { part: { ...part, props: { ...part.props, pressed: true } } } : {})}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
                 hideValue={lod && !selectedParts.has(part.id)}

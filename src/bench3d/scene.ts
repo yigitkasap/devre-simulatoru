@@ -51,6 +51,8 @@ export interface BenchCallbacks {
   onToggle(partId: string): void;
   /** Potansiyometre düğmesi sürükleniyor: yeni konum (%); done: bırakıldı. */
   onKnob(partId: string, position: number, done: boolean): void;
+  /** Basmalı düğme: simülasyon çalışırken basıldı (down) ya da bırakıldı. */
+  onPress(partId: string, down: boolean): void;
   /** Kullanıcı kamerayı elle oynattı (kamera menüsü "Serbest"e döner). */
   onCamera?(): void;
 }
@@ -203,6 +205,8 @@ export class BenchScene {
   private overlay: HTMLElement | null = null;
   private readonly overlayObserver = new MutationObserver(() => (this.dirty = true));
   private drag: { id: string; x: number; start: number; position: number } | null = null;
+  /** Basılı tutulan düğme. */
+  private pressing: string | null = null;
   private down: { x: number; y: number; t: number } | null = null;
   /** Son kare süresi (ms) ve çizim sayısı: performans taraması okur. */
   stats = { frames: 0, renderMs: 0 };
@@ -733,6 +737,13 @@ export class BenchScene {
     if (!e.isPrimary) return;
     this.down = { x: e.clientX, y: e.clientY, t: performance.now() };
     const hit = this.pick(e);
+    if (hit?.model.interaction === 'press' && this.active) {
+      this.pressing = hit.part.id;
+      this.controls.enabled = false;
+      this.renderer.domElement.setPointerCapture(e.pointerId);
+      this.cb.onPress(hit.part.id, true);
+      return;
+    }
     if (hit?.model.interaction === 'knob') {
       const position = Number(hit.part.props.position ?? 50);
       this.drag = { id: hit.part.id, x: e.clientX, start: position, position };
@@ -754,6 +765,13 @@ export class BenchScene {
     if (!e.isPrimary) return;
     const down = this.down;
     this.down = null;
+    if (this.pressing) {
+      const id = this.pressing;
+      this.pressing = null;
+      this.controls.enabled = true;
+      this.cb.onPress(id, false);
+      return;
+    }
     if (this.drag) {
       const { id, position, start } = this.drag;
       this.drag = null;
