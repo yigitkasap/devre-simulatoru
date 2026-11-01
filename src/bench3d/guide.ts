@@ -94,6 +94,8 @@ function describe(part: Part): { name: string; detail: string } {
       return { name: `Potansiyometre ${formatOhm(numProp(p, 'resistance', 10e3))}`, detail: 'dikey trimpot, 3 bacak' };
     case 'switch':
       return { name: 'Anahtar (iki konumlu)', detail: `başlangıçta ${boolProp(p, 'closed', false) ? 'kapalı' : 'açık'}` };
+    case 'bridge':
+      return { name: `Köprü diyot ${typeof p.model === 'string' ? p.model : 'KBP307'}`, detail: '4 bacak düz sıra: + ~ ~ −' };
     case 'spdt':
       return { name: 'Çift yollu anahtar (SPDT)', detail: 'kollu, 3 bacak; ortak uç (C) ortada' };
     case 'pushbutton':
@@ -201,6 +203,9 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         break;
       case 'potentiometer':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ') });
+        break;
+      case 'bridge':
+        steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: '+ bacak, gövdenin pahlı köşesinin altındaki; yazılı yüz sana dönük soldan sağa + ~ ~ −.' });
         break;
       case 'spdt':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Ortadaki bacak ortak uç (C).' });

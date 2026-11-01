@@ -421,6 +421,59 @@ export function switchModel(props: Props): PartModel {
   };
 }
 
+// --- Sıralı bacaklı gövdeler (köprü diyot, TO-220) --------------------------------------------------------------
+
+/** Ön yüzüne yazı çizilen kutu (ön yüz +z). */
+function frontTexBox(w: number, h: number, d: number, side: MeshStandardMaterial, draw: (c: CanvasRenderingContext2D, W: number, H: number) => void, ppu = 64): Mesh {
+  const tex = canvasTexture(w, h, draw, ppu);
+  const box = new Mesh(new BoxGeometry(w, h, d), [side, side, side, side, new MeshStandardMaterial({ map: tex, roughness: 0.5 }), side]);
+  box.userData.ownsMaterial = true;
+  return box;
+}
+
+/**
+ * Bacakları gerçek kılıftaki sırayla (soldan sağa `legs`: pin sırası) uçlarına bağlar. Breadboard'da
+ * uçlar bir satırdadır; yerleşim parçayı ters takmışsa (ilk bacağın deliği sağda) gövde arkasını döner.
+ */
+function inlineLegs(root: Group, anchors: readonly Vector3[], legs: readonly number[], pitch: number, y0: number, z: number): void {
+  const first = anchors[legs[0]!]!;
+  const last = anchors[legs[legs.length - 1]!]!;
+  const inRow = anchors.every((a) => Math.abs(a.z - first.z) < 0.1);
+  if (inRow && first.x > last.x) root.rotation.y = Math.PI;
+  const toLocal = (a: Vector3) => (root.rotation.y ? new Vector3(-a.x, a.y, -a.z) : a);
+  legs.forEach((pin, k) => root.add(legDown(new Vector3((k - (legs.length - 1) / 2) * pitch, y0, z), toLocal(anchors[pin]!), 0.12)));
+}
+
+// --- Köprü diyot (KBP tipi, düz sıralı 4 bacak: + ~ ~ −; tasarım: parcalar-3b/newParts.ts) -----------------
+
+export function bridgeModel(props: Props): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('bridge');
+  const text = typeof props.model === 'string' ? props.model : 'KBP307';
+  const w = 5.6;
+  const h = 4.4;
+  const t = 1.4;
+  const y0 = 1.8;
+  const box = frontTexBox(w, h, t, mat('#1b1c1f', 0.5), (c, W, H) => {
+    c.fillStyle = '#1b1c1f';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = '#d6dade';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `600 ${Math.round(H * 0.15)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.fillText(text, W / 2, H * 0.32);
+    c.font = `700 ${Math.round(H * 0.17)}px "IBM Plex Sans", system-ui, sans-serif`;
+    ['+', '~', '~', '−'].forEach((m, i) => c.fillText(m, W * (0.2 + 0.2 * i), H * 0.78));
+  });
+  box.position.set(0, y0 + h / 2, 0);
+  const body = new Group();
+  body.add(box);
+  // Gerçek sıra soldan: +, ~, ~, − → şema pinleri 1, 0, 2, 3.
+  inlineLegs(body, anchors, [1, 0, 2, 3], 1.12, y0, 0);
+  root.add(body);
+  return { root, anchors };
+}
+
 // --- Çift yollu anahtar (SPDT): bugünkü kollu anahtarın gövdesi, üç bacak; kol bağlı ucun tersine yatar ---
 
 /**

@@ -78,6 +78,7 @@ export function partValueText(part: Part): string {
     case 'zener':
       return formatSI(numProp(p, 'zenerVoltage', 5.1), 'V', { trim: true, digits: 4 });
     case 'diode':
+    case 'bridge':
     case 'njfet':
     case 'nmos':
       return modelName(part);
@@ -235,6 +236,10 @@ export function labelLayout(part: Part, displayFlip: boolean): { anchor: 'middle
   if (part.type === 'opamp' && part.rotation === 0) {
     // İşlemsel yükselteç: üstte V+, sağda çıkış kablosu var; ad üçgenin sağ üst köşesinde.
     return { anchor: 'start', nameX: 8, nameY: -16, valueY: -16 };
+  }
+  if (part.type === 'bridge') {
+    // Köprü diyot: dört kenarda da bacak var; ad sol üstte, model sol altta (çapraz boşluklarda).
+    return { anchor: 'end', nameX: -12, nameY: -22, valueY: 33 };
   }
   if (def.labelRight && part.rotation === 0) {
     // Transistör: üst ve alt uçlar kablolu olduğu için yazılar sağda (dönmüşse eski kurallar).

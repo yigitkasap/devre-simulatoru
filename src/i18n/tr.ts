@@ -60,6 +60,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   currentsource: 'Akım kaynağı',
   pushbutton: 'Basmalı düğme',
   spdt: 'Çift yollu anahtar',
+  bridge: 'Köprü diyot',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
   tank: 'Su haznesi',
@@ -103,6 +104,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   currentsource: 'akım kaynağının',
   pushbutton: 'basmalı düğmesinin',
   spdt: 'çift yollu anahtarının',
+  bridge: 'köprü diyodunun',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
   tank: 'su haznesinin',
@@ -145,6 +147,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   currentsource: ['1. ucu (akım girer)', '2. ucu (akım çıkar)'],
   pushbutton: ['1. ucu', '2. ucu'],
   spdt: ['ortak ucu (C)', 'A ucu', 'B ucu'],
+  bridge: ['üst ~ (AC) ucu', '+ (DC) ucu', 'alt ~ (AC) ucu', '− (DC) ucu'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
@@ -189,6 +192,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   currentsource: ['1', '2'],
   pushbutton: ['1', '2'],
   spdt: ['C', 'A', 'B'],
+  bridge: ['~', '+', '~', '−'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
 };
@@ -232,6 +236,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   currentsource: ['1. uç', '2. uç'],
   pushbutton: ['1. uç', '2. uç'],
   spdt: ['C', 'A', 'B'],
+  bridge: ['~ üst', '+', '~ alt', '−'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
 };
@@ -530,6 +535,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   relay:
     'Elektromıknatısla çalışan anahtar: sargısından yeterli akım geçince demir paleti çeker ve kontağı değiştirir (C, NK’dan ayrılıp NA’ya değer). Küçük bir akımla, sargıdan yalıtılmış başka bir devreyi açıp kapatır.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
+  bridge:
+    'Dört diyot tek pakette (tam dalga köprü doğrultmaç): iki ~ ucuna AC gerilim verilir, + ve − uçlarından tek yönlü (doğrultulmuş) gerilim alınır. Her yarım periyotta iki diyot iletir; çıkış, girişin tepesinden iki diyot gerilimi kadar düşük olur.',
   spdt:
     'Çift yollu (SPDT) anahtar: ortak uç C, A ya da B ile birleşir; öbür uç açıkta kalır. Bir lambayı iki yerden yakıp söndürmek ya da bir sinyali iki yoldan birine vermek için kullanılır. Simülasyon sırasında şemada ya da 3B tezgâhta tıklanınca konum değişir.',
   pushbutton:
@@ -1570,6 +1577,8 @@ export const tr = {
     ledLimits: (vf: string, max: string) => `20 mA’de ileri gerilim ≈ ${vf}; en fazla ${max}.`,
     switchClosedNote: (r: string) => `Kapalı anahtar ${r} değerinde bir dirençtir.`,
     pressed: 'basılı',
+    dcOutput: 'DC çıkış (+ − −)',
+    bridgeNote: 'Her yarım periyotta iki diyot seri iletir: çıkış, AC girişin anlık değerinden iki diyot gerilimi (KBP307’de 10 mA’de ≈ 0,64 V, 1 A’de ≈ 0,93 V her biri) kadar düşüktür.',
     spdtNote: (to: string, open: string, r: string) => `C ucu ${to} ucuna bağlı (kapalı kontak ${r}); ${open} ucu açıkta, ondan akım geçmez.`,
     released: 'bırakılmış',
     switchOpenNote: 'Açık anahtar akım geçirmez; uçları arasındaki gerilim devrenin geri kalanına bağlıdır.',
@@ -2382,6 +2391,7 @@ export const tr = {
       currentsource: 'Akım kaynakları',
       pushbutton: 'Basmalı düğmeler',
       spdt: 'Çift yollu anahtarlar',
+      bridge: 'Köprü diyotlar',
       ammeter: 'Ampermetreler',
       oscilloscope: 'Osiloskoplar',
       tank: 'Su hazneleri',
@@ -2756,6 +2766,8 @@ export const tr = {
     } as Partial<Record<DeviceType, string>>,
     /** Parça modelinin notu (genel modellerde türün notu kullanılır). */
     modelNotes: {
+      KBP307:
+        'KBP307: 3 A, 1000 V köprü diyot (dört diyot tek pakette; bacaklar + ~ ~ −). Her diyodun ileri gerilimi DOWO veri sayfasının tipik eğrisinden: 10 mA’de ≈ 0,64 V, 0,1 A’de ≈ 0,75 V, 1 A’de ≈ 0,93 V (tablo: 3 A’de en çok 1,1 V). Kapasite ve ters toparlanma hesaplanmaz.',
       '1N4001':
         '1N4001: 1 A, 50 V doğrultucu diyot. İleri gerilim 10 mA’de ≈ 0,60 V, 100 mA’de ≈ 0,72 V (Vishay veri sayfası). Eklem kapasitesi (0 V’ta ≈ 30 pF) ve ters toparlanma (τ_{T} ≈ 5,8 µs) de hesaplanır: frekans arttıkça diyot ters yönde de bir süre akım geçirir; 1 MHz’te neredeyse doğrultmaz.',
       genel: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer; kapasitesi yoktur, her frekansta anında iletir ya da keser.',

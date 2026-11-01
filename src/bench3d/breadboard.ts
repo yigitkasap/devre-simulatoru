@@ -59,7 +59,7 @@ export function holeXZ(h: Hole, cols: number): { x: number; z: number } {
     : { x: railX(h.k, cols), z: boardZ(h.board) + railZ(h.rail) };
 }
 
-export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8' | 'button';
+export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8' | 'button' | 'inline';
 
 export interface BoardPart {
   readonly partId: string;
@@ -122,6 +122,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   switch: { mount: 'axial', span: 2 },
   pushbutton: { mount: 'button' },
   spdt: { mount: 'to92' },
+  bridge: { mount: 'inline' },
   npn: { mount: 'to92' },
   pnp: { mount: 'to92' },
   njfet: { mount: 'to92' },
@@ -139,6 +140,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
  */
 const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
   spdt: [1, 0, 2], // A, C, B: ortak uç ortada
+  bridge: [1, 0, 2, 3], // KBP: + ~ ~ −
 };
 
 /** DIP-8: parça pin sırası → entegre bacak numarası (1–8). */
@@ -405,9 +407,10 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
       onBoard.set(part.id, { partId: part.id, mount: 'button', holes, extraHoles });
       continue;
     }
-    const pins = spec.mount === 'to92' || spec.mount === 'pot' ? 3 : 2;
-    const span = pins === 3 ? 1 : spec.span!;
-    const width = pins === 3 ? 3 : span + 1;
+    // Sıralı bacaklar (TO-92, trimpot, köprü diyot, TO-220): aynı satırda ardışık delikler.
+    const pins = spec.mount === 'inline' ? part.type === 'bridge' ? 4 : 3 : spec.mount === 'to92' || spec.mount === 'pot' ? 3 : 2;
+    const span = pins >= 3 ? 1 : spec.span!;
+    const width = pins >= 3 ? pins : span + 1;
     const nets = Array.from({ length: pins }, (_, i) => net(part, i));
     const physical = LEG_ORDER[part.type] ?? Array.from({ length: pins }, (_, i) => i);
     const ends = [nets[physical[0]!]!, nets[physical[pins - 1]!]!];
@@ -415,7 +418,7 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
     // Paylaşılan ağ son bacaktaysa parça ters takılır (o bacak ilk sütuna).
     const reversed = shared !== null && shared !== ends[0] && shared === ends[1];
     const order = reversed ? [...physical].reverse() : physical;
-    const columns = pins === 3 ? [start, start + 1, start + 2] : [start, start + span];
+    const columns = pins >= 3 ? Array.from({ length: pins }, (_, k) => start + k) : [start, start + span];
     const columnStrips = columns.map((col, k) => takeStrip(slot.board, slot.half, col, nets[order[k]!]!));
     // Aynı satır (bütün şeritlerde boş) tercih edilir.
     const pref = rowsOf(slot.half);

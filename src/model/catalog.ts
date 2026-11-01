@@ -31,6 +31,8 @@ import {
   PJFET_DEFAULTS,
   PMOSFET_DEFAULTS,
   ZENER_DEFAULTS,
+  BRIDGE_DEFAULTS,
+  BRIDGE_MODELS,
   CAPACITOR_DEFAULTS,
   CURRENT_SOURCE_DEFAULTS,
   PUSHBUTTON_CONTACTS,
@@ -443,6 +445,23 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: false,
   },
+  bridge: {
+    type: 'bridge',
+    category: 'semiconductors',
+    labelPrefix: 'BR',
+    // Uçlar karenin köşelerinde: ~ üstte, + sağda, ~ altta, − solda.
+    pins: [
+      { x: 0, y: -4 },
+      { x: 4, y: 0 },
+      { x: 0, y: 4 },
+      { x: -4, y: 0 },
+    ],
+    bounds: { x: -4, y: -4, w: 8, h: 8 },
+    defaultProps: { ...BRIDGE_DEFAULTS },
+    propDefs: [{ kind: 'select', key: 'model', options: BRIDGE_MODELS }],
+    showLabel: true,
+    polarized: true,
+  },
   spdt: {
     type: 'spdt',
     category: 'switches',
@@ -759,7 +778,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
 export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: readonly DeviceType[] }> = [
   { id: 'sources', types: ['battery', 'acsource', 'currentsource', 'ground'] },
   { id: 'passive', types: ['resistor', 'potentiometer', 'capacitor', 'inductor', 'transformer'] },
-  { id: 'semiconductors', types: ['diode', 'zener', 'led'] },
+  { id: 'semiconductors', types: ['diode', 'zener', 'led', 'bridge'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'ics', types: ['opamp', 'timer555', 'arduino'] },
   { id: 'switches', types: ['switch', 'pushbutton', 'spdt', 'relay', 'fuse'] },

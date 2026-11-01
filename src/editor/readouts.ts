@@ -495,6 +495,17 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
       };
     }
+    case 'bridge':
+      // DC çıkış (+ − −), + uçtan verilen akım ve dört diyotta harcanan güç.
+      return {
+        title,
+        rows: [
+          { label: t.dcOutput, value: v(m.voltage) },
+          { label: t.outputCurrent, value: a(m.current) },
+          { label: t.powerUsed, value: w(P) },
+        ],
+        note: t.bridgeNote,
+      };
     case 'spdt': {
       const to = spdtThrow(p);
       const [on, off] = to === 'a' ? ['A', 'B'] : ['B', 'A'];

@@ -631,6 +631,42 @@ function Spdt({ to }: { to: SpdtThrow }) {
   );
 }
 
+/** Kenar üstünde küçük diyot: (ax, ay) anottan (kx, ky) katoda; üçgen ve katot çizgisi kenarın ortasında. */
+function EdgeDiode({ ax, ay, kx, ky }: { ax: number; ay: number; kx: number; ky: number }) {
+  const l = Math.hypot(kx - ax, ky - ay);
+  const [ux, uy] = [(kx - ax) / l, (ky - ay) / l];
+  const [nx, ny] = [-uy, ux];
+  const [mx, my] = [(ax + kx) / 2, (ay + ky) / 2];
+  const s = 6;
+  const w = 6;
+  const tip = [mx + ux * s, my + uy * s] as const;
+  const base = [mx - ux * s, my - uy * s] as const;
+  return (
+    <g>
+      <path d={`M${base[0] + nx * w} ${base[1] + ny * w} L${base[0] - nx * w} ${base[1] - ny * w} L${tip[0]} ${tip[1]} Z`} fill="currentColor" />
+      <line x1={tip[0] + nx * w} y1={tip[1] + ny * w} x2={tip[0] - nx * w} y2={tip[1] - ny * w} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+    </g>
+  );
+}
+
+/** Köprü diyot: köşeleri ~ (üst, alt), + (sağ), − (sol) olan kare; dört diyot + ucuna doğru iletir. */
+function Bridge() {
+  const v = 26;
+  return (
+    <g>
+      <Lead from={-40} to={-v} />
+      <Lead from={v} to={40} />
+      <line x1={0} y1={-40} x2={0} y2={-v} stroke="currentColor" strokeWidth={2} />
+      <line x1={0} y1={v} x2={0} y2={40} stroke="currentColor" strokeWidth={2} />
+      <path d={`M0 ${-v} L${v} 0 L0 ${v} L${-v} 0 Z`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <EdgeDiode ax={0} ay={-v} kx={v} ky={0} />
+      <EdgeDiode ax={0} ay={v} kx={v} ky={0} />
+      <EdgeDiode ax={-v} ay={0} kx={0} ky={-v} />
+      <EdgeDiode ax={-v} ay={0} kx={0} ky={v} />
+    </g>
+  );
+}
+
 /** DC akım kaynağı: dairede ok; ok akımın çıktığı ucu (2. uç) gösterir. */
 function CurrentSource() {
   return (
@@ -1182,6 +1218,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <PushButton closed={pushbuttonClosed(props)} />;
     case 'spdt':
       return <Spdt to={spdtThrow(props)} />;
+    case 'bridge':
+      return <Bridge />;
   }
 }
 

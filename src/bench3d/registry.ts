@@ -9,6 +9,7 @@ import { dcsupplyModel, funcgenModel, meterModel, multimeterModel, oscilloscopeM
 import type { PartModel } from './model';
 import {
   batteryModel,
+  bridgeModel,
   buzzerModel,
   capacitorModel,
   currentSourceModel,
@@ -87,6 +88,8 @@ function build(part: Part): PartModel {
       return pushButtonModel();
     case 'spdt':
       return spdtModel(p);
+    case 'bridge':
+      return bridgeModel(p);
     case 'lamp':
       return lampModel();
     case 'speaker':

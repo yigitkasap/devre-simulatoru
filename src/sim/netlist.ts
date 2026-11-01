@@ -44,7 +44,8 @@ export type DeviceType =
   | 'multimeter'
   | 'currentsource'
   | 'pushbutton'
-  | 'spdt';
+  | 'spdt'
+  | 'bridge';
 
 export type PropValue = number | string | boolean;
 export type Props = Readonly<Record<string, PropValue>>;

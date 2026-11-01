@@ -154,3 +154,35 @@ describe('Çift yollu anahtar (SPDT)', () => {
     expect(cols[0]! + 1).toBe(cols[2]);
   });
 });
+
+describe('Köprü diyot (KBP307)', () => {
+  it('her diyot DOWO eğrisine uydu: 10 mA ≈ 0,63 V, 1 A ≈ 0,93 V, 3 A ≈ 1,06 V (eğri 0,64 / 0,93 / 1,07)', () => {
+    for (const [i, vf] of [[0.01, 0.64], [1, 0.93], [3, 1.07]] as const) {
+      // Akım kaynağıyla ~₁ → + diyodu (öbür diyotlar ters ya da boşta).
+      const sim = new CircuitSimulator(circuit().add('currentsource', 'I1', ['gnd', 'ac'], { current: i }).add('bridge', 'BR1', ['ac', 'gnd', 'x', 'y']).ground('G1', 'gnd').build());
+      sim.advance(0);
+      expect(Math.abs((sim.voltageAt('ac') ?? NaN) - vf)).toBeLessThan(0.02);
+    }
+  });
+
+  it('tam dalga: giriş hangi yönde olursa olsun çıkış + − − pozitif, iki diyot gerilimi kadar düşük', () => {
+    for (const sign of [1, -1]) {
+      const sim = new CircuitSimulator(
+        circuit().battery('B1', 'a', 'b', 5 * sign).add('bridge', 'BR1', ['a', 'p', 'b', 'n']).resistor('RL', 'p', 'n', 1000).ground('G1', 'n').build(),
+      );
+      sim.advance(0);
+      const out = sim.measure('BR1')!;
+      expect(out.voltage).toBeGreaterThan(3.8);
+      expect(out.voltage).toBeLessThan(3.95);
+      expect(out.current).toBeCloseTo(out.voltage / 1000, 9);
+    }
+  });
+
+  it("breadboard'da dört ardışık delik, gerçek sıra + ~ ~ −", () => {
+    const doc = { version: 1 as const, parts: [{ id: 'br', type: 'bridge' as const, label: 'BR1', x: 0, y: 0, rotation: 0 as const, props: { model: 'KBP307' } }], wires: [] };
+    const at = planBreadboard(doc).onBoard.get('br')!;
+    const cols = at.holes.map((h) => (h.kind === 'strip' ? h.col : -1));
+    // Pin sırası ~, +, ~, −: + en solda, sonra ~ (üst), ~ (alt), −.
+    expect([cols[1]! + 1, cols[1]! + 2, cols[1]! + 3]).toEqual([cols[0], cols[2], cols[3]]);
+  });
+});
