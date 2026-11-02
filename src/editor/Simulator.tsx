@@ -11,8 +11,8 @@ import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivi
 import { boardCircuit } from '../tahta/circuit';
 import { planFromBuild } from '../tahta/plan';
 import { planBreadboard } from '../bench3d/breadboard';
-import { emptyBuild } from '../model/build';
-import { BoardPanel, BoardStage, type BoardView } from './tahta/BoardMode';
+import { emptyBuild, type Build } from '../model/build';
+import { BoardPanel, BoardStage, type BoardView, type Placing } from './tahta/BoardMode';
 import { groupOf } from './ExampleTab';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
@@ -425,6 +425,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [boardView, setBoardView] = useState<BoardView>('top');
   const [showConnected, setShowConnected] = useState(true);
   const [boardSchema, setBoardSchema] = useState(false);
+  /** Takılmakta olan parça (panel ile tahta arasında ortak). */
+  const [placing, setPlacing] = useState<Placing | null>(null);
   /** Şemanın breadboard planı: tahtanın boyu, masadaki yerler, alet kabloları (3B ya da Tahtada kur açıkken). */
   const schematicPlan = useMemo(() => (boardMode || viewMode === 'bench' ? planBreadboard(doc) : null), [boardMode, viewMode, doc]);
   const boardBuild = useMemo(() => (boardMode && schematicPlan ? (doc.build ?? emptyBuild(schematicPlan.cols)) : null), [boardMode, schematicPlan, doc.build]);
@@ -535,8 +537,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const exitBoard = () => {
     sim.stop();
     setBoardSchema(false);
+    setPlacing(null);
     setBoardMode(false);
   };
+  /** Tahtadaki değişiklik: belgenin kurulum alanı (geri al / yinele kapsar). */
+  const commitBuild = (next: Build) => dispatch({ type: 'commit', doc: { ...doc, build: next } });
+  const boardSelected = boardMode && selection.parts.length === 1 ? selection.parts[0]! : null;
+  const selectOnBoard = (id: string | null) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION });
 
   const play = () => {
     if (gate) showToast(gate, 'error');
@@ -1644,6 +1651,20 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           schematicPlan={schematicPlan}
           bench={{ ...benchProps, onSchematic: () => setBoardSchema(true) }}
           touch={touchUi}
+          build={boardBuild!}
+          onBuild={commitBuild}
+          placing={placing}
+          onPlacing={setPlacing}
+          selected={boardSelected}
+          onSelect={selectOnBoard}
+          onUndo={() => {
+            setPlacing(null);
+            dispatch({ type: 'undo' });
+          }}
+          onRedo={() => {
+            setPlacing(null);
+            dispatch({ type: 'redo' });
+          }}
         />
       ) : viewMode === 'bench' ? (
         <BenchView
@@ -2269,6 +2290,17 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   touch={tablet}
                   large={boardSchema}
                   onLarge={setBoardSchema}
+                  placing={placing}
+                  onPlace={(id, dragging) => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setPlacing({ partId: id, first: null, turned: false, dragging });
+                  }}
+                  selected={boardSelected}
+                  onSelect={(id) => {
+                    setPlacing(null);
+                    selectOnBoard(id);
+                  }}
                 />
               ) : (
                 notebook

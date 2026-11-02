@@ -147,7 +147,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
  * Sıralı bacaklı parçalarda gerçek kılıftaki bacak sırası (soldan sağa, sütun sırasıyla) → pin. Yoksa
  * pin sırası (BC547'de C-B-E).
  */
-const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
+export const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
   spdt: [1, 0, 2], // A, C, B: ortak uç ortada
   bridge: [1, 0, 2, 3], // KBP: + ~ ~ −
   reg7805: [0, 1, 2], // TO-220: IN, GND, OUT
@@ -156,13 +156,13 @@ const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
 };
 
 /** DIP-8: parça pin sırası → entegre bacak numarası (1–8). */
-const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = {
+export const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = {
   opamp: [2, 3, 6, 7, 4], // LM741: −, +, OUT, V+, V− (1, 5, 8 boş)
   timer555: [1, 2, 3, 4, 5, 6, 7, 8],
 };
 
 /** DIP-4: parça pin sırası → bacak numarası (PC817: 1 A, 2 K, 3 E, 4 C; Sharp iç bağlantı şeması). */
-const DIP4_PINS: Partial<Record<DeviceType, readonly number[]>> = {
+export const DIP4_PINS: Partial<Record<DeviceType, readonly number[]>> = {
   opto: [1, 2, 4, 3],
 };
 

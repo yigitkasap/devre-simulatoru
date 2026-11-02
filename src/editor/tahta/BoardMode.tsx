@@ -5,8 +5,9 @@
 // Tepeden görünüm 3B sahnenin dik (ortografik) kamerasıdır (kullanıcı kararı); masadaki cihazlar bu
 // görünümde ön panelleri ve uçları görünen düz kartlardır. 3B'de yalnızca bakılır.
 
-import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { mountOf, netColors, type BreadboardPlan } from '../../bench3d/breadboard';
+import { holeLabel } from '../../bench3d/holes';
 import type { BenchScene } from '../../bench3d/scene';
 import { tr } from '../../i18n/tr';
 import type { Build } from '../../model/build';
@@ -18,11 +19,16 @@ import { deviceSummary } from '../DeviceCards';
 import { Icon, type IconName } from '../icons';
 import { partValueText } from '../PartView';
 import type { Settings } from '../settings';
+import { BoardTop, type BoardCommands, type Placing } from './BoardTop';
+
+export type { Placing } from './BoardTop';
 
 export type BoardView = 'top' | 'bench';
 
-/** Tepeden görünümde sahnenin kenarlarında boş kalan alan (üst çubuk, araç çubukları; piksel). */
-const TOP_INSETS = { top: 64, right: 16, bottom: 76, left: 16 } as const;
+const doc_part = (doc: CircuitDoc, id: string): Part | undefined => doc.parts.find((p) => p.id === id);
+
+/** Tepeden görünümde sahnenin kenarlarında boş kalan alan (üst çubuk; altta araç çubuğu ve takma çubuğu; piksel). */
+const TOP_INSETS = { top: 64, right: 16, bottom: 132, left: 16 } as const;
 
 /** Tahtaya takılan parçalar (masadakiler ve toprak sembolü hariç), planın sırasıyla (soldan sağa). */
 export function boardParts(doc: CircuitDoc, schematic: BreadboardPlan): Part[] {
@@ -53,11 +59,27 @@ export interface BoardStageProps {
   /** 3B görünümün ortak özellikleri (BenchView). */
   readonly bench: Omit<BenchViewProps, 'plan' | 'top' | 'onScene' | 'overlayExtra' | 'unlabelled'>;
   readonly touch: boolean;
+  /** Öğrencinin kurulumu ve değişince kaydı (geri al / yinele kapsar). */
+  readonly build: Build;
+  readonly onBuild: (build: Build) => void;
+  readonly placing: Placing | null;
+  readonly onPlacing: (placing: Placing | null) => void;
+  /** Tahtada seçili (takılı) parça. */
+  readonly selected: string | null;
+  readonly onSelect: (partId: string | null) => void;
+  /** Geri al / yinele (Ctrl+Z, Ctrl+Y; şema tuvali bu kipte yok). */
+  readonly onUndo: () => void;
+  readonly onRedo: () => void;
 }
 
 export function BoardStage(props: BoardStageProps) {
-  const { view, plan, schematicPlan, bench, touch } = props;
+  const { view, plan, schematicPlan, bench, touch, build } = props;
   const [scene, setScene] = useState<BenchScene | null>(null);
+  const [viewTick, setViewTick] = useState(0);
+  const onView = useCallback(() => setViewTick((n) => n + 1), []);
+  const [said, setSaid] = useState('');
+  const commands = useRef<BoardCommands>(null);
+  const selectedPart = props.selected && build.parts[props.selected] ? doc_part(bench.doc, props.selected) : undefined;
   const top = view === 'top';
   const doc = bench.doc;
   const tableIds = new Set(schematicPlan.table.keys());
@@ -108,40 +130,45 @@ export function BoardStage(props: BoardStageProps) {
       })
     : null;
 
-  // Tepeden görünüm: boş yerde sürükleyince kayar, tekerlekle yakınlaşır (3B'nin yörünge denetimi kapalı).
-  const drag = useRef<{ id: number; x: number; y: number } | null>(null);
-  const layer = useRef<HTMLDivElement>(null);
+  // Geri al ve yinele kurulumu da kapsar (belgenin parçası).
+  const history = useRef({ undo: props.onUndo, redo: props.onRedo });
+  history.current = { undo: props.onUndo, redo: props.onRedo };
   useEffect(() => {
-    const el = layer.current;
-    if (!el || !scene) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const key = e.key.toLocaleLowerCase('en');
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        history.current.undo();
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        history.current.redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Tepeden görünüm: tekerlekle imlecin olduğu yere yakınlaşır (kaydırma ve takma BoardTop'ta).
+  const [stage, setStage] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!stage || !scene || !top) return undefined;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      const r = el.getBoundingClientRect();
+      const r = stage.getBoundingClientRect();
       scene.zoomTop(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
     };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [scene, top]);
-  const onDown = (e: ReactPointerEvent) => {
-    if (e.button !== 0) return;
-    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const onMove = (e: ReactPointerEvent) => {
-    const d = drag.current;
-    if (!d || d.id !== e.pointerId || !scene) return;
-    scene.panTop(e.clientX - d.x, e.clientY - d.y);
-    drag.current = { ...d, x: e.clientX, y: e.clientY };
-  };
-  const onUp = (e: ReactPointerEvent) => {
-    if (drag.current?.id === e.pointerId) drag.current = null;
-  };
+    stage.addEventListener('wheel', onWheel, { passive: false });
+    return () => stage.removeEventListener('wheel', onWheel);
+  }, [stage, scene, top]);
 
   const h = touch ? 'h-11' : 'h-9';
-  const tool = (icon: IconName, label: string, key: string, enabled: boolean) => (
+  const tool = (icon: IconName, label: string, key: string, enabled: boolean, run?: () => void) => (
     <button
       type="button"
       disabled={!enabled}
+      onClick={run}
       aria-keyshortcuts={key}
       className={`flex items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink shadow-sm hover:bg-panel-2 disabled:text-stopped disabled:hover:bg-panel ${touch ? 'h-11' : 'h-10'}`}
     >
@@ -152,9 +179,10 @@ export function BoardStage(props: BoardStageProps) {
   );
 
   return (
-    <div className="absolute inset-0 overflow-hidden" aria-label={tr.tahta.boardLabel(plan.cols)} role="region">
+    <div ref={setStage} className="absolute inset-0 overflow-hidden" aria-label={tr.tahta.boardLabel(plan.cols)} role="region">
       <BenchView
         {...bench}
+        callbacks={{ ...bench.callbacks, onView }}
         plan={plan}
         top={top ? TOP_INSETS : null}
         onScene={setScene}
@@ -166,7 +194,26 @@ export function BoardStage(props: BoardStageProps) {
         }
         {...(top ? { unlabelled: tableIds } : {})}
       />
-      {top && <div ref={layer} className="absolute inset-0 z-10 cursor-grab touch-none active:cursor-grabbing" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} />}
+      {top && (
+        <BoardTop
+          scene={scene}
+          viewTick={viewTick}
+          doc={bench.doc}
+          build={build}
+          placing={props.placing}
+          onPlacing={props.onPlacing}
+          selected={props.selected}
+          onSelect={props.onSelect}
+          showConnected={props.showConnected}
+          onBuild={props.onBuild}
+          announce={setSaid}
+          touch={touch}
+          commands={commands}
+        />
+      )}
+      <p className="sr-only" aria-live="polite">
+        {said}
+      </p>
 
       {/* Üst çubuk (T1): Tahtada kur · Tepeden | 3B ... Bağlı delikleri göster · Çık. */}
       <div className="pointer-events-none absolute top-3 right-3 left-3 z-20 flex items-start justify-between gap-2">
@@ -218,8 +265,8 @@ export function BoardStage(props: BoardStageProps) {
         <>
           <div role="toolbar" aria-label={tr.tahta.toolbar} className="absolute bottom-4 left-4 z-20 flex items-center gap-2">
             {tool('wire', tr.tahta.toolWire, 'K', false)}
-            {tool('rotate', tr.tahta.toolRotate, 'R', false)}
-            {tool('trash', tr.tahta.toolDelete, 'Del', false)}
+            {tool('rotate', tr.tahta.toolRotate, 'R', selectedPart !== undefined, () => commands.current?.rotate())}
+            {tool('trash', tr.tahta.toolDelete, 'Del', selectedPart !== undefined, () => commands.current?.remove())}
           </div>
           <div role="group" aria-label={tr.toolbar.view} className="absolute right-4 bottom-4 z-20 flex items-center rounded-[10px] border border-line bg-panel p-[3px] shadow-sm">
             {(
@@ -253,6 +300,11 @@ export interface BoardPanelProps {
   /** Şemanın büyük görünümü açık (3B'deki küçük şemadan da açılır). */
   readonly large: boolean;
   readonly onLarge: (open: boolean) => void;
+  readonly placing: Placing | null;
+  /** Kutudaki parçayı takmaya başla (`dragging`: satırdan sürükleniyor). */
+  readonly onPlace: (partId: string, dragging: boolean) => void;
+  readonly selected: string | null;
+  readonly onSelect: (partId: string | null) => void;
 }
 
 /** Sağ panel (T1): başlık, şema (değiştirilemez), parça kutusu, alet kabloları, Denetle. */
@@ -303,14 +355,37 @@ export function BoardPanel(props: BoardPanelProps) {
             {parts.map((part) => {
               const at = build.parts[part.id];
               const value = partValueText(part);
+              const isPlacing = props.placing?.partId === part.id;
+              const isSelected = props.selected === part.id;
               return (
-                <li key={part.id} className={`flex items-center gap-3 rounded-[10px] border border-line bg-panel px-3 ${touch ? 'min-h-12' : 'min-h-11'}`}>
+                <li key={part.id}>
+                  <button
+                    type="button"
+                    aria-label={at ? undefined : tr.tahta.placePart(part.label)}
+                    aria-pressed={isPlacing || isSelected}
+                    onPointerDown={(e) => {
+                      if (at || e.button !== 0 || e.pointerType !== 'mouse') return;
+                      // Satırdan sürükleme: imleç tahtanın üstünde bırakılınca takılır (BoardTop).
+                      const start = { x: e.clientX, y: e.clientY };
+                      const onMove = (m: PointerEvent) => {
+                        if (Math.hypot(m.clientX - start.x, m.clientY - start.y) < 6) return;
+                        window.removeEventListener('pointermove', onMove);
+                        props.onPlace(part.id, true);
+                      };
+                      window.addEventListener('pointermove', onMove);
+                      window.addEventListener('pointerup', () => window.removeEventListener('pointermove', onMove), { once: true });
+                    }}
+                    onClick={() => (at ? props.onSelect(part.id) : props.onPlace(part.id, false))}
+                    className={`flex w-full items-center gap-3 rounded-[10px] border px-3 text-left ${touch ? 'min-h-12' : 'min-h-11'} ${isPlacing || isSelected ? 'border-accent bg-accent-soft' : 'border-line bg-panel hover:bg-panel-2'} ${at ? '' : 'cursor-grab'}`}
+                  >
                   <b className="w-12 shrink-0 text-small font-semibold">{part.label}</b>
                   <span className="min-w-0 flex-1 truncate text-small text-ink-2">
                     {tr.devices.names[part.type]}
                     {value ? ` ${value}` : ''}
                   </span>
-                  {at ? (
+                  {isPlacing ? (
+                    <span className="font-mono text-[12px] font-semibold text-accent-ink">{props.placing?.first ? tr.tahta.placing(holeLabel(props.placing.first, build.cols)) : tr.tahta.placingFixed}</span>
+                  ) : at ? (
                     <span className="flex items-center gap-1 font-mono text-[12px] text-ok-ink">
                       <Icon name="check" className="h-3.5 w-3.5" />
                       {at.holes.join(' · ')}
@@ -318,6 +393,7 @@ export function BoardPanel(props: BoardPanelProps) {
                   ) : (
                     <span className="text-small text-muted">{tr.tahta.inBox}</span>
                   )}
+                  </button>
                 </li>
               );
             })}
