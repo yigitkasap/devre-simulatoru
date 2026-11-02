@@ -10,7 +10,9 @@ import bf245a from './veri/veri-bf245a.json';
 
 const jfet = exampleDoc('jfet-karakteristik')!.parts.find((p) => p.type === 'njfet')!;
 
-describe('Analiz: eğri izleyici', () => {
+// Yük doğrusu ve Q basamağı testleri tek başına 1–2,5 s sürer; bütün dosyalar paralel çalışırken 5 s'lik
+// varsayılan sınırı aşabiliyordu (ara sıra düşen test).
+describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
   it('BF245A çıkış ailesi: V_DS = 10 V’ta I_D referansla %1 içinde (V_GS 0 → 4,14 mA, −0,6 V → 1,78 mA)', () => {
     const req: SweepRequest = { type: 'njfet', props: jfet.props, ...defaultRequest('njfet', jfet.props, 'output') };
     expect(req.steps).toEqual([0, -0.2, -0.4, -0.6]);
