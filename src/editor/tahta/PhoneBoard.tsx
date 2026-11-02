@@ -37,6 +37,12 @@ export interface PhoneBoardSheetProps {
   readonly onTypeHole: (text: string) => boolean;
   readonly onCheck: () => void;
   readonly onHint: (problem: Problem) => void;
+  /** Görev (T6): kalan Denetle hakkı (null: sınırsız), yalnızca teslim, ipucu sınırı, Bağlı delikler kilitli, Teslim et. */
+  readonly checksLeft?: number | null;
+  readonly submitOnly?: boolean;
+  readonly maxHint?: number;
+  readonly connectedLocked?: boolean;
+  readonly onSubmit?: () => void;
   readonly cue: string | null;
   readonly onReport: () => void;
   readonly onGuide: () => void;
@@ -179,7 +185,7 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
   if (problems.length > 0 && session) {
     const first = problems.every((p) => levelOf(session, p) <= 1);
     const again = (
-      <button type="button" onClick={props.onCheck} className={`${BUTTON} bg-accent text-white`}>
+      <button type="button" onClick={props.onCheck} disabled={props.checksLeft === 0} className={`${BUTTON} bg-accent text-white disabled:opacity-50`}>
         <Icon name="check" className="h-[18px] w-[18px]" />
         {d.again}
       </button>
@@ -187,7 +193,7 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
     return (
       <Layout
         footer={
-          first ? (
+          first && (props.maxHint ?? 4) >= 2 ? (
             <div className="grid grid-cols-[2fr_3fr] gap-2">
               <button type="button" onClick={() => problems.forEach((p) => props.onHint(p))} className={`${BUTTON} bg-accent-soft text-accent-ink`}>
                 <Icon name="bulb" className="h-[18px] w-[18px]" />
@@ -225,7 +231,7 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
           <>
             <ol className="m-0 flex list-none flex-col gap-2.5 p-0" aria-label={d.title(problems.length)}>
               {problems.map((p, i) => (
-                <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={levelOf(session, p)} touch onHint={props.onHint} />
+                <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={levelOf(session, p)} touch onHint={props.onHint} cap={props.maxHint ?? 4} />
               ))}
             </ol>
           </>
@@ -240,10 +246,23 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
   return (
     <Layout
       footer={
-        <button type="button" onClick={props.onCheck} className={`${BUTTON} bg-accent text-white`}>
-          <Icon name="check" className="h-[18px] w-[18px]" />
-          {checks === 0 ? d.check : d.again}
-        </button>
+        <>
+          {!props.submitOnly && (
+            <button type="button" onClick={props.onCheck} disabled={props.checksLeft === 0} className={`${BUTTON} bg-accent text-white disabled:opacity-50`}>
+              <Icon name="check" className="h-[18px] w-[18px]" />
+              {checks === 0 ? d.check : d.again}
+            </button>
+          )}
+          {props.onSubmit && (
+            <button type="button" onClick={props.onSubmit} className={`${BUTTON} ${props.submitOnly ? 'bg-accent text-white' : 'border border-line bg-panel text-ink'}`}>
+              <Icon name="upload" className="h-[18px] w-[18px]" />
+              {tr.tahta.gorev.submit}
+            </button>
+          )}
+          {(props.submitOnly || (props.checksLeft !== undefined && props.checksLeft !== null)) && (
+            <p className="m-0 text-center text-label text-muted">{props.submitOnly ? tr.tahta.gorev.submitOnly : tr.tahta.gorev.checksLeft(props.checksLeft!)}</p>
+          )}
+        </>
       }
     >
       <BoxBody {...props} parts={parts} leads={leads} placed={placed} plugged={plugged.length} colorOf={colorOf} compact={false} />
@@ -325,10 +344,12 @@ function BoxBody(
           <Icon name="wire" className="h-[18px] w-[18px]" />
           {tr.tahta.toolWire}
         </button>
-        <button type="button" aria-pressed={props.showConnected} onClick={() => props.onShowConnected(!props.showConnected)} className={`${BUTTON} ${props.showConnected ? 'bg-accent-soft text-accent-ink' : 'border border-line bg-panel text-ink'}`}>
-          <Icon name="eye" className="h-[18px] w-[18px]" />
-          {tr.tahta.phone.connected}
-        </button>
+        {!props.connectedLocked && (
+          <button type="button" aria-pressed={props.showConnected} onClick={() => props.onShowConnected(!props.showConnected)} className={`${BUTTON} ${props.showConnected ? 'bg-accent-soft text-accent-ink' : 'border border-line bg-panel text-ink'}`}>
+            <Icon name="eye" className="h-[18px] w-[18px]" />
+            {tr.tahta.phone.connected}
+          </button>
+        )}
       </div>
     </>
   );

@@ -2729,6 +2729,58 @@ try {
     await ctx.close();
   }
 
+  // --- Tahtada kur: giriş noktaları ve görev (T6): örnek kartı, Görev oluştur → Tahtada kur, öğrenci, Teslim et ---
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', acceptDownloads: true });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Transistör anahtar: LED kollektörde: tahtada kur' }).click(); await page.waitForTimeout(1500);
+    let panel = page.getByRole('region', { name: 'Tahtada kur paneli' });
+    const entered = (await panel.count()) === 1 && ((await panel.textContent()) ?? '').includes('0 / 4 takılı') && ((await panel.textContent()) ?? '').includes('Deney 9');
+    check('Tahtada kur (T6): Örnekler’de her kartta “Tahtada kur”: örnek açılıyor, tahta boş, şema sağ panelde', entered);
+    await page.getByRole('button', { name: /Tahtada kur’dan çık/ }).click(); await page.waitForTimeout(400);
+    await page.getByRole('button', { name: /^Dosya|^Transistör anahtar/ }).first().click(); await page.waitForTimeout(150);
+    await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
+    const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
+    await dlg.getByRole('radio', { name: 'Tahtada kur' }).click(); await page.waitForTimeout(150);
+    await dlg.getByRole('textbox', { name: 'Görev adı' }).fill('Deney 9 · tahtada kur');
+    await dlg.getByRole('radiogroup', { name: 'Başlangıçta tahtada' }).getByRole('radio', { name: 'Seçili parçalar takılı' }).click();
+    await dlg.getByRole('button', { name: 'Q1', exact: true }).click();
+    await dlg.getByRole('radiogroup', { name: 'Denetle hakkı' }).getByRole('radio', { name: '3 kez' }).click();
+    await dlg.getByRole('radiogroup', { name: 'İpuçları en çok' }).getByRole('radio', { name: 'Açıklama' }).click();
+    await dlg.getByRole('switch', { name: /^Bağlı delikleri göster/ }).click();
+    await dlg.getByRole('switch', { name: /^Oynat’la denemeye izin ver/ }).click();
+    const boardRow = ((await dlg.textContent()) ?? '').includes('Yarım boy · 30 sütun');
+    const url = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    check('Tahtada kur (T6): Görev oluştur’da üçüncü sekme; başlangıç, Denetle hakkı, ipucu sınırı, Bağlı delikler, Oynat izni; tahta “Yarım boy · 30 sütun”; #g= bağlantısı',
+      boardRow && url.includes('#g='), url.slice(0, 60));
+    // Öğrenci: bağlantıyı açar → doğrudan Tahtada kur; Çık ve Bağlı delikler anahtarı yok; Q1 hazır takılı.
+    const sp = await ctx.newPage();
+    sp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await sp.goto(url, { waitUntil: 'networkidle' }); await sp.waitForTimeout(2000);
+    panel = sp.getByRole('region', { name: 'Tahtada kur paneli' });
+    const text = (await panel.textContent()) ?? '';
+    const locked = (await sp.getByRole('button', { name: /Tahtada kur’dan çık/ }).count()) === 0 && (await sp.getByRole('switch', { name: 'Bağlı delikleri göster' }).count()) === 0;
+    await sp.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await sp.waitForTimeout(300);
+    const noPlay = ((await sp.getByRole('alert').allTextContents()).join(' ')).includes('Bu görevde Oynat kapalı');
+    check('Tahtada kur (T6, öğrenci): bağlantı doğrudan bu kipte açılıyor; Çık ve Bağlı delikler gizli; Q1 hazır takılı (1 / 4 takılı); Oynat kapalı; “Denetle hakkı: 3”',
+      text.includes('1 / 4 takılı') && text.includes('Deney 9 · tahtada kur') && locked && noPlay && text.includes('Denetle hakkı: 3'), `${locked} ${noPlay} ${text.slice(0, 80)}`);
+    for (let i = 0; i < 3; i++) { await panel.getByRole('button', { name: /^(Denetle|Yeniden denetle)$/ }).click(); await sp.waitForTimeout(250); }
+    const spent = await panel.getByRole('button', { name: 'Yeniden denetle' }).isDisabled();
+    await panel.getByRole('button', { name: 'Yerini göster' }).first().click(); await sp.waitForTimeout(150);
+    await panel.getByRole('button', { name: 'Açıklamayı göster' }).first().click(); await sp.waitForTimeout(150);
+    const noExample = (await panel.getByRole('button', { name: 'Örnek yerleşim' }).count()) === 0;
+    const [download] = await Promise.all([sp.waitForEvent('download'), panel.getByRole('button', { name: 'Teslim et' }).click()]);
+    const body = JSON.parse(readFileSync(await download.path(), 'utf8'));
+    check('Tahtada kur (T6, öğrenci): 3 Denetle’den sonra düğme kapalı (“Denetle hakkın bitti”); ipucu sınırı Açıklama (Örnek yerleşim yok); Teslim et dosyasında son kurulum, 3 deneme, ipuçları, süre',
+      spent && ((await panel.textContent()) ?? '').includes('Denetle hakkın bitti') && noExample && body.teslim?.tahtada_kur?.denetle?.length === 3 && body.teslim.tahtada_kur.ipuclari.length === 2 && typeof body.teslim.tahtada_kur.sure_sn === 'number' && body.build?.parts !== undefined,
+      `${spent} ${noExample} ${JSON.stringify(body.teslim?.tahtada_kur?.denetle?.map((c) => c.sorunlar.length))}`);
+    await ctx.close();
+  }
+
   // --- Tahtada kur (telefon, T5): 3B'den giriş, parça kutusu alttan, dokun-kaydır-bırak ve büyüteç, Denetle ---
   {
     const { page, cdp } = await phone();

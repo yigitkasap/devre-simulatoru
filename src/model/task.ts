@@ -66,6 +66,28 @@ export interface FaultTask {
   readonly scenario?: string;
 }
 
+/**
+ * Tahtada kur görevi (T6): öğrenci şemadaki devreyi tahtaya kurar; şema değiştirilemez. Başlangıç
+ * tahtası görevin devresinde (devre.build). Teslim dosyasında son kurulum, her Denetle sonucu, açılan
+ * ipuçları ve süre.
+ */
+export interface BoardTask {
+  /** Başlangıçta tahtada: boş, güç rayları bağlı, seçili parçalar takılı (güç raylarıyla). */
+  readonly start: 'empty' | 'rails' | 'parts';
+  /** Hazır takılı parçalar (start = 'parts'). */
+  readonly parts: readonly string[];
+  /** Denetle hakkı: sınırsız, 3 kez, yalnızca teslimde (Denetle gizli; sınav için). */
+  readonly checks: 'unlimited' | 'three' | 'submit';
+  /** Açılabilecek en yüksek ipucu kademesi: 1 sayı, 2 yer, 3 açıklama, 4 örnek yerleşim. */
+  readonly maxHint: 1 | 2 | 3 | 4;
+  /** Bağlı delikleri göster (kapalıysa öğrenci açamaz). */
+  readonly showConnected: boolean;
+  /** Oynat'la denemeye izin ver. */
+  readonly allowPlay: boolean;
+}
+
+export const DEFAULT_BOARD_TASK: BoardTask = { start: 'rails', parts: [], checks: 'unlimited', maxHint: 3, showConnected: true, allowPlay: true };
+
 export interface TaskDef {
   readonly name: string;
   readonly instruction: string;
@@ -86,6 +108,8 @@ export interface TaskDef {
   readonly circuit?: string;
   /** Arıza bulma görevi (B2); hedefli görevde yok. */
   readonly fault?: FaultTask;
+  /** Tahtada kur görevi (T6). */
+  readonly board?: BoardTask;
 }
 
 /** Görevle açılan devrenin üst çubuktaki adı: görevin adı, yoksa başlangıç devresinin adı. */
@@ -189,6 +213,20 @@ function parseFaultTask(v: unknown): FaultTask | null {
   };
 }
 
+function parseBoardTask(v: unknown): BoardTask | null {
+  if (!isRecord(v)) return null;
+  const d = DEFAULT_BOARD_TASK;
+  const level = num(v.maxHint, d.maxHint);
+  return {
+    start: v.start === 'empty' || v.start === 'parts' ? v.start : 'rails',
+    parts: Array.isArray(v.parts) ? v.parts.filter((x): x is string => typeof x === 'string').slice(0, 500) : [],
+    checks: v.checks === 'three' || v.checks === 'submit' ? v.checks : 'unlimited',
+    maxHint: (level >= 1 && level <= 4 ? Math.round(level) : d.maxHint) as BoardTask['maxHint'],
+    showConnected: v.showConnected !== false,
+    allowPlay: v.allowPlay !== false,
+  };
+}
+
 export function parseTask(v: unknown): TaskDef | null {
   if (!isRecord(v)) return null;
   const targets: Target[] = [];
@@ -209,6 +247,10 @@ export function parseTask(v: unknown): TaskDef | null {
     ...(() => {
       const fault = parseFaultTask(v.fault);
       return fault ? { fault } : {};
+    })(),
+    ...(() => {
+      const board = parseBoardTask(v.board);
+      return board ? { board } : {};
     })(),
   };
 }

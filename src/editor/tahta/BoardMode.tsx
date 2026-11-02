@@ -54,7 +54,10 @@ export interface BoardStageProps {
   readonly onView: (view: BoardView) => void;
   readonly showConnected: boolean;
   readonly onShowConnected: (on: boolean) => void;
-  readonly onExit: () => void;
+  /** Çık; görevde yok (T6: çıkış düğmesi görevde gizli). */
+  readonly onExit?: () => void;
+  /** Görevde "Bağlı delikleri göster" kapalı: anahtar gizli. */
+  readonly connectedLocked?: boolean;
   /** Öğrencinin kurulumunun yerleşimi (tezgâh bununla çizilir). */
   readonly plan: BreadboardPlan;
   /** Şemanın planı: masadaki yerler, alet kablolarının listesi ve renkleri. */
@@ -314,9 +317,11 @@ export function BoardStage(props: BoardStageProps) {
           <button type="button" onClick={() => bench.onSchematic?.()} className="flex h-11 shrink-0 items-center rounded-full border border-line bg-panel px-3 text-[13px] font-semibold shadow-sm">
             {tr.tahta.schematic}
           </button>
-          <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink">
-            <Icon name="close" className="h-5 w-5" />
-          </button>
+          {props.onExit && (
+            <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink">
+              <Icon name="close" className="h-5 w-5" />
+            </button>
+          )}
         </div>
       )}
 
@@ -343,7 +348,7 @@ export function BoardStage(props: BoardStageProps) {
           </div>
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
-          {top && (
+          {top && !props.connectedLocked && (
             <label className={`flex cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-medium shadow-sm ${h}`}>
               {tr.tahta.showConnected}
               <input type="checkbox" role="switch" checked={props.showConnected} onChange={(e) => props.onShowConnected(e.target.checked)} className="peer sr-only" />
@@ -358,10 +363,12 @@ export function BoardStage(props: BoardStageProps) {
               {tr.tahta.denetle.solvedPill}
             </span>
           )}
-          <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className={`flex items-center gap-1.5 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold shadow-sm hover:bg-panel-2 ${h}`}>
-            <Icon name="close" className="h-4 w-4" />
-            {tr.tahta.exit}
-          </button>
+          {props.onExit && (
+            <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className={`flex items-center gap-1.5 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold shadow-sm hover:bg-panel-2 ${h}`}>
+              <Icon name="close" className="h-4 w-4" />
+              {tr.tahta.exit}
+            </button>
+          )}
         </div>
       </div>}
 
@@ -470,6 +477,11 @@ export interface BoardPanelProps {
   readonly buildKey: string;
   readonly onCheck: () => void;
   readonly onHint: (problem: Problem) => void;
+  /** Görev (T6): kalan Denetle hakkı (null: sınırsız; 0: yok), ipucu sınırı, Teslim et. */
+  readonly checksLeft?: number | null;
+  readonly submitOnly?: boolean;
+  readonly maxHint?: number;
+  readonly onSubmit?: () => void;
   /** Sonuç kartında "Şimdi Oynat’a bas" metni (örneğin kısa ipucu); kendi devrede null. */
   readonly cue: string | null;
   readonly onReport: () => void;
@@ -508,9 +520,10 @@ export function sessionMarks(doc: CircuitDoc, session: BoardSession | null): Rea
 }
 
 /** Sorun kartı (T3): numara, kademeye göre başlık, açıklama, açılan ipuçları ve sonraki ipucu. */
-export function ProblemCard({ doc, problem, index, level, touch, onHint }: { doc: CircuitDoc; problem: Problem; index: number; level: number; touch: boolean; onHint: (p: Problem) => void }) {
+export function ProblemCard({ doc, problem, index, level, touch, onHint, cap = 4 }: { doc: CircuitDoc; problem: Problem; index: number; level: number; touch: boolean; onHint: (p: Problem) => void; cap?: number }) {
   const d = tr.tahta.denetle;
-  const max = maxLevel(problem);
+  // Görevin ipucu sınırı (T6): sınırın üstündeki kademeler görünmez.
+  const max = Math.min(maxLevel(problem), cap);
   const names = d.levels.slice(0, max);
   const h = touch ? 'h-11' : 'h-9';
   return (
@@ -816,7 +829,7 @@ export function BoardPanel(props: BoardPanelProps) {
         {problems.length > 0 && (
           <ol className="m-0 flex list-none flex-col gap-2.5 p-0" aria-label={d.title(problems.length)}>
             {problems.map((p, i) => (
-              <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={level(p)} touch={touch} onHint={props.onHint} />
+              <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={level(p)} touch={touch} onHint={props.onHint} cap={props.maxHint ?? 4} />
             ))}
           </ol>
         )}
@@ -835,11 +848,36 @@ export function BoardPanel(props: BoardPanelProps) {
         {showBox && box}
       </div>
       <div className="flex shrink-0 items-center gap-3 border-t border-line px-4 py-3">
-        <button type="button" onClick={props.onCheck} className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-accent font-semibold text-white hover:bg-accent/90 ${touch ? 'h-12' : 'h-11'}`}>
-          <Icon name="check" className="h-[18px] w-[18px]" />
-          {checks === 0 ? d.check : d.again}
-        </button>
-        <p className="m-0 w-1/2 text-label leading-snug text-muted">{checks === 0 ? tr.tahta.wiresNote(build.wires.length) : d.stats(checks, session?.hints.length ?? 0)}</p>
+        {!props.submitOnly && (
+          <button
+            type="button"
+            onClick={props.onCheck}
+            disabled={props.checksLeft === 0}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-accent font-semibold text-white hover:bg-accent/90 disabled:opacity-50 ${touch ? 'h-12' : 'h-11'}`}
+          >
+            <Icon name="check" className="h-[18px] w-[18px]" />
+            {checks === 0 ? d.check : d.again}
+          </button>
+        )}
+        {props.onSubmit && (
+          <button
+            type="button"
+            onClick={props.onSubmit}
+            className={`flex items-center justify-center gap-2 rounded-[10px] px-4 font-semibold ${props.submitOnly ? 'flex-1 bg-accent text-white hover:bg-accent/90' : 'border border-line bg-panel text-ink hover:bg-panel-2'} ${touch ? 'h-12' : 'h-11'}`}
+          >
+            <Icon name="upload" className="h-[18px] w-[18px]" />
+            {tr.tahta.gorev.submit}
+          </button>
+        )}
+        <p className="m-0 w-1/2 text-label leading-snug text-muted">
+          {props.submitOnly
+            ? tr.tahta.gorev.submitOnly
+            : props.checksLeft !== undefined && props.checksLeft !== null
+              ? tr.tahta.gorev.checksLeft(props.checksLeft)
+              : checks === 0
+                ? tr.tahta.wiresNote(build.wires.length)
+                : d.stats(checks, session?.hints.length ?? 0)}
+        </p>
       </div>
       {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} overlay={overlay} onClose={() => setLarge(false)} />}
     </div>

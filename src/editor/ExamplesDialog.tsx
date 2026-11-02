@@ -14,6 +14,8 @@ export interface ExamplesDialogProps {
   readonly phone: boolean;
   readonly activeExample: ExampleId | null;
   readonly onLoad: (id: ExampleId) => void;
+  /** Örneği aç ve Tahtada kur'a geç (T6): tahta boş gelir, şema sağ panelde. */
+  readonly onBoard?: (id: ExampleId) => void;
   /** Hazır arıza senaryosunu aç (Arıza bul grubu, B2). */
   readonly onFault: (id: FaultScenarioId) => void;
   /** Açık senaryo. */
@@ -25,7 +27,22 @@ export function ExamplesDialog(props: ExamplesDialogProps) {
   return props.phone ? <PhoneExamples {...props} /> : <DesktopExamples {...props} />;
 }
 
-function DesktopExamples({ activeExample, onLoad, onFault, activeFault, onClose }: ExamplesDialogProps) {
+/** Örnek kartındaki "Tahtada kur" (T6). */
+function BoardButton({ id, onBoard, className }: { id: ExampleId; onBoard: (id: ExampleId) => void; className: string }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onBoard(id)}
+      aria-label={tr.tahta.gorev.onExampleLabel(tr.examples.texts[id].title)}
+      className={`flex items-center gap-1.5 rounded-lg bg-accent-soft font-semibold text-accent-ink hover:brightness-95 ${className}`}
+    >
+      <Icon name="board" className="h-4 w-4" />
+      {tr.tahta.gorev.onExample}
+    </button>
+  );
+}
+
+function DesktopExamples({ activeExample, onLoad, onBoard, onFault, activeFault, onClose }: ExamplesDialogProps) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -78,13 +95,13 @@ function DesktopExamples({ activeExample, onLoad, onFault, activeFault, onClose 
                   const texts = tr.examples.texts[id];
                   const active = activeExample === id;
                   return (
-                    <li key={id}>
+                    <li key={id} className="relative">
                       <button
                         type="button"
                         onClick={() => onLoad(id)}
                         aria-pressed={active}
                         aria-label={texts.title}
-                        className={`flex h-full w-full items-start gap-2.5 rounded-lg border px-3 py-2 text-left ${
+                        className={`flex h-full w-full items-start gap-2.5 rounded-lg border px-3 py-2 text-left ${onBoard ? 'pb-10' : ''} ${
                           active ? 'border-accent bg-accent-soft' : 'border-line hover:bg-app'
                         }`}
                       >
@@ -101,6 +118,7 @@ function DesktopExamples({ activeExample, onLoad, onFault, activeFault, onClose 
                           </span>
                         </span>
                       </button>
+                      {onBoard && <BoardButton id={id} onBoard={onBoard} className="absolute bottom-2 left-11 h-7 px-2.5 text-xs" />}
                     </li>
                   );
                 })}
@@ -176,7 +194,7 @@ function normalize(text: string): string {
     .replace(/ü/g, 'u');
 }
 
-function PhoneExamples({ activeExample, onLoad, onFault, activeFault, onClose }: ExamplesDialogProps) {
+function PhoneExamples({ activeExample, onLoad, onBoard, onFault, activeFault, onClose }: ExamplesDialogProps) {
   const titleId = useId();
   const [query, setQuery] = useState('');
   const activeGroup = EXAMPLE_GROUPS.find((g) => (g.ids as readonly ExampleId[]).includes(activeExample as ExampleId))?.id;
@@ -294,6 +312,7 @@ function PhoneExamples({ activeExample, onLoad, onFault, activeFault, onClose }:
                             </span>
                           </span>
                         </button>
+                        {onBoard && <BoardButton id={id} onBoard={onBoard} className="mt-1.5 ml-8 h-11 px-3.5 text-[15px]" />}
                       </li>
                     );
                   })}

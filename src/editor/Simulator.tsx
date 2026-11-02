@@ -18,6 +18,8 @@ import { PhoneBoardSheet } from './tahta/PhoneBoard';
 import { checkBuild, type Problem } from '../tahta/check';
 import { boardReport } from '../tahta/report';
 import { openHint, recordCheck, startSession, type BoardSession } from '../tahta/session';
+import { checksLeft } from '../tahta/task';
+import { problemShort } from '../tahta/explain';
 import { groupOf } from './ExampleTab';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
@@ -257,7 +259,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     setWrongReport(false);
   }, [task]);
   /** Tahminler kaydedilmeden simülasyon ve ölçüm kapalı (B1): Oynat'ta ve Analiz'de söylenen yazı. */
-  const gate = task?.predict && !predictions.locked ? tr.task.gate : null;
+  // Oynat'ın engeli: tahmin kaydedilmeden (B1) ya da Tahtada kur görevinde Oynat kapalıysa (T6).
+  const gate = task?.board && !task.board.allowPlay ? tr.tahta.gorev.noPlay : task?.predict && !predictions.locked ? tr.task.gate : null;
   const docRef = useRef(state.doc);
   docRef.current = state.doc;
   /** Reddedilen değişikliğin bildirimi (sürüklerken art arda gelmesin diye önizlemede seyrek). */
@@ -440,6 +443,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const boardCommands = useRef<BoardCommands | null>(null);
   /** Telefonda Tahtada kur'un alttaki sayfası (T5). */
   const [boardSheet, setBoardSheet] = useState<SheetSize>('half');
+  // Tahtada kur görevi (T6) doğrudan bu kipte açılır; çıkış yok. Bağlı delikler kapalıysa öğrenci açamaz.
+  useEffect(() => {
+    if (!task?.board) return;
+    setBoardView('top');
+    setBoardSession((s) => s ?? startSession(Date.now()));
+    setBoardMode(true);
+    if (!task.board.showConnected) setShowConnected(false);
+  }, [task]);
   // Telefonda takma ya da kablo bitince parça kutusu küçük konuma iner (T5: "Tak’a basınca kutu kapanır").
   const wasPlacing = useRef(false);
   useEffect(() => {
@@ -545,8 +556,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   }, [doc.parts, sim.status, simConnectivity]);
   /** Oynat: görevde tahminler kaydedilmediyse (B1) çalışmaz, nedenini söyler. */
   /** Tahtada kur'a gir: tek tahtaya sığmayan devrede açılmaz (kullanıcı kararı). Simülasyon durur. */
-  const enterBoard = () => {
-    const plan = schematicPlan ?? planBreadboard(doc);
+  const enterBoard = (target: CircuitDoc = doc) => {
+    const plan = target === doc ? (schematicPlan ?? planBreadboard(doc)) : planBreadboard(target);
     if (plan.boards > 1) {
       showToast(tr.tahta.tooBig, 'error');
       return;
@@ -584,6 +595,34 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     setKartaTab('perf');
     setKartaOpen(true);
   };
+  /** Tahtada kur görevi (T6): teslim dosyası (son kurulum devrede; her Denetle, ipuçları, süre, son durum). */
+  const submitBoardTask = () => {
+    if (!task?.board || !boardBuild || !schematicPlan) return;
+    const session = boardSession ?? startSession(Date.now());
+    const final = checkBuild(doc, boardBuild, schematicPlan).problems;
+    const body = {
+      ...toSerializable(doc, analysis.doc),
+      teslim: {
+        gorev: task.name,
+        tarih: new Date().toISOString(),
+        tahtada_kur: {
+          ...boardReport(doc, session, circuitTitle, Date.now()),
+          son_durum: final.length === 0 ? tr.tahta.denetle.solved : tr.tahta.denetle.unsolved(final.length),
+          son_sorunlar: final.map((p) => problemShort(doc, { id: p.id, kind: p.kind, part: p.part, wire: p.wire, onRail: p.onRail })),
+        },
+      },
+    };
+    void saveFile(datedName(`${tr.tahta.gorev.file}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
+    showToast(tr.tahta.gorev.submitted, 'info');
+  };
+  const boardRules = task?.board
+    ? {
+        checksLeft: checksLeft(task.board, boardSession?.checks.length ?? 0),
+        submitOnly: task.board.checks === 'submit',
+        maxHint: task.board.maxHint,
+        onSubmit: submitBoardTask,
+      }
+    : {};
   const resetBoard = () => {
     if (!boardBuild) return;
     setPlacing(null);
@@ -1706,7 +1745,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           onView={setBoardView}
           showConnected={showConnected}
           onShowConnected={setShowConnected}
-          onExit={exitBoard}
+          {...(task?.board ? { connectedLocked: !task.board.showConnected } : { onExit: exitBoard })}
           plan={boardPlan}
           schematicPlan={schematicPlan}
           bench={{ ...benchProps, onSchematic: () => setBoardSchema(true) }}
@@ -1745,7 +1784,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         <BenchView
           {...benchProps}
           onSchematic={() => setViewMode('schematic')}
-          {...(doc.parts.length > 0 && !fault && !task ? { onBoard: enterBoard, boardBlocked: schematicPlan && schematicPlan.boards > 1 ? tr.tahta.tooBig : null } : {})}
+          {...(doc.parts.length > 0 && !fault && !task ? { onBoard: () => enterBoard(), boardBlocked: schematicPlan && schematicPlan.boards > 1 ? tr.tahta.tooBig : null } : {})}
         />
       ) : (
         schematic
@@ -1923,6 +1962,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       onLoad={(id) => {
         setExamplesOpen(false);
         loadExample(id);
+      }}
+      onBoard={(id) => {
+        // Örnek açılır, tahta boş gelir (T6).
+        setExamplesOpen(false);
+        loadExample(id);
+        const next = exampleDoc(id);
+        if (next) enterBoard(next);
       }}
       activeFault={fault?.scenario ?? null}
       onFault={(id) => {
@@ -2183,6 +2229,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                     setBoardSheet('half');
                   }}
                   onHint={boardHint}
+                  {...boardRules}
+                  {...(task?.board ? { connectedLocked: !task.board.showConnected } : {})}
                   cue={activeExample ? tr.examples.cues[activeExample] : null}
                   onReport={downloadBoardReport}
                   onGuide={openSolderGuide}
@@ -2453,7 +2501,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   connectivity={connectivity}
                   build={boardBuild}
                   schematicPlan={schematicPlan}
-                  group={activeExample ? groupOf(activeExample).split(' · ')[0]! : ''}
+                  group={task?.board ? task.name : activeExample ? groupOf(activeExample).split(' · ')[0]! : ''}
                   settings={settings}
                   touch={tablet}
                   large={boardSchema}
@@ -2475,6 +2523,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   buildKey={boardKey}
                   onCheck={checkBoard}
                   onHint={boardHint}
+                  {...boardRules}
                   cue={activeExample ? tr.examples.cues[activeExample] : null}
                   onReport={downloadBoardReport}
                   onGuide={openSolderGuide}
