@@ -10,7 +10,8 @@ import { mountOf, netColors, type BreadboardPlan } from '../../bench3d/breadboar
 import { holeLabel } from '../../bench3d/holes';
 import type { BenchScene } from '../../bench3d/scene';
 import { tr } from '../../i18n/tr';
-import type { Build } from '../../model/build';
+import { WIRE_COLORS, type Build, type WireColor } from '../../model/build';
+import { recolorWire } from '../../tahta/wiring';
 import type { Connectivity } from '../../model/connectivity';
 import type { CircuitDoc, Part } from '../../model/types';
 import { BenchView, type BenchViewProps } from '../BenchView';
@@ -19,9 +20,10 @@ import { deviceSummary } from '../DeviceCards';
 import { Icon, type IconName } from '../icons';
 import { partValueText } from '../PartView';
 import type { Settings } from '../settings';
-import { BoardTop, type BoardCommands, type Placing } from './BoardTop';
+import { BoardTop, pickedIn, Swatch, terminalName, type BoardCommands, type Cabling, type Pick, type Placing } from './BoardTop';
 
-export type { Placing } from './BoardTop';
+export type { Cabling, Placing } from './BoardTop';
+export { terminalName } from './BoardTop';
 
 export type BoardView = 'top' | 'bench';
 
@@ -34,11 +36,6 @@ const TOP_INSETS = { top: 64, right: 16, bottom: 132, left: 16 } as const;
 export function boardParts(doc: CircuitDoc, schematic: BreadboardPlan): Part[] {
   const order = [...schematic.onBoard.keys()];
   return doc.parts.filter((p) => mountOf(p.type) !== undefined).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-}
-
-/** Masadaki parçanın ucunun kısa adı (kartta ve çipte): A, B, COM, 1+… */
-export function terminalName(part: Part, pin: number): string {
-  return tr.devices.pinTags[part.type]?.[pin] ?? String(pin + 1);
 }
 
 /** Masadaki parçaların tahtaya gitmesi gereken kabloları (şemada bağlı uçlar; planın sırasıyla). */
@@ -64,6 +61,8 @@ export interface BoardStageProps {
   readonly onBuild: (build: Build) => void;
   readonly placing: Placing | null;
   readonly onPlacing: (placing: Placing | null) => void;
+  readonly cabling: Cabling | null;
+  readonly onCabling: (cabling: Cabling | null) => void;
   /** Tahtada seçili (takılı) parça. */
   readonly selected: string | null;
   readonly onSelect: (partId: string | null) => void;
@@ -80,6 +79,28 @@ export function BoardStage(props: BoardStageProps) {
   const [said, setSaid] = useState('');
   const commands = useRef<BoardCommands>(null);
   const selectedPart = props.selected && build.parts[props.selected] ? doc_part(bench.doc, props.selected) : undefined;
+  // Seçili kablo (tahtada tıklanan); parça seçilince ya da kablo aracı açılınca kalkar.
+  const [pick, setPick] = useState<Pick | null>(null);
+  const picked = pickedIn(build, pick);
+  useEffect(() => {
+    if (props.selected || props.cabling || props.placing) setPick(null);
+  }, [props.selected, props.cabling, props.placing]);
+  const [palette, setPalette] = useState(false);
+  const wireMode = props.cabling?.kind === 'wire' ? props.cabling : null;
+  const pickedWire = picked?.kind === 'wire' ? build.wires[picked.index] : undefined;
+  const showColor = wireMode !== null || pickedWire !== undefined;
+  const currentColor: WireColor | null = wireMode ? wireMode.color : (pickedWire?.color ?? null);
+  useEffect(() => {
+    if (!showColor) setPalette(false);
+  }, [showColor]);
+  const chooseColor = (color: WireColor | null) => {
+    setPalette(false);
+    if (wireMode) props.onCabling({ ...wireMode, color });
+    else if (picked?.kind === 'wire' && color) {
+      props.onBuild(recolorWire(build, picked.index, color));
+      setSaid(tr.tahta.wireRecolored(tr.tahta.colors[color] ?? color));
+    }
+  };
   const top = view === 'top';
   const doc = bench.doc;
   const tableIds = new Set(schematicPlan.table.keys());
@@ -124,7 +145,7 @@ export function BoardStage(props: BoardStageProps) {
             className="absolute top-0 left-0 flex h-[18px] w-[18px] items-center justify-center opacity-0"
           >
             <span className="absolute -top-[17px] font-mono text-[11px] font-semibold whitespace-nowrap text-ink-2">{terminalName(p, pin)}</span>
-            <span className="h-[18px] w-[18px] rounded-full border-2 border-panel shadow-sm" style={{ background: colorOf(net) }} />
+            <span className="h-[18px] w-[18px] rounded-full border-2 border-panel shadow-sm ring-1 ring-ink-2/60" style={{ background: colorOf(net) }} />
           </span>
         );
       })
@@ -164,13 +185,14 @@ export function BoardStage(props: BoardStageProps) {
   }, [stage, scene, top]);
 
   const h = touch ? 'h-11' : 'h-9';
-  const tool = (icon: IconName, label: string, key: string, enabled: boolean, run?: () => void) => (
+  const tool = (icon: IconName, label: string, key: string, enabled: boolean, run?: () => void, pressed?: boolean) => (
     <button
       type="button"
       disabled={!enabled}
       onClick={run}
       aria-keyshortcuts={key}
-      className={`flex items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink shadow-sm hover:bg-panel-2 disabled:text-stopped disabled:hover:bg-panel ${touch ? 'h-11' : 'h-10'}`}
+      {...(pressed !== undefined ? { 'aria-pressed': pressed } : {})}
+      className={`flex items-center gap-2 rounded-[10px] border px-3 text-small font-semibold shadow-sm disabled:text-stopped disabled:hover:bg-panel ${pressed ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-panel text-ink hover:bg-panel-2'} ${touch ? 'h-11' : 'h-10'}`}
     >
       <Icon name={icon} className="h-[18px] w-[18px]" />
       {label}
@@ -202,6 +224,10 @@ export function BoardStage(props: BoardStageProps) {
           build={build}
           placing={props.placing}
           onPlacing={props.onPlacing}
+          cabling={props.cabling}
+          onCabling={props.onCabling}
+          pick={picked}
+          onPick={setPick}
           selected={props.selected}
           onSelect={props.onSelect}
           showConnected={props.showConnected}
@@ -264,9 +290,43 @@ export function BoardStage(props: BoardStageProps) {
       {top && (
         <>
           <div role="toolbar" aria-label={tr.tahta.toolbar} className="absolute bottom-4 left-4 z-20 flex items-center gap-2">
-            {tool('wire', tr.tahta.toolWire, 'K', false)}
+            {tool('wire', tr.tahta.toolWire, 'K', true, () => commands.current?.toggleWire(), wireMode !== null)}
+            {showColor && (
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-haspopup="true"
+                  aria-expanded={palette}
+                  aria-label={`${tr.tahta.colorLabel}: ${currentColor ? tr.tahta.colors[currentColor] : tr.tahta.colorAuto}`}
+                  onClick={() => setPalette((v) => !v)}
+                  className={`flex items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink shadow-sm hover:bg-panel-2 ${touch ? 'h-11' : 'h-10'}`}
+                >
+                  <Swatch color={currentColor} />
+                  {currentColor ? tr.tahta.colors[currentColor] : tr.tahta.colorAutoShort}
+                  <Icon name="chevronDown" className="h-4 w-4 text-muted" />
+                </button>
+                {palette && (
+                  <div role="radiogroup" aria-label={tr.tahta.colorLabel} className="absolute bottom-full left-0 mb-2 grid w-max grid-cols-6 gap-1 rounded-xl border border-line bg-panel p-1.5 shadow-lg">
+                    {(wireMode ? [null, ...WIRE_COLORS] : [...WIRE_COLORS]).map((c) => (
+                      <button
+                        key={c ?? 'oto'}
+                        type="button"
+                        role="radio"
+                        aria-checked={currentColor === c}
+                        aria-label={c ? tr.tahta.colors[c] : tr.tahta.colorAuto}
+                        title={c ? tr.tahta.colors[c] : tr.tahta.colorAuto}
+                        onClick={() => chooseColor(c)}
+                        className={`flex items-center justify-center rounded-lg ${touch ? 'h-11 w-11' : 'h-9 w-9'} ${currentColor === c ? 'bg-accent-soft ring-2 ring-accent' : 'hover:bg-app'}`}
+                      >
+                        <Swatch color={c} large />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {tool('rotate', tr.tahta.toolRotate, 'R', selectedPart !== undefined, () => commands.current?.rotate())}
-            {tool('trash', tr.tahta.toolDelete, 'Del', selectedPart !== undefined, () => commands.current?.remove())}
+            {tool('trash', tr.tahta.toolDelete, 'Del', selectedPart !== undefined || picked !== null, () => commands.current?.remove())}
           </div>
           <div role="group" aria-label={tr.toolbar.view} className="absolute right-4 bottom-4 z-20 flex items-center rounded-[10px] border border-line bg-panel p-[3px] shadow-sm">
             {(
@@ -305,6 +365,9 @@ export interface BoardPanelProps {
   readonly onPlace: (partId: string, dragging: boolean) => void;
   readonly selected: string | null;
   readonly onSelect: (partId: string | null) => void;
+  readonly cabling: Cabling | null;
+  /** Masadaki aletin kablosunu takmaya başla (ya da bırak). */
+  readonly onLead: (part: string, pin: number) => void;
 }
 
 /** Sağ panel (T1): başlık, şema (değiştirilemez), parça kutusu, alet kabloları, Denetle. */
@@ -412,12 +475,27 @@ export function BoardPanel(props: BoardPanelProps) {
               {leads.map((l) => {
                 const part = doc.parts.find((p) => p.id === l.part);
                 if (!part) return null;
-                const done = build.leads.some((b) => b.part === l.part && b.pin === l.pin);
+                const done = build.leads.find((b) => b.part === l.part && b.pin === l.pin);
+                const active = props.cabling?.kind === 'lead' && props.cabling.part === l.part && props.cabling.pin === l.pin;
+                const label = `${part.label} ${terminalName(part, l.pin)}`;
                 return (
-                  <li key={`${l.part}-${l.pin}`} className={`flex items-center gap-1.5 rounded-full border px-2.5 font-mono text-[12px] ${touch ? 'h-11' : 'h-8'} ${done ? 'border-ok-line bg-ok-soft text-ok-ink' : 'border-line bg-panel text-ink'}`}>
-                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full ring-1 ring-line-2" style={{ background: colorOf(l.net) }} />
-                    {part.label} {terminalName(part, l.pin)}
-                    {done && <Icon name="check" className="h-3.5 w-3.5" />}
+                  <li key={`${l.part}-${l.pin}`}>
+                    <button
+                      type="button"
+                      aria-pressed={active}
+                      aria-label={done ? tr.tahta.leadSelected(label, done.hole) : tr.tahta.leadChip(label)}
+                      onClick={() => props.onLead(l.part, l.pin)}
+                      className={`flex items-center gap-1.5 rounded-full border px-2.5 font-mono text-[12px] ${touch ? 'h-11' : 'h-8'} ${active ? 'border-accent bg-accent-soft text-accent-ink' : done ? 'border-ok-line bg-ok-soft text-ok-ink hover:bg-ok-soft/70' : 'border-line bg-panel text-ink hover:bg-panel-2'}`}
+                    >
+                      <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full ring-1 ring-line-2" style={{ background: colorOf(l.net) }} />
+                      {label}
+                      {done && (
+                        <>
+                          <Icon name="check" className="h-3.5 w-3.5" />
+                          <span className="opacity-80">{done.hole}</span>
+                        </>
+                      )}
+                    </button>
                   </li>
                 );
               })}

@@ -43,11 +43,15 @@ export function planFromBuild(doc: CircuitDoc, build: Build, schematic: Breadboa
     const net = schematic.netOf.get(pinKey(lead.part, lead.pin)) ?? `${lead.part}#${lead.pin}`;
     leads.push({ net, partId: lead.part, pin: lead.pin, hole: h, color: colorOf(net) });
   }
+  // Takılmamış alet kabloları: şemada bağlı olup kurulumda deliği olmayan uçlar.
+  const loose = schematic.leads
+    .filter((l) => !build.leads.some((b) => b.part === l.partId && b.pin === l.pin))
+    .map((l) => ({ partId: l.partId, pin: l.pin, color: colorOf(l.net) }));
   const jumpers: Jumper[] = [];
   build.wires.forEach((wire, i) => {
     const a = hole(wire.a);
     const b = hole(wire.b);
     if (a && b) jumpers.push({ net: `tahta-kablo-${i}`, a, b, color: WIRE_HEX[wire.color] });
   });
-  return { boards: 1, cols: build.cols, onBoard, table: schematic.table, jumpers, leads, netOf: schematic.netOf, roles: schematic.roles };
+  return { boards: 1, cols: build.cols, onBoard, table: schematic.table, jumpers, leads, netOf: schematic.netOf, roles: schematic.roles, loose };
 }

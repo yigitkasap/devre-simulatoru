@@ -12,7 +12,7 @@ import { boardCircuit } from '../tahta/circuit';
 import { planFromBuild } from '../tahta/plan';
 import { planBreadboard } from '../bench3d/breadboard';
 import { emptyBuild, type Build } from '../model/build';
-import { BoardPanel, BoardStage, type BoardView, type Placing } from './tahta/BoardMode';
+import { BoardPanel, BoardStage, type BoardView, type Cabling, type Placing } from './tahta/BoardMode';
 import { groupOf } from './ExampleTab';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
@@ -427,6 +427,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [boardSchema, setBoardSchema] = useState(false);
   /** Takılmakta olan parça (panel ile tahta arasında ortak). */
   const [placing, setPlacing] = useState<Placing | null>(null);
+  /** Kablo aracı ya da takılmakta olan alet kablosu (panelin çiplerinden de başlar). */
+  const [cabling, setCabling] = useState<Cabling | null>(null);
   /** Şemanın breadboard planı: tahtanın boyu, masadaki yerler, alet kabloları (3B ya da Tahtada kur açıkken). */
   const schematicPlan = useMemo(() => (boardMode || viewMode === 'bench' ? planBreadboard(doc) : null), [boardMode, viewMode, doc]);
   const boardBuild = useMemo(() => (boardMode && schematicPlan ? (doc.build ?? emptyBuild(schematicPlan.cols)) : null), [boardMode, schematicPlan, doc.build]);
@@ -538,6 +540,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     sim.stop();
     setBoardSchema(false);
     setPlacing(null);
+    setCabling(null);
     setBoardMode(false);
   };
   /** Tahtadaki değişiklik: belgenin kurulum alanı (geri al / yinele kapsar). */
@@ -1654,15 +1657,25 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           build={boardBuild!}
           onBuild={commitBuild}
           placing={placing}
-          onPlacing={setPlacing}
+          onPlacing={(next) => {
+            if (next) setCabling(null);
+            setPlacing(next);
+          }}
+          cabling={cabling}
+          onCabling={(next) => {
+            if (next) setPlacing(null);
+            setCabling(next);
+          }}
           selected={boardSelected}
           onSelect={selectOnBoard}
           onUndo={() => {
             setPlacing(null);
+            setCabling(null);
             dispatch({ type: 'undo' });
           }}
           onRedo={() => {
             setPlacing(null);
+            setCabling(null);
             dispatch({ type: 'redo' });
           }}
         />
@@ -2294,12 +2307,21 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   onPlace={(id, dragging) => {
                     selectOnBoard(null);
                     setBoardView('top');
+                    setCabling(null);
                     setPlacing({ partId: id, first: null, turned: false, dragging });
                   }}
                   selected={boardSelected}
                   onSelect={(id) => {
                     setPlacing(null);
+                    setCabling(null);
                     selectOnBoard(id);
+                  }}
+                  cabling={cabling}
+                  onLead={(part, pin) => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setPlacing(null);
+                    setCabling(cabling?.kind === 'lead' && cabling.part === part && cabling.pin === pin ? null : { kind: 'lead', part, pin });
                   }}
                 />
               ) : (

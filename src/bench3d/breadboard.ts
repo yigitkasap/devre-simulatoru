@@ -109,6 +109,8 @@ export interface BreadboardPlan {
   /** Pin anahtarı (pinKey) → ağ. */
   readonly netOf: ReadonlyMap<string, string>;
   readonly roles: ReadonlyMap<string, NetRole>;
+  /** Tahtada kur: takılmamış alet kabloları (aletin önünde sarkar). */
+  readonly loose?: ReadonlyArray<{ readonly partId: string; readonly pin: number; readonly color: string }>;
 }
 
 /** Breadboard'a takılan parçaların takılışı ve iki bacaklılarda sütun aralığı. */

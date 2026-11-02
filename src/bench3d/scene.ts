@@ -589,6 +589,22 @@ export class BenchScene {
       this.cables.add(mesh(plug, plugMat, to.x, to.y + 0.75, to.z));
       this.cables.add(rod(new Vector3(to.x, to.y - HOLE_DEPTH, to.z), to, 0.1, M.tin(), 6));
     }
+    // Tahtada kur: takılmamış alet kabloları aletin önünde masaya sarkar (fişi masada).
+    for (const loose of plan.loose ?? []) {
+      const placed = this.parts.get(loose.partId);
+      const from = placed?.anchors[loose.pin];
+      if (!placed || !from) continue;
+      const center = new Box3().setFromObject(placed.group).getCenter(new Vector3());
+      const dir = new Vector3(from.x - center.x, 0, from.z - center.z);
+      if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+      dir.normalize();
+      const end = from.clone().addScaledVector(dir, 3.4).setY(0.4);
+      const curve = new CubicBezierCurve3(from.clone().add(new Vector3(0, 0.4, 0)), from.clone().addScaledVector(dir, 1.2).add(new Vector3(0, 1.4, 0)), end.clone().addScaledVector(dir, -0.6).add(new Vector3(0, 0.8, 0)), end);
+      this.cables.add(new Mesh(new TubeGeometry(curve, 16, 0.28, 8, false), mat(loose.color, 0.55)));
+      const tip = mesh(plug, plugMat, end.x, 0.4, end.z);
+      tip.rotation.set(Math.PI / 2, 0, -Math.atan2(dir.x, dir.z));
+      this.cables.add(tip);
+    }
     this.cablePaths = [...paths, ...jumperPaths];
     this.cableAmps = new Float64Array(this.cablePaths.length);
     this.cablePhases = new Float64Array(this.cablePaths.length);

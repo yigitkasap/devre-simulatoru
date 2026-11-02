@@ -2623,6 +2623,30 @@ try {
     const back = await holesOf('R1');
     await panel.getByRole('button', { name: 'R1' }).first().click();
     check('Tahtada kur: seçili parça Del ile kutuya dönüyor, Ctrl+Z geri getiriyor', removed === null && back === '2c 6c', `${removed} → ${back}`);
+    // Kablolar (5. aşama): K ile ara kablo, kendiliğinden renk, renk değiştirme, Del; alet kablosu.
+    await bp.keyboard.press('k'); await bp.waitForTimeout(200);
+    const wireOn = (await bp.getByRole('toolbar', { name: 'Tahta araçları' }).getByRole('button', { name: 'Kablo K', exact: true }).getAttribute('aria-pressed')) === 'true';
+    for (const name of ['8c', 'üst + rayı (5. sütun hizası)', '13a', '16a']) { await bp.keyboard.type(name); await bp.keyboard.press('Enter'); await bp.waitForTimeout(120); }
+    await bp.keyboard.press('Escape'); await bp.waitForTimeout(500);
+    const colors = ((await doc(bp)).build?.wires ?? []).map((w) => w.color).join(' ');
+    const a = await holeXY('13a'); const c = await holeXY('16a');
+    await bp.mouse.click((a.x + c.x) / 2, (a.y + c.y) / 2); await bp.waitForTimeout(200);
+    await bp.getByRole('button', { name: /^Kablo rengi:/ }).click(); await bp.waitForTimeout(150);
+    await bp.getByRole('radio', { name: 'mavi' }).click(); await bp.waitForTimeout(500);
+    const recolored = ((await doc(bp)).build?.wires ?? []).map((w) => w.color).join(' ');
+    await bp.keyboard.press('Delete'); await bp.waitForTimeout(500);
+    const left = ((await doc(bp)).build?.wires ?? []).length;
+    check('Tahtada kur: K ile iki delik arasına kablo; renk kendiliğinden (+ rayına giden kırmızı, öbürü turuncu), seçilen kablo araç çubuğundan maviye boyanıyor, Del ile çıkıyor',
+      wireOn && colors === 'red orange' && recolored === 'red blue' && left === 1, `${wireOn} ${colors} → ${recolored} → ${left}`);
+    await panel.getByRole('button', { name: 'PS1 1+ kablosunu tak' }).click(); await bp.waitForTimeout(150);
+    await bp.keyboard.type('20a'); await bp.keyboard.press('Enter'); await bp.waitForTimeout(500);
+    const lead = ((await doc(bp)).build?.leads ?? []).map((l) => l.hole).join(' ');
+    const pin = await bp.locator('[data-anchor="pin"][data-exact]').nth(0).boundingBox();
+    await bp.mouse.click(pin.x + pin.width / 2, pin.y + pin.height / 2); await bp.waitForTimeout(200);
+    const leadChip = await bp.getByRole('group', { name: /kablosu · bir deliğe tak$/ }).count();
+    await bp.keyboard.press('Escape'); await bp.waitForTimeout(150);
+    check('Tahtada kur: alet kablosu panelin çipinden başlatılıp delik adıyla takılıyor (1 / 7 takılı); karttaki uca tıklayınca da takma başlıyor',
+      lead === '20a' && ((await panel.textContent()) ?? '').includes('1 / 7 takılı') && leadChip === 1, `${lead} ${leadChip}`);
     await bp.getByRole('button', { name: /Tahtada kur’dan çık/ }).click(); await bp.waitForTimeout(400);
     check('Tahtada kur: Çık ile 3B tezgâha dönülüyor, kurulum devrede kalıyor', (await bp.getByRole('region', { name: 'Tahtada kur paneli' }).count()) === 0 && (await holesOf('Q1')) === '2h 3h 4h');
     await ctx.close();
