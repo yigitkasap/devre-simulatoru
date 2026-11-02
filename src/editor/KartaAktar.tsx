@@ -990,8 +990,8 @@ function Tabs({ tab, onTab, phone }: { tab: Tab; onTab: (tab: Tab) => void; phon
   );
 }
 
-export default function KartaAktarDialog({ doc, title, phone, dark, onClose }: { doc: CircuitDoc; title: string; phone: boolean; dark: boolean; onClose: () => void }) {
-  const [tab, setTabState] = useState<Tab>(readTab);
+export default function KartaAktarDialog({ doc, title, phone, dark, tab: initialTab, onClose }: { doc: CircuitDoc; title: string; phone: boolean; dark: boolean; tab?: Tab; onClose: () => void }) {
+  const [tab, setTabState] = useState<Tab>(() => initialTab ?? readTab());
   const [fullscreen, setFullscreen] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const setTab = (next: Tab) => {

@@ -6,6 +6,7 @@ import { ek } from '../i18n/ek';
 import { tr } from '../i18n/tr';
 import type { CircuitDoc, Part } from '../model/types';
 import type { PinRef, Problem } from './check';
+import type { ProblemRecord } from './session';
 
 const t = () => tr.tahta.denetle;
 
@@ -33,12 +34,38 @@ export function pinRef(doc: CircuitDoc, ref: PinRef): string {
 
 const pinName = (part: Part, pin: number) => tr.devices.pins[part.type][pin] ?? `${pin + 1}. ucu`;
 
+/** Ters takılmışın çeşidi: iki bacaklı ve kılıflı entegre "ters", transistör "bacak sırası", alet "kabloları". */
+function reversedSort(part: Part): 'reversed' | 'order' | 'swappedLeads' {
+  const mount = mountOf(part.type);
+  if (mount === undefined) return 'swappedLeads';
+  if (mount === 'dip8' || mount === 'dip4' || part.type === 'potentiometer' || part.type === 'spdt' || tr.devices.pins[part.type].length === 2) return 'reversed';
+  return 'order';
+}
+
+/** Sonuç kartındaki ve rapordaki kısa ad: "R1 aynı şeritte", "LED1 ters", "2d – 7i kablosu fazla". */
+export function problemShort(doc: CircuitDoc, problem: ProblemRecord): string {
+  const k = t();
+  if (problem.wire) return k.wireShort(problem.wire.a, problem.wire.b);
+  const part = partOf(doc, problem.part);
+  if (!part) return '';
+  const sort = problem.kind === 'sameStrip' ? (problem.onRail ? 'sameRail' : 'sameStrip') : problem.kind === 'reversed' ? reversedSort(part) : problem.kind;
+  return `${part.label} ${k.short[sort]}`;
+}
+
+/** Süre: "40 s", "12 dk 40 s", "1 sa 5 dk". */
+export function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return t().hours(h, m);
+  if (m > 0) return t().minutes(m, s);
+  return t().seconds(s);
+}
+
 /** Ters takılmış sorunun başlığı: iki bacaklıda ve kılıflı entegrede "ters takılmış", transistörde "bacak sırası yanlış". */
 function reversedTitle(part: Part): string {
-  const mount = mountOf(part.type);
-  if (mount === undefined) return t().kinds.swappedLeads;
-  if (mount === 'dip8' || mount === 'dip4' || part.type === 'potentiometer' || part.type === 'spdt' || tr.devices.pins[part.type].length === 2) return t().kinds.reversed;
-  return t().kinds.order;
+  return t().kinds[reversedSort(part)];
 }
 
 /** Kademeye göre başlık: 1 "1. sorun", 2 "LED1 çevresinde", 3–4 "LED1 · ters takılmış". */

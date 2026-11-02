@@ -16,8 +16,8 @@ import type { Connectivity } from '../../model/connectivity';
 import { partBounds } from '../../model/geometry';
 import { GRID, type CircuitDoc, type Part } from '../../model/types';
 import type { Problem } from '../../tahta/check';
-import { countWord, problemText, problemTitle } from '../../tahta/explain';
-import { levelOf, maxLevel, type BoardSession } from '../../tahta/session';
+import { countWord, formatDuration, problemShort, problemText, problemTitle } from '../../tahta/explain';
+import { levelOf, maxLevel, sessionStats, solved, type BoardSession } from '../../tahta/session';
 import { BenchView, type BenchViewProps } from '../BenchView';
 import { CircuitView } from '../CircuitView';
 import { deviceSummary } from '../DeviceCards';
@@ -72,6 +72,8 @@ export interface BoardStageProps {
   readonly onSelect: (partId: string | null) => void;
   /** Denetle oturumu: sorunlar ve ipucu kademeleri (tahtadaki işaretler). */
   readonly session: BoardSession | null;
+  /** Kurulumun karşılaştırma anahtarı (sonuç eskidi mi). */
+  readonly buildKey: string;
   readonly onMarks: (on: boolean) => void;
   /** Geri al / yinele (Ctrl+Z, Ctrl+Y; şema tuvali bu kipte yok). */
   readonly onUndo: () => void;
@@ -311,6 +313,12 @@ export function BoardStage(props: BoardStageProps) {
               </span>
             </label>
           )}
+          {solved(props.session, props.buildKey) && (
+            <span className={`flex items-center gap-1.5 rounded-[10px] border border-ok-line bg-ok-soft px-3 text-small font-semibold text-ok-ink shadow-sm ${h}`}>
+              <Icon name="check" className="h-4 w-4" />
+              {tr.tahta.denetle.solvedPill}
+            </span>
+          )}
           <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className={`flex items-center gap-1.5 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold shadow-sm hover:bg-panel-2 ${h}`}>
             <Icon name="close" className="h-4 w-4" />
             {tr.tahta.exit}
@@ -420,8 +428,14 @@ export interface BoardPanelProps {
   readonly onLead: (part: string, pin: number) => void;
   /** Denetle oturumu (sonuç, ipucu kademeleri, sayılar). */
   readonly session: BoardSession | null;
+  readonly buildKey: string;
   readonly onCheck: () => void;
   readonly onHint: (problem: Problem) => void;
+  /** Sonuç kartında "Şimdi Oynat’a bas" metni (örneğin kısa ipucu); kendi devrede null. */
+  readonly cue: string | null;
+  readonly onReport: () => void;
+  readonly onGuide: () => void;
+  readonly onReset: () => void;
 }
 
 /** Şemadaki işaret: sorunlu parçanın çevresinde kırmızı çerçeve ve numara (dünya koordinatı). */
@@ -503,7 +517,9 @@ export function BoardPanel(props: BoardPanelProps) {
   const leadsPlaced = leads.filter((l) => build.leads.some((b) => b.part === l.part && b.pin === l.pin)).length;
   const colorOf = netColors(schematicPlan);
   const titleId = useId();
-  const result = session?.result ?? null;
+  // Sorunsuz sonuç kurulum değişince geçersizdir (panel kurulum görünümüne döner); sorunlu sonuç kalır.
+  const done = solved(session, props.buildKey);
+  const result = session?.result && (session.result.problems.length > 0 || done) ? session.result : null;
   const problems = result?.problems ?? [];
   const checks = session?.checks.length ?? 0;
   const level = (p: Problem) => (session ? levelOf(session, p) : 1);
@@ -515,6 +531,77 @@ export function BoardPanel(props: BoardPanelProps) {
   const boxMark = new Map(located.filter(({ p }) => p.inBox).map(({ p, n }) => [p.part!, n]));
   const [boxOpen, setBoxOpen] = useState(false);
   const showBox = result === null || problems.length === 0 || boxOpen || boxMark.size > 0;
+
+  if (done && session) {
+    const stats = sessionStats(session, Date.now());
+    const rows: [string, string][] = [
+      [d.rows.checks, d.times(stats.checks)],
+      [d.rows.hints, d.hintsValue(stats.hints, stats.deepest ? d.levels[stats.deepest - 1]! : null)],
+      [d.rows.problems, stats.problems.length > 0 ? stats.problems.map((p) => problemShort(doc, p)).join(' · ') : d.none],
+      [d.rows.time, formatDuration(stats.duration)],
+    ];
+    const action = `flex w-full items-center justify-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink hover:bg-panel-2 ${touch ? 'h-12' : 'h-11'}`;
+    return (
+      <div className="flex min-h-0 flex-1 flex-col" role="region" aria-label={tr.tahta.panelLabel}>
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 pb-4">
+          <span className="flex items-center gap-1.5 text-label font-semibold text-accent-ink">
+            <Icon name="board" className="h-4 w-4" />
+            {tr.tahta.panelTag(props.group)}
+          </span>
+          <p className="sr-only" aria-live="polite">
+            {`${d.tag(checks)}. ${d.announce(0)}`}
+          </p>
+          <section aria-labelledby={titleId} className="flex flex-col gap-3 rounded-2xl border border-ok-line bg-panel p-4">
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ok-soft text-ok-ink">
+                <Icon name="check" className="h-6 w-6" />
+              </span>
+              <div className="flex flex-col">
+                <h2 id={titleId} className="m-0 text-[19px] leading-tight font-semibold">
+                  {d.okTitle}
+                </h2>
+                <span className="text-small text-ink-2">{d.solvedAt(checks)}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1 rounded-xl bg-panel-2 px-3.5 py-3">
+              <b className="text-small font-semibold">{d.playTitle}</b>
+              <p className="m-0 text-small leading-snug text-ink-2">{props.cue ?? d.playGeneric}</p>
+            </div>
+          </section>
+          <section className="flex flex-col gap-1.5">
+            <h3 className="m-0 text-label font-semibold tracking-wide text-muted uppercase">{d.summary}</h3>
+            <dl className="m-0 flex flex-col rounded-xl border border-line bg-panel px-3.5">
+              {rows.map(([k, v], i) => (
+                <div key={k} className={`flex items-baseline justify-between gap-4 py-2.5 ${i > 0 ? 'border-t border-line' : ''}`}>
+                  <dt className="text-small text-ink-2">{k}</dt>
+                  <dd className="m-0 text-right font-mono text-[13px] text-ink">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+          <div className="flex flex-col gap-2">
+            <button type="button" onClick={props.onReport} className={action}>
+              <Icon name="download" className="h-[18px] w-[18px]" />
+              {d.report}
+            </button>
+            <button type="button" onClick={props.onGuide} className={action}>
+              <Icon name="external" className="h-[18px] w-[18px]" />
+              {d.guide}
+            </button>
+            <button type="button" onClick={props.onReset} className={action}>
+              <Icon name="restart" className="h-[18px] w-[18px]" />
+              {d.reset}
+            </button>
+          </div>
+          <p className="m-0 flex gap-1.5 text-label leading-snug text-muted">
+            <Icon name="info" className="mt-px h-3.5 w-3.5 shrink-0" />
+            {d.note}
+          </p>
+        </div>
+        {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} overlay={undefined} onClose={() => setLarge(false)} />}
+      </div>
+    );
+  }
 
   const header =
     result === null ? (
@@ -704,9 +791,9 @@ export function BoardPanel(props: BoardPanelProps) {
       <div className="flex shrink-0 items-center gap-3 border-t border-line px-4 py-3">
         <button type="button" onClick={props.onCheck} className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-accent font-semibold text-white hover:bg-accent/90 ${touch ? 'h-12' : 'h-11'}`}>
           <Icon name="check" className="h-[18px] w-[18px]" />
-          {result === null ? d.check : d.again}
+          {checks === 0 ? d.check : d.again}
         </button>
-        <p className="m-0 w-1/2 text-label leading-snug text-muted">{result === null ? tr.tahta.wiresNote(build.wires.length) : d.stats(checks, session?.hints.length ?? 0)}</p>
+        <p className="m-0 w-1/2 text-label leading-snug text-muted">{checks === 0 ? tr.tahta.wiresNote(build.wires.length) : d.stats(checks, session?.hints.length ?? 0)}</p>
       </div>
       {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} overlay={overlay} onClose={() => setLarge(false)} />}
     </div>

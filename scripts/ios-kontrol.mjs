@@ -2652,9 +2652,9 @@ try {
     await ctx.close();
   }
 
-  // --- Tahtada kur: Denetle (T3): R1 aynı şeritte, LED1 ters; ipucu kademeleri, işaretler, düzeltince aynı ---
+  // --- Tahtada kur: Denetle (T3) ve sonuç (T4): R1 aynı şeritte, LED1 ters; ipuçları, işaretler, düzeltince aynı ---
   {
-    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', acceptDownloads: true });
     await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
     const bp = await ctx.newPage();
     bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
@@ -2707,9 +2707,25 @@ try {
       await bp.keyboard.type(a); await bp.keyboard.press('Enter'); await bp.keyboard.type(b); await bp.keyboard.press('Enter'); await bp.waitForTimeout(250);
     }
     await panel.getByRole('button', { name: 'Yeniden denetle' }).click(); await bp.waitForTimeout(300);
-    const fixed = `${await panel.locator('h2').textContent()} / ${(await panel.locator('p').last().textContent()) ?? ''}`;
-    check('Tahtada kur, Denetle: İşaretleri gizle tahtadaki işaretleri kaldırıyor; düzeltip Yeniden denetle “Kurulum şemayla aynı” (Denetle 2)',
-      hidden === 0 && fixed === 'Kurulum şemayla aynı / Denetle 2 · ipucu 4.', `${hidden} / ${fixed}`);
+    const fixed = `${await panel.locator('h2').textContent()} / ${(await panel.locator('h2 + span').textContent()) ?? ''}`;
+    check('Tahtada kur, Denetle: İşaretleri gizle tahtadaki işaretleri kaldırıyor; düzeltip Yeniden denetle “Kurulum şemayla aynı” (2. denetlemede)',
+      hidden === 0 && fixed === 'Kurulum şemayla aynı / 2. denetlemede', `${hidden} / ${fixed}`);
+    // Sonuç (T4): özet, üst çubukta "Şemayla aynı", rapor, lehim rehberi, tahtayı boşalt.
+    const rows = (await panel.locator('dl > div').allTextContents()).join(' | ');
+    const pill = await bp.getByText('Şemayla aynı', { exact: true }).count();
+    const [download] = await Promise.all([bp.waitForEvent('download'), panel.getByRole('button', { name: 'Raporu indir (.json)' }).click()]);
+    const report = JSON.parse(readFileSync(await download.path(), 'utf8'));
+    check('Tahtada kur, sonuç (T4): Bu kurulum (Denetle 2 kez · İpucu 4 (en çok: açıklama) · R1 aynı şeritte · LED1 ters); üst çubukta “Şemayla aynı”; rapor .json’da 2 deneme ve son kurulum',
+      rows.startsWith('Denetle2 kez | İpucu4 (en çok: açıklama) | SorunlarR1 aynı şeritte · LED1 ters | Süre') && pill === 1 && report.rapor?.denetle?.length === 2 && report.rapor.sonuc === 'şemayla aynı' && Object.keys(report.build?.parts ?? {}).length === 4,
+      `${rows} / ${pill} / ${JSON.stringify(report.rapor?.denetle)}`);
+    await panel.getByRole('button', { name: 'Lehim rehberine geç' }).click(); await bp.waitForTimeout(1200);
+    const guideTab = (await bp.getByRole('dialog').getByRole('tab', { selected: true }).allTextContents()).join(' ');
+    await bp.keyboard.press('Escape'); await bp.waitForTimeout(400);
+    await panel.getByRole('button', { name: 'Tahtayı boşalt, yeniden kur' }).click(); await bp.waitForTimeout(500);
+    const emptied = ((await panel.textContent()) ?? '').includes('0 / 4 takılı') && (await panel.locator('h2').textContent()) === 'Şemadaki devreyi tahtaya kur';
+    await bp.keyboard.press('Control+z'); await bp.waitForTimeout(400);
+    check('Tahtada kur, sonuç: Lehim rehberine geç Karta aktar’ı Delikli plaket sekmesinde açıyor; Tahtayı boşalt parçaları kutuya alıyor, Ctrl+Z geri getiriyor',
+      guideTab === 'Delikli plaket' && emptied && ((await panel.textContent()) ?? '').includes('4 / 4 takılı'), `${guideTab} / ${emptied}`);
     await ctx.close();
   }
 

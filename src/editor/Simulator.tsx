@@ -11,9 +11,10 @@ import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivi
 import { boardCircuit } from '../tahta/circuit';
 import { planFromBuild } from '../tahta/plan';
 import { planBreadboard } from '../bench3d/breadboard';
-import { emptyBuild, type Build } from '../model/build';
+import { emptyBuild, serializeBuild, type Build } from '../model/build';
 import { BoardPanel, BoardStage, type BoardView, type Cabling, type Placing } from './tahta/BoardMode';
 import { checkBuild, type Problem } from '../tahta/check';
+import { boardReport } from '../tahta/report';
 import { openHint, recordCheck, startSession, type BoardSession } from '../tahta/session';
 import { groupOf } from './ExampleTab';
 import { maskFrame } from './fault/mask';
@@ -377,6 +378,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [helpOpen, setHelpOpen] = useState(false);
   /** Karta aktar penceresi (3B kart: delikli plaket ve baskı devre). */
   const [kartaOpen, setKartaOpen] = useState(false);
+  /** Karta aktar'ın açılacağı sekme (Tahtada kur → Lehim rehberine geç: delikli plaket). */
+  const [kartaTab, setKartaTab] = useState<'perf' | undefined>(undefined);
   const [tour, setTour] = useState<{ step: TourStep; parts: number; wires: number } | null>(null);
   const canvasRef = useRef<CanvasHandle>(null);
   const [viewMode, setViewMode] = useViewMode();
@@ -548,13 +551,33 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     setCabling(null);
     setBoardMode(false);
   };
+  /** Kurulumun karşılaştırma anahtarı: Denetle'den sonra değiştiyse sonuç eskimiştir. */
+  const boardKey = useMemo(() => (boardBuild ? JSON.stringify(serializeBuild(boardBuild)) : ''), [boardBuild]);
   /** Denetle: tahtadaki bağlantılar şemayla karşılaştırılır; sonuç ve deneme oturuma yazılır. */
   const checkBoard = () => {
     if (!boardBuild || !schematicPlan) return;
     const result = checkBuild(doc, boardBuild, schematicPlan);
     setPlacing(null);
     setCabling(null);
-    setBoardSession((s) => recordCheck(s ?? startSession(Date.now()), result, Date.now()));
+    setBoardSession((s) => recordCheck(s ?? startSession(Date.now()), result, Date.now(), boardKey));
+  };
+  /** Sonuç (T4): rapor, lehim rehberi, tahtayı boşalt. */
+  const downloadBoardReport = () => {
+    if (!boardSession) return;
+    const body = { ...toSerializable(doc, analysis.doc), rapor: boardReport(doc, boardSession, circuitTitle, Date.now()) };
+    void saveFile(datedName(`${tr.tahta.denetle.file}-${slug(circuitTitle)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
+  };
+  const openSolderGuide = () => {
+    setKartaTab('perf');
+    setKartaOpen(true);
+  };
+  const resetBoard = () => {
+    if (!boardBuild) return;
+    setPlacing(null);
+    setCabling(null);
+    commitBuild(emptyBuild(boardBuild.cols));
+    setBoardSession(startSession(Date.now()));
+    showToast(tr.tahta.denetle.resetDone, 'info');
   };
   const boardHint = (problem: Problem) => setBoardSession((s) => (s ? openHint(s, problem, Date.now()) : s));
   const boardMarks = (on: boolean) => setBoardSession((s) => (s ? { ...s, marks: on } : s));
@@ -1689,6 +1712,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           selected={boardSelected}
           onSelect={selectOnBoard}
           session={boardSession}
+          buildKey={boardKey}
           onMarks={boardMarks}
           onUndo={() => {
             setPlacing(null);
@@ -1850,7 +1874,17 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       )}
       {kartaOpen && (
         <Suspense fallback={null}>
-          <KartaAktarDialog doc={doc} title={circuitTitle} phone={phone} dark={theme === 'dark'} onClose={() => setKartaOpen(false)} />
+          <KartaAktarDialog
+            doc={doc}
+            title={circuitTitle}
+            phone={phone}
+            dark={theme === 'dark'}
+            {...(kartaTab ? { tab: kartaTab } : {})}
+            onClose={() => {
+              setKartaOpen(false);
+              setKartaTab(undefined);
+            }}
+          />
         </Suspense>
       )}
       {helpOpen && <HelpDialog scale={settings.wireScale} onTour={startTour} onClose={() => setHelpOpen(false)} />}
@@ -2339,8 +2373,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                     selectOnBoard(id);
                   }}
                   session={boardSession}
+                  buildKey={boardKey}
                   onCheck={checkBoard}
                   onHint={boardHint}
+                  cue={activeExample ? tr.examples.cues[activeExample] : null}
+                  onReport={downloadBoardReport}
+                  onGuide={openSolderGuide}
+                  onReset={resetBoard}
                   cabling={cabling}
                   onLead={(part, pin) => {
                     selectOnBoard(null);
