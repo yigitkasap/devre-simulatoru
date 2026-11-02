@@ -8,6 +8,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, us
 import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
+import { boardCircuit } from '../tahta/circuit';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
 import { METER_DISPLAY } from './PartView';
@@ -411,12 +412,15 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       return next;
     });
   }, []);
+  /** Tahtada kur kipi: Oynat şemayla değil tahtadaki kurulumla çalışır (tahta/circuit.ts). */
+  const [boardMode] = useState(false);
+  const board = useMemo(() => (boardMode && doc.build ? boardCircuit(doc, doc.build) : null), [boardMode, doc]);
   const simConnectivity = useMemo(() => {
-    const c = fault ? buildConnectivity(simDoc, activeFaults) : connectivity;
+    const c = board ? { netlist: board.netlist, junctions: [], unconnectedPins: board.loosePins, danglingEnds: [] } : fault ? buildConnectivity(simDoc, activeFaults) : connectivity;
     const netlist = fault ? wireMeter(c.netlist, meter.mode, meter.red, meter.black) : c.netlist;
     const elements = pressed.size === 0 ? netlist.elements : netlist.elements.map((e) => (pressed.has(e.id) ? { ...e, props: { ...e.props, pressed: true } } : e));
     return elements === c.netlist.elements ? c : { ...c, netlist: { ...netlist, elements } };
-  }, [fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black, pressed]);
+  }, [board, fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black, pressed]);
   /** Otomatik göstergeler kapalı: kablo renkleri, akım noktaları, düğüm etiketleri, kartlardaki canlı değerler. */
   const hideLive = fault !== null && fault.hideIndicators && !repaired;
   /** Tezgâhta gözle görülen arızalar (karar 1): ters takılmış, yanlış değerli, yanmış parça. */
