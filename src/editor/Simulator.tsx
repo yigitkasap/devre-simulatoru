@@ -2163,7 +2163,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     );
 
     // Telefonda Tahtada kur (T5): üst çubuk, bütün alanda tahta, alttaki tek sayfada parça kutusu, takma,
-    // Denetle ve sonuç; Oynat düğmesi sayfanın üstünde.
+    // Denetle ve sonuç. Oynat sayfanın alt şeridinde (tahtanın üstünde yüzen düğme delikleri örtüyordu);
+    // takarken yok.
     if (boardMode && boardBuild && schematicPlan) {
       return (
         <div className="app-root flex flex-col overflow-hidden bg-panel-2" style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
@@ -2186,7 +2187,6 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           />
           <div ref={phoneAreaRef} className="relative flex min-h-0 flex-1 flex-col">
             <main className="relative min-h-0 flex-1 bg-paper">{canvas}</main>
-            <PhoneFabs lift={sheetHeight} status={sim.status} canAdd={false} addOpen={false} onAdd={() => undefined} onPlay={play} onPause={sim.pause} />
             <TouchUi.Provider value>
               <BottomSheet size={boardSheet} sizes={['peek', 'half']} halfRatio={0.62} label={tr.tahta.phone.sheet} areaHeight={phoneAreaHeight} onHeight={setSheetHeight} onSize={setBoardSheet}>
                 <PhoneBoardSheet
@@ -2235,6 +2235,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   onReport={downloadBoardReport}
                   onGuide={openSolderGuide}
                   onReset={resetBoard}
+                  status={sim.status}
+                  onPlay={play}
+                  onPause={sim.pause}
                 />
               </BottomSheet>
             </TouchUi.Provider>

@@ -2818,7 +2818,13 @@ try {
     check('Tahtada kur (telefon): 3B’den açılıyor; tahta yüksekliğine sığıyor (delik aralığı ≥ 22 px, tahta yatay kayar); parça kutusu alttaki sayfada (0 / 4 takılı, Tak düğmeleri, 7 kablo çipi)',
       sheetText.includes('Parça kutusu') && sheetText.includes('0 / 4 takılı') && (await sheet.getByRole('button', { name: /: tahtaya tak$/ }).count()) === 4 && (await sheet.getByRole('button', { name: /kablosunu tak$/ }).count()) === 7 && pitch >= 22,
       `aralık ${pitch.toFixed(1)} px`);
+    // Oynat tahtanın üstünde yüzmüyor: alttaki sayfanın içinde; takarken hiç yok.
+    const playAtEntry = await page.getByRole('button', { name: 'Oynat', exact: true }).boundingBox();
+    const sheetBox = await sheet.boundingBox();
     await sheet.getByRole('button', { name: 'R1: tahtaya tak' }).tap(); await page.waitForTimeout(300);
+    const playWhilePlacing = await page.getByRole('button', { name: 'Oynat', exact: true }).count();
+    check('Tahtada kur (telefon): Oynat düğmesi tahtanın üstünde değil, alttaki sayfanın şeridinde; takma sırasında görünmüyor',
+      playAtEntry !== null && sheetBox !== null && playAtEntry.y >= sheetBox.y && playWhilePlacing === 0, `${Math.round(playAtEntry?.y ?? -1)} ≥ ${Math.round(sheetBox?.y ?? -1)} / takarken ${playWhilePlacing}`);
     const step1 = (await sheet.textContent()) ?? '';
     const t = touch(cdp);
     let a = await holeXY('3c'); const b = await holeXY('2c');

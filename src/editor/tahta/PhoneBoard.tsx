@@ -13,6 +13,7 @@ import { countWord, formatDuration, problemShort } from '../../tahta/explain';
 import { isFixed } from '../../tahta/rules';
 import { levelOf, sessionStats, solved, type BoardSession } from '../../tahta/session';
 import { Icon } from '../icons';
+import type { SimStatus } from '../useSimulation';
 import { partValueText } from '../PartView';
 import { boardParts, exampleText, ProblemCard, requiredLeads, terminalName, type Cabling, type Placing } from './BoardMode';
 
@@ -47,6 +48,10 @@ export interface PhoneBoardSheetProps {
   readonly onReport: () => void;
   readonly onGuide: () => void;
   readonly onReset: () => void;
+  /** Oynat / Duraklat: alt şeritte (takarken yok). */
+  readonly status: SimStatus;
+  readonly onPlay: () => void;
+  readonly onPause: () => void;
 }
 
 const BUTTON = 'flex h-12 items-center justify-center gap-2 rounded-[12px] px-3 text-[15px] font-semibold';
@@ -64,6 +69,17 @@ function Layout({ children, footer }: { children: ReactNode; footer?: ReactNode 
 export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
   const { doc, build, schematicPlan, session, placing, cabling } = props;
   const d = tr.tahta.denetle;
+  const running = props.status === 'running';
+  const play = (
+    <button
+      type="button"
+      onClick={running ? props.onPause : props.onPlay}
+      aria-label={running ? tr.sim.pause : props.status === 'paused' ? tr.phone.resume : tr.sim.play}
+      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] ${running ? 'bg-ink text-on-ink' : 'bg-ok text-white'}`}
+    >
+      <Icon name={running ? 'pause' : 'play'} className="h-5 w-5" />
+    </button>
+  );
   const [typing, setTyping] = useState(false);
   const [typed, setTyped] = useState('');
   const parts = boardParts(doc, schematicPlan);
@@ -142,7 +158,14 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
       [d.rows.time, formatDuration(stats.duration)],
     ];
     return (
-      <Layout>
+      <Layout
+        footer={
+          <button type="button" onClick={running ? props.onPause : props.onPlay} className={`${BUTTON} ${running ? 'bg-ink text-on-ink' : 'bg-ok text-white'}`}>
+            <Icon name={running ? 'pause' : 'play'} className="h-5 w-5" />
+            {running ? tr.sim.pause : props.status === 'paused' ? tr.phone.resume : tr.sim.play}
+          </button>
+        }
+      >
         <div className="flex items-center gap-3">
           <span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ok-soft text-ok-ink">
             <Icon name="check" className="h-6 w-6" />
@@ -194,7 +217,8 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
       <Layout
         footer={
           first && (props.maxHint ?? 4) >= 2 ? (
-            <div className="grid grid-cols-[2fr_3fr] gap-2">
+            <div className="grid grid-cols-[48px_2fr_3fr] gap-2">
+              {play}
               <button type="button" onClick={() => problems.forEach((p) => props.onHint(p))} className={`${BUTTON} bg-accent-soft text-accent-ink`}>
                 <Icon name="bulb" className="h-[18px] w-[18px]" />
                 {tr.tahta.phone.where}
@@ -202,7 +226,10 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
               {again}
             </div>
           ) : (
-            again
+            <div className="flex gap-2">
+              {play}
+              <div className="flex-1 *:w-full">{again}</div>
+            </div>
           )
         }
       >
@@ -247,14 +274,23 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
     <Layout
       footer={
         <>
+          <div className="flex gap-2">
+          {play}
           {!props.submitOnly && (
-            <button type="button" onClick={props.onCheck} disabled={props.checksLeft === 0} className={`${BUTTON} bg-accent text-white disabled:opacity-50`}>
+            <button type="button" onClick={props.onCheck} disabled={props.checksLeft === 0} className={`${BUTTON} flex-1 bg-accent text-white disabled:opacity-50`}>
               <Icon name="check" className="h-[18px] w-[18px]" />
               {checks === 0 ? d.check : d.again}
             </button>
           )}
-          {props.onSubmit && (
-            <button type="button" onClick={props.onSubmit} className={`${BUTTON} ${props.submitOnly ? 'bg-accent text-white' : 'border border-line bg-panel text-ink'}`}>
+          {props.onSubmit && props.submitOnly && (
+            <button type="button" onClick={props.onSubmit} className={`${BUTTON} flex-1 bg-accent text-white`}>
+              <Icon name="upload" className="h-[18px] w-[18px]" />
+              {tr.tahta.gorev.submit}
+            </button>
+          )}
+          </div>
+          {props.onSubmit && !props.submitOnly && (
+            <button type="button" onClick={props.onSubmit} className={`${BUTTON} border border-line bg-panel text-ink`}>
               <Icon name="upload" className="h-[18px] w-[18px]" />
               {tr.tahta.gorev.submit}
             </button>
