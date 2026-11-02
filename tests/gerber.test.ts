@@ -96,7 +96,9 @@ describe('Üretim dosyaları (Gerber, Excellon)', () => {
     expect(foldText('+ uç')).toBe('+ UC');
     expect(foldText('− uç')).toBe('- UC');
     expect(foldText('İçi')).toBe('ICI');
-    expect(foldText('Ω')).toBe(' ');
+    // Ω multimetrenin VΩ ucu için çizilir.
+    expect(foldText('VΩ')).toBe('VΩ');
+    expect(foldText('µ')).toBe(' ');
     // Yazı ortalanır ve yükseklik tutar.
     const strokes = textStrokes('HB', 10, 20, 1).flat();
     const xs = strokes.map((p) => p[0]);
