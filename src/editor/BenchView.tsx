@@ -146,6 +146,8 @@ export interface BenchViewProps {
   readonly overlayExtra?: ReactNode;
   /** Etiketi gösterilmeyecek parçalar (Tepeden görünümde masadaki cihazlar; kartları var). */
   readonly unlabelled?: ReadonlySet<string>;
+  /** Tahtada kur'un 3B görünümü: şema sağ panelde; köşedeki küçük şema ve "Şema" düğmesi yok. */
+  readonly inBoard?: boolean;
   /** 3B araç çubuğundaki "Tahtada kur" (T6); `boardBlocked`: açılamıyorsa nedeni (düğme kapalı). */
   readonly onBoard?: () => void;
   readonly boardBlocked?: string | null;
@@ -283,7 +285,7 @@ export function BenchView(props: BenchViewProps) {
         )}
       </div>
 
-      {!phone && !top && roomy && doc.parts.length > 0 && (
+      {!phone && !top && !props.inBoard && roomy && doc.parts.length > 0 && (
         <button
           type="button"
           onClick={props.onSchematic}
@@ -347,9 +349,11 @@ export function BenchView(props: BenchViewProps) {
             {viewButton('minus', tr.toolbar.zoomOut, () => setZoom((z) => ({ n: z.n + 1, factor: 1.25 })))}
             {viewButton('plus', tr.toolbar.zoomIn, () => setZoom((z) => ({ n: z.n + 1, factor: 0.8 })))}
             {viewButton('fit', tr.bench.fit, () => pickCamera(cameraLabel === 'part' ? 'free' : cameraLabel))}
-            <button type="button" onClick={props.onSchematic} className={`ml-0.5 border-l border-line px-2.5 text-small font-medium hover:bg-app ${touch ? 'h-11' : 'h-9'}`}>
-              {tr.bench.schematic}
-            </button>
+            {!props.inBoard && (
+              <button type="button" onClick={props.onSchematic} className={`ml-0.5 border-l border-line px-2.5 text-small font-medium hover:bg-app ${touch ? 'h-11' : 'h-9'}`}>
+                {tr.bench.schematic}
+              </button>
+            )}
           </div>
         )}
       </div>}

@@ -255,6 +255,7 @@ export function BoardStage(props: BoardStageProps) {
         {...bench}
         callbacks={{ ...bench.callbacks, onView }}
         plan={plan}
+        inBoard
         top={top ? (phone ? PHONE_INSETS : TOP_INSETS) : null}
         onScene={setScene}
         overlayExtra={
