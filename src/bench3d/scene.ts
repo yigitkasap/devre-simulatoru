@@ -184,6 +184,8 @@ export class BenchScene {
   private readonly ortho = new OrthographicCamera(-1, 1, 1, -1, 1, 1000);
   /** Tepeden görünüm: ekranın ortasındaki dünya noktası ve ölçek (piksel / birim); null: 3B kamera. */
   private topView: { cx: number; cz: number; scale: number } | null = null;
+  /** Tepeden sığdırma kartlar DOM'a gelmeden yapıldı (3B gövdelerle): kartlar gelince bir kez yeniden. */
+  private topFitPending = false;
   private topInsets: TopInsets = { top: 0, right: 0, bottom: 0, left: 0 };
   private interactive = true;
   private readonly controls: OrbitControls;
@@ -318,6 +320,10 @@ export class BenchScene {
   private positionOverlay(): void {
     const el = this.overlay;
     if (!el) return;
+    if (this.topFitPending && this.topView && el.querySelector('[data-anchor="footprint"]')) {
+      this.topFitPending = false;
+      this.fitTop();
+    }
     const canvas = this.renderer.domElement;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
@@ -750,20 +756,15 @@ export class BenchScene {
     }
   }
 
-  /** Tepeden görünümde tahtanın tamamı ve masadaki parçalar görünsün (kenarlar boş kalır). */
+  /**
+   * Tepeden görünümde tahtanın tamamı ve masadaki aletlerin kartları görünsün, kullanılabilir alanı
+   * doldursun. Aletlerin 3B gövdesi tepeden görünmez (yerinde düz kart var): kartın ekrandaki yeri
+   * (positionOverlay: uçların 24 px altından data-h piksel yukarı, en az data-minw piksel genişlik)
+   * ölçeğe bağlı olduğu için sığan en büyük ölçek ikili aramayla bulunur.
+   */
   fitTop(): void {
     if (!this.topView) return;
-    const box = new Box3();
     const plan = this.plan;
-    if (plan) {
-      const half = boardWidth(plan.cols) / 2;
-      box.expandByPoint(new Vector3(-half, 0, -BB.depth / 2)).expandByPoint(new Vector3(half, 0, boardZ(plan.boards - 1) + BB.depth / 2));
-      for (const id of plan.table.keys()) {
-        const placed = this.parts.get(id);
-        if (placed) box.expandByObject(placed.group);
-      }
-    }
-    if (box.isEmpty()) box.set(new Vector3(-20, 0, -15), new Vector3(20, 0, 15));
     const canvas = this.renderer.domElement;
     const { top, right, bottom, left } = this.topInsets;
     const w = Math.max(40, canvas.clientWidth - left - right);
@@ -779,11 +780,47 @@ export class BenchScene {
       this.applyTop();
       return;
     }
-    const size = box.getSize(new Vector3());
-    const scale = Math.min(w / (size.x * 1.04), h / (size.z * 1.04));
-    const center = box.getCenter(new Vector3());
+    const half = plan ? boardWidth(plan.cols) / 2 : 20;
+    const z0 = plan ? -BB.depth / 2 : -15;
+    const z1 = plan ? boardZ(plan.boards - 1) + BB.depth / 2 : 15;
+    // Kartlar: alet, gövdesinin x aralığı, uçlarının en büyük z'si; kartın en küçük genişliği ve yüksekliği (piksel).
+    const nodes = this.overlay ? [...this.overlay.querySelectorAll<HTMLElement>('[data-anchor="footprint"]')] : [];
+    const cards = (plan ? [...plan.table.keys()] : []).flatMap((id) => {
+      const placed = this.parts.get(id);
+      if (!placed) return [];
+      const box = new Box3().setFromObject(placed.model.root);
+      const node = nodes.find((n) => n.dataset.id === id);
+      const pinZ = placed.anchors.length > 0 ? Math.max(...placed.anchors.map((a) => a.z)) : box.max.z;
+      return [{ x0: box.min.x, x1: box.max.x, zTop: node ? null : box.min.z, pinZ, minW: Number(node?.dataset.minw ?? 0), h: Number(node?.dataset.h ?? 0) }];
+    });
+    this.topFitPending = cards.some((c) => c.zTop !== null);
+    const bounds = (scale: number) => {
+      let xa = -half;
+      let xb = half;
+      let za = z0;
+      let zb = z1;
+      for (const c of cards) {
+        const width = Math.max(c.x1 - c.x0, c.minW / scale);
+        const cx = (c.x0 + c.x1) / 2;
+        xa = Math.min(xa, cx - width / 2);
+        xb = Math.max(xb, cx + width / 2);
+        za = Math.min(za, c.zTop ?? c.pinZ + (24 - c.h) / scale);
+        zb = Math.max(zb, c.pinZ + 24 / scale);
+      }
+      return { xa, xb, za, zb };
+    };
+    let lo = 1;
+    let hi = 120;
+    for (let i = 0; i < 40; i++) {
+      const scale = (lo + hi) / 2;
+      const b = bounds(scale);
+      if ((b.xb - b.xa) * scale * 1.02 <= w && (b.zb - b.za) * scale * 1.02 <= h) lo = scale;
+      else hi = scale;
+    }
+    const scale = lo;
+    const b = bounds(scale);
     // Ekranın ortası, kenarlar çıkarılınca kalan alanın ortasına göre kayar.
-    this.topView = { scale, cx: center.x - (left - right) / 2 / scale, cz: center.z - (top - bottom) / 2 / scale };
+    this.topView = { scale, cx: (b.xa + b.xb) / 2 - (left - right) / 2 / scale, cz: (b.za + b.zb) / 2 - (top - bottom) / 2 / scale };
     this.applyTop();
   }
 

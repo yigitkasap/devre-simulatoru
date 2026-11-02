@@ -33,8 +33,11 @@ export type BoardView = 'top' | 'bench';
 
 const doc_part = (doc: CircuitDoc, id: string): Part | undefined => doc.parts.find((p) => p.id === id);
 
-/** Tepeden görünümde sahnenin kenarlarında boş kalan alan (üst çubuk; altta araç çubuğu ve takma çubuğu; piksel). */
-const TOP_INSETS = { top: 64, right: 16, bottom: 132, left: 16 } as const;
+/**
+ * Tepeden görünümde sahnenin kenarlarında boş kalan alan (piksel): üstte çubuk (12 + 36), altta araç çubuğu
+ * (16 + 40) ve üstündeki takma / Denetle çipi (alttan 72 px'te, 44 px).
+ */
+const TOP_INSETS = { top: 56, right: 16, bottom: 120, left: 16 } as const;
 /** Telefonda (T5): tahta, üst çubuk ile küçük alt sayfa arasına yüksekliğiyle sığar; yatay kaydırılır. */
 const PHONE_INSETS = { top: 60, right: 8, bottom: 214, left: 8, boardOnly: true } as const;
 
