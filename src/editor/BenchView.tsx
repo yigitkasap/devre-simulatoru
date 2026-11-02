@@ -334,6 +334,7 @@ export function BenchView(props: BenchViewProps) {
             onClick={props.onBoard}
             disabled={Boolean(props.boardBlocked)}
             title={props.boardBlocked ?? tr.tahta.enter}
+            aria-label={phone ? tr.tahta.enter : undefined}
             className={`pointer-events-auto flex items-center justify-center gap-1.5 rounded-[10px] bg-accent font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-50 ${touch ? 'h-11' : 'h-9'} ${iconOnly}`}
           >
             <Icon name="board" className="h-[18px] w-[18px]" />

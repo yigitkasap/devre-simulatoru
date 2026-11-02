@@ -99,6 +99,8 @@ export interface BoardTopProps {
   /** Ekran okuyucuya duyuru ("R2, 7h ve 11h deliklerine takıldı."). */
   readonly announce: (text: string) => void;
   readonly touch: boolean;
+  /** Telefon (T5): takma ve kablo çipleri alttaki sayfada; dokunmatikte büyüteç. */
+  readonly phone?: boolean;
   /** Araç çubuğunun komutları (Döndür, Sil). */
   readonly commands?: Ref<BoardCommands>;
 }
@@ -109,16 +111,24 @@ export interface BoardCommands {
   remove(): void;
   /** Kablo aracını aç / kapat (K). */
   toggleWire(): void;
+  /** Delik adı yazarak takma (telefonda alttaki sayfadan); ad geçersizse false (uyarı gösterilir). */
+  typeHole(text: string): boolean;
 }
 
 type Press =
   | { readonly kind: 'pan'; readonly id: number; x: number; y: number; readonly sx: number; readonly sy: number }
   | { readonly kind: 'place'; readonly id: number; readonly sx: number; readonly sy: number }
   | { readonly kind: 'cable'; readonly id: number; readonly sx: number; readonly sy: number }
+  /** Dokunmatikte takma: parmak deliğe dokunur, kaydırarak ayarlar, bırakınca takılır (büyüteç). */
+  | { readonly kind: 'aim'; readonly id: number; readonly sx: number; readonly sy: number }
   | { readonly kind: 'body'; readonly id: number; readonly partId: string; readonly grab: Hole; readonly sx: number; readonly sy: number }
   | { readonly kind: 'leg'; readonly id: number; readonly partId: string; readonly leg: number; readonly sx: number; readonly sy: number };
 
 const MOVE_PX = 5;
+/** Büyüteç: yarıçap (px), büyütme ve parmaktan uzaklığı (T5). */
+const LOUPE_R = 58;
+const LOUPE_ZOOM = 1.9;
+const LOUPE_LIFT = 104;
 
 export function BoardTop(props: BoardTopProps) {
   const { scene, doc, build, placing, selected, cabling } = props;
@@ -135,6 +145,10 @@ export function BoardTop(props: BoardTopProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const noticeTimer = useRef(0);
   const [typed, setTyped] = useState('');
+  // Dokunmatik: parmağın yeri (büyüteç) ve iki parmakla yakınlaştırma.
+  const [finger, setFinger] = useState<{ x: number; y: number } | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; x: number; y: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const t: TopTransform | null = scene?.topTransform() ?? null;
@@ -377,9 +391,23 @@ export function BoardTop(props: BoardTopProps) {
       props.onCabling({ kind: 'wire', from: null, color: null });
     }
   };
-  const keys = useRef({ rotateSelected, deleteSelected, toggleWire });
-  keys.current = { rotateSelected, deleteSelected, toggleWire };
-  useImperativeHandle(props.commands, () => ({ rotate: () => keys.current.rotateSelected(), remove: () => keys.current.deleteSelected(), toggleWire: () => keys.current.toggleWire() }), []);
+  const typeHole = (text: string): boolean => {
+    const at = typedHole(text, cols);
+    if (!at) {
+      warn(tr.tahta.unknownHole(text.trim()));
+      return false;
+    }
+    if (cabling) cableAt(at);
+    else if (placing) placeAt(at);
+    return true;
+  };
+  const keys = useRef({ rotateSelected, deleteSelected, toggleWire, typeHole });
+  keys.current = { rotateSelected, deleteSelected, toggleWire, typeHole };
+  useImperativeHandle(
+    props.commands,
+    () => ({ rotate: () => keys.current.rotateSelected(), remove: () => keys.current.deleteSelected(), toggleWire: () => keys.current.toggleWire(), typeHole: (text: string) => keys.current.typeHole(text) }),
+    [],
+  );
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
@@ -416,6 +444,28 @@ export function BoardTop(props: BoardTopProps) {
     const q = local(e.clientX, e.clientY);
     e.currentTarget.setPointerCapture(e.pointerId);
     const h = holeAt(q.x, q.y);
+    const touch = e.pointerType === 'touch';
+    if (touch) {
+      pointers.current.set(e.pointerId, q);
+      // İkinci parmak: iki parmakla yakınlaştırma ve kaydırma (takma ve kaydırma bırakılır).
+      if (pointers.current.size === 2) {
+        const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
+        pinch.current = { dist: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        setPress(null);
+        setFinger(null);
+        setHover(null);
+        return;
+      }
+      if (placing || cabling) {
+        const other = cabling ? terminalAt(q.x, q.y) : null;
+        if (!other) {
+          setPress({ kind: 'aim', id: e.pointerId, sx: q.x, sy: q.y });
+          setFinger(q);
+          setHover(h);
+          return;
+        }
+      }
+    }
     if (cabling) {
       // Karttaki bir uca tıklanırsa o ucun kablosu takılmaya başlar (aynı uç: bırakılır).
       const other = terminalAt(q.x, q.y);
@@ -446,7 +496,7 @@ export function BoardTop(props: BoardTopProps) {
       setPress({ kind: 'pan', id: e.pointerId, x: e.clientX, y: e.clientY, sx: q.x, sy: q.y });
       return;
     }
-    if (selectedPart && h && !isFixed(selectedPart.type)) {
+    if (selectedPart && h && !isFixed(selectedPart.type) && !touch) {
       const leg = build.parts[selectedPart.id]?.holes.indexOf(name(h)) ?? -1;
       if (leg >= 0) {
         setPress({ kind: 'leg', id: e.pointerId, partId: selectedPart.id, leg, sx: q.x, sy: q.y });
@@ -456,8 +506,9 @@ export function BoardTop(props: BoardTopProps) {
     const hit = partAt(q.x, q.y);
     if (hit && h) {
       setPick(null);
-      setPress({ kind: 'body', id: e.pointerId, partId: hit, grab: h, sx: q.x, sy: q.y });
       if (hit !== selected) props.onSelect(hit);
+      // Dokunmatikte taşıma yok (T5): seçilir, kaydırma sürer; yeri değiştirmek için Sil ve yeniden tak.
+      setPress(touch ? { kind: 'pan', id: e.pointerId, x: e.clientX, y: e.clientY, sx: q.x, sy: q.y } : { kind: 'body', id: e.pointerId, partId: hit, grab: h, sx: q.x, sy: q.y });
       return;
     }
     const wire = wireAt(q.x, q.y);
@@ -471,6 +522,26 @@ export function BoardTop(props: BoardTopProps) {
   };
   const onMove = (e: ReactPointerEvent) => {
     const q = local(e.clientX, e.clientY);
+    if (e.pointerType === 'touch' && pointers.current.has(e.pointerId)) {
+      pointers.current.set(e.pointerId, q);
+      const p = pinch.current;
+      if (p && pointers.current.size === 2 && scene) {
+        const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        if (p.dist > 0) scene.zoomTop(dist / p.dist, mx, my);
+        scene.panTop(mx - p.x, my - p.y);
+        pinch.current = { dist, x: mx, y: my };
+        return;
+      }
+      if (press?.kind === 'aim' && press.id === e.pointerId) {
+        setFinger(q);
+        setHover(holeAt(q.x, q.y));
+        return;
+      }
+      if (press === null) return;
+    }
     setHover(holeAt(q.x, q.y));
     if ((press?.kind === 'pan' || press?.kind === 'cable' || press?.kind === 'place') && press.id === e.pointerId && scene && 'x' in press) {
       scene.panTop(e.clientX - press.x, e.clientY - press.y);
@@ -479,12 +550,31 @@ export function BoardTop(props: BoardTopProps) {
     }
   };
   const onUp = (e: ReactPointerEvent) => {
+    if (e.pointerType === 'touch') {
+      pointers.current.delete(e.pointerId);
+      if (pinch.current) {
+        if (pointers.current.size < 2) pinch.current = null;
+        setPress(null);
+        return;
+      }
+    }
     const p = press;
     setPress(null);
     if (!p || p.id !== e.pointerId) return;
     const q = local(e.clientX, e.clientY);
     const moved = Math.hypot(q.x - p.sx, q.y - p.sy) > MOVE_PX;
     const h = holeAt(q.x, q.y);
+    if (p.kind === 'aim') {
+      // Parmak kalkınca büyütecin gösterdiği deliğe takılır.
+      const target = hover ?? h;
+      setFinger(null);
+      setHover(null);
+      if (target) {
+        if (cabling) cableAt(target);
+        else if (placing) placeAt(target);
+      }
+      return;
+    }
     if (p.kind === 'place') {
       if (!moved && h) placeAt(h);
       return;
@@ -713,6 +803,67 @@ export function BoardTop(props: BoardTopProps) {
     }
   }
 
+  // Büyüteç (T5): parmağın altındaki delikler büyütülmüş, hedef delik halkalı, bağlı delikler çerçeveli;
+  // altında delik adı ve bağlı olduğu delikler. Parmak ekranın üstüne yakınsa büyüteç parmağın altında.
+  const loupe = (() => {
+    if (!finger || !hover || !t) return null;
+    const at = toScreen(hover);
+    const cy = finger.y - LOUPE_LIFT < LOUPE_R + 8 ? finger.y + LOUPE_LIFT : finger.y - LOUPE_LIFT;
+    const cx = Math.min(Math.max(finger.x, LOUPE_R + 8), (layer.current?.clientWidth ?? 9999) - LOUPE_R - 8);
+    const span = (LOUPE_R / LOUPE_ZOOM) + t.scale;
+    const near = holes.filter((h) => {
+      const c = toScreen(h);
+      return Math.abs(c.x - at.x) <= span && Math.abs(c.y - at.y) <= span;
+    });
+    const map = (c: { x: number; y: number }) => ({ x: cx + (c.x - at.x) * LOUPE_ZOOM, y: cy + (c.y - at.y) * LOUPE_ZOOM });
+    const side = 0.46 * t.scale * LOUPE_ZOOM;
+    const group = connectedHoles(hover, cols);
+    const shown = group.map(toScreen).map(map);
+    const pad = side * 0.85;
+    const bad = occupied.has(name(hover)) && !(cabling?.kind === 'lead' && leadAt(hover)?.part === cabling.part && leadAt(hover)?.pin === cabling.pin);
+    const label =
+      hover.kind === 'strip' ? tr.tahta.loupeStrip(name(hover), name(group[0]!), name(group[group.length - 1]!)) : tr.tahta.loupeRail(name(hover), group.length);
+    const clip = `buyutec-${Math.round(cx)}-${Math.round(cy)}`;
+    return (
+      <>
+        <svg className="pointer-events-none absolute inset-0 z-20 h-full w-full" aria-hidden="true">
+          <defs>
+            <clipPath id={clip}>
+              <circle cx={cx} cy={cy} r={LOUPE_R} />
+            </clipPath>
+          </defs>
+          <circle cx={finger.x} cy={finger.y} r={20} fill="var(--color-ink)" fillOpacity={0.18} />
+          <circle cx={cx} cy={cy} r={LOUPE_R} fill="var(--color-panel)" stroke="var(--color-line-2)" strokeWidth={2} />
+          <g clipPath={`url(#${clip})`}>
+            {props.showConnected && (
+              <rect
+                x={Math.min(...shown.map((q) => q.x)) - pad}
+                y={Math.min(...shown.map((q) => q.y)) - pad}
+                width={Math.max(...shown.map((q) => q.x)) - Math.min(...shown.map((q) => q.x)) + 2 * pad}
+                height={Math.max(...shown.map((q) => q.y)) - Math.min(...shown.map((q) => q.y)) + 2 * pad}
+                rx={pad}
+                fill="var(--color-accent-soft)"
+                stroke="var(--color-accent)"
+                strokeWidth={2}
+              />
+            )}
+            {near.map((h) => {
+              const c = map(toScreen(h));
+              const used = occupied.has(name(h));
+              return <rect key={name(h)} x={c.x - side / 2} y={c.y - side / 2} width={side} height={side} rx={2} fill={used ? 'var(--color-muted)' : 'var(--color-ink)'} fillOpacity={used ? 0.9 : 0.85} />;
+            })}
+            <circle cx={cx} cy={cy} r={side * 0.95} fill="none" stroke={bad ? 'var(--color-danger)' : 'var(--color-accent)'} strokeWidth={3} />
+          </g>
+        </svg>
+        <div
+          className={`pointer-events-none absolute z-20 -translate-x-1/2 rounded-lg px-2.5 py-1 font-mono text-[13px] font-semibold whitespace-nowrap shadow-md ${bad ? 'bg-danger text-white' : 'bg-ink text-on-ink'}`}
+          style={{ left: cx, top: cy + LOUPE_R + 6 }}
+        >
+          {bad ? `${name(hover)} · ${tr.tahta.occupiedShort}` : label}
+        </div>
+      </>
+    );
+  })();
   const tipPos = tip ? toScreen(tip.at) : null;
   const selectedBox = (() => {
     if (!t || !selectedPart || placing || press) return null;
@@ -741,13 +892,19 @@ export function BoardTop(props: BoardTopProps) {
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
-        onPointerCancel={() => setPress(null)}
+        onPointerCancel={() => {
+          setPress(null);
+          setFinger(null);
+          pointers.current.clear();
+          pinch.current = null;
+        }}
         onPointerLeave={() => !press && setHover(null)}
       >
         <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
           {overlays}
         </svg>
-        {tip && tipPos && (tip.line || tip.bad) && (
+        {loupe}
+        {tip && tipPos && (tip.line || tip.bad) && !finger && !props.phone && (
           <div
             className={`pointer-events-none absolute z-10 flex max-w-[280px] flex-col rounded-lg border px-2.5 py-1.5 shadow-md ${tip.bad ? 'border-danger-line bg-panel' : 'border-line bg-panel'}`}
             style={{ left: tipPos.x + r + 14, top: tipPos.y - 18 }}
@@ -784,7 +941,7 @@ export function BoardTop(props: BoardTopProps) {
         )}
       </div>
 
-      {cabling && (
+      {cabling && !props.phone && (
         <div
           className="absolute bottom-[72px] left-1/2 z-20 flex max-w-[calc(100%-32px)] -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-ink py-1.5 pr-2 pl-4 text-small whitespace-nowrap text-on-ink shadow-lg"
           role="group"
@@ -840,7 +997,7 @@ export function BoardTop(props: BoardTopProps) {
           </button>
         </div>
       )}
-      {placing && placingPart && (
+      {placing && placingPart && !props.phone && (
         <div className="absolute bottom-[72px] left-1/2 z-20 flex max-w-[calc(100%-32px)] -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-ink py-1.5 pr-2 pl-4 text-small whitespace-nowrap text-on-ink shadow-lg" role="group" aria-label={tr.tahta.placePart(placingPart.label)}>
           <b className="font-semibold">
             {placingPart.label} {partValueText(placingPart)}

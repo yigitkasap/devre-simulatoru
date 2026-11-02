@@ -5,7 +5,7 @@
 // Tepeden görünüm 3B sahnenin dik (ortografik) kamerasıdır (kullanıcı kararı); masadaki cihazlar bu
 // görünümde ön panelleri ve uçları görünen düz kartlardır. 3B'de yalnızca bakılır.
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { mountOf, netColors, type BreadboardPlan } from '../../bench3d/breadboard';
 import { holeLabel } from '../../bench3d/holes';
 import type { BenchScene } from '../../bench3d/scene';
@@ -35,6 +35,8 @@ const doc_part = (doc: CircuitDoc, id: string): Part | undefined => doc.parts.fi
 
 /** Tepeden görünümde sahnenin kenarlarında boş kalan alan (üst çubuk; altta araç çubuğu ve takma çubuğu; piksel). */
 const TOP_INSETS = { top: 64, right: 16, bottom: 132, left: 16 } as const;
+/** Telefonda (T5): tahta, üst çubuk ile küçük alt sayfa arasına yüksekliğiyle sığar; yatay kaydırılır. */
+const PHONE_INSETS = { top: 60, right: 8, bottom: 214, left: 8, boardOnly: true } as const;
 
 /** Tahtaya takılan parçalar (masadakiler ve toprak sembolü hariç), planın sırasıyla (soldan sağa). */
 export function boardParts(doc: CircuitDoc, schematic: BreadboardPlan): Part[] {
@@ -78,6 +80,10 @@ export interface BoardStageProps {
   /** Geri al / yinele (Ctrl+Z, Ctrl+Y; şema tuvali bu kipte yok). */
   readonly onUndo: () => void;
   readonly onRedo: () => void;
+  /** Telefon (T5): sıkışık üst çubuk, tahta yüksekliğine sığar; araçlar ve sonuç alttaki sayfada. */
+  readonly phone?: boolean;
+  /** Tahtanın komutları (telefonda alttaki sayfa da kullanır: Kablo, delik adı yaz). */
+  readonly commands?: RefObject<BoardCommands | null>;
 }
 
 export function BoardStage(props: BoardStageProps) {
@@ -86,7 +92,9 @@ export function BoardStage(props: BoardStageProps) {
   const [viewTick, setViewTick] = useState(0);
   const onView = useCallback(() => setViewTick((n) => n + 1), []);
   const [said, setSaid] = useState('');
-  const commands = useRef<BoardCommands>(null);
+  const ownCommands = useRef<BoardCommands>(null);
+  const commands = props.commands ?? ownCommands;
+  const phone = props.phone ?? false;
   const selectedPart = props.selected && build.parts[props.selected] ? doc_part(bench.doc, props.selected) : undefined;
   // Seçili kablo (tahtada tıklanan); parça seçilince ya da kablo aracı açılınca kalkar.
   const [pick, setPick] = useState<Pick | null>(null);
@@ -244,7 +252,7 @@ export function BoardStage(props: BoardStageProps) {
         {...bench}
         callbacks={{ ...bench.callbacks, onView }}
         plan={plan}
-        top={top ? TOP_INSETS : null}
+        top={top ? (phone ? PHONE_INSETS : TOP_INSETS) : null}
         onScene={setScene}
         overlayExtra={
           <>
@@ -274,6 +282,7 @@ export function BoardStage(props: BoardStageProps) {
           onBuild={props.onBuild}
           announce={setSaid}
           touch={touch}
+          phone={phone}
           commands={commands}
         />
       )}
@@ -281,8 +290,38 @@ export function BoardStage(props: BoardStageProps) {
         {said}
       </p>
 
+      {/* Telefonda üst çubuk (T5): Tahtada kur · Tepeden | 3B · Şema · ✕. */}
+      {phone && (
+        <div className="absolute top-2 right-2 left-2 z-20 flex items-center gap-1.5">
+          <span className="flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] bg-accent px-2.5 text-[13px] font-semibold text-white shadow-sm">
+            <Icon name="board" className="h-4 w-4" />
+            {tr.tahta.mode}
+          </span>
+          <div role="group" aria-label={tr.tahta.viewGroup} className="flex shrink-0 rounded-[10px] border border-line bg-panel p-[2px] shadow-sm">
+            {(['top', 'bench'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => props.onView(v)}
+                className={`flex h-11 min-w-11 items-center justify-center rounded-md px-2.5 text-[13px] font-semibold ${view === v ? 'bg-panel-2 text-ink shadow-sm' : 'text-ink-2'}`}
+              >
+                {v === 'top' ? tr.tahta.top : tr.tahta.bench}
+              </button>
+            ))}
+          </div>
+          <span className="flex-1" />
+          <button type="button" onClick={() => bench.onSchematic?.()} className="flex h-11 shrink-0 items-center rounded-full border border-line bg-panel px-3 text-[13px] font-semibold shadow-sm">
+            {tr.tahta.schematic}
+          </button>
+          <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink">
+            <Icon name="close" className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
       {/* Üst çubuk (T1): Tahtada kur · Tepeden | 3B ... Bağlı delikleri göster · Çık. */}
-      <div className="pointer-events-none absolute top-3 right-3 left-3 z-20 flex items-start justify-between gap-2">
+      {!phone && <div className="pointer-events-none absolute top-3 right-3 left-3 z-20 flex items-start justify-between gap-2">
         <div className="pointer-events-auto flex items-center gap-2">
           <span className={`flex items-center gap-2 rounded-[10px] bg-accent px-3 font-semibold text-white shadow-sm ${h} text-small`}>
             <Icon name="board" className="h-[18px] w-[18px]" />
@@ -324,16 +363,16 @@ export function BoardStage(props: BoardStageProps) {
             {tr.tahta.exit}
           </button>
         </div>
-      </div>
+      </div>}
 
       {!top && (
-        <p className="pointer-events-none absolute top-16 left-1/2 z-20 m-0 flex -translate-x-1/2 items-center gap-2 rounded-full bg-ink/85 px-3.5 py-1.5 text-small whitespace-nowrap text-on-ink shadow-sm">
+        <p className={`pointer-events-none absolute left-1/2 z-20 m-0 flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-2 rounded-full bg-ink/85 px-3.5 py-1.5 text-small text-on-ink shadow-sm ${phone ? 'top-[60px]' : 'top-16 whitespace-nowrap'}`}>
           <Icon name="info" className="h-4 w-4" />
           {tr.tahta.hint3d}
         </p>
       )}
 
-      {top && (
+      {top && !phone && (
         <>
           <div role="toolbar" aria-label={tr.tahta.toolbar} className="absolute bottom-4 left-4 z-20 flex items-center gap-2">
             {tool('wire', tr.tahta.toolWire, 'K', true, () => commands.current?.toggleWire(), wireMode !== null)}
@@ -439,7 +478,7 @@ export interface BoardPanelProps {
 }
 
 /** Şemadaki işaret: sorunlu parçanın çevresinde kırmızı çerçeve ve numara (dünya koordinatı). */
-function schematicMarks(doc: CircuitDoc, marks: ReadonlyArray<{ readonly part: string; readonly n: number }>): ReactNode {
+export function schematicMarks(doc: CircuitDoc, marks: ReadonlyArray<{ readonly part: string; readonly n: number }>): ReactNode {
   return marks.map(({ part, n }) => {
     const p = doc.parts.find((q) => q.id === part);
     if (!p) return null;
@@ -461,8 +500,15 @@ function schematicMarks(doc: CircuitDoc, marks: ReadonlyArray<{ readonly part: s
   });
 }
 
+/** Oturumdaki yeri açılmış sorunların şemadaki işaretleri (İşaretleri gizle kapalıyken); yoksa undefined. */
+export function sessionMarks(doc: CircuitDoc, session: BoardSession | null): ReactNode | undefined {
+  if (!session?.result || !session.marks) return undefined;
+  const marks = session.result.problems.flatMap((p, i) => (p.part !== null && levelOf(session, p) >= 2 ? [{ part: p.part, n: i + 1 }] : []));
+  return marks.length > 0 ? schematicMarks(doc, marks) : undefined;
+}
+
 /** Sorun kartı (T3): numara, kademeye göre başlık, açıklama, açılan ipuçları ve sonraki ipucu. */
-function ProblemCard({ doc, problem, index, level, touch, onHint }: { doc: CircuitDoc; problem: Problem; index: number; level: number; touch: boolean; onHint: (p: Problem) => void }) {
+export function ProblemCard({ doc, problem, index, level, touch, onHint }: { doc: CircuitDoc; problem: Problem; index: number; level: number; touch: boolean; onHint: (p: Problem) => void }) {
   const d = tr.tahta.denetle;
   const max = maxLevel(problem);
   const names = d.levels.slice(0, max);
@@ -801,7 +847,7 @@ export function BoardPanel(props: BoardPanelProps) {
 }
 
 /** Şemanın büyük görünümü (değiştirilemez). */
-function SchematicDialog({ doc, connectivity, settings, overlay, onClose }: { doc: CircuitDoc; connectivity: Connectivity; settings: Settings; overlay: ReactNode; onClose: () => void }) {
+export function SchematicDialog({ doc, connectivity, settings, overlay, onClose }: { doc: CircuitDoc; connectivity: Connectivity; settings: Settings; overlay: ReactNode; onClose: () => void }) {
   const titleId = useId();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();

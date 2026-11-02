@@ -12,7 +12,9 @@ import { boardCircuit } from '../tahta/circuit';
 import { planFromBuild } from '../tahta/plan';
 import { planBreadboard } from '../bench3d/breadboard';
 import { emptyBuild, serializeBuild, type Build } from '../model/build';
-import { BoardPanel, BoardStage, type BoardView, type Cabling, type Placing } from './tahta/BoardMode';
+import { BoardPanel, BoardStage, SchematicDialog, sessionMarks, type BoardView, type Cabling, type Placing } from './tahta/BoardMode';
+import type { BoardCommands } from './tahta/BoardTop';
+import { PhoneBoardSheet } from './tahta/PhoneBoard';
 import { checkBuild, type Problem } from '../tahta/check';
 import { boardReport } from '../tahta/report';
 import { openHint, recordCheck, startSession, type BoardSession } from '../tahta/session';
@@ -434,6 +436,17 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [placing, setPlacing] = useState<Placing | null>(null);
   /** Kablo aracı ya da takılmakta olan alet kablosu (panelin çiplerinden de başlar). */
   const [cabling, setCabling] = useState<Cabling | null>(null);
+  /** Tahtanın komutları (telefonda alttaki sayfa: delik adı yaz). */
+  const boardCommands = useRef<BoardCommands | null>(null);
+  /** Telefonda Tahtada kur'un alttaki sayfası (T5). */
+  const [boardSheet, setBoardSheet] = useState<SheetSize>('half');
+  // Telefonda takma ya da kablo bitince parça kutusu küçük konuma iner (T5: "Tak’a basınca kutu kapanır").
+  const wasPlacing = useRef(false);
+  useEffect(() => {
+    const now = placing !== null || cabling !== null;
+    if (wasPlacing.current && !now) setBoardSheet('peek');
+    wasPlacing.current = now;
+  }, [placing, cabling]);
   /** Tahtada kur oturumu: Denetle denemeleri, ipuçları, süre (yeni belge yüklenince sıfırlanır). */
   const [boardSession, setBoardSession] = useState<BoardSession | null>(null);
   /** Şemanın breadboard planı: tahtanın boyu, masadaki yerler, alet kabloları (3B ya da Tahtada kur açıkken). */
@@ -1238,7 +1251,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const observer = new ResizeObserver((entries) => setPhoneAreaHeight(entries[0]?.contentRect.height ?? 0));
     observer.observe(el);
     return () => observer.disconnect();
-  }, [phone]);
+    // Tahtada kur telefonda ayrı bir düzen: alan öğesi değişir, yeniden izlenir.
+  }, [phone, boardMode]);
   useEffect(() => {
     if (!addSheet) setSheetHeight(0);
   }, [addSheet]);
@@ -1714,6 +1728,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           session={boardSession}
           buildKey={boardKey}
           onMarks={boardMarks}
+          phone={phone}
+          commands={boardCommands}
           onUndo={() => {
             setPlacing(null);
             setCabling(null);
@@ -1729,13 +1745,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         <BenchView
           {...benchProps}
           onSchematic={() => setViewMode('schematic')}
-          {...(!phone && doc.parts.length > 0 && !fault && !task ? { onBoard: enterBoard, boardBlocked: schematicPlan && schematicPlan.boards > 1 ? tr.tahta.tooBig : null } : {})}
+          {...(doc.parts.length > 0 && !fault && !task ? { onBoard: enterBoard, boardBlocked: schematicPlan && schematicPlan.boards > 1 ? tr.tahta.tooBig : null } : {})}
         />
       ) : (
         schematic
       )}
       {/* Telefonda Şema | 3B şema kutusunun sol üstünde; masaüstünde ve tablette 3B ve Şema sağ alttaki kutularda. */}
-      {phone && !connect && <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} />}
+      {phone && !connect && !boardMode && <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} />}
     </>
   );
 
@@ -2099,6 +2115,89 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         {shareDialogEl}
       </>
     );
+
+    // Telefonda Tahtada kur (T5): üst çubuk, bütün alanda tahta, alttaki tek sayfada parça kutusu, takma,
+    // Denetle ve sonuç; Oynat düğmesi sayfanın üstünde.
+    if (boardMode && boardBuild && schematicPlan) {
+      return (
+        <div className="app-root flex flex-col overflow-hidden bg-panel-2" style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
+          {skipLink}
+          <PhoneHeader
+            title={circuitTitle}
+            status={sim.status}
+            time={sim.frame?.time ?? 0}
+            saveState={saveState}
+            canUndo={state.past.length > 0}
+            statusOpen={modal === 'status'}
+            moreOpen={modal === 'more'}
+            onStatus={() => setModal('status')}
+            onUndo={() => {
+              setPlacing(null);
+              setCabling(null);
+              dispatch({ type: 'undo' });
+            }}
+            onMore={() => setModal('more')}
+          />
+          <div ref={phoneAreaRef} className="relative flex min-h-0 flex-1 flex-col">
+            <main className="relative min-h-0 flex-1 bg-paper">{canvas}</main>
+            <PhoneFabs lift={sheetHeight} status={sim.status} canAdd={false} addOpen={false} onAdd={() => undefined} onPlay={play} onPause={sim.pause} />
+            <TouchUi.Provider value>
+              <BottomSheet size={boardSheet} sizes={['peek', 'half']} halfRatio={0.62} label={tr.tahta.phone.sheet} areaHeight={phoneAreaHeight} onHeight={setSheetHeight} onSize={setBoardSheet}>
+                <PhoneBoardSheet
+                  doc={doc}
+                  build={boardBuild}
+                  schematicPlan={schematicPlan}
+                  session={boardSession}
+                  buildKey={boardKey}
+                  placing={placing}
+                  cabling={cabling}
+                  showConnected={showConnected}
+                  onShowConnected={setShowConnected}
+                  onPlace={(id) => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setCabling(null);
+                    setPlacing({ partId: id, first: null, turned: false, dragging: false });
+                    setBoardSheet('half');
+                  }}
+                  onLead={(part, pin) => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setPlacing(null);
+                    setCabling({ kind: 'lead', part, pin });
+                    setBoardSheet('half');
+                  }}
+                  onWire={() => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setPlacing(null);
+                    setCabling((c) => (c?.kind === 'wire' ? null : { kind: 'wire', from: null, color: null }));
+                  }}
+                  onCancel={() => {
+                    setPlacing(null);
+                    setCabling(null);
+                  }}
+                  onTypeHole={(text) => boardCommands.current?.typeHole(text) ?? false}
+                  onCheck={() => {
+                    checkBoard();
+                    setBoardSheet('half');
+                  }}
+                  onHint={boardHint}
+                  cue={activeExample ? tr.examples.cues[activeExample] : null}
+                  onReport={downloadBoardReport}
+                  onGuide={openSolderGuide}
+                  onReset={resetBoard}
+                />
+              </BottomSheet>
+            </TouchUi.Provider>
+          </div>
+          {boardSchema && <SchematicDialog doc={doc} connectivity={connectivity} settings={settings} overlay={sessionMarks(doc, boardSession)} onClose={() => setBoardSchema(false)} />}
+          {modals}
+          {overlays}
+          <Toast toast={toast} offset={sheetHeight + 12} onDone={hideToast} />
+        </div>
+      );
+    }
 
     // Dikey ve yatay telefon (DP1–DP4): üst çubuk; şema kutusu (karta odaklanınca şerit, tam ekranda ya
     // da kablo bağlarken bütün alan); altında defter; yüzen düğmeler. Tuval kipler arasında aynı yerde

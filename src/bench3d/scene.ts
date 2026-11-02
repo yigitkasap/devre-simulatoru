@@ -73,6 +73,8 @@ export interface TopInsets {
   readonly right: number;
   readonly bottom: number;
   readonly left: number;
+  /** Telefonda (T5): yalnızca tahtanın yüksekliğine sığdırılır, sol kenarı görünür; tahta yatay kaydırılır, masadaki aletler ekran dışında. */
+  readonly boardOnly?: boolean;
 }
 
 /** Kamera görünümleri: Serbest (önden ve yukarıdan, 52°), Üstten, Önden (alçaktan). */
@@ -766,6 +768,17 @@ export class BenchScene {
     const { top, right, bottom, left } = this.topInsets;
     const w = Math.max(40, canvas.clientWidth - left - right);
     const h = Math.max(40, canvas.clientHeight - top - bottom);
+    if (this.topInsets.boardOnly && plan) {
+      const half = boardWidth(plan.cols) / 2;
+      const z0 = -BB.depth / 2;
+      const z1 = boardZ(plan.boards - 1) + BB.depth / 2;
+      const scale = Math.min(60, h / ((z1 - z0) * 1.02));
+      const viewW = canvas.clientWidth / scale;
+      const viewH = canvas.clientHeight / scale;
+      this.topView = { scale, cx: -half - left / scale + viewW / 2 - 0.4, cz: z0 - top / scale + viewH / 2 - ((h / scale - (z1 - z0)) / 2) };
+      this.applyTop();
+      return;
+    }
     const size = box.getSize(new Vector3());
     const scale = Math.min(w / (size.x * 1.04), h / (size.z * 1.04));
     const center = box.getCenter(new Vector3());

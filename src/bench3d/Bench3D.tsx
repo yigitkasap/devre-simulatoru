@@ -72,10 +72,10 @@ export default function Bench3D(props: Bench3DProps) {
   useEffect(() => scene.current?.setTheme(dark), [dark]);
   useEffect(() => scene.current?.setOverlay(overlay), [overlay]);
   useEffect(() => scene.current?.setDoc(doc, plan), [doc, plan]);
-  const insets = top ? `${top.top},${top.right},${top.bottom},${top.left}` : null;
+  const insets = top ? `${top.top},${top.right},${top.bottom},${top.left},${top.boardOnly ? 1 : 0}` : null;
   useEffect(() => {
-    const [t = 0, r = 0, b = 0, l = 0] = insets ? insets.split(',').map(Number) : [];
-    scene.current?.setTop(insets !== null, { top: t, right: r, bottom: b, left: l });
+    const [t = 0, r = 0, b = 0, l = 0, board = 0] = insets ? insets.split(',').map(Number) : [];
+    scene.current?.setTop(insets !== null, { top: t, right: r, bottom: b, left: l, boardOnly: board === 1 });
   }, [insets]);
   useEffect(() => scene.current?.setDots(dots, electronFlow, running), [dots, electronFlow, running]);
   useEffect(() => scene.current?.setFrame(frame, active, ohmTexts), [frame, active, ohmTexts]);

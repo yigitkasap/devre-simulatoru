@@ -2729,6 +2729,67 @@ try {
     await ctx.close();
   }
 
+  // --- Tahtada kur (telefon, T5): 3B'den giriş, parça kutusu alttan, dokun-kaydır-bırak ve büyüteç, Denetle ---
+  {
+    const { page, cdp } = await phone();
+    await openExample(page, 'Transistör anahtar: LED kollektörde');
+    await page.getByRole('button', { name: '3B', exact: true }).first().tap();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }); await page.waitForTimeout(1200);
+    await page.getByRole('button', { name: 'Tahtada kur', exact: true }).tap(); await page.waitForTimeout(1500);
+    const sheet = page.getByRole('region', { name: 'Tahtada kur', exact: true });
+    const sheetText = (await sheet.textContent()) ?? '';
+    const holeXY = (name) => page.evaluate((n) => {
+      const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
+      const m = /^(\d+)([a-j])$/.exec(n); const col = +m[1]; const row = 'abcdefghij'.indexOf(m[2]);
+      return { x: rect.left + (col - 15.5) * t.scale + t.ox, y: rect.top + (row < 5 ? -5.5 + row : 1.5 + (row - 5)) * t.scale + t.oy };
+    }, name);
+    const pitch = await page.evaluate(() => window.__tezgah.topTransform().scale);
+    check('Tahtada kur (telefon): 3B’den açılıyor; tahta yüksekliğine sığıyor (delik aralığı ≥ 22 px, tahta yatay kayar); parça kutusu alttaki sayfada (0 / 4 takılı, Tak düğmeleri, 7 kablo çipi)',
+      sheetText.includes('Parça kutusu') && sheetText.includes('0 / 4 takılı') && (await sheet.getByRole('button', { name: /: tahtaya tak$/ }).count()) === 4 && (await sheet.getByRole('button', { name: /kablosunu tak$/ }).count()) === 7 && pitch >= 22,
+      `aralık ${pitch.toFixed(1)} px`);
+    await sheet.getByRole('button', { name: 'R1: tahtaya tak' }).tap(); await page.waitForTimeout(300);
+    const step1 = (await sheet.textContent()) ?? '';
+    const t = touch(cdp);
+    let a = await holeXY('3c'); const b = await holeXY('2c');
+    await t.start(a.x, a.y); await page.waitForTimeout(60);
+    for (let i = 1; i <= 6; i++) { await t.move(a.x + ((b.x - a.x) * i) / 6, a.y); await page.waitForTimeout(20); }
+    await page.waitForTimeout(150);
+    const loupe = (await page.getByText(/^2c · 2a–2e bağlı$/).count()) === 1;
+    await t.end(); await page.waitForTimeout(250);
+    const step2 = (await sheet.textContent()) ?? '';
+    a = await holeXY('6c'); await tap(page, cdp, a); await page.waitForTimeout(300);
+    const r1 = (await part(page, 'R1')).id;
+    const holes = (await doc(page)).build?.parts?.[r1]?.holes?.join(' ');
+    check('Tahtada kur (telefon): Tak → takma sayfası (R1 · 10 kΩ, 1. bacak); dokun-kaydır-bırak: büyüteç ve “2c · 2a–2e bağlı”, bırakınca 2. bacak; R1 2c–6c',
+      step1.includes('R1 · 10 kΩ') && step1.includes('1. bacak') && loupe && step2.includes('2. bacak') && holes === '2c 6c', `${loupe} / ${holes}`);
+    // Alet kablosu: çip → Delik adı yaz.
+    await sheet.getByRole('button', { name: 'PS1 1+ kablosunu tak' }).tap(); await page.waitForTimeout(200);
+    await sheet.getByRole('button', { name: 'Delik adı yaz' }).tap(); await page.waitForTimeout(200);
+    const fontSize = await sheet.getByRole('textbox').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    await sheet.getByRole('textbox').fill('20a'); await sheet.getByRole('button', { name: 'Tak', exact: true }).tap(); await page.waitForTimeout(400);
+    const leads = ((await doc(page)).build?.leads ?? []).map((l) => l.hole).join(' ');
+    // İki parmakla yakınlaştırma.
+    const s0 = await page.evaluate(() => window.__tezgah.topTransform().scale);
+    const c = await holeXY('8f');
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: c.x - 30, y: c.y, id: 1 }, { x: c.x + 30, y: c.y, id: 2 }] });
+    for (let i = 1; i <= 6; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: c.x - 30 - i * 10, y: c.y, id: 1 }, { x: c.x + 30 + i * 10, y: c.y, id: 2 }] }); await page.waitForTimeout(20); }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await page.waitForTimeout(200);
+    const s1 = await page.evaluate(() => window.__tezgah.topTransform().scale);
+    check('Tahtada kur (telefon): alet kablosu çipten, “Delik adı yaz” ile (yazı 16 px); iki parmakla yakınlaşıyor',
+      leads === '20a' && fontSize >= 16 && s1 > s0 * 1.3, `${leads} / ${fontSize} px / ${s0.toFixed(1)} → ${s1.toFixed(1)}`);
+    // Denetle: ilk kademede yalnızca sayı ve "Nerede?"; sonra kartlar.
+    await sheet.getByRole('button', { name: 'Denetle', exact: true }).tap(); await page.waitForTimeout(400);
+    const checked = (await sheet.locator('h2').first().textContent()) ?? '';
+    const cards0 = await sheet.locator('ol > li').count();
+    await sheet.getByRole('button', { name: 'Nerede?' }).tap(); await page.waitForTimeout(400);
+    const cards = (await sheet.locator('ol > li b').allTextContents()).slice(0, 2).join(' | ');
+    const small = await page.evaluate(() => [...document.querySelectorAll('button, input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && (r.height < 44 || r.width < 44); }).map((e) => `${(e.getAttribute('aria-label') ?? e.textContent ?? '').trim().slice(0, 24)} ${Math.round(e.getBoundingClientRect().width)}×${Math.round(e.getBoundingClientRect().height)}`));
+    const scrolled = await page.evaluate(() => window.scrollY + document.scrollingElement.scrollTop + document.querySelector('.app-root').scrollTop);
+    check('Tahtada kur (telefon): Denetle alttaki sayfada (ilk kademede kart yok, “Nerede?” yerleri adlandırıyor); dokunma hedefleri ≥ 44 px, sayfa kaymıyor',
+      /^\d+ sorun var$/.test(checked) && cards0 === 0 && /çevresinde/.test(cards) && small.length === 0 && scrolled === 0, `${checked} / ${cards} / ${small.join(', ')} / ${scrolled}`);
+    await page.context().close();
+  }
+
   // --- Sıkışık masaüstü (1100 px): defter 400 px, parça defterden eklenir (v3) ---------------
   const compact = await browser.newContext({ viewport: { width: 1100, height: 760 }, locale: 'tr-TR' });
   const cp = await compact.newPage();
