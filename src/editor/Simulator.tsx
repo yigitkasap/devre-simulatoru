@@ -12,6 +12,7 @@ import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
 import { METER_DISPLAY } from './PartView';
 import { nodeName } from './analysis/traces';
+import { lm317Divider } from './lm317Divider';
 import { multimeterMode } from '../sim/devices/multimeter';
 import { spdtThrow } from '../sim/devices/spdt';
 import { meterIntact, remapFaults, removedMeters, unplugAll, type InsertedMeter } from '../model/meters';
@@ -480,6 +481,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       return name === '0' ? (doc.parts.find((p) => p.type === 'ground')?.label ?? tr.fault.ground) : name;
     },
     [analysis.idx, doc.parts],
+  );
+  const divider = useCallback(
+    (id: string) => {
+      const part = doc.parts.find((p) => p.id === id);
+      return part ? lm317Divider(part, doc, analysis.idx) : null;
+    },
+    [doc, analysis.idx],
   );
   /** Multimetre parçalarının Ω okuması: simülasyon durmuşken (güç kapalı; B2'deki multimetreyle aynı ölçüm). */
   const ohmTexts = useMemo(() => {
@@ -1284,6 +1292,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       {...inspectProps}
       {...(ohmTexts ? { ohmTexts } : {})}
       pinNode={pinNode}
+      divider={divider}
       pressed={pressed}
       onPress={pressButton}
       floating={floatingParts}

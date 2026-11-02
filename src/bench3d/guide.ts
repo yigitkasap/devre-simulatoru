@@ -96,6 +96,8 @@ function describe(part: Part): { name: string; detail: string } {
       return { name: `Potansiyometre ${formatOhm(numProp(p, 'resistance', 10e3))}`, detail: 'dikey trimpot, 3 bacak' };
     case 'switch':
       return { name: 'Anahtar (iki konumlu)', detail: `başlangıçta ${boolProp(p, 'closed', false) ? 'kapalı' : 'açık'}` };
+    case 'lm317':
+      return { name: 'Ayarlı regülatör LM317T', detail: 'TO-220; bacaklar yazılı yüz sana dönükken soldan ADJ, OUT, IN' };
     case 'reg7805':
       return { name: 'Gerilim regülatörü L7805CV', detail: 'TO-220; bacaklar yazılı yüz sana dönükken soldan IN, GND, OUT' };
     case 'bridge':
@@ -208,6 +210,9 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         break;
       case 'potentiometer':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ') });
+        break;
+      case 'lm317':
+        steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Yazılı yüz sana dönük; metal tırnak arkada (OUT’a bağlıdır). Bacak sırası 7805’ten farklı.' });
         break;
       case 'reg7805':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Yazılı yüz sana dönük; metal tırnak arkada (GND’ye bağlıdır).' });

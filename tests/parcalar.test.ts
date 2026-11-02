@@ -7,6 +7,7 @@ import { tr } from '../src/i18n/tr';
 import { planBreadboard } from '../src/bench3d/breadboard';
 import { CATALOG, CATEGORIES } from '../src/model/catalog';
 import { CircuitSimulator } from '../src/sim';
+import { LM317 } from '../src/sim/devices/regulator';
 import { circuit } from './helpers';
 
 const reading = (sim: CircuitSimulator, id: string) => sim.status(id).reading ?? NaN;
@@ -256,5 +257,43 @@ describe('Gerilim regülatörü 7805', () => {
     const at = planBreadboard(doc).onBoard.get('u')!;
     const cols = at.holes.map((h) => (h.kind === 'strip' ? h.col : -1));
     expect([cols[0]! + 1, cols[0]! + 2]).toEqual([cols[1], cols[2]]);
+  });
+});
+
+describe('Ayarlı regülatör LM317', () => {
+  const build = (vin: number) =>
+    new CircuitSimulator(
+      circuit()
+        .battery('B1', 'in', 'gnd', vin)
+        .add('lm317', 'U1', ['in', 'adj', 'out'], { model: 'LM317T' })
+        .resistor('R1', 'out', 'adj', 240)
+        .resistor('R2', 'adj', 'gnd', 720)
+        .resistor('RL', 'out', 'gnd', 100)
+        .ground('G1', 'gnd')
+        .build(),
+    );
+  it('R1 240 Ω, R2 720 Ω: Vout = 1,25 · (1 + 3) = 5 V, ADJ akımı (50 µA) R2’de 36 mV ekler; OUT − ADJ = 1,25 V', () => {
+    const sim = build(12);
+    sim.advance(0);
+    const r = sim.status('U1').regulator!;
+    // OUT − ADJ = 1,25 V − RO·I (yük regülasyonu); bölücü bunu 4 katına çıkarır.
+    expect(r.output).toBeCloseTo((1.25 - LM317.ro * r.current) * 4 + 50e-6 * 720, 6);
+    expect(r.output).toBeCloseTo(5.035, 3);
+    expect((sim.voltageAt('out') ?? NaN) - (sim.voltageAt('adj') ?? NaN)).toBeCloseTo(1.25, 3);
+    expect(sim.pinCurrents('U1')![1]).toBeCloseTo(-50e-6, 9);
+    expect(r.dropout).toBe(false);
+  });
+
+  it('6 V girişte giriş yetmez (55 mA’de bırakma ≈ 1,52 V): uyarı', () => {
+    const sim = build(6);
+    sim.advance(0);
+    expect(sim.status('U1').regulator!.dropout).toBe(true);
+    expect(sim.runtimeDiagnostics.map((d) => d.code)).toContain('regulator-dropout');
+  });
+
+  it("breadboard'da gerçek sıra ADJ, OUT, IN", () => {
+    const doc = { version: 1 as const, parts: [{ id: 'u', type: 'lm317' as const, label: 'U1', x: 0, y: 0, rotation: 0 as const, props: { model: 'LM317T' } }], wires: [] };
+    const cols = planBreadboard(doc).onBoard.get('u')!.holes.map((h) => (h.kind === 'strip' ? h.col : -1));
+    expect([cols[1]! + 1, cols[1]! + 2]).toEqual([cols[2], cols[0]]);
   });
 });

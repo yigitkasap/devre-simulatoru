@@ -66,6 +66,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   oscilloscope: 'Osiloskop',
   tank: 'Su haznesi',
   reg7805: 'Gerilim regülatörü',
+  lm317: 'Ayarlı regülatör',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -112,6 +113,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   oscilloscope: 'osiloskobunun',
   tank: 'su haznesinin',
   reg7805: 'gerilim regülatörünün',
+  lm317: 'ayarlı regülatörünün',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -157,6 +159,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
   reg7805: ['giriş ucu (IN)', 'toprak ucu (GND)', 'çıkış ucu (OUT)'],
+  lm317: ['giriş ucu (IN)', 'ayar ucu (ADJ)', 'çıkış ucu (OUT)'],
 };
 
 /** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
@@ -203,6 +206,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
   reg7805: ['IN', 'GND', 'OUT'],
+  lm317: ['IN', 'ADJ', 'OUT'],
 };
 
 /** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
@@ -249,6 +253,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
   reg7805: ['IN', 'GND', 'OUT'],
+  lm317: ['IN', 'ADJ', 'OUT'],
 };
 
 function list(labels: readonly string[]): string {
@@ -581,6 +586,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Gerilimin zamanla nasıl değiştiğini çizer; iki kanal (A, B) ortak uca göre, DC/AC/GND kuplaj, ADD, INV ve X-Y. Girişi 1 MΩ, COM ucu şebeke toprağına bağlıdır.',
   reg7805:
     'Sabit 5 V çıkış veren doğrusal regülatör (7805): girişi çıkışın en az ≈ 2 V üstünde olduğu sürece çıkış 5 V’ta kalır, aradaki gerilim farkı ısı olarak harcanır. GND ucu toprağa bağlanır.',
+  lm317:
+    'Ayarlı doğrusal regülatör (LM317): çıkışı ADJ ucunun 1,25 V üstünde tutar. Çıkış ile ADJ arasına R1, ADJ ile toprak arasına R2 bağlanınca Vout = 1,25 V · (1 + R2 / R1). Giriş, çıkışın en az ≈ 1,5–2 V üstünde olmalı.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -689,6 +696,7 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   },
   model: {
     genel: 'Genel (basit)',
+    LM317T: 'LM317T · 1,5 A',
     BC547B: 'BC547B (basit)',
     '2N5457': '2N5457 (basit)',
     '2N7000': '2N7000 (basit)',
@@ -1614,6 +1622,10 @@ export const tr = {
     inputMinusOutput: 'Giriş − çıkış',
     regulatorDropout: (needed: string) =>
       `Giriş yetmiyor: çıkışın ayarlanan değeri tutabilmesi için giriş, çıkışın en az ${needed} (bu akımda bırakma gerilimi) üstünde olmalı. Çıkış girişin ${needed} altında kalıyor.`,
+    lm317Note: (needed: string) =>
+      `LM317 çıkışı ADJ ucunun 1,25 V üstünde tutar: Vout = 1,25 V · (1 + R2 / R1) (R1: OUT ile ADJ arası, R2: ADJ ile toprak arası). Giriş, çıkışın en az ${needed} (bu akımda bırakma gerilimi) üstünde olmalı.`,
+    lm317Formula: (r1: string, r2: string, vout: string) =>
+      `Vout = 1,25 V · (1 + R2 / R1) = 1,25 V · (1 + ${r2} / ${r1}) = ${vout}. R1: OUT ile ADJ arası (${r1}), R2: ADJ ile toprak arası (${r2}); ADJ akımı (≈ 50 µA) ihmal edildi.`,
     reg7805Note: (needed: string) =>
       `7805 çıkışı GND'ye göre 5 V'ta tutar; giriş çıkışın en az ${needed} (bu akımda bırakma gerilimi, ST veri sayfası) üstünde olmalı. Giriş − çıkış farkı ile akımın çarpımı ısı olarak harcanır.`,
     bridgeNote: 'Her yarım periyotta iki diyot seri iletir: çıkış, AC girişin anlık değerinden iki diyot gerilimi (KBP307’de 10 mA’de ≈ 0,64 V, 1 A’de ≈ 0,93 V her biri) kadar düşüktür.',
@@ -2435,6 +2447,7 @@ export const tr = {
       oscilloscope: 'Osiloskoplar',
       tank: 'Su hazneleri',
       reg7805: 'Gerilim regülatörleri',
+      lm317: 'Ayarlı regülatörler',
     } satisfies Record<DeviceType, string>,
   },
   file: {
@@ -2806,6 +2819,8 @@ export const tr = {
     } as Partial<Record<DeviceType, string>>,
     /** Parça modelinin notu (genel modellerde türün notu kullanılır). */
     modelNotes: {
+      LM317T:
+        'LM317T: ayarlı regülatör, TO-220 (ST, TI, onsemi veri sayfaları). V_{REF} = 1,25 V (OUT − ADJ), ADJ akımı ≈ 50 µA, akım sınırı ≈ 2,2 A. Giriş, çıkışın bırakma gerilimi kadar üstünde olmalı (ST eğrisi: 20 mA’de ≈ 1,5 V, 1 A’de ≈ 2,05 V). Bacaklar ADJ, OUT, IN (7805’ten farklı).',
       '1N5819':
         '1N5819: 1 A, 40 V Schottky diyot (DO-41). İleri gerilim veri sayfası tablosundaki en çok değerlere göre: 0,1 A’de 0,34 V, 1 A’de 0,60 V, 3 A’de 0,90 V (onsemi, Diodes). Ters sızıntı ≈ 0,88 mA (tablo: 40 V’ta en çok 1 mA). 1N4001 ile aynı gövde; ayırmak için gövdedeki yazıya bak.',
       KBP307:

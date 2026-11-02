@@ -10,6 +10,7 @@ import {
   AMMETER_DEFAULTS,
   multimeterMode,
   dropoutVoltage,
+  LM317,
   REG7805,
   pushbuttonClosed,
   spdtThrow,
@@ -498,10 +499,12 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
       };
     }
-    case 'reg7805': {
+    case 'reg7805':
+    case 'lm317': {
       const r = status.regulator;
       if (!r) return { title, rows: [] };
-      const needed = dropoutVoltage(REG7805, r.current);
+      const lm317 = part.type === 'lm317';
+      const needed = dropoutVoltage(lm317 ? LM317 : REG7805, r.current);
       return {
         title,
         rows: [
@@ -511,7 +514,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
           { label: t.powerUsed, value: w(r.power) },
           { label: t.inputMinusOutput, value: v(r.input - r.output) },
         ],
-        note: r.dropout ? t.regulatorDropout(vn(needed)) : t.reg7805Note(vn(needed)),
+        note: r.dropout ? t.regulatorDropout(vn(needed)) : lm317 ? t.lm317Note(vn(needed)) : t.reg7805Note(vn(needed)),
       };
     }
     case 'bridge':

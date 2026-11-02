@@ -92,6 +92,8 @@ export interface NotebookProps extends InspectTabProps {
   readonly ohmTexts?: ReadonlyMap<string, string>;
   /** Ucun bağlı olduğu düğümün adı (multimetre kartı). */
   readonly pinNode?: (partId: string, pin: number) => string;
+  /** LM317'nin ayar dirençleri (R1: OUT–ADJ, R2: ADJ–toprak); bulunamazsa null. */
+  readonly divider?: (partId: string) => { readonly r1: number; readonly r2: number } | null;
   /** Basılı tutulan düğmeler ve basma / bırakma (basmalı düğme kartı). */
   readonly pressed?: ReadonlySet<string>;
   readonly onPress?: (partId: string, down: boolean) => void;
@@ -141,7 +143,7 @@ export function cardReading(part: Part, frame: SimFrame | null): { main: string;
   if (!rows || rows.length === 0) return null;
   if (part.type === 'led' && rows[1]) return { main: rows[0]!.value, second: rows[1].value };
   // Regülatör: çıkış gerilimi (satırlar giriş, çıkış, akım…).
-  if (part.type === 'reg7805' && rows[1]) return { main: rows[1].value };
+  if ((part.type === 'reg7805' || part.type === 'lm317') && rows[1]) return { main: rows[1].value };
   if (part.type === 'dcsupply') {
     // Güç kaynağı: akım veren çıkışlar (ikisi de boştaysa 1. çıkış); satırlar çıkış sırasında.
     const outputs = frame.statuses.get(part.id)?.outputs ?? [];
@@ -753,7 +755,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
             )}
             <PrimaryControl {...props} values={values} locked={locked} />
             {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
-            <LiveTiles part={part} frame={frame} />
+            <LiveTiles part={part} frame={frame} note={lm317Note(part, props.divider)} />
             {props.liveHidden && status !== 'stopped' && <p className="m-0 text-label leading-snug text-muted">{t.liveHiddenNote}</p>}
           </>
         )}
@@ -1023,8 +1025,19 @@ function ColorCode({ ohms }: { ohms: number }) {
 }
 
 /** Çalışırken Gerilim, Akım, Güç (ve türe özel öbür satırlar) karelerde; durmuşken yok. */
-function LiveTiles({ part, frame }: { part: Part; frame: SimFrame | null }) {
-  const live = liveRows(part, frame);
+/** LM317: ayar dirençleri bulunursa "Neden bu değer?" notunda formül sayılarla (Y3). */
+function lm317Note(part: Part, divider: NotebookProps['divider']): string | undefined {
+  if (part.type !== 'lm317') return undefined;
+  const d = divider?.(part.id);
+  if (!d || d.r1 <= 0) return undefined;
+  const ohm = (r: number) => formatSI(r, 'Ω', { trim: true, digits: 4 });
+  return tr.readout.lm317Formula(ohm(d.r1), ohm(d.r2), formatSI(1.25 * (1 + d.r2 / d.r1), 'V', { digits: 3 }));
+}
+
+function LiveTiles({ part, frame, note }: { part: Part; frame: SimFrame | null; note?: string | undefined }) {
+  const rows = liveRows(part, frame);
+  // Giriş yetmiyorsa uyarı notu kalır; öbür durumda formül notu.
+  const live = rows && note && !frame?.statuses.get(part.id)?.regulator?.dropout ? { ...rows, note } : rows;
   const spoken = useThrottledText(live ? live.rows.map((r) => `${plainText(r.label)} ${r.value}`).join(', ') : '');
   if (!live || live.rows.length === 0) return null;
   const formula = live.note?.includes('→') ?? false;

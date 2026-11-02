@@ -1254,6 +1254,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Schottky />;
     case 'reg7805':
       return <Regulator text="7805" rotation={rotation} dropout={live?.dropout ?? false} />;
+    case 'lm317':
+      return <Regulator text="LM317" rotation={rotation} dropout={live?.dropout ?? false} />;
   }
 }
 

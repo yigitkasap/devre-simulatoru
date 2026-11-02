@@ -2,13 +2,15 @@ import type { MnaSystem } from '../mna';
 import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Measurement, type RatingWarning } from './device';
 
 // Doğrusal gerilim regülatörleri (davranışsal model). Pinler: [0] = IN, [1] = başvuru ucu (7805'te GND,
-// LM317'de ADJ), [2] = OUT. Çıkış, başvuru ucuna göre ayar gerilimini (Vset) tutmaya çalışır:
-//   I_reg  = (V_ref + Vset − V_out) / RO          (RO: yük regülasyonu)
-// Giriş yeterince yüksek değilse geçiş transistörü girişin bırakma gerilimi kadar altına çıkamaz:
-//   V_in − V_out ≥ Vd(I)  ⇒  I_drop = Vd⁻¹(V_in − V_out)     (Vd: veri sayfasının dropout eğrisi)
-// Çıkış akımı I = min(I_reg, I_drop), 0 ile akım sınırı arasında; girişten çekilir (IN → OUT). Akımı
-// geri alamaz (çıkış ayardan yüksekse akım ≈ 0; geçiş 1 µA ölçeğinde yumuşak). Başvuru ucundan da IN'den gelen küçük bir akım akar:
-// 7805'te bekleme akımı (GND'ye), LM317'de ADJ akımı (ADJ ucundan dışarı).
+// LM317'de ADJ), [2] = OUT. Geçiş akımı I (IN → OUT) bir MNA dalıdır; her Newton yinelemesinde dört
+// durumdan biri geçerlidir:
+//   ayar (regülasyon):  V_out = V_ref + Vset − RO·I          (RO: yük regülasyonu)
+//   bırakma:            V_out = V_in − Vd(I)                 (Vd: veri sayfasının dropout eğrisi)
+//   akım sınırı:        I = Ilim
+//   kapalı:             I = 0                                (akımı geri alamaz; giriş yokken)
+// Durum bir önceki yinelemenin çözümünden seçilir (çıkış ikisinin küçüğü; I, 0 ile Ilim arasında). Ayar
+// durumunda denklem doğrusaldır: Newton tek adımda çözer. Başvuru ucundan da IN'den gelen küçük bir
+// akım akar: 7805'te bekleme akımı (GND'ye), LM317'de ADJ akımı (ADJ ucundan dışarı).
 // Varsayımlar (veri sayfasında yok): bekleme / ADJ akımı giriş − başvuru gerilimi 0'dan sıfır yük
 // bırakma gerilimine çıkarken 0'dan tam değerine doğrusal artar (güç yokken akmaz); akım sınırı giriş −
 // çıkış farkından bağımsızdır (gerçekte fark büyüdükçe düşer).
@@ -76,28 +78,6 @@ export const LM317: RegulatorSpec = {
   reference: 50e-6,
 };
 
-/** Newton yinelemesinde çıkışın doğrusallaştırma noktasının en büyük adımı (V). */
-const VOUT_STEP = 1;
-
-/** Akım sınırındayken çıkış düğümü boşta kalmasın diye çok küçük eğim (S). */
-const LEAK = 1e-9;
-/** Sıfır akım sınırının yumuşaklığı (A): regülasyondaki etkisi ölçülemeyecek kadar küçük. */
-const SOFT = 1e-6;
-
-/** Bırakma eğrisinin tersi: giriş − çıkış farkında geçebilecek en büyük akım ve türevi (uçlarda uzantı). */
-function dropoutCurrent(spec: RegulatorSpec, headroom: number): { i: number; g: number } {
-  const pts = spec.dropout;
-  for (let k = 1; k < pts.length; k++) {
-    const [i0, v0] = pts[k - 1]!;
-    const [i1, v1] = pts[k]!;
-    if (headroom <= v1 || k === pts.length - 1) {
-      const g = (i1 - i0) / (v1 - v0);
-      return { i: i0 + g * (headroom - v0), g };
-    }
-  }
-  return { i: 0, g: 0 };
-}
-
 /** Akıma göre bırakma gerilimi (eğriden doğrusal ara değer; son parçanın uzantısı). */
 export function dropoutVoltage(spec: RegulatorSpec, current: number): number {
   const pts = spec.dropout;
@@ -109,125 +89,140 @@ export function dropoutVoltage(spec: RegulatorSpec, current: number): number {
   return pts[0]![1];
 }
 
-interface Operating {
-  /** IN → OUT akımı ve kısmi türevleri (V_in, V_ref, V_out). */
-  readonly i: number;
-  readonly dIn: number;
-  readonly dRef: number;
-  readonly dOut: number;
-  /** IN → başvuru ucu akımı ve türevi (V_in − V_ref'e göre). */
-  readonly q: number;
-  readonly dq: number;
-  /** Giriş yetmiyor (bırakma gerilimiyle sınırlı). */
-  readonly dropout: boolean;
+/** Bırakma eğrisinin akıma göre eğimi (Ω; doğrusal ara değerin parçası). */
+function dropoutSlope(spec: RegulatorSpec, current: number): number {
+  const pts = spec.dropout;
+  for (let k = 1; k < pts.length; k++) {
+    const [i0, v0] = pts[k - 1]!;
+    const [i1, v1] = pts[k]!;
+    if (current <= i1 || k === pts.length - 1) return (v1 - v0) / (i1 - i0);
+  }
+  return 0;
 }
 
-function operate(spec: RegulatorSpec, vin: number, vref: number, vout: number): Operating {
-  const reg = (vref + spec.vset - vout) / spec.ro;
-  const drop = dropoutCurrent(spec, vin - vout);
-  // Küçük olan sınırlar: ayar (regülasyon) ya da girişin yetmemesi (bırakma gerilimi).
-  const dropout = drop.i < reg;
-  const m = dropout ? drop.i : reg;
-  let dIn = dropout ? drop.g : 0;
-  let dRef = dropout ? 0 : 1 / spec.ro;
-  let dOut = dropout ? -drop.g : -1 / spec.ro;
-  // Akımı geri alamaz: I = softplus(m) − SOFT·ln 2 (ölçek SOFT): m ≫ SOFT'ta I = m, m = 0'da tam 0
-  // (yüksüz çıkış ayarda kalır), m < 0'da en çok 0,7 µA geri alır. Türev sürekli olduğu için Newton
-  // yinelemesi sıfır akım sınırında gidip gelmez.
-  const z = m / SOFT;
-  let i = (z > 0 ? m + SOFT * Math.log1p(Math.exp(-z)) : SOFT * Math.log1p(Math.exp(z))) - SOFT * Math.LN2;
-  const slope = z > 0 ? 1 / (1 + Math.exp(-z)) : Math.exp(z) / (1 + Math.exp(z));
-  dIn *= slope;
-  dRef *= slope;
-  // Eğim sıfıra inince (giriş yokken, yüksüz çıkış) matris tekil olmasın: çok küçük alt sınır.
-  dOut = Math.min(dOut * slope, -LEAK);
-  if (i > spec.ilim) {
-    i = spec.ilim;
-    dIn = 0;
-    dRef = 0;
-    dOut = -LEAK;
-  }
-  // Başvuru ucunun akımı: giriş − başvuru, sıfır yük bırakma gerilimine çıkarken 0'dan tam değerine.
-  const head = vin - vref;
+/** Başvuru ucunun akımı (IN → başvuru): giriş − başvuru 0'dan sıfır yük bırakma gerilimine çıkarken 0'dan tam değerine. */
+function referenceCurrent(spec: RegulatorSpec, head: number): { q: number; dq: number } {
   const ramp = spec.dropout[0]![1];
-  const q = head <= 0 ? 0 : head >= ramp ? spec.reference : (spec.reference * head) / ramp;
-  const dq = head <= 0 || head >= ramp ? 0 : spec.reference / ramp;
-  return { i, dIn, dRef, dOut, q, dq, dropout: dropout && i > 1e-6 };
+  if (head <= 0) return { q: 0, dq: 0 };
+  if (head >= ramp) return { q: spec.reference, dq: 0 };
+  return { q: (spec.reference * head) / ramp, dq: spec.reference / ramp };
 }
+
+type Mode = 'reg' | 'drop' | 'limit' | 'off';
+
+export const LM317_MODELS = ['LM317T'] as const;
+export const LM317_DEFAULTS = { model: 'LM317T' as (typeof LM317_MODELS)[number] };
 
 export class RegulatorDevice extends Device {
-  readonly type: 'reg7805';
+  readonly type: 'reg7805' | 'lm317';
   readonly spec: RegulatorSpec;
-  /** NR doğrusallaştırma noktası (V_in, V_ref, V_out). */
-  private it = { vin: 0, vref: 0, vout: 0 };
-  private saved = { vin: 0, vref: 0, vout: 0 };
+  /** Yinelemedeki durum ve bırakma eğrisinin doğrusallaştırıldığı akım; son kabul edilenler. */
+  private mode: Mode = 'reg';
+  private i0 = 0;
+  private saved: { mode: Mode; i0: number; head: number } = { mode: 'reg', i0: 0, head: 0 };
+  /** Başvuru ucu akımının doğrusallaştırma noktası (giriş − başvuru). */
+  private head = 0;
 
-  constructor(init: DeviceInit, type: 'reg7805') {
+  constructor(init: DeviceInit, type: 'reg7805' | 'lm317') {
     super(init);
     this.type = type;
-    this.spec = REG7805;
+    this.spec = type === 'reg7805' ? REG7805 : LM317;
   }
 
   override get nonlinear(): boolean {
     return true;
   }
 
-  /** Doğrusallaştırılmış iki bağımlı akım kaynağı: IN → OUT ve IN → başvuru ucu. */
+  private get branch(): number {
+    return this.branches[0]!;
+  }
+
   override stampNonlinear(sys: MnaSystem): void {
     const [nin, nref, nout] = this.nodes as [number, number, number];
-    const { vin, vref, vout } = this.it;
-    const o = operate(this.spec, vin, vref, vout);
-    // I = i + dIn·Δvin + dRef·Δvref + dOut·Δvout: IN düğümünden çıkar, OUT düğümüne girer.
-    const ieq = o.i - o.dIn * vin - o.dRef * vref - o.dOut * vout;
-    this.vccs(sys, nin, nout, [
-      [nin, o.dIn],
-      [nref, o.dRef],
-      [nout, o.dOut],
-    ], ieq);
-    const qeq = o.q - o.dq * (vin - vref);
-    this.vccs(sys, nin, nref, [
-      [nin, o.dq],
-      [nref, -o.dq],
-    ], qeq);
-  }
-
-  /** `from` düğümünden çıkıp `to` düğümüne giren akım: Σ g·v + ieq. */
-  private vccs(sys: MnaSystem, from: number, to: number, terms: ReadonlyArray<readonly [number, number]>, ieq: number): void {
-    for (const [node, g] of terms) {
-      if (node < 0 || g === 0) continue;
-      if (from >= 0) sys.add(from, node, g);
-      if (to >= 0) sys.add(to, node, -g);
+    const k = this.branch;
+    const { spec } = this;
+    // Geçiş akımı I: IN düğümünden çıkar, OUT düğümüne girer.
+    if (nin >= 0) sys.add(nin, k, 1);
+    if (nout >= 0) sys.add(nout, k, -1);
+    switch (this.mode) {
+      case 'reg':
+        // V_out − V_ref + RO·I = Vset
+        if (nout >= 0) sys.add(k, nout, 1);
+        if (nref >= 0) sys.add(k, nref, -1);
+        sys.add(k, k, spec.ro);
+        sys.addRhs(k, spec.vset);
+        break;
+      case 'drop': {
+        // V_out − V_in + rd·I = −(Vd(I0) − rd·I0)
+        const rd = dropoutSlope(spec, this.i0);
+        if (nout >= 0) sys.add(k, nout, 1);
+        if (nin >= 0) sys.add(k, nin, -1);
+        sys.add(k, k, rd);
+        sys.addRhs(k, -(dropoutVoltage(spec, this.i0) - rd * this.i0));
+        break;
+      }
+      case 'limit':
+        sys.add(k, k, 1);
+        sys.addRhs(k, spec.ilim);
+        break;
+      case 'off':
+        sys.add(k, k, 1);
+        break;
     }
-    sys.currentSource(from, to, ieq);
+    // Başvuru ucunun akımı (IN → başvuru), giriş − başvuruya göre doğrusallaştırılmış.
+    const { q, dq } = referenceCurrent(spec, this.head);
+    if (dq !== 0) {
+      if (nin >= 0) {
+        sys.add(nin, nin, dq);
+        if (nref >= 0) sys.add(nin, nref, -dq);
+      }
+      if (nref >= 0) {
+        sys.add(nref, nref, dq);
+        if (nin >= 0) sys.add(nref, nin, -dq);
+      }
+    }
+    sys.currentSource(nin, nref, q - dq * this.head);
   }
 
-  /**
-   * Çıkışın doğrusallaştırma noktası yineleme başına en çok VOUT_STEP değişir (diyottaki gerilim
-   * sınırlaması gibi): parçalı doğrusal model akım sınırı ile sıfır akım arasında gidip gelmesin.
-   */
+  /** Bir önceki çözümden durumu seçer: çıkış ayar ile bırakma sınırının küçüğü, akım 0 ile Ilim arası. */
   override updateIterate(x: Float64Array): boolean {
-    const next = { vin: this.v(x, 0), vref: this.v(x, 1), vout: this.v(x, 2) };
-    const close = (a: number, b: number) => Math.abs(a - b) < 1e-6 + 1e-6 * Math.abs(a);
-    const converged = close(next.vin, this.it.vin) && close(next.vref, this.it.vref) && close(next.vout, this.it.vout);
-    const step = next.vout - this.it.vout;
-    if (Math.abs(step) > VOUT_STEP) next.vout = this.it.vout + Math.sign(step) * VOUT_STEP;
-    this.it = next;
+    const { spec } = this;
+    const vin = this.v(x, 0);
+    const vref = this.v(x, 1);
+    const vout = this.v(x, 2);
+    const i = x[this.branch]!;
+    const regulated = (current: number) => vref + spec.vset - spec.ro * current;
+    const ceiling = (current: number) => vin - dropoutVoltage(spec, current);
+    const onMode = (current: number): Mode => (ceiling(current) < regulated(current) ? 'drop' : 'reg');
+    let next: Mode;
+    if (this.mode === 'limit') next = vout > Math.min(regulated(spec.ilim), ceiling(spec.ilim)) + 1e-9 ? onMode(spec.ilim) : 'limit';
+    else if (this.mode === 'off') next = Math.min(regulated(0), ceiling(0)) > vout + 1e-9 ? onMode(0) : 'off';
+    else next = i > spec.ilim ? 'limit' : i < 0 ? 'off' : onMode(i);
+    const head = vin - vref;
+    const converged = next === this.mode && Math.abs(i - this.i0) < 1e-9 + 1e-6 * Math.abs(i) && Math.abs(head - this.head) < 1e-6 + 1e-6 * Math.abs(head);
+    this.mode = next;
+    this.i0 = Math.max(0, i);
+    this.head = head;
     return converged;
   }
 
   override restoreIterate(): void {
-    this.it = { ...this.saved };
+    this.mode = this.saved.mode;
+    this.i0 = this.saved.i0;
+    this.head = this.saved.head;
   }
 
   override accept(): void {
-    this.saved = { ...this.it };
+    this.saved = { mode: this.mode, i0: this.i0, head: this.head };
   }
 
   private state(x: Float64Array) {
     const vin = this.v(x, 0);
     const vref = this.v(x, 1);
     const vout = this.v(x, 2);
-    return { vin, vref, vout, ...operate(this.spec, vin, vref, vout) };
+    const i = x[this.branch]!;
+    const q = referenceCurrent(this.spec, vin - vref).q;
+    return { vin, vref, vout, i, q, power: (vin - vout) * i + (vin - vref) * q, dropout: this.mode === 'drop' && i > 1e-6 };
   }
 
   override pinCurrents(x: Float64Array): number[] {
@@ -238,12 +233,12 @@ export class RegulatorDevice extends Device {
   /** Çıkış: OUT − başvuru gerilimi, verdiği akım ve regülatörde harcanan güç. */
   measure(x: Float64Array): Measurement {
     const s = this.state(x);
-    return { voltage: s.vout - s.vref, current: s.i, power: (s.vin - s.vout) * s.i + (s.vin - s.vref) * s.q };
+    return { voltage: s.vout - s.vref, current: s.i, power: s.power };
   }
 
   override status(x: Float64Array): DeviceStatus {
     const s = this.state(x);
-    return { regulator: { input: s.vin, output: s.vout, current: s.i, power: (s.vin - s.vout) * s.i + (s.vin - s.vref) * s.q, dropout: s.dropout } };
+    return { regulator: { input: s.vin, output: s.vout, current: s.i, power: s.power, dropout: s.dropout } };
   }
 
   /** Giriş, çıkışın bırakma gerilimi kadar üstünde değil: çıkış ayarlanan değeri tutamıyor. */
@@ -254,7 +249,9 @@ export class RegulatorDevice extends Device {
 
   override adoptState(prev: Device): void {
     if (prev instanceof RegulatorDevice && prev.type === this.type) {
-      this.it = { ...prev.it };
+      this.mode = prev.mode;
+      this.i0 = prev.i0;
+      this.head = prev.head;
       this.saved = { ...prev.saved };
     }
   }
@@ -264,6 +261,14 @@ export const reg7805Model: DeviceModel = {
   type: 'reg7805',
   pinCount: 3,
   internalNodes: 0,
-  branchCount: 0,
+  branchCount: 1,
   create: (init) => new RegulatorDevice(init, 'reg7805'),
+};
+
+export const lm317Model: DeviceModel = {
+  type: 'lm317',
+  pinCount: 3,
+  internalNodes: 0,
+  branchCount: 1,
+  create: (init) => new RegulatorDevice(init, 'lm317'),
 };
