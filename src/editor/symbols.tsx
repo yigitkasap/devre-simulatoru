@@ -573,21 +573,37 @@ function Motor({ angle, rotation }: { angle: number; rotation: Rotation }) {
   );
 }
 
-function Meter({ letter, rotation }: { letter: string; rotation: Rotation }) {
+/** Ekranda (dx, dy) kadar kaymanın sembolün kendi (döndürülmemiş) koordinatındaki karşılığı. */
+function unrotate(dx: number, dy: number, rotation: Rotation): [number, number] {
+  switch (rotation) {
+    case 90:
+      return [dy, -dx];
+    case 180:
+      return [-dx, -dy];
+    case 270:
+      return [-dy, dx];
+    default:
+      return [dx, dy];
+  }
+}
+
+/** `letterShift`: harf ekranda bu kadar aşağı (eksiyse yukarı) kayar (multimetrede altındaki işarete yer). */
+function Meter({ letter, rotation, letterShift = 0 }: { letter: string; rotation: Rotation; letterShift?: number }) {
+  const [lx, ly] = unrotate(0, 0.5 + letterShift, rotation);
   return (
     <g>
       <Lead from={-40} to={-15} />
       <Lead from={15} to={40} />
       <circle cx={0} cy={0} r={15} style={PAPER} stroke="currentColor" strokeWidth={2} />
       <text
-        x={0}
-        y={0.5}
+        x={lx}
+        y={ly}
         textAnchor="middle"
         dominantBaseline="central"
         fontSize={16}
         fontWeight={700}
         fill="currentColor"
-        transform={rotation ? `rotate(${-rotation})` : undefined}
+        transform={rotation ? `rotate(${-rotation} ${lx} ${ly})` : undefined}
         style={{ fontFamily: 'var(--font-sans)' }}
       >
         {letter}
@@ -748,21 +764,28 @@ function CurrentSource() {
 }
 
 /** Multimetre: dairede kipine göre V, A ya da Ω; altında doğru (⎓) ya da alternatif (∿) işareti. */
+/**
+ * Multimetre: harf kipe göre (V, A, Ω), altında ⎓ ya da ∿ (Y2). İşaret ekranda her zaman harfin altındadır:
+ * yatayda Y2'deki gibi çemberin altında; dikeyde çemberin altından uç geçtiği için çemberin içinde (harf
+ * biraz yukarı kayar).
+ */
 function Multimeter({ mode, rotation }: { mode: MultimeterMode; rotation: Rotation }) {
   const mark = mode === 'ac' ? '∿' : mode === 'ohm' ? null : '⎓';
+  const vertical = rotation === 90 || rotation === 270;
+  const [mx, my] = unrotate(0, vertical ? 8 : 23, rotation);
   return (
     <g>
-      <Meter letter={mode === 'a' ? 'A' : mode === 'ohm' ? 'Ω' : 'V'} rotation={rotation} />
+      <Meter letter={mode === 'a' ? 'A' : mode === 'ohm' ? 'Ω' : 'V'} rotation={rotation} letterShift={mark && vertical ? -4 : 0} />
       {mark && (
         <text
-          x={0}
-          y={25}
+          x={mx}
+          y={my}
           textAnchor="middle"
           dominantBaseline="central"
-          fontSize={13}
-          fontWeight={700}
+          fontSize={vertical ? 10 : 11}
+          fontWeight={600}
           fill="currentColor"
-          transform={rotation ? `rotate(${-rotation} 0 25)` : undefined}
+          transform={rotation ? `rotate(${-rotation} ${mx} ${my})` : undefined}
           style={{ fontFamily: 'var(--font-sans)' }}
         >
           {mark}

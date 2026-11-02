@@ -256,7 +256,11 @@ export function labelLayout(part: Part, displayFlip: boolean): { anchor: 'middle
     // Transistör: üst ve alt uçlar kablolu olduğu için yazılar sağda (dönmüşse eski kurallar).
     return { anchor: 'start', nameX: right + 4, nameY: cy - 3, valueY: cy + 11 };
   }
-  if (part.rotation % 180 === 0) return { anchor: 'middle', nameX: cx, nameY: isMeter && !displayFlip ? bottom + 13 : top - 5, valueY: bottom + 13 };
+  if (part.rotation % 180 === 0) {
+    // Multimetrenin kip işareti (⎓, ∿) yatayda her döndürmede çemberin altında: ad onun altına.
+    const below = part.type === 'multimeter' ? Math.max(bottom, 2.7 * GRID) : bottom;
+    return { anchor: 'middle', nameX: cx, nameY: isMeter && !displayFlip ? below + 13 : top - 5, valueY: below + 13 };
+  }
   const anchor = isMeter && displayFlip ? 'end' : 'start';
   return { anchor, nameX: anchor === 'end' ? left - 6 : right + 6, nameY: isMeter ? cy + DISPLAY_H / 2 + 14 : cy - 3, valueY: cy + 11 };
 }
