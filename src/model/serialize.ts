@@ -5,11 +5,13 @@
 //   "version": 1,
 //   "parts": [{ "id": "p1", "type": "resistor", "label": "R1", "x": 0, "y": 0, "rotation": 0,
 //               "props": { "resistance": 1000 } }],
-//   "wires": [{ "id": "w1", "points": [[4, 0], [10, 0]] }]
+//   "wires": [{ "id": "w1", "points": [[4, 0], [10, 0]] }],
+//   "build": { ... }   (Tahtada kur; isteğe bağlı, model/build.ts)
 // }
 
 import type { PropValue } from '../sim/netlist';
 import { serializeAnalysis, type AnalysisDoc } from './analysis';
+import { parseBuild, serializeBuild } from './build';
 import { isDeviceType } from './catalog';
 import { DOC_VERSION, type CircuitDoc, type Part, type Point, type Rotation, type Wire } from './types';
 import { normalizePoints } from './wires';
@@ -28,6 +30,8 @@ interface SerializedDoc {
   wires: Array<{ id: string; points: Array<[number, number]> }>;
   /** Analiz katmanı (izler, ölçüm tablosu); devrenin bağlantısına girmez. */
   analysis?: Record<string, unknown>;
+  /** Tahtada kur: breadboard kurulumu (şemadan ayrı). */
+  build?: Record<string, unknown>;
 }
 
 export function toSerializable(doc: CircuitDoc, analysis?: AnalysisDoc): SerializedDoc {
@@ -45,6 +49,7 @@ export function toSerializable(doc: CircuitDoc, analysis?: AnalysisDoc): Seriali
       props: { ...p.props },
     })),
     wires: doc.wires.map((w) => ({ id: w.id, points: w.points.map((p) => [p.x, p.y] as [number, number]) })),
+    ...(doc.build ? { build: serializeBuild(doc.build) } : {}),
   };
 }
 
@@ -105,7 +110,9 @@ export function parseDoc(value: unknown): CircuitDoc | null {
     wireIds.add(id);
     outWires.push({ id, points: clean });
   }
-  return { version: DOC_VERSION, parts: outParts, wires: outWires };
+  // Kurulum okunamazsa şema yine okunur; kurulum boş başlar.
+  const build = value.build === undefined ? null : parseBuild(value.build, outParts);
+  return { version: DOC_VERSION, parts: outParts, wires: outWires, ...(build ? { build } : {}) };
 }
 
 /** Bağlantıyı etkileyen her şeyin (parça konumu, döndürme, kablo geometrisi) özeti. Değerler dahil değil. */

@@ -8,18 +8,13 @@ import type { CircuitDoc, Part } from '../model/types';
 import { boolProp, numProp, strProp } from '../sim/netlist';
 import { LED_COLORS } from '../sim/devices/led';
 import { resistorColorCode } from './bands';
-import { holeXZ, railX, type BreadboardPlan, type Hole } from './breadboard';
+import { holeXZ, type BreadboardPlan, type Hole } from './breadboard';
+import { holeLabel } from './holes';
 
-const ROWS = 'abcdefghij';
 
 /** Deliğin adı: şeritte "12c", rayda "üst + rayı (12. sütun hizası)"; birden çok kartta kart numarası. */
 export function holeName(h: Hole, plan: BreadboardPlan): string {
-  const board = plan.boards > 1 ? `${h.board + 1}. kart, ` : '';
-  if (h.kind === 'strip') return `${board}${h.col}${ROWS[h.row]}`;
-  const side = h.rail <= 1 ? 'üst' : 'alt';
-  const sign = h.rail === 0 || h.rail === 3 ? '+' : '−';
-  const col = Math.round(railX(h.k, plan.cols) + (plan.cols + 1) / 2);
-  return `${board}${side} ${sign} rayı (${col}. sütun hizası)`;
+  return holeLabel(h, plan.cols, plan.boards);
 }
 
 /** İki delik arası düz uzaklık (mm; delik aralığı 2,54 mm). */
