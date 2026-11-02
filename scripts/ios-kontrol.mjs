@@ -2688,6 +2688,14 @@ try {
     const boardMarks = await bp.locator('[role=region][aria-label^="Breadboard"] svg rect[stroke="var(--color-danger)"]').count();
     check('Tahtada kur, Denetle: “Yerini göster” sorunun parçasını adlandırıyor; tahtada ve şemada iki kırmızı işaret',
       located === 'R1 çevresinde | LED1 çevresinde' && schematicMarks === 2 && boardMarks === 2, `${located} / şema ${schematicMarks} / tahta ${boardMarks}`);
+    // Sonuçlar listelenince (parça kutusu da açıkken) şema kartı ezilmiyor (en az 200 px), işaretler görünür; panel kayıyor.
+    await panel.getByRole('button', { name: /^Parça kutusu ·/ }).click(); await bp.waitForTimeout(200);
+    const schematicBox = await panel.getByRole('region', { name: 'Şema (değiştirilemez): tahtaya kurulacak devre' }).boundingBox();
+    const markBox = await panel.locator('svg rect[stroke="var(--color-danger)"]').first().boundingBox();
+    const scrolls = await panel.locator('div.overflow-y-auto').first().evaluate((el) => el.scrollHeight > el.clientHeight && getComputedStyle(el).overflowY === 'auto');
+    await panel.getByRole('button', { name: /^Parça kutusu ·/ }).click(); await bp.waitForTimeout(150);
+    check('Tahtada kur, Denetle: sorun kartları listelenince sağ paneldeki şema en az 200 px kalıyor, kırmızı işaret görünür; panel kendi içinde kayıyor',
+      (schematicBox?.height ?? 0) >= 200 && (markBox?.height ?? 0) > 4 && scrolls, `şema ${Math.round(schematicBox?.height ?? 0)} px / işaret ${Math.round(markBox?.height ?? 0)} px / kayar ${scrolls}`);
     for (let i = 0; i < 2; i++) await panel.getByRole('button', { name: 'Açıklamayı göster' }).first().click();
     await bp.waitForTimeout(300);
     const explained = await titles();

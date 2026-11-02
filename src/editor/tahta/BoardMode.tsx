@@ -602,7 +602,7 @@ export function BoardPanel(props: BoardPanelProps) {
     const action = `flex w-full items-center justify-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink hover:bg-panel-2 ${touch ? 'h-12' : 'h-11'}`;
     return (
       <div className="flex min-h-0 flex-1 flex-col" role="region" aria-label={tr.tahta.panelLabel}>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 pb-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 pb-4 *:shrink-0">
           <span className="flex items-center gap-1.5 text-label font-semibold text-accent-ink">
             <Icon name="board" className="h-4 w-4" />
             {tr.tahta.panelTag(props.group)}
@@ -806,7 +806,8 @@ export function BoardPanel(props: BoardPanelProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" role="region" aria-label={tr.tahta.panelLabel}>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 pb-3">
+      {/* Bölümler ezilmez (şema en az 200 px); panel kendi içinde kayar. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 pb-3 *:shrink-0">
         {header}
         <p className="sr-only" aria-live="polite">
           {checks > 0 ? `${d.tag(checks)}. ${d.announce(problems.length)}` : ''}
