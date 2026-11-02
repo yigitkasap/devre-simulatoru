@@ -7,7 +7,7 @@
 // Çizimler ekran koordinatında (sahnenin dik kamerasının dönüşümüyle, topTransform).
 
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactElement, type Ref } from 'react';
-import { holeXZ, type Hole } from '../../bench3d/breadboard';
+import { BB, boardWidth, holeXZ, type Hole } from '../../bench3d/breadboard';
 import { allHoles, connectedHoles, holeLabel, sameHole } from '../../bench3d/holes';
 import type { BenchScene, TopTransform } from '../../bench3d/scene';
 import { tr } from '../../i18n/tr';
@@ -805,6 +805,10 @@ export function BoardTop(props: BoardTopProps) {
 
   // Büyüteç (T5): parmağın altındaki delikler büyütülmüş, hedef delik halkalı, bağlı delikler çerçeveli;
   // altında delik adı ve bağlı olduğu delikler. Parmak ekranın üstüne yakınsa büyüteç parmağın altında.
+  // Tahtanın kenarı: açık temada tahta tuval zemininden zor ayrılıyordu (dik kamerada gölge yok).
+  const edge = t
+    ? { left: t.ox - (boardWidth(cols) / 2) * t.scale, top: t.oy - (BB.depth / 2) * t.scale, width: boardWidth(cols) * t.scale, height: BB.depth * t.scale }
+    : null;
   const loupe = (() => {
     if (!finger || !hover || !t) return null;
     const at = toScreen(hover);
@@ -904,6 +908,7 @@ export function BoardTop(props: BoardTopProps) {
         }}
         onPointerLeave={() => !press && setHover(null)}
       >
+        {edge && <div aria-hidden="true" className="pointer-events-none absolute rounded-[3px] shadow-[0_2px_12px_color-mix(in_srgb,var(--color-scrim)_28%,transparent)] ring-1 ring-line-2" style={edge} />}
         <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
           {overlays}
         </svg>
