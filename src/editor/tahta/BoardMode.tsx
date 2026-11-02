@@ -13,14 +13,18 @@ import { tr } from '../../i18n/tr';
 import { WIRE_COLORS, type Build, type WireColor } from '../../model/build';
 import { recolorWire } from '../../tahta/wiring';
 import type { Connectivity } from '../../model/connectivity';
-import type { CircuitDoc, Part } from '../../model/types';
+import { partBounds } from '../../model/geometry';
+import { GRID, type CircuitDoc, type Part } from '../../model/types';
+import type { Problem } from '../../tahta/check';
+import { countWord, problemText, problemTitle } from '../../tahta/explain';
+import { levelOf, maxLevel, type BoardSession } from '../../tahta/session';
 import { BenchView, type BenchViewProps } from '../BenchView';
 import { CircuitView } from '../CircuitView';
 import { deviceSummary } from '../DeviceCards';
 import { Icon, type IconName } from '../icons';
 import { partValueText } from '../PartView';
 import type { Settings } from '../settings';
-import { BoardTop, pickedIn, Swatch, terminalName, type BoardCommands, type Cabling, type Pick, type Placing } from './BoardTop';
+import { BoardTop, pickedIn, Swatch, terminalName, type BoardCommands, type BoardGhost, type BoardMark, type Cabling, type Pick, type Placing } from './BoardTop';
 
 export type { Cabling, Placing } from './BoardTop';
 export { terminalName } from './BoardTop';
@@ -66,6 +70,9 @@ export interface BoardStageProps {
   /** Tahtada seçili (takılı) parça. */
   readonly selected: string | null;
   readonly onSelect: (partId: string | null) => void;
+  /** Denetle oturumu: sorunlar ve ipucu kademeleri (tahtadaki işaretler). */
+  readonly session: BoardSession | null;
+  readonly onMarks: (on: boolean) => void;
   /** Geri al / yinele (Ctrl+Z, Ctrl+Y; şema tuvali bu kipte yok). */
   readonly onUndo: () => void;
   readonly onRedo: () => void;
@@ -105,6 +112,35 @@ export function BoardStage(props: BoardStageProps) {
   const doc = bench.doc;
   const tableIds = new Set(schematicPlan.table.keys());
   const colorOf = netColors(schematicPlan);
+
+  // Denetle (T3): yeri açılmış sorunlar tahtada kırmızı çerçeve ve numarayla; 4. kademede örnek yerleşim.
+  // İşaretler görünürken parça etiketleri gizlenir (T3: etiket yok, işaretler okunur).
+  const d = tr.tahta.denetle;
+  const session = props.session;
+  const problems = session?.result?.problems ?? [];
+  const located = problems.map((p, i) => ({ p, n: i + 1 })).filter(({ p }) => session !== null && levelOf(session, p) >= 2);
+  const showMarks = session?.marks ?? true;
+  const boardMarks: BoardMark[] = showMarks
+    ? located.flatMap(({ p, n }): BoardMark[] => {
+        if (p.wire) return [{ n, holes: [p.wire.a, p.wire.b], terminals: [], wire: true }];
+        const placed = p.part ? build.parts[p.part] : undefined;
+        if (placed) return [{ n, holes: [...placed.holes, ...(placed.extra ?? [])], terminals: [], wire: false }];
+        if (p.inBox || !p.part) return [];
+        return [{ n, holes: p.pins.flatMap((q) => (q.hole ? [q.hole] : [])), terminals: p.pins.filter((q) => q.hole === null).map((q) => ({ part: p.part!, pin: q.pin })), wire: false }];
+      })
+    : [];
+  const ghosts: BoardGhost[] = showMarks
+    ? located.flatMap(({ p }): BoardGhost[] => {
+        const part = p.part ? doc_part(doc, p.part) : undefined;
+        if (!part || !session || levelOf(session, p) < 4) return [];
+        const at = schematicPlan.onBoard.get(part.id);
+        if (at) {
+          return [{ label: part.label, lead: false, holes: at.holes.map((h, i) => ({ hole: holeLabel(h, plan.cols), tag: terminalName(part, i) })), extra: (at.extraHoles ?? []).map((h) => holeLabel(h, plan.cols)) }];
+        }
+        const leads = schematicPlan.leads.filter((l) => l.partId === part.id);
+        return [{ label: part.label, lead: true, holes: leads.map((l) => ({ hole: holeLabel(l.hole, plan.cols), tag: terminalName(part, l.pin) })), extra: [] }];
+      })
+    : [];
 
   // Masadaki cihazlar Tepeden görünümde düz kart; uçları (şemada bağlı olanlar) kartın üstünde.
   const cards: ReactNode = top
@@ -214,7 +250,7 @@ export function BoardStage(props: BoardStageProps) {
             {terminals}
           </>
         }
-        {...(top ? { unlabelled: tableIds } : {})}
+        {...(top ? { unlabelled: showMarks && located.length > 0 ? new Set(doc.parts.map((p) => p.id)) : tableIds } : {})}
       />
       {top && (
         <BoardTop
@@ -230,6 +266,8 @@ export function BoardStage(props: BoardStageProps) {
           onPick={setPick}
           selected={props.selected}
           onSelect={props.onSelect}
+          marks={boardMarks}
+          ghosts={ghosts}
           showConnected={props.showConnected}
           onBuild={props.onBuild}
           announce={setSaid}
@@ -328,6 +366,18 @@ export function BoardStage(props: BoardStageProps) {
             {tool('rotate', tr.tahta.toolRotate, 'R', selectedPart !== undefined, () => commands.current?.rotate())}
             {tool('trash', tr.tahta.toolDelete, 'Del', selectedPart !== undefined || picked !== null, () => commands.current?.remove())}
           </div>
+          {problems.length > 0 && !props.placing && !props.cabling && (
+            <div className="absolute bottom-[72px] left-1/2 z-20 flex max-w-[calc(100%-32px)] -translate-x-1/2 items-center gap-3 rounded-2xl bg-ink py-1.5 pr-1.5 pl-4 text-small whitespace-nowrap text-on-ink shadow-lg">
+              <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-danger" />
+              <b className="font-semibold">{d.chip(problems.length)}</b>
+              {(showMarks || located.length === 0) && <span className="truncate opacity-80">{located.length === 0 ? d.marksNone : located.every(({ p }) => p.wire) ? d.marksWire : d.marksOn}</span>}
+              {located.length > 0 && (
+                <button type="button" onClick={() => props.onMarks(!showMarks)} className={`shrink-0 rounded-xl bg-on-ink/15 px-3 font-medium hover:bg-on-ink/25 ${touch ? 'h-11' : 'h-8'}`}>
+                  {showMarks ? d.marksHide : d.marksShow}
+                </button>
+              )}
+            </div>
+          )}
           <div role="group" aria-label={tr.toolbar.view} className="absolute right-4 bottom-4 z-20 flex items-center rounded-[10px] border border-line bg-panel p-[3px] shadow-sm">
             {(
               [
@@ -368,80 +418,183 @@ export interface BoardPanelProps {
   readonly cabling: Cabling | null;
   /** Masadaki aletin kablosunu takmaya başla (ya da bırak). */
   readonly onLead: (part: string, pin: number) => void;
+  /** Denetle oturumu (sonuç, ipucu kademeleri, sayılar). */
+  readonly session: BoardSession | null;
+  readonly onCheck: () => void;
+  readonly onHint: (problem: Problem) => void;
 }
 
-/** Sağ panel (T1): başlık, şema (değiştirilemez), parça kutusu, alet kabloları, Denetle. */
+/** Şemadaki işaret: sorunlu parçanın çevresinde kırmızı çerçeve ve numara (dünya koordinatı). */
+function schematicMarks(doc: CircuitDoc, marks: ReadonlyArray<{ readonly part: string; readonly n: number }>): ReactNode {
+  return marks.map(({ part, n }) => {
+    const p = doc.parts.find((q) => q.id === part);
+    if (!p) return null;
+    const b = partBounds(p);
+    const pad = 0.6;
+    const x = (b.x - pad) * GRID;
+    const y = (b.y - pad) * GRID;
+    const w = (b.w + 2 * pad) * GRID;
+    const h = (b.h + 2 * pad) * GRID;
+    return (
+      <g key={`isaret-${part}`} aria-hidden="true">
+        <rect x={x} y={y} width={w} height={h} rx={6} fill="var(--color-danger-soft)" fillOpacity={0.35} stroke="var(--color-danger)" strokeWidth={2.5} />
+        <circle cx={x + w} cy={y} r={11} fill="var(--color-danger)" />
+        <text x={x + w} y={y + 4.5} textAnchor="middle" fontSize={13} fontWeight={600} fill="white">
+          {n}
+        </text>
+      </g>
+    );
+  });
+}
+
+/** Sorun kartı (T3): numara, kademeye göre başlık, açıklama, açılan ipuçları ve sonraki ipucu. */
+function ProblemCard({ doc, problem, index, level, touch, onHint }: { doc: CircuitDoc; problem: Problem; index: number; level: number; touch: boolean; onHint: (p: Problem) => void }) {
+  const d = tr.tahta.denetle;
+  const max = maxLevel(problem);
+  const names = d.levels.slice(0, max);
+  const h = touch ? 'h-11' : 'h-9';
+  return (
+    <li className="flex flex-col gap-2 rounded-xl border border-danger-line bg-panel p-3.5">
+      <div className="flex items-start gap-2.5">
+        <span aria-hidden="true" className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-danger text-[13px] font-semibold text-white">
+          {index + 1}
+        </span>
+        <b className="text-body leading-snug font-semibold">{problemTitle(doc, problem, index, level)}</b>
+      </div>
+      {level >= 3 && <p className="m-0 text-small leading-snug text-ink-2">{problemText(doc, problem)}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <ul className="m-0 flex list-none flex-wrap gap-1 p-0" aria-label={d.levelsLabel(names.slice(0, level).join(', '))}>
+          {names.map((name, k) => (
+            <li key={name} className={`rounded-full border px-2 py-0.5 text-label ${k < level ? 'border-danger-soft bg-danger-soft text-danger-ink' : 'border-line text-muted'}`}>
+              {name}
+            </li>
+          ))}
+        </ul>
+        {level < max ? (
+          <button
+            type="button"
+            onClick={() => onHint(problem)}
+            className={`flex items-center gap-1.5 rounded-[10px] px-3 text-small font-semibold ${h} ${level === 3 ? 'border border-line bg-panel text-ink hover:bg-panel-2' : 'bg-accent-soft text-accent-ink hover:bg-accent-soft/70'}`}
+          >
+            <Icon name={level === 1 ? 'target' : level === 2 ? 'bulb' : 'eye'} className="h-4 w-4" />
+            {d.next[level]}
+          </button>
+        ) : (
+          max === 4 && (
+            <span className="flex items-center gap-1.5 text-label text-muted">
+              <Icon name="eye" className="h-4 w-4" />
+              {d.exampleOn}
+            </span>
+          )
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** Sağ panel (T1, T3): başlık, şema (değiştirilemez), parça kutusu, alet kabloları, Denetle ve sonucu. */
 export function BoardPanel(props: BoardPanelProps) {
-  const { doc, build, schematicPlan, touch, large } = props;
+  const { doc, build, schematicPlan, touch, large, session } = props;
   const setLarge = props.onLarge;
+  const d = tr.tahta.denetle;
   const parts = boardParts(doc, schematicPlan);
   const leads = requiredLeads(schematicPlan);
   const placed = parts.filter((p) => build.parts[p.id] !== undefined).length;
   const leadsPlaced = leads.filter((l) => build.leads.some((b) => b.part === l.part && b.pin === l.pin)).length;
   const colorOf = netColors(schematicPlan);
   const titleId = useId();
+  const result = session?.result ?? null;
+  const problems = result?.problems ?? [];
+  const checks = session?.checks.length ?? 0;
+  const level = (p: Problem) => (session ? levelOf(session, p) : 1);
+  // Yeri açılmış (2. kademe) sorunların şemadaki ve kutudaki işaretleri.
+  const located = problems.map((p, i) => ({ p, n: i + 1 })).filter(({ p }) => level(p) >= 2);
+  const marks = session?.marks ?? true;
+  const schematicMarked = marks ? located.filter(({ p }) => p.part !== null).map(({ p, n }) => ({ part: p.part!, n })) : [];
+  const overlay = schematicMarked.length > 0 ? schematicMarks(doc, schematicMarked) : undefined;
+  const boxMark = new Map(located.filter(({ p }) => p.inBox).map(({ p, n }) => [p.part!, n]));
+  const [boxOpen, setBoxOpen] = useState(false);
+  const showBox = result === null || problems.length === 0 || boxOpen || boxMark.size > 0;
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col" role="region" aria-label={tr.tahta.panelLabel}>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 pb-3">
-        <header className="flex flex-col gap-1">
-          <span className="flex items-center gap-1.5 text-label font-semibold text-accent-ink">
-            <Icon name="board" className="h-4 w-4" />
-            {tr.tahta.panelTag(props.group)}
-          </span>
-          <h2 id={titleId} className="m-0 text-[19px] leading-tight font-semibold">
-            {tr.tahta.title}
-          </h2>
-          <p className="m-0 text-small leading-snug text-ink-2">{tr.tahta.intro}</p>
-        </header>
+  const header =
+    result === null ? (
+      <header className="flex flex-col gap-1">
+        <span className="flex items-center gap-1.5 text-label font-semibold text-accent-ink">
+          <Icon name="board" className="h-4 w-4" />
+          {tr.tahta.panelTag(props.group)}
+        </span>
+        <h2 id={titleId} className="m-0 text-[19px] leading-tight font-semibold">
+          {tr.tahta.title}
+        </h2>
+        <p className="m-0 text-small leading-snug text-ink-2">{tr.tahta.intro}</p>
+      </header>
+    ) : problems.length === 0 ? (
+      <header className="flex flex-col gap-1">
+        <span className="flex items-center gap-1.5 text-label font-semibold text-ok-ink">
+          <Icon name="check" className="h-4 w-4" />
+          {d.tag(checks)}
+        </span>
+        <h2 id={titleId} className="m-0 text-[19px] leading-tight font-semibold">
+          {d.okTitle}
+        </h2>
+        <p className="m-0 text-small leading-snug text-ink-2">{d.okIntro}</p>
+      </header>
+    ) : (
+      <header className="flex flex-col gap-1">
+        <span className="flex items-center gap-1.5 text-label font-semibold text-danger-ink">
+          <Icon name="warning" className="h-4 w-4" />
+          {d.tag(checks)}
+        </span>
+        <h2 id={titleId} className="m-0 text-[19px] leading-tight font-semibold">
+          {d.title(problems.length)}
+        </h2>
+        <p className="m-0 text-small leading-snug text-ink-2">{d.intro(countWord(problems.length))}</p>
+      </header>
+    );
 
-        <section aria-label={tr.tahta.schematicLabel} className="overflow-hidden rounded-xl border border-line bg-panel">
-          <div className="flex items-center justify-between border-b border-line px-3 py-2 text-small">
-            <span>
-              <b className="font-semibold">{tr.tahta.schematic}</b> <span className="text-muted">· {tr.tahta.locked}</span>
-            </span>
-            <button type="button" onClick={() => setLarge(true)} className={`rounded-md px-2 font-medium text-accent-ink hover:bg-accent-soft ${touch ? 'h-11' : 'h-8'}`}>
-              {tr.tahta.enlarge}
-            </button>
-          </div>
-          <div className="h-[230px] bg-paper p-1.5">
-            <CircuitView doc={doc} connectivity={props.connectivity} frame={null} settings={props.settings} label={tr.tahta.schematicLabel} className="block h-full w-full" />
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-1.5">
-          <h3 className="m-0 flex items-center justify-between text-label font-semibold tracking-wide text-muted uppercase">
-            {tr.tahta.parts}
-            <span className="font-mono text-[12px] font-normal tracking-normal normal-case">{tr.tahta.placedCount(placed, parts.length)}</span>
-          </h3>
-          <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-            {parts.map((part) => {
-              const at = build.parts[part.id];
-              const value = partValueText(part);
-              const isPlacing = props.placing?.partId === part.id;
-              const isSelected = props.selected === part.id;
-              return (
-                <li key={part.id}>
-                  <button
-                    type="button"
-                    aria-label={at ? undefined : tr.tahta.placePart(part.label)}
-                    aria-pressed={isPlacing || isSelected}
-                    onPointerDown={(e) => {
-                      if (at || e.button !== 0 || e.pointerType !== 'mouse') return;
-                      // Satırdan sürükleme: imleç tahtanın üstünde bırakılınca takılır (BoardTop).
-                      const start = { x: e.clientX, y: e.clientY };
-                      const onMove = (m: PointerEvent) => {
-                        if (Math.hypot(m.clientX - start.x, m.clientY - start.y) < 6) return;
-                        window.removeEventListener('pointermove', onMove);
-                        props.onPlace(part.id, true);
-                      };
-                      window.addEventListener('pointermove', onMove);
-                      window.addEventListener('pointerup', () => window.removeEventListener('pointermove', onMove), { once: true });
-                    }}
-                    onClick={() => (at ? props.onSelect(part.id) : props.onPlace(part.id, false))}
-                    className={`flex w-full items-center gap-3 rounded-[10px] border px-3 text-left ${touch ? 'min-h-12' : 'min-h-11'} ${isPlacing || isSelected ? 'border-accent bg-accent-soft' : 'border-line bg-panel hover:bg-panel-2'} ${at ? '' : 'cursor-grab'}`}
-                  >
-                  <b className="w-12 shrink-0 text-small font-semibold">{part.label}</b>
+  const box = (
+    <>
+      <section className="flex flex-col gap-1.5">
+        <h3 className="m-0 flex items-center justify-between text-label font-semibold tracking-wide text-muted uppercase">
+          {tr.tahta.parts}
+          <span className="font-mono text-[12px] font-normal tracking-normal normal-case">{tr.tahta.placedCount(placed, parts.length)}</span>
+        </h3>
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {parts.map((part) => {
+            const at = build.parts[part.id];
+            const value = partValueText(part);
+            const isPlacing = props.placing?.partId === part.id;
+            const isSelected = props.selected === part.id;
+            const mark = boxMark.get(part.id);
+            return (
+              <li key={part.id}>
+                <button
+                  type="button"
+                  aria-label={at ? undefined : tr.tahta.placePart(part.label)}
+                  aria-pressed={isPlacing || isSelected}
+                  onPointerDown={(e) => {
+                    if (at || e.button !== 0 || e.pointerType !== 'mouse') return;
+                    // Satırdan sürükleme: imleç tahtanın üstünde bırakılınca takılır (BoardTop).
+                    const start = { x: e.clientX, y: e.clientY };
+                    const onMove = (m: PointerEvent) => {
+                      if (Math.hypot(m.clientX - start.x, m.clientY - start.y) < 6) return;
+                      window.removeEventListener('pointermove', onMove);
+                      props.onPlace(part.id, true);
+                    };
+                    window.addEventListener('pointermove', onMove);
+                    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', onMove), { once: true });
+                  }}
+                  onClick={() => (at ? props.onSelect(part.id) : props.onPlace(part.id, false))}
+                  className={`flex w-full items-center gap-3 rounded-[10px] border px-3 text-left ${touch ? 'min-h-12' : 'min-h-11'} ${isPlacing || isSelected ? 'border-accent bg-accent-soft' : mark !== undefined && marks ? 'border-danger-line bg-danger-soft/40 hover:bg-danger-soft/60' : 'border-line bg-panel hover:bg-panel-2'} ${at ? '' : 'cursor-grab'}`}
+                >
+                  <b className="flex w-12 shrink-0 items-center gap-1.5 text-small font-semibold">
+                    {mark !== undefined && marks && (
+                      <span aria-hidden="true" className="flex h-5 w-5 items-center justify-center rounded-full bg-danger text-[11px] text-white">
+                        {mark}
+                      </span>
+                    )}
+                    {part.label}
+                  </b>
                   <span className="min-w-0 flex-1 truncate text-small text-ink-2">
                     {tr.devices.names[part.type]}
                     {value ? ` ${value}` : ''}
@@ -456,67 +609,112 @@ export function BoardPanel(props: BoardPanelProps) {
                   ) : (
                     <span className="text-small text-muted">{tr.tahta.inBox}</span>
                   )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      <section className="flex flex-col gap-1.5">
+        <h3 className="m-0 flex items-center justify-between text-label font-semibold tracking-wide text-muted uppercase">
+          {tr.tahta.leads}
+          {leads.length > 0 && <span className="font-mono text-[12px] font-normal tracking-normal normal-case">{tr.tahta.placedCount(leadsPlaced, leads.length)}</span>}
+        </h3>
+        {leads.length === 0 ? (
+          <p className="m-0 text-small text-muted">{tr.tahta.leadsNone}</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+            {leads.map((l) => {
+              const part = doc.parts.find((p) => p.id === l.part);
+              if (!part) return null;
+              const done = build.leads.find((b) => b.part === l.part && b.pin === l.pin);
+              const active = props.cabling?.kind === 'lead' && props.cabling.part === l.part && props.cabling.pin === l.pin;
+              const label = `${part.label} ${terminalName(part, l.pin)}`;
+              return (
+                <li key={`${l.part}-${l.pin}`}>
+                  <button
+                    type="button"
+                    aria-pressed={active}
+                    aria-label={done ? tr.tahta.leadSelected(label, done.hole) : tr.tahta.leadChip(label)}
+                    onClick={() => props.onLead(l.part, l.pin)}
+                    className={`flex items-center gap-1.5 rounded-full border px-2.5 font-mono text-[12px] ${touch ? 'h-11' : 'h-8'} ${active ? 'border-accent bg-accent-soft text-accent-ink' : done ? 'border-ok-line bg-ok-soft text-ok-ink hover:bg-ok-soft/70' : 'border-line bg-panel text-ink hover:bg-panel-2'}`}
+                  >
+                    <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full ring-1 ring-line-2" style={{ background: colorOf(l.net) }} />
+                    {label}
+                    {done && (
+                      <>
+                        <Icon name="check" className="h-3.5 w-3.5" />
+                        <span className="opacity-80">{done.hole}</span>
+                      </>
+                    )}
                   </button>
                 </li>
               );
             })}
           </ul>
+        )}
+      </section>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col" role="region" aria-label={tr.tahta.panelLabel}>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 pb-3">
+        {header}
+        <p className="sr-only" aria-live="polite">
+          {checks > 0 ? `${d.tag(checks)}. ${d.announce(problems.length)}` : ''}
+        </p>
+
+        <section aria-label={tr.tahta.schematicLabel} className="overflow-hidden rounded-xl border border-line bg-panel">
+          <div className="flex items-center justify-between border-b border-line px-3 py-2 text-small">
+            <span>
+              <b className="font-semibold">{tr.tahta.schematic}</b> <span className="text-muted">· {tr.tahta.locked}</span>
+            </span>
+            <button type="button" onClick={() => setLarge(true)} className={`rounded-md px-2 font-medium text-accent-ink hover:bg-accent-soft ${touch ? 'h-11' : 'h-8'}`}>
+              {tr.tahta.enlarge}
+            </button>
+          </div>
+          <div className="h-[230px] bg-paper p-1.5">
+            <CircuitView doc={doc} connectivity={props.connectivity} frame={null} settings={props.settings} label={tr.tahta.schematicLabel} className="block h-full w-full" overlay={overlay} />
+          </div>
         </section>
 
-        <section className="flex flex-col gap-1.5">
-          <h3 className="m-0 flex items-center justify-between text-label font-semibold tracking-wide text-muted uppercase">
-            {tr.tahta.leads}
-            {leads.length > 0 && <span className="font-mono text-[12px] font-normal tracking-normal normal-case">{tr.tahta.placedCount(leadsPlaced, leads.length)}</span>}
-          </h3>
-          {leads.length === 0 ? (
-            <p className="m-0 text-small text-muted">{tr.tahta.leadsNone}</p>
-          ) : (
-            <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-              {leads.map((l) => {
-                const part = doc.parts.find((p) => p.id === l.part);
-                if (!part) return null;
-                const done = build.leads.find((b) => b.part === l.part && b.pin === l.pin);
-                const active = props.cabling?.kind === 'lead' && props.cabling.part === l.part && props.cabling.pin === l.pin;
-                const label = `${part.label} ${terminalName(part, l.pin)}`;
-                return (
-                  <li key={`${l.part}-${l.pin}`}>
-                    <button
-                      type="button"
-                      aria-pressed={active}
-                      aria-label={done ? tr.tahta.leadSelected(label, done.hole) : tr.tahta.leadChip(label)}
-                      onClick={() => props.onLead(l.part, l.pin)}
-                      className={`flex items-center gap-1.5 rounded-full border px-2.5 font-mono text-[12px] ${touch ? 'h-11' : 'h-8'} ${active ? 'border-accent bg-accent-soft text-accent-ink' : done ? 'border-ok-line bg-ok-soft text-ok-ink hover:bg-ok-soft/70' : 'border-line bg-panel text-ink hover:bg-panel-2'}`}
-                    >
-                      <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full ring-1 ring-line-2" style={{ background: colorOf(l.net) }} />
-                      {label}
-                      {done && (
-                        <>
-                          <Icon name="check" className="h-3.5 w-3.5" />
-                          <span className="opacity-80">{done.hole}</span>
-                        </>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+        {problems.length > 0 && (
+          <ol className="m-0 flex list-none flex-col gap-2.5 p-0" aria-label={d.title(problems.length)}>
+            {problems.map((p, i) => (
+              <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={level(p)} touch={touch} onHint={props.onHint} />
+            ))}
+          </ol>
+        )}
+
+        {result !== null && problems.length > 0 && (
+          <button
+            type="button"
+            aria-expanded={showBox}
+            onClick={() => setBoxOpen(!showBox)}
+            className={`flex w-full items-center justify-between gap-2 rounded-[10px] border border-line bg-panel px-3 text-left text-small font-medium text-ink-2 hover:bg-panel-2 ${touch ? 'min-h-12' : 'min-h-10'}`}
+          >
+            {d.box(placed, parts.length, leadsPlaced, leads.length)}
+            <Icon name={showBox ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0 text-muted" />
+          </button>
+        )}
+        {showBox && box}
       </div>
       <div className="flex shrink-0 items-center gap-3 border-t border-line px-4 py-3">
-        <button type="button" disabled className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-accent font-semibold text-white disabled:opacity-60 ${touch ? 'h-12' : 'h-11'}`}>
+        <button type="button" onClick={props.onCheck} className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-accent font-semibold text-white hover:bg-accent/90 ${touch ? 'h-12' : 'h-11'}`}>
           <Icon name="check" className="h-[18px] w-[18px]" />
-          {tr.tahta.check}
+          {result === null ? d.check : d.again}
         </button>
-        <p className="m-0 w-1/2 text-label leading-snug text-muted">{tr.tahta.wiresNote(build.wires.length)}</p>
+        <p className="m-0 w-1/2 text-label leading-snug text-muted">{result === null ? tr.tahta.wiresNote(build.wires.length) : d.stats(checks, session?.hints.length ?? 0)}</p>
       </div>
-      {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} onClose={() => setLarge(false)} />}
+      {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} overlay={overlay} onClose={() => setLarge(false)} />}
     </div>
   );
 }
 
 /** Şemanın büyük görünümü (değiştirilemez). */
-function SchematicDialog({ doc, connectivity, settings, onClose }: { doc: CircuitDoc; connectivity: Connectivity; settings: Settings; onClose: () => void }) {
+function SchematicDialog({ doc, connectivity, settings, overlay, onClose }: { doc: CircuitDoc; connectivity: Connectivity; settings: Settings; overlay: ReactNode; onClose: () => void }) {
   const titleId = useId();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -535,7 +733,7 @@ function SchematicDialog({ doc, connectivity, settings, onClose }: { doc: Circui
           </button>
         </div>
         <div className="min-h-0 flex-1 bg-paper p-3">
-          <CircuitView doc={doc} connectivity={connectivity} frame={null} settings={settings} label={tr.tahta.schematicLabel} className="block h-full w-full" />
+          <CircuitView doc={doc} connectivity={connectivity} frame={null} settings={settings} label={tr.tahta.schematicLabel} className="block h-full w-full" overlay={overlay} />
         </div>
       </div>
     </div>

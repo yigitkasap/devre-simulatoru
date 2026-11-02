@@ -2613,7 +2613,7 @@ try {
     check('Tahtada kur: tıklayarak, kutudan sürükleyerek ve delik adı yazarak takılıyor; T1’in kurulumu (R1 2c–6c, Q1 2h-3h-4h, R2 7h–11h, LED1 11g–12g)',
       placed.join(' | ') === '2c 6c | 2h 3h 4h | 7h 11h | 11g 12g' && ((await panel.textContent()) ?? '').includes('4 / 4 takılı'), placed.join(' | '));
     check('Tahtada kur: uzanmayan bacak (direnç 3–8 delik) ve dolu delik kısa uyarıyla reddediliyor; takılınca ekran okuyucuya duyuru',
-      far.includes('uzanmaz') && full.includes('dolu') && ((await bp.locator('[aria-live=polite]').last().textContent()) ?? '').includes('LED1, 11g ve 12g deliklerine takıldı'), `${far.slice(-50)} / ${full.slice(-40)}`);
+      far.includes('uzanmaz') && full.includes('dolu') && ((await bp.locator('[role=region][aria-label^="Breadboard"] [aria-live=polite]').textContent()) ?? '').includes('LED1, 11g ve 12g deliklerine takıldı'), `${far.slice(-50)} / ${full.slice(-40)}`);
     // Esc vazgeçer; seçili parça Del ile kutuya döner, Ctrl+Z geri getirir.
     await panel.getByRole('button', { name: 'R1' }).first().click();
     at = await holeXY('4c'); await bp.mouse.click(at.x, at.y); await bp.waitForTimeout(200);
@@ -2649,6 +2649,67 @@ try {
       lead === '20a' && ((await panel.textContent()) ?? '').includes('1 / 7 takılı') && leadChip === 1, `${lead} ${leadChip}`);
     await bp.getByRole('button', { name: /Tahtada kur’dan çık/ }).click(); await bp.waitForTimeout(400);
     check('Tahtada kur: Çık ile 3B tezgâha dönülüyor, kurulum devrede kalıyor', (await bp.getByRole('region', { name: 'Tahtada kur paneli' }).count()) === 0 && (await holesOf('Q1')) === '2h 3h 4h');
+    await ctx.close();
+  }
+
+  // --- Tahtada kur: Denetle (T3): R1 aynı şeritte, LED1 ters; ipucu kademeleri, işaretler, düzeltince aynı ---
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const bp = await ctx.newPage();
+    bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await bp.goto(URL0, { waitUntil: 'networkidle' });
+    await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
+    await bp.getByRole('button', { name: 'Transistör anahtar: LED kollektörde', exact: true }).click(); await bp.waitForTimeout(300);
+    // T3'teki kurulum: planBreadboard yerleşimi, yalnızca R1 6b–6e ve LED1 ters.
+    const d = await doc(bp);
+    const id = (label) => d.parts.find((p) => p.label === label).id;
+    const rail = (side, sign, col) => `${side} ${sign} rayı (${col}. sütun hizası)`;
+    d.build = {
+      cols: 30,
+      parts: { [id('R1')]: { holes: ['6b', '6e'] }, [id('Q1')]: { holes: ['2h', '3h', '4h'] }, [id('R2')]: { holes: ['7h', '11h'] }, [id('LED1')]: { holes: ['12g', '11g'] } },
+      wires: [['6a', '3j', 'orange'], ['2j', '12j', 'yellow'], ['4j', rail('alt', '−', 4), 'black'], ['7j', rail('alt', '+', 8), 'red'], [rail('üst', '+', 2), rail('alt', '+', 2), 'red'], [rail('üst', '−', 2), rail('alt', '−', 2), 'black']].map(([a, b, color]) => ({ a, b, color })),
+      leads: [['PS1', 0, rail('üst', '+', 4)], ['PS1', 1, rail('üst', '−', 4)], ['FG1', 1, '2a'], ['FG1', 2, rail('üst', '−', 18)], ['OSC1', 0, '2b'], ['OSC1', 1, '12f'], ['OSC1', 2, rail('üst', '−', 29)]].map(([label, pin, hole]) => ({ part: id(label), pin, hole })),
+    };
+    await bp.evaluate((x) => localStorage.setItem('devre-simulatoru:devre', JSON.stringify(x)), d);
+    await bp.reload({ waitUntil: 'networkidle' });
+    await bp.getByRole('button', { name: '3B', exact: true }).first().click();
+    await bp.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }); await bp.waitForTimeout(800);
+    await bp.getByRole('button', { name: 'Tahtada kur', exact: true }).click(); await bp.waitForTimeout(1500);
+    const panel = bp.getByRole('region', { name: 'Tahtada kur paneli' });
+    await panel.getByRole('button', { name: 'Denetle', exact: true }).click(); await bp.waitForTimeout(300);
+    const titles = async () => (await panel.locator('ol > li b').allTextContents()).join(' | ');
+    const first = `${await panel.locator('h2').textContent()} / ${await titles()}`;
+    check('Tahtada kur, Denetle (T3): T3’ün kurulumunda “2 sorun var”; ilk kademede yalnızca sayı (1. sorun, 2. sorun)', first === '2 sorun var / 1. sorun | 2. sorun', first);
+    for (let i = 0; i < 2; i++) await panel.getByRole('button', { name: 'Yerini göster' }).first().click();
+    await bp.waitForTimeout(300);
+    const located = await titles();
+    const schematicMarks = await panel.locator('svg rect[stroke="var(--color-danger)"]').count();
+    const boardMarks = await bp.locator('[role=region][aria-label^="Breadboard"] svg rect[stroke="var(--color-danger)"]').count();
+    check('Tahtada kur, Denetle: “Yerini göster” sorunun parçasını adlandırıyor; tahtada ve şemada iki kırmızı işaret',
+      located === 'R1 çevresinde | LED1 çevresinde' && schematicMarks === 2 && boardMarks === 2, `${located} / şema ${schematicMarks} / tahta ${boardMarks}`);
+    for (let i = 0; i < 2; i++) await panel.getByRole('button', { name: 'Açıklamayı göster' }).first().click();
+    await bp.waitForTimeout(300);
+    const explained = await titles();
+    const text = (await panel.locator('ol > li p').first().textContent()) ?? '';
+    const stats = (await panel.locator('p').last().textContent()) ?? '';
+    check('Tahtada kur, Denetle: açıklamada tür ve yer (R1 · iki bacağı aynı şeritte, 6b ve 6e’de; LED1 · ters takılmış); Denetle 1 · ipucu 4',
+      explained === 'R1 · iki bacağı aynı şeritte | LED1 · ters takılmış' && text.startsWith('R1’in bacakları 6b ve 6e’de.') && stats === 'Denetle 1 · ipucu 4.', `${explained} / ${text.slice(0, 40)} / ${stats}`);
+    await bp.getByRole('button', { name: 'İşaretleri gizle' }).click(); await bp.waitForTimeout(200);
+    const hidden = await bp.locator('[role=region][aria-label^="Breadboard"] svg rect[stroke="var(--color-danger)"]').count();
+    await bp.getByRole('button', { name: 'İşaretleri göster' }).click(); await bp.waitForTimeout(200);
+    // Düzelt: R1 2c–6c, LED1 11g–12g; Yeniden denetle.
+    await panel.getByRole('button', { name: /^Parça kutusu ·/ }).click(); await bp.waitForTimeout(150);
+    for (const [label, a, b] of [['R1', '2c', '6c'], ['LED1', '11g', '12g']]) {
+      await panel.getByRole('button', { name: new RegExp(`^${label}`) }).first().click(); await bp.waitForTimeout(150);
+      await bp.keyboard.press('Delete'); await bp.waitForTimeout(200);
+      await panel.getByRole('button', { name: `${label}: tahtaya tak` }).click(); await bp.waitForTimeout(150);
+      await bp.keyboard.type(a); await bp.keyboard.press('Enter'); await bp.keyboard.type(b); await bp.keyboard.press('Enter'); await bp.waitForTimeout(250);
+    }
+    await panel.getByRole('button', { name: 'Yeniden denetle' }).click(); await bp.waitForTimeout(300);
+    const fixed = `${await panel.locator('h2').textContent()} / ${(await panel.locator('p').last().textContent()) ?? ''}`;
+    check('Tahtada kur, Denetle: İşaretleri gizle tahtadaki işaretleri kaldırıyor; düzeltip Yeniden denetle “Kurulum şemayla aynı” (Denetle 2)',
+      hidden === 0 && fixed === 'Kurulum şemayla aynı / Denetle 2 · ipucu 4.', `${hidden} / ${fixed}`);
     await ctx.close();
   }
 

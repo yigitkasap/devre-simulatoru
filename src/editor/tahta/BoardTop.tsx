@@ -17,6 +17,7 @@ import { WIRE_HEX } from '../../tahta/plan';
 import { fixedHoles, isFixed, legRange, movePlaced, moveLeg, partHoles, placePart, reaches, removePart, rotatePlaced, secondLegHoles, typedHole, type PlaceResult } from '../../tahta/rules';
 import { addWire, plugLead, removeWire, unplugLead, type WireResult } from '../../tahta/wiring';
 import { parseHole } from '../../bench3d/holes';
+import type { PinRef } from '../../tahta/check';
 import { Icon } from '../icons';
 import { partValueText } from '../PartView';
 
@@ -52,6 +53,24 @@ export function Swatch({ color, large = false }: { color: WireColor | null; larg
 /** Tahtada seçili kablo: ara kablo (sırası) ya da alet kablosu. */
 export type Pick = { readonly kind: 'wire'; readonly index: number } | { readonly kind: 'lead'; readonly part: string; readonly pin: number };
 
+/** Denetle işareti (yeri açılmış sorun): çevresi kırmızı çerçeveli delikler ya da takılmamış alet uçları. */
+export interface BoardMark {
+  readonly n: number;
+  readonly holes: readonly string[];
+  readonly terminals: readonly PinRef[];
+  /** Fazladan ara kablo: iki ucu ve arası işaretlenir. */
+  readonly wire: boolean;
+}
+
+/** Örnek yerleşim (4. kademe): planBreadboard'un o parça için yerleşimi, saydam. */
+export interface BoardGhost {
+  readonly label: string;
+  readonly holes: ReadonlyArray<{ readonly hole: string; readonly tag: string }>;
+  readonly extra: readonly string[];
+  /** Alet kabloları (gövde çizilmez). */
+  readonly lead: boolean;
+}
+
 /** Seçim kurulumda hâlâ varsa kendisi, yoksa null. */
 export function pickedIn(build: Build, pick: Pick | null): Pick | null {
   if (!pick) return null;
@@ -73,6 +92,8 @@ export interface BoardTopProps {
   readonly onPick: (pick: Pick | null) => void;
   readonly selected: string | null;
   readonly onSelect: (partId: string | null) => void;
+  readonly marks?: readonly BoardMark[];
+  readonly ghosts?: readonly BoardGhost[];
   readonly showConnected: boolean;
   readonly onBuild: (build: Build) => void;
   /** Ekran okuyucuya duyuru ("R2, 7h ve 11h deliklerine takıldı."). */
@@ -615,6 +636,74 @@ export function BoardTop(props: BoardTopProps) {
       if (h) overlays.push(ring(h, 'var(--color-accent)', 'su', false, 3.5));
       const at = terminalPos(picked.part, picked.pin);
       if (at) overlays.push(<circle key="su1" cx={at.x} cy={at.y} r={13} fill="none" stroke="var(--color-accent)" strokeWidth={3} />);
+    }
+    // Örnek yerleşim (saydam) ve Denetle işaretleri.
+    (props.ghosts ?? []).forEach((g, gi) => {
+      const at = g.holes.flatMap(({ hole, tag }) => {
+        const h = parseHole(hole, cols);
+        return h ? [{ h, tag, c: toScreen(h) }] : [];
+      });
+      if (at.length === 0) return;
+      if (!g.lead && at.length >= 2) {
+        const xs = at.map((q) => q.c.x);
+        const ys = at.map((q) => q.c.y);
+        const pad = r * 0.9;
+        overlays.push(
+          <rect key={`ghost-body-${gi}`} x={Math.min(...xs) - pad} y={Math.min(...ys) - pad} width={Math.max(...xs) - Math.min(...xs) + 2 * pad} height={Math.max(...ys) - Math.min(...ys) + 2 * pad} rx={pad} fill="var(--color-accent)" fillOpacity={0.18} stroke="var(--color-accent)" strokeOpacity={0.7} strokeWidth={1.5} strokeDasharray="5 4" />,
+        );
+      }
+      at.forEach(({ h, tag, c }, i) => {
+        overlays.push(<g key={`ghost-${gi}-${i}`} opacity={0.85}>{ring(h, 'var(--color-accent)', `gr-${gi}-${i}`, true, 2.2)}</g>);
+        overlays.push(
+          <text key={`ghost-t-${gi}-${i}`} x={c.x} y={c.y + r + 13} textAnchor="middle" paintOrder="stroke" stroke="var(--color-panel)" strokeWidth={3} strokeLinejoin="round" className="font-mono text-[11px] font-semibold" style={{ fill: 'var(--color-accent-ink)' }}>
+            {tag}
+          </text>,
+        );
+      });
+      for (const [i, e] of g.extra.entries()) {
+        const h = parseHole(e, cols);
+        if (h) overlays.push(<g key={`ghost-e-${gi}-${i}`} opacity={0.6}>{ring(h, 'var(--color-accent)', `ge-${gi}-${i}`, true, 1.5)}</g>);
+      }
+      const cx = (Math.min(...at.map((q) => q.c.x)) + Math.max(...at.map((q) => q.c.x))) / 2;
+      const cy = Math.min(...at.map((q) => q.c.y));
+      overlays.push(
+        <text key={`ghost-l-${gi}`} x={cx} y={cy - r - 8} textAnchor="middle" paintOrder="stroke" stroke="var(--color-panel)" strokeWidth={4} strokeLinejoin="round" className="text-[12px] font-semibold" style={{ fill: 'var(--color-accent-ink)' }}>
+          {tr.tahta.denetle.ghostLabel(g.label)}
+        </text>,
+      );
+    });
+    const badge = (x: number, y: number, n: number, key: string) => (
+      <g key={key}>
+        <circle cx={x} cy={y} r={11} fill="var(--color-danger)" stroke="var(--color-panel)" strokeWidth={1.5} />
+        <text x={x} y={y + 4.5} textAnchor="middle" fontSize={13} fontWeight={600} fill="white">
+          {n}
+        </text>
+      </g>
+    );
+    for (const m of props.marks ?? []) {
+      const hs = m.holes.map((n) => parseHole(n, cols)).filter((h): h is Hole => h !== null);
+      if (m.wire && hs.length === 2) {
+        const a = toScreen(hs[0]!);
+        const b = toScreen(hs[1]!);
+        overlays.push(<line key={`mk-w-${m.n}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="var(--color-danger)" strokeOpacity={0.45} strokeWidth={Math.max(8, 0.45 * (t?.scale ?? 20))} strokeLinecap="round" />);
+        overlays.push(ring(hs[0]!, 'var(--color-danger)', `mk-a-${m.n}`, false, 2.5), ring(hs[1]!, 'var(--color-danger)', `mk-b-${m.n}`, false, 2.5));
+        overlays.push(badge(a.x + r + 8, a.y - r - 8, m.n, `mk-n-${m.n}`));
+      } else if (hs.length > 0) {
+        const pts = hs.map(toScreen);
+        const pad = r + 5;
+        const x0 = Math.min(...pts.map((q) => q.x)) - pad;
+        const y0 = Math.min(...pts.map((q) => q.y)) - pad;
+        const x1 = Math.max(...pts.map((q) => q.x)) + pad;
+        const y1 = Math.max(...pts.map((q) => q.y)) + pad;
+        overlays.push(<rect key={`mk-${m.n}`} x={x0} y={y0} width={x1 - x0} height={y1 - y0} rx={pad} fill="var(--color-danger-soft)" fillOpacity={0.3} stroke="var(--color-danger)" strokeWidth={2.5} />);
+        overlays.push(badge(x1, y0, m.n, `mk-n-${m.n}`));
+      }
+      m.terminals.forEach((q, i) => {
+        const at = terminalPos(q.part, q.pin);
+        if (!at) return;
+        overlays.push(<circle key={`mk-t-${m.n}-${i}`} cx={at.x} cy={at.y} r={14} fill="none" stroke="var(--color-danger)" strokeWidth={3} />);
+        if (i === 0 && hs.length === 0) overlays.push(badge(at.x + 14, at.y - 14, m.n, `mk-tn-${m.n}`));
+      });
     }
     if (hover && !tip) {
       const list = connectedHoles(hover, cols);

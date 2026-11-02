@@ -13,6 +13,8 @@ import { planFromBuild } from '../tahta/plan';
 import { planBreadboard } from '../bench3d/breadboard';
 import { emptyBuild, type Build } from '../model/build';
 import { BoardPanel, BoardStage, type BoardView, type Cabling, type Placing } from './tahta/BoardMode';
+import { checkBuild, type Problem } from '../tahta/check';
+import { openHint, recordCheck, startSession, type BoardSession } from '../tahta/session';
 import { groupOf } from './ExampleTab';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
@@ -429,6 +431,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [placing, setPlacing] = useState<Placing | null>(null);
   /** Kablo aracı ya da takılmakta olan alet kablosu (panelin çiplerinden de başlar). */
   const [cabling, setCabling] = useState<Cabling | null>(null);
+  /** Tahtada kur oturumu: Denetle denemeleri, ipuçları, süre (yeni belge yüklenince sıfırlanır). */
+  const [boardSession, setBoardSession] = useState<BoardSession | null>(null);
   /** Şemanın breadboard planı: tahtanın boyu, masadaki yerler, alet kabloları (3B ya da Tahtada kur açıkken). */
   const schematicPlan = useMemo(() => (boardMode || viewMode === 'bench' ? planBreadboard(doc) : null), [boardMode, viewMode, doc]);
   const boardBuild = useMemo(() => (boardMode && schematicPlan ? (doc.build ?? emptyBuild(schematicPlan.cols)) : null), [boardMode, schematicPlan, doc.build]);
@@ -534,6 +538,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     sim.stop();
     dispatch({ type: 'select', selection: EMPTY_SELECTION });
     setBoardView('top');
+    setBoardSession((s) => s ?? startSession(Date.now()));
     setBoardMode(true);
   };
   const exitBoard = () => {
@@ -543,6 +548,16 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     setCabling(null);
     setBoardMode(false);
   };
+  /** Denetle: tahtadaki bağlantılar şemayla karşılaştırılır; sonuç ve deneme oturuma yazılır. */
+  const checkBoard = () => {
+    if (!boardBuild || !schematicPlan) return;
+    const result = checkBuild(doc, boardBuild, schematicPlan);
+    setPlacing(null);
+    setCabling(null);
+    setBoardSession((s) => recordCheck(s ?? startSession(Date.now()), result, Date.now()));
+  };
+  const boardHint = (problem: Problem) => setBoardSession((s) => (s ? openHint(s, problem, Date.now()) : s));
+  const boardMarks = (on: boolean) => setBoardSession((s) => (s ? { ...s, marks: on } : s));
   /** Tahtadaki değişiklik: belgenin kurulum alanı (geri al / yinele kapsar). */
   const commitBuild = (next: Build) => dispatch({ type: 'commit', doc: { ...doc, build: next } });
   const boardSelected = boardMode && selection.parts.length === 1 ? selection.parts[0]! : null;
@@ -780,6 +795,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     rawDispatch({ type: 'set-tool', tool: { kind: 'select' } });
     setActiveExample(example);
     setConnect(null);
+    // Tahtada kur yeni belgede baştan başlar.
+    setBoardMode(false);
+    setPlacing(null);
+    setCabling(null);
+    setBoardSession(null);
     // Telefonda örneğin kartı defterin üstünde: şema kutusu ve defter görünür.
     setAddSheet(null);
     setSchematicFull(false);
@@ -1668,6 +1688,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           }}
           selected={boardSelected}
           onSelect={selectOnBoard}
+          session={boardSession}
+          onMarks={boardMarks}
           onUndo={() => {
             setPlacing(null);
             setCabling(null);
@@ -2316,6 +2338,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                     setCabling(null);
                     selectOnBoard(id);
                   }}
+                  session={boardSession}
+                  onCheck={checkBoard}
+                  onHint={boardHint}
                   cabling={cabling}
                   onLead={(part, pin) => {
                     selectOnBoard(null);

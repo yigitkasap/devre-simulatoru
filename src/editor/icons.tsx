@@ -75,7 +75,8 @@ export type IconName =
   | 'wrench'
   | 'flag'
   | 'bulb'
-  | 'multimeter';
+  | 'multimeter'
+  | 'eye';
 
 const PATHS: Record<IconName, ReactNode> = {
   target: (
@@ -354,6 +355,12 @@ const PATHS: Record<IconName, ReactNode> = {
       <rect x="4" y="2.5" width="12" height="15" rx="2" />
       <rect x="6.5" y="5" width="7" height="4" rx=".8" />
       <circle cx="10" cy="13" r="2" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2 10s3-5.5 8-5.5 8 5.5 8 5.5-3 5.5-8 5.5S2 10 2 10z" />
+      <circle cx="10" cy="10" r="2.5" />
     </>
   ),
 };

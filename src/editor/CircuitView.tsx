@@ -23,6 +23,8 @@ export interface CircuitViewProps {
   readonly minWidth?: number;
   /** Kabloların ve parçaların altında çizilen katman (dünya koordinatı). */
   readonly underlay?: ReactNode;
+  /** Parçaların üstünde çizilen katman (dünya koordinatı; ör. Denetle'nin işaretleri). */
+  readonly overlay?: ReactNode;
   /** Vurgulanan (seçili) parçalar: 3B'nin köşesindeki küçük şema. */
   readonly selected?: readonly string[];
   /** Çizimin sınıfı (varsayılan: tuvalle aynı "schematic"). */
@@ -55,7 +57,7 @@ function bounds(doc: CircuitDoc) {
   return { x: x0 - pad, y: y0 - pad, w: x1 - x0 + 2 * pad + 6, h: y1 - y0 + 2 * pad };
 }
 
-export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth, underlay, selected, className = 'schematic block h-full w-full' }: CircuitViewProps) {
+export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth, underlay, overlay, selected, className = 'schematic block h-full w-full' }: CircuitViewProps) {
   const b = bounds(doc);
   return (
     <div className="h-full w-full overflow-auto overscroll-contain">
@@ -96,6 +98,7 @@ export const CircuitView = memo(function CircuitView({ doc, connectivity, frame,
           const live = frame?.live.get(part.id);
           return <PartView key={part.id} part={part} tone={selected?.includes(part.id) ? 'selected' : 'normal'} resistorStyle={settings.resistorStyle} {...(live ? { live } : {})} />;
         })}
+        {overlay}
       </svg>
     </div>
   );
