@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 9, "internalResistance": 0}},
+    {"id": "p2", "type": "pushbutton", "label": "BT2", "x": 8, "y": -10, "rotation": 0, "props": {"contact": "nc"}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 20, "y": -10, "rotation": 0, "props": {"resistance": 470, "powerRating": "0.25"}},
+    {"id": "p4", "type": "led", "label": "LED1", "x": 30, "y": -4, "rotation": 90, "props": {"color": "red"}},
+    {"id": "p5", "type": "scr", "label": "SCR1", "x": 30, "y": 6, "rotation": 90, "props": {"model": "MCR100-6"}},
+    {"id": "p6", "type": "pushbutton", "label": "BT1", "x": 14, "y": 0, "rotation": 90, "props": {"contact": "no"}},
+    {"id": "p7", "type": "resistor", "label": "RG", "x": 21, "y": 8, "rotation": 0, "props": {"resistance": 10000, "powerRating": "0.25"}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": 0, "y": 14, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -10], [4, -10]]},
+    {"id": "w2", "points": [[12, -10], [14, -10]]},
+    {"id": "w3", "points": [[14, -10], [16, -10]]},
+    {"id": "w4", "points": [[14, -10], [14, -4]]},
+    {"id": "w5", "points": [[24, -10], [30, -10], [30, -8]]},
+    {"id": "w6", "points": [[30, 0], [30, 2]]},
+    {"id": "w7", "points": [[14, 4], [14, 8], [17, 8]]},
+    {"id": "w8", "points": [[25, 8], [27, 8]]},
+    {"id": "w9", "points": [[0, 4], [0, 14], [30, 14], [30, 10]]}
+  ]
+}

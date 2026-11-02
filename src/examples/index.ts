@@ -67,11 +67,19 @@ import monostabil555 from './555-monostabil.json';
 import voltmetreYukleme from './voltmetre-yukleme.json';
 import yarimDalga from './yarim-dalga.json';
 import zenerKarakteristigi from './zener-karakteristigi.json';
+import akimKaynagiOhm from './akim-kaynagi-ohm.json';
+import besleme7805 from './7805-besleme.json';
+import lm317Ayarli from './lm317-ayarli.json';
+import optokuplorLed from './optokuplor-led.json';
+import schottky1n4001 from './schottky-1n4001.json';
+import kopruDiyot from './kopru-diyot.json';
+import tristorMandal from './tristor-mandal.json';
 
 /**
  * Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir.
- * "Temel" ve "aletler" dışındaki gruplar Fizik 2. sınıf Elektronik Laboratuvarı föyünün dokuz
- * deneyidir; devreler föydeki parçalar ve değerlerle kuruludur.
+ * "Deney" grupları Fizik 2. sınıf Elektronik Laboratuvarı föyünün dokuz deneyidir; devreler föydeki
+ * parçalar ve değerlerle kuruludur. Grupların sonundaki Schottky, köprü diyot (KBP307) ve tristör
+ * örnekleri deneyin konusunu Parça Dalga 1'in parçalarıyla sürdürür (föyde yoktur).
  */
 export const EXAMPLE_GROUPS = [
   {
@@ -86,24 +94,25 @@ export const EXAMPLE_GROUPS = [
       'rl-devresi',
       'bobin-serbest-gecis',
       'diyot-yonu',
+      'akim-kaynagi-ohm',
     ],
   },
   { id: 'aletler', ids: ['toprak-tuzagi'] },
   { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc', 'role', 'role-transistor', 'role-muhurleme', 'dc-motor', 'motor-jenerator', 'motor-h-koprusu'] },
   { id: 'sensorler', ids: ['potansiyometre', 'ldr-gece-lambasi', 'ntc-termometre', 'lamba-ani-akim'] },
   { id: 'ses', ids: ['hoparlor', 'buzzer-sicaklik', 'sigorta'] },
-  { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici', '555-astabil', '555-monostabil', '555-ses'] },
+  { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici', '555-astabil', '555-monostabil', '555-ses', '7805-besleme', 'lm317-ayarli', 'optokuplor-led'] },
   // Arduino Uno: önceden derlenmiş örnek programlar (src/arduino/sketches).
   { id: 'arduino', ids: ['ard-blink', 'ard-dugme', 'ard-sayac', 'ard-trafik-isigi', 'ard-fade', 'ard-potansiyometre', 'ard-gece-lambasi', 'ard-termometre', 'ard-pwm-filtre', 'ard-melodi', 'ard-role'] },
-  { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
-  { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
+  { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi', 'schottky-1n4001'] },
+  { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac', 'kopru-diyot'] },
   { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
   { id: 'kirpici', ids: ['paralel-kirpici', 'cift-kirpici'] },
   { id: 'fet-karakteristigi', ids: ['jfet-karakteristik'] },
   { id: 'fet-yukseltec', ids: ['fet-yukseltec'] },
   { id: 'bjt-yukseltec', ids: ['bjt-yukseltec'] },
   { id: 'mosfet-yukseltec', ids: ['mosfet-yukseltec'] },
-  { id: 'anahtar', ids: ['bjt-anahtar', 'bjt-anahtar-emetor'] },
+  { id: 'anahtar', ids: ['bjt-anahtar', 'bjt-anahtar-emetor', 'tristor-mandal'] },
   // Proje: baraj su seviyesi uyarısı (ayrı sayfası da var: /baraj).
   { id: 'baraj', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
 ] as const;
@@ -177,6 +186,13 @@ const DATA: Record<ExampleId, unknown> = {
   'ard-pwm-filtre': ardPwmFiltre,
   'ard-melodi': ardMelodi,
   'ard-role': ardRole,
+  'akim-kaynagi-ohm': akimKaynagiOhm,
+  '7805-besleme': besleme7805,
+  'lm317-ayarli': lm317Ayarli,
+  'optokuplor-led': optokuplorLed,
+  'schottky-1n4001': schottky1n4001,
+  'kopru-diyot': kopruDiyot,
+  'tristor-mandal': tristorMandal,
 };
 
 /** Örneğin devresi; JSON bozuksa null (testler bunu yakalar). */

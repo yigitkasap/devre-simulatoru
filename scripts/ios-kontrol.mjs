@@ -2211,13 +2211,13 @@ try {
   dp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await dp.goto(URL0, { waitUntil: 'networkidle' });
   const canvas = await dp.locator('svg.schematic').boundingBox();
-  // v3: sol kütüphane yok; "Bütün parçalara göz at (35)" kategorili ızgarayı açar, tıklanan parça eklenir.
-  await notebook(dp).getByRole('button', { name: /Bütün parçalara göz at \(35\)/ }).click(); await dp.waitForTimeout(200);
+  // v3: sol kütüphane yok; "Bütün parçalara göz at (45)" kategorili ızgarayı açar, tıklanan parça eklenir.
+  await notebook(dp).getByRole('button', { name: /Bütün parçalara göz at \(45\)/ }).click(); await dp.waitForTimeout(200);
   const grid = dp.getByRole('dialog', { name: 'Bütün parçalar' });
   const tiles = await grid.locator('button[data-part]').count();
   await grid.getByRole('button', { name: 'Kondansatör', exact: true }).click(); await dp.waitForTimeout(300);
-  check('masaüstü (v3): kütüphane yok; "Bütün parçalar" 35 parçayı gösteriyor, tıklanan parça ekleniyor, pencere kapanıyor',
-    (await dp.getByPlaceholder(/Parça ara/).count()) === 0 && tiles === 35 && (await doc(dp)).parts.some((p) => p.type === 'capacitor') && (await grid.count()) === 0, `${tiles} parça`);
+  check('masaüstü (v3): kütüphane yok; "Bütün parçalar" 45 parçayı gösteriyor, tıklanan parça ekleniyor, pencere kapanıyor',
+    (await dp.getByPlaceholder(/Parça ara/).count()) === 0 && tiles === 45 && (await doc(dp)).parts.some((p) => p.type === 'capacitor') && (await grid.count()) === 0, `${tiles} parça`);
   await dp.getByRole('button', { name: 'Geri al', exact: true }).click(); await dp.waitForTimeout(150);
   // v3: alt simülasyon çubuğu ve ipucu şeridi yok; tuval alta kadar, görünüm düğmeleri sağ altında.
   const view = await dp.getByRole('group', { name: 'Görünüm' }).boundingBox();
@@ -2506,6 +2506,56 @@ try {
       `${inLibrary} kütüphane; ampermetre ${closedText}; ${text.slice(0, 50)}`,
     );
     await ctx.close();
+  }
+
+  // --- Parça Dalga 1 (Y3): çift yollu anahtar tıklanınca değişir, basmalı düğme basılı tutulur ----------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const openDesktop = async (name) => {
+      const bp = await ctx.newPage();
+      bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await bp.goto(URL0, { waitUntil: 'networkidle' });
+      await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
+      await bp.getByRole('button', { name, exact: true }).click(); await bp.waitForTimeout(400);
+      await bp.getByRole('button', { name: 'Oynat', exact: true }).last().click(); await bp.waitForTimeout(800);
+      return bp;
+    };
+    const ohm = await openDesktop('Akım kaynağıyla Ohm yasası');
+    const meters = async () => (await ohm.locator('svg.schematic text', { hasText: / (V|mA)$/ }).allTextContents()).join(' ');
+    const before = await meters();
+    const s1 = await part(ohm, 'S1');
+    const at = await screen(ohm, s1.x, s1.y);
+    await ohm.mouse.click(at.x, at.y); await ohm.waitForTimeout(900);
+    const after = await meters();
+    // B'de multimetrenin 10 MΩ'u 10 V'ta 1 µA çeker: ampermetre 9,999 mA.
+    check('masaüstü (Parça Dalga 1): çift yollu anahtara tıklayınca B’ye geçiyor; multimetre 4,70 V → 10,0 V, akım yine ≈ 10,0 mA',
+      before.includes('4,701 V') && after.includes('10,00 V') && /(9,99\d|10,00) mA/.test(after) && (await part(ohm, 'S1')).props.to === 'b', `${before} → ${after}`);
+    const scr = await openDesktop('Tristörle mandallı LED');
+    const bt1 = await part(scr, 'BT1');
+    const p1 = await screen(scr, bt1.x, bt1.y);
+    await scr.mouse.move(p1.x, p1.y); await scr.mouse.down(); await scr.waitForTimeout(600);
+    const held = (await notebook(scr).textContent()) ?? '';
+    await scr.mouse.up(); await scr.waitForTimeout(700);
+    const released = (await notebook(scr).textContent()) ?? '';
+    check('masaüstü (Parça Dalga 1): basmalı düğme basılı tutulunca tristör tetikleniyor, bırakınca LED yanık kalıyor (mandal)',
+      held.includes('basılı') && held.includes('iletimde') && released.includes('iletimde') && !released.includes('basılı'), released.replace(/\s+/g, ' ').slice(0, 80));
+    await ctx.close();
+    // Telefonda: Ölç’te parmakla basılı tutulur; kartın "Basılı tut" düğmesi en az 44 px.
+    const { page, cdp } = await phone();
+    await openExample(page, 'Tristörle mandallı LED');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
+    const b = await part(page, 'BT1');
+    const s = await screen(page, b.x, b.y);
+    const t = touch(cdp);
+    await t.start(s.x, s.y); await page.waitForTimeout(600); await t.end(); await page.waitForTimeout(600);
+    const text = (await phoneNotebook(page).textContent()) ?? '';
+    await phoneNotebook(page).getByRole('button', { name: /^BT1 ·/ }).tap(); await page.waitForTimeout(400);
+    const holdBox = await phoneNotebook(page).getByRole('region', { name: /^BT1 ·/ }).getByRole('button', { name: /Basılı tut/ }).boundingBox().catch(() => null);
+    await shot(page, 'ios-dalga1.png');
+    check('telefon (Parça Dalga 1): Ölç’te düğmeye parmakla basılı tutunca tristör tetikleniyor; kartta "Basılı tut" en az 44 px, sayfa kaymıyor',
+      text.includes('iletimde') && holdBox !== null && holdBox.height >= 44 && !(await pageScrolls(page)), `${holdBox ? Math.round(holdBox.height) : 'yok'} px; ${text.replace(/\s+/g, ' ').slice(0, 60)}`);
+    await page.context().close();
   }
 
   // --- Sıkışık masaüstü (1100 px): defter 400 px, parça defterden eklenir (v3) ---------------

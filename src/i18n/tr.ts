@@ -1350,6 +1350,69 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     everyday:
       'Tek ışıklı durum göstergeleri (yeşil-sarı-kırmızı), yakıt ve batarya göstergelerinin en yüksek seviyeyi gösteren mantığı, asansörlerin kat göstergeleri ve öncelikli alarm panelleri aynı mantık kapılarıyla kurulur.',
   },
+  'akim-kaynagi-ohm': {
+    title: 'Akım kaynağıyla Ohm yasası',
+    description:
+      '10 mA’lik ideal akım kaynağı, çift yollu anahtar S1 üzerinden 470 Ω’luk R1’i (A konumu) ya da 1 kΩ’luk R2’yi (B konumu) besliyor. Ampermetre alt hattaki akımı, multimetre (V ⎓ kipinde) kaynağın uçları arasındaki gerilimi ölçüyor. Oynat’a bas, sonra S1’e tıklayıp konumunu değiştir.',
+    purpose:
+      'Akım kaynağı, bağlandığı direnç ne olursa olsun aynı akımı verir; uçlarındaki gerilimi dirence göre kendisi ayarlar: V = I · R. A konumunda multimetre 4,70 V okur (10 mA · 470 Ω). S1’i B’ye al: direnç iki katından biraz fazla büyür, gerilim 10,0 V’a çıkar; ampermetre yine 10,0 mA gösterir. Pil bunun tersidir: gerilimini sabit tutar, akımı direnç belirler. Kaynağın akımını 5 mA yap: aynı 470 Ω’da gerilim yarıya, 2,35 V’a iner.',
+    everyday:
+      'LED sürücüleri LED’den ayarlanan sabit bir akım geçirir: LED ısınıp ileri gerilimi değişse de parlaklığı aynı kalır. Pil şarj cihazları şarjın ilk evresinde sabit akım verir. Laboratuvar güç kaynaklarının CC (sabit akım) kipi ve PT100 gibi sıcaklık sensörlerine ölçüm akımı veren devreler de akım kaynağıdır.',
+  },
+  '7805-besleme': {
+    title: '7805 ile 5 V besleme',
+    description:
+      'İdeal 9 V’luk pil, 7805 gerilim regülatörünün IN ucuna bağlı; GND ucu alt hatta. Girişte 0,33 µF’lık, çıkışta 0,1 µF’lık kondansatör var (ST veri sayfasındaki uygulama devresi). Çıkışa 100 Ω’luk (0,5 W) yük ve voltmetre bağlı. Pilin gerilimini ve yükü değiştirip çıkışı izle.',
+    purpose:
+      'Değişen ya da yüksek bir gerilimden sabit 5 V elde eder. 7805 girişteki fazla gerilimi kendi üstünde tutar: voltmetre 5,00 V okur, yükten 50,0 mA geçer; regülatörde ≈ 0,24 W ısı açığa çıkar (giriş − çıkış farkı 4 V ile 50 mA’in çarpımı ve 9 V’ta 4,2 mA’lik bekleme akımı). Yükü 1 kΩ yap: akım 5,0 mA’e iner, çıkış yine 5,00 V’ta kalır. Bunun için giriş, çıkıştan en az bırakma gerilimi kadar yüksek olmalıdır (veri sayfasının eğrisinden 50 mA’de ≈ 1,5 V). Pili 6 V yap: fark yetmez, çıkış 4,49 V’a düşer, sembolün çerçevesi turuncu olur ve kartta uyarı çıkar.',
+    everyday:
+      'Mikrodenetleyici kartlarının, sensörlerin ve TTL mantık devrelerinin klasik 5 V beslemesidir. Fazla gerilimi ısıya çevirdiği için büyük akımda soğutucuya takılır; telefon şarj aletleri gibi verimin önemli olduğu yerlerde yerini anahtarlamalı regülatörler almıştır.',
+  },
+  'lm317-ayarli': {
+    title: 'LM317 ile ayarlı çıkış',
+    description:
+      'İdeal 12 V’luk pil LM317’nin IN ucuna bağlı. OUT ile ADJ arasında R1 = 240 Ω, ADJ ile alt hat arasında R2 = 720 Ω var; çıkışta 100 Ω’luk (0,5 W) yük ve voltmetre. R2’nin değerini değiştirip çıkışı izle.',
+    purpose:
+      'İki dirençle istenen çıkış gerilimini ayarlar. LM317, OUT ile ADJ arasında 1,25 V’luk başvuru gerilimini tutar: R1’den 1,25 V / 240 Ω ≈ 5,2 mA geçer ve aynı akım R2’den de geçer. Böylece V_{çıkış} = 1,25 V · (1 + R_{2} / R_{1}) = 1,25 V · (1 + 720 Ω / 240 Ω) = 5,00 V. Voltmetre 5,04 V okur: ADJ ucundan R2’ye ≈ 50 µA daha akar ve 720 Ω’da 0,04 V ekler. Yükten 50,4 mA geçer; LM317’de ≈ 0,39 W ısı açığa çıkar. R2’yi 480 Ω yap: çıkış 3,77 V’a iner (formülle 3,75 V).',
+    everyday:
+      'Laboratuvar güç kaynaklarında, ayarlı adaptörlerde ve hazır regülatörü bulunmayan gerilimler için kullanılır. R2 yerine bir potansiyometre konunca çıkış 1,25 V’tan girişin biraz altına kadar ayarlanabilir.',
+  },
+  'optokuplor-led': {
+    title: 'Optokuplörle yalıtılmış LED',
+    description:
+      'Sol devrede 5 V’luk pil, BT1 düğmesi ve 390 Ω üzerinden PC817’nin içindeki LED’i (1 A, 2 K uçları) besliyor. Sağ devrede ayrı bir 9 V’luk pil, 1 kΩ ve kırmızı LED1 üzerinden PC817’nin çıkış transistörüne (4 C, 3 E) bağlı. İki devre arasında hiç kablo yok (Mesajlar’da sağ devrenin kendi sıfır noktası olduğu yazar). Oynat’a bas, BT1’e basılı tut.',
+    purpose:
+      'Bir devreden ötekine elektriksel bağlantı olmadan sinyal taşır: bağlantı ışıkladır. Düğmeye basılıyken içteki LED’den 9,7 mA geçer (üstünde 1,22 V düşer). Işık çıkış transistörünü iletime sokar; transistör doyuma girer (C ile E arasında 0,13 V kalır) ve LED1’den 7,1 mA geçer: bu akımı artık sağ devredeki 1 kΩ sınırlar. Düğmeyi bırakınca ikisi de söner. R1’i 3,3 kΩ yap: LED akımı 1,18 mA’e iner, transistör doyumdan çıkar ve çıkış akımını akım aktarma oranı belirler: I_{C} = CTR · I_{F} ≈ %300 · 1,18 mA ≈ 3,55 mA; LED1 sönük yanar.',
+    everyday:
+      'Şebekeye bağlı cihazlarda alçak gerilimli kontrol devresini şebeke tarafından ayırır: telefon şarj aletleri ve bilgisayar güç kaynakları çıkış geriliminin bilgisini optokuplörle şebeke tarafına geri gönderir. Endüstriyel kontrol cihazlarının (PLC) girişleri, röle ve motor sürücü kartları da optokuplörle korunur.',
+  },
+  'schottky-1n4001': {
+    title: 'Schottky ile 1N4001’in ileri gerilimi',
+    description:
+      'İdeal 5 V’luk pil iki kolu besliyor: solda 470 Ω ve 1N5819 Schottky diyot, sağda 470 Ω ve 1N4001 (silisyum pn diyot). Her diyodun gerilimini ayrı bir voltmetre ölçüyor.',
+    purpose:
+      'İki diyot türünün ileri gerilimini karşılaştırır. İki koldan da ≈ 10 mA geçer; 1N4001’de 0,60 V, 1N5819’da yalnızca 0,18 V düşer. Schottky diyotta eklem metal ile yarı iletken arasındadır: engel daha alçaktır, aynı akım daha küçük gerilimle geçer. Diyotta harcanan güç de bu yüzden küçüktür: 5,6 mW’a karşı 1,8 mW. Bedeli ters yöndeki sızıntıdır: iki diyodu da ters çevir (F); 1N5819’dan ters yönde 0,88 mA geçer (veri sayfasına göre 40 V’ta en çok 1 mA), 1N4001’den yalnızca 0,1 µA.',
+    everyday:
+      'Schottky diyotlar düşük ileri gerilimin verim demek olduğu yerlerde kullanılır: anahtarlamalı güç kaynaklarının çıkışında, güneş panellerinde (akünün geceleri panele geri boşalmasını önleyen diyot) ve pilin ters takılmasına karşı koruma devrelerinde. Hızlı açılıp kapandıkları için yüksek frekanslı doğrultmaçlarda da tercih edilirler.',
+  },
+  'kopru-diyot': {
+    title: 'Köprü diyot (KBP307) ile tam dalga doğrultmaç',
+    description:
+      'Topraktan yalıtılmış bir AC kaynak (50 Hz, 10 V tepe; bir transformatörün ikincil sargısı gibi) KBP307 köprü diyodunun ~ uçlarına bağlı; dört diyot tek paketin içinde. + ve − uçları 1 kΩ’luk yükü besliyor; S1 kapatılınca yüke 22 µF’lık filtre kondansatörü bağlanır. Voltmetre yükün DC (ortalama) gerilimini, osiloskobun A kanalı yükün gerilimini gösteriyor; toprak köprünün − ucunda.',
+    purpose:
+      'İki yarım dalgayı da aynı yöne çevirir: her yarıda köprünün karşılıklı iki diyodu iletir, yükün akımı hep + uçtan girer. Filtresiz tepe 8,74 V: kaynağın tepesinden ≈ 1,26 V, iletimdeki iki diyotta düşer. Voltmetre 5,24 V okur. S1’i kapat: kondansatör tepelerde dolup aralarda yükü besler; çıkış 6,32 V ile 8,72 V arasında 100 Hz’le dalgalanır, voltmetre 7,59 V okur. Aynı 22 µF ve 1 kΩ’la yarım dalga doğrultmaçta dalgalanma ≈ 4,3 V’tur: tam dalgada kondansatör iki kat sık dolduğu için dalgalanma yaklaşık yarıya iner. Kondansatörü 470 µF yap: dalgalanma 0,14 V’a iner.',
+    everyday:
+      'Adaptörlerde, akü şarj cihazlarında ve şebeke beslemeli neredeyse her cihazın girişinde dört diyot tek bir köprü paketindedir: KBP gibi düz paketler devre kartına takılır, büyük akımlı metal gövdeli köprüler soğutucuya vidalanır.',
+  },
+  'tristor-mandal': {
+    title: 'Tristörle mandallı LED',
+    description:
+      '9 V’luk pil; normalde kapalı BT2 (Durdur) düğmesi, 470 Ω ve kırmızı LED üzerinden MCR100-6 tristörünün anotunu besliyor, katot alt hatta. Normalde açık BT1 (Başlat) düğmesi 10 kΩ’luk RG üzerinden kapıya akım verir. Oynat’a bas; BT1’e bir kez basıp bırak, sonra BT2’ye bas.',
+    purpose:
+      'Bir kez tetiklenince kendi kendini tutan (mandallanan) bir anahtardır. BT1’e basınca kapıdan 0,83 mA geçer (tetikleme akımı I_{GT} ≈ 40 µA’den çok büyük): tristör iletime geçer, LED’den 13,6 mA geçer ve anot ile katot arasında 0,82 V kalır. BT1’i bırakınca kapı akımı kesilir ama LED yanmaya devam eder: anot akımı tutma akımının (I_{H} ≈ 0,5 mA) üstünde kaldıkça tristör iletir. Söndürmenin yolu anot akımını kesmektir: BT2’ye basınca akım sıfıra iner ve tristör keser; BT2’yi bırakınca LED, BT1’e yeniden basılana kadar sönük kalır. Transistör anahtar (Deney 9) ise ancak tabanına akım verildiği sürece iletir.',
+    everyday:
+      'Hırsız alarmları (bir kez tetiklenince sensör eski hâline dönse de çalmaya devam eder) ve güç kaynaklarının aşırı gerilim koruması (crowbar) tristörle kurulur; ışık ayarlı dimmerler aynı aileden triyak kullanır. Büyük tristörler motor sürücülerinde ve yüksek gerilimli doğru akım iletim hatlarında binlerce amperi anahtarlar.',
+  },
 };
 
 export const tr = {
@@ -1849,6 +1912,13 @@ export const tr = {
       'bjt-anahtar-emetor': 'LED neden sönük yanıyor?',
       'baraj-cubuk': 'Hazneyi doldur, ışıkların sırayla yanmasını izle',
       'baraj-tek-isik': 'Hazneyi doldur, yalnızca en üst ışığın yanmasını izle',
+      'akim-kaynagi-ohm': 'S1’i B’ye al: akım aynı, gerilim neden değişiyor?',
+      '7805-besleme': 'Pili 6 V yap, çıkışın 5 V’u bırakmasını izle',
+      'lm317-ayarli': 'R2’yi değiştir, çıkışı formülle karşılaştır',
+      'optokuplor-led': 'BT1’e basılı tut: kablosuz bağlı LED’in yanmasını izle',
+      'schottky-1n4001': 'İki diyodun ileri gerilimini karşılaştır',
+      'kopru-diyot': 'S1’i kapat, dalgalanmanın küçülmesini izle',
+      'tristor-mandal': 'BT1’e bas ve bırak: LED neden yanık kalıyor?',
     } satisfies Record<ExampleId, string>,
     badge: 'Örnek',
     purpose: 'Ne işe yarar?',

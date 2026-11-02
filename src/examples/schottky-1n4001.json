@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 0, "rotation": 90, "props": {"voltage": 5, "internalResistance": 0}},
+    {"id": "p2", "type": "resistor", "label": "R1", "x": 16, "y": -6, "rotation": 90, "props": {"resistance": 470, "powerRating": "0.25"}},
+    {"id": "p3", "type": "schottky", "label": "D1", "x": 16, "y": 2, "rotation": 90, "props": {"model": "1N5819"}},
+    {"id": "p4", "type": "voltmeter", "label": "V1", "x": 24, "y": 2, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000, "ideal": false}},
+    {"id": "p5", "type": "resistor", "label": "R2", "x": 40, "y": -6, "rotation": 90, "props": {"resistance": 470, "powerRating": "0.25"}},
+    {"id": "p6", "type": "diode", "label": "D2", "x": 40, "y": 2, "rotation": 90, "props": {"model": "1N4001"}},
+    {"id": "p7", "type": "voltmeter", "label": "V2", "x": 48, "y": 2, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000, "ideal": false}},
+    {"id": "p8", "type": "ground", "label": "GND1", "x": 0, "y": 10, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -10], [16, -10]]},
+    {"id": "w2", "points": [[16, -10], [40, -10]]},
+    {"id": "w3", "points": [[16, -2], [24, -2]]},
+    {"id": "w4", "points": [[40, -2], [48, -2]]},
+    {"id": "w5", "points": [[0, 4], [0, 10], [16, 10]]},
+    {"id": "w6", "points": [[16, 6], [16, 10]]},
+    {"id": "w7", "points": [[16, 10], [24, 10]]},
+    {"id": "w8", "points": [[24, 6], [24, 10]]},
+    {"id": "w9", "points": [[24, 10], [40, 10]]},
+    {"id": "w10", "points": [[40, 6], [40, 10]]},
+    {"id": "w11", "points": [[40, 10], [48, 10], [48, 6]]}
+  ]
+}
