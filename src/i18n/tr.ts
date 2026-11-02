@@ -2285,6 +2285,7 @@ export const tr = {
       start: 'Başlangıçta tahtada',
       starts: { empty: 'Boş tahta', rails: 'Güç rayları bağlı', parts: 'Seçili parçalar takılı' },
       partsNote: 'Seçilen parçalar (ve güç rayları) tahtada hazır gelir; öğrenci kalanları takar.',
+      partsSchematic: 'Şema: hazır takılı gelecek parçalar vurgulu',
       checks: 'Denetle hakkı',
       checksOptions: { unlimited: 'Sınırsız', three: '3 kez', submit: 'Teslimde' },
       maxHint: 'İpuçları en çok',

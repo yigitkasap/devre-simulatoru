@@ -1,17 +1,22 @@
 // Görev oluştur → Tahtada kur (T6): başlangıç tahtası (boş, güç rayları bağlı, seçili parçalar takılı),
 // Denetle hakkı (sınırsız, 3 kez, teslimde), ipucu sınırı, Bağlı delikleri göster, Oynat izni. Tahtanın
 // boyu devreye göre seçilir (planBreadboard). Seçili parçalar çiplerle seçilir (değiştirilebilir parçalar
-// gibi).
+// gibi); seçilenler penceredeki şemada vurgulu.
 
+import { useMemo } from 'react';
 import type { BreadboardPlan } from '../../bench3d/breadboard';
 import { tr } from '../../i18n/tr';
 import type { BoardTask } from '../../model/task';
+import { buildConnectivity } from '../../model/connectivity';
 import type { CircuitDoc } from '../../model/types';
+import { CircuitView } from '../CircuitView';
 import { Icon } from '../icons';
+import type { Settings } from '../settings';
 import { boardParts } from '../tahta/BoardMode';
 
-export function BoardFields({ doc, plan, value, onChange, touch }: { doc: CircuitDoc; plan: BreadboardPlan; value: BoardTask; onChange: (next: BoardTask) => void; touch: boolean }) {
+export function BoardFields({ doc, plan, value, onChange, touch, settings }: { doc: CircuitDoc; plan: BreadboardPlan; value: BoardTask; onChange: (next: BoardTask) => void; touch: boolean; settings: Pick<Settings, 'resistorStyle' | 'wireScale'> }) {
   const t = tr.tahta.gorev;
+  const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const set = (patch: Partial<BoardTask>) => onChange({ ...value, ...patch });
   const h = touch ? 'h-11' : 'h-9';
   const segmented = <K extends string | number>(label: string, options: readonly (readonly [K, string])[], current: K, pick: (k: K) => void) => (
@@ -66,6 +71,9 @@ export function BoardFields({ doc, plan, value, onChange, touch }: { doc: Circui
                   </button>
                 );
               })}
+            </div>
+            <div className="h-[200px] overflow-hidden rounded-lg border border-line bg-paper p-1.5">
+              <CircuitView doc={doc} connectivity={connectivity} frame={null} settings={settings} label={t.partsSchematic} selected={value.parts} className="block h-full w-full" />
             </div>
           </div>
         )}

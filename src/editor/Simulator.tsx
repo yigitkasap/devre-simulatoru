@@ -1987,6 +1987,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         traces={analysis.traces}
         draft={taskDraft}
         onDraft={setTaskDraft}
+        settings={settings}
         onClose={() => setTaskDialog(false)}
         notify={notify}
         onPickPlace={(row, which) => {

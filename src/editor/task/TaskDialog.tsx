@@ -18,6 +18,7 @@ import { parseTheory } from '../analysis/table';
 import type { NetIndex } from '../analysis/traces';
 import { newId } from '../analysis/useAnalysis';
 import { Icon } from '../icons';
+import { DEFAULT_SETTINGS, type Settings } from '../settings';
 import { plainText } from '../Rich';
 import { useTouchUi } from '../touchUi';
 import { firstFault } from './faultRows';
@@ -37,6 +38,8 @@ export interface TaskDialogProps {
   readonly notify: (message: string) => void;
   /** Arıza bulma: satırın yerini şemadan seç (pencere kapanır, seçince taslakla geri açılır). */
   readonly onPickPlace?: (row: number, which: 'at' | 'to') => void;
+  /** Şema çizim ayarları (Tahtada kur: seçili parçaların şeması). */
+  readonly settings?: Pick<Settings, 'resistorStyle' | 'wireScale'>;
 }
 
 /** Görev adından dosya adı: küçük harf, Türkçe harfler sadeleştirilmiş, tire ile. */
@@ -52,7 +55,7 @@ export function slug(text: string): string {
   );
 }
 
-export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, notify, onPickPlace }: TaskDialogProps) {
+export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, notify, onPickPlace, settings = DEFAULT_SETTINGS }: TaskDialogProps) {
   const t = tr.task.dialog;
   const titleId = useId();
   const touch = useTouchUi();
@@ -143,7 +146,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
             <input ref={first} value={task.name} onChange={(e) => set({ name: e.target.value })} className={`${field} font-normal`} />
           </label>
           {mode === 'board' ? (
-            <BoardFields doc={doc} plan={plan} value={board} onChange={setBoard} touch={touch} />
+            <BoardFields doc={doc} plan={plan} value={board} onChange={setBoard} touch={touch} settings={settings} />
           ) : mode === 'fault' ? (
             <FaultFields doc={doc} idx={idx} value={fault} onChange={setFault} touch={touch} {...(onPickPlace ? { onPick: onPickPlace } : {})} />
           ) : (
