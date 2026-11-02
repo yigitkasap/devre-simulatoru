@@ -2439,7 +2439,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                 <span className="pl-[22px] text-label">{tr.fault.analysisNote}</span>
               </p>
             ) : (
-              (task || readOnly) && (
+              // Görev çipi şema tuvaline ait; Tahtada kur'da kendi üst çubuğu var.
+              (task || readOnly) &&
+              !boardMode && (
                 <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft/95 px-3 py-1.5 text-small font-semibold text-accent-ink shadow-sm">
                   <Icon name={task ? 'target' : 'lock'} className="h-4 w-4" />
                   {task ? tr.task.mode(editableLabels) : tr.embed.mode}

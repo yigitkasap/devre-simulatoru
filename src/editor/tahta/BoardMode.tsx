@@ -847,13 +847,15 @@ export function BoardPanel(props: BoardPanelProps) {
         )}
         {showBox && box}
       </div>
-      <div className="flex shrink-0 items-center gap-3 border-t border-line px-4 py-3">
+      {/* Görevde (Teslim et varken) düğmeler bir satırda, not altta; öbür durumda düğme ve not yan yana (T1). */}
+      <div className={`flex shrink-0 gap-3 border-t border-line px-4 py-3 ${props.onSubmit ? 'flex-col' : 'items-center'}`}>
+        <div className={`flex items-center gap-2 ${props.onSubmit ? '' : 'flex-1'}`}>
         {!props.submitOnly && (
           <button
             type="button"
             onClick={props.onCheck}
             disabled={props.checksLeft === 0}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-accent font-semibold text-white hover:bg-accent/90 disabled:opacity-50 ${touch ? 'h-12' : 'h-11'}`}
+            className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[10px] bg-accent font-semibold whitespace-nowrap text-white hover:bg-accent/90 disabled:opacity-50 ${touch ? 'h-12' : 'h-11'}`}
           >
             <Icon name="check" className="h-[18px] w-[18px]" />
             {checks === 0 ? d.check : d.again}
@@ -863,13 +865,14 @@ export function BoardPanel(props: BoardPanelProps) {
           <button
             type="button"
             onClick={props.onSubmit}
-            className={`flex items-center justify-center gap-2 rounded-[10px] px-4 font-semibold ${props.submitOnly ? 'flex-1 bg-accent text-white hover:bg-accent/90' : 'border border-line bg-panel text-ink hover:bg-panel-2'} ${touch ? 'h-12' : 'h-11'}`}
+            className={`flex items-center justify-center gap-2 rounded-[10px] px-4 font-semibold whitespace-nowrap ${props.submitOnly ? 'flex-1 bg-accent text-white hover:bg-accent/90' : 'shrink-0 border border-line bg-panel text-ink hover:bg-panel-2'} ${touch ? 'h-12' : 'h-11'}`}
           >
             <Icon name="upload" className="h-[18px] w-[18px]" />
             {tr.tahta.gorev.submit}
           </button>
         )}
-        <p className="m-0 w-1/2 text-label leading-snug text-muted">
+        </div>
+        <p className={`m-0 text-label leading-snug text-muted ${props.onSubmit ? '' : 'w-1/2'}`}>
           {props.submitOnly
             ? tr.tahta.gorev.submitOnly
             : props.checksLeft !== undefined && props.checksLeft !== null

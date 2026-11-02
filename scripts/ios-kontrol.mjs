@@ -2768,6 +2768,11 @@ try {
     const text = (await panel.textContent()) ?? '';
     const locked = (await sp.getByRole('button', { name: /Tahtada kur’dan çık/ }).count()) === 0 && (await sp.getByRole('switch', { name: 'Bağlı delikleri göster' }).count()) === 0;
     const fromTask = await schematicControls(sp);
+    // Görevde alt şerit: Denetle ve Teslim et tek satır, kırpılmıyor; şema tuvalinin görev çipi yok.
+    const footer = await panel.evaluate((el) => [...el.querySelectorAll('button')].filter((b) => /^(Denetle|Teslim et)$/.test((b.textContent ?? '').trim())).map((b) => [b.scrollWidth <= b.clientWidth + 1, b.getBoundingClientRect().height <= 48])).catch(() => []);
+    const chip = await sp.getByText(/^Görev kipi/).count();
+    check('Tahtada kur (T6, öğrenci, masaüstü): alttaki Denetle ve Teslim et tek satırda, kırpılmadan; “Görev kipi” çipi Tahtada kur’un arkasında görünmüyor',
+      footer.length === 2 && footer.flat().every(Boolean) && chip === 0, `${JSON.stringify(footer)} / çip ${chip}`);
     check('Tahtada kur: Örnekler’den ve görev bağlantısından girince şemanın yakınlaştırma grubu (Devreyi ekrana sığdır, ikinci Uzaklaştır) görünmüyor',
       fromExample.join(',') === '0,1' && fromTask.join(',') === '0,1', `${fromExample} / ${fromTask}`);
     await sp.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await sp.waitForTimeout(300);
