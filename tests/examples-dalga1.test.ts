@@ -7,6 +7,7 @@ import { buildConnectivity } from '../src/model/connectivity';
 import { flipParts, updatePart } from '../src/model/docOps';
 import type { CircuitDoc } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
+import { schottkyLeakage } from '../src/sim/devices/schottky';
 import type { Netlist } from '../src/sim/netlist';
 
 function load(id: ExampleId): CircuitDoc {
@@ -112,7 +113,7 @@ describe('Parça Dalga 1 örnekleri: metinlerdeki sayılar', { timeout: 60_000 }
     expect(dim.output * 1e3).toBeCloseTo(3.55, 2);
   });
 
-  it('Schottky: ≈ 10 mA’de 0,18 V ve 1N4001’de 0,60 V; güç 1,8 / 5,6 mW; ters yönde 0,88 mA ve 0,1 µA', () => {
+  it('Schottky: ≈ 10 mA’de 0,18 V ve 1N4001’de 0,60 V; güç 1,8 / 5,6 mW; 5 V ters yönde 45 µA ve 0,1 µA (≈ 450 kat); eğride 20 V ≈ 0,13 mA, 39 V ≈ 0,29 mA', () => {
     const doc = load('schottky-1n4001');
     const sim = run(doc, 0.01);
     const d1 = sim.measure(idOf(doc, 'D1'))!;
@@ -123,8 +124,14 @@ describe('Parça Dalga 1 örnekleri: metinlerdeki sayılar', { timeout: 60_000 }
     expect(d1.power * 1e3).toBeCloseTo(1.8, 1);
     expect(d2.power * 1e3).toBeCloseTo(5.6, 1);
     const reverse = run(flipParts(doc, new Set([idOf(doc, 'D1'), idOf(doc, 'D2')])), 0.01);
-    expect(-reverse.measure(idOf(doc, 'D1'))!.current * 1e3).toBeCloseTo(0.88, 2);
-    expect(-reverse.measure(idOf(doc, 'D2'))!.current * 1e6).toBeCloseTo(0.1, 2);
+    const schottky = -reverse.measure(idOf(doc, 'D1'))!.current;
+    const silicon = -reverse.measure(idOf(doc, 'D2'))!.current;
+    expect(schottky * 1e6).toBeCloseTo(45, 0);
+    expect(silicon * 1e6).toBeCloseTo(0.1, 2);
+    expect(schottky / silicon / 450).toBeCloseTo(1, 1);
+    // Metindeki eğri değerleri (onsemi Şekil 9, 25 °C).
+    expect(schottkyLeakage(20).l * 1e3).toBeCloseTo(0.13, 2);
+    expect(schottkyLeakage(39).l * 1e3).toBeCloseTo(0.29, 2);
   });
 
   it('Köprü diyot: filtresiz tepe 8,74 V, DC 5,24 V; 22 µF’ta 6,32–8,72 V (DC 7,59 V); yarım dalgada ≈ 4,3 V; 470 µF’ta 0,14 V', () => {

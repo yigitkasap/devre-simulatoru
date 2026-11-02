@@ -20,8 +20,10 @@ export class SeriesJunction {
     readonly cathode: number,
     /** Eklem kapasitesi (yoksa eklem anlık davranır). */
     charge: ChargeParams | null = null,
+    /** Eklemin kendisi; verilmezse Shockley eklemi (ters akımı farklı olan Schottky kendi eklemini verir). */
+    junction: Junction = new Junction(saturationCurrent, emission, charge),
   ) {
-    this.junction = new Junction(saturationCurrent, emission, charge);
+    this.junction = junction;
   }
 
   stampStatic(sys: MnaSystem): void {

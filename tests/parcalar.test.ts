@@ -8,6 +8,7 @@ import { planBreadboard } from '../src/bench3d/breadboard';
 import { CATALOG, CATEGORIES } from '../src/model/catalog';
 import { CircuitSimulator } from '../src/sim';
 import { LM317 } from '../src/sim/devices/regulator';
+import { SCHOTTKY_REVERSE, SchottkyJunction } from '../src/sim/devices/schottky';
 import { circuit } from './helpers';
 
 const reading = (sim: CircuitSimulator, id: string) => sim.status(id).reading ?? NaN;
@@ -218,13 +219,44 @@ describe('Schottky diyot (1N5819)', () => {
     expect(forward(3)).toBeCloseTo(0.9, 3);
   });
 
-  it('10 mA’de 1N4001’den çok düşük (≈ 0,18 V ile ≈ 0,60 V); ters sızıntı ≈ 0,88 mA (tablo: en çok 1 mA)', () => {
+  it('10 mA’de 1N4001’den çok düşük (≈ 0,18 V ile ≈ 0,60 V)', () => {
     expect(forward(0.01)).toBeCloseTo(0.176, 2);
-    const sim = new CircuitSimulator(circuit().battery('B1', 'k', 'gnd', 10).add('schottky', 'D1', ['gnd', 'k'], { model: '1N5819' }).ground('G1', 'gnd').build());
-    sim.advance(0);
-    const leak = -sim.measure('D1')!.current;
-    expect(leak).toBeGreaterThan(0.8e-3);
-    expect(leak).toBeLessThan(1e-3);
+  });
+
+  it('ters akım ters gerilime bağlı: onsemi Şekil 9’un 25 °C eğrisinden geçer (4 V 41,6 µA … 38,9 V 291 µA)', () => {
+    const reverse = (volts: number) => {
+      const sim = new CircuitSimulator(circuit().battery('B1', 'k', 'gnd', volts).add('schottky', 'D1', ['gnd', 'k'], { model: '1N5819' }).ground('G1', 'gnd').build());
+      sim.advance(0);
+      return -sim.measure('D1')!.current;
+    };
+    for (const [volts, amps] of SCHOTTKY_REVERSE) expect(reverse(volts) / amps).toBeCloseTo(1, 3);
+    // Noktaların arası logaritmik: 10 V’ta √(57,2 · 77,3) ≈ 66,5 µA; 2,2 V’un altında eğrinin başı.
+    expect(reverse(10) * 1e6).toBeCloseTo(66.5, 1);
+    expect(reverse(1) * 1e6).toBeCloseTo(34.7, 1);
+    // 40 V’ta (VRRM) tablodaki en çok 1 mA’in altında.
+    expect(reverse(40)).toBeLessThan(0.35e-3);
+  });
+
+  it('0 V çevresinde akım ve eğimi sürekli; AC’de ters akım eğriye göre, Newton hatasız', () => {
+    const j = new SchottkyJunction();
+    for (const dv of [1e-9, 1e-6]) {
+      expect(Math.abs(j.current(dv) - j.current(-dv))).toBeLessThan(2 * dv * j.conductance(0) * 1.01);
+      expect(j.conductance(-dv) / j.conductance(dv)).toBeCloseTo(1, 2);
+    }
+    // Ters akım birkaç milivoltta eğrinin değerine ulaşır, sonra yalnızca eğriyle artar.
+    expect(-j.current(-0.05) / 34.7e-6).toBeCloseTo(1, 3);
+    const sim = new CircuitSimulator(
+      circuit().acsource('AC1', 'a', 'gnd', { amplitude: 20, frequency: 50 }).add('schottky', 'D1', ['a', 'b'], { model: '1N5819' }).resistor('RL', 'b', 'gnd', 1000).ground('G1', 'gnd').build(),
+    );
+    expect(sim.runUntil(0.1).ok).toBe(true);
+    let most = 0;
+    for (let k = 0; k < 200; k++) {
+      expect(sim.advance(1e-4).ok).toBe(true);
+      most = Math.max(most, -sim.measure('D1')!.current);
+    }
+    // Ters tepe ≈ 20 V: eğride ≈ 126 µA.
+    expect(most * 1e6).toBeGreaterThan(115);
+    expect(most * 1e6).toBeLessThan(130);
   });
 
   it('dört 1N5819’la yalıtılmış kaynaklı köprü filtreyle yakınsar (eklem kapasitesi: Diodes SPICE CJO 203 pF)', () => {

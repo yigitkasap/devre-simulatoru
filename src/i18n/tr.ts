@@ -1391,7 +1391,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     description:
       'İdeal 5 V’luk pil iki kolu besliyor: solda 470 Ω ve 1N5819 Schottky diyot, sağda 470 Ω ve 1N4001 (silisyum pn diyot). Her diyodun gerilimini ayrı bir voltmetre ölçüyor.',
     purpose:
-      'İki diyot türünün ileri gerilimini karşılaştırır. İki koldan da ≈ 10 mA geçer; 1N4001’de 0,60 V, 1N5819’da yalnızca 0,18 V düşer. Schottky diyotta eklem metal ile yarı iletken arasındadır: engel daha alçaktır, aynı akım daha küçük gerilimle geçer. Diyotta harcanan güç de bu yüzden küçüktür: 5,6 mW’a karşı 1,8 mW. Bedeli ters yöndeki sızıntıdır: iki diyodu da ters çevir (F); 1N5819’dan ters yönde 0,88 mA geçer (veri sayfasına göre 40 V’ta en çok 1 mA), 1N4001’den yalnızca 0,1 µA.',
+      'İki diyot türünün ileri gerilimini karşılaştırır. İki koldan da ≈ 10 mA geçer; 1N4001’de 0,60 V, 1N5819’da yalnızca 0,18 V düşer. Schottky diyotta eklem metal ile yarı iletken arasındadır: engel daha alçaktır, aynı akım daha küçük gerilimle geçer. Diyotta harcanan güç de bu yüzden küçüktür: 5,6 mW’a karşı 1,8 mW. Bedeli ters yöndeki sızıntıdır: iki diyodu da ters çevir (F); 5 V’ta 1N5819’dan ters yönde 45 µA geçer, 1N4001’den yalnızca 0,1 µA (yaklaşık 450 kat az). Schottky’nin ters akımı ters gerilimle artar: veri sayfasının 25 °C eğrisine göre 20 V’ta ≈ 0,13 mA, 40 V’a yakın ≈ 0,29 mA.',
     everyday:
       'Schottky diyotlar düşük ileri gerilimin verim demek olduğu yerlerde kullanılır: anahtarlamalı güç kaynaklarının çıkışında, güneş panellerinde (akünün geceleri panele geri boşalmasını önleyen diyot) ve pilin ters takılmasına karşı koruma devrelerinde. Hızlı açılıp kapandıkları için yüksek frekanslı doğrultmaçlarda da tercih edilirler.',
   },
@@ -2928,7 +2928,7 @@ export const tr = {
       LM317T:
         'LM317T: ayarlı regülatör, TO-220 (ST, TI, onsemi veri sayfaları). V_{REF} = 1,25 V (OUT − ADJ), ADJ akımı ≈ 50 µA, akım sınırı ≈ 2,2 A. Giriş, çıkışın bırakma gerilimi kadar üstünde olmalı (ST eğrisi: 20 mA’de ≈ 1,5 V, 1 A’de ≈ 2,05 V). Bacaklar ADJ, OUT, IN (7805’ten farklı).',
       '1N5819':
-        '1N5819: 1 A, 40 V Schottky diyot (DO-41). İleri gerilim veri sayfası tablosundaki en çok değerlere göre: 0,1 A’de 0,34 V, 1 A’de 0,60 V, 3 A’de 0,90 V (onsemi, Diodes). Ters sızıntı ≈ 0,88 mA (tablo: 40 V’ta en çok 1 mA). Eklem kapasitesi Diodes SPICE modelinden (4 V’ta ≈ 119 pF; tablo tipik 110 pF); Schottky’de ters toparlanma yoktur. 1N4001 ile aynı gövde; ayırmak için gövdedeki yazıya bak.',
+        '1N5819: 1 A, 40 V Schottky diyot (DO-41). İleri gerilim veri sayfası tablosundaki en çok değerlere göre: 0,1 A’de 0,34 V, 1 A’de 0,60 V, 3 A’de 0,90 V (onsemi, Diodes). Ters akım ters gerilimle artar (onsemi veri sayfasının 25 °C tipik eğrisi): 4 V’ta ≈ 42 µA, 20 V’ta ≈ 0,13 mA, 39 V’ta ≈ 0,29 mA (tablo: 40 V’ta en çok 1 mA). Eklem kapasitesi Diodes SPICE modelinden (4 V’ta ≈ 119 pF; tablo tipik 110 pF); Schottky’de ters toparlanma yoktur. 1N4001 ile aynı gövde; ayırmak için gövdedeki yazıya bak.',
       KBP307:
         'KBP307: 3 A, 1000 V köprü diyot (dört diyot tek pakette; bacaklar + ~ ~ −). Her diyodun ileri gerilimi DOWO veri sayfasının tipik eğrisinden: 10 mA’de ≈ 0,64 V, 0,1 A’de ≈ 0,75 V, 1 A’de ≈ 0,93 V (tablo: 3 A’de en çok 1,1 V). Diyot başına 25 pF’lık eklem kapasitesi hesaplanır (DOWO tablosunda yok; aynı adlı HXY KBP307’nin tipik değeri); ters toparlanma hesaplanmaz.',
       '1N4001':
