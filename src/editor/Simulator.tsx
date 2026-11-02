@@ -9,6 +9,11 @@ import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
 import { boardCircuit } from '../tahta/circuit';
+import { planFromBuild } from '../tahta/plan';
+import { planBreadboard } from '../bench3d/breadboard';
+import { emptyBuild } from '../model/build';
+import { BoardPanel, BoardStage, type BoardView } from './tahta/BoardMode';
+import { groupOf } from './ExampleTab';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
 import { METER_DISPLAY } from './PartView';
@@ -54,7 +59,7 @@ import { slug, TaskDialog } from './task/TaskDialog';
 import { goalText, measureTarget, targetName, targetParts } from './task/targets';
 import { Icon } from './icons';
 import { BottomSheet, SheetHeader, type SheetSize } from './BottomSheet';
-import { BenchView, ViewToggle, useViewMode } from './BenchView';
+import { BenchView, ViewToggle, useViewMode, type BenchViewProps } from './BenchView';
 import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type PhoneCanvas, type TapTarget } from './Canvas';
 import { CanvasControls, WiringControls } from './CanvasControls';
 import type { DeviceHooks } from './DeviceCards';
@@ -412,9 +417,19 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       return next;
     });
   }, []);
-  /** Tahtada kur kipi: Oynat şemayla değil tahtadaki kurulumla çalışır (tahta/circuit.ts). */
-  const [boardMode] = useState(false);
-  const board = useMemo(() => (boardMode && doc.build ? boardCircuit(doc, doc.build) : null), [boardMode, doc]);
+  /**
+   * Tahtada kur kipi (T1–T6): şema değiştirilemez, öğrenci devreyi tahtaya kurar; Oynat şemayla değil
+   * tahtadaki kurulumla çalışır (tahta/circuit.ts). Kurulum belgede (doc.build) durur.
+   */
+  const [boardMode, setBoardMode] = useState(false);
+  const [boardView, setBoardView] = useState<BoardView>('top');
+  const [showConnected, setShowConnected] = useState(true);
+  const [boardSchema, setBoardSchema] = useState(false);
+  /** Şemanın breadboard planı: tahtanın boyu, masadaki yerler, alet kabloları (3B ya da Tahtada kur açıkken). */
+  const schematicPlan = useMemo(() => (boardMode || viewMode === 'bench' ? planBreadboard(doc) : null), [boardMode, viewMode, doc]);
+  const boardBuild = useMemo(() => (boardMode && schematicPlan ? (doc.build ?? emptyBuild(schematicPlan.cols)) : null), [boardMode, schematicPlan, doc.build]);
+  const board = useMemo(() => (boardBuild ? boardCircuit(doc, boardBuild) : null), [boardBuild, doc]);
+  const boardPlan = useMemo(() => (boardBuild && schematicPlan ? planFromBuild(doc, boardBuild, schematicPlan) : null), [boardBuild, schematicPlan, doc]);
   const simConnectivity = useMemo(() => {
     const c = board ? { netlist: board.netlist, junctions: [], unconnectedPins: board.loosePins, danglingEnds: [] } : fault ? buildConnectivity(simDoc, activeFaults) : connectivity;
     const netlist = fault ? wireMeter(c.netlist, meter.mode, meter.red, meter.black) : c.netlist;
@@ -505,6 +520,24 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     return texts;
   }, [doc.parts, sim.status, simConnectivity]);
   /** Oynat: görevde tahminler kaydedilmediyse (B1) çalışmaz, nedenini söyler. */
+  /** Tahtada kur'a gir: tek tahtaya sığmayan devrede açılmaz (kullanıcı kararı). Simülasyon durur. */
+  const enterBoard = () => {
+    const plan = schematicPlan ?? planBreadboard(doc);
+    if (plan.boards > 1) {
+      showToast(tr.tahta.tooBig, 'error');
+      return;
+    }
+    sim.stop();
+    dispatch({ type: 'select', selection: EMPTY_SELECTION });
+    setBoardView('top');
+    setBoardMode(true);
+  };
+  const exitBoard = () => {
+    sim.stop();
+    setBoardSchema(false);
+    setBoardMode(false);
+  };
+
   const play = () => {
     if (gate) showToast(gate, 'error');
     else sim.play();
@@ -1562,44 +1595,61 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   );
   // Şema | 3B: devre şemada kurulur; 3B tezgâhta aynı devre masada (izlenir, anahtar ve
   // potansiyometreyle oynanır).
+  // 3B tezgâhın ortak özellikleri (3B görünüm ve Tahtada kur).
+  const benchProps: Omit<BenchViewProps, 'onSchematic'> = {
+    doc,
+    connectivity,
+    frame: sim.frame,
+    ...(ohmTexts ? { ohmTexts } : {}),
+    ...(benchLook !== doc ? { look: benchLook } : {}),
+    ...(hideLive ? { labelFrame: shownFrame, liveHidden: true } : {}),
+    active: sim.status !== 'stopped',
+    running: sim.status === 'running',
+    selection: selection.parts,
+    overlayOpen,
+    touch: touchUi,
+    phone,
+    dark: theme === 'dark',
+    settings: shownSettings,
+    onSettings: updateSettings,
+    measured: measuredParts,
+    onKarta: () => setKartaOpen(true),
+    focusRequest: benchFocus,
+    onFocusDone: clearBenchFocus,
+    ...(phone ? { controlsInset: { right: 60, bottom: schematicFull ? 'calc(100px + env(safe-area-inset-bottom))' : 10 } } : {}),
+    callbacks: {
+      onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
+      onToggle: (id) => {
+        const part = doc.parts.find((p) => p.id === id);
+        if (part?.type === 'spdt') updatePartFromPanel(id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } });
+        else if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
+      },
+      onPress: pressButton,
+      onKnob: (id, position, done) => {
+        const part = doc.parts.find((p) => p.id === id);
+        if (part) slidePartFromPanel(id, { props: { ...part.props, position } }, done);
+      },
+    },
+  };
   const canvas = (
     <>
-      {viewMode === 'bench' ? (
-        <BenchView
-          doc={doc}
-          connectivity={connectivity}
-          frame={sim.frame}
-          {...(ohmTexts ? { ohmTexts } : {})}
-          {...(benchLook !== doc ? { look: benchLook } : {})}
-          {...(hideLive ? { labelFrame: shownFrame, liveHidden: true } : {})}
-          active={sim.status !== 'stopped'}
-          running={sim.status === 'running'}
-          selection={selection.parts}
-          overlayOpen={overlayOpen}
+      {boardMode && boardPlan && schematicPlan ? (
+        <BoardStage
+          view={boardView}
+          onView={setBoardView}
+          showConnected={showConnected}
+          onShowConnected={setShowConnected}
+          onExit={exitBoard}
+          plan={boardPlan}
+          schematicPlan={schematicPlan}
+          bench={{ ...benchProps, onSchematic: () => setBoardSchema(true) }}
           touch={touchUi}
-          phone={phone}
-          dark={theme === 'dark'}
-          settings={shownSettings}
-          onSettings={updateSettings}
-          measured={measuredParts}
+        />
+      ) : viewMode === 'bench' ? (
+        <BenchView
+          {...benchProps}
           onSchematic={() => setViewMode('schematic')}
-          onKarta={() => setKartaOpen(true)}
-          focusRequest={benchFocus}
-          onFocusDone={clearBenchFocus}
-          {...(phone ? { controlsInset: { right: 60, bottom: schematicFull ? 'calc(100px + env(safe-area-inset-bottom))' : 10 } } : {})}
-          callbacks={{
-            onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
-            onToggle: (id) => {
-              const part = doc.parts.find((p) => p.id === id);
-              if (part?.type === 'spdt') updatePartFromPanel(id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } });
-              else if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
-            },
-            onPress: pressButton,
-            onKnob: (id, position, done) => {
-              const part = doc.parts.find((p) => p.id === id);
-              if (part) slidePartFromPanel(id, { props: { ...part.props, position } }, done);
-            },
-          }}
+          {...(!phone && doc.parts.length > 0 && !fault && !task ? { onBoard: enterBoard, boardBlocked: schematicPlan && schematicPlan.boards > 1 ? tr.tahta.tooBig : null } : {})}
         />
       ) : (
         schematic
@@ -2208,7 +2258,21 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               className="flex min-h-0 shrink-0 flex-col border-l border-line"
               style={{ width: layout.inspectorWidth }}
             >
-              {notebook}
+              {boardMode && boardBuild && schematicPlan ? (
+                <BoardPanel
+                  doc={doc}
+                  connectivity={connectivity}
+                  build={boardBuild}
+                  schematicPlan={schematicPlan}
+                  group={activeExample ? groupOf(activeExample).split(' · ')[0]! : ''}
+                  settings={settings}
+                  touch={tablet}
+                  large={boardSchema}
+                  onLarge={setBoardSchema}
+                />
+              ) : (
+                notebook
+              )}
             </aside>
           )}
         </div>

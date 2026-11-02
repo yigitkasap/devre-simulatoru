@@ -82,6 +82,8 @@ export interface Jumper {
   readonly net: string;
   readonly a: Hole;
   readonly b: Hole;
+  /** Tahtada kur: öğrencinin seçtiği renk (yoksa ağın rengi). */
+  readonly color?: string;
 }
 
 /** Masadaki bir parçanın ucundan breadboard'a giden kablo. */
@@ -90,6 +92,8 @@ export interface Lead {
   readonly partId: string;
   readonly pin: number;
   readonly hole: Hole;
+  /** Tahtada kur: kablonun rengi (yoksa ağın rengi). */
+  readonly color?: string;
 }
 
 export type NetRole = 'ground' | 'supply';
@@ -202,6 +206,16 @@ export function netColors(plan: BreadboardPlan): (net: string) => string {
 
 export function isOnBoard(type: DeviceType): boolean {
   return MOUNTS[type] !== undefined;
+}
+
+/** Breadboard'a takılan parçanın takılışı (masadaki parçada undefined). */
+export function mountOf(type: DeviceType): Mount | undefined {
+  return MOUNTS[type]?.mount;
+}
+
+/** Planın iki bacaklı parçaya verdiği sütun aralığı (Tahtada kur'da bacak aralığı sınırları bunun çevresinde). */
+export function planSpan(type: DeviceType): number | undefined {
+  return MOUNTS[type]?.span;
 }
 
 /** Şeridin parçalara ayrılan delik sayısı (kalanlar jumper'lara). */

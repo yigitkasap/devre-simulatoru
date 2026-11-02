@@ -6,9 +6,10 @@
 // aletlerinin etiketi. Seçili transistörde uçların harfleri. Hareket ipucu Yardım'da; telefonda 3B ilk
 // açılışta bir kez tek satır.
 
-import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CameraRequest } from '../bench3d/Bench3D';
-import type { BenchCallbacks, CameraView } from '../bench3d/scene';
+import type { BreadboardPlan } from '../bench3d/breadboard';
+import type { BenchCallbacks, BenchScene, CameraView, TopInsets } from '../bench3d/scene';
 import { tr } from '../i18n/tr';
 import type { Connectivity } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
@@ -133,6 +134,21 @@ export interface BenchViewProps {
   /** Telefon: sağ alttaki denetimlerin yeri (şema kutusunun tam ekran düğmesinin solunda). */
   readonly controlsInset?: { readonly right: number; readonly bottom: number | string };
   readonly callbacks: BenchCallbacks;
+  /** Tahtada kur: öğrencinin kurulumunun yerleşimi (tezgâh onunla kurulur). */
+  readonly plan?: BreadboardPlan | null;
+  /**
+   * Tahtada kur → Tepeden: dik kamera. 3B denetimleri, küçük şema ve masadaki parçaların etiketleri
+   * gizlenir (yerlerini Tahtada kur'un araç çubuğu ve cihaz kartları alır).
+   */
+  readonly top?: TopInsets | null;
+  readonly onScene?: (scene: BenchScene | null) => void;
+  /** Etiket katmanına eklenecek öğeler ([data-anchor] konumlarını sahne verir). */
+  readonly overlayExtra?: ReactNode;
+  /** Etiketi gösterilmeyecek parçalar (Tepeden görünümde masadaki cihazlar; kartları var). */
+  readonly unlabelled?: ReadonlySet<string>;
+  /** 3B araç çubuğundaki "Tahtada kur" (T6); `boardBlocked`: açılamıyorsa nedeni (düğme kapalı). */
+  readonly onBoard?: () => void;
+  readonly boardBlocked?: string | null;
 }
 
 type CameraChoice = CameraView | 'part';
@@ -188,7 +204,8 @@ export function BenchView(props: BenchViewProps) {
   const callbacks: BenchCallbacks = { ...props.callbacks, onCamera: () => setCameraLabel('free') };
 
   // Etiketler: telefonda yalnızca seçili parça ve ölçü aletleri; toprak sembolü etiketsiz.
-  const labelled = labels ? doc.parts.filter((p) => p.type !== 'ground' && (!phone || selection.includes(p.id) || METERS.has(p.type))) : [];
+  const top = props.top ?? null;
+  const labelled = labels ? doc.parts.filter((p) => p.type !== 'ground' && !props.unlabelled?.has(p.id) && (!phone || selection.includes(p.id) || METERS.has(p.type))) : [];
   const lettered = single ? doc.parts.find((p) => p.id === single && LETTERED.has(p.type)) : undefined;
 
   const button = (pressed: boolean | undefined, extra = '') =>
@@ -232,6 +249,9 @@ export function BenchView(props: BenchViewProps) {
           overlay={overlay}
           dark={props.dark}
           callbacks={callbacks}
+          plan={props.plan ?? null}
+          top={top}
+          {...(props.onScene ? { onScene: props.onScene } : {})}
         />
       </Suspense>
 
@@ -255,6 +275,7 @@ export function BenchView(props: BenchViewProps) {
               {letter}
             </span>
           ))}
+        {props.overlayExtra}
         {hint && (
           <p data-obstacle className="absolute left-3 m-0 max-w-[calc(100%-24px)] rounded-md bg-panel/90 px-2 py-1 text-label text-ink-2 shadow-sm" style={{ bottom: hintBottom }}>
             {tr.bench.hintPhone}
@@ -262,7 +283,7 @@ export function BenchView(props: BenchViewProps) {
         )}
       </div>
 
-      {!phone && roomy && doc.parts.length > 0 && (
+      {!phone && !top && roomy && doc.parts.length > 0 && (
         <button
           type="button"
           onClick={props.onSchematic}
@@ -288,7 +309,7 @@ export function BenchView(props: BenchViewProps) {
       )}
 
       {/* Sağ alt: 3B seçenekleri ve altında görünüm kutusu (şemadaki "− + Sığdır | 3B" kutusunun karşılığı). */}
-      <div
+      {!top && <div
         className="pointer-events-none absolute z-10 flex max-w-[calc(100%-32px)] flex-col items-end gap-2"
         style={props.controlsInset ? { right: props.controlsInset.right, bottom: props.controlsInset.bottom } : { right: 16, bottom: 16 }}
       >
@@ -307,6 +328,18 @@ export function BenchView(props: BenchViewProps) {
             {!phone && tr.karta.open}
           </button>
         )}
+        {props.onBoard && (
+          <button
+            type="button"
+            onClick={props.onBoard}
+            disabled={Boolean(props.boardBlocked)}
+            title={props.boardBlocked ?? tr.tahta.enter}
+            className={`pointer-events-auto flex items-center justify-center gap-1.5 rounded-[10px] bg-accent font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-50 ${touch ? 'h-11' : 'h-9'} ${iconOnly}`}
+          >
+            <Icon name="board" className="h-[18px] w-[18px]" />
+            {!phone && tr.tahta.enter}
+          </button>
+        )}
         </div>
         {!phone && (
           <div role="group" aria-label={tr.toolbar.view} className="pointer-events-auto flex items-center rounded-[10px] border border-line bg-panel p-[3px] shadow-sm">
@@ -318,7 +351,7 @@ export function BenchView(props: BenchViewProps) {
             </button>
           </div>
         )}
-      </div>
+      </div>}
 
     </div>
   );
