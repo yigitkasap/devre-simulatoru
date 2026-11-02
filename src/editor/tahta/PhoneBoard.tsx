@@ -14,6 +14,7 @@ import { isFixed } from '../../tahta/rules';
 import { levelOf, sessionStats, solved, type BoardSession } from '../../tahta/session';
 import { Icon } from '../icons';
 import type { SimStatus } from '../useSimulation';
+import type { Locks } from '../../tahta/task';
 import { partValueText } from '../PartView';
 import { boardParts, exampleText, ProblemCard, requiredLeads, terminalName, type Cabling, type Placing } from './BoardMode';
 
@@ -48,6 +49,8 @@ export interface PhoneBoardSheetProps {
   readonly onReport: () => void;
   readonly onGuide: () => void;
   readonly onReset: () => void;
+  /** Görevde hazır gelenler (kilitli): satırda kilit işareti. */
+  readonly locks?: Locks | null;
   /** Oynat / Duraklat: alt şeritte (takarken yok). */
   readonly status: SimStatus;
   readonly onPlay: () => void;
@@ -339,7 +342,8 @@ function BoxBody(
               </span>
               {at ? (
                 <span className="flex items-center gap-1 pr-1.5 font-mono text-[13px] text-ok-ink">
-                  <Icon name="check" className="h-3.5 w-3.5" />
+                  {props.locks?.parts.has(part.id) ? <Icon name="lock" className="h-3.5 w-3.5 text-ink-2" /> : <Icon name="check" className="h-3.5 w-3.5" />}
+                  {props.locks?.parts.has(part.id) && <span className="sr-only">{tr.tahta.gorev.lockedLabel}</span>}
                   {at.holes.join(' · ')}
                 </span>
               ) : (

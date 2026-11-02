@@ -29,3 +29,32 @@ export function checksLeft(board: BoardTask | undefined, used: number): number |
   if (board.checks === 'submit') return 0;
   return Math.max(0, 3 - used);
 }
+
+/** Görevde hazır gelen (kilitli) parçalar, ara kablolar ve alet kabloları: taşınamaz, döndürülemez, silinemez. */
+export interface Locks {
+  readonly parts: ReadonlySet<string>;
+  /** Ara kablo: "a|b". */
+  readonly wires: ReadonlySet<string>;
+  /** Alet kablosu: "parça#uç". */
+  readonly leads: ReadonlySet<string>;
+}
+
+export const wireKey = (w: { readonly a: string; readonly b: string }) => `${w.a}|${w.b}`;
+export const leadKey = (part: string, pin: number) => `${part}#${pin}`;
+
+/** Başlangıç tahtasındaki her şey kilitli; boş başlangıçta kilit yok (null). */
+export function locksOf(start: Build): Locks | null {
+  const locks = { parts: new Set(Object.keys(start.parts)), wires: new Set(start.wires.map(wireKey)), leads: new Set(start.leads.map((l) => leadKey(l.part, l.pin))) };
+  return locks.parts.size + locks.wires.size + locks.leads.size > 0 ? locks : null;
+}
+
+/** "Tahtayı boşalt" görevde: yalnızca öğrencinin taktıkları kalkar, kilitliler yerinde kalır. */
+export function keepLocked(build: Build, locks: Locks | null): Build {
+  if (!locks) return { cols: build.cols, parts: {}, wires: [], leads: [] };
+  return {
+    cols: build.cols,
+    parts: Object.fromEntries(Object.entries(build.parts).filter(([id]) => locks.parts.has(id))),
+    wires: build.wires.filter((w) => locks.wires.has(wireKey(w))),
+    leads: build.leads.filter((l) => locks.leads.has(leadKey(l.part, l.pin))),
+  };
+}

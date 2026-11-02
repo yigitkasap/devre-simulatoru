@@ -18,7 +18,7 @@ import { PhoneBoardSheet } from './tahta/PhoneBoard';
 import { checkBuild, type Problem } from '../tahta/check';
 import { boardReport } from '../tahta/report';
 import { openHint, recordCheck, startSession, type BoardSession } from '../tahta/session';
-import { checksLeft } from '../tahta/task';
+import { checksLeft, keepLocked, leadKey, locksOf, startBuild } from '../tahta/task';
 import { problemShort } from '../tahta/explain';
 import { groupOf } from './ExampleTab';
 import { maskFrame } from './fault/mask';
@@ -615,6 +615,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     void saveFile(datedName(`${tr.tahta.gorev.file}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
     showToast(tr.tahta.gorev.submitted, 'info');
   };
+  // Görevde hazır gelenler kilitli (kullanıcı kararı): başlangıç tahtası görevden yeniden hesaplanır.
+  const boardLocks = useMemo(() => (task?.board && schematicPlan ? locksOf(startBuild(doc, schematicPlan, task.board)) : null), [task, schematicPlan, doc]);
   const boardRules = task?.board
     ? {
         checksLeft: checksLeft(task.board, boardSession?.checks.length ?? 0),
@@ -627,7 +629,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     if (!boardBuild) return;
     setPlacing(null);
     setCabling(null);
-    commitBuild(emptyBuild(boardBuild.cols));
+    // Görevde yalnızca öğrencinin taktıkları kalkar; hazır gelenler yerinde kalır.
+    commitBuild(keepLocked(boardBuild, boardLocks));
     setBoardSession(startSession(Date.now()));
     showToast(tr.tahta.denetle.resetDone, 'info');
   };
@@ -1768,6 +1771,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           buildKey={boardKey}
           onMarks={boardMarks}
           phone={phone}
+          locks={boardLocks}
           commands={boardCommands}
           onUndo={() => {
             setPlacing(null);
@@ -2236,6 +2240,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   onReport={downloadBoardReport}
                   onGuide={openSolderGuide}
                   onReset={resetBoard}
+                  locks={boardLocks}
                   status={sim.status}
                   onPlay={play}
                   onPause={sim.pause}
@@ -2538,11 +2543,16 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   onReset={resetBoard}
                   cabling={cabling}
                   onLead={(part, pin) => {
+                    if (boardLocks?.leads.has(leadKey(part, pin))) {
+                      showToast(tr.tahta.gorev.lockedCable, 'info');
+                      return;
+                    }
                     selectOnBoard(null);
                     setBoardView('top');
                     setPlacing(null);
                     setCabling(cabling?.kind === 'lead' && cabling.part === part && cabling.pin === pin ? null : { kind: 'lead', part, pin });
                   }}
+                  locks={boardLocks}
                 />
               ) : (
                 notebook

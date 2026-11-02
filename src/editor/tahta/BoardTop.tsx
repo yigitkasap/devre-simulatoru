@@ -18,6 +18,7 @@ import { fixedHoles, isFixed, legRange, movePlaced, moveLeg, partHoles, placePar
 import { addWire, plugLead, removeWire, unplugLead, type WireResult } from '../../tahta/wiring';
 import { parseHole } from '../../bench3d/holes';
 import type { PinRef } from '../../tahta/check';
+import { leadKey, wireKey, type Locks } from '../../tahta/task';
 import { Icon } from '../icons';
 import { partValueText } from '../PartView';
 
@@ -101,6 +102,8 @@ export interface BoardTopProps {
   readonly touch: boolean;
   /** Telefon (T5): takma ve kablo çipleri alttaki sayfada; dokunmatikte büyüteç. */
   readonly phone?: boolean;
+  /** Görevde hazır gelenler (kilitli): taşınamaz, döndürülemez, silinemez; üstlerinde kilit. */
+  readonly locks?: Locks | null;
   /** Araç çubuğunun komutları (Döndür, Sil). */
   readonly commands?: Ref<BoardCommands>;
 }
@@ -307,6 +310,7 @@ export function BoardTop(props: BoardTopProps) {
       if (!result.ok) warn(result.reason === 'same' ? tr.tahta.sameHole : tr.tahta.occupied);
     };
     if (cabling.kind === 'lead') {
+      if (lockedLead(cabling.part, cabling.pin)) return warn(tr.tahta.gorev.lockedCable);
       const result = plugLead(build, cabling.part, cabling.pin, h);
       if (!result.ok) return fail(result);
       props.onBuild(result.build);
@@ -358,13 +362,18 @@ export function BoardTop(props: BoardTopProps) {
     if ((placing && !placing.dragging) || cabling) input.current?.focus({ preventScroll: true });
   }, [placing?.partId, placing?.first, placing?.dragging, cabling?.kind, cabling?.kind === 'wire' ? cabling.from : null, cabling?.kind === 'lead' ? `${cabling.part}#${cabling.pin}` : null]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const lockedPart = (id: string) => props.locks?.parts.has(id) ?? false;
+  const lockedLead = (part: string, pin: number) => props.locks?.leads.has(leadKey(part, pin)) ?? false;
+  const lockedWire = (index: number) => (build.wires[index] ? (props.locks?.wires.has(wireKey(build.wires[index]!)) ?? false) : false);
   const rotateSelected = () => {
     const p = selectedPart;
     if (!p || !build.parts[p.id]) return;
+    if (lockedPart(p.id)) return warn(tr.tahta.gorev.locked(p.label));
     commit(p, rotatePlaced(build, p.type, p.id), (b) => tr.tahta.rotated(p.label, holesText(b, p.id)));
   };
   const deleteSelected = () => {
     if (picked) {
+      if (picked.kind === 'wire' ? lockedWire(picked.index) : lockedLead(picked.part, picked.pin)) return warn(tr.tahta.gorev.lockedCable);
       if (picked.kind === 'wire') {
         const w = build.wires[picked.index]!;
         props.onBuild(removeWire(build, picked.index));
@@ -378,6 +387,7 @@ export function BoardTop(props: BoardTopProps) {
     }
     const p = selectedPart;
     if (!p || !build.parts[p.id]) return;
+    if (lockedPart(p.id)) return warn(tr.tahta.gorev.locked(p.label));
     props.onBuild(removePart(build, p.id));
     props.onSelect(null);
     props.announce(tr.tahta.removed(p.label));
@@ -471,6 +481,7 @@ export function BoardTop(props: BoardTopProps) {
     if (cabling) {
       // Karttaki bir uca tıklanırsa o ucun kablosu takılmaya başlar (aynı uç: bırakılır).
       const other = terminalAt(q.x, q.y);
+      if (other && lockedLead(other.part, other.pin)) return warn(tr.tahta.gorev.lockedCable);
       if (other) {
         const same = cabling.kind === 'lead' && other.part === cabling.part && other.pin === cabling.pin;
         props.onCabling(same ? null : { kind: 'lead', part: other.part, pin: other.pin });
@@ -485,6 +496,7 @@ export function BoardTop(props: BoardTopProps) {
     }
     // Cihaz kartındaki uca tıklama: o kablo takılır (takılıysa yeni deliğe taşınır).
     const term = terminalAt(q.x, q.y);
+    if (term && lockedLead(term.part, term.pin)) return warn(tr.tahta.gorev.lockedCable);
     if (term) {
       props.onSelect(null);
       setPick(null);
@@ -498,7 +510,7 @@ export function BoardTop(props: BoardTopProps) {
       setPress({ kind: 'pan', id: e.pointerId, x: e.clientX, y: e.clientY, sx: q.x, sy: q.y });
       return;
     }
-    if (selectedPart && h && !isFixed(selectedPart.type) && !touch) {
+    if (selectedPart && h && !isFixed(selectedPart.type) && !touch && !lockedPart(selectedPart.id)) {
       const leg = build.parts[selectedPart.id]?.holes.indexOf(name(h)) ?? -1;
       if (leg >= 0) {
         setPress({ kind: 'leg', id: e.pointerId, partId: selectedPart.id, leg, sx: q.x, sy: q.y });
@@ -593,6 +605,7 @@ export function BoardTop(props: BoardTopProps) {
     }
     const target = part(p.partId);
     if (!target || !moved || !h) return;
+    if (lockedPart(target.id)) return warn(tr.tahta.gorev.locked(target.label));
     if (p.kind === 'body') {
       if (h.kind !== 'strip' || p.grab.kind !== 'strip') return;
       commit(target, movePlaced(build, target.type, target.id, h.col - p.grab.col, h.row - p.grab.row), (b) => tr.tahta.moved(target.label, holesText(b, target.id)));
@@ -864,6 +877,37 @@ export function BoardTop(props: BoardTopProps) {
       </>
     );
   })();
+  // Kilit işaretleri (görevde hazır gelenler): parçanın gövdesinin, kablonun ortasında, alet kablosunun deliğinde
+  // (zaten dolu yerler; boş delik örtmez).
+  const lockBadges = (() => {
+    const locks = props.locks;
+    if (!t || !locks) return null;
+    const at: { key: string; x: number; y: number }[] = [];
+    for (const id of locks.parts) {
+      const pts = partHoles(build, id);
+      if (!pts) continue;
+      const all = [...pts.holes, ...pts.extra].map(toScreen);
+      at.push({ key: `p-${id}`, x: all.reduce((s2, q) => s2 + q.x, 0) / all.length, y: all.reduce((s2, q) => s2 + q.y, 0) / all.length });
+    }
+    for (const w of build.wires) {
+      if (!locks.wires.has(wireKey(w))) continue;
+      const a2 = parseHole(w.a, cols);
+      const b2 = parseHole(w.b, cols);
+      if (!a2 || !b2) continue;
+      const p1 = toScreen(a2);
+      const p2 = toScreen(b2);
+      at.push({ key: `w-${wireKey(w)}`, x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 });
+    }
+    for (const l of build.leads) {
+      const hh = locks.leads.has(leadKey(l.part, l.pin)) ? parseHole(l.hole, cols) : null;
+      if (hh) at.push({ key: `l-${l.part}-${l.pin}`, ...toScreen(hh) });
+    }
+    return at.map(({ key, x, y }) => (
+      <span key={key} aria-hidden="true" className="pointer-events-none absolute z-10 flex h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-ink text-on-ink shadow-sm" style={{ left: x, top: y }}>
+        <Icon name="lock" className="h-3 w-3" />
+      </span>
+    ));
+  })();
   const tipPos = tip ? toScreen(tip.at) : null;
   // Parça etiketi ve seçim çubukları tahtanın orta kanalında (deliksiz şerit, z = 0): hiçbir deliği örtmez.
   // Parçanın (ya da kablonun) hizasında, tuvalin içinde kalacak biçimde.
@@ -914,6 +958,7 @@ export function BoardTop(props: BoardTopProps) {
         <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
           {overlays}
         </svg>
+        {lockBadges}
         {loupe}
         {tip && tipPos && (tip.line || tip.bad) && !finger && !props.phone && (
           <div
@@ -936,24 +981,40 @@ export function BoardTop(props: BoardTopProps) {
               {selectedPart.label}
               {partValueText(selectedPart) ? ` · ${partValueText(selectedPart)}` : ''}
             </span>
-            <button type="button" onClick={rotateSelected} className={`flex items-center gap-1 rounded-md px-2 text-small hover:bg-app ${h}`}>
-              <Icon name="rotate" className="h-4 w-4" />
-              {tr.tahta.toolRotate}
-            </button>
-            <button type="button" onClick={deleteSelected} className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft ${h}`}>
-              <Icon name="trash" className="h-4 w-4" />
-              {tr.tahta.toolDelete}
-            </button>
+            {lockedPart(selectedPart.id) ? (
+              <span className={`flex items-center gap-1 px-2 text-small text-ink-2 ${h}`}>
+                <Icon name="lock" className="h-4 w-4" />
+                {tr.tahta.gorev.lockedShort}
+              </span>
+            ) : (
+              <>
+                <button type="button" onClick={rotateSelected} className={`flex items-center gap-1 rounded-md px-2 text-small hover:bg-app ${h}`}>
+                  <Icon name="rotate" className="h-4 w-4" />
+                  {tr.tahta.toolRotate}
+                </button>
+                <button type="button" onClick={deleteSelected} className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft ${h}`}>
+                  <Icon name="trash" className="h-4 w-4" />
+                  {tr.tahta.toolDelete}
+                </button>
+              </>
+            )}
           </div>
         )}
         {pickBox && picked && (
           <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[10px] border border-line bg-panel p-1 shadow-md" style={{ left: pickBox.x, top: pickBox.y }} onPointerDown={(e) => e.stopPropagation()}>
             {picked.kind === 'wire' && <span aria-hidden="true" className="ml-1.5 h-3 w-3 rounded-full ring-1 ring-line-2" style={{ background: WIRE_HEX[build.wires[picked.index]!.color] }} />}
             <span className="px-2 font-mono text-small font-semibold">{pickLabel}</span>
-            <button type="button" onClick={deleteSelected} className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft ${h}`}>
-              <Icon name="trash" className="h-4 w-4" />
-              {picked.kind === 'wire' ? tr.tahta.toolDelete : tr.tahta.unplug}
-            </button>
+            {(picked.kind === 'wire' ? lockedWire(picked.index) : lockedLead(picked.part, picked.pin)) ? (
+              <span className={`flex items-center gap-1 px-2 text-small text-ink-2 ${h}`}>
+                <Icon name="lock" className="h-4 w-4" />
+                {tr.tahta.gorev.lockedShort}
+              </span>
+            ) : (
+              <button type="button" onClick={deleteSelected} className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft ${h}`}>
+                <Icon name="trash" className="h-4 w-4" />
+                {picked.kind === 'wire' ? tr.tahta.toolDelete : tr.tahta.unplug}
+              </button>
+            )}
           </div>
         )}
       </div>

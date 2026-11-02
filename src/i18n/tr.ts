@@ -2309,6 +2309,10 @@ export const tr = {
       noPlay: 'Bu görevde Oynat kapalı: kurulumu Denetle ile ya da teslimde değerlendir.',
       file: 'tahtada-kur-teslim',
       onExample: 'Tahtada kur',
+      locked: (label: string) => `${label} görevde hazır geldi: taşınamaz, döndürülemez, silinemez.`,
+      lockedCable: 'Bu kablo görevde hazır geldi: çıkarılamaz, yeri ve rengi değişmez.',
+      lockedShort: 'hazır geldi',
+      lockedLabel: 'kilitli (görevde hazır geldi)',
       onExampleLabel: (title: string) => `${title}: tahtada kur`,
     },
     // Telefon (T5): alttaki sayfa

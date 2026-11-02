@@ -18,6 +18,7 @@ import { GRID, type CircuitDoc, type Part } from '../../model/types';
 import type { Problem } from '../../tahta/check';
 import { countWord, formatDuration, problemShort, problemText, problemTitle } from '../../tahta/explain';
 import { levelOf, maxLevel, sessionStats, solved, type BoardSession } from '../../tahta/session';
+import { leadKey, wireKey, type Locks } from '../../tahta/task';
 import { BenchView, type BenchViewProps } from '../BenchView';
 import { CircuitView } from '../CircuitView';
 import { deviceSummary } from '../DeviceCards';
@@ -105,6 +106,8 @@ export interface BoardStageProps {
   readonly phone?: boolean;
   /** Tahtanın komutları (telefonda alttaki sayfa da kullanır: Kablo, delik adı yaz). */
   readonly commands?: RefObject<BoardCommands | null>;
+  /** Görevde hazır gelenler (kilitli). */
+  readonly locks?: Locks | null;
 }
 
 export function BoardStage(props: BoardStageProps) {
@@ -135,6 +138,10 @@ export function BoardStage(props: BoardStageProps) {
     setPalette(false);
     if (wireMode) props.onCabling({ ...wireMode, color });
     else if (picked?.kind === 'wire' && color) {
+      if (props.locks?.wires.has(wireKey(build.wires[picked.index]!))) {
+        setSaid(tr.tahta.gorev.lockedCable);
+        return;
+      }
       props.onBuild(recolorWire(build, picked.index, color));
       setSaid(tr.tahta.wireRecolored(tr.tahta.colors[color] ?? color));
     }
@@ -303,6 +310,7 @@ export function BoardStage(props: BoardStageProps) {
           announce={setSaid}
           touch={touch}
           phone={phone}
+          locks={props.locks ?? null}
           commands={commands}
         />
       )}
@@ -512,6 +520,8 @@ export interface BoardPanelProps {
   readonly onReport: () => void;
   readonly onGuide: () => void;
   readonly onReset: () => void;
+  /** Görevde hazır gelenler (kilitli): satırda kilit işareti. */
+  readonly locks?: Locks | null;
 }
 
 /** Şemadaki işaret: sorunlu parçanın çevresinde kırmızı çerçeve ve numara (dünya koordinatı). */
@@ -774,7 +784,8 @@ export function BoardPanel(props: BoardPanelProps) {
                     <span className="font-mono text-[12px] font-semibold text-accent-ink">{props.placing?.first ? tr.tahta.placing(holeLabel(props.placing.first, build.cols)) : tr.tahta.placingFixed}</span>
                   ) : at ? (
                     <span className="flex items-center gap-1 font-mono text-[12px] text-ok-ink">
-                      <Icon name="check" className="h-3.5 w-3.5" />
+                      {props.locks?.parts.has(part.id) ? <Icon name="lock" className="h-3.5 w-3.5 text-ink-2" /> : <Icon name="check" className="h-3.5 w-3.5" />}
+                      {props.locks?.parts.has(part.id) && <span className="sr-only">{tr.tahta.gorev.lockedLabel}</span>}
                       {at.holes.join(' · ')}
                     </span>
                   ) : (
@@ -815,7 +826,7 @@ export function BoardPanel(props: BoardPanelProps) {
                     {label}
                     {done && (
                       <>
-                        <Icon name="check" className="h-3.5 w-3.5" />
+                        <Icon name={props.locks?.leads.has(leadKey(l.part, l.pin)) ? 'lock' : 'check'} className="h-3.5 w-3.5" />
                         <span className="opacity-80">{done.hole}</span>
                       </>
                     )}

@@ -6,7 +6,7 @@ import { planBreadboard } from '../src/bench3d/breadboard';
 import { exampleDoc } from '../src/examples';
 import { DEFAULT_BOARD_TASK, parseTask, taskFromHash, taskUrl, type TaskDef } from '../src/model/task';
 import type { CircuitDoc } from '../src/model/types';
-import { checksLeft, startBuild } from '../src/tahta/task';
+import { checksLeft, keepLocked, leadKey, locksOf, startBuild, wireKey } from '../src/tahta/task';
 
 const idOf = (doc: CircuitDoc, label: string) => doc.parts.find((p) => p.label === label)!.id;
 const labelOf = (doc: CircuitDoc, id: string) => doc.parts.find((p) => p.id === id)!.label;
@@ -40,6 +40,28 @@ describe('Tahtada kur görevi (T6)', () => {
     expect(parts.wires).toEqual(rails.wires);
     // Hazır parçalar planBreadboard'un yerinde.
     expect(parts.parts[idOf(doc, 'Q1')]!.holes).toEqual(['2h', '3h', '4h']);
+  });
+
+  it('hazır gelenler kilitli; Tahtayı boşalt yalnızca öğrencinin taktıklarını kaldırır', () => {
+    const start = startBuild(doc, plan, { ...DEFAULT_BOARD_TASK, start: 'parts', parts: [idOf(doc, 'Q1')] });
+    const locks = locksOf(start)!;
+    expect([...locks.parts].map((id) => labelOf(doc, id))).toEqual(['Q1']);
+    expect(locks.wires.size).toBe(2);
+    expect([...locks.leads]).toEqual(start.leads.map((l) => leadKey(l.part, l.pin)));
+    // Öğrenci R1'i taktı, bir kablo ve FG1'in kablosunu ekledi.
+    const fg = idOf(doc, 'FG1');
+    const student = {
+      ...start,
+      parts: { ...start.parts, [idOf(doc, 'R1')]: { holes: ['2c', '6c'] } },
+      wires: [...start.wires, { a: '6a', b: '3j', color: 'orange' as const }],
+      leads: [...start.leads, { part: fg, pin: 1, hole: '2a' }],
+    };
+    expect(keepLocked(student, locks)).toEqual(start);
+    expect(student.wires.filter((w) => locks.wires.has(wireKey(w))).length).toBe(2);
+    // Boş başlangıçta kilit yok; boşaltınca tahta boş.
+    const empty = startBuild(doc, plan, { ...DEFAULT_BOARD_TASK, start: 'empty' });
+    expect(locksOf(empty)).toBeNull();
+    expect(keepLocked(student, null)).toEqual({ cols: start.cols, parts: {}, wires: [], leads: [] });
   });
 
   it('Denetle hakkı: sınırsız, 3 kez, teslimde', () => {
