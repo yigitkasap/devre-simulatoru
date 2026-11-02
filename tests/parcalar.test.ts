@@ -179,6 +179,24 @@ describe('Köprü diyot (KBP307)', () => {
     }
   });
 
+  it('topraktan yalıtılmış kaynakla ve büyük filtreyle yakınsar (dört diyot birden kesimdeyken kaynak yalnızca eklem kapasitesiyle bağlı)', () => {
+    for (const capacitance of [100e-6, 470e-6, 1000e-6]) {
+      for (const internalResistance of [0, 1, 10]) {
+        const sim = new CircuitSimulator(
+          circuit()
+            .acsource('AC1', 'a', 'b', { amplitude: 10, frequency: 50, internalResistance })
+            .add('bridge', 'BR1', ['a', 'p', 'b', 'n'])
+            .capacitor('C1', 'p', 'n', capacitance)
+            .resistor('RL', 'p', 'n', 1000)
+            .ground('G1', 'n')
+            .build(),
+        );
+        expect(sim.runUntil(0.3).ok, `${capacitance} F, ${internalResistance} Ω`).toBe(true);
+        expect(sim.measure('RL')!.voltage).toBeGreaterThan(7.5);
+      }
+    }
+  });
+
   it("breadboard'da dört ardışık delik, gerçek sıra + ~ ~ −", () => {
     const doc = { version: 1 as const, parts: [{ id: 'br', type: 'bridge' as const, label: 'BR1', x: 0, y: 0, rotation: 0 as const, props: { model: 'KBP307' } }], wires: [] };
     const at = planBreadboard(doc).onBoard.get('br')!;
@@ -209,6 +227,14 @@ describe('Schottky diyot (1N5819)', () => {
     expect(leak).toBeLessThan(1e-3);
   });
 
+  it('dört 1N5819’la yalıtılmış kaynaklı köprü filtreyle yakınsar (eklem kapasitesi: Diodes SPICE CJO 203 pF)', () => {
+    const c = circuit().acsource('AC1', 'a', 'b', { amplitude: 10, frequency: 50 });
+    for (const [id, anode, cathode] of [['D1', 'a', 'p'], ['D2', 'b', 'p'], ['D3', 'n', 'a'], ['D4', 'n', 'b']] as const) c.add('schottky', id, [anode, cathode], { model: '1N5819' });
+    const sim = new CircuitSimulator(c.capacitor('C1', 'p', 'n', 470e-6).resistor('RL', 'p', 'n', 1000).ground('G1', 'n').build());
+    expect(sim.runUntil(0.3).ok).toBe(true);
+    expect(sim.measure('RL')!.voltage).toBeGreaterThan(8.5);
+  });
+
   it('ters gerilim 40 V’u aşarsa uyarı', () => {
     const sim = new CircuitSimulator(circuit().battery('B1', 'k', 'gnd', 45).add('schottky', 'D1', ['gnd', 'k'], { model: '1N5819' }).ground('G1', 'gnd').build());
     sim.advance(0);
@@ -219,6 +245,18 @@ describe('Schottky diyot (1N5819)', () => {
 describe('Gerilim regülatörü 7805', () => {
   const build = (vin: number, load: number) =>
     new CircuitSimulator(circuit().battery('B1', 'in', 'gnd', vin).add('reg7805', 'U1', ['in', 'gnd', 'out']).resistor('RL', 'out', 'gnd', load).ground('G1', 'gnd').build());
+  it('çıkıştaki kondansatörde yamuk kuralı salınmaz: regülatörün akımı her adımda yükünkine eşit', () => {
+    for (const vin of [9, 7, 6.6]) {
+      const sim = new CircuitSimulator(
+        circuit().battery('B1', 'in', 'gnd', vin).capacitor('C1', 'in', 'gnd', 0.33e-6).add('reg7805', 'U1', ['in', 'gnd', 'out']).capacitor('C2', 'out', 'gnd', 0.1e-6).resistor('RL', 'out', 'gnd', 100).ground('G1', 'gnd').build(),
+      );
+      for (let k = 0; k < 40; k++) {
+        expect(sim.advance(1e-4).ok).toBe(true);
+        expect(Math.abs(sim.status('U1').regulator!.current - sim.measure('RL')!.current), `${vin} V, ${k}`).toBeLessThan(1e-5);
+      }
+    }
+  });
+
   it('12 V girişte 100 Ω yükte 5 V (RO 17 mΩ), 50 mA; GND ucundan bekleme akımı 4,2 mA; harcanan güç ≈ 0,40 W', () => {
     const sim = build(12, 100);
     sim.advance(0);

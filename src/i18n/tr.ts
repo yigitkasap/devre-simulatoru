@@ -2858,9 +2858,9 @@ export const tr = {
       LM317T:
         'LM317T: ayarlı regülatör, TO-220 (ST, TI, onsemi veri sayfaları). V_{REF} = 1,25 V (OUT − ADJ), ADJ akımı ≈ 50 µA, akım sınırı ≈ 2,2 A. Giriş, çıkışın bırakma gerilimi kadar üstünde olmalı (ST eğrisi: 20 mA’de ≈ 1,5 V, 1 A’de ≈ 2,05 V). Bacaklar ADJ, OUT, IN (7805’ten farklı).',
       '1N5819':
-        '1N5819: 1 A, 40 V Schottky diyot (DO-41). İleri gerilim veri sayfası tablosundaki en çok değerlere göre: 0,1 A’de 0,34 V, 1 A’de 0,60 V, 3 A’de 0,90 V (onsemi, Diodes). Ters sızıntı ≈ 0,88 mA (tablo: 40 V’ta en çok 1 mA). 1N4001 ile aynı gövde; ayırmak için gövdedeki yazıya bak.',
+        '1N5819: 1 A, 40 V Schottky diyot (DO-41). İleri gerilim veri sayfası tablosundaki en çok değerlere göre: 0,1 A’de 0,34 V, 1 A’de 0,60 V, 3 A’de 0,90 V (onsemi, Diodes). Ters sızıntı ≈ 0,88 mA (tablo: 40 V’ta en çok 1 mA). Eklem kapasitesi Diodes SPICE modelinden (4 V’ta ≈ 119 pF; tablo tipik 110 pF); Schottky’de ters toparlanma yoktur. 1N4001 ile aynı gövde; ayırmak için gövdedeki yazıya bak.',
       KBP307:
-        'KBP307: 3 A, 1000 V köprü diyot (dört diyot tek pakette; bacaklar + ~ ~ −). Her diyodun ileri gerilimi DOWO veri sayfasının tipik eğrisinden: 10 mA’de ≈ 0,64 V, 0,1 A’de ≈ 0,75 V, 1 A’de ≈ 0,93 V (tablo: 3 A’de en çok 1,1 V). Kapasite ve ters toparlanma hesaplanmaz.',
+        'KBP307: 3 A, 1000 V köprü diyot (dört diyot tek pakette; bacaklar + ~ ~ −). Her diyodun ileri gerilimi DOWO veri sayfasının tipik eğrisinden: 10 mA’de ≈ 0,64 V, 0,1 A’de ≈ 0,75 V, 1 A’de ≈ 0,93 V (tablo: 3 A’de en çok 1,1 V). Diyot başına 25 pF’lık eklem kapasitesi hesaplanır (DOWO tablosunda yok; aynı adlı HXY KBP307’nin tipik değeri); ters toparlanma hesaplanmaz.',
       '1N4001':
         '1N4001: 1 A, 50 V doğrultucu diyot. İleri gerilim 10 mA’de ≈ 0,60 V, 100 mA’de ≈ 0,72 V (Vishay veri sayfası). Eklem kapasitesi (0 V’ta ≈ 30 pF) ve ters toparlanma (τ_{T} ≈ 5,8 µs) de hesaplanır: frekans arttıkça diyot ters yönde de bir süre akım geçirir; 1 MHz’te neredeyse doğrultmaz.',
       genel: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer; kapasitesi yoktur, her frekansta anında iletir ya da keser.',

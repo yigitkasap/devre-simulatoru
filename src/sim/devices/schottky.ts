@@ -12,12 +12,17 @@ import { SeriesJunction } from './seriesJunction';
 //   3 A'de 0,90 V    — Diodes Inc. DS23001 s. 2; onsemi, Vishay aynı
 //   ⇒ RS = 0,112 Ω, N = 2,69 (N·VT = 69,4 mV), IS = 0,885 mA (üç noktadan da tam geçer).
 // Sızıntı: ters yönde akım ≈ IS = 0,88 mA (tablo: 40 V'ta, 25 °C'de en çok 1,0 mA; dört üreticide aynı).
-// Kırılma modellenmez; ters gerilim VRRM'yi (40 V) aşarsa uyarı. Eklem kapasitesi (tablo: 4 V'ta tipik
-// 110 pF) hesaplanmaz.
+// Kırılma modellenmez; ters gerilim VRRM'yi (40 V) aşarsa uyarı.
+// Eklem kapasitesi: Diodes Inc. SPICE modelinin CJO = 203 pF, M = 0,333 değerleri (VJ modelde yok:
+// SPICE varsayılanı 1 V); 4 V'ta 119 pF verir, tablodaki tipik 110 pF'a (DS23001 s. 2, 4 V, 1 MHz)
+// yakın. Modelin TT'si (4,32 µs) alınmadı: Schottky'de azınlık taşıyıcı depolanmaz, ters toparlanma
+// yoktur. Kapasite, bütün eklemler ters kutuplanınca yalnızca diyotlarla bağlı kalan bir devre
+// parçasının (yalıtılmış kaynaklı köprü) Newton çözümünü de kararlı tutar.
 export const SCHOTTKY_IS = 8.84838e-4;
 export const SCHOTTKY_N = 2.68541;
 export const SCHOTTKY_RS = 0.111886;
 export const SCHOTTKY_VRRM = 40;
+export const SCHOTTKY_CHARGE = { cj0: 203e-12, vj: 1, m: 0.333, tt: 0 };
 
 export const SCHOTTKY_MODELS = ['1N5819'] as const;
 export const SCHOTTKY_DEFAULTS = { model: '1N5819' as (typeof SCHOTTKY_MODELS)[number] };
@@ -32,7 +37,7 @@ export class SchottkyDevice extends Device {
   constructor(init: DeviceInit) {
     super(init);
     const [anode, cathode, inner] = init.nodes as [number, number, number];
-    this.diode = new SeriesJunction(SCHOTTKY_IS, SCHOTTKY_N, SCHOTTKY_RS, anode, inner, cathode);
+    this.diode = new SeriesJunction(SCHOTTKY_IS, SCHOTTKY_N, SCHOTTKY_RS, anode, inner, cathode, SCHOTTKY_CHARGE);
   }
 
   override get nonlinear(): boolean {
@@ -53,6 +58,10 @@ export class SchottkyDevice extends Device {
 
   override restoreIterate(): void {
     this.diode.junction.restore();
+  }
+
+  override lteStates(): ReadonlyArray<readonly [number, number]> {
+    return [this.diode.lteState()!];
   }
 
   override accept(x: Float64Array, ctx: StepContext): void {

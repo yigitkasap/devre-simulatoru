@@ -1,7 +1,7 @@
 import type { MnaSystem } from '../mna';
 import { nodeVoltage } from '../mna';
 import type { StepContext } from './device';
-import { Junction } from './junction';
+import { type ChargeParams, Junction } from './junction';
 
 /**
  * Seri dirençli eklem (SPICE diyodunun RS'si): anot → RS → iç düğüm → eklem → katot. Yüksek akımda
@@ -18,8 +18,10 @@ export class SeriesJunction {
     readonly anode: number,
     readonly inner: number,
     readonly cathode: number,
+    /** Eklem kapasitesi (yoksa eklem anlık davranır). */
+    charge: ChargeParams | null = null,
   ) {
-    this.junction = new Junction(saturationCurrent, emission);
+    this.junction = new Junction(saturationCurrent, emission, charge);
   }
 
   stampStatic(sys: MnaSystem): void {
@@ -34,7 +36,12 @@ export class SeriesJunction {
     return this.junction.update(nodeVoltage(x, this.inner) - nodeVoltage(x, this.cathode));
   }
 
-  /** Anottan girip katottan çıkan akım. */
+  /** Kapasiteli eklemde zaman adımının denetlediği durum: eklem gerilimi (iç düğüm − katot). */
+  lteState(): readonly [number, number] | null {
+    return this.junction.charge ? [this.inner, this.cathode] : null;
+  }
+
+  /** Anottan girip katottan çıkan akım (kapasitif akım dahil). */
   current(x: Float64Array): number {
     return (nodeVoltage(x, this.anode) - nodeVoltage(x, this.inner)) / this.resistance;
   }

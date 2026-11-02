@@ -901,7 +901,7 @@ export class CircuitSimulator {
       this.accumulate(h);
       this.sampleWatched(h);
       this.pushHistory();
-      this.eulerNext = landing || this.limitEvent;
+      this.eulerNext = landing || this.limitEvent || this.nonlinearDevices.some((d) => d.discontinuity());
       if (this.lteStates.length === 0) {
         // Durum değişkeni yok (ör. AC kaynak, direnç, diyot): en büyük adım; yakınsama için
         // küçülmüşse art arda başarılı adımlardan sonra büyür.

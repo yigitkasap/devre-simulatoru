@@ -246,6 +246,16 @@ export abstract class Device {
   /** Adım kabul edildi: durumu kaydet. */
   accept(_x: Float64Array, _ctx: StepContext): void {}
 
+  /**
+   * Son kabul edilen adımda bileşenin kipi değişti mi (regülatörün akım sınırından ayara geçmesi gibi)
+   * ya da akımı adım adım bir artıp bir azalıyor mu? Öyleyse motor sonraki adımı geri Euler'le atar:
+   * yamuk kuralı, neredeyse ideal bir gerilim kaynağına bağlı kondansatörde süreksizlikten sonra
+   * sönmeyen bir akım salınımı bırakır.
+   */
+  discontinuity(): boolean {
+    return false;
+  }
+
   /** Kabul edilen çözümü `time` anının ölçümü olarak kaydet (osiloskop). */
   observe(_x: Float64Array, _time: number): void {}
 

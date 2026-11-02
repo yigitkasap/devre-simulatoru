@@ -10,12 +10,17 @@ import { SeriesJunction } from './seriesJunction';
 //   ⇒ en küçük kareler: IS = 1,64·10⁻⁷ A, N = 2,21, RS = 34,5 mΩ (beş noktada da fark ≤ 0,016 V).
 // Tablo (LGE "KBP301 THRU KBP307" 20170701-P1 ve DOWO): diyot başına en çok 1,1 V (3 A), VRRM 1000 V,
 // sızıntı 25 °C'de en çok 5 µA (LGE) / 10 µA (DOWO). Modelde ters akım ≈ IS = 0,16 µA.
-// Eklem kapasitesi ve ters toparlanma modellenmez (tabloda değer yok, yalnızca eğri).
+// Eklem kapasitesi: DOWO ve LGE tablolarında değer yok (yalnızca eğri). Aynı adlı HXY KBP307'nin (800 V;
+// LCSC C7507388) tablosundaki tipik 25 pF (diyot başına, 4 V, 1 MHz) gerilimden bağımsız alınır. Kapasite,
+// dört diyot birden ters kutuplanınca yalnızca köprüyle bağlı kalan kaynağın (yalıtılmış AC kaynak,
+// transformatörün ikincili) Newton çözümünü kararlı tutar; yalnızca GMIN'le bağlı düğüm çözülemezdi.
+// Ters toparlanma modellenmez (tabloda değer yok).
 export const BRIDGE_IS = 1.64078e-7;
 export const BRIDGE_N = 2.21472;
 export const BRIDGE_RS = 0.0344867;
 /** Tablodaki en büyük ters gerilim (LGE ve DOWO KBP307). */
 export const BRIDGE_VRRM = 1000;
+export const BRIDGE_CHARGE = { cj0: 25e-12, vj: 1, m: 0, tt: 0 };
 
 export const BRIDGE_MODELS = ['KBP307'] as const;
 export const BRIDGE_DEFAULTS = { model: 'KBP307' as (typeof BRIDGE_MODELS)[number] };
@@ -31,7 +36,7 @@ export class BridgeDevice extends Device {
   constructor(init: DeviceInit) {
     super(init);
     const [ac1, plus, ac2, minus, i0, i1, i2, i3] = init.nodes as [number, number, number, number, number, number, number, number];
-    const d = (anode: number, inner: number, cathode: number) => new SeriesJunction(BRIDGE_IS, BRIDGE_N, BRIDGE_RS, anode, inner, cathode);
+    const d = (anode: number, inner: number, cathode: number) => new SeriesJunction(BRIDGE_IS, BRIDGE_N, BRIDGE_RS, anode, inner, cathode, BRIDGE_CHARGE);
     this.diodes = [d(ac1, i0, plus), d(ac2, i1, plus), d(minus, i2, ac1), d(minus, i3, ac2)];
   }
 
@@ -55,6 +60,10 @@ export class BridgeDevice extends Device {
 
   override restoreIterate(): void {
     for (const d of this.diodes) d.junction.restore();
+  }
+
+  override lteStates(): ReadonlyArray<readonly [number, number]> {
+    return this.diodes.map((d) => d.lteState()!);
   }
 
   override accept(_x: Float64Array, ctx: StepContext): void {

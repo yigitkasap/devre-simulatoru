@@ -122,6 +122,11 @@ export class RegulatorDevice extends Device {
   private saved: { mode: Mode; i0: number; head: number } = { mode: 'reg', i0: 0, head: 0 };
   /** Başvuru ucu akımının doğrusallaştırma noktası (giriş − başvuru). */
   private head = 0;
+  /** Son kabul edilen adımda durum değişti ya da akım salınıyor (süreksizlik). */
+  private jumped = false;
+  /** Son kabul edilen geçiş akımı ve bir önceki adıma göre değişimi. */
+  private lastCurrent = 0;
+  private lastDelta = 0;
 
   constructor(init: DeviceInit, type: 'reg7805' | 'lm317') {
     super(init);
@@ -212,8 +217,25 @@ export class RegulatorDevice extends Device {
     this.head = this.saved.head;
   }
 
-  override accept(): void {
+  /**
+   * Durum değiştiyse ya da geçiş akımı adım adım bir artıp bir azalıyorsa (yamuk kuralının salınımı)
+   * süreksizlik bildirilir. Salınım çıkıştaki kondansatörde başlar: ayar durumunda çıkış neredeyse ideal
+   * bir gerilim kaynağıdır (RO çok küçük), yamuk kuralı da kondansatör akımındaki bir tutarsızlığı
+   * söndürmez; bir geri Euler adımı onu sıfırlar.
+   */
+  override accept(x: Float64Array): void {
+    const i = x[this.branch]!;
+    const delta = i - this.lastCurrent;
+    const tolerance = 1e-6 + 1e-4 * Math.abs(i);
+    const ringing = delta * this.lastDelta < 0 && Math.abs(delta) > tolerance && Math.abs(this.lastDelta) > tolerance;
+    this.jumped = this.mode !== this.saved.mode || ringing;
+    this.lastCurrent = i;
+    this.lastDelta = delta;
     this.saved = { mode: this.mode, i0: this.i0, head: this.head };
+  }
+
+  override discontinuity(): boolean {
+    return this.jumped;
   }
 
   private state(x: Float64Array) {
@@ -253,6 +275,8 @@ export class RegulatorDevice extends Device {
       this.i0 = prev.i0;
       this.head = prev.head;
       this.saved = { ...prev.saved };
+      this.lastCurrent = prev.lastCurrent;
+      this.lastDelta = prev.lastDelta;
     }
   }
 }
