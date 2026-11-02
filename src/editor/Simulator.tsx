@@ -2023,7 +2023,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           <div className={`relative flex min-h-0 flex-1 ${stacked ? 'flex-col' : ''}`}>
             <main className="relative min-h-0 min-w-0 flex-1 bg-paper">
               {canvas}
-              {viewMode === 'schematic' && !phone && (
+              {viewMode === 'schematic' && !phone && !boardMode && (
                 <CanvasControls
                   onZoomOut={() => canvasRef.current?.zoomOut()}
                   onZoomIn={() => canvasRef.current?.zoomIn()}
@@ -2446,7 +2446,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                 </p>
               )
             )}
+            {/* Şemanın yakınlaştırma grubu Tahtada kur'da yok (tahtanın kendi grubu var). */}
             {viewMode === 'schematic' &&
+              !boardMode &&
               (connect ? (
                 <WiringControls
                   canUndo={state.past.length > 0}

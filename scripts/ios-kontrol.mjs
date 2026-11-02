@@ -2741,6 +2741,9 @@ try {
     let panel = page.getByRole('region', { name: 'Tahtada kur paneli' });
     const entered = (await panel.count()) === 1 && ((await panel.textContent()) ?? '').includes('0 / 4 takılı') && ((await panel.textContent()) ?? '').includes('Deney 9');
     check('Tahtada kur (T6): Örnekler’de her kartta “Tahtada kur”: örnek açılıyor, tahta boş, şema sağ panelde', entered);
+    // Şemanın yakınlaştırma grubu (Uzaklaştır, Yakınlaştır, Devreyi ekrana sığdır, 3B) Tahtada kur'da yok; tahtanın grubu tek.
+    const schematicControls = async (p) => [(await p.getByRole('button', { name: 'Devreyi ekrana sığdır' }).count()), (await p.getByRole('button', { name: 'Uzaklaştır', exact: true }).count())];
+    const fromExample = await schematicControls(page);
     await page.getByRole('button', { name: /Tahtada kur’dan çık/ }).click(); await page.waitForTimeout(400);
     await page.getByRole('button', { name: /^Dosya|^Transistör anahtar/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
@@ -2764,6 +2767,9 @@ try {
     panel = sp.getByRole('region', { name: 'Tahtada kur paneli' });
     const text = (await panel.textContent()) ?? '';
     const locked = (await sp.getByRole('button', { name: /Tahtada kur’dan çık/ }).count()) === 0 && (await sp.getByRole('switch', { name: 'Bağlı delikleri göster' }).count()) === 0;
+    const fromTask = await schematicControls(sp);
+    check('Tahtada kur: Örnekler’den ve görev bağlantısından girince şemanın yakınlaştırma grubu (Devreyi ekrana sığdır, ikinci Uzaklaştır) görünmüyor',
+      fromExample.join(',') === '0,1' && fromTask.join(',') === '0,1', `${fromExample} / ${fromTask}`);
     await sp.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await sp.waitForTimeout(300);
     const noPlay = ((await sp.getByRole('alert').allTextContents()).join(' ')).includes('Bu görevde Oynat kapalı');
     check('Tahtada kur (T6, öğrenci): bağlantı doğrudan bu kipte açılıyor; Çık ve Bağlı delikler gizli; Q1 hazır takılı (1 / 4 takılı); Oynat kapalı; “Denetle hakkı: 3”',
