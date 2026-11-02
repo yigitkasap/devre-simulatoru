@@ -67,7 +67,7 @@ function BoardDiagram({ doc, plan }: { doc: CircuitDoc; plan: BreadboardPlan }) 
         const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
         const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
         const name = label(p.partId);
-        if (p.mount === 'dip8') {
+        if (p.mount === 'dip8' || p.mount === 'dip4') {
           return (
             <g key={p.partId}>
               <rect x={Math.min(...xs) - 0.5} y={cy - 1.2} width={Math.max(...xs) - Math.min(...xs) + 1} height={2.4} rx={0.2} fill="#24262a" />

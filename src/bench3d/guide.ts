@@ -90,6 +90,8 @@ function describe(part: Part): { name: string; detail: string } {
     }
     case 'opamp':
       return { name: 'İşlemsel yükselteç LM741', detail: 'DIP-8; 8 bacaklı soketle' };
+    case 'opto':
+      return { name: `Optokuplör ${typeof p.model === 'string' ? p.model : 'PC817'}`, detail: 'DIP-4; 1. bacak (nokta) anot' };
     case 'timer555':
       return { name: '555 zamanlayıcı NE555', detail: 'DIP-8; 8 bacaklı soketle' };
     case 'potentiometer':
@@ -171,6 +173,14 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         break;
       case 'switch':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: holes.join(' ↔ ') });
+        break;
+      case 'opto':
+        steps.push({
+          group: 'ic',
+          title: `${part.label} · ${material}`,
+          holes: `orta kanalın üstünde, ${at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ')}`,
+          note: `Noktalı köşe (1. bacak, A) ${name(at.holes[0]!)} deliğinde; LED tarafı (A, K) alt yarıda, çıkış (C, E) üst yarıda.`,
+        });
         break;
       case 'opamp':
       case 'timer555': {

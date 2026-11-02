@@ -297,3 +297,59 @@ describe('Ayarlı regülatör LM317', () => {
     expect([cols[1]! + 1, cols[1]! + 2]).toEqual([cols[2], cols[0]]);
   });
 });
+
+describe('Optokuplör (PC817)', () => {
+  /** LED: 5 V, 330 Ω; çıkış: 5 V, 470 Ω kollektör yükü (ayrı toprak gibi ama aynı devre). */
+  const build = (rank: string, rc: number) =>
+    new CircuitSimulator(
+      circuit()
+        .battery('B1', 'v', 'gnd', 5)
+        .resistor('R1', 'v', 'a', 330)
+        .add('opto', 'U1', ['a', 'gnd', 'c', 'gnd'], { model: 'PC817', rank })
+        .resistor('RC', 'v', 'c', rc)
+        .ground('G1', 'gnd')
+        .build(),
+    );
+  it('LED eğrisi (Şekil 6): 10 mA civarında ≈ 1,22 V; çıkış aktifken I_C = CTR · I_F (C sınıfı %300)', () => {
+    const sim = build('C', 100e3);
+    sim.advance(0);
+    const o = sim.status('U1').opto!;
+    expect(o.led).toBeGreaterThan(10e-3);
+    expect(o.led).toBeLessThan(12e-3);
+    expect(o.ledVoltage).toBeGreaterThan(1.2);
+    expect(o.ledVoltage).toBeLessThan(1.25);
+    // 100 kΩ yükte çıkış doyar (CTR · I_F ≈ 34 mA'yı çekemez): V_CE küçük.
+    expect(o.saturated).toBe(true);
+    expect(o.vce).toBeLessThan(0.15);
+  });
+
+  it('dış devre yeterince akım çekebiliyorsa I_C = CTR · I_F; sınıfa göre (A %120, D %450)', () => {
+    for (const [rank, ctr] of [['A', 1.2], ['D', 4.5]] as const) {
+      const sim = new CircuitSimulator(
+        circuit().battery('B1', 'v', 'gnd', 5).resistor('R1', 'v', 'a', 4700).add('opto', 'U1', ['a', 'gnd', 'c', 'gnd'], { rank }).battery('B2', 'c', 'gnd', 5).ground('G1', 'gnd').build(),
+      );
+      sim.advance(0);
+      const o = sim.status('U1').opto!;
+      expect(o.output / o.led).toBeCloseTo(ctr, 6);
+    }
+  });
+
+  it('doyma tablonun koşulunda: I_F = 20 mA, I_C = 1 mA iken V_CE = 0,1 V', () => {
+    const sim = new CircuitSimulator(
+      circuit().add('currentsource', 'I1', ['gnd', 'a'], { current: 20e-3 }).add('opto', 'U1', ['a', 'gnd', 'c', 'gnd'], { rank: 'C' }).add('currentsource', 'I2', ['gnd', 'c'], { current: 1e-3 }).ground('G1', 'gnd').build(),
+    );
+    sim.advance(0);
+    expect(sim.status('U1').opto!.vce).toBeCloseTo(0.1, 4);
+  });
+
+  it("breadboard'da DIP-4 orta kanalın üstünde: A, K alt yarıda; E, C üst yarıda (C, A'nın karşısında)", () => {
+    const doc = { version: 1 as const, parts: [{ id: 'u', type: 'opto' as const, label: 'U1', x: 0, y: 0, rotation: 0 as const, props: { rank: 'C' } }], wires: [] };
+    const at = planBreadboard(doc).onBoard.get('u')!;
+    expect(at.mount).toBe('dip4');
+    const h = at.holes.map((x) => (x.kind === 'strip' ? [x.col, x.row] : [-1, -1]));
+    expect(h[0]![1]).toBe(5);
+    expect(h[1]).toEqual([h[0]![0]! + 1, 5]);
+    expect(h[2]).toEqual([h[0]![0], 4]);
+    expect(h[3]).toEqual([h[0]![0]! + 1, 4]);
+  });
+});

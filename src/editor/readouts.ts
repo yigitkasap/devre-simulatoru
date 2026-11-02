@@ -499,6 +499,21 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
       };
     }
+    case 'opto': {
+      const o = status.opto;
+      if (!o) return { title, rows: [] };
+      return {
+        title,
+        rows: [
+          { label: t.ledCurrent, value: a(o.led) },
+          { label: t.forwardVoltage, value: v(o.ledVoltage) },
+          { label: t.outputCurrent2, value: a(o.output) },
+          { label: t.vce, value: v(o.vce) },
+          { label: 'CTR', value: `%${formatNumber(o.ctr * 100, 0)}` },
+        ],
+        note: t.optoNote(`%${formatNumber(o.ctr * 100, 0)}`, a(o.ctr * o.led), o.saturated),
+      };
+    }
     case 'reg7805':
     case 'lm317': {
       const r = status.regulator;

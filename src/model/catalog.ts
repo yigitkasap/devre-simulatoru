@@ -35,6 +35,9 @@ import {
   BRIDGE_MODELS,
   LM317_DEFAULTS,
   LM317_MODELS,
+  OPTO_DEFAULTS,
+  OPTO_MODELS,
+  OPTO_RANKS,
   SCHOTTKY_DEFAULTS,
   SCHOTTKY_MODELS,
   CAPACITOR_DEFAULTS,
@@ -465,6 +468,27 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: true,
   },
+  opto: {
+    type: 'opto',
+    category: 'ics',
+    labelPrefix: 'U',
+    // LED solda (A üstte, K altta), fototransistör sağda (C üstte, E altta).
+    pins: [
+      { x: -4, y: -1 },
+      { x: -4, y: 1 },
+      { x: 4, y: -1 },
+      { x: 4, y: 1 },
+    ],
+    bounds: { x: -4, y: -2.4, w: 8, h: 4.8 },
+    defaultProps: { ...OPTO_DEFAULTS },
+    // Kartta ana ayar CTR sınıfı (kullanıcı kararı); model Diğer ayarlar'da.
+    propDefs: [
+      { kind: 'select', key: 'rank', options: OPTO_RANKS },
+      { kind: 'select', key: 'model', options: OPTO_MODELS },
+    ],
+    showLabel: true,
+    polarized: true,
+  },
   lm317: {
     type: 'lm317',
     category: 'ics',
@@ -827,7 +851,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'passive', types: ['resistor', 'potentiometer', 'capacitor', 'inductor', 'transformer'] },
   { id: 'semiconductors', types: ['diode', 'zener', 'led', 'bridge', 'schottky'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
-  { id: 'ics', types: ['opamp', 'timer555', 'arduino', 'reg7805', 'lm317'] },
+  { id: 'ics', types: ['opamp', 'timer555', 'arduino', 'reg7805', 'lm317', 'opto'] },
   { id: 'switches', types: ['switch', 'pushbutton', 'spdt', 'relay', 'fuse'] },
   { id: 'outputs', types: ['lamp', 'motor', 'speaker', 'buzzer'] },
   { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },

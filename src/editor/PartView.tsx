@@ -31,6 +31,7 @@ export function partValueText(part: Part): string {
     case 'reg7805':
       return '5 V';
     case 'lm317':
+    case 'opto':
       return modelName(part);
     case 'acsource': {
       const peak = formatSI(numProp(p, 'amplitude', 0), 'V', { trim: true, digits: 4 });

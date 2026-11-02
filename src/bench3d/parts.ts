@@ -519,6 +519,46 @@ export function to220Model(type: DeviceType, text: string, subtitle: string, leg
   return { root, anchors };
 }
 
+// --- Optokuplör (PC817, DIP-4): krem gövde, 1. bacak noktası (newParts.ts) -------------------------------------
+
+/**
+ * Gövde uçlara göre yönlenir: LED tarafı (A, K) ile çıkış tarafı (C, E) karşılıklı kenarlarda. Masada
+ * şema pinleri, breadboard'da orta kanalın iki yanındaki delikler (A, K bir yanda; E, C öbür yanda).
+ */
+export function optoModel(props: Props): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('opto');
+  const [a, k, c, e] = anchors as [Vector3, Vector3, Vector3, Vector3];
+  const center = [a, k, c, e].reduce((s, p) => s.add(p), new Vector3()).multiplyScalar(0.25);
+  const across = c.clone().add(e).sub(a).sub(k).setY(0).normalize();
+  const along = k.clone().sub(a).setY(0).normalize();
+  const bw = 2.56;
+  const bd = 1.8;
+  const bh = 1.4;
+  const y0 = 0.9;
+  const text = typeof props.model === 'string' ? props.model : 'PC817';
+  const body = new Group();
+  const chip = new Mesh(new BoxGeometry(bd, bh, bw), mat('#e9e4d6', 0.55));
+  chip.position.y = y0 + bh / 2;
+  body.add(chip);
+  const plate = labelPlate(text, bw * 0.8, 0.6, { fg: '#26292e', bg: '#e9e4d6' });
+  plate.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+  plate.position.set(0, y0 + bh + 0.01, 0);
+  body.add(plate);
+  body.position.set(center.x, 0, center.z);
+  body.rotation.y = Math.atan2(-across.z, across.x);
+  root.add(body);
+  // 1. bacak noktası (A'nın köşesinde).
+  const dot = center.clone().addScaledVector(across, -bd / 2 + 0.3).addScaledVector(along, -bw / 2 + 0.35);
+  root.add(mesh(new CylinderGeometry(0.13, 0.13, 0.04, 14), mat('#26292e', 0.6), dot.x, y0 + bh + 0.02, dot.z));
+  // Bacaklar: gövdenin iki yanından, kendi uçlarına.
+  for (const [pin, side, row] of [[a, -1, -0.5], [k, -1, 0.5], [c, 1, -0.5], [e, 1, 0.5]] as const) {
+    const root0 = center.clone().addScaledVector(across, (side * bd) / 2).addScaledVector(along, row).setY(y0 + 0.4);
+    root.add(legDown(root0, pin, 0.1));
+  }
+  return { root, anchors };
+}
+
 // --- Köprü diyot (KBP tipi, düz sıralı 4 bacak: + ~ ~ −; tasarım: parcalar-3b/newParts.ts) -----------------
 
 export function bridgeModel(props: Props): PartModel {

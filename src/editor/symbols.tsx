@@ -633,6 +633,28 @@ function Spdt({ to }: { to: SpdtThrow }) {
   );
 }
 
+/**
+ * Optokuplör: kesikli kutuda solda LED (A üst, K alt), sağda fototransistör (C üst, E alt), arada ışık
+ * okları. Uçlar: A (−40, −10), K (−40, 10), C (40, −10), E (40, 10).
+ */
+function Optocoupler() {
+  return (
+    <g>
+      <rect x={-27} y={-23} width={54} height={46} rx={2} fill="none" stroke="currentColor" strokeWidth={1.6} strokeDasharray="4 3" />
+      <path d="M-40,-10 H-15 V-7 M-15,7 V10 H-40" fill="none" stroke="currentColor" strokeWidth={2} />
+      <path d="M-22,-7 L-8,-7 L-15,5 Z" fill="currentColor" />
+      <line x1={-22} y1={5} x2={-8} y2={5} stroke="currentColor" strokeWidth={2.4} />
+      <line x1={-4} y1={-3} x2={4} y2={-3} stroke="currentColor" strokeWidth={1.6} />
+      <path d={arrowHead(7, -3, 1, 0, 5, 2.6)} fill="currentColor" />
+      <line x1={-4} y1={3} x2={4} y2={3} stroke="currentColor" strokeWidth={1.6} />
+      <path d={arrowHead(7, 3, 1, 0, 5, 2.6)} fill="currentColor" />
+      <line x1={11} y1={-9} x2={11} y2={9} stroke="currentColor" strokeWidth={2.6} />
+      <path d="M11,-4 L20,-10 H40 M11,4 L20,10 H40" fill="none" stroke="currentColor" strokeWidth={2} />
+      <path d={arrowHead(20, 10, 9, 6, 6, 3)} fill="currentColor" />
+    </g>
+  );
+}
+
 /** Gerilim regülatörü: IN (sol), OUT (sağ), GND / ADJ (alt) uçlu kutu; giriş yetmiyorsa turuncu çerçeve. */
 function Regulator({ text, rotation, dropout }: { text: string; rotation: Rotation; dropout: boolean }) {
   return (
@@ -1256,6 +1278,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Regulator text="7805" rotation={rotation} dropout={live?.dropout ?? false} />;
     case 'lm317':
       return <Regulator text="LM317" rotation={rotation} dropout={live?.dropout ?? false} />;
+    case 'opto':
+      return <Optocoupler />;
   }
 }
 

@@ -23,6 +23,7 @@ import {
   ledModel,
   motorModel,
   ntcModel,
+  optoModel,
   potentiometerModel,
   pushButtonModel,
   relayModel,
@@ -97,6 +98,8 @@ function build(part: Part): PartModel {
     case 'reg7805':
       // Bacak sırası IN, GND, OUT (ST L78 Şekil 2).
       return to220Model('reg7805', 'L7805CV', '5 V · 1,5 A', [0, 1, 2]);
+    case 'opto':
+      return optoModel(p);
     case 'lm317':
       // Bacak sırası ADJ, OUT, IN (ST LM317 Şekil 1, TI Şekil 5-2).
       return to220Model('lm317', 'LM317T', 'ADJ · 1,5 A', [1, 2, 0]);

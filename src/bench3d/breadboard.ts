@@ -59,7 +59,7 @@ export function holeXZ(h: Hole, cols: number): { x: number; z: number } {
     : { x: railX(h.k, cols), z: boardZ(h.board) + railZ(h.rail) };
 }
 
-export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8' | 'button' | 'inline';
+export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8' | 'dip4' | 'button' | 'inline';
 
 export interface BoardPart {
   readonly partId: string;
@@ -134,6 +134,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   pmos: { mount: 'to92' },
   potentiometer: { mount: 'pot' },
   opamp: { mount: 'dip8' },
+  opto: { mount: 'dip4' },
   timer555: { mount: 'dip8' },
 };
 
@@ -152,6 +153,11 @@ const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
 const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = {
   opamp: [2, 3, 6, 7, 4], // LM741: −, +, OUT, V+, V− (1, 5, 8 boş)
   timer555: [1, 2, 3, 4, 5, 6, 7, 8],
+};
+
+/** DIP-4: parça pin sırası → bacak numarası (PC817: 1 A, 2 K, 3 E, 4 C; Sharp iç bağlantı şeması). */
+const DIP4_PINS: Partial<Record<DeviceType, readonly number[]>> = {
+  opto: [1, 2, 4, 3],
 };
 
 /** Masadaki parçaların yeri: sol sütun, arka sıra (cihazlar), ön sıra. */
@@ -356,20 +362,21 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
   for (const part of ordered) {
     const spec = MOUNTS[part.type];
     if (!spec) continue;
-    if (spec.mount === 'dip8') {
-      // Orta kanalın üstünde: iki yarının aynı dört sütunu.
+    if (spec.mount === 'dip8' || spec.mount === 'dip4') {
+      // Orta kanalın üstünde: iki yarının aynı dört (DIP-4'te iki) sütunu.
+      const half = spec.mount === 'dip4' ? 2 : 4;
       let board = 0;
       let start = 0;
       for (; ; board++) {
         if (board >= boards) boards = board + 1;
         const [top, bottom] = slotsOf(board);
         start = Math.max(top!.cursor, bottom!.cursor);
-        if (start + 3 <= cols - 1) break;
+        if (start + half - 1 <= cols - 1) break;
       }
       const [top, bottom] = slotsOf(board);
-      const map = DIP_PINS[part.type]!;
+      const map = (spec.mount === 'dip4' ? DIP4_PINS : DIP_PINS)[part.type]!;
       const legOf = (dip: number): { half: 0 | 1; col: number; row: number } =>
-        dip <= 4 ? { half: 1, col: start + dip - 1, row: 5 } : { half: 0, col: start + 8 - dip, row: 4 };
+        dip <= half ? { half: 1, col: start + dip - 1, row: 5 } : { half: 0, col: start + 2 * half - dip, row: 4 };
       const holes = map.map((dip, i) => {
         const at = legOf(dip);
         const s = takeStrip(board, at.half, at.col, net(part, i));
@@ -377,16 +384,16 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
         return stripHole(s, at.row);
       });
       const extraHoles: Hole[] = [];
-      for (let dip = 1; dip <= 8; dip++) {
+      for (let dip = 1; dip <= 2 * half; dip++) {
         if (map.includes(dip)) continue;
         const at = legOf(dip);
         extraHoles.push(stripHole(takeStrip(board, at.half, at.col, null), at.row));
       }
       for (const slot of [top!, bottom!]) {
         slot.frontier = 0;
-        slot.cursor = start + 3 + GAP;
+        slot.cursor = start + half - 1 + GAP;
       }
-      onBoard.set(part.id, { partId: part.id, mount: 'dip8', holes, extraHoles });
+      onBoard.set(part.id, { partId: part.id, mount: spec.mount, holes, extraHoles });
       continue;
     }
     if (spec.mount === 'button') {

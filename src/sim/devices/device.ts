@@ -98,6 +98,11 @@ export interface DeviceStatus {
    * güç; giriş yetmiyor mu (bırakma gerilimiyle sınırlı).
    */
   readonly regulator?: { readonly input: number; readonly output: number; readonly current: number; readonly power: number; readonly dropout: boolean };
+  /**
+   * Optokuplör: LED akımı ve gerilimi, çıkış (kollektör) akımı, VCE, CTR (oran); çıkış doymada mı
+   * (dış devre CTR · IF'den az akım çekiyor).
+   */
+  readonly opto?: { readonly led: number; readonly ledVoltage: number; readonly output: number; readonly vce: number; readonly ctr: number; readonly saturated: boolean };
   /** Basmalı düğme: basılı tutuluyor mu? */
   readonly pressed?: boolean;
   /** Röle: palet çekili mi (NA kontağı kapalı)? */

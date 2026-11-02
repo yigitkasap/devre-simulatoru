@@ -48,7 +48,8 @@ export type DeviceType =
   | 'bridge'
   | 'schottky'
   | 'reg7805'
-  | 'lm317';
+  | 'lm317'
+  | 'opto';
 
 export type PropValue = number | string | boolean;
 export type Props = Readonly<Record<string, PropValue>>;

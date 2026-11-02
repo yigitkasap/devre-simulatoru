@@ -67,6 +67,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   tank: 'Su haznesi',
   reg7805: 'Gerilim regülatörü',
   lm317: 'Ayarlı regülatör',
+  opto: 'Optokuplör',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -114,6 +115,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   tank: 'su haznesinin',
   reg7805: 'gerilim regülatörünün',
   lm317: 'ayarlı regülatörünün',
+  opto: 'optokuplörünün',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -160,6 +162,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
   reg7805: ['giriş ucu (IN)', 'toprak ucu (GND)', 'çıkış ucu (OUT)'],
   lm317: ['giriş ucu (IN)', 'ayar ucu (ADJ)', 'çıkış ucu (OUT)'],
+  opto: ['LED anodu (A)', 'LED katodu (K)', 'kollektör ucu (C)', 'emiter ucu (E)'],
 };
 
 /** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
@@ -207,6 +210,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   oscilloscope: ['A', 'B', 'COM'],
   reg7805: ['IN', 'GND', 'OUT'],
   lm317: ['IN', 'ADJ', 'OUT'],
+  opto: ['A', 'K', 'C', 'E'],
 };
 
 /** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
@@ -254,6 +258,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
   reg7805: ['IN', 'GND', 'OUT'],
   lm317: ['IN', 'ADJ', 'OUT'],
+  opto: ['A', 'K', 'C', 'E'],
 };
 
 function list(labels: readonly string[]): string {
@@ -588,6 +593,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Sabit 5 V çıkış veren doğrusal regülatör (7805): girişi çıkışın en az ≈ 2 V üstünde olduğu sürece çıkış 5 V’ta kalır, aradaki gerilim farkı ısı olarak harcanır. GND ucu toprağa bağlanır.',
   lm317:
     'Ayarlı doğrusal regülatör (LM317): çıkışı ADJ ucunun 1,25 V üstünde tutar. Çıkış ile ADJ arasına R1, ADJ ile toprak arasına R2 bağlanınca Vout = 1,25 V · (1 + R2 / R1). Giriş, çıkışın en az ≈ 1,5–2 V üstünde olmalı.',
+  opto:
+    'Bir LED ile bir fototransistör aynı kılıfta: LED’den akım geçince yanar, ışığı fototransistörü iletime sokar. İki taraf arasında elektriksel bağ yoktur (yalıtım); çıkış akımı yaklaşık CTR · IF, CTR akım aktarım oranıdır.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -648,6 +655,7 @@ function fieldLabel(type: DeviceType, key: string): string {
     internalResistance: 'İç direnç',
     current: 'Akım',
     contact: 'Tür',
+    rank: 'CTR sınıfı',
     to: 'Konum',
     resistance: 'Direnç',
     capacitance: 'Kapasite',
@@ -678,6 +686,7 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   kind: { electrolytic: 'Elektrolitik (kutuplu, +)', film: 'Seramik / film (kutupsuz)' },
   contact: { no: 'Normalde açık', nc: 'Normalde kapalı' },
   to: { a: 'C → A', b: 'C → B' },
+  rank: { A: 'A (%80–160; modelde %120)', B: 'B (%130–260; modelde %195)', C: 'C (%200–400; modelde %300)', D: 'D (%300–600; modelde %450)' },
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
   mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', a: 'Akım (A)', ohm: 'Direnç (Ω)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
   input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
@@ -1617,6 +1626,12 @@ export const tr = {
     switchClosedNote: (r: string) => `Kapalı anahtar ${r} değerinde bir dirençtir.`,
     pressed: 'basılı',
     dcOutput: 'DC çıkış (+ − −)',
+    ledCurrent: 'LED akımı (I_{F})',
+    outputCurrent2: 'Çıkış akımı (I_{C})',
+    optoNote: (ctr: string, ic: string, saturated: boolean) =>
+      saturated
+        ? `Çıkış doymada: dış devre CTR · I_{F}’den (${ctr}) az akım çekiyor, V_{CE} ≈ 0,1 V. LED ile çıkış arasında elektriksel bağ yok; bağı ışık kurar.`
+        : `I_{C} = CTR · I_{F} = ${ctr} (${ic}). LED ile çıkış arasında elektriksel bağ yok; bağı ışık kurar.`,
     regInput: 'Giriş',
     regOutput: 'Çıkış',
     inputMinusOutput: 'Giriş − çıkış',
@@ -2448,6 +2463,7 @@ export const tr = {
       tank: 'Su hazneleri',
       reg7805: 'Gerilim regülatörleri',
       lm317: 'Ayarlı regülatörler',
+      opto: 'Optokuplörler',
     } satisfies Record<DeviceType, string>,
   },
   file: {
@@ -2819,6 +2835,8 @@ export const tr = {
     } as Partial<Record<DeviceType, string>>,
     /** Parça modelinin notu (genel modellerde türün notu kullanılır). */
     modelNotes: {
+      PC817:
+        'PC817 (Sharp): LED’in ileri gerilimi 20 mA’de ≈ 1,28 V (veri sayfasının eğrisi; tablo tipik 1,2 V). Çıkış akımı I_{C} = CTR · I_{F}; CTR sınıfa göre (veri sayfası yalnızca aralık verir, modelde aralığın ortası). Dış devre daha az akım çekerse çıkış doyar: V_{CE} ≈ 0,1 V (tablodaki tipik değer, I_{F} = 20 mA, I_{C} = 1 mA). Giriş ile çıkış arasında 5 kV yalıtım.',
       LM317T:
         'LM317T: ayarlı regülatör, TO-220 (ST, TI, onsemi veri sayfaları). V_{REF} = 1,25 V (OUT − ADJ), ADJ akımı ≈ 50 µA, akım sınırı ≈ 2,2 A. Giriş, çıkışın bırakma gerilimi kadar üstünde olmalı (ST eğrisi: 20 mA’de ≈ 1,5 V, 1 A’de ≈ 2,05 V). Bacaklar ADJ, OUT, IN (7805’ten farklı).',
       '1N5819':
