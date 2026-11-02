@@ -350,7 +350,10 @@ const TOUCH_PIN_INSIDE_PX = 12;
 const DRAG_THRESHOLD_PX = 5;
 /** Dokunmatik: bu süre kıpırdamadan basılı tutmak sağ tık menüsünü açar (iOS'ta contextmenu olayı yok). */
 const LONG_PRESS_MS = 550;
-/** Dokunmatik: iki dokunuş arasındaki bu süre çift dokunuş sayılır (iOS'ta dblclick güvenilir değil). */
+/**
+ * Dokunmatik: iki dokunuş arasındaki bu süre çift dokunuş sayılır (iOS'ta dblclick güvenilir değil). Süre
+ * olayların kendi zaman damgasıyla (PointerEvent.timeStamp) ölçülür: sayfanın o anki yükü sonucu değiştirmez.
+ */
 const DOUBLE_TAP_MS = 350;
 /** Telefon: parça bu kadar basılı tutulunca sürüklenir; daha önce kayarsa tuval kaydırılır (N01). */
 const PHONE_HOLD_MS = 150;
@@ -875,18 +878,18 @@ export function Canvas({
     phone.onConnectStart(null);
   };
 
-  const phoneTap = (hit: Hit | null, g: Point, local: { x: number; y: number }) => {
+  /** `time`: dokunuşun zaman damgası (PointerEvent.timeStamp; performance.now ile aynı saat). */
+  const phoneTap = (hit: Hit | null, g: Point, local: { x: number; y: number }, time: number) => {
     if (!phone) return;
     if (phone.mode === 'bagla') {
       const target = connectTarget(local, g);
       if (!target) {
         // Boşluğa çift dokunuş: Bağla kipinden çık.
-        const now = performance.now();
-        if (now - lastEmptyTap.current < DOUBLE_TAP_MS) {
+        if (time - lastEmptyTap.current < DOUBLE_TAP_MS) {
           lastEmptyTap.current = 0;
           phone.onExitConnect();
         } else {
-          lastEmptyTap.current = now;
+          lastEmptyTap.current = time;
         }
         return;
       }
@@ -917,13 +920,12 @@ export function Canvas({
         return;
       }
       // Kur: çift dokunuş değer sayfasını yarım açar.
-      const now = performance.now();
       const previous = lastTap.current;
-      if (previous && previous.partId === hit.partId && now - previous.time < DOUBLE_TAP_MS) {
+      if (previous && previous.partId === hit.partId && time - previous.time < DOUBLE_TAP_MS) {
         lastTap.current = null;
         onOpenProperties(hit.partId);
       } else {
-        lastTap.current = { partId: hit.partId, time: now };
+        lastTap.current = { partId: hit.partId, time };
       }
       return;
     }
@@ -1366,7 +1368,7 @@ export function Canvas({
         if (phoneLongFired.current) return;
         const local = localPoint(e.clientX, e.clientY);
         const g = toGrid(e.clientX, e.clientY);
-        phoneTap(current.kind === 'press' ? current.hit : hitTest(g), g, local);
+        phoneTap(current.kind === 'press' ? current.hit : hitTest(g), g, local, e.timeStamp);
         return;
       }
       clearPhoneTimers();
@@ -1403,13 +1405,12 @@ export function Canvas({
         // Dokunmatik çift dokunuş: özellik penceresi.
         menuFromLongPress.current = false;
         if (current.kind === 'drag-parts' && e.pointerType !== 'mouse' && !moved && !longPressFired) {
-          const now = performance.now();
           const previous = lastTap.current;
-          if (previous && previous.partId === current.tapPartId && now - previous.time < DOUBLE_TAP_MS) {
+          if (previous && previous.partId === current.tapPartId && e.timeStamp - previous.time < DOUBLE_TAP_MS) {
             lastTap.current = null;
             onOpenProperties(current.tapPartId);
           } else {
-            lastTap.current = { partId: current.tapPartId, time: now };
+            lastTap.current = { partId: current.tapPartId, time: e.timeStamp };
           }
         }
         return;

@@ -61,6 +61,16 @@ async function drag(page, cdp, from, to, holdMs = 30) {
   await t.end(); await page.waitForTimeout(200);
 }
 async function tap(page, cdp, p, holdMs = 40) { const t = touch(cdp); await t.start(p.x, p.y); await page.waitForTimeout(holdMs); await t.end(); await page.waitForTimeout(150); }
+/**
+ * Çift dokunuş: dört dokunma olayı açık zaman damgalarıyla (40 ms bas, 80 ms ara, 40 ms bas). Uygulama süreyi
+ * olayların zaman damgasından ölçer; makinenin yükü ya da CDP'nin gecikmesi aradaki süreyi değiştirmez.
+ */
+async function doubleTap(page, cdp, p) {
+  const t0 = Date.now() / 1000;
+  const at = (type, dt) => cdp.send('Input.dispatchTouchEvent', { type, timestamp: t0 + dt, touchPoints: type === 'touchEnd' ? [] : [{ x: p.x, y: p.y }] });
+  await at('touchStart', 0); await at('touchEnd', 0.04); await at('touchStart', 0.12); await at('touchEnd', 0.16);
+  await page.waitForTimeout(150);
+}
 const screen = (page, gx, gy) => page.evaluate(([x, y]) => {
   const svg = document.querySelector('svg.schematic'); const g = svg.querySelector('g[transform]');
   const m = g.getAttribute('transform').match(/translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)/); const r = svg.getBoundingClientRect();
@@ -355,7 +365,7 @@ try {
     check('yakınlaştırmadan sonra parça yine tek parmakla taşınıyor', r1f.x !== r1e.x, `(${r1e.x},${r1e.y}) → (${r1f.x},${r1f.y})`);
     // Çift dokunuş: kartı açılır, şema şeride küçülür (DP3).
     s = await screen(page, r1f.x, r1f.y);
-    await tap(page, cdp, s); await page.waitForTimeout(80); await tap(page, cdp, s); await page.waitForTimeout(400);
+    await doubleTap(page, cdp, s); await page.waitForTimeout(400);
     const strip = await page.getByRole('button', { name: /^Şemayı aç/ }).boundingBox();
     const field = phoneNotebook(page).getByLabel('Direnç', { exact: true });
     const fontSize = await field.evaluate((el) => getComputedStyle(el).fontSize).catch(() => '');
