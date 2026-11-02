@@ -353,3 +353,61 @@ describe('Optokuplör (PC817)', () => {
     expect(h[3]).toEqual([h[0]![0]! + 1, 4]);
   });
 });
+
+describe('Tristör (MCR100-6)', () => {
+  /** 9 V, 470 Ω, LED, tristör; kapı 10 kΩ üstünden düğmeyle 9 V'a; anot beslemesi anahtarla. */
+  const latch = (pressed: boolean, supply: boolean) =>
+    circuit()
+      .battery('B1', 'v', 'gnd', 9)
+      .switch('S1', 'v', 's', supply)
+      .resistor('R1', 's', 'l', 470)
+      .led('LED1', 'l', 'a')
+      .add('scr', 'SCR1', ['a', 'gnd', 'g'], { model: 'MCR100-6' })
+      .add('pushbutton', 'BT1', ['v', 'p'], { contact: 'no', pressed })
+      .resistor('RG', 'p', 'g', 10e3)
+      .ground('G1', 'gnd')
+      .build();
+  it('kapıya akım verilince tetiklenir, düğme bırakılınca da iletimde kalır (mandal); anot akımı kesilince söner', () => {
+    const sim = new CircuitSimulator(latch(false, true));
+    sim.advance(0.01);
+    expect(sim.status('SCR1').scr!.on).toBe(false);
+    expect(sim.measure('LED1')!.current).toBeLessThan(1e-6);
+    sim.update(latch(true, true));
+    sim.advance(0.01);
+    expect(sim.status('SCR1').scr!.on).toBe(true);
+    expect(sim.status('SCR1').scr!.gate).toBeGreaterThan(40e-6);
+    sim.update(latch(false, true));
+    sim.advance(0.01);
+    expect(sim.status('SCR1').scr!.on).toBe(true);
+    const led = sim.measure('LED1')!.current;
+    expect(led).toBeGreaterThan(10e-3);
+    // İletim gerilimi (Şekil 6'nın uzantısı) ≈ 0,8 V.
+    const vak = sim.measure('SCR1')!.voltage;
+    expect(vak).toBeGreaterThan(0.75);
+    expect(vak).toBeLessThan(0.85);
+    sim.update(latch(false, false));
+    sim.advance(0.01);
+    expect(sim.status('SCR1').scr!.on).toBe(false);
+    sim.update(latch(false, true));
+    sim.advance(0.01);
+    expect(sim.status('SCR1').scr!.on).toBe(false);
+  });
+
+  it('anot akımı tutma akımına yetmiyorsa (yük 1 MΩ) kapı bırakılınca keser', () => {
+    const weak = (pressed: boolean) =>
+      circuit().battery('B1', 'v', 'gnd', 9).resistor('RL', 'v', 'a', 1e6).add('scr', 'SCR1', ['a', 'gnd', 'g'], {}).add('pushbutton', 'BT1', ['v', 'p'], { pressed }).resistor('RG', 'p', 'g', 10e3).ground('G1', 'gnd').build();
+    const sim = new CircuitSimulator(weak(true));
+    sim.advance(0.01);
+    expect(sim.status('SCR1').scr!.on).toBe(true);
+    sim.update(weak(false));
+    sim.advance(0.01);
+    expect(sim.status('SCR1').scr!.on).toBe(false);
+  });
+
+  it("breadboard'da üç ardışık delik, gerçek sıra K, G, A", () => {
+    const doc = { version: 1 as const, parts: [{ id: 's', type: 'scr' as const, label: 'SCR1', x: 0, y: 0, rotation: 0 as const, props: {} }], wires: [] };
+    const cols = planBreadboard(doc).onBoard.get('s')!.holes.map((h) => (h.kind === 'strip' ? h.col : -1));
+    // Pin sırası A, K, G: K en solda, sonra G, en sağda A.
+    expect([cols[1]! + 1, cols[1]! + 2]).toEqual([cols[2], cols[0]]);
+  });
+});

@@ -68,6 +68,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   reg7805: 'Gerilim regülatörü',
   lm317: 'Ayarlı regülatör',
   opto: 'Optokuplör',
+  scr: 'Tristör',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -116,6 +117,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   reg7805: 'gerilim regülatörünün',
   lm317: 'ayarlı regülatörünün',
   opto: 'optokuplörünün',
+  scr: 'tristörünün',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -163,6 +165,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   reg7805: ['giriş ucu (IN)', 'toprak ucu (GND)', 'çıkış ucu (OUT)'],
   lm317: ['giriş ucu (IN)', 'ayar ucu (ADJ)', 'çıkış ucu (OUT)'],
   opto: ['LED anodu (A)', 'LED katodu (K)', 'kollektör ucu (C)', 'emiter ucu (E)'],
+  scr: ['anot (A)', 'katot (K)', 'kapı (G)'],
 };
 
 /** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
@@ -211,6 +214,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   reg7805: ['IN', 'GND', 'OUT'],
   lm317: ['IN', 'ADJ', 'OUT'],
   opto: ['A', 'K', 'C', 'E'],
+  scr: ['A', 'K', 'G'],
 };
 
 /** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
@@ -259,6 +263,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   reg7805: ['IN', 'GND', 'OUT'],
   lm317: ['IN', 'ADJ', 'OUT'],
   opto: ['A', 'K', 'C', 'E'],
+  scr: ['A', 'K', 'G'],
 };
 
 function list(labels: readonly string[]): string {
@@ -595,6 +600,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Ayarlı doğrusal regülatör (LM317): çıkışı ADJ ucunun 1,25 V üstünde tutar. Çıkış ile ADJ arasına R1, ADJ ile toprak arasına R2 bağlanınca Vout = 1,25 V · (1 + R2 / R1). Giriş, çıkışın en az ≈ 1,5–2 V üstünde olmalı.',
   opto:
     'Bir LED ile bir fototransistör aynı kılıfta: LED’den akım geçince yanar, ışığı fototransistörü iletime sokar. İki taraf arasında elektriksel bağ yoktur (yalıtım); çıkış akımı yaklaşık CTR · IF, CTR akım aktarım oranıdır.',
+  scr:
+    'Kapıdan küçük bir akımla tetiklenen diyot (SCR): tetiklenince anottan katoda iletir ve kapı akımı kesilse de iletimde kalır; anot akımı tutma akımının altına inince keser. Mandal gibi davranır.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -1626,6 +1633,14 @@ export const tr = {
     switchClosedNote: (r: string) => `Kapalı anahtar ${r} değerinde bir dirençtir.`,
     pressed: 'basılı',
     dcOutput: 'DC çıkış (+ − −)',
+    scrOn: 'iletimde',
+    scrOff: 'kesimde',
+    gateCurrent: 'Kapı akımı (I_{G})',
+    anodeCurrent: 'Anot akımı',
+    scrNote: (on: boolean) =>
+      on
+        ? 'İletimde: kapı akımı kesilse de anot akımı tutma akımının (≈ 0,5 mA) üstünde kaldıkça iletir. Kesmek için anot akımını kes (ör. düğmeyle ya da beslemeyi kapatarak).'
+        : 'Kesimde: anottan katoda akım geçmez. Kapıdan ≈ 40 µA (I_{GT}) akım verilince ve anot katottan pozitifken iletime geçer.',
     ledCurrent: 'LED akımı (I_{F})',
     outputCurrent2: 'Çıkış akımı (I_{C})',
     optoNote: (ctr: string, ic: string, saturated: boolean) =>
@@ -2464,6 +2479,7 @@ export const tr = {
       reg7805: 'Gerilim regülatörleri',
       lm317: 'Ayarlı regülatörler',
       opto: 'Optokuplörler',
+      scr: 'Tristörler',
     } satisfies Record<DeviceType, string>,
   },
   file: {
@@ -2835,6 +2851,8 @@ export const tr = {
     } as Partial<Record<DeviceType, string>>,
     /** Parça modelinin notu (genel modellerde türün notu kullanılır). */
     modelNotes: {
+      'MCR100-6':
+        'MCR100-6 (onsemi): 400 V, 0,8 A, TO-92 tristör. Kapı akımı I_{GT} ≈ 40 µA’i (V_{GT} ≈ 0,62 V) aşınca iletime geçer; kapı akımı kesilince anot akımı kilitleme akımı I_{L} ≈ 0,6 mA’in üstündeyse iletimde kalır, sonra anot akımı tutma akımı I_{H} ≈ 0,5 mA’in altına inince keser (tablodaki tipik değerler). İletim gerilimi veri sayfasının eğrisinden: 0,1 A’de ≈ 0,9 V.',
       PC817:
         'PC817 (Sharp): LED’in ileri gerilimi 20 mA’de ≈ 1,28 V (veri sayfasının eğrisi; tablo tipik 1,2 V). Çıkış akımı I_{C} = CTR · I_{F}; CTR sınıfa göre (veri sayfası yalnızca aralık verir, modelde aralığın ortası). Dış devre daha az akım çekerse çıkış doyar: V_{CE} ≈ 0,1 V (tablodaki tipik değer, I_{F} = 20 mA, I_{C} = 1 mA). Giriş ile çıkış arasında 5 kV yalıtım.',
       LM317T:

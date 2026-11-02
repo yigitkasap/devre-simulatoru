@@ -90,6 +90,8 @@ function describe(part: Part): { name: string; detail: string } {
     }
     case 'opamp':
       return { name: 'İşlemsel yükselteç LM741', detail: 'DIP-8; 8 bacaklı soketle' };
+    case 'scr':
+      return { name: `Tristör ${typeof p.model === 'string' ? p.model : 'MCR100-6'}`, detail: 'TO-92; düz yüz sana dönükken soldan K, G, A' };
     case 'opto':
       return { name: `Optokuplör ${typeof p.model === 'string' ? p.model : 'PC817'}`, detail: 'DIP-4; 1. bacak (nokta) anot' };
     case 'timer555':
@@ -173,6 +175,9 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         break;
       case 'switch':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: holes.join(' ↔ ') });
+        break;
+      case 'scr':
+        steps.push({ group: 'transistor', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Düz (yazılı) yüz sana dönük: soldan katot, kapı, anot.' });
         break;
       case 'opto':
         steps.push({

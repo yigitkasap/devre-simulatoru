@@ -38,6 +38,8 @@ import {
   OPTO_DEFAULTS,
   OPTO_MODELS,
   OPTO_RANKS,
+  SCR_DEFAULTS,
+  SCR_MODELS,
   SCHOTTKY_DEFAULTS,
   SCHOTTKY_MODELS,
   CAPACITOR_DEFAULTS,
@@ -468,6 +470,22 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     showLabel: true,
     polarized: true,
   },
+  scr: {
+    type: 'scr',
+    category: 'semiconductors',
+    labelPrefix: 'SCR',
+    // Anot solda, katot sağda, kapı katodun altında (Y2).
+    pins: [
+      { x: -4, y: 0 },
+      { x: 4, y: 0 },
+      { x: 2, y: 3 },
+    ],
+    bounds: { x: -4, y: -1.2, w: 8, h: 4.2 },
+    defaultProps: { ...SCR_DEFAULTS },
+    propDefs: [{ kind: 'select', key: 'model', options: SCR_MODELS }],
+    showLabel: true,
+    polarized: true,
+  },
   opto: {
     type: 'opto',
     category: 'ics',
@@ -849,7 +867,7 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
 export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: readonly DeviceType[] }> = [
   { id: 'sources', types: ['battery', 'acsource', 'currentsource', 'ground'] },
   { id: 'passive', types: ['resistor', 'potentiometer', 'capacitor', 'inductor', 'transformer'] },
-  { id: 'semiconductors', types: ['diode', 'zener', 'led', 'bridge', 'schottky'] },
+  { id: 'semiconductors', types: ['diode', 'zener', 'led', 'bridge', 'schottky', 'scr'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'ics', types: ['opamp', 'timer555', 'arduino', 'reg7805', 'lm317', 'opto'] },
   { id: 'switches', types: ['switch', 'pushbutton', 'spdt', 'relay', 'fuse'] },

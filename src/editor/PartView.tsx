@@ -32,6 +32,7 @@ export function partValueText(part: Part): string {
       return '5 V';
     case 'lm317':
     case 'opto':
+    case 'scr':
       return modelName(part);
     case 'acsource': {
       const peak = formatSI(numProp(p, 'amplitude', 0), 'V', { trim: true, digits: 4 });

@@ -31,6 +31,8 @@ export interface LiveVisual {
   readonly ions?: IonView;
   /** Direnç: harcanan gücün güç sınırına oranı (1'i aşınca ısınıyormuş gibi çizilir). */
   readonly powerRatio?: number;
+  /** Tristör: iletimde (gövde akım rengiyle dolar). */
+  readonly on?: boolean;
   /** Gerilim regülatörü: giriş yetmiyor (bırakma gerilimiyle sınırlı): turuncu çerçeve. */
   readonly dropout?: boolean;
   /** Röle: palet çekili mi? */
@@ -629,6 +631,19 @@ function Spdt({ to }: { to: SpdtThrow }) {
       <circle cx={-14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
       <circle cx={14} cy={-20} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
       <circle cx={14} cy={20} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+    </g>
+  );
+}
+
+/** Tristör: diyot gövdesi, katot çizgisinden kapı ucu (2, 3); iletimdeyken gövde akım rengiyle dolu. */
+function Scr({ on }: { on: boolean }) {
+  return (
+    <g>
+      <Lead from={-40} to={-9} />
+      <Lead from={9} to={40} />
+      <path d="M-9,-10 L-9,10 L9,0 Z" fill={on ? 'var(--color-dot)' : 'var(--color-paper)'} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <line x1={9} y1={-10} x2={9} y2={10} stroke="currentColor" strokeWidth={2.4} />
+      <path d="M9,6 L20,16 V30" fill="none" stroke="currentColor" strokeWidth={2} />
     </g>
   );
 }
@@ -1280,6 +1295,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Regulator text="LM317" rotation={rotation} dropout={live?.dropout ?? false} />;
     case 'opto':
       return <Optocoupler />;
+    case 'scr':
+      return <Scr on={live?.on ?? false} />;
   }
 }
 

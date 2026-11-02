@@ -29,6 +29,7 @@ import {
   relayModel,
   resistorModel,
   schottkyModel,
+  scrModel,
   sourceBoxModel,
   speakerModel,
   to220Model,
@@ -100,6 +101,8 @@ function build(part: Part): PartModel {
       return to220Model('reg7805', 'L7805CV', '5 V · 1,5 A', [0, 1, 2]);
     case 'opto':
       return optoModel(p);
+    case 'scr':
+      return scrModel(p);
     case 'lm317':
       // Bacak sırası ADJ, OUT, IN (ST LM317 Şekil 1, TI Şekil 5-2).
       return to220Model('lm317', 'LM317T', 'ADJ · 1,5 A', [1, 2, 0]);

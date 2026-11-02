@@ -499,6 +499,20 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
       };
     }
+    case 'scr': {
+      const sc = status.scr;
+      const on = sc?.on ?? false;
+      return {
+        title,
+        rows: [
+          { label: t.state, value: on ? t.scrOn : t.scrOff },
+          { label: t.anodeCurrent, value: a(m.current) },
+          { label: t.voltageAcross, value: v(m.voltage) },
+          { label: t.gateCurrent, value: a(sc?.gate ?? 0) },
+        ],
+        note: t.scrNote(on),
+      };
+    }
     case 'opto': {
       const o = status.opto;
       if (!o) return { title, rows: [] };

@@ -519,6 +519,33 @@ export function to220Model(type: DeviceType, text: string, subtitle: string, leg
   return { root, anchors };
 }
 
+// --- Tristör (SCR, TO-92: MCR100-6): transistörle aynı gövde, yazı farklı (newParts.ts) ---------------------
+
+/** Bacak sırası düz (yazılı) yüze bakınca soldan K, G, A (onsemi MCR100/D, STYLE 10: 1 K, 2 G, 3 A). */
+export function scrModel(props: Props): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('scr');
+  const text = typeof props.model === 'string' ? props.model : 'MCR100-6';
+  const h = 1.8;
+  const y0 = 2.0;
+  const body = new Group();
+  body.add(mesh(new CylinderGeometry(0.95, 0.95, h, 24, 1, false, 0, Math.PI), mat('#1b1c1f', 0.45), 0, y0 + h / 2, 0));
+  body.add(mesh(new BoxGeometry(0.02, h, 1.9), mat('#1b1c1f', 0.45), 0, y0 + h / 2, 0));
+  const plate = labelPlate(text, 1.8, 0.5, { fg: '#cfd3d8' });
+  plate.rotation.set(0, -X_AXIS, 0);
+  plate.position.set(-0.02, y0 + h / 2, 0);
+  body.add(plate);
+  // Breadboard'da uçlar bir sütunda (yerel z boyunca); ters takıldıysa (K'nin deliği A'nınkinden sonra) gövde döner.
+  const order = [1, 2, 0];
+  const first = anchors[order[0]!]!;
+  const last = anchors[order[2]!]!;
+  const flip = Math.abs(first.x - last.x) < 0.1 && first.z > last.z;
+  if (flip) body.rotation.y = Math.PI;
+  root.add(body);
+  order.forEach((pin, k) => root.add(legDown(new Vector3(0.25 * (flip ? -1 : 1), y0, (k - 1) * 0.5 * (flip ? -1 : 1)), anchors[pin]!, 0.07)));
+  return { root, anchors };
+}
+
 // --- Optokuplör (PC817, DIP-4): krem gövde, 1. bacak noktası (newParts.ts) -------------------------------------
 
 /**

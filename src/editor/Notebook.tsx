@@ -142,6 +142,8 @@ export function cardReading(part: Part, frame: SimFrame | null): { main: string;
   const rows = liveRows(part, frame)?.rows;
   if (!rows || rows.length === 0) return null;
   if (part.type === 'led' && rows[1]) return { main: rows[0]!.value, second: rows[1].value };
+  // Basmalı düğme: kapalı satırda basılı / bırakılmış (Y3), kontak durumu açık kartta.
+  if (part.type === 'pushbutton') return null;
   // Regülatör: çıkış gerilimi (satırlar giriş, çıkış, akım…).
   if ((part.type === 'reg7805' || part.type === 'lm317') && rows[1]) return { main: rows[1].value };
   if (part.type === 'dcsupply') {

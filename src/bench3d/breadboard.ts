@@ -123,6 +123,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   switch: { mount: 'axial', span: 2 },
   pushbutton: { mount: 'button' },
   spdt: { mount: 'to92' },
+  scr: { mount: 'to92' },
   bridge: { mount: 'inline' },
   reg7805: { mount: 'inline' },
   lm317: { mount: 'inline' },
@@ -147,6 +148,7 @@ const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
   bridge: [1, 0, 2, 3], // KBP: + ~ ~ −
   reg7805: [0, 1, 2], // TO-220: IN, GND, OUT
   lm317: [1, 2, 0], // TO-220: ADJ, OUT, IN
+  scr: [1, 2, 0], // TO-92 MCR100: K, G, A
 };
 
 /** DIP-8: parça pin sırası → entegre bacak numarası (1–8). */

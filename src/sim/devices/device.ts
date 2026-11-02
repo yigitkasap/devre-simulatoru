@@ -103,6 +103,8 @@ export interface DeviceStatus {
    * (dış devre CTR · IF'den az akım çekiyor).
    */
   readonly opto?: { readonly led: number; readonly ledVoltage: number; readonly output: number; readonly vce: number; readonly ctr: number; readonly saturated: boolean };
+  /** Tristör: iletimde mi; kapı akımı ve kapı–katot gerilimi. */
+  readonly scr?: { readonly on: boolean; readonly gate: number; readonly gateVoltage: number };
   /** Basmalı düğme: basılı tutuluyor mu? */
   readonly pressed?: boolean;
   /** Röle: palet çekili mi (NA kontağı kapalı)? */

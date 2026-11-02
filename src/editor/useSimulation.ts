@@ -307,6 +307,8 @@ export function useSimulation(
         live.set(part.id, { charge: (averaged && a !== null && b !== null ? a - b : m.voltage) / vmax });
       } else if (part.type === 'resistor') {
         if (status.powerRatio !== undefined) live.set(part.id, { powerRatio: status.powerRatio });
+      } else if (part.type === 'scr') {
+        if (status.scr?.on) live.set(part.id, { on: true });
       } else if (REGULATORS.has(part.type)) {
         if (status.regulator?.dropout) live.set(part.id, { dropout: true });
       } else if (part.type === 'relay') {
