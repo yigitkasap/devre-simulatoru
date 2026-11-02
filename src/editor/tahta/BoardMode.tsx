@@ -141,7 +141,9 @@ export function BoardStage(props: BoardStageProps) {
   };
   const top = view === 'top';
   const doc = bench.doc;
-  const tableIds = new Set(schematicPlan.table.keys());
+  // Tepeden görünümde 3B etiketleri yok: parça etiketi yalnızca imleç üstündeyken ya da seçiliyken, tahtanın
+  // orta kanalında (BoardTop); masadaki cihazların kartı var.
+  const allIds = new Set(doc.parts.map((p) => p.id));
   const colorOf = netColors(schematicPlan);
 
   // Denetle (T3): yeri açılmış sorunlar tahtada kırmızı çerçeve ve numarayla; 4. kademede örnek yerleşim.
@@ -278,7 +280,7 @@ export function BoardStage(props: BoardStageProps) {
             {terminals}
           </>
         }
-        {...(top ? { unlabelled: showMarks && located.length > 0 ? new Set(doc.parts.map((p) => p.id)) : tableIds } : {})}
+        {...(top ? { unlabelled: allIds } : {})}
       />
       {top && (
         <BoardTop

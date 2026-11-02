@@ -149,6 +149,8 @@ export function BoardTop(props: BoardTopProps) {
   const [finger, setFinger] = useState<{ x: number; y: number } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ dist: number; x: number; y: number } | null>(null);
+  // Farenin yeri: imleç bir parçanın üstündeyken o parçanın etiketi görünür.
+  const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const t: TopTransform | null = scene?.topTransform() ?? null;
@@ -522,6 +524,7 @@ export function BoardTop(props: BoardTopProps) {
   };
   const onMove = (e: ReactPointerEvent) => {
     const q = local(e.clientX, e.clientY);
+    if (e.pointerType === 'mouse') setMouse(q);
     if (e.pointerType === 'touch' && pointers.current.has(e.pointerId)) {
       pointers.current.set(e.pointerId, q);
       const p = pinch.current;
@@ -862,19 +865,26 @@ export function BoardTop(props: BoardTopProps) {
     );
   })();
   const tipPos = tip ? toScreen(tip.at) : null;
-  const selectedBox = (() => {
-    if (!t || !selectedPart || placing || press) return null;
-    const at = partHoles(build, selectedPart.id);
-    if (!at) return null;
-    const pts = [...at.holes, ...at.extra].map(toScreen);
-    return { x: (Math.min(...pts.map((q) => q.x)) + Math.max(...pts.map((q) => q.x))) / 2, y: Math.min(...pts.map((q) => q.y)) - r - 10 };
-  })();
+  // Parça etiketi ve seçim çubukları tahtanın orta kanalında (deliksiz şerit, z = 0): hiçbir deliği örtmez.
+  // Parçanın (ya da kablonun) hizasında, tuvalin içinde kalacak biçimde.
+  const inChannel = (pts: readonly { x: number; y: number }[]) => {
+    if (!t || pts.length === 0) return null;
+    const x = (Math.min(...pts.map((q) => q.x)) + Math.max(...pts.map((q) => q.x))) / 2;
+    const width = layer.current?.clientWidth ?? 0;
+    return { x: width > 300 ? Math.min(Math.max(x, 150), width - 150) : x, y: t.oy };
+  };
+  const partPoints = (id: string) => {
+    const at = partHoles(build, id);
+    return at ? [...at.holes, ...at.extra].map(toScreen) : [];
+  };
+  const selectedBox = !selectedPart || placing || press ? null : inChannel(partPoints(selectedPart.id));
+  const hoveredId = !placing && !cabling && !press && mouse ? partAt(mouse.x, mouse.y) : null;
+  const hoveredPart = hoveredId && hoveredId !== selected ? part(hoveredId) : undefined;
+  const hoverBox = hoveredPart ? inChannel(partPoints(hoveredPart.id)) : null;
   const pickBox = (() => {
-    if (!t || !picked || press || cabling) return null;
+    if (!picked || press || cabling) return null;
     const ends = picked.kind === 'wire' ? [build.wires[picked.index]!.a, build.wires[picked.index]!.b] : [build.leads.find((l) => l.part === picked.part && l.pin === picked.pin)!.hole];
-    const pts = ends.map((e) => parseHole(e, cols)).filter((x): x is Hole => x !== null).map(toScreen);
-    if (pts.length === 0) return null;
-    return { x: (Math.min(...pts.map((q) => q.x)) + Math.max(...pts.map((q) => q.x))) / 2, y: Math.min(...pts.map((q) => q.y)) - r - 10 };
+    return inChannel(ends.map((e) => parseHole(e, cols)).filter((x): x is Hole => x !== null).map(toScreen));
   })();
   const pickLabel = picked ? (picked.kind === 'wire' ? tr.tahta.wireSelected(build.wires[picked.index]!.a, build.wires[picked.index]!.b) : tr.tahta.leadSelected(leadName(picked.part, picked.pin), build.leads.find((l) => l.part === picked.part && l.pin === picked.pin)!.hole)) : '';
   const firstPinName = placingPart ? (tr.devices.pinTags[placingPart.type][placing?.turned ? 1 : 0] ?? '1') : '';
@@ -895,7 +905,10 @@ export function BoardTop(props: BoardTopProps) {
           pointers.current.clear();
           pinch.current = null;
         }}
-        onPointerLeave={() => !press && setHover(null)}
+        onPointerLeave={() => {
+          setMouse(null);
+          if (!press) setHover(null);
+        }}
       >
         {edge && <div aria-hidden="true" className="pointer-events-none absolute rounded-[3px] shadow-[0_2px_12px_color-mix(in_srgb,var(--color-scrim)_28%,transparent)] ring-1 ring-line-2" style={edge} />}
         <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
@@ -911,8 +924,14 @@ export function BoardTop(props: BoardTopProps) {
             {tip.line && <span className={`text-label leading-snug ${tip.bad ? 'text-danger-ink' : 'text-ink-2'}`}>{tip.line}</span>}
           </div>
         )}
+        {hoverBox && hoveredPart && (
+          <span className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-ink px-2.5 py-1 text-small font-semibold whitespace-nowrap text-on-ink shadow-md" style={{ left: hoverBox.x, top: hoverBox.y }}>
+            {hoveredPart.label}
+            {partValueText(hoveredPart) ? ` · ${partValueText(hoveredPart)}` : ''}
+          </span>
+        )}
         {selectedBox && selectedPart && (
-          <div className="absolute z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-[10px] border border-line bg-panel p-1 shadow-md" style={{ left: selectedBox.x, top: selectedBox.y }} onPointerDown={(e) => e.stopPropagation()}>
+          <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[10px] border border-line bg-panel p-1 shadow-md" style={{ left: selectedBox.x, top: selectedBox.y }} onPointerDown={(e) => e.stopPropagation()}>
             <span className="px-2 text-small font-semibold">
               {selectedPart.label}
               {partValueText(selectedPart) ? ` · ${partValueText(selectedPart)}` : ''}
@@ -928,7 +947,7 @@ export function BoardTop(props: BoardTopProps) {
           </div>
         )}
         {pickBox && picked && (
-          <div className="absolute z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-[10px] border border-line bg-panel p-1 shadow-md" style={{ left: pickBox.x, top: pickBox.y }} onPointerDown={(e) => e.stopPropagation()}>
+          <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[10px] border border-line bg-panel p-1 shadow-md" style={{ left: pickBox.x, top: pickBox.y }} onPointerDown={(e) => e.stopPropagation()}>
             {picked.kind === 'wire' && <span aria-hidden="true" className="ml-1.5 h-3 w-3 rounded-full ring-1 ring-line-2" style={{ background: WIRE_HEX[build.wires[picked.index]!.color] }} />}
             <span className="px-2 font-mono text-small font-semibold">{pickLabel}</span>
             <button type="button" onClick={deleteSelected} className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft ${h}`}>
