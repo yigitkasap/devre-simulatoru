@@ -56,9 +56,19 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   buzzer: 'Buzzer (aktif)',
   fuse: 'Sigorta',
   voltmeter: 'Voltmetre',
+  multimeter: 'Multimetre',
+  currentsource: 'Akım kaynağı',
+  pushbutton: 'Basmalı düğme',
+  spdt: 'Çift yollu anahtar',
+  bridge: 'Köprü diyot',
+  schottky: 'Schottky diyot',
   ammeter: 'Ampermetre',
   oscilloscope: 'Osiloskop',
   tank: 'Su haznesi',
+  reg7805: 'Gerilim regülatörü',
+  lm317: 'Ayarlı regülatör',
+  opto: 'Optokuplör',
+  scr: 'Tristör',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -95,9 +105,19 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   buzzer: 'buzzerının',
   fuse: 'sigortasının',
   voltmeter: 'voltmetresinin',
+  multimeter: 'multimetresinin',
+  currentsource: 'akım kaynağının',
+  pushbutton: 'basmalı düğmesinin',
+  spdt: 'çift yollu anahtarının',
+  bridge: 'köprü diyodunun',
+  schottky: 'Schottky diyodunun',
   ammeter: 'ampermetresinin',
   oscilloscope: 'osiloskobunun',
   tank: 'su haznesinin',
+  reg7805: 'gerilim regülatörünün',
+  lm317: 'ayarlı regülatörünün',
+  opto: 'optokuplörünün',
+  scr: 'tristörünün',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -133,9 +153,19 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   fuse: ['1. ucu', '2. ucu'],
   relay: ['sargısının 1. ucu', 'sargısının 2. ucu', 'kontağının ortak ucu (C)', 'normalde açık kontak ucu (NA)', 'normalde kapalı kontak ucu (NK)'],
   voltmeter: ['+ ucu', '− ucu'],
+  multimeter: ['VΩ ucu (kırmızı)', 'COM ucu (siyah)'],
+  currentsource: ['1. ucu (akım girer)', '2. ucu (akım çıkar)'],
+  pushbutton: ['1. ucu', '2. ucu'],
+  spdt: ['ortak ucu (C)', 'A ucu', 'B ucu'],
+  bridge: ['üst ~ (AC) ucu', '+ (DC) ucu', 'alt ~ (AC) ucu', '− (DC) ucu'],
+  schottky: ['anot', 'katot'],
   ammeter: ['+ ucu', '− ucu'],
   oscilloscope: ['A kanalı', 'B kanalı', 'ortak ucu (COM)'],
   tank: ['ortak probu (dipte)', 'Seviye 1 probu', 'Seviye 2 probu', 'Seviye 3 probu'],
+  reg7805: ['giriş ucu (IN)', 'toprak ucu (GND)', 'çıkış ucu (OUT)'],
+  lm317: ['giriş ucu (IN)', 'ayar ucu (ADJ)', 'çıkış ucu (OUT)'],
+  opto: ['LED anodu (A)', 'LED katodu (K)', 'kollektör ucu (C)', 'emiter ucu (E)'],
+  scr: ['anot (A)', 'katot (K)', 'kapı (G)'],
 };
 
 /** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
@@ -173,8 +203,18 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   buzzer: ['+', '−'],
   fuse: ['1', '2'],
   voltmeter: ['+', '−'],
+  multimeter: ['VΩ', 'COM'],
+  currentsource: ['1', '2'],
+  pushbutton: ['1', '2'],
+  spdt: ['C', 'A', 'B'],
+  bridge: ['~', '+', '~', '−'],
+  schottky: ['A', 'K'],
   ammeter: ['+', '−'],
   oscilloscope: ['A', 'B', 'COM'],
+  reg7805: ['IN', 'GND', 'OUT'],
+  lm317: ['IN', 'ADJ', 'OUT'],
+  opto: ['A', 'K', 'C', 'E'],
+  scr: ['A', 'K', 'G'],
 };
 
 /** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
@@ -212,8 +252,18 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   buzzer: ['+ uç', '− uç'],
   fuse: ['1. uç', '2. uç'],
   voltmeter: ['+ uç', '− uç'],
+  multimeter: ['VΩ', 'COM'],
+  currentsource: ['1. uç', '2. uç'],
+  pushbutton: ['1. uç', '2. uç'],
+  spdt: ['C', 'A', 'B'],
+  bridge: ['~ üst', '+', '~ alt', '−'],
+  schottky: ['anot', 'katot'],
   ammeter: ['+ uç', '− uç'],
   oscilloscope: ['A girişi', 'B girişi', 'COM'],
+  reg7805: ['IN', 'GND', 'OUT'],
+  lm317: ['IN', 'ADJ', 'OUT'],
+  opto: ['A', 'K', 'C', 'E'],
+  scr: ['A', 'K', 'G'],
 };
 
 function list(labels: readonly string[]): string {
@@ -264,6 +314,21 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'Ampermetre seri bağlanır; iç direnci çok küçük olduğu için paralel bağlanınca kısa devre olur.',
       };
     }
+    case 'current-source-open':
+      return {
+        title: 'Akım kaynağının akacak yolu yok',
+        detail: `${labels[0] ?? ''} akım kaynağının iki ucu arasında akımın dönebileceği bir yol yok (açık devre). Akım kaynağı akımını ancak kapalı bir devreye verebilir; bu yüzden şu an akım vermiyor.`,
+      };
+    case 'multimeter-parallel': {
+      const other = d.elementIds[1];
+      const type = other ? ctx.type(other) : undefined;
+      return {
+        title: 'Multimetre A kipinde paralel bağlanmış',
+        detail:
+          `${labels[0] ?? ''} multimetresi A kipinde ${labels[1] ?? ''}${type ? ` ${DEVICE_GENITIVE[type]}` : ''} iki ucuna bağlanmış. ` +
+          'A kipinde multimetre ölçtüğü parçaya seri bağlanır; iç direnci çok küçük (0,1 Ω) olduğu için paralel bağlanınca o parçayı kısa devre eder.',
+      };
+    }
     case 'ground-return': {
       // Toprak sembolü kendi adıyla, topraklı cihaz "OSC1 osiloskobunun COM ucu" biçiminde.
       const names = d.elementIds.map((id) => {
@@ -302,6 +367,15 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'Seri bir ön direnç ekle: R = (V_{kaynak} − V_{f}) / I. ' +
           `(Bu LED için V_{f} ≈ ${formatSI(p.forwardVoltage ?? 0, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`,
       };
+    case 'regulator-dropout': {
+      const v = (x: number | undefined) => formatSI(x ?? 0, 'V', { digits: 3 });
+      return {
+        title: 'Regülatörün girişi yetmiyor',
+        detail:
+          `${firstLabel}: giriş ${v(p.input)}, çıkış ${v(p.output)}. Çıkışın ayarlanan değeri tutabilmesi için giriş, çıkışın en az ` +
+          `${v(p.needed)} (bu akımda bırakma gerilimi) üstünde olmalı. Girişi yükselt ya da yük akımını azalt.`,
+      };
+    }
     case 'reverse-voltage': {
       const voltage = formatSI(p.voltage ?? 0, 'V', { trim: true });
       if (first !== undefined && ctx.type(first) === 'led') {
@@ -310,6 +384,14 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           detail:
             `${firstLabel}: LED ters yönde ${voltage} görüyor; gerçek bir LED en fazla ` +
             `${formatSI(p.limit ?? 5, 'V', { trim: true })}’a dayanır ve bozulabilir. LED’i çevir ya da ters gerilimi azalt.`,
+        };
+      }
+      if (first !== undefined && ctx.type(first) === 'schottky') {
+        return {
+          title: 'Schottky diyoda ters gerilim',
+          detail:
+            `${firstLabel}: 1N5819 ters yönde ${voltage} görüyor; veri sayfasına göre en fazla ` +
+            `${formatSI(p.limit ?? 40, 'V', { trim: true })}’a (V_{RRM}) dayanır. Schottky diyotların ters gerilimi düşüktür: daha yüksek gerilimde 1N4001 ailesini kullan.`,
         };
       }
       return {
@@ -495,11 +577,31 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
   relay:
     'Elektromıknatısla çalışan anahtar: sargısından yeterli akım geçince demir paleti çeker ve kontağı değiştirir (C, NK’dan ayrılıp NA’ya değer). Küçük bir akımla, sargıdan yalıtılmış başka bir devreyi açıp kapatır.',
   voltmeter: 'İki nokta arasındaki gerilimi ölçer; ölçülen parçaya paralel bağlanır.',
+  schottky:
+    'Metal-yarı iletken eklemli diyot: ileri gerilimi silisyum diyottan küçüktür (1N5819’da 0,1 A’de en çok 0,34 V) ve çok hızlı anahtarlanır; ters sızıntı akımı büyük, ters gerilimi düşüktür (40 V). Katot çizgisi S biçimlidir.',
+  bridge:
+    'Dört diyot tek pakette (tam dalga köprü doğrultmaç): iki ~ ucuna AC gerilim verilir, + ve − uçlarından tek yönlü (doğrultulmuş) gerilim alınır. Her yarım periyotta iki diyot iletir; çıkış, girişin tepesinden iki diyot gerilimi kadar düşük olur.',
+  spdt:
+    'Çift yollu (SPDT) anahtar: ortak uç C, A ya da B ile birleşir; öbür uç açıkta kalır. Bir lambayı iki yerden yakıp söndürmek ya da bir sinyali iki yoldan birine vermek için kullanılır. Simülasyon sırasında şemada ya da 3B tezgâhta tıklanınca konum değişir.',
+  pushbutton:
+    'Yalnızca basılı tutulurken kontağı değişen düğme: normalde açık olanı basılınca kapanır, normalde kapalı olanı açılır; bırakınca eski hâline döner. Şemada, 3B tezgâhta ya da kartta basılı tutulur.',
+  currentsource:
+    'Uçlarındaki gerilim ne olursa olsun sabit bir akım veren ideal kaynak. Akım ok yönünde 2. uçtan dış devreye çıkar, 1. uçtan geri girer; uçlarındaki gerilimi dış devre belirler (dirençte V = I · R).',
+  multimeter:
+    'El multimetresi: kipine göre doğru ya da alternatif gerilim (V ⎓, V ∿), akım (A) ya da direnç (Ω) ölçer. V kiplerinde ölçülen parçaya paralel (iç direnç 10 MΩ), A kipinde seri (iç direnç 0,1 Ω) bağlanır; Ω yalnızca simülasyon durmuşken (güç kapalı) ölçer.',
   ammeter: 'İçinden geçen akımı ölçer; devreye seri bağlanır.',
   tank:
     'Su seviyesi probları olan hazne (baraj). Su bir proba ulaşınca o prob ile dipteki ortak prob arasında suyun direnci oluşur ve akımı sudaki iyonlar taşır; elektrotlarda ≈ 1,5–2 V elektrolize harcanır. Kuru prob açık devredir. Seviye elle ya da Doldur / Boşalt ile zamanla değişir.',
   oscilloscope:
     'Gerilimin zamanla nasıl değiştiğini çizer; iki kanal (A, B) ortak uca göre, DC/AC/GND kuplaj, ADD, INV ve X-Y. Girişi 1 MΩ, COM ucu şebeke toprağına bağlıdır.',
+  reg7805:
+    'Sabit 5 V çıkış veren doğrusal regülatör (7805): girişi çıkışın en az ≈ 2 V üstünde olduğu sürece çıkış 5 V’ta kalır, aradaki gerilim farkı ısı olarak harcanır. GND ucu toprağa bağlanır.',
+  lm317:
+    'Ayarlı doğrusal regülatör (LM317): çıkışı ADJ ucunun 1,25 V üstünde tutar. Çıkış ile ADJ arasına R1, ADJ ile toprak arasına R2 bağlanınca Vout = 1,25 V · (1 + R2 / R1). Giriş, çıkışın en az ≈ 1,5–2 V üstünde olmalı.',
+  opto:
+    'Bir LED ile bir fototransistör aynı kılıfta: LED’den akım geçince yanar, ışığı fototransistörü iletime sokar. İki taraf arasında elektriksel bağ yoktur (yalıtım); çıkış akımı yaklaşık CTR · IF, CTR akım aktarım oranıdır.',
+  scr:
+    'Kapıdan küçük bir akımla tetiklenen diyot (SCR): tetiklenince anottan katoda iletir ve kapı akımı kesilse de iletimde kalır; anot akımı tutma akımının altına inince keser. Mandal gibi davranır.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -558,6 +660,10 @@ function fieldLabel(type: DeviceType, key: string): string {
     offset: 'DC kayma',
     voltage: 'Gerilim',
     internalResistance: 'İç direnç',
+    current: 'Akım',
+    contact: 'Tür',
+    rank: 'CTR sınıfı',
+    to: 'Konum',
     resistance: 'Direnç',
     capacitance: 'Kapasite',
     inductance: 'Endüktans',
@@ -585,8 +691,11 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   color: { red: 'Kırmızı', yellow: 'Sarı', green: 'Yeşil', blue: 'Mavi' },
   powerRating: { '0.125': '1/8 W (0,125 W)', '0.25': '1/4 W (0,25 W)', '0.5': '1/2 W (0,5 W)', '1': '1 W', '2': '2 W', '5': '5 W' },
   kind: { electrolytic: 'Elektrolitik (kutuplu, +)', film: 'Seramik / film (kutupsuz)' },
+  contact: { no: 'Normalde açık', nc: 'Normalde kapalı' },
+  to: { a: 'C → A', b: 'C → B' },
+  rank: { A: 'A (%80–160; modelde %120)', B: 'B (%130–260; modelde %195)', C: 'C (%200–400; modelde %300)', D: 'D (%300–600; modelde %450)' },
   waveform: { sine: 'Sinüs', square: 'Kare', triangle: 'Üçgen' },
-  mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
+  mode: { dc: 'DC (ortalama)', ac: 'AC (etkin değer)', a: 'Akım (A)', ohm: 'Direnç (Ω)', stop: 'Dur', fill: 'Doldur', drain: 'Boşalt' },
   input: { real: '1 MΩ ‖ 25 pF (gerçek)', ideal: 'İdeal (akım çekmez)' },
   program: {
     blink: 'Yanıp sönen LED (Blink)',
@@ -603,6 +712,7 @@ const OPTION_LABELS: Record<string, Record<string, string>> = {
   },
   model: {
     genel: 'Genel (basit)',
+    LM317T: 'LM317T · 1,5 A',
     BC547B: 'BC547B (basit)',
     '2N5457': '2N5457 (basit)',
     '2N7000': '2N7000 (basit)',
@@ -1240,6 +1350,69 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     everyday:
       'Tek ışıklı durum göstergeleri (yeşil-sarı-kırmızı), yakıt ve batarya göstergelerinin en yüksek seviyeyi gösteren mantığı, asansörlerin kat göstergeleri ve öncelikli alarm panelleri aynı mantık kapılarıyla kurulur.',
   },
+  'akim-kaynagi-ohm': {
+    title: 'Akım kaynağıyla Ohm yasası',
+    description:
+      '10 mA’lik ideal akım kaynağı, çift yollu anahtar S1 üzerinden 470 Ω’luk R1’i (A konumu) ya da 1 kΩ’luk R2’yi (B konumu) besliyor. Ampermetre alt hattaki akımı, multimetre (V ⎓ kipinde) kaynağın uçları arasındaki gerilimi ölçüyor. Oynat’a bas, sonra S1’e tıklayıp konumunu değiştir.',
+    purpose:
+      'Akım kaynağı, bağlandığı direnç ne olursa olsun aynı akımı verir; uçlarındaki gerilimi dirence göre kendisi ayarlar: V = I · R. A konumunda multimetre 4,70 V okur (10 mA · 470 Ω). S1’i B’ye al: direnç iki katından biraz fazla büyür, gerilim 10,0 V’a çıkar; ampermetre yine 10,0 mA gösterir. Pil bunun tersidir: gerilimini sabit tutar, akımı direnç belirler. Kaynağın akımını 5 mA yap: aynı 470 Ω’da gerilim yarıya, 2,35 V’a iner.',
+    everyday:
+      'LED sürücüleri LED’den ayarlanan sabit bir akım geçirir: LED ısınıp ileri gerilimi değişse de parlaklığı aynı kalır. Pil şarj cihazları şarjın ilk evresinde sabit akım verir. Laboratuvar güç kaynaklarının CC (sabit akım) kipi ve PT100 gibi sıcaklık sensörlerine ölçüm akımı veren devreler de akım kaynağıdır.',
+  },
+  '7805-besleme': {
+    title: '7805 ile 5 V besleme',
+    description:
+      'İdeal 9 V’luk pil, 7805 gerilim regülatörünün IN ucuna bağlı; GND ucu alt hatta. Girişte 0,33 µF’lık, çıkışta 0,1 µF’lık kondansatör var (ST veri sayfasındaki uygulama devresi). Çıkışa 100 Ω’luk (0,5 W) yük ve voltmetre bağlı. Pilin gerilimini ve yükü değiştirip çıkışı izle.',
+    purpose:
+      'Değişen ya da yüksek bir gerilimden sabit 5 V elde eder. 7805 girişteki fazla gerilimi kendi üstünde tutar: voltmetre 5,00 V okur, yükten 50,0 mA geçer; regülatörde ≈ 0,24 W ısı açığa çıkar (giriş − çıkış farkı 4 V ile 50 mA’in çarpımı ve 9 V’ta 4,2 mA’lik bekleme akımı). Yükü 1 kΩ yap: akım 5,0 mA’e iner, çıkış yine 5,00 V’ta kalır. Bunun için giriş, çıkıştan en az bırakma gerilimi kadar yüksek olmalıdır (veri sayfasının eğrisinden 50 mA’de ≈ 1,5 V). Pili 6 V yap: fark yetmez, çıkış 4,49 V’a düşer, sembolün çerçevesi turuncu olur ve kartta uyarı çıkar.',
+    everyday:
+      'Mikrodenetleyici kartlarının, sensörlerin ve TTL mantık devrelerinin klasik 5 V beslemesidir. Fazla gerilimi ısıya çevirdiği için büyük akımda soğutucuya takılır; telefon şarj aletleri gibi verimin önemli olduğu yerlerde yerini anahtarlamalı regülatörler almıştır.',
+  },
+  'lm317-ayarli': {
+    title: 'LM317 ile ayarlı çıkış',
+    description:
+      'İdeal 12 V’luk pil LM317’nin IN ucuna bağlı. OUT ile ADJ arasında R1 = 240 Ω, ADJ ile alt hat arasında R2 = 720 Ω var; çıkışta 100 Ω’luk (0,5 W) yük ve voltmetre. R2’nin değerini değiştirip çıkışı izle.',
+    purpose:
+      'İki dirençle istenen çıkış gerilimini ayarlar. LM317, OUT ile ADJ arasında 1,25 V’luk başvuru gerilimini tutar: R1’den 1,25 V / 240 Ω ≈ 5,2 mA geçer ve aynı akım R2’den de geçer. Böylece V_{çıkış} = 1,25 V · (1 + R_{2} / R_{1}) = 1,25 V · (1 + 720 Ω / 240 Ω) = 5,00 V. Voltmetre 5,04 V okur: ADJ ucundan R2’ye ≈ 50 µA daha akar ve 720 Ω’da 0,04 V ekler. Yükten 50,4 mA geçer; LM317’de ≈ 0,39 W ısı açığa çıkar. R2’yi 480 Ω yap: çıkış 3,77 V’a iner (formülle 3,75 V).',
+    everyday:
+      'Laboratuvar güç kaynaklarında, ayarlı adaptörlerde ve hazır regülatörü bulunmayan gerilimler için kullanılır. R2 yerine bir potansiyometre konunca çıkış 1,25 V’tan girişin biraz altına kadar ayarlanabilir.',
+  },
+  'optokuplor-led': {
+    title: 'Optokuplörle yalıtılmış LED',
+    description:
+      'Sol devrede 5 V’luk pil, BT1 düğmesi ve 390 Ω üzerinden PC817’nin içindeki LED’i (1 A, 2 K uçları) besliyor. Sağ devrede ayrı bir 9 V’luk pil, 1 kΩ ve kırmızı LED1 üzerinden PC817’nin çıkış transistörüne (4 C, 3 E) bağlı. İki devre arasında hiç kablo yok (Mesajlar’da sağ devrenin kendi sıfır noktası olduğu yazar). Oynat’a bas, BT1’e basılı tut.',
+    purpose:
+      'Bir devreden ötekine elektriksel bağlantı olmadan sinyal taşır: bağlantı ışıkladır. Düğmeye basılıyken içteki LED’den 9,7 mA geçer (üstünde 1,22 V düşer). Işık çıkış transistörünü iletime sokar; transistör doyuma girer (C ile E arasında 0,13 V kalır) ve LED1’den 7,1 mA geçer: bu akımı artık sağ devredeki 1 kΩ sınırlar. Düğmeyi bırakınca ikisi de söner. R1’i 3,3 kΩ yap: LED akımı 1,18 mA’e iner, transistör doyumdan çıkar ve çıkış akımını akım aktarma oranı belirler: I_{C} = CTR · I_{F} ≈ %300 · 1,18 mA ≈ 3,55 mA; LED1 sönük yanar.',
+    everyday:
+      'Şebekeye bağlı cihazlarda alçak gerilimli kontrol devresini şebeke tarafından ayırır: telefon şarj aletleri ve bilgisayar güç kaynakları çıkış geriliminin bilgisini optokuplörle şebeke tarafına geri gönderir. Endüstriyel kontrol cihazlarının (PLC) girişleri, röle ve motor sürücü kartları da optokuplörle korunur.',
+  },
+  'schottky-1n4001': {
+    title: 'Schottky ile 1N4001’in ileri gerilimi',
+    description:
+      'İdeal 5 V’luk pil iki kolu besliyor: solda 470 Ω ve 1N5819 Schottky diyot, sağda 470 Ω ve 1N4001 (silisyum pn diyot). Her diyodun gerilimini ayrı bir voltmetre ölçüyor.',
+    purpose:
+      'İki diyot türünün ileri gerilimini karşılaştırır. İki koldan da ≈ 10 mA geçer; 1N4001’de 0,60 V, 1N5819’da yalnızca 0,18 V düşer. Schottky diyotta eklem metal ile yarı iletken arasındadır: engel daha alçaktır, aynı akım daha küçük gerilimle geçer. Diyotta harcanan güç de bu yüzden küçüktür: 5,6 mW’a karşı 1,8 mW. Bedeli ters yöndeki sızıntıdır: iki diyodu da ters çevir (F); 5 V’ta 1N5819’dan ters yönde 45 µA geçer, 1N4001’den yalnızca 0,1 µA (yaklaşık 450 kat az). Schottky’nin ters akımı ters gerilimle artar: veri sayfasının 25 °C eğrisine göre 20 V’ta ≈ 0,13 mA, 40 V’a yakın ≈ 0,29 mA.',
+    everyday:
+      'Schottky diyotlar düşük ileri gerilimin verim demek olduğu yerlerde kullanılır: anahtarlamalı güç kaynaklarının çıkışında, güneş panellerinde (akünün geceleri panele geri boşalmasını önleyen diyot) ve pilin ters takılmasına karşı koruma devrelerinde. Hızlı açılıp kapandıkları için yüksek frekanslı doğrultmaçlarda da tercih edilirler.',
+  },
+  'kopru-diyot': {
+    title: 'Köprü diyot (KBP307) ile tam dalga doğrultmaç',
+    description:
+      'Topraktan yalıtılmış bir AC kaynak (50 Hz, 10 V tepe; bir transformatörün ikincil sargısı gibi) KBP307 köprü diyodunun ~ uçlarına bağlı; dört diyot tek paketin içinde. + ve − uçları 1 kΩ’luk yükü besliyor; S1 kapatılınca yüke 22 µF’lık filtre kondansatörü bağlanır. Voltmetre yükün DC (ortalama) gerilimini, osiloskobun A kanalı yükün gerilimini gösteriyor; toprak köprünün − ucunda.',
+    purpose:
+      'İki yarım dalgayı da aynı yöne çevirir: her yarıda köprünün karşılıklı iki diyodu iletir, yükün akımı hep + uçtan girer. Filtresiz tepe 8,74 V: kaynağın tepesinden ≈ 1,26 V, iletimdeki iki diyotta düşer. Voltmetre 5,24 V okur. S1’i kapat: kondansatör tepelerde dolup aralarda yükü besler; çıkış 6,32 V ile 8,72 V arasında 100 Hz’le dalgalanır, voltmetre 7,59 V okur. Aynı 22 µF ve 1 kΩ’la yarım dalga doğrultmaçta dalgalanma ≈ 4,3 V’tur: tam dalgada kondansatör iki kat sık dolduğu için dalgalanma yaklaşık yarıya iner. Kondansatörü 470 µF yap: dalgalanma 0,14 V’a iner.',
+    everyday:
+      'Adaptörlerde, akü şarj cihazlarında ve şebeke beslemeli neredeyse her cihazın girişinde dört diyot tek bir köprü paketindedir: KBP gibi düz paketler devre kartına takılır, büyük akımlı metal gövdeli köprüler soğutucuya vidalanır.',
+  },
+  'tristor-mandal': {
+    title: 'Tristörle mandallı LED',
+    description:
+      '9 V’luk pil; normalde kapalı BT2 (Durdur) düğmesi, 470 Ω ve kırmızı LED üzerinden MCR100-6 tristörünün anotunu besliyor, katot alt hatta. Normalde açık BT1 (Başlat) düğmesi 10 kΩ’luk RG üzerinden kapıya akım verir. Oynat’a bas; BT1’e bir kez basıp bırak, sonra BT2’ye bas.',
+    purpose:
+      'Bir kez tetiklenince kendi kendini tutan (mandallanan) bir anahtardır. BT1’e basınca kapıdan 0,83 mA geçer (tetikleme akımı I_{GT} ≈ 40 µA’den çok büyük): tristör iletime geçer, LED’den 13,6 mA geçer ve anot ile katot arasında 0,82 V kalır. BT1’i bırakınca kapı akımı kesilir ama LED yanmaya devam eder: anot akımı tutma akımının (I_{H} ≈ 0,5 mA) üstünde kaldıkça tristör iletir. Söndürmenin yolu anot akımını kesmektir: BT2’ye basınca akım sıfıra iner ve tristör keser; BT2’yi bırakınca LED, BT1’e yeniden basılana kadar sönük kalır. Transistör anahtar (Deney 9) ise ancak tabanına akım verildiği sürece iletir.',
+    everyday:
+      'Hırsız alarmları (bir kez tetiklenince sensör eski hâline dönse de çalmaya devam eder) ve güç kaynaklarının aşırı gerilim koruması (crowbar) tristörle kurulur; ışık ayarlı dimmerler aynı aileden triyak kullanır. Büyük tristörler motor sürücülerinde ve yüksek gerilimli doğru akım iletim hatlarında binlerce amperi anahtarlar.',
+  },
 };
 
 export const tr = {
@@ -1507,6 +1680,9 @@ export const tr = {
     closed: 'Kapalı',
     burned: 'Yanmış',
     voltageAcross: 'Uçları arasındaki gerilim',
+    currentSourceOpen: 'Akacak yol yok (açık devre): akım kaynağı akım vermiyor.',
+    currentSourceNote: (current: string, voltage: string) =>
+      `Kaynak ${current} veriyor; uçlarındaki ${voltage} gerilimi dış devre belirliyor (dirençte V = I · R). Akım ok yönünde 2. uçtan çıkar.`,
     reading: 'Gösterge',
     drawnCurrent: 'Devreden çektiği akım',
     voltageDrop: 'Üzerindeki gerilim düşümü',
@@ -1518,6 +1694,38 @@ export const tr = {
     burnedNote: 'Yanmış LED açık devredir. Durdur’a bas ya da sağ tıklayıp “Onar”ı seç.',
     ledLimits: (vf: string, max: string) => `20 mA’de ileri gerilim ≈ ${vf}; en fazla ${max}.`,
     switchClosedNote: (r: string) => `Kapalı anahtar ${r} değerinde bir dirençtir.`,
+    pressed: 'basılı',
+    dcOutput: 'DC çıkış (+ − −)',
+    scrOn: 'iletimde',
+    scrOff: 'kesimde',
+    gateCurrent: 'Kapı akımı (I_{G})',
+    anodeCurrent: 'Anot akımı',
+    scrNote: (on: boolean) =>
+      on
+        ? 'İletimde: kapı akımı kesilse de anot akımı tutma akımının (≈ 0,5 mA) üstünde kaldıkça iletir. Kesmek için anot akımını kes (ör. düğmeyle ya da beslemeyi kapatarak).'
+        : 'Kesimde: anottan katoda akım geçmez. Kapıdan ≈ 40 µA (I_{GT}) akım verilince ve anot katottan pozitifken iletime geçer.',
+    ledCurrent: 'LED akımı (I_{F})',
+    outputCurrent2: 'Çıkış akımı (I_{C})',
+    optoNote: (ctr: string, ic: string, saturated: boolean) =>
+      saturated
+        ? `Çıkış doymada: dış devre CTR · I_{F}’den (${ctr}) az akım çekiyor, V_{CE} ≈ 0,1 V. LED ile çıkış arasında elektriksel bağ yok; bağı ışık kurar.`
+        : `I_{C} = CTR · I_{F} = ${ctr} (${ic}). LED ile çıkış arasında elektriksel bağ yok; bağı ışık kurar.`,
+    regInput: 'Giriş',
+    regOutput: 'Çıkış',
+    inputMinusOutput: 'Giriş − çıkış',
+    regulatorDropout: (needed: string) =>
+      `Giriş yetmiyor: çıkışın ayarlanan değeri tutabilmesi için giriş, çıkışın en az ${needed} (bu akımda bırakma gerilimi) üstünde olmalı. Çıkış girişin ${needed} altında kalıyor.`,
+    lm317Note: (needed: string) =>
+      `LM317 çıkışı ADJ ucunun 1,25 V üstünde tutar: V_{çıkış} = 1,25 V · (1 + R_{2} / R_{1}) + I_{ADJ} · R_{2} (R_{1}: OUT ile ADJ arası, R_{2}: ADJ ile toprak arası, I_{ADJ} ≈ 50 µA: ADJ ucundan R_{2}’ye akan akım). Giriş, çıkışın en az ${needed} (bu akımda bırakma gerilimi) üstünde olmalı.`,
+    /** `load`: çıkış akımı başvuru gerilimini yük regülasyonu kadar düşürür; sonucu değiştiriyorsa yazılır. */
+    lm317Formula: (r1: string, r2: string, adj: string, vout: string, load: { readonly current: string; readonly drop: string; readonly vout: string } | null) =>
+      `V_{çıkış} = 1,25 V · (1 + R_{2} / R_{1}) + I_{ADJ} · R_{2} = 1,25 V · (1 + ${r2} / ${r1}) + ${adj} · ${r2} = ${vout}. R_{1}: OUT ile ADJ arası, R_{2}: ADJ ile toprak arası, I_{ADJ}: ADJ ucundan R_{2}’ye akan akım.` +
+      (load ? ` Çıkış akımı (${load.current}) başvuru gerilimini yük regülasyonu kadar düşürür; çıkış ${load.drop} iner: ${load.vout}.` : ''),
+    reg7805Note: (needed: string) =>
+      `7805 çıkışı GND'ye göre 5 V'ta tutar; giriş çıkışın en az ${needed} (bu akımda bırakma gerilimi, ST veri sayfası) üstünde olmalı. Giriş − çıkış farkı ile akımın çarpımı ısı olarak harcanır.`,
+    bridgeNote: 'Her yarım periyotta iki diyot seri iletir: çıkış, AC girişin anlık değerinden iki diyot gerilimi (KBP307’de 10 mA’de ≈ 0,64 V, 1 A’de ≈ 0,93 V her biri) kadar düşüktür.',
+    spdtNote: (to: string, open: string, r: string) => `C ucu ${to} ucuna bağlı (kapalı kontak ${r}); ${open} ucu açıkta, ondan akım geçmez.`,
+    released: 'bırakılmış',
     switchOpenNote: 'Açık anahtar akım geçirmez; uçları arasındaki gerilim devrenin geri kalanına bağlıdır.',
     idealVoltmeter: 'İdeal voltmetre devreden hiç akım çekmez.',
     realVoltmeter: (r: string, i: string) => `İç direnci ${r}: ölçtüğü devreden ${i} çekiyor.`,
@@ -1706,6 +1914,13 @@ export const tr = {
       'bjt-anahtar-emetor': 'LED neden sönük yanıyor?',
       'baraj-cubuk': 'Hazneyi doldur, ışıkların sırayla yanmasını izle',
       'baraj-tek-isik': 'Hazneyi doldur, yalnızca en üst ışığın yanmasını izle',
+      'akim-kaynagi-ohm': 'S1’i B’ye al: akım aynı, gerilim neden değişiyor?',
+      '7805-besleme': 'Pili 6 V yap, çıkışın 5 V’u bırakmasını izle',
+      'lm317-ayarli': 'R2’yi değiştir, çıkışı formülle karşılaştır',
+      'optokuplor-led': 'BT1’e basılı tut: kablosuz bağlı LED’in yanmasını izle',
+      'schottky-1n4001': 'İki diyodun ileri gerilimini karşılaştır',
+      'kopru-diyot': 'S1’i kapat, dalgalanmanın küçülmesini izle',
+      'tristor-mandal': 'BT1’e bas ve bırak: LED neden yanık kalıyor?',
     } satisfies Record<ExampleId, string>,
     badge: 'Örnek',
     purpose: 'Ne işe yarar?',
@@ -2080,7 +2295,7 @@ export const tr = {
         short: 'Bu kablo parçası ampermetre için kısa; daha uzun bir parçaya dokun.',
         junction: 'Burada başka bir bağlantı var; kablonun başka bir yerine dokun.',
         diagonal: 'Eğik kablo parçasına ampermetre takılamaz.',
-        crowded: 'Burada ampermetreye yer yok (başka kablo ve parçaların üstüne biner); aynı koldaki daha açık bir kabloya dokun.',
+        crowded: 'Burada ampermetreye yer yok (kablonun üstünde ve 3 birim yanında başka kablo, parça ya da yazı var); aynı koldaki daha açık bir kabloya dokun.',
       },
     },
     leg: 'bacağı',
@@ -2219,7 +2434,7 @@ export const tr = {
       modeLabel: 'Multimetrenin kipi',
       modes: { dc: 'V ⎓', ac: 'V ∿', ohm: 'Ω' },
       modeNames: { dc: 'Doğru gerilim (V ⎓)', ac: 'Alternatif gerilim, etkin değer (V ∿)', ohm: 'Direnç (Ω)' },
-      units: { dc: '⎓', ac: '∿' },
+      units: { dc: '⎓', ac: '∿', a: '⎓' },
       red: 'Kırmızı',
       black: 'Siyah',
       redTip: 'Kırmızı uç',
@@ -2241,12 +2456,30 @@ export const tr = {
       ohmFailed: 'Bu iki nokta arası ölçülemedi.',
     },
   },
+  /** Multimetre parçasının kartı (Parça Dalga 1, Y3). */
+  multimeter: {
+    modes: { dc: 'V ⎓', ac: 'V ∿', a: 'A', ohm: 'Ω' },
+    modeNames: {
+      dc: 'Doğru gerilim (V ⎓)',
+      ac: 'Alternatif gerilim, etkin değer (V ∿)',
+      a: 'Akım (A, doğru akım ortalaması)',
+      ohm: 'Direnç (Ω)',
+    },
+    red: 'Kırmızı uç (VΩ)',
+    black: 'Siyah uç (COM)',
+    note: 'Ω kipi yalnızca simülasyon durmuşken ölçer (güç kapalı). A kipinde multimetre devreye seri bağlanır; paralel bağlanırsa uyarı çıkar.',
+    internalV: (value: string) => ({ label: 'İç direnç (V)', value }),
+    internalA: (value: string) => ({ label: 'İç direnç (A)', value }),
+    testVoltage: (value: string) => ({ label: 'Ω test gerilimi', value }),
+  },
   notebook: {
     label: 'Defter: devredeki parçalar',
     title: 'Devredeki parçalar',
     count: (n: number) => `${n} parça`,
     openCard: (label: string, type: string) => `${label} · ${type}: kartı aç`,
     collapse: 'Kartı küçült',
+    hold: 'Basılı tut',
+    holding: 'Basılı tutuluyor',
     floating: (n: number) => `${n} uç boşta`,
     liveHidden: 'canlı değerler gizli',
     liveHiddenNote: 'Arıza bulmada canlı değerler gizli: ölçü aletiyle ölç.',
@@ -2306,9 +2539,19 @@ export const tr = {
       buzzer: 'Buzzer’lar',
       fuse: 'Sigortalar',
       voltmeter: 'Voltmetreler',
+      multimeter: 'Multimetreler',
+      currentsource: 'Akım kaynakları',
+      pushbutton: 'Basmalı düğmeler',
+      spdt: 'Çift yollu anahtarlar',
+      bridge: 'Köprü diyotlar',
+      schottky: 'Schottky diyotlar',
       ammeter: 'Ampermetreler',
       oscilloscope: 'Osiloskoplar',
       tank: 'Su hazneleri',
+      reg7805: 'Gerilim regülatörleri',
+      lm317: 'Ayarlı regülatörler',
+      opto: 'Optokuplörler',
+      scr: 'Tristörler',
     } satisfies Record<DeviceType, string>,
   },
   file: {
@@ -2653,6 +2896,10 @@ export const tr = {
         'Gerçek voltmetrelerin iç direnci sonludur. Ölçtüğün kaynağın iç direnci büyükse voltmetre gerçek değerden düşük okur (yükleme etkisi).',
       ammeter:
         'Gerçek ampermetrelerin de küçük bir iç direnci vardır; seri bağlandığı devrenin akımını biraz azaltır.',
+      currentsource:
+        'İdeal akım kaynağı: ayarlanan akımı verir, uçlarındaki gerilim dış devreye göre kendiliğinden oluşur. Akacak yol yoksa (açık devre) akım vermez ve uyarı çıkar: gerçek bir akım kaynağının gerilimi de sınırlıdır.',
+      multimeter:
+        'Arıza bulmadaki multimetreyle aynı alet: V kiplerinde iç direnç 10 MΩ, A kipinde 0,1 Ω; AC kaynaklı devrede V ⎓ ve A bir periyodun ortalamasını, V ∿ etkin değeri gösterir. Ω, simülasyon durmuşken (güç kapalı) uçlar arasına 0,3 V uygulayarak ölçer.',
       oscilloscope:
         'Kanallar ortak uca (COM) göre gerilimi ölçer. Gerçek girişte her kanal COM’a 1 MΩ ‖ 25 pF ile bağlıdır (laboratuvardaki osiloskoplar gibi). COM şebeke toprağına bağlıysa devrenin toprağıyla aynı noktadır: köprü doğrultmaçta prob toprağını yük tarafına takmak bir diyodu kısa devre eder. Bölme, kuplaj, ADD ve INV ayarları tuvalin köşesindeki panelde.',
       funcgen:
@@ -2676,6 +2923,16 @@ export const tr = {
     } as Partial<Record<DeviceType, string>>,
     /** Parça modelinin notu (genel modellerde türün notu kullanılır). */
     modelNotes: {
+      'MCR100-6':
+        'MCR100-6 (onsemi): 400 V, 0,8 A, TO-92 tristör. Kapı akımı I_{GT} ≈ 40 µA’i (V_{GT} ≈ 0,62 V) aşınca iletime geçer; kapı akımı kesilince anot akımı kilitleme akımı I_{L} ≈ 0,6 mA’in üstündeyse iletimde kalır, sonra anot akımı tutma akımı I_{H} ≈ 0,5 mA’in altına inince keser (tablodaki tipik değerler). İletim gerilimi veri sayfasının eğrisinden: 0,1 A’de ≈ 0,9 V.',
+      PC817:
+        'PC817 (Sharp): LED’in ileri gerilimi 20 mA’de ≈ 1,28 V (veri sayfasının eğrisi; tablo tipik 1,2 V). Çıkış akımı I_{C} = CTR · I_{F}; CTR sınıfa göre (veri sayfası yalnızca aralık verir, modelde aralığın ortası). Dış devre daha az akım çekerse çıkış doyar: V_{CE} ≈ 0,1 V (tablodaki tipik değer, I_{F} = 20 mA, I_{C} = 1 mA). Giriş ile çıkış arasında 5 kV yalıtım.',
+      LM317T:
+        'LM317T: ayarlı regülatör, TO-220 (ST, TI, onsemi veri sayfaları). V_{REF} = 1,25 V (OUT − ADJ), ADJ akımı ≈ 50 µA, akım sınırı ≈ 2,2 A. Giriş, çıkışın bırakma gerilimi kadar üstünde olmalı (ST eğrisi: 20 mA’de ≈ 1,5 V, 1 A’de ≈ 2,05 V). Bacaklar ADJ, OUT, IN (7805’ten farklı).',
+      '1N5819':
+        '1N5819: 1 A, 40 V Schottky diyot (DO-41). İleri gerilim veri sayfası tablosundaki en çok değerlere göre: 0,1 A’de 0,34 V, 1 A’de 0,60 V, 3 A’de 0,90 V (onsemi, Diodes). Ters akım ters gerilimle artar (onsemi veri sayfasının 25 °C tipik eğrisi): 4 V’ta ≈ 42 µA, 20 V’ta ≈ 0,13 mA, 39 V’ta ≈ 0,29 mA (tablo: 40 V’ta en çok 1 mA). Eklem kapasitesi Diodes SPICE modelinden (4 V’ta ≈ 119 pF; tablo tipik 110 pF); Schottky’de ters toparlanma yoktur. 1N4001 ile aynı gövde; ayırmak için gövdedeki yazıya bak.',
+      KBP307:
+        'KBP307: 3 A, 1000 V köprü diyot (dört diyot tek pakette; bacaklar + ~ ~ −). Her diyodun ileri gerilimi DOWO veri sayfasının tipik eğrisinden: 10 mA’de ≈ 0,64 V, 0,1 A’de ≈ 0,75 V, 1 A’de ≈ 0,93 V (tablo: 3 A’de en çok 1,1 V). Diyot başına 25 pF’lık eklem kapasitesi hesaplanır (DOWO tablosunda yok; aynı adlı HXY KBP307’nin tipik değeri); ters toparlanma hesaplanmaz.',
       '1N4001':
         '1N4001: 1 A, 50 V doğrultucu diyot. İleri gerilim 10 mA’de ≈ 0,60 V, 100 mA’de ≈ 0,72 V (Vishay veri sayfası). Eklem kapasitesi (0 V’ta ≈ 30 pF) ve ters toparlanma (τ_{T} ≈ 5,8 µs) de hesaplanır: frekans arttıkça diyot ters yönde de bir süre akım geçirir; 1 MHz’te neredeyse doğrultmaz.',
       genel: 'Genel amaçlı silisyum diyot: 1 mA’de ≈ 0,60 V, 20 mA’de ≈ 0,70 V ileri gerilim. Ters yönde yalnızca çok küçük bir sızıntı akımı geçer; kapasitesi yoktur, her frekansta anında iletir ya da keser.',

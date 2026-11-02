@@ -6,6 +6,9 @@ import { CATALOG, partProp } from '../model/catalog';
 import { GRID } from '../model/types';
 import { WAVEFORMS, type Waveform } from '../sim/devices/acsource';
 import { LED_COLORS, LED_MODELS, type LedColor } from '../sim/devices/led';
+import { multimeterMode, type MultimeterMode } from '../sim/devices/multimeter';
+import { pushbuttonClosed } from '../sim/devices/pushbutton';
+import { spdtThrow, type SpdtThrow } from '../sim/devices/spdt';
 import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
@@ -28,6 +31,10 @@ export interface LiveVisual {
   readonly ions?: IonView;
   /** Direnç: harcanan gücün güç sınırına oranı (1'i aşınca ısınıyormuş gibi çizilir). */
   readonly powerRatio?: number;
+  /** Tristör: iletimde (gövde akım rengiyle dolar). */
+  readonly on?: boolean;
+  /** Gerilim regülatörü: giriş yetmiyor (bırakma gerilimiyle sınırlı): turuncu çerçeve. */
+  readonly dropout?: boolean;
   /** Röle: palet çekili mi? */
   readonly energized?: boolean;
   /** 555: çıkış yüksek mi? */
@@ -566,26 +573,224 @@ function Motor({ angle, rotation }: { angle: number; rotation: Rotation }) {
   );
 }
 
-function Meter({ letter, rotation }: { letter: string; rotation: Rotation }) {
+/** Ekranda (dx, dy) kadar kaymanın sembolün kendi (döndürülmemiş) koordinatındaki karşılığı. */
+function unrotate(dx: number, dy: number, rotation: Rotation): [number, number] {
+  switch (rotation) {
+    case 90:
+      return [dy, -dx];
+    case 180:
+      return [-dx, -dy];
+    case 270:
+      return [-dy, dx];
+    default:
+      return [dx, dy];
+  }
+}
+
+/** `letterShift`: harf ekranda bu kadar aşağı (eksiyse yukarı) kayar (multimetrede altındaki işarete yer). */
+function Meter({ letter, rotation, letterShift = 0 }: { letter: string; rotation: Rotation; letterShift?: number }) {
+  const [lx, ly] = unrotate(0, 0.5 + letterShift, rotation);
   return (
     <g>
       <Lead from={-40} to={-15} />
       <Lead from={15} to={40} />
       <circle cx={0} cy={0} r={15} style={PAPER} stroke="currentColor" strokeWidth={2} />
       <text
-        x={0}
-        y={0.5}
+        x={lx}
+        y={ly}
         textAnchor="middle"
         dominantBaseline="central"
         fontSize={16}
         fontWeight={700}
         fill="currentColor"
-        transform={rotation ? `rotate(${-rotation})` : undefined}
+        transform={rotation ? `rotate(${-rotation} ${lx} ${ly})` : undefined}
         style={{ fontFamily: 'var(--font-sans)' }}
       >
         {letter}
       </text>
       <Plus x={-27} y={-8} />
+    </g>
+  );
+}
+
+/**
+ * Basmalı düğme: iki kontak, üstünde basma çubuğu. Çubuk kontaklara değiyorsa kontak kapalı (normalde
+ * açık düğme basılıyken, normalde kapalı düğme bırakılmışken).
+ */
+function PushButton({ closed }: { closed: boolean }) {
+  const bar = closed ? -3 : -10;
+  return (
+    <g>
+      <Lead from={-40} to={-14} />
+      <Lead from={14} to={40} />
+      <line x1={-18} y1={bar} x2={18} y2={bar} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+      <line x1={0} y1={bar} x2={0} y2={-20} stroke="currentColor" strokeWidth={2} />
+      <line x1={-7} y1={-20} x2={7} y2={-20} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+      <circle cx={-14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+    </g>
+  );
+}
+
+/**
+ * Çift yollu anahtar: C (−40, 0), A (40, −20), B (40, 20). Dil C'nin kontağında döner, bağlı olduğu
+ * ucun kontağına değer.
+ */
+function Spdt({ to }: { to: SpdtThrow }) {
+  const tipY = to === 'a' ? -20 : 20;
+  return (
+    <g>
+      <Lead from={-40} to={-14} />
+      <line x1={14} y1={-20} x2={40} y2={-20} stroke="currentColor" strokeWidth={2} />
+      <line x1={14} y1={20} x2={40} y2={20} stroke="currentColor" strokeWidth={2} />
+      <line x1={-14} y1={0} x2={12} y2={tipY} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+      <circle cx={-14} cy={0} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={14} cy={-20} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <circle cx={14} cy={20} r={2.8} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+    </g>
+  );
+}
+
+/** Tristör: diyot gövdesi, katot çizgisinden kapı ucu (2, 3); iletimdeyken gövde akım rengiyle dolu. */
+function Scr({ on }: { on: boolean }) {
+  return (
+    <g>
+      <Lead from={-40} to={-9} />
+      <Lead from={9} to={40} />
+      <path d="M-9,-10 L-9,10 L9,0 Z" fill={on ? 'var(--color-dot)' : 'var(--color-paper)'} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <line x1={9} y1={-10} x2={9} y2={10} stroke="currentColor" strokeWidth={2.4} />
+      <path d="M9,6 L20,16 V30" fill="none" stroke="currentColor" strokeWidth={2} />
+    </g>
+  );
+}
+
+/**
+ * Optokuplör: kesikli kutuda solda LED (A üst, K alt), sağda fototransistör (C üst, E alt), arada ışık
+ * okları. Uçlar: A (−40, −10), K (−40, 10), C (40, −10), E (40, 10).
+ */
+function Optocoupler() {
+  return (
+    <g>
+      <rect x={-27} y={-23} width={54} height={46} rx={2} fill="none" stroke="currentColor" strokeWidth={1.6} strokeDasharray="4 3" />
+      <path d="M-40,-10 H-15 V-7 M-15,7 V10 H-40" fill="none" stroke="currentColor" strokeWidth={2} />
+      <path d="M-22,-7 L-8,-7 L-15,5 Z" fill="currentColor" />
+      <line x1={-22} y1={5} x2={-8} y2={5} stroke="currentColor" strokeWidth={2.4} />
+      <line x1={-4} y1={-3} x2={4} y2={-3} stroke="currentColor" strokeWidth={1.6} />
+      <path d={arrowHead(7, -3, 1, 0, 5, 2.6)} fill="currentColor" />
+      <line x1={-4} y1={3} x2={4} y2={3} stroke="currentColor" strokeWidth={1.6} />
+      <path d={arrowHead(7, 3, 1, 0, 5, 2.6)} fill="currentColor" />
+      <line x1={11} y1={-9} x2={11} y2={9} stroke="currentColor" strokeWidth={2.6} />
+      <path d="M11,-4 L20,-10 H40 M11,4 L20,10 H40" fill="none" stroke="currentColor" strokeWidth={2} />
+      <path d={arrowHead(20, 10, 9, 6, 6, 3)} fill="currentColor" />
+    </g>
+  );
+}
+
+/** Gerilim regülatörü: IN (sol), OUT (sağ), GND / ADJ (alt) uçlu kutu; giriş yetmiyorsa turuncu çerçeve. */
+function Regulator({ text, rotation, dropout }: { text: string; rotation: Rotation; dropout: boolean }) {
+  return (
+    <g>
+      <Lead from={-40} to={-24} />
+      <Lead from={24} to={40} />
+      <line x1={0} y1={16} x2={0} y2={30} stroke="currentColor" strokeWidth={2} />
+      {dropout && <rect x={-29} y={-21} width={58} height={42} rx={6} fill="none" stroke="var(--color-warn)" strokeWidth={3} />}
+      <rect x={-24} y={-16} width={48} height={32} rx={3} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <DeviceText x={0} y={0.5} rotation={rotation} size={text.length > 4 ? 12 : 14}>
+        {text}
+      </DeviceText>
+    </g>
+  );
+}
+
+/** Schottky diyot: diyot üçgeni, katot çizgisinin iki ucu S biçiminde kıvrık. */
+function Schottky() {
+  return (
+    <g>
+      <Lead from={-40} to={-9} />
+      <Lead from={9} to={40} />
+      <path d="M-9,-10 L-9,10 L9,0 Z" fill="currentColor" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <path d="M14,-6 L14,-10 L9,-10 L9,10 L4,10 L4,6" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinejoin="round" />
+    </g>
+  );
+}
+
+/** Kenar üstünde küçük diyot: (ax, ay) anottan (kx, ky) katoda; üçgen ve katot çizgisi kenarın ortasında. */
+function EdgeDiode({ ax, ay, kx, ky }: { ax: number; ay: number; kx: number; ky: number }) {
+  const l = Math.hypot(kx - ax, ky - ay);
+  const [ux, uy] = [(kx - ax) / l, (ky - ay) / l];
+  const [nx, ny] = [-uy, ux];
+  const [mx, my] = [(ax + kx) / 2, (ay + ky) / 2];
+  const s = 6;
+  const w = 6;
+  const tip = [mx + ux * s, my + uy * s] as const;
+  const base = [mx - ux * s, my - uy * s] as const;
+  return (
+    <g>
+      <path d={`M${base[0] + nx * w} ${base[1] + ny * w} L${base[0] - nx * w} ${base[1] - ny * w} L${tip[0]} ${tip[1]} Z`} fill="currentColor" />
+      <line x1={tip[0] + nx * w} y1={tip[1] + ny * w} x2={tip[0] - nx * w} y2={tip[1] - ny * w} stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" />
+    </g>
+  );
+}
+
+/** Köprü diyot: köşeleri ~ (üst, alt), + (sağ), − (sol) olan kare; dört diyot + ucuna doğru iletir. */
+function Bridge() {
+  const v = 26;
+  return (
+    <g>
+      <Lead from={-40} to={-v} />
+      <Lead from={v} to={40} />
+      <line x1={0} y1={-40} x2={0} y2={-v} stroke="currentColor" strokeWidth={2} />
+      <line x1={0} y1={v} x2={0} y2={40} stroke="currentColor" strokeWidth={2} />
+      <path d={`M0 ${-v} L${v} 0 L0 ${v} L${-v} 0 Z`} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />
+      <EdgeDiode ax={0} ay={-v} kx={v} ky={0} />
+      <EdgeDiode ax={0} ay={v} kx={v} ky={0} />
+      <EdgeDiode ax={-v} ay={0} kx={0} ky={-v} />
+      <EdgeDiode ax={-v} ay={0} kx={0} ky={v} />
+    </g>
+  );
+}
+
+/** DC akım kaynağı: dairede ok; ok akımın çıktığı ucu (2. uç) gösterir. */
+function CurrentSource() {
+  return (
+    <g>
+      <Lead from={-40} to={-15} />
+      <Lead from={15} to={40} />
+      <circle cx={0} cy={0} r={15} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      <line x1={-9} y1={0} x2={3} y2={0} stroke="currentColor" strokeWidth={2} />
+      <path d={arrowHead(10, 0, 1, 0, 8, 4.5)} fill="currentColor" />
+    </g>
+  );
+}
+
+/** Multimetre: dairede kipine göre V, A ya da Ω; altında doğru (⎓) ya da alternatif (∿) işareti. */
+/**
+ * Multimetre: harf kipe göre (V, A, Ω), altında ⎓ ya da ∿ (Y2). İşaret ekranda her zaman harfin altındadır:
+ * yatayda Y2'deki gibi çemberin altında; dikeyde çemberin altından uç geçtiği için çemberin içinde (harf
+ * biraz yukarı kayar).
+ */
+function Multimeter({ mode, rotation }: { mode: MultimeterMode; rotation: Rotation }) {
+  const mark = mode === 'ac' ? '∿' : mode === 'ohm' ? null : '⎓';
+  const vertical = rotation === 90 || rotation === 270;
+  const [mx, my] = unrotate(0, vertical ? 8 : 23, rotation);
+  return (
+    <g>
+      <Meter letter={mode === 'a' ? 'A' : mode === 'ohm' ? 'Ω' : 'V'} rotation={rotation} letterShift={mark && vertical ? -4 : 0} />
+      {mark && (
+        <text
+          x={mx}
+          y={my}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={vertical ? 10 : 11}
+          fontWeight={600}
+          fill="currentColor"
+          transform={rotation ? `rotate(${-rotation} ${mx} ${my})` : undefined}
+          style={{ fontFamily: 'var(--font-sans)' }}
+        >
+          {mark}
+        </text>
+      )}
     </g>
   );
 }
@@ -1095,6 +1300,26 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Meter letter="V" rotation={rotation} />;
     case 'ammeter':
       return <Meter letter="A" rotation={rotation} />;
+    case 'multimeter':
+      return <Multimeter mode={multimeterMode(props)} rotation={rotation} />;
+    case 'currentsource':
+      return <CurrentSource />;
+    case 'pushbutton':
+      return <PushButton closed={pushbuttonClosed(props)} />;
+    case 'spdt':
+      return <Spdt to={spdtThrow(props)} />;
+    case 'bridge':
+      return <Bridge />;
+    case 'schottky':
+      return <Schottky />;
+    case 'reg7805':
+      return <Regulator text="7805" rotation={rotation} dropout={live?.dropout ?? false} />;
+    case 'lm317':
+      return <Regulator text="LM317" rotation={rotation} dropout={live?.dropout ?? false} />;
+    case 'opto':
+      return <Optocoupler />;
+    case 'scr':
+      return <Scr on={live?.on ?? false} />;
   }
 }
 

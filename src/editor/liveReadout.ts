@@ -13,7 +13,7 @@
 import { tr } from '../i18n/tr';
 import type { Part } from '../model/types';
 import { mergeStats, type DeviceStatus, type KeyStats, type Measurement } from '../sim';
-import { meterText, partReadout, type Readout, type ReadoutRow } from './readouts';
+import { meterRole, meterText, partReadout, type Readout, type ReadoutRow } from './readouts';
 
 /** Salınan değerlerin güncellenme aralığı (gerçek zaman, s): multimetrelerin ≈ 2–3 okuma/s'si. */
 export const DISPLAY_WINDOW = 0.4;
@@ -135,7 +135,8 @@ function signedRms(s: KeyStats): number {
 type Pick = 'min' | 'max' | 'summary';
 
 function isMeter(part: Part): boolean {
-  return part.type === 'voltmeter' || part.type === 'ammeter';
+  const role = meterRole(part);
+  return role === 'voltmeter' || role === 'ammeter';
 }
 
 /** Yaprağın seçilen uçtaki ya da özet değeri. */

@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "battery", "label": "B1", "x": 0, "y": 2, "rotation": 90, "props": {"voltage": 12, "internalResistance": 0}},
+    {"id": "p2", "type": "lm317", "label": "U1", "x": 12, "y": -8, "rotation": 0, "props": {"model": "LM317T"}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 20, "y": -1, "rotation": 90, "props": {"resistance": 240, "powerRating": "0.25"}},
+    {"id": "p4", "type": "resistor", "label": "R2", "x": 12, "y": 7, "rotation": 90, "props": {"resistance": 720, "powerRating": "0.25"}},
+    {"id": "p5", "type": "resistor", "label": "RL", "x": 28, "y": 2, "rotation": 90, "props": {"resistance": 100, "powerRating": "0.5"}},
+    {"id": "p6", "type": "voltmeter", "label": "V1", "x": 36, "y": 2, "rotation": 90, "props": {"mode": "dc", "resistance": 10000000, "ideal": false}},
+    {"id": "p7", "type": "ground", "label": "GND1", "x": 0, "y": 14, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -2], [0, -8], [8, -8]]},
+    {"id": "w2", "points": [[16, -8], [20, -8]]},
+    {"id": "w3", "points": [[20, -8], [20, -5]]},
+    {"id": "w4", "points": [[20, -8], [28, -8]]},
+    {"id": "w5", "points": [[28, -8], [28, -2]]},
+    {"id": "w6", "points": [[28, -8], [36, -8], [36, -2]]},
+    {"id": "w7", "points": [[12, -5], [12, 3]]},
+    {"id": "w8", "points": [[12, 3], [20, 3]]},
+    {"id": "w9", "points": [[0, 6], [0, 14], [12, 14]]},
+    {"id": "w10", "points": [[12, 11], [12, 14]]},
+    {"id": "w11", "points": [[12, 14], [28, 14]]},
+    {"id": "w12", "points": [[28, 6], [28, 14]]},
+    {"id": "w13", "points": [[28, 14], [36, 14], [36, 6]]}
+  ]
+}

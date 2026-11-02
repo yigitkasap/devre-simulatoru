@@ -91,13 +91,13 @@ function outputUsed(part: Part, pin: number, idx: NetIndex): boolean {
  * Düğümün adı; toprak ağıysa "0". Sıra (analiz düzeltmeleri, 10): kaynağın ucu ("PS1 +", "FG1 OUT"),
  * transistörün ya da entegrenin ucu ("Q1 baz"), öbür ucu toprakta olan iki uçlu parça ("C1"), toprak
  * dışındaki ilk parçanın adlandırılmış ucu ("R1 1. uç"). Grafik izleri, CSV başlıkları, Bode çıkışı
- * ve görev hedefleri bu adı kullanır.
+ * ve görev hedefleri bu adı kullanır. `exclude`: adda kullanılmayacak parça (düğüme bağlı ölçü aletinin kendisi).
  */
-export function nodeName(key: string, idx: NetIndex): string {
+export function nodeName(key: string, idx: NetIndex, exclude?: string): string {
   const net = idx.netOf(key);
   if (net === undefined) return '?';
   if (net === idx.ground) return '0';
-  const pins = idx.pins(net).filter((p) => p.part.type !== 'ground').sort(byLabel);
+  const pins = idx.pins(net).filter((p) => p.part.type !== 'ground' && p.part.id !== exclude).sort(byLabel);
   const source = pins.find((p) => SOURCES.has(p.part.type));
   if (source) return pinName(source, idx);
   const active = pins.find((p) => ACTIVE.has(p.part.type));

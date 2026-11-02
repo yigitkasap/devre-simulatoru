@@ -7,6 +7,14 @@ import { METER_MODES } from '../sim/averager';
 import {
   acRms,
   AC_SOURCE_DEFAULTS,
+  AMMETER_DEFAULTS,
+  multimeterMode,
+  dropoutVoltage,
+  LM317,
+  REG7805,
+  pushbuttonClosed,
+  spdtThrow,
+  VOLTMETER_DEFAULTS,
   dcsupplySettings,
   funcgenSettings,
   scopeSettings,
@@ -21,6 +29,17 @@ import { tankSettings } from '../sim/devices/tank';
 import { SWITCH_ON_RESISTANCE } from '../sim/constants';
 import { boolProp, numProp, strProp, type Props } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
+
+/**
+ * Ölçü aletinin şu anki işi: voltmetre gibi, ampermetre gibi ya da Ω (çalışırken okumaz); ölçü aleti
+ * değilse null. Multimetre kipine göre (A kipi DC ortalama).
+ */
+export function meterRole(part: Part): 'voltmeter' | 'ammeter' | 'ohm' | null {
+  if (part.type === 'voltmeter' || part.type === 'ammeter') return part.type;
+  if (part.type !== 'multimeter') return null;
+  const mode = multimeterMode(part.props);
+  return mode === 'a' ? 'ammeter' : mode === 'ohm' ? 'ohm' : 'voltmeter';
+}
 
 /** Ölçü aletinin kipi ve gösterdiği değer (durum yoksa anlık değer). */
 function meterValue(props: Props, instantaneous: number, status: DeviceStatus): { ac: boolean; value: number } {
@@ -386,6 +405,7 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
       };
     }
     case 'diode':
+    case 'schottky':
     case 'led': {
       const rows: ReadoutRow[] = [
         { label: t.forwardVoltage, value: v(m.voltage) },
@@ -465,11 +485,113 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
         note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
       };
     }
+    case 'pushbutton': {
+      // Basılı olup olmadığı simülasyonun durumundan (belgede durmaz).
+      const pressed = status.pressed === true;
+      const closed = pushbuttonClosed({ ...p, pressed });
+      return {
+        title,
+        rows: [
+          { label: t.state, value: closed ? t.closed : t.open },
+          { label: t.voltageAcross, value: v(V) },
+          { label: t.current, value: a(I) },
+        ],
+        note: closed ? t.switchClosedNote(ohmValue(SWITCH_ON_RESISTANCE)) : t.switchOpenNote,
+      };
+    }
+    case 'scr': {
+      const sc = status.scr;
+      const on = sc?.on ?? false;
+      return {
+        title,
+        rows: [
+          { label: t.state, value: on ? t.scrOn : t.scrOff },
+          { label: t.anodeCurrent, value: a(m.current) },
+          { label: t.voltageAcross, value: v(m.voltage) },
+          { label: t.gateCurrent, value: a(sc?.gate ?? 0) },
+        ],
+        note: t.scrNote(on),
+      };
+    }
+    case 'opto': {
+      const o = status.opto;
+      if (!o) return { title, rows: [] };
+      return {
+        title,
+        rows: [
+          { label: t.ledCurrent, value: a(o.led) },
+          { label: t.forwardVoltage, value: v(o.ledVoltage) },
+          { label: t.outputCurrent2, value: a(o.output) },
+          { label: t.vce, value: v(o.vce) },
+          { label: 'CTR', value: `%${formatNumber(o.ctr * 100, 0)}` },
+        ],
+        note: t.optoNote(`%${formatNumber(o.ctr * 100, 0)}`, a(o.ctr * o.led), o.saturated),
+      };
+    }
+    case 'reg7805':
+    case 'lm317': {
+      const r = status.regulator;
+      if (!r) return { title, rows: [] };
+      const lm317 = part.type === 'lm317';
+      const needed = dropoutVoltage(lm317 ? LM317 : REG7805, r.current);
+      return {
+        title,
+        rows: [
+          { label: t.regInput, value: v(r.input) },
+          { label: t.regOutput, value: v(r.output) },
+          { label: t.current, value: a(r.current) },
+          { label: t.powerUsed, value: w(r.power) },
+          { label: t.inputMinusOutput, value: v(r.input - r.output) },
+        ],
+        note: r.dropout ? t.regulatorDropout(vn(needed)) : lm317 ? t.lm317Note(vn(needed)) : t.reg7805Note(vn(needed)),
+      };
+    }
+    case 'bridge':
+      // DC çıkış (+ − −), + uçtan verilen akım ve dört diyotta harcanan güç.
+      return {
+        title,
+        rows: [
+          { label: t.dcOutput, value: v(m.voltage) },
+          { label: t.outputCurrent, value: a(m.current) },
+          { label: t.powerUsed, value: w(P) },
+        ],
+        note: t.bridgeNote,
+      };
+    case 'spdt': {
+      const to = spdtThrow(p);
+      const [on, off] = to === 'a' ? ['A', 'B'] : ['B', 'A'];
+      return {
+        title,
+        rows: [
+          { label: t.state, value: `C → ${on}` },
+          { label: t.current, value: a(I) },
+        ],
+        note: t.spdtNote(on, off, ohmValue(SWITCH_ON_RESISTANCE)),
+      };
+    }
+    case 'currentsource': {
+      // Kaynağın verdiği akım ve uçlarındaki gerilim (2. uç − 1. uç: dış devre belirler).
+      const current = m.current;
+      return {
+        title,
+        rows: [
+          { label: t.current, value: a(current) },
+          { label: t.voltageAcross, value: v(-m.voltage) },
+          { label: t.powerDelivered, value: w(Math.abs(m.power)) },
+        ],
+        note: current === 0 ? t.currentSourceOpen : t.currentSourceNote(a(current), v(-m.voltage)),
+      };
+    }
     case 'voltmeter':
-    case 'ammeter': {
-      const voltmeter = part.type === 'voltmeter';
-      const ideal = boolProp(p, 'ideal', false);
-      const R = numProp(p, 'resistance', voltmeter ? 10e6 : 0.1);
+    case 'ammeter':
+    case 'multimeter': {
+      const role = meterRole(part);
+      // Multimetrenin Ω kipi: simülasyon sırasında devreden çıkar, okumaz (Ω durmuşken ölçülür).
+      if (role === 'ohm') return { title, rows: [{ label: t.reading, value: tr.fault.meter.empty }], note: tr.fault.meter.ohmRunning };
+      const voltmeter = role === 'voltmeter';
+      const multimeter = part.type === 'multimeter';
+      const ideal = !multimeter && boolProp(p, 'ideal', false);
+      const R = multimeter ? (voltmeter ? VOLTMETER_DEFAULTS.resistance : AMMETER_DEFAULTS.resistance) : numProp(p, 'resistance', voltmeter ? 10e6 : 0.1);
       const instantaneous = voltmeter ? m.voltage : m.current;
       const { ac, value } = meterValue(p, instantaneous, status);
       // Gösterge anlık değerden ayrıysa (AC kaynaklı devre ya da AC kipi) ikisi de gösterilir.
@@ -494,8 +616,9 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
  * sonuna "~" eklenir (230 V~ gibi).
  */
 export function meterText(part: Part, m: Measurement, status: DeviceStatus = {}): string | null {
-  if (part.type !== 'voltmeter' && part.type !== 'ammeter') return null;
-  const voltmeter = part.type === 'voltmeter';
+  const role = meterRole(part);
+  if (role !== 'voltmeter' && role !== 'ammeter') return null;
+  const voltmeter = role === 'voltmeter';
   const { ac, value } = meterValue(part.props, voltmeter ? m.voltage : m.current, status);
   const text = formatSI(value, voltmeter ? 'V' : 'A', { digits: 4 });
   return ac ? `${text}~` : text;

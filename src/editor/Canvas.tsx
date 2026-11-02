@@ -54,7 +54,9 @@ import { FIELD_COLOR, MagneticField } from './MagneticField';
 import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import type { MessageSeverity } from './messages';
-import { meterDisplayRect, meterFlipped, partValueText, PartView, type PartTone } from './PartView';
+import { selectionActions, type TaskParts } from './InspectTab';
+import { spdtThrow } from '../sim/devices/spdt';
+import { METER_DISPLAY, meterDisplayRect, meterFlipped, partValueText, PartView, type PartTone } from './PartView';
 import { visibleLive } from './fault/mask';
 import type { Probe } from './fault/meter';
 import { PlaceMarks, ProbeLayer, type PlaceMark, type ProbeView } from './fault/ProbeLayer';
@@ -67,6 +69,9 @@ import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from '.
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
 import { circuitHits, circuitShapes, fitAvoiding, type Rect } from './legendFit';
 import { clampScale, fitView, screenToGrid, snap, zoomAt, type View } from './view';
+
+/** Simülasyon sırasında tıklanınca (ya da basılı tutulunca) kullanılan parçalar: imleç el olur. */
+const OPERATED: ReadonlySet<DeviceType> = new Set(['switch', 'spdt', 'pushbutton']);
 
 export interface CanvasHandle {
   zoomIn(): void;
@@ -240,12 +245,19 @@ export interface CanvasProps {
   /** Analiz izlerinin şemadaki renkli etiketleri ve seçilmeyi bekleyen düğümün halkası. */
   readonly marks?: readonly CanvasMark[];
   /** Görev (öğrenci): değiştirilebilir parçalar mavi çerçeveli, kilitliler kilit rozetli (lockMarks false: rozet yok, arıza bulmada her şey kilitli). */
-  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string>; readonly lockMarks?: boolean } | null;
+  readonly taskParts?: TaskParts | null;
   /**
    * Elle kablo çizilmez ve kablo taşınmaz (arıza bulma: kablolar yalnızca ampermetre takıp kaldırmakla
    * değişir). Uçlar kablo başlatmaz, kablo aracı (W) açılmaz; kabloya tıklamak onu seçer.
    */
   readonly wiringLocked?: boolean;
+  /** Takılı ampermetrelerin gösterge yanı (arıza bulma; takarken seçildi). */
+  readonly meterFlips?: ReadonlyMap<string, boolean>;
+  /** Multimetrelerin Ω okuması (simülasyon durmuşken). */
+  readonly ohmTexts?: ReadonlyMap<string, string>;
+  /** Basılı tutulan düğmeler (belgede durmaz) ve basma / bırakma. */
+  readonly pressed?: ReadonlySet<string>;
+  readonly onPress?: (partId: string, down: boolean) => void;
   readonly ref?: Ref<CanvasHandle>;
 }
 
@@ -392,6 +404,10 @@ export function Canvas({
   marks,
   taskParts,
   wiringLocked = false,
+  meterFlips,
+  ohmTexts,
+  pressed,
+  onPress,
   ref,
 }: CanvasProps) {
   // Göstergeler kapalıysa kablo renkleri ve öbür göstergeler simülasyon yokmuş gibi çizilir.
@@ -889,6 +905,10 @@ export function Canvas({
         commit(updatePart(doc, part.id, { props: { ...part.props, closed: !boolProp(part.props, 'closed', false) } }));
         return;
       }
+      if (phone.mode === 'olc' && part?.type === 'spdt') {
+        commit(updatePart(doc, part.id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } }));
+        return;
+      }
       if (!selection.parts.includes(hit.partId) || selection.parts.length > 1 || selection.wires.length > 0) {
         dispatch({ type: 'select', selection: { parts: [hit.partId], wires: [] } });
       }
@@ -919,6 +939,18 @@ export function Canvas({
     if (selection.parts.length > 0 || selection.wires.length > 0) dispatch({ type: 'select', selection: EMPTY_SELECTION });
   };
 
+  /** Basmalı düğme: parmak ya da fare kalkana kadar basılı. */
+  const holdButton = (partId: string) => {
+    onPress?.(partId, true);
+    const release = () => {
+      onPress?.(partId, false);
+      window.removeEventListener('pointerup', release);
+      window.removeEventListener('pointercancel', release);
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+  };
+
   const phonePointerDown = (e: ReactPointerEvent<SVGSVGElement>, mode: PhoneCanvas['mode']) => {
     const g = toGrid(e.clientX, e.clientY);
     const local = localPoint(e.clientX, e.clientY);
@@ -928,6 +960,10 @@ export function Canvas({
     phoneLongFired.current = false;
     clearPhoneTimers();
     const hit = mode === 'bagla' ? null : hitTest(g, mode === 'olc' ? { pins: false } : undefined);
+    if (mode === 'olc' && hit?.kind === 'part' && doc.parts.find((p) => p.id === hit.partId)?.type === 'pushbutton') {
+      holdButton(hit.partId);
+      return;
+    }
     capture(e.pointerId);
     const pointerId = e.pointerId;
     setInteraction({ kind: 'press', pointerId, sx: local.x, sy: local.y, view, hit, g });
@@ -1112,6 +1148,16 @@ export function Canvas({
     // Seçme aracı
     if (hit?.kind === 'part') {
       const part = doc.parts.find((p) => p.id === hit.partId);
+      if (simActive && part?.type === 'pushbutton' && !e.shiftKey) {
+        // Simülasyon sırasında düğme basılı tutulur, bırakınca açılır.
+        holdButton(part.id);
+        return;
+      }
+      if (simActive && part?.type === 'spdt' && !e.shiftKey) {
+        // Simülasyon sırasında çift yollu anahtara tıklamak C'yi öbür uca bağlar.
+        commit(updatePart(doc, part.id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } }));
+        return;
+      }
       if (simActive && part?.type === 'switch' && !e.shiftKey) {
         // Simülasyon sırasında anahtara tıklamak onu açar/kapatır.
         const closed = boolProp(part.props, 'closed', false);
@@ -1599,7 +1645,7 @@ export function Canvas({
         : tool.kind === 'place' || tool.kind === 'wire' || interaction.kind === 'wiring' || hoverPin
           ? 'cursor-crosshair'
           : hover?.kind === 'part'
-            ? simActive && doc.parts.find((p) => p.id === hover.partId)?.type === 'switch'
+            ? simActive && OPERATED.has(doc.parts.find((p) => p.id === hover.partId)?.type ?? 'ground')
               ? 'cursor-pointer'
               : 'cursor-move'
             : hover?.kind === 'wire'
@@ -1631,11 +1677,12 @@ export function Canvas({
     statusRef.current?.({ hint: JSON.parse(hintKey) as CanvasHint, scale: view.scale });
   }, [hintKey, view.scale]);
 
-  // Ölçü aleti ekranı başka bir parçanın üstüne biniyorsa ve öbür taraf boşsa, ekran öbür tarafa açılır.
+  // Ölçü aleti ekranı başka bir parçanın üstüne biniyorsa ve öbür taraf boşsa, ekran öbür tarafa açılır
+  // (takılı ampermetrede yanı takarken seçildi).
   const displayFlips = new Set<string>();
   for (const part of doc.parts) {
-    if (part.type !== 'voltmeter' && part.type !== 'ammeter') continue;
-    if (meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)))) displayFlips.add(part.id);
+    if (!METER_DISPLAY.has(part.type)) continue;
+    if (meterFlips?.get(part.id) ?? meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)))) displayFlips.add(part.id);
   }
 
   const highlightTone = highlight?.severity === 'error' || highlight?.severity === 'warning' ? highlight.severity : 'selected';
@@ -1831,7 +1878,8 @@ export function Canvas({
                 part={part}
                 tone={toneOf(part.id)}
                 resistorStyle={settings.resistorStyle}
-                meterText={liveFrame?.meterTexts.get(part.id) ?? null}
+                meterText={liveFrame?.meterTexts.get(part.id) ?? ohmTexts?.get(part.id) ?? null}
+                {...(part.type === 'pushbutton' && pressed?.has(part.id) ? { part: { ...part, props: { ...part.props, pressed: true } } } : {})}
                 alarm={frame?.alarms.has(part.id) ?? false}
                 displayFlip={displayFlips.has(part.id)}
                 hideValue={lod && !selectedParts.has(part.id)}
@@ -2252,18 +2300,24 @@ export function Canvas({
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
         const burned = frame?.statuses.get(part.id)?.burned === true;
+        // Görevde kilitli parçada Döndür, Ters çevir ve Sil yok (sağ paneldeki gibi).
+        const actions = selectionActions(taskParts, [part.id], 0);
         const items: MenuItem[] = [
           { label: phone ? tr.phone.value : tr.contextMenu.properties, onSelect: () => onOpenProperties(part.id) },
-          { label: tr.contextMenu.rotate, shortcut: 'R', onSelect: () => onRotate([part.id]) },
-          ...(CATALOG[part.type].polarized ? [{ label: tr.contextMenu.flip, shortcut: 'F', onSelect: () => onFlip([part.id]) }] : []),
+          ...(actions.rotate ? [{ label: tr.contextMenu.rotate, shortcut: 'R', onSelect: () => onRotate([part.id]) }] : []),
+          ...(actions.rotate && CATALOG[part.type].polarized ? [{ label: tr.contextMenu.flip, shortcut: 'F', onSelect: () => onFlip([part.id]) }] : []),
           ...(burned ? [{ label: tr.contextMenu.repair, onSelect: () => onRepair(part.id), tone: 'accent' as const, separatorBefore: true }] : []),
-          {
-            label: tr.contextMenu.remove,
-            shortcut: 'Delete',
-            onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
-            tone: 'danger',
-            separatorBefore: !burned,
-          },
+          ...(actions.remove
+            ? [
+                {
+                  label: tr.contextMenu.remove,
+                  shortcut: 'Delete',
+                  onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
+                  tone: 'danger' as const,
+                  separatorBefore: !burned,
+                },
+              ]
+            : []),
         ];
         return (
           <ContextMenu
@@ -2793,7 +2847,7 @@ function docBounds(doc: CircuitDoc): Box | null {
   for (const part of doc.parts) {
     box = unionBox(box, partBounds(part));
     // Ölçü aleti ekranı da görünsün.
-    if (part.type === 'voltmeter' || part.type === 'ammeter') box = unionBox(box, meterDisplayRect(part, false));
+    if (METER_DISPLAY.has(part.type)) box = unionBox(box, meterDisplayRect(part, false));
   }
   for (const wire of doc.wires) {
     for (const p of wire.points) box = unionBox(box, { x: p.x, y: p.y, w: 0, h: 0 });

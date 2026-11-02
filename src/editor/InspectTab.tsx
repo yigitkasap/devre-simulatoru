@@ -41,6 +41,27 @@ export interface InspectTabProps {
   readonly onSelectPart: (partId: string) => void;
 }
 
+/** Görev (öğrenci): kilitli ve değiştirilebilir parçalar, takılı ampermetreler, kilit simgesi, kablo kilidi. */
+export interface TaskParts {
+  readonly locked: ReadonlySet<string>;
+  readonly editable: ReadonlySet<string>;
+  readonly plugged?: ReadonlySet<string>;
+  readonly lockMarks?: boolean;
+  readonly wiresLocked?: boolean;
+}
+
+/**
+ * Seçime gösterilen eylemler: öğelerin hepsi kilitliyse Döndür (ve Ters çevir) ile Sil yok. Takılı
+ * ampermetre döndürülmez ama silinir (kaldırılır).
+ */
+export function selectionActions(task: TaskParts | null | undefined, partIds: readonly string[], wireCount: number): { rotate: boolean; remove: boolean } {
+  if (!task) return { rotate: partIds.length > 0, remove: true };
+  return {
+    rotate: partIds.some((id) => !task.locked.has(id) && !task.plugged?.has(id)),
+    remove: partIds.some((id) => !task.locked.has(id)) || (wireCount > 0 && !task.wiresLocked),
+  };
+}
+
 /** Ayarları cihaz rafındaki ön panelinde olan parçalar. */
 export const RACK_DEVICES: ReadonlySet<string> = new Set(['oscilloscope', 'funcgen', 'dcsupply', 'tank']);
 
@@ -342,8 +363,8 @@ function NumberField({
 
 // --- Kablo ve çoklu seçim -------------------------------------------------------------------
 
-export function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wireId: string }) {
-  // Telefonda silme alt çubukta (Ölç kipinde yapı kilitli).
+export function WireDetails({ wireId, frame, onDelete, removable = true }: InspectTabProps & { wireId: string; removable?: boolean }) {
+  // Telefonda silme alt çubukta (Ölç kipinde yapı kilitli); görevde kablolar kilitliyse Sil yok.
   const touch = useTouchUi();
   const voltage = frame?.wireVoltages.get(wireId);
   // Salınan gerilim: pencerenin ortalaması büyük, uçları altında (anlık değer her karede zıplar).
@@ -360,7 +381,7 @@ export function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wir
           <Icon name="wire" className="h-6 w-6" />
         </span>
         <h2 className="flex-1 text-title font-semibold">{tr.inspector.wire}</h2>
-        {!touch && (
+        {!touch && removable && (
         <button
           type="button"
           onClick={onDelete}
@@ -407,10 +428,17 @@ export function WireDetails({ wireId, frame, onDelete }: InspectTabProps & { wir
   );
 }
 
-export function MultiSelection({ count, parts, onRotate, onFlip, onDelete }: InspectTabProps & { count: number; parts: readonly Part[] }) {
-  // Telefonda eylemler alt çubukta.
+export function MultiSelection({
+  count,
+  parts,
+  actions,
+  onRotate,
+  onFlip,
+  onDelete,
+}: InspectTabProps & { count: number; parts: readonly Part[]; actions: { rotate: boolean; remove: boolean } }) {
+  // Telefonda eylemler alt çubukta; görevde öğelerin hepsi kilitliyse Döndür, Ters çevir ve Sil yok.
   const touch = useTouchUi();
-  const canFlip = parts.some((p) => CATALOG[p.type].polarized);
+  const canFlip = actions.rotate && parts.some((p) => CATALOG[p.type].polarized);
   const ids = parts.map((p) => p.id);
   return (
     <>
@@ -418,8 +446,9 @@ export function MultiSelection({ count, parts, onRotate, onFlip, onDelete }: Ins
         <h2 className="text-title font-semibold">{tr.inspector.selectedItems(count)}</h2>
         <span className="text-small text-muted">{tr.inspector.selectedHint}</span>
       </div>
+      {(actions.rotate || actions.remove) && (
       <div className={`flex flex-wrap gap-1.5 ${touch ? 'hidden' : ''}`}>
-        {ids.length > 0 && (
+        {ids.length > 0 && actions.rotate && (
           <button
             type="button"
             onClick={() => onRotate(ids)}
@@ -439,6 +468,7 @@ export function MultiSelection({ count, parts, onRotate, onFlip, onDelete }: Ins
             {tr.toolbar.flip}
           </button>
         )}
+        {actions.remove && (
         <button
           type="button"
           onClick={onDelete}
@@ -447,7 +477,9 @@ export function MultiSelection({ count, parts, onRotate, onFlip, onDelete }: Ins
           <Icon name="trash" />
           {tr.toolbar.remove}
         </button>
+        )}
       </div>
+      )}
     </>
   );
 }

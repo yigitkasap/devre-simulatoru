@@ -126,5 +126,16 @@ function parseMeter(raw: unknown): InsertedMeter | null {
     if (isRecord(w) && typeof w.id === 'string' && wp) made.push({ id: w.id, points: wp });
   }
   if (!points || (links.length !== 0 && links.length !== 2) || made.length !== 2 + links.length) return null;
-  return { part: raw.part, x: raw.x, y: raw.y, rotation: raw.rotation as Rotation, wire: raw.wire, half: raw.half, links, made, points };
+  return {
+    part: raw.part,
+    x: raw.x,
+    y: raw.y,
+    rotation: raw.rotation as Rotation,
+    ...(typeof raw.flip === 'boolean' ? { flip: raw.flip } : {}),
+    wire: raw.wire,
+    half: raw.half,
+    links,
+    made,
+    points,
+  };
 }

@@ -1,13 +1,16 @@
 // Arıza bulmada "Buraya ampermetre tak" (B2): ampermetre dokunulan yerde kablo parçasının üstüne,
 // kablonun yönünde oturur (uçları 8 birim aralıklı; kablo iki yarıya bölünür, yarılar ampermetrenin
 // uçlarında biter). Gövdesi, göstergesi ya da adı başka bir kablonun, parçanın ya da yazının üstüne
-// biniyorsa çakışmayan en yakın yer seçilir: kablo boyunca kaydırılır ya da kablonun yanına konur.
-// Yanda iki biçim var: U (kablo 8 birim açılır, ampermetre yanında, uçlarına iki dik kablo) ve kısa
-// kablo parçaları için saç tokası (kablo 1 birim açılır, ampermetre kabloya dik, iki kablo dolanır).
-// Yandaki yerler fazladan kablo çizdiği için biraz uzak sayılır. Bağlantı kabloları başka bir kablonun
-// üstünden, bir parçanın, yazının ya da ucun içinden geçemez; başka bir kabloyu kesebilir (az kesen
-// yeğlenir). Çakışmayan yer yoksa ampermetre takılmaz ("yer yok"): üst üste binen ampermetre okunmaz.
-// Açılan boşluğun içine başka bir kablonun ucu ya da bir parçanın ucu düşemez (bağlantı koparır).
+// biniyorsa yakındaki bir yer seçilir: kablo boyunca kaydırılır ya da kablonun en çok 3 birim yanına
+// konur. Yanda iki biçim var: U (kablo 8 birim açılır, ampermetre 3 birim yanında, uçlarına iki dik
+// kablo) ve kısa kablo parçaları için saç tokası (kablo 1 birim açılır, ampermetre kabloya dik, yakın
+// ucu kablodan en çok 3 birim ötede, iki kablo dolanır). Yandaki yerler fazladan kablo çizdiği için
+// biraz uzak sayılır. Bağlantı kabloları başka bir kabloyu dik açıyla, noktasız kesebilir; bir
+// parçanın, bağlantı noktasının (kablo ya da parça ucu, kablo köşesi), ölçü aleti göstergesinin ya da
+// yazının üstüne binemez. Göstergesi bir yanda sığmazsa öbür (boş) yanına açılır. Böyle bir yer yoksa
+// ampermetre takılmaz ("yer yok").
+// Ampermetre dokunulan kolda kalır: boşluk, dokunulan noktanın iki yanındaki ilk bağlantıyı (bu kablo
+// parçasına değen başka bir kablo ya da parça ucu) aşmaz; aşsaydı başka bir kolun akımını ölçerdi.
 // Kayıt ve kaldırma: model/meters.ts.
 
 import type { Box } from '../../model/catalog';
@@ -15,25 +18,29 @@ import { addPart, addWire, nextLabel, replaceWirePoints } from '../../model/docO
 import { partBounds, pinPositions, samePoint } from '../../model/geometry';
 import type { InsertedMeter } from '../../model/meters';
 import type { CircuitDoc, Part, Point, Rotation } from '../../model/types';
-import { meterDisplayRect, meterFlipped, partTextBoxes } from '../PartView';
+import { METER_DISPLAY, meterDisplayRect, meterFlipped, partTextBoxes } from '../PartView';
 
 export type InsertError = 'short' | 'junction' | 'diagonal' | 'crowded';
 
 /** Ampermetrenin uçları arası (ızgara birimi; katalogdaki iki uç ±4). */
 const SPAN = 8;
-/** U biçiminde ampermetrenin kablodan uzaklığı; saç tokasında yakın ucunun uzaklığı (ızgara birimi). */
-const U_OFFSETS = [3, 4, 6, 8, 10, 12] as const;
-const PIN_OFFSETS = [2, 4, 6, 8, 10] as const;
+/** Yana konan ampermetre kablodan en çok 3 birim ötede: U biçiminde ekseni, saç tokasında yakın ucu. */
+const U_OFFSETS = [3] as const;
+const PIN_OFFSETS = [2, 3] as const;
 /** Saç tokasında ampermetrenin ekseni, yakın bağlantı kablosundan bu kadar ötede (gövde yarı genişliği 1,7). */
-const PIN_SIDES = [3, 5, 7] as const;
-/** Bağlantı kablosunun başka bir kabloyu kesmesi: çakışma değil, ama az kesen yer yeğlenir. */
-const CROSS_COST = 0.5;
+const PIN_SIDES = [3, 5] as const;
 /** Yandaki yerlerin fazladan uzaklığı: kablonun üstü, biraz uzakta da olsa yeğlenir. */
 const U_COST = 2;
 const PIN_COST = 4;
-/** Çakışma payı (ızgara birimi): ampermetre parçalara ve yazılara bu kadar, kablolara daha çok yaklaşmaz. */
+/**
+ * Çakışma payları (ızgara birimi): ampermetre parçalara ve yazılara BOX_PAD, gövdesi kablolara WIRE_PAD,
+ * göstergesi ve adı kablolara TEXT_PAD kadar yaklaşmaz.
+ */
 const BOX_PAD = 0.25;
 const WIRE_PAD = 0.6;
+const TEXT_PAD = 0.3;
+/** Parça kutusunun uç taşıyan kenarındaki bacak payı: bacak ince bir çizgi, gösterge ve yazı yanına girebilir. */
+const LEAD = 1;
 
 type Segment = readonly [Point, Point];
 
@@ -57,25 +64,15 @@ function inside(s: Segment, b: Box): number {
   return Math.max(0, Math.min(Math.max(a.x, c.x), b.x + b.w) - Math.max(Math.min(a.x, c.x), b.x));
 }
 
-/** İki dik kablo parçası: üst üste binen uzunluk (overlap) ya da birbirinin içinden geçiyorsa kesişme (cross). */
-function clash(s: Segment, o: Segment): { overlap: number; cross: number } {
+/** İki dik kablo parçası aynı doğrunun üstündeyse ortak uzunlukları (dik kesişme serbest). */
+function collinear(s: Segment, o: Segment): number {
   const [a, b] = s;
   const [c, d] = o;
   const sv = a.x === b.x;
-  const ov = c.x === d.x;
-  if (sv === ov) {
-    // Aynı doğrultu: aynı doğrunun üstündeyse ortak uzunluk.
-    if (sv ? a.x !== c.x : a.y !== c.y) return { overlap: 0, cross: 0 };
-    const [s0, s1] = sv ? [Math.min(a.y, b.y), Math.max(a.y, b.y)] : [Math.min(a.x, b.x), Math.max(a.x, b.x)];
-    const [o0, o1] = sv ? [Math.min(c.y, d.y), Math.max(c.y, d.y)] : [Math.min(c.x, d.x), Math.max(c.x, d.x)];
-    return { overlap: Math.max(0, Math.min(s1, o1) - Math.max(s0, o0)), cross: 0 };
-  }
-  // Dik: kesişme noktası ikisinin de içindeyse (uçta değmek bağlantı ya da köşe sayılmaz).
-  const [v, h] = sv ? [s, o] : [o, s];
-  const x = v[0].x;
-  const y = h[0].y;
-  const within = (p: number, q: number, r: number) => p > Math.min(q, r) && p < Math.max(q, r);
-  return { overlap: 0, cross: within(x, h[0].x, h[1].x) && within(y, v[0].y, v[1].y) ? 1 : 0 };
+  if (sv !== (c.x === d.x) || (sv ? a.x !== c.x : a.y !== c.y)) return 0;
+  const [s0, s1] = sv ? [Math.min(a.y, b.y), Math.max(a.y, b.y)] : [Math.min(a.x, b.x), Math.max(a.x, b.x)];
+  const [o0, o1] = sv ? [Math.min(c.y, d.y), Math.max(c.y, d.y)] : [Math.min(c.x, d.x), Math.max(c.x, d.x)];
+  return Math.max(0, Math.min(s1, o1) - Math.max(s0, o0));
 }
 
 /** Nokta kablo parçasının içinde mi (uçları hariç). */
@@ -83,6 +80,26 @@ function onInterior(p: Point, s: Segment): boolean {
   const [a, b] = s;
   if (a.x === b.x) return p.x === a.x && p.y > Math.min(a.y, b.y) && p.y < Math.max(a.y, b.y);
   return p.y === a.y && p.x > Math.min(a.x, b.x) && p.x < Math.max(a.x, b.x);
+}
+
+/** Nokta kablo parçasının üstünde mi (uçları dahil). */
+const onSegment = (p: Point, s: Segment) => samePoint(p, s[0]) || samePoint(p, s[1]) || onInterior(p, s);
+
+/** Parçanın gövde kutusu (uç taşıyan kenarlardan bacak payı kadar içeride) ve bacak çizgileri. */
+function partCore(part: Part): { box: Box; leads: Segment[] } {
+  const b = partBounds(part);
+  let [x0, y0, x1, y1] = [b.x, b.y, b.x + b.w, b.y + b.h];
+  const leads: Segment[] = [];
+  for (const p of pinPositions(part)) {
+    const edge = p.x === b.x ? { x: 1, y: 0 } : p.x === b.x + b.w ? { x: -1, y: 0 } : p.y === b.y ? { x: 0, y: 1 } : p.y === b.y + b.h ? { x: 0, y: -1 } : null;
+    if (!edge) continue;
+    leads.push([p, add(p, edge, LEAD)]);
+    if (edge.x === 1) x0 = Math.max(x0, b.x + LEAD);
+    if (edge.x === -1) x1 = Math.min(x1, b.x + b.w - LEAD);
+    if (edge.y === 1) y0 = Math.max(y0, b.y + LEAD);
+    if (edge.y === -1) y1 = Math.min(y1, b.y + b.h - LEAD);
+  }
+  return { box: { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) }, leads };
 }
 
 /** Bir yer: ampermetrenin merkezi ve dönüşü, kablodaki boşluk (t: A'dan uzaklık), bağlantı kabloları. */
@@ -95,10 +112,16 @@ interface Spot {
 }
 
 /**
- * Kabloya ampermetre takar. `at`: kablonun üstünde dokunulan nokta. Kablo parçası 3 birimden kısaysa
- * ya da eğikse, boşluk için uygun yer yoksa hata.
+ * Kabloya ampermetre takar. `at`: kablonun üstünde dokunulan nokta; `flips`: takılı ampermetrelerin
+ * gösterge yanı (kayıtlardan). Kablo parçası 3 birimden kısaysa ya da eğikse, boşluk için uygun yer
+ * yoksa hata.
  */
-export function insertAmmeter(doc: CircuitDoc, wireId: string, at: Point): { doc: CircuitDoc; meter: InsertedMeter } | { error: InsertError } {
+export function insertAmmeter(
+  doc: CircuitDoc,
+  wireId: string,
+  at: Point,
+  flips?: ReadonlyMap<string, boolean>,
+): { doc: CircuitDoc; meter: InsertedMeter } | { error: InsertError } {
   const wire = doc.wires.find((w) => w.id === wireId);
   if (!wire) return { error: 'short' };
   // Dokunulan noktaya en yakın kablo parçası.
@@ -124,20 +147,17 @@ export function insertAmmeter(doc: CircuitDoc, wireId: string, at: Point): { doc
   const normals: Point[] = u.y === 0 ? [{ x: 0, y: -1 }, { x: 0, y: 1 }] : [{ x: 1, y: 0 }, { x: -1, y: 0 }];
   const P = (t: number) => add(A, u, t);
   // Boşluk köşede başlayıp bitebilir; kablonun ucunda (parçaya ya da başka kabloya bağlı) en az 1 birim içeride.
-  const first = best > 0 ? 0 : 1;
-  const last = best + 2 < wire.points.length ? length : length - 1;
-
-  // Boşluğun içine (uçları hariç) başka bir kablonun ucu ya da bir parçanın ucu düşmesin.
+  // Bu parçaya değen başka kablo ve parça uçları (bağlantılar): boşluk dokunulan noktanın iki yanındakileri aşmaz.
   const ends = [...doc.wires.filter((w) => w.id !== wireId).flatMap((w) => [w.points[0]!, w.points[w.points.length - 1]!]), ...doc.parts.flatMap((p) => pinPositions(p))];
-  const gapFree = (from: number, to: number) =>
-    !ends.some((q) => {
-      const t = (q.x - A.x) * u.x + (q.y - A.y) * u.y;
-      return t > from && t < to && (u.x === 0 ? q.x === A.x : q.y === A.y);
-    });
+  const joints = ends
+    .filter((q) => (u.x === 0 ? q.x === A.x : q.y === A.y))
+    .map((q) => (q.x - A.x) * u.x + (q.y - A.y) * u.y)
+    .filter((t) => t > 0 && t < length);
+  const first = Math.max(best > 0 ? 0 : 1, ...joints.filter((t) => t <= tap));
+  const last = Math.min(best + 2 < wire.points.length ? length : length - 1, ...joints.filter((t) => t >= tap));
 
   const spots: Spot[] = [];
   for (let s = first; s + SPAN <= last; s++) {
-    if (!gapFree(s, s + SPAN)) continue;
     const center = P(s + SPAN / 2);
     // Kablonun üstünde: uçları boşluğun iki ucunda.
     spots.push({ center, rotation: along, gap: [s, s + SPAN], links: [], score: Math.abs(s + SPAN / 2 - tap) });
@@ -160,7 +180,6 @@ export function insertAmmeter(doc: CircuitDoc, wireId: string, at: Point): { doc
   // Saç tokası: 1 birimlik boşluk; ampermetre kabloya dik, boşluğun bir yanında. Yakın kablo yakın uca,
   // uzak kablo boşluğun öbür ucundan uzak uca dolanır.
   for (let s = first; s + 1 <= last; s++) {
-    if (!gapFree(s, s + 1)) continue;
     for (const k of PIN_OFFSETS) {
       for (const n of normals) {
         for (const [side, lateral] of PIN_SIDES.flatMap((d) => [[1, d] as const, [-1, d] as const])) {
@@ -184,48 +203,66 @@ export function insertAmmeter(doc: CircuitDoc, wireId: string, at: Point): { doc
   }
   if (spots.length === 0) return { error: length < SPAN + 2 ? 'short' : 'junction' };
 
-  // Engeller: parçalar, ölçü aletlerinin ekranları, yazılar ve kablolar (bölünen parçanın boşluk dışı kısmı yerine göre).
+  // Engeller: parçalar (tam kutu ve bacaksız gövde), ölçü aletlerinin göstergeleri ve yazılar, kablolar
+  // (bölünen parçanın boşluk dışı kısmı yerine göre) ve kablo köşeleri.
   const bounds = doc.parts.map((p) => partBounds(p));
-  const boxes: Box[] = [];
+  const cores = doc.parts.map(partCore);
+  const leads = cores.flatMap((c) => c.leads);
+  const labels: Box[] = [];
   doc.parts.forEach((p, i) => {
-    const meter = p.type === 'voltmeter' || p.type === 'ammeter';
-    const flip = meter && meterFlipped(p, bounds.filter((_, j) => j !== i));
-    boxes.push(bounds[i]!, ...(meter ? [meterDisplayRect(p, flip)] : []), ...partTextBoxes(p, flip));
+    const meter = METER_DISPLAY.has(p.type);
+    const flip = meter && (flips?.get(p.id) ?? meterFlipped(p, bounds.filter((_, j) => j !== i)));
+    labels.push(...(meter ? [meterDisplayRect(p, flip)] : []), ...partTextBoxes(p, flip));
   });
   const others: Segment[] = doc.wires.flatMap((w) => pathSegments(w.points).filter((_, i) => w.id !== wireId || i !== best));
+  const corners: Point[] = doc.wires.flatMap((w) => w.points.slice(1, -1));
   const label = nextLabel(doc, 'ammeter');
-  /** Çakışma (kesin) ve kesişme sayısı. */
-  const cost = (spot: Spot): { hard: number; crossings: number } => {
+  /** Gösterge bu yanda iken çakışma: üst üste binen alan ve uzunluk (0: yer uygun). */
+  const cost = (spot: Spot, flip: boolean): number => {
     const part: Part = { id: '', type: 'ammeter', label, x: spot.center.x, y: spot.center.y, rotation: spot.rotation, props: {} };
-    const flip = meterFlipped(part, bounds);
+    const body = partBounds(part);
     const shown = [meterDisplayRect(part, flip), ...partTextBoxes(part, flip)];
-    const own = [partBounds(part), ...shown];
+    const pins = pinPositions(part);
     // Bölünen parçanın boşluk dışı kısımları: ampermetre kablonun üstündeyse uçlarında biter (engel değil).
     const pieces: Segment[] = spot.links.length === 0 ? [] : [...(spot.gap[0] > 0 ? [[A, P(spot.gap[0])] as const] : []), ...(spot.gap[1] < length ? [[P(spot.gap[1]), B] as const] : [])];
     const segments: Segment[] = [...others, ...pieces];
     const links = spot.links.flatMap(pathSegments);
     let hard = 0;
-    let crossings = 0;
-    for (const b of own) {
-      for (const o of boxes) hard += overlap(grow(b, BOX_PAD), o);
-      for (const s of segments) hard += inside(s, grow(b, WIRE_PAD));
+    // Gövde: parçalara, yazılara ve kablolara binmez; ucunda biten kablo (bağlantı) yalnızca gövdenin içinden geçemez.
+    for (const o of bounds) hard += overlap(grow(body, BOX_PAD), o);
+    for (const o of labels) hard += overlap(grow(body, BOX_PAD), o);
+    for (const s of segments) hard += pins.some((p) => samePoint(p, s[0]) || samePoint(p, s[1])) ? inside(s, body) : inside(s, grow(body, WIRE_PAD));
+    // Uçlar başka bir kablonun içine düşmez (bağlanırdı).
+    for (const p of pins) for (const s of segments) if (onInterior(p, s)) hard += 1;
+    // Gösterge ve ad: parçaların gövdesine, bacaklarına, yazılara, kablolara ve bağlantı kablolarına binmez.
+    for (const b of shown) {
+      for (const c of cores) hard += overlap(grow(b, BOX_PAD), c.box);
+      for (const o of labels) hard += overlap(grow(b, BOX_PAD), o);
+      for (const s of [...segments, ...leads, ...links]) hard += inside(s, grow(b, TEXT_PAD));
     }
+    // Bağlantı kabloları: kabloları yalnızca dik kesebilir; parça, gösterge, yazı ve bağlantı noktasının üstünden geçemez.
     for (const l of links) {
-      for (const o of [...boxes, ...shown]) hard += inside(l, grow(o, BOX_PAD));
-      // Başka bir kablonun ucu ya da bir parçanın ucu bağlantı kablosunun içine düşerse bağlanırdı.
-      for (const q of ends) if (onInterior(q, l)) hard += 1;
-      for (const s of segments) {
-        const c = clash(l, s);
-        hard += c.overlap;
-        crossings += c.cross;
-      }
+      for (const o of [...bounds, ...labels, ...shown]) hard += inside(l, grow(o, BOX_PAD));
+      hard += inside(l, body);
+      for (const s of segments) hard += collinear(l, s);
+      for (const q of [...ends, ...corners]) if (onInterior(q, l)) hard += 1;
     }
-    return { hard, crossings };
+    // Bağlantı kablolarının köşeleri başka bir kablonun üstüne düşmez (bağlantı gibi görünür).
+    for (const path of spot.links) for (const q of path.slice(1, -1)) if (segments.some((s) => onSegment(q, s))) hard += 1;
+    return hard;
   };
-  // Kenara değmek çakışma değil (kayan noktadan kalan çok küçük alan sayılmaz).
-  const free = spots.map((spot) => ({ spot, ...cost(spot) })).filter((o) => o.hard < 1e-6);
-  if (free.length === 0) return { error: 'crowded' };
-  const { spot } = free.reduce((a, b) => (b.spot.score + b.crossings * CROSS_COST < a.spot.score + a.crossings * CROSS_COST ? b : a));
+  // En yakından uzağa çakışmayan ilk yer; gösterge önce olağan yanında, sığmazsa öbür yanında (kenara
+  // değmek çakışma değil; kayan noktadan kalan çok küçük alan sayılmaz).
+  let chosen: { spot: Spot; flip: boolean } | null = null;
+  for (const spot of [...spots].sort((a, b) => a.score - b.score)) {
+    const flip = cost(spot, false) < 1e-6 ? false : cost(spot, true) < 1e-6 ? true : null;
+    if (flip !== null) {
+      chosen = { spot, flip };
+      break;
+    }
+  }
+  if (!chosen) return { error: 'crowded' };
+  const { spot, flip } = chosen;
 
   const before = wire.points;
   const P1 = P(spot.gap[0]);
@@ -248,5 +285,5 @@ export function insertAmmeter(doc: CircuitDoc, wireId: string, at: Point): { doc
   const reached = spot.links.length === 0 ? [P1, P2] : spot.links.flatMap((l) => [l[0]!, l[l.length - 1]!]);
   if (!pins.every((p) => reached.some((q) => samePoint(p, q)))) return { error: 'junction' };
   const made = [wireId, half.id, ...links].map((id) => next.wires.find((w) => w.id === id)!);
-  return { doc: next, meter: { part: added.id, x: spot.center.x, y: spot.center.y, rotation: spot.rotation, wire: wireId, half: half.id, links, made, points: before } };
+  return { doc: next, meter: { part: added.id, x: spot.center.x, y: spot.center.y, rotation: spot.rotation, flip, wire: wireId, half: half.id, links, made, points: before } };
 }

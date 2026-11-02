@@ -26,10 +26,13 @@ import type { DeviceType, PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
 import { useThrottledText } from './a11y';
 import { ArduinoCardBody } from './ArduinoPanel';
+import { MultimeterCardBody } from './MultimeterCard';
+import { spdtThrow } from '../sim/devices/spdt';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
 import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
-import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, useCommitField, WireDetails, type InspectTabProps, type PartPatch } from './InspectTab';
+import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, selectionActions, useCommitField, WireDetails, type InspectTabProps, type PartPatch, type TaskParts } from './InspectTab';
+import { lm317Note } from './lm317Divider';
 import { stableReadout } from './liveReadout';
 import type { MessageItem } from './messages';
 import { SeverityMark, type MessageAction } from './MessagesTab';
@@ -80,15 +83,25 @@ export interface NotebookProps extends InspectTabProps {
   readonly taskCard?: ReactNode;
   /**
    * Görev: kilitli ve değiştirilebilir parçalar; takılı ampermetreler (arıza bulma: kaldırılır, yeri
-   * değişmez); lockMarks false ise kilit simgesi yok (arıza bulmada her şey kilitli).
+   * değişmez); lockMarks false ise kilit simgesi yok (arıza bulmada her şey kilitli); wiresLocked:
+   * kablolar değiştirilemez.
    */
-  readonly taskParts?: { readonly locked: ReadonlySet<string>; readonly editable: ReadonlySet<string>; readonly plugged?: ReadonlySet<string>; readonly lockMarks?: boolean } | null;
+  readonly taskParts?: TaskParts | null;
   /** Arıza bulma (B2): canlı değerler gizli (kare ölçü aletleri dışında boş gelir). */
   readonly liveHidden?: boolean;
+  /** Multimetrelerin Ω okuması (simülasyon durmuşken). */
+  readonly ohmTexts?: ReadonlyMap<string, string>;
+  /** Ucun bağlı olduğu düğümün adı (multimetre kartı). */
+  readonly pinNode?: (partId: string, pin: number) => string;
+  /** LM317'nin ayar dirençleri (R1: OUT–ADJ, R2: ADJ–toprak); bulunamazsa null. */
+  readonly divider?: (partId: string) => { readonly r1: number; readonly r2: number } | null;
+  /** Basılı tutulan düğmeler ve basma / bırakma (basmalı düğme kartı). */
+  readonly pressed?: ReadonlySet<string>;
+  readonly onPress?: (partId: string, down: boolean) => void;
 }
 
 const SOURCES: ReadonlySet<DeviceType> = new Set(['battery', 'acsource', 'dcsupply', 'funcgen']);
-const METERS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter']);
+const METERS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter', 'multimeter']);
 
 function partValues(part: Part): Record<string, PropValue> {
   const values: Record<string, PropValue> = {};
@@ -130,6 +143,10 @@ export function cardReading(part: Part, frame: SimFrame | null): { main: string;
   const rows = liveRows(part, frame)?.rows;
   if (!rows || rows.length === 0) return null;
   if (part.type === 'led' && rows[1]) return { main: rows[0]!.value, second: rows[1].value };
+  // Basmalı düğme: kapalı satırda basılı / bırakılmış (Y3), kontak durumu açık kartta.
+  if (part.type === 'pushbutton') return null;
+  // Regülatör: çıkış gerilimi (satırlar giriş, çıkış, akım…).
+  if ((part.type === 'reg7805' || part.type === 'lm317') && rows[1]) return { main: rows[1].value };
   if (part.type === 'dcsupply') {
     // Güç kaynağı: akım veren çıkışlar (ikisi de boştaysa 1. çıkış); satırlar çıkış sırasında.
     const outputs = frame.statuses.get(part.id)?.outputs ?? [];
@@ -201,6 +218,7 @@ export function Notebook(props: NotebookProps) {
 
   const others = selection.parts.length + selection.wires.length;
   const selectedParts = doc.parts.filter((p) => selection.parts.includes(p.id));
+  const actions = selectionActions(props.taskParts, selection.parts, selection.wires.length);
   // Kapalı kartlar seyrek karelerle ve sabit geri çağırmalarla bir kez kurulur: simülasyon her karede
   // defteri yeniden çizer, ama kapalı kartların alt ağaçları yalnızca seyrek karede güncellenir.
   const slow = useSlowFrame(frame);
@@ -290,9 +308,9 @@ export function Notebook(props: NotebookProps) {
       {openId === null && others > 0 && (
         <div className="flex flex-col gap-4 rounded-lg border-2 border-accent bg-panel px-3.5 py-3">
           {selection.parts.length === 0 && selection.wires.length === 1 ? (
-            <WireDetails wireId={selection.wires[0]!} {...props} />
+            <WireDetails wireId={selection.wires[0]!} removable={actions.remove} {...props} />
           ) : (
-            <MultiSelection count={others} parts={selectedParts} {...props} />
+            <MultiSelection count={others} parts={selectedParts} actions={actions} {...props} />
           )}
         </div>
       )}
@@ -594,9 +612,22 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   const touch = useTouchUi();
   const bodyId = useId();
   const typeName = tr.devices.names[part.type];
-  const value = partValueText(part);
+  const value =
+    part.type === 'pushbutton'
+      ? props.pressed?.has(part.id)
+        ? tr.readout.pressed
+        : tr.readout.released
+      : part.type === 'spdt'
+        ? spdtThrow(part.props).toUpperCase()
+        : partValueText(part);
   const device = RACK_DEVICES.has(part.type);
-  const reading = device ? null : props.measured === null || props.measured.has(part.id) ? cardReading(part, frame) : null;
+  const reading = device
+    ? null
+    : part.type === 'multimeter' && props.ohmTexts?.has(part.id)
+      ? { main: props.ohmTexts.get(part.id)!, big: true }
+      : props.measured === null || props.measured.has(part.id)
+        ? cardReading(part, frame)
+        : null;
   const summary = device ? deviceSummary(part, frame ? props.devices.scopeView(part.id) : null) : null;
   const burned = frame?.statuses.get(part.id)?.burned === true;
   const lit = part.type === 'led' && !burned && (frame?.live.get(part.id)?.brightness ?? 0) > 0.05;
@@ -703,6 +734,15 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
           <ControlsLocked.Provider value={locked && CATALOG[part.type].propDefs.every((p) => !operable(part.type, p.key))}>
             <DeviceControls part={part} devices={props.devices} />
           </ControlsLocked.Provider>
+        ) : part.type === 'multimeter' ? (
+          <MultimeterCardBody
+            part={part}
+            frame={frame}
+            status={status}
+            ohm={props.ohmTexts?.get(part.id)}
+            pinNode={props.pinNode}
+            onMode={(next) => onUpdatePart(part.id, { props: next })}
+          />
         ) : part.type === 'arduino' ? (
           <ArduinoCardBody
             part={part}
@@ -713,9 +753,16 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
           />
         ) : (
           <>
+            {part.type === 'pushbutton' && (
+              <HoldButton pressed={props.pressed?.has(part.id) ?? false} onPress={(down) => props.onPress?.(part.id, down)} touch={touch} />
+            )}
             <PrimaryControl {...props} values={values} locked={locked} />
             {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
-            <LiveTiles part={part} frame={frame} />
+            <LiveTiles
+              part={part}
+              frame={frame}
+              note={part.type === 'lm317' ? lm317Note(props.divider?.(part.id) ?? null, frame?.statuses.get(part.id)?.regulator?.current ?? 0) : undefined}
+            />
             {props.liveHidden && status !== 'stopped' && <p className="m-0 text-label leading-snug text-muted">{t.liveHiddenNote}</p>}
           </>
         )}
@@ -784,6 +831,34 @@ function OpenCardHeader({
       )}
       {action('chevronUp', t.collapse, onClose)}
     </div>
+  );
+}
+
+/** Basmalı düğmenin "Basılı tut"u: fare, parmak ya da Boşluk / Enter kalkana kadar basılı. */
+function HoldButton({ pressed, onPress, touch }: { pressed: boolean; onPress: (down: boolean) => void; touch: boolean }) {
+  const isKey = (key: string) => key === ' ' || key === 'Enter';
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        onPress(true);
+      }}
+      onPointerUp={() => onPress(false)}
+      onPointerCancel={() => onPress(false)}
+      onLostPointerCapture={() => onPress(false)}
+      onKeyDown={(e) => {
+        if (!isKey(e.key)) return;
+        e.preventDefault();
+        if (!e.repeat) onPress(true);
+      }}
+      onKeyUp={(e) => isKey(e.key) && onPress(false)}
+      onBlur={() => onPress(false)}
+      className={`flex select-none items-center justify-center rounded-[10px] text-[15px] font-semibold text-on-ink ${touch ? 'h-14' : 'h-12'} ${pressed ? 'bg-accent' : 'bg-ink'}`}
+    >
+      {pressed ? t.holding : t.hold}
+    </button>
   );
 }
 
@@ -957,8 +1032,10 @@ function ColorCode({ ohms }: { ohms: number }) {
 }
 
 /** Çalışırken Gerilim, Akım, Güç (ve türe özel öbür satırlar) karelerde; durmuşken yok. */
-function LiveTiles({ part, frame }: { part: Part; frame: SimFrame | null }) {
-  const live = liveRows(part, frame);
+function LiveTiles({ part, frame, note }: { part: Part; frame: SimFrame | null; note?: string | undefined }) {
+  const rows = liveRows(part, frame);
+  // Giriş yetmiyorsa uyarı notu kalır; öbür durumda formül notu.
+  const live = rows && note && !frame?.statuses.get(part.id)?.regulator?.dropout ? { ...rows, note } : rows;
   const spoken = useThrottledText(live ? live.rows.map((r) => `${plainText(r.label)} ${r.value}`).join(', ') : '');
   if (!live || live.rows.length === 0) return null;
   const formula = live.note?.includes('→') ?? false;

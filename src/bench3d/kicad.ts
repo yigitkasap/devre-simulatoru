@@ -88,6 +88,7 @@ function geometry(part: Part): Geometry {
     case 'resistor':
       return { name: 'R_Axial_P10.16mm', equivalent: 'Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P10.16mm_Horizontal', drill: 0.8, size: 1.6, body: 'axial' };
     case 'diode':
+    case 'schottky':
       return { name: 'D_DO-41_P10.16mm', equivalent: 'Diode_THT:D_DO-41_SOD81_P10.16mm_Horizontal', drill: 1.0, size: 2.0, square: 1, body: 'axial' };
     case 'zener':
       return { name: 'D_DO-35_P7.62mm', equivalent: 'Diode_THT:D_DO-35_SOD27_P7.62mm_Horizontal', drill: 0.8, size: 1.6, square: 1, body: 'axial' };
@@ -130,7 +131,7 @@ const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = { opamp: [2, 3,
 export function padNumber(type: DeviceType, pin: number): string {
   const dip = DIP_PINS[type];
   if (dip) return String(dip[pin]);
-  if (type === 'diode' || type === 'zener' || type === 'led') return pin === 0 ? '2' : '1';
+  if (type === 'diode' || type === 'schottky' || type === 'zener' || type === 'led') return pin === 0 ? '2' : '1';
   return String(pin + 1);
 }
 
@@ -268,7 +269,7 @@ export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard
       const corner = (s: number, t: number) => [cx + ux * s - uy * t, cy + uy * s + ux * t] as const;
       const c = [corner(-half, -w), corner(half, -w), corner(half, w), corner(-half, w)];
       for (let i = 0; i < 4; i++) silk.push([c[i]![0], c[i]![1], c[(i + 1) % 4]![0], c[(i + 1) % 4]![1]]);
-      if (part.type === 'diode' || part.type === 'zener') {
+      if (part.type === 'diode' || part.type === 'schottky' || part.type === 'zener') {
         // Katot bandı (2. ped tarafı).
         const p0 = corner(half - 0.8, -w);
         const p1 = corner(half - 0.8, w);

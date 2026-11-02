@@ -7,8 +7,9 @@ import { GRID, type Part } from '../model/types';
 import { tr } from '../i18n/tr';
 import { funcgenSettings } from '../sim/devices/funcgen';
 import { LED_COLORS } from '../sim/devices/led';
-import { numProp, strProp } from '../sim/netlist';
+import { numProp, strProp, type DeviceType } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
+import { meterRole } from './readouts';
 import type { ResistorStyle } from './settings';
 import { PartSymbol, type LiveVisual } from './symbols';
 
@@ -25,6 +26,14 @@ export function partValueText(part: Part): string {
   switch (part.type) {
     case 'battery':
       return formatSI(numProp(p, 'voltage', 0), 'V', { trim: true, digits: 4 });
+    case 'currentsource':
+      return formatSI(numProp(p, 'current', 0), 'A', { trim: true, digits: 4 });
+    case 'reg7805':
+      return '5 V';
+    case 'lm317':
+    case 'opto':
+    case 'scr':
+      return modelName(part);
     case 'acsource': {
       const peak = formatSI(numProp(p, 'amplitude', 0), 'V', { trim: true, digits: 4 });
       const offset = numProp(p, 'offset', 0);
@@ -75,6 +84,8 @@ export function partValueText(part: Part): string {
     case 'zener':
       return formatSI(numProp(p, 'zenerVoltage', 5.1), 'V', { trim: true, digits: 4 });
     case 'diode':
+    case 'schottky':
+    case 'bridge':
     case 'njfet':
     case 'nmos':
       return modelName(part);
@@ -141,12 +152,13 @@ export const PartView = memo(function PartView({
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
   const horizontal = part.rotation % 180 === 0;
-  const isMeter = part.type === 'voltmeter' || part.type === 'ammeter';
+  const isMeter = METER_DISPLAY.has(part.type);
   const value = partValueText(part);
   const color = TONE_COLORS[tone];
 
   // Ölçü aletinde ekran üstte (dikeyde sağda), ad karşı tarafta; displayFlip ile yer değiştirir.
-  const display = isMeter ? meterDisplay(part.type === 'voltmeter' ? 'V' : 'A', meterText ?? null) : null;
+  const role = meterRole(part);
+  const display = isMeter ? meterDisplay(role === 'ohm' ? 'Ω' : role === 'ammeter' ? 'A' : 'V', meterText ?? null) : null;
   const displayRect = meterDisplayRect(part, displayFlip);
   const displayX = displayRect.x * GRID - part.x * GRID;
   const displayY = displayRect.y * GRID - part.y * GRID;
@@ -227,16 +239,28 @@ export function labelLayout(part: Part, displayFlip: boolean): { anchor: 'middle
   const bottom = (box.y + box.h) * GRID;
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
-  const isMeter = part.type === 'voltmeter' || part.type === 'ammeter';
+  const isMeter = METER_DISPLAY.has(part.type);
   if (part.type === 'opamp' && part.rotation === 0) {
     // İşlemsel yükselteç: üstte V+, sağda çıkış kablosu var; ad üçgenin sağ üst köşesinde.
     return { anchor: 'start', nameX: 8, nameY: -16, valueY: -16 };
+  }
+  if ((part.type === 'reg7805' || part.type === 'lm317') && part.rotation === 0) {
+    // Regülatör: altta GND / ADJ bacağı var; ad ve değer bacağın sağında.
+    return { anchor: 'start', nameX: 6, nameY: top - 5, valueY: bottom + 13 };
+  }
+  if (part.type === 'bridge') {
+    // Köprü diyot: dört kenarda da bacak var; ad sol üstte, model sol altta (çapraz boşluklarda).
+    return { anchor: 'end', nameX: -12, nameY: -22, valueY: 33 };
   }
   if (def.labelRight && part.rotation === 0) {
     // Transistör: üst ve alt uçlar kablolu olduğu için yazılar sağda (dönmüşse eski kurallar).
     return { anchor: 'start', nameX: right + 4, nameY: cy - 3, valueY: cy + 11 };
   }
-  if (part.rotation % 180 === 0) return { anchor: 'middle', nameX: cx, nameY: isMeter && !displayFlip ? bottom + 13 : top - 5, valueY: bottom + 13 };
+  if (part.rotation % 180 === 0) {
+    // Multimetrenin kip işareti (⎓, ∿) yatayda her döndürmede çemberin altında: ad onun altına.
+    const below = part.type === 'multimeter' ? Math.max(bottom, 2.7 * GRID) : bottom;
+    return { anchor: 'middle', nameX: cx, nameY: isMeter && !displayFlip ? below + 13 : top - 5, valueY: below + 13 };
+  }
   const anchor = isMeter && displayFlip ? 'end' : 'start';
   return { anchor, nameX: anchor === 'end' ? left - 6 : right + 6, nameY: isMeter ? cy + DISPLAY_H / 2 + 14 : cy - 3, valueY: cy + 11 };
 }
@@ -250,7 +274,7 @@ const TEXT_H = 11.5;
 export function partTextBoxes(part: Part, displayFlip: boolean): Box[] {
   const def = CATALOG[part.type];
   const { anchor, nameX, nameY, valueY } = labelLayout(part, displayFlip);
-  const isMeter = part.type === 'voltmeter' || part.type === 'ammeter';
+  const isMeter = METER_DISPLAY.has(part.type);
   const box = (text: string, x: number, baseline: number): Box => {
     const w = text.length * CHAR_W;
     const left = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
@@ -282,6 +306,9 @@ function ChargeBar({ charge, x, y, vertical }: { charge: number; x: number; y: n
     </g>
   );
 }
+
+/** Şemada göstergesi (ekranı) olan ölçü aletleri. */
+export const METER_DISPLAY: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter', 'multimeter']);
 
 const DISPLAY_W = 70;
 const DISPLAY_H = 19;

@@ -12,6 +12,8 @@ export type CameraRequest = { readonly n: number } & ({ readonly view: CameraVie
 export interface Bench3DProps {
   readonly doc: CircuitDoc;
   readonly frame: SimFrame | null;
+  /** Multimetrelerin Ω okuması (simülasyon durmuşken; ekranda gösterilir). */
+  readonly ohmTexts?: ReadonlyMap<string, string>;
   readonly active: boolean;
   /** Simülasyon ilerliyor (duraklatılınca akım noktaları durur). */
   readonly running: boolean;
@@ -32,7 +34,7 @@ export interface Bench3DProps {
 }
 
 export default function Bench3D(props: Bench3DProps) {
-  const { doc, frame, active, running, selection, overlayOpen, camera, zoom, dots, electronFlow, overlay, dark } = props;
+  const { doc, frame, ohmTexts, active, running, selection, overlayOpen, camera, zoom, dots, electronFlow, overlay, dark } = props;
   const host = useRef<HTMLDivElement>(null);
   const scene = useRef<BenchScene | null>(null);
   const cb = useRef(props.callbacks);
@@ -43,6 +45,7 @@ export default function Bench3D(props: Bench3DProps) {
       onSelect: (id) => cb.current.onSelect(id),
       onToggle: (id) => cb.current.onToggle(id),
       onKnob: (id, position, done) => cb.current.onKnob(id, position, done),
+      onPress: (id, down) => cb.current.onPress(id, down),
       onCamera: () => cb.current.onCamera?.(),
     });
     scene.current = s;
@@ -58,7 +61,7 @@ export default function Bench3D(props: Bench3DProps) {
   useEffect(() => scene.current?.setOverlay(overlay), [overlay]);
   useEffect(() => scene.current?.setDoc(doc), [doc]);
   useEffect(() => scene.current?.setDots(dots, electronFlow, running), [dots, electronFlow, running]);
-  useEffect(() => scene.current?.setFrame(frame, active), [frame, active]);
+  useEffect(() => scene.current?.setFrame(frame, active, ohmTexts), [frame, active, ohmTexts]);
   useEffect(() => scene.current?.setSelection(selection), [selection]);
   useEffect(() => scene.current?.setInteractive(!overlayOpen), [overlayOpen]);
   useEffect(() => {

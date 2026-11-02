@@ -59,7 +59,7 @@ export function holeXZ(h: Hole, cols: number): { x: number; z: number } {
     : { x: railX(h.k, cols), z: boardZ(h.board) + railZ(h.rail) };
 }
 
-export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8';
+export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8' | 'dip4' | 'button' | 'inline';
 
 export interface BoardPart {
   readonly partId: string;
@@ -111,6 +111,7 @@ export interface BreadboardPlan {
 const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   resistor: { mount: 'axial', span: 4 },
   diode: { mount: 'axial', span: 4 },
+  schottky: { mount: 'axial', span: 4 },
   zener: { mount: 'axial', span: 3 },
   fuse: { mount: 'axial', span: 9 },
   capacitor: { mount: 'radial', span: 1 },
@@ -120,6 +121,12 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   ntc: { mount: 'radial', span: 1 },
   buzzer: { mount: 'radial', span: 3 },
   switch: { mount: 'axial', span: 2 },
+  pushbutton: { mount: 'button' },
+  spdt: { mount: 'to92' },
+  scr: { mount: 'to92' },
+  bridge: { mount: 'inline' },
+  reg7805: { mount: 'inline' },
+  lm317: { mount: 'inline' },
   npn: { mount: 'to92' },
   pnp: { mount: 'to92' },
   njfet: { mount: 'to92' },
@@ -128,7 +135,20 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   pmos: { mount: 'to92' },
   potentiometer: { mount: 'pot' },
   opamp: { mount: 'dip8' },
+  opto: { mount: 'dip4' },
   timer555: { mount: 'dip8' },
+};
+
+/**
+ * Sıralı bacaklı parçalarda gerçek kılıftaki bacak sırası (soldan sağa, sütun sırasıyla) → pin. Yoksa
+ * pin sırası (BC547'de C-B-E).
+ */
+const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
+  spdt: [1, 0, 2], // A, C, B: ortak uç ortada
+  bridge: [1, 0, 2, 3], // KBP: + ~ ~ −
+  reg7805: [0, 1, 2], // TO-220: IN, GND, OUT
+  lm317: [1, 2, 0], // TO-220: ADJ, OUT, IN
+  scr: [1, 2, 0], // TO-92 MCR100: K, G, A
 };
 
 /** DIP-8: parça pin sırası → entegre bacak numarası (1–8). */
@@ -137,17 +157,24 @@ const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = {
   timer555: [1, 2, 3, 4, 5, 6, 7, 8],
 };
 
+/** DIP-4: parça pin sırası → bacak numarası (PC817: 1 A, 2 K, 3 E, 4 C; Sharp iç bağlantı şeması). */
+const DIP4_PINS: Partial<Record<DeviceType, readonly number[]>> = {
+  opto: [1, 2, 4, 3],
+};
+
 /** Masadaki parçaların yeri: sol sütun, arka sıra (cihazlar), ön sıra. */
 type Side = 'left' | 'back' | 'front';
 const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rotation: number }>> = {
   arduino: { side: 'left', w: 21, d: 27, rotation: 0 },
   battery: { side: 'left', w: 12, d: 5.4, rotation: 0 },
   acsource: { side: 'left', w: 10, d: 5, rotation: 0 },
+  currentsource: { side: 'left', w: 10, d: 5, rotation: 0 },
   dcsupply: { side: 'back', w: 11.6, d: 12.8, rotation: -90 },
   funcgen: { side: 'back', w: 8.6, d: 12.8, rotation: -90 },
   oscilloscope: { side: 'back', w: 8.6, d: 13.4, rotation: 90 },
   voltmeter: { side: 'back', w: 11, d: 5.6, rotation: 0 },
   ammeter: { side: 'back', w: 11, d: 5.6, rotation: 0 },
+  multimeter: { side: 'back', w: 12.5, d: 20.5, rotation: 0 },
   lamp: { side: 'front', w: 9, d: 5, rotation: 0 },
   motor: { side: 'front', w: 12, d: 6, rotation: 0 },
   speaker: { side: 'front', w: 9, d: 6.5, rotation: 0 },
@@ -337,20 +364,21 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
   for (const part of ordered) {
     const spec = MOUNTS[part.type];
     if (!spec) continue;
-    if (spec.mount === 'dip8') {
-      // Orta kanalın üstünde: iki yarının aynı dört sütunu.
+    if (spec.mount === 'dip8' || spec.mount === 'dip4') {
+      // Orta kanalın üstünde: iki yarının aynı dört (DIP-4'te iki) sütunu.
+      const half = spec.mount === 'dip4' ? 2 : 4;
       let board = 0;
       let start = 0;
       for (; ; board++) {
         if (board >= boards) boards = board + 1;
         const [top, bottom] = slotsOf(board);
         start = Math.max(top!.cursor, bottom!.cursor);
-        if (start + 3 <= cols - 1) break;
+        if (start + half - 1 <= cols - 1) break;
       }
       const [top, bottom] = slotsOf(board);
-      const map = DIP_PINS[part.type]!;
+      const map = (spec.mount === 'dip4' ? DIP4_PINS : DIP_PINS)[part.type]!;
       const legOf = (dip: number): { half: 0 | 1; col: number; row: number } =>
-        dip <= 4 ? { half: 1, col: start + dip - 1, row: 5 } : { half: 0, col: start + 8 - dip, row: 4 };
+        dip <= half ? { half: 1, col: start + dip - 1, row: 5 } : { half: 0, col: start + 2 * half - dip, row: 4 };
       const holes = map.map((dip, i) => {
         const at = legOf(dip);
         const s = takeStrip(board, at.half, at.col, net(part, i));
@@ -358,28 +386,53 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
         return stripHole(s, at.row);
       });
       const extraHoles: Hole[] = [];
-      for (let dip = 1; dip <= 8; dip++) {
+      for (let dip = 1; dip <= 2 * half; dip++) {
         if (map.includes(dip)) continue;
         const at = legOf(dip);
         extraHoles.push(stripHole(takeStrip(board, at.half, at.col, null), at.row));
       }
       for (const slot of [top!, bottom!]) {
         slot.frontier = 0;
-        slot.cursor = start + 3 + GAP;
+        slot.cursor = start + half - 1 + GAP;
       }
-      onBoard.set(part.id, { partId: part.id, mount: 'dip8', holes, extraHoles });
+      onBoard.set(part.id, { partId: part.id, mount: spec.mount, holes, extraHoles });
       continue;
     }
-    const pins = spec.mount === 'to92' || spec.mount === 'pot' ? 3 : 2;
-    const span = pins === 3 ? 1 : spec.span!;
-    const width = pins === 3 ? 3 : span + 1;
+    if (spec.mount === 'button') {
+      // 12 mm basmalı düğme orta kanalın iki yanında: uçlar d (üst yarı) ve g (alt yarı) satırında, aynı
+      // sütunda; içten bağlı ikiz bacaklar iki sütun yanda (şeritleri yalnızca düğmeye ayrılır).
+      let board = 0;
+      let start = 0;
+      for (; ; board++) {
+        if (board >= boards) boards = board + 1;
+        const [top, bottom] = slotsOf(board);
+        start = Math.max(top!.cursor, bottom!.cursor);
+        if (start + 2 <= cols - 1) break;
+      }
+      const [top, bottom] = slotsOf(board);
+      const pinStrip = [takeStrip(board, 0, start, net(part, 0)), takeStrip(board, 1, start, net(part, 1))];
+      pinStrip.forEach((s) => s.legs++);
+      const holes = [stripHole(pinStrip[0]!, 3), stripHole(pinStrip[1]!, 6)];
+      const extraHoles = [stripHole(takeStrip(board, 0, start + 2, null), 3), stripHole(takeStrip(board, 1, start + 2, null), 6)];
+      for (const slot of [top!, bottom!]) {
+        slot.frontier = 0;
+        slot.cursor = start + 2 + GAP;
+      }
+      onBoard.set(part.id, { partId: part.id, mount: 'button', holes, extraHoles });
+      continue;
+    }
+    // Sıralı bacaklar (TO-92, trimpot, köprü diyot, TO-220): aynı satırda ardışık delikler.
+    const pins = spec.mount === 'inline' ? part.type === 'bridge' ? 4 : 3 : spec.mount === 'to92' || spec.mount === 'pot' ? 3 : 2;
+    const span = pins >= 3 ? 1 : spec.span!;
+    const width = pins >= 3 ? pins : span + 1;
     const nets = Array.from({ length: pins }, (_, i) => net(part, i));
-    const ends = [nets[0]!, nets[pins - 1]!];
+    const physical = LEG_ORDER[part.type] ?? Array.from({ length: pins }, (_, i) => i);
+    const ends = [nets[physical[0]!]!, nets[physical[pins - 1]!]!];
     const { slot, start, shared } = findSlot(width, ends);
-    // Paylaşılan ağ son pindeyse parça ters takılır (o pin ilk sütuna).
-    const reversed = shared !== null && shared !== nets[0] && shared === nets[pins - 1];
-    const order = Array.from({ length: pins }, (_, i) => (reversed ? pins - 1 - i : i));
-    const columns = pins === 3 ? [start, start + 1, start + 2] : [start, start + span];
+    // Paylaşılan ağ son bacaktaysa parça ters takılır (o bacak ilk sütuna).
+    const reversed = shared !== null && shared !== ends[0] && shared === ends[1];
+    const order = reversed ? [...physical].reverse() : physical;
+    const columns = pins >= 3 ? Array.from({ length: pins }, (_, k) => start + k) : [start, start + span];
     const columnStrips = columns.map((col, k) => takeStrip(slot.board, slot.half, col, nets[order[k]!]!));
     // Aynı satır (bütün şeritlerde boş) tercih edilir.
     const pref = rowsOf(slot.half);

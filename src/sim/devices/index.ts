@@ -23,6 +23,15 @@ import { resistorModel } from './resistor';
 import { switchModel } from './switch';
 import { motorModel } from './motor';
 import { relayModel } from './relay';
+import { currentSourceModel } from './currentsource';
+import { pushbuttonModel } from './pushbutton';
+import { spdtModel } from './spdt';
+import { bridgeModel } from './bridge';
+import { schottkyModel } from './schottky';
+import { lm317Model, reg7805Model } from './regulator';
+import { optocouplerModel } from './optocoupler';
+import { scrModel } from './scr';
+import { multimeterModel } from './multimeter';
 import { lampModel, ldrModel, ntcModel, potentiometerModel } from './sensors';
 import { buzzerModel, fuseModel, speakerModel } from './sound';
 import { opampModel } from './opamp';
@@ -68,6 +77,16 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   voltmeter: voltmeterModel,
   ammeter: ammeterModel,
   oscilloscope: oscilloscopeModel,
+  multimeter: multimeterModel,
+  currentsource: currentSourceModel,
+  pushbutton: pushbuttonModel,
+  spdt: spdtModel,
+  bridge: bridgeModel,
+  schottky: schottkyModel,
+  reg7805: reg7805Model,
+  lm317: lm317Model,
+  opto: optocouplerModel,
+  scr: scrModel,
 };
 
 export * from './device';
@@ -205,3 +224,12 @@ export {
   type TankSettings,
 } from './tank';
 export { VoltmeterDevice, VOLTMETER_DEFAULTS } from './voltmeter';
+export { CURRENT_SOURCE_DEFAULTS, CurrentSourceDevice } from './currentsource';
+export { BRIDGE_DEFAULTS, BRIDGE_MODELS, BridgeDevice } from './bridge';
+export { SCR_DEFAULTS, SCR_IGT, SCR_IH, SCR_IL, SCR_MODELS, ScrDevice } from './scr';
+export { OPTO_CTR, OPTO_DEFAULTS, OPTO_MODELS, OPTO_RANKS, OptocouplerDevice, optoCtr, type OptoRank } from './optocoupler';
+export { dropoutVoltage, LM317, LM317_DEFAULTS, LM317_MODELS, REG7805, RegulatorDevice } from './regulator';
+export { SCHOTTKY_DEFAULTS, SCHOTTKY_MODELS, SchottkyDevice } from './schottky';
+export { SPDT_DEFAULTS, SPDT_THROWS, SpdtDevice, spdtThrow, type SpdtThrow } from './spdt';
+export { PUSHBUTTON_CONTACTS, PUSHBUTTON_DEFAULTS, PushButtonDevice, pushbuttonClosed } from './pushbutton';
+export { MULTIMETER_DEFAULTS, MULTIMETER_MODES, multimeterMode, type MultimeterMode } from './multimeter';

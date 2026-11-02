@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "currentsource", "label": "I1", "x": 0, "y": 0, "rotation": 270, "props": {"current": 0.01}},
+    {"id": "p2", "type": "spdt", "label": "S1", "x": 26, "y": -10, "rotation": 0, "props": {"to": "a"}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 44, "y": 0, "rotation": 90, "props": {"resistance": 470, "powerRating": "0.25"}},
+    {"id": "p4", "type": "resistor", "label": "R2", "x": 36, "y": 0, "rotation": 90, "props": {"resistance": 1000, "powerRating": "0.25"}},
+    {"id": "p5", "type": "ammeter", "label": "A1", "x": 24, "y": 8, "rotation": 180, "props": {"mode": "dc", "resistance": 0.1, "ideal": false}},
+    {"id": "p6", "type": "multimeter", "label": "MM1", "x": 12, "y": 0, "rotation": 90, "props": {"mode": "dc"}},
+    {"id": "p7", "type": "ground", "label": "GND1", "x": 0, "y": 8, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[0, -4], [0, -10], [12, -10]]},
+    {"id": "w2", "points": [[12, -10], [22, -10]]},
+    {"id": "w3", "points": [[12, -4], [12, -10]]},
+    {"id": "w4", "points": [[30, -12], [44, -12], [44, -4]]},
+    {"id": "w5", "points": [[30, -8], [36, -8], [36, -4]]},
+    {"id": "w6", "points": [[0, 4], [0, 8], [12, 8]]},
+    {"id": "w7", "points": [[12, 4], [12, 8]]},
+    {"id": "w8", "points": [[12, 8], [20, 8]]},
+    {"id": "w9", "points": [[28, 8], [36, 8]]},
+    {"id": "w10", "points": [[36, 4], [36, 8]]},
+    {"id": "w11", "points": [[36, 8], [44, 8], [44, 4]]}
+  ]
+}

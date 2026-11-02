@@ -165,8 +165,8 @@ function seat(part: Part, mount: 'pair' | 'to92' | 'center', holes: Vector3[], e
     g.position.set((a.x + b.x) / 2, T, (a.z + b.z) / 2);
     g.rotation.y = Math.atan2(-(b.z - a.z), b.x - a.x);
   } else if (mount === 'to92') {
-    // Yerel z ekseni bacaklar boyunca: düz (yazılı) yüz izleyiciye bakar.
-    g.position.set(holes[1]!.x, T, holes[1]!.z);
+    // Yerel z ekseni bacaklar boyunca: düz (yazılı) yüz izleyiciye bakar. Gövde üç deliğin ortasında.
+    g.position.set(center.x, T, center.z);
     g.rotation.y = Math.PI / 2;
   } else {
     g.position.set(center.x, T, center.z);

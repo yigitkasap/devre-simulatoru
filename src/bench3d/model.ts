@@ -32,8 +32,8 @@ export interface PartModel {
    * döner: sahne bir sonraki karede yeniden çizilir.
    */
   update?(ctx: LiveContext): boolean;
-  /** Tıklanınca anahtar gibi davranır ya da sürüklenince döner (potansiyometre). */
-  readonly interaction?: 'toggle' | 'knob';
+  /** Tıklanınca anahtar gibi davranır, sürüklenince döner (potansiyometre) ya da basılı tutulur (düğme). */
+  readonly interaction?: 'toggle' | 'knob' | 'press';
   dispose?(): void;
 }
 

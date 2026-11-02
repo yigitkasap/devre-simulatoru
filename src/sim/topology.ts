@@ -86,6 +86,8 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
 
   diagnostics.push(...findVoltageLoops(input));
   diagnostics.push(...findAmmetersAcrossBatteries(input));
+  diagnostics.push(...findParallelMultimeters(input));
+  diagnostics.push(...findOpenCurrentSources(input));
   if (groundConnected) diagnostics.push(...floatingIslands(input));
   return diagnostics;
 }
@@ -185,7 +187,9 @@ function findPath(
 /** Ampermetre doğrudan bir pilin (ya da AC kaynağın) iki ucuna bağlanmışsa (paralel) eğitsel uyarı. */
 function findAmmetersAcrossBatteries(input: TopologyInput): Diagnostic[] {
   const result: Diagnostic[] = [];
-  const ammeters = input.devices.filter((d) => d.type === 'ammeter');
+  // A kipindeki multimetre de ampermetre olarak çözülür; onun uyarısı findParallelMultimeters'ta.
+  const multimeters = new Set(input.netlist.elements.filter((e) => e.type === 'multimeter').map((e) => e.id));
+  const ammeters = input.devices.filter((d) => d.type === 'ammeter' && !multimeters.has(d.id));
   const batteries = input.devices.filter((d) => d.type === 'battery' || d.type === 'acsource' || d.type === 'funcgen');
   for (const ammeter of ammeters) {
     const [a0, a1] = ammeter.nodes;
@@ -200,6 +204,60 @@ function findAmmetersAcrossBatteries(input: TopologyInput): Diagnostic[] {
           netKeys: rootKeysOf(input, [b0!, b1!]),
         });
       }
+    }
+  }
+  return result;
+}
+
+/**
+ * Akım kaynağının akacak yolu yok: iki ucu öbür bileşenler üzerinden (akım taşıyabilecek her yol;
+ * kondansatör de) birbirine bağlı değil. Kaynak o zaman akım vermez (currentsource.ts).
+ */
+function findOpenCurrentSources(input: TopologyInput): Diagnostic[] {
+  const result: Diagnostic[] = [];
+  const sources = input.devices.filter((d) => d.type === 'currentsource');
+  for (const source of sources) {
+    const uf = new UnionFind();
+    const index = new Map<number, number>();
+    const at = (node: number) => {
+      let i = index.get(node);
+      if (i === undefined) {
+        i = uf.add();
+        index.set(node, i);
+      }
+      return i;
+    };
+    for (const d of input.devices) {
+      if (d === source) continue;
+      for (const group of d.possibleGroups(true)) for (const node of group) uf.union(at(group[0]!), at(node));
+    }
+    const [a, b] = source.nodes;
+    if (uf.find(at(a!)) !== uf.find(at(b!))) {
+      result.push({ severity: 'warning', code: 'current-source-open', elementIds: [source.id], netKeys: rootKeysOf(input, [a!, b!]) });
+    }
+  }
+  return result;
+}
+
+/**
+ * A kipindeki multimetre seri bağlanmamış: iki ucuna doğrudan başka bir parça da bağlı (iç direnci
+ * 0,1 Ω olduğu için o parçayı kısa devre eder). Kaynağın iki ucuna bağlanması da buraya girer.
+ */
+function findParallelMultimeters(input: TopologyInput): Diagnostic[] {
+  const result: Diagnostic[] = [];
+  const elements = new Map(input.netlist.elements.map((e) => [e.id, e] as const));
+  for (const meter of input.devices) {
+    if (meter.type !== 'ammeter' || elements.get(meter.id)?.type !== 'multimeter') continue;
+    const [a0, a1] = meter.nodes;
+    if (a0 === a1) continue;
+    const across = input.devices.find((d) => {
+      const el = elements.get(d.id);
+      if (d === meter || !el || el.type === 'ground') return false;
+      const pins = d.nodes.slice(0, el.pins.length);
+      return pins.includes(a0!) && pins.includes(a1!);
+    });
+    if (across) {
+      result.push({ severity: 'warning', code: 'multimeter-parallel', elementIds: [meter.id, across.id], netKeys: rootKeysOf(input, [a0!, a1!]) });
     }
   }
   return result;

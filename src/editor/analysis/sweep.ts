@@ -41,6 +41,7 @@ export interface Curve {
 
 export const FAMILY: Partial<Record<DeviceType, TracerFamily>> = {
   diode: 'diode',
+  schottky: 'diode',
   zener: 'diode',
   led: 'diode',
   njfet: 'fet',

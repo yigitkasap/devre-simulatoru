@@ -93,6 +93,20 @@ export interface DeviceStatus {
     readonly loadPower: number;
     readonly heating: number;
   };
+  /**
+   * Gerilim regülatörü: giriş ve çıkış (7805'te GND'ye, LM317'de toprağa göre), verdiği akım, harcanan
+   * güç; giriş yetmiyor mu (bırakma gerilimiyle sınırlı).
+   */
+  readonly regulator?: { readonly input: number; readonly output: number; readonly current: number; readonly power: number; readonly dropout: boolean };
+  /**
+   * Optokuplör: LED akımı ve gerilimi, çıkış (kollektör) akımı, VCE, CTR (oran); çıkış doymada mı
+   * (dış devre CTR · IF'den az akım çekiyor).
+   */
+  readonly opto?: { readonly led: number; readonly ledVoltage: number; readonly output: number; readonly vce: number; readonly ctr: number; readonly saturated: boolean };
+  /** Tristör: iletimde mi; kapı akımı ve kapı–katot gerilimi. */
+  readonly scr?: { readonly on: boolean; readonly gate: number; readonly gateVoltage: number };
+  /** Basmalı düğme: basılı tutuluyor mu? */
+  readonly pressed?: boolean;
   /** Röle: palet çekili mi (NA kontağı kapalı)? */
   readonly energized?: boolean;
   /** Potansiyometre: sürgünün 3. uca göre gerilimi ve iki bölümün direnci. */
@@ -161,7 +175,7 @@ export interface DeviceStatus {
 
 /** Gerçek parçanın sınırı aşıldı (Fizik 5): uyarı kodu ve ayrıntıları (gerilim, güç, sınır). */
 export interface RatingWarning {
-  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse' | 'motor-overload' | 'pin-overcurrent'>;
+  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse' | 'motor-overload' | 'pin-overcurrent' | 'regulator-dropout'>;
   readonly params: Readonly<Record<string, number>>;
 }
 
@@ -231,6 +245,16 @@ export abstract class Device {
 
   /** Adım kabul edildi: durumu kaydet. */
   accept(_x: Float64Array, _ctx: StepContext): void {}
+
+  /**
+   * Son kabul edilen adımda bileşenin kipi değişti mi (regülatörün akım sınırından ayara geçmesi gibi)
+   * ya da akımı adım adım bir artıp bir azalıyor mu? Öyleyse motor sonraki adımı geri Euler'le atar:
+   * yamuk kuralı, neredeyse ideal bir gerilim kaynağına bağlı kondansatörde süreksizlikten sonra
+   * sönmeyen bir akım salınımı bırakır.
+   */
+  discontinuity(): boolean {
+    return false;
+  }
 
   /** Kabul edilen çözümü `time` anının ölçümü olarak kaydet (osiloskop). */
   observe(_x: Float64Array, _time: number): void {}
@@ -320,6 +344,12 @@ export abstract class Device {
   possibleGroups(transient: boolean): ReadonlyArray<readonly number[]> {
     return this.conductiveGroups(transient);
   }
+
+  /**
+   * Motor, akımı KCL gereği tam 0 olan uçları (findZeroPins) her topoloji değişiminde bildirir; yoksa
+   * undefined. İdeal akım kaynağı akacak yolu olmayınca akım vermez (açık devrede sonsuz gerilim olmasın).
+   */
+  zeroCurrentPins(_zero: readonly boolean[] | undefined): void {}
 
   /** Topoloji kontrolü için: bu bileşenin içindeki ideal gerilim dalları (düğüm çiftleri). */
   idealVoltageBranches(): Array<readonly [number, number]> {

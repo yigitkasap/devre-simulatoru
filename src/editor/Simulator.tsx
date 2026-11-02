@@ -10,6 +10,11 @@ import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
+import { METER_DISPLAY } from './PartView';
+import { nodeName } from './analysis/traces';
+import { lm317Divider } from './lm317Divider';
+import { multimeterMode } from '../sim/devices/multimeter';
+import { spdtThrow } from '../sim/devices/spdt';
 import { meterIntact, remapFaults, removedMeters, unplugAll, type InsertedMeter } from '../model/meters';
 import { FaultCard } from './fault/FaultCard';
 import { faultExplain, faultPoint, placeLabel, placeMatches, placePoint, randomFault } from './fault/judge';
@@ -18,7 +23,7 @@ import { PhoneFaultSheet } from './fault/PhoneFaultSheet';
 import { nextScenario, scenarioTask, scenarioTexts } from './fault/scenarios';
 import { FoundCard, ReportCard } from './fault/ReportCards';
 import { faultFromPlace } from './task/faultRows';
-import { defaultBlack, measureResistance, METER_ID, meterPart, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
+import { defaultBlack, measureResistance, METER_ID, meterPart, ohmText, onGround, spotLabel, wireMeter, type MeterMode, type Probe, type ProbeColor } from './fault/meter';
 import { MultimeterPanel, type MeterReading } from './fault/MultimeterPanel';
 import { addEntry, entryName, METER_LIMIT, NEW_SESSION, parseSession, type FaultSession, type Place } from './fault/session';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
@@ -383,6 +388,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const repaired = fault !== null && faultSession.repaired;
   /** Takılı ampermetreler: kayıtlardan belgede takıldığı gibi duranlar (Geri al ve Yinele de değiştirir). */
   const plugged = useMemo(() => (fault ? faultSession.meters.filter((m) => meterIntact(doc, m)) : []), [fault, faultSession.meters, doc]);
+  /** Takılı ampermetrelerin gösterge yanı (takarken seçildi; eski kayıtlarda yok). */
+  const meterFlips = useMemo(() => new Map(plugged.flatMap((m) => (m.flip === undefined ? [] : [[m.part, m.flip] as const]))), [plugged]);
   /** Görevin arızaları; takılı ampermetrenin böldüğü kablonun son ucundaki arıza ikinci yarıya taşınır. */
   const effectiveFaults = useMemo(() => (fault ? remapFaults(fault.faults, plugged) : []), [fault, plugged]);
   const activeFaults = useMemo(() => (fault && !repaired ? effectiveFaults : []), [fault, repaired, effectiveFaults]);
@@ -393,11 +400,23 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   }, [fault]);
   // Multimetre simülasyona görünmez bir voltmetre olarak girer (iç direnç 10 MΩ; şemada yok).
   const simDoc = useMemo(() => (fault ? { ...doc, parts: [...doc.parts, meterPart(meter.mode)] } : doc), [doc, fault, meter.mode]);
+  /** Basılı tutulan düğmeler: belgede durmaz (geçmişe ve kayda girmez), yalnızca simülasyonun devresine eklenir. */
+  const [pressed, setPressed] = useState<ReadonlySet<string>>(() => new Set());
+  const pressButton = useCallback((id: string, down: boolean) => {
+    setPressed((s) => {
+      if (s.has(id) === down) return s;
+      const next = new Set(s);
+      if (down) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
   const simConnectivity = useMemo(() => {
-    if (!fault) return connectivity;
-    const c = buildConnectivity(simDoc, activeFaults);
-    return { ...c, netlist: wireMeter(c.netlist, meter.mode, meter.red, meter.black) };
-  }, [fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black]);
+    const c = fault ? buildConnectivity(simDoc, activeFaults) : connectivity;
+    const netlist = fault ? wireMeter(c.netlist, meter.mode, meter.red, meter.black) : c.netlist;
+    const elements = pressed.size === 0 ? netlist.elements : netlist.elements.map((e) => (pressed.has(e.id) ? { ...e, props: { ...e.props, pressed: true } } : e));
+    return elements === c.netlist.elements ? c : { ...c, netlist: { ...netlist, elements } };
+  }, [fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black, pressed]);
   /** Otomatik göstergeler kapalı: kablo renkleri, akım noktaları, düğüm etiketleri, kartlardaki canlı değerler. */
   const hideLive = fault !== null && fault.hideIndicators && !repaired;
   /** Tezgâhta gözle görülen arızalar (karar 1): ters takılmış, yanlış değerli, yanmış parça. */
@@ -445,7 +464,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const timeVarying = doc.parts.some((p) => TIME_VARYING.has(p.type));
   const watchedKey = [
     ...selection.parts.slice(0, 8),
-    ...doc.parts.filter((p) => p.type === 'voltmeter' || p.type === 'ammeter').map((p) => p.id),
+    ...doc.parts.filter((p) => METER_DISPLAY.has(p.type)).map((p) => p.id),
     // Görev hedeflerinin parçaları (salınan değerin pencere özeti ve DC ortalaması için).
     ...(task ? targetParts(task.targets) : []),
     ...(timeVarying && !phone ? doc.parts.filter((p) => CARD_WATCHED.has(p.type)).slice(0, 8).map((p) => p.id) : []),
@@ -455,6 +474,32 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   /** Defterde kapalı kartı ölçüm gösterebilen parçalar (DC devrede hepsi). */
   const measuredParts = useMemo<ReadonlySet<string> | null>(() => (timeVarying ? new Set(watched) : null), [timeVarying, watched]);
   const sim = useSimulation(simDoc, simConnectivity, flowGraph, settings.electronFlow, settings.sound, watched, analysis.traces);
+  /** Ucun bağlı olduğu düğümün adı (multimetre kartı); toprak ağında toprak sembolünün adı. */
+  const pinNode = useCallback(
+    (id: string, pin: number) => {
+      const name = nodeName(pinKey(id, pin), analysis.idx, id);
+      return name === '0' ? (doc.parts.find((p) => p.type === 'ground')?.label ?? tr.fault.ground) : name;
+    },
+    [analysis.idx, doc.parts],
+  );
+  const divider = useCallback(
+    (id: string) => {
+      const part = doc.parts.find((p) => p.id === id);
+      return part ? lm317Divider(part, doc, analysis.idx) : null;
+    },
+    [doc, analysis.idx],
+  );
+  /** Multimetre parçalarının Ω okuması: simülasyon durmuşken (güç kapalı; B2'deki multimetreyle aynı ölçüm). */
+  const ohmTexts = useMemo(() => {
+    const meters = doc.parts.filter((p) => p.type === 'multimeter' && multimeterMode(p.props) === 'ohm');
+    if (sim.status !== 'stopped' || meters.length === 0) return undefined;
+    const texts = new Map<string, string>();
+    for (const p of meters) {
+      const text = ohmText(measureResistance(simConnectivity.netlist, pinKey(p.id, 0), pinKey(p.id, 1)));
+      if (text) texts.set(p.id, text);
+    }
+    return texts;
+  }, [doc.parts, sim.status, simConnectivity]);
   /** Oynat: görevde tahminler kaydedilmediyse (B1) çalışmaz, nedenini söyler. */
   const play = () => {
     if (gate) showToast(gate, 'error');
@@ -473,12 +518,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const taskParts = useMemo(() => {
     if (!task) return null;
     // Takılı ampermetre kilitli değil (kaldırılır) ama yeri değişmez; arıza bulmada her şey kilitli, kilit simgesi yok.
+    // Kablolar arıza bulmada ve "Yeni parça eklenebilir" kapalıyken kilitli (bekçi her kablo değişikliğini reddeder).
     const own = new Set(plugged.map((m) => m.part));
     return {
       editable: new Set(task.editable),
       locked: new Set(doc.parts.filter((p) => !task.editable.includes(p.id) && !own.has(p.id)).map((p) => p.id)),
       plugged: own,
       lockMarks: !task.fault,
+      wiresLocked: !!task.fault || !task.allowNew,
     };
   }, [task, doc.parts, plugged]);
   /** Arıza bulmada eklenebilen parça türleri (hoca izin verdiyse yalnızca ampermetre); öbür kiplerde süzgeç yok. */
@@ -1243,6 +1290,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const notebook = (
     <Notebook
       {...inspectProps}
+      {...(ohmTexts ? { ohmTexts } : {})}
+      pinNode={pinNode}
+      divider={divider}
+      pressed={pressed}
+      onPress={pressButton}
       floating={floatingParts}
       measured={measuredParts}
       onClearSelection={() => dispatch({ type: 'select', selection: EMPTY_SELECTION })}
@@ -1326,7 +1378,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const meterFree = fault !== null && fault.tools.ammeter && measuring && meter.placing === null && viewMode === 'schematic';
   /** Kabloyu ikiye böler, ampermetreyi araya seri takar (kablo dokunulan yerde). */
   const plugAmmeter = (wireId: string, at: { x: number; y: number }) => {
-    const r = insertAmmeter(doc, wireId, at);
+    const r = insertAmmeter(doc, wireId, at, meterFlips);
     if ('error' in r) {
       showToast(tr.fault.ammeter.errors[r.error], 'error');
       return;
@@ -1459,6 +1511,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       probes={probeView}
       tapMenu={tapMenu}
       wiringLocked={fault !== null}
+      meterFlips={meterFlips}
+      {...(ohmTexts ? { ohmTexts } : {})}
+      pressed={pressed}
+      onPress={pressButton}
       onLocate={
         reporting
           ? (place, at) => setReporting((r) => (r ? { ...r, place, at: placePoint(place, doc) ?? at } : r))
@@ -1509,6 +1565,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           doc={doc}
           connectivity={connectivity}
           frame={sim.frame}
+          {...(ohmTexts ? { ohmTexts } : {})}
           {...(benchLook !== doc ? { look: benchLook } : {})}
           {...(hideLive ? { labelFrame: shownFrame, liveHidden: true } : {})}
           active={sim.status !== 'stopped'}
@@ -1530,8 +1587,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
             onToggle: (id) => {
               const part = doc.parts.find((p) => p.id === id);
-              if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
+              if (part?.type === 'spdt') updatePartFromPanel(id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } });
+              else if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
             },
+            onPress: pressButton,
             onKnob: (id, position, done) => {
               const part = doc.parts.find((p) => p.id === id);
               if (part) slidePartFromPanel(id, { props: { ...part.props, position } }, done);

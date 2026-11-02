@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { atOperatingPoint } from '../src/editor/analysis/bode';
-import { exampleDoc, type ExampleId } from '../src/examples';
+import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../src/examples';
 import { buildConnectivity, pinKey, wireKey } from '../src/model/connectivity';
 import { faultFits, faultValid, type Fault } from '../src/model/faults';
 import { pinPositions } from '../src/model/geometry';
@@ -428,12 +428,14 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     if ('error' in r) throw new Error(r.error);
     return r;
   };
-  /** Ampermetrenin tuvalde kapladığı yer: gövde, ekran ve ad. */
-  const footprint = (doc: CircuitDoc, id: string) => {
-    const part = doc.parts.find((p) => p.id === id)!;
-    const flip = meterFlipped(part, doc.parts.filter((p) => p.id !== id).map((p) => partBounds(p)));
+  /** Ampermetrenin tuvalde kapladığı yer: gövde, ekran ve ad (gösterge yanı kayıttan). */
+  const footprint = (doc: CircuitDoc, meter: InsertedMeter) => {
+    const part = doc.parts.find((p) => p.id === meter.part)!;
+    const flip = meter.flip ?? meterFlipped(part, doc.parts.filter((p) => p.id !== meter.part).map((p) => partBounds(p)));
     return [partBounds(part), meterDisplayRect(part, flip), ...partTextBoxes(part, flip)];
   };
+  /** Ucu bu noktada biten kablo. */
+  const wireAt = (doc: CircuitDoc, x: number, y: number) => doc.wires.find((w) => [w.points[0]!, w.points.at(-1)!].some((q) => q.x === x && q.y === y))!.id;
   /** Kutular gerçekten kesişiyor (kenara değmek sayılmaz). */
   const overlaps = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
     boxesIntersect(a, b) && Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 1e-9 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 1e-9;
@@ -530,7 +532,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
       expect(r.doc.wires.find((w) => w.id === w11.id)!.points.at(-1)).toEqual(p0);
       expect(r.doc.wires.find((w) => w.id === r.meter.half)!.points[0]).toEqual(p1);
       // Gövde, ekran ve ad: başka parça, yazı ya da kablo yok.
-      const own = footprint(r.doc, a.id);
+      const own = footprint(r.doc, r.meter);
       for (const p of doc.parts) for (const box of [partBounds(p), ...partTextBoxes(p, false)]) expect(own.some((b) => overlaps(b, box))).toBe(false);
       for (let i = 1; i < w10.points.length; i++) {
         const [q0, q1] = [w10.points[i - 1]!, w10.points[i]!];
@@ -539,10 +541,13 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     }
   });
 
-  it('"Buraya ampermetre tak": kısa kablo parçasında (RC’nin üst kablosu) yanına konur, iki bağlantı kablosu; kollektör akımını ölçer, devre değişmez; kaldırınca kablo eski hâline döner', () => {
+  /** Emiter kablosu: Q1'in emiterinden toprağa (kısa, 8 birim). */
+  const emitterWire = (doc: CircuitDoc) => doc.wires.find((x) => x.points[0]!.x === 44 && x.points[0]!.y === 8)!;
+
+  it('"Buraya ampermetre tak": kısa kablo parçasında (emiter kablosu) yanına konur, iki bağlantı kablosu; emiter akımını ölçer (≈ kollektör akımı), devre değişmez; kaldırınca kablo eski hâline döner', () => {
     const doc = exampleDoc('bjt-yukseltec')!;
-    const w = doc.wires.find((x) => x.points.at(-1)!.x === 44 && x.points.at(-1)!.y === -12)!;
-    const r = plug(doc, w.id, { x: 44, y: -14 });
+    const w = emitterWire(doc);
+    const r = plug(doc, w.id, { x: 44, y: 12 });
     expect(r.doc.parts.find((p) => p.id === r.meter.part)!.type).toBe('ammeter');
     expect(r.meter.links.length).toBe(2);
     expect(r.doc.wires.length).toBe(doc.wires.length + 3);
@@ -555,13 +560,16 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     expect(unplugAll(removeItems(r.doc, [r.meter.part], []), [r.meter])).toEqual(doc);
   });
 
-  it('kablo ucundaki arıza ikinci yarıya taşınır; kopuk RC bacağında ampermetre sıfıra yakın akım gösterir; kayıt saklanıp geri okunur', () => {
+  it('kablo ucundaki arıza ikinci yarıya taşınır; kopuk emiter bacağında ampermetre sıfıra yakın akım gösterir; kayıt saklanıp geri okunur', () => {
     const doc = exampleDoc('bjt-yukseltec')!;
-    const w = doc.wires.find((x) => x.points.at(-1)!.x === 44 && x.points.at(-1)!.y === -12)!;
-    const r = plug(doc, w.id, { x: 44, y: -14 });
+    const w = emitterWire(doc);
+    const r = plug(doc, w.id, { x: 44, y: 12 });
     expect(remapFaults([{ kind: 'open', at: { wire: w.id, end: 1 } }], [r.meter])).toEqual([{ kind: 'open', at: { wire: r.meter.half, end: 1 } }]);
     expect(remapFaults([{ kind: 'open', at: { wire: w.id, end: 0 } }], [r.meter])).toEqual([{ kind: 'open', at: { wire: w.id, end: 0 } }]);
-    const sim = new CircuitSimulator(atOperatingPoint(buildConnectivity(r.doc, [{ kind: 'open', at: { part: partId(doc, 'RC'), pin: 1 } }]).netlist));
+    const q1 = doc.parts.find((p) => p.label === 'Q1')!;
+    const emitter = pinPositions(q1).findIndex((q) => q.x === 44 && q.y === 8);
+    expect(emitter).toBeGreaterThanOrEqual(0);
+    const sim = new CircuitSimulator(atOperatingPoint(buildConnectivity(r.doc, [{ kind: 'open', at: { part: q1.id, pin: emitter } }]).netlist));
     sim.runUntil(0.2);
     expect(Math.abs(reading(sim, r.meter.part))).toBeLessThan(1e-6);
     const saved: readonly InsertedMeter[] = parseSession(JSON.parse(JSON.stringify({ ...NEW_SESSION, meters: [r.meter] }))).meters;
@@ -572,6 +580,134 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     // Çok kısa kablo parçası: takılmaz.
     const short = doc.wires.find((x) => x.points.length === 2 && Math.abs(x.points[0]!.x - x.points[1]!.x) + Math.abs(x.points[0]!.y - x.points[1]!.y) < 3);
     if (short) expect(insertAmmeter(doc, short.id, short.points[0]!)).toEqual({ error: 'short' });
+  });
+
+  it('üst rayda RB bağlantısının sağı: ampermetre bağlantıyla köşe arasında kablonun üstünde, göstergesi altta (üstte OSC1 A kablosu); solunda bağlantının solunda kalır; tam bağlantıda takılmaz', () => {
+    const doc = exampleDoc('bjt-yukseltec')!;
+    const w1 = doc.wires.find((x) => x.points.at(-1)!.x === 44 && x.points.at(-1)!.y === -12)!;
+    // Eskiden şemanın en üstüne gidip OSC1 A kablosunu kesiyordu.
+    const right = plug(doc, w1.id, { x: 39, y: -16 });
+    expect([right.meter.x, right.meter.y, right.meter.rotation, right.meter.links.length, right.meter.flip]).toEqual([40, -16, 0, 0, true]);
+    // RB'nin bağlandığı nokta (36, -16): solunda RB ile RC'nin toplamı akar; ampermetre dokunulan yanda kalır.
+    const left = plug(doc, w1.id, { x: 34, y: -16 });
+    expect(left.meter.made[0]!.points.at(-1)!.x).toBeLessThanOrEqual(36);
+    expect(left.meter.made[1]!.points[0]!.x).toBeLessThanOrEqual(36);
+    // Tam bağlantının üstünde: hangi kol olduğu belirsiz, takılmaz.
+    expect(insertAmmeter(doc, w1.id, { x: 36, y: -16 })).toEqual({ error: 'junction' });
+    // RC'nin hemen üstündeki dikey parça (4 birim): yanda da yer yok (sağda OSC1 A, solda RB kablosu).
+    expect(insertAmmeter(doc, w1.id, { x: 44, y: -14 })).toEqual({ error: 'crowded' });
+  });
+
+  it('kollektör (drain) akımı o koldaki en az bir kablodan ölçülür; okunan değer simülasyondaki kollektör (drain) akımıyla aynı (bjt-yukseltec, bjt-anahtar, fet-yukseltec, mosfet-yukseltec)', () => {
+    /** Koldaki kablolar (yalnızca kollektör ya da drain akımı geçen kısımları) ve transistör. */
+    type Branch = { wire: (doc: CircuitDoc) => string; keep?: (at: { x: number; y: number }) => boolean };
+    const branches: readonly { id: ExampleId; transistor: string; wires: readonly Branch[] }[] = [
+      // Üst rayda RB'nin bağlandığı noktanın (36, -16) solundan RB akımı da geçer.
+      { id: 'bjt-yukseltec', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -12), keep: (at) => (at.y === -16 && at.x > 36) || at.x === 44 }, { wire: (d) => wireAt(d, 44, 0) }] },
+      { id: 'bjt-anahtar', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -18) }, { wire: (d) => wireAt(d, 44, -8) }, { wire: (d) => wireAt(d, 44, 2) }] },
+      { id: 'fet-yukseltec', transistor: 'J1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
+      { id: 'mosfet-yukseltec', transistor: 'M1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
+    ];
+    for (const { id, transistor, wires } of branches) {
+      const doc = exampleDoc(id)!;
+      const sim = new CircuitSimulator(atOperatingPoint(buildConnectivity(doc).netlist));
+      sim.runUntil(0.2);
+      const t = doc.parts.find((p) => p.label === transistor)!;
+      // Ampermetresiz devrede transistörün kollektör (drain) ucundan giren akım; fonksiyon üreteci
+      // çalışırken ampermetre gibi bir periyodun ortalaması (BJT'de üstel eğri ortalamayı büyütür).
+      const collector = Math.abs(sim.averagePinCurrents(t.id)![0]!);
+      let measured = 0;
+      const seen = new Set<string>();
+      for (const { wire, keep } of wires) {
+        const w = doc.wires.find((x) => x.id === wire(doc))!;
+        let simulated = 0;
+        for (let i = 0; i + 1 < w.points.length; i++) {
+          const [a, b] = [w.points[i]!, w.points[i + 1]!];
+          const len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+          // Her noktaya dokunulur; aynı yer bir kez, kablo başına en çok üç yer simüle edilir.
+          for (let k = 0; k <= len && simulated < 3; k++) {
+            const at = { x: a.x + Math.sign(b.x - a.x) * k, y: a.y + Math.sign(b.y - a.y) * k };
+            if (keep && !keep(at)) continue;
+            const r = insertAmmeter(doc, w.id, at);
+            if ('error' in r) continue;
+            const key = `${r.meter.x},${r.meter.y},${r.meter.rotation},${JSON.stringify(r.meter.made[0]!.points.at(-1))}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            simulated++;
+            const s2 = new CircuitSimulator(atOperatingPoint(buildConnectivity(r.doc).netlist));
+            s2.runUntil(0.2);
+            // Pencerelerin denk gelişinden kalan fark binde 2'den az.
+            expect(Math.abs(Math.abs(reading(s2, r.meter.part)) / collector - 1), `${id} ${w.id} ${at.x},${at.y}`).toBeLessThan(2e-3);
+            measured++;
+          }
+        }
+      }
+      expect(measured, id).toBeGreaterThan(0);
+    }
+  }, 20_000);
+
+  it('bütün örneklerde: ampermetre kablonun üstünde ya da en çok 3 birim yanında; bağlantı kabloları kabloları yalnızca dik keser, bağlantı noktasından geçmez; gösterge kablo üstüne binmez; boşlukla dokunulan nokta arasında bağlantı yok', () => {
+    type Pt = { readonly x: number; readonly y: number };
+    type Seg = readonly [Pt, Pt];
+    const segs = (pts: readonly Pt[]): Seg[] => pts.slice(1).map((q, i) => [pts[i]!, q] as const);
+    const between = (p: number, a: number, b: number) => p > Math.min(a, b) && p < Math.max(a, b);
+    /** Aynı doğru üstünde ortak uzunluk (dik kesişme serbest). */
+    const alongside = ([a, b]: Seg, [c, d]: Seg) => {
+      const sv = a.x === b.x;
+      if (sv !== (c.x === d.x) || (sv ? a.x !== c.x : a.y !== c.y)) return false;
+      const [s0, s1] = sv ? [Math.min(a.y, b.y), Math.max(a.y, b.y)] : [Math.min(a.x, b.x), Math.max(a.x, b.x)];
+      const [o0, o1] = sv ? [Math.min(c.y, d.y), Math.max(c.y, d.y)] : [Math.min(c.x, d.x), Math.max(c.x, d.x)];
+      return Math.min(s1, o1) - Math.max(s0, o0) > 1e-9;
+    };
+    const interior = (q: Pt, [a, b]: Seg) => (a.x === b.x ? q.x === a.x && between(q.y, a.y, b.y) : q.y === a.y && between(q.x, a.x, b.x));
+    /** Kablo parçası kutunun içinden geçiyor (kenara değmek sayılmaz). */
+    const through = ([a, b]: Seg, r: { x: number; y: number; w: number; h: number }) =>
+      a.x === b.x
+        ? a.x > r.x && a.x < r.x + r.w && Math.min(Math.max(a.y, b.y), r.y + r.h) - Math.max(Math.min(a.y, b.y), r.y) > 1e-9
+        : a.y > r.y && a.y < r.y + r.h && Math.min(Math.max(a.x, b.x), r.x + r.w) - Math.max(Math.min(a.x, b.x), r.x) > 1e-9;
+    let placed = 0;
+    let beside = 0;
+    for (const id of EXAMPLE_IDS) {
+      const doc = exampleDoc(id)!;
+      const ends = [...doc.wires.flatMap((w) => [w.points[0]!, w.points.at(-1)!].map((q) => ({ q, owner: w.id }))), ...doc.parts.flatMap((p) => pinPositions(p).map((q) => ({ q, owner: '' })))];
+      const corners = doc.wires.flatMap((w) => w.points.slice(1, -1));
+      for (const w of doc.wires) {
+        segs(w.points).forEach(([a, b], i) => {
+          if (a.x !== b.x && a.y !== b.y) return;
+          const at = { x: Math.round((a.x + b.x) / 2), y: Math.round((a.y + b.y) / 2) };
+          const r = insertAmmeter(doc, w.id, at);
+          if ('error' in r) return;
+          placed++;
+          const where = `${id} ${w.id}#${i}`;
+          const links = new Set(r.meter.links);
+          const part = r.doc.parts.find((p) => p.id === r.meter.part)!;
+          const vertical = a.x === b.x;
+          // Kablodan uzaklık: yakın ucu en çok 3 birim.
+          const off = Math.min(...pinPositions(part).map((q) => Math.abs(vertical ? q.x - a.x : q.y - a.y)));
+          expect(off, where).toBeLessThanOrEqual(3);
+          if (links.size > 0) beside++;
+          const linkSegs = r.meter.made.filter((m) => links.has(m.id)).flatMap((m) => segs(m.points));
+          const rest = r.doc.wires.filter((x) => !links.has(x.id)).flatMap((x) => segs(x.points));
+          for (const l of linkSegs) {
+            for (const o of rest) expect(alongside(l, o), where).toBe(false);
+            for (const q of [...ends.map((e) => e.q), ...corners]) expect(interior(q, l), where).toBe(false);
+          }
+          // Gösterge kutusu hiçbir kablonun üstünde değil.
+          const display = meterDisplayRect(part, r.meter.flip ?? false);
+          for (const s of r.doc.wires.flatMap((x) => segs(x.points))) expect(through(s, display), where).toBe(false);
+          // Boşluk (P1–P2) ile dokunulan nokta arasında bu kablo parçasına değen başka kablo ya da parça ucu yok.
+          const P1 = r.meter.made[0]!.points.at(-1)!;
+          const P2 = r.meter.made[1]!.points[0]!;
+          const key = (q: Pt) => (vertical ? q.y : q.x);
+          const lo = Math.min(key(at), key(P1), key(P2));
+          const hi = Math.max(key(at), key(P1), key(P2));
+          const inside = ends.filter(({ q, owner }) => owner !== w.id && (vertical ? q.x === a.x : q.y === a.y) && key(q) > lo && key(q) < hi && between(key(q), key(a), key(b)));
+          expect(inside, where).toEqual([]);
+        });
+      }
+    }
+    expect(placed).toBeGreaterThan(100);
+    expect(beside).toBeGreaterThan(10);
   });
 });
 

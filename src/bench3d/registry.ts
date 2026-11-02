@@ -5,12 +5,14 @@ import type { Part } from '../model/types';
 import { dipChipModel } from './breadboardModel';
 import { withAnchors } from './kit';
 import { arduinoModel } from './arduinoModel';
-import { dcsupplyModel, funcgenModel, meterModel, oscilloscopeModel, tankModel } from './instruments';
+import { dcsupplyModel, funcgenModel, meterModel, multimeterModel, oscilloscopeModel, tankModel } from './instruments';
 import type { PartModel } from './model';
 import {
   batteryModel,
+  bridgeModel,
   buzzerModel,
   capacitorModel,
+  currentSourceModel,
   diodeModel,
   fuseModel,
   groundModel,
@@ -21,11 +23,17 @@ import {
   ledModel,
   motorModel,
   ntcModel,
+  optoModel,
   potentiometerModel,
+  pushButtonModel,
   relayModel,
   resistorModel,
+  schottkyModel,
+  scrModel,
   sourceBoxModel,
   speakerModel,
+  to220Model,
+  spdtModel,
   switchModel,
   transformerModel,
   transistorModel,
@@ -38,6 +46,7 @@ import {
  */
 export function buildPartModel(part: Part, holes: readonly Vector3[] | null = null, extra: readonly Vector3[] = []): PartModel {
   if (holes && (part.type === 'opamp' || part.type === 'timer555')) return dipChipModel(part.type, holes, extra);
+  if (holes && part.type === 'pushbutton') return withAnchors(holes, () => pushButtonModel(extra));
   return withAnchors(holes, () => build(part));
 }
 
@@ -79,6 +88,24 @@ function build(part: Part): PartModel {
       return arduinoModel();
     case 'switch':
       return switchModel(p);
+    case 'pushbutton':
+      return pushButtonModel();
+    case 'spdt':
+      return spdtModel(p);
+    case 'bridge':
+      return bridgeModel(p);
+    case 'schottky':
+      return schottkyModel(p);
+    case 'reg7805':
+      // Bacak sırası IN, GND, OUT (ST L78 Şekil 2).
+      return to220Model('reg7805', 'L7805CV', '5 V · 1,5 A', [0, 1, 2]);
+    case 'opto':
+      return optoModel(p);
+    case 'scr':
+      return scrModel(p);
+    case 'lm317':
+      // Bacak sırası ADJ, OUT, IN (ST LM317 Şekil 1, TI Şekil 5-2).
+      return to220Model('lm317', 'LM317T', 'ADJ · 1,5 A', [1, 2, 0]);
     case 'lamp':
       return lampModel();
     case 'speaker':
@@ -95,11 +122,15 @@ function build(part: Part): PartModel {
       return batteryModel(p);
     case 'acsource':
       return sourceBoxModel('acsource', 'AC');
+    case 'currentsource':
+      return currentSourceModel(p);
     case 'ground':
       return groundModel();
     case 'voltmeter':
     case 'ammeter':
       return meterModel(part.type);
+    case 'multimeter':
+      return multimeterModel();
     case 'dcsupply':
       return dcsupplyModel();
     case 'funcgen':

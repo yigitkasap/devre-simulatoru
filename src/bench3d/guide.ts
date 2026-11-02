@@ -75,6 +75,8 @@ function describe(part: Part): { name: string; detail: string } {
     }
     case 'diode':
       return { name: 'Diyot 1N4001', detail: 'bantlı uç katot' };
+    case 'schottky':
+      return { name: 'Schottky diyot 1N5819', detail: 'bantlı uç katot; gövdede 1N5819 yazar' };
     case 'zener':
       return { name: `Zener diyot ${value}`, detail: 'bantlı uç katot' };
     case 'npn':
@@ -88,12 +90,26 @@ function describe(part: Part): { name: string; detail: string } {
     }
     case 'opamp':
       return { name: 'İşlemsel yükselteç LM741', detail: 'DIP-8; 8 bacaklı soketle' };
+    case 'scr':
+      return { name: `Tristör ${typeof p.model === 'string' ? p.model : 'MCR100-6'}`, detail: 'TO-92; düz yüz sana dönükken soldan K, G, A' };
+    case 'opto':
+      return { name: `Optokuplör ${typeof p.model === 'string' ? p.model : 'PC817'}`, detail: 'DIP-4; 1. bacak (nokta) anot' };
     case 'timer555':
       return { name: '555 zamanlayıcı NE555', detail: 'DIP-8; 8 bacaklı soketle' };
     case 'potentiometer':
       return { name: `Potansiyometre ${formatOhm(numProp(p, 'resistance', 10e3))}`, detail: 'dikey trimpot, 3 bacak' };
     case 'switch':
       return { name: 'Anahtar (iki konumlu)', detail: `başlangıçta ${boolProp(p, 'closed', false) ? 'kapalı' : 'açık'}` };
+    case 'lm317':
+      return { name: 'Ayarlı regülatör LM317T', detail: 'TO-220; bacaklar yazılı yüz sana dönükken soldan ADJ, OUT, IN' };
+    case 'reg7805':
+      return { name: 'Gerilim regülatörü L7805CV', detail: 'TO-220; bacaklar yazılı yüz sana dönükken soldan IN, GND, OUT' };
+    case 'bridge':
+      return { name: `Köprü diyot ${typeof p.model === 'string' ? p.model : 'KBP307'}`, detail: '4 bacak düz sıra: + ~ ~ −' };
+    case 'spdt':
+      return { name: 'Çift yollu anahtar (SPDT)', detail: 'kollu, 3 bacak; ortak uç (C) ortada' };
+    case 'pushbutton':
+      return { name: 'Basmalı düğme 12 mm', detail: `4 bacak; ${p.contact === 'nc' ? 'normalde kapalı' : 'normalde açık'}` };
     case 'arduino':
       return { name: 'Arduino Uno', detail: `program: ${value}; USB kablosuyla beslenir` };
     default:
@@ -153,11 +169,23 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         steps.push({ group: 'axial', title: `${part.label} · ${material}`, holes: holes.join(' ↔ ') });
         break;
       case 'diode':
+      case 'schottky':
       case 'zener':
         steps.push({ group: 'axial', title: `${part.label} · ${material}`, holes: holes.join(' ↔ '), note: `Bantlı uç (katot) ${holes[1]} deliğine.` });
         break;
       case 'switch':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: holes.join(' ↔ ') });
+        break;
+      case 'scr':
+        steps.push({ group: 'transistor', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Düz (yazılı) yüz sana dönük: soldan katot, kapı, anot.' });
+        break;
+      case 'opto':
+        steps.push({
+          group: 'ic',
+          title: `${part.label} · ${material}`,
+          holes: `orta kanalın üstünde, ${at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ')}`,
+          note: `Noktalı köşe (1. bacak, A) ${name(at.holes[0]!)} deliğinde; LED tarafı (A, K) alt yarıda, çıkış (C, E) üst yarıda.`,
+        });
         break;
       case 'opamp':
       case 'timer555': {
@@ -198,6 +226,26 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
       case 'potentiometer':
         steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ') });
         break;
+      case 'lm317':
+        steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Yazılı yüz sana dönük; metal tırnak arkada (OUT’a bağlıdır). Bacak sırası 7805’ten farklı.' });
+        break;
+      case 'reg7805':
+        steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Yazılı yüz sana dönük; metal tırnak arkada (GND’ye bağlıdır).' });
+        break;
+      case 'bridge':
+        steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: '+ bacak, gövdenin pahlı köşesinin altındaki; yazılı yüz sana dönük soldan sağa + ~ ~ −.' });
+        break;
+      case 'spdt':
+        steps.push({ group: 'tall', title: `${part.label} · ${material}`, holes: at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', '), note: 'Ortadaki bacak ortak uç (C).' });
+        break;
+      case 'pushbutton':
+        steps.push({
+          group: 'tall',
+          title: `${part.label} · ${material}`,
+          holes: `orta kanalın iki yanında, ${holes.join(' ↔ ')}`,
+          note: `İçten bağlı ikiz bacaklar ${(at.extraHoles ?? []).map(name).join(' ve ')} deliklerine; düğmeye basınca iki yan birleşir.`,
+        });
+        break;
       default:
         steps.push({ group: 'radial', title: `${part.label} · ${material}`, holes: holes.join(' ↔ ') });
     }
@@ -220,7 +268,7 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
   if (doc.parts.some((p) => p.type === 'transformer' || p.type === 'acsource')) {
     warnings.push('Bu devrede şebeke (230 V) ya da AC kaynak var. Şebeke gerilimini delikli plakete ve breadboard\'a bağlama: yerine hazır bir AC ya da DC adaptörün düşük gerilim çıkışını kullan.');
   }
-  if (doc.parts.some((p) => p.type === 'oscilloscope' || p.type === 'funcgen' || p.type === 'dcsupply' || p.type === 'voltmeter' || p.type === 'ammeter')) {
+  if (doc.parts.some((p) => p.type === 'oscilloscope' || p.type === 'funcgen' || p.type === 'dcsupply' || p.type === 'voltmeter' || p.type === 'ammeter' || p.type === 'multimeter')) {
     warnings.push('Ölçü aletleri ve laboratuvar cihazları karta lehimlenmez: onların teli giden deliklere prob ya da timsah kıskaçla bağlanır.');
   }
   const half = plan.cols < 63;

@@ -68,6 +68,7 @@ function polarity(part: Part): readonly string[] | null {
     case 'buzzer':
       return ['+', '−'];
     case 'diode':
+    case 'schottky':
     case 'zener':
       return ['A', 'K'];
     default:
@@ -144,7 +145,7 @@ export function stepGroups(targets: readonly (StepTarget | null)[], current: num
 }
 
 /** Ölçü aletleri ve şebeke: rehberin uyarısı bu parçaların dış tel adımlarının kartında not olarak. */
-const INSTRUMENTS: ReadonlySet<DeviceType> = new Set(['oscilloscope', 'funcgen', 'dcsupply', 'voltmeter', 'ammeter']);
+const INSTRUMENTS: ReadonlySet<DeviceType> = new Set(['oscilloscope', 'funcgen', 'dcsupply', 'voltmeter', 'ammeter', 'multimeter']);
 const MAINS: ReadonlySet<DeviceType> = new Set(['transformer', 'acsource']);
 
 /** Adımın kartındaki uyarı (yoksa null): rehberin uyarılarından adımın parçasına uyan. */

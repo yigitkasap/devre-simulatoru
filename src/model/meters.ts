@@ -14,6 +14,8 @@ export interface InsertedMeter {
   readonly x: number;
   readonly y: number;
   readonly rotation: Rotation;
+  /** Gösterge olağan yanının öbür tarafında (olağan yanda sığmadı); eski kayıtlarda yok. */
+  readonly flip?: boolean;
   readonly wire: string;
   readonly half: string;
   /** Kablonun üstüne oturduysa boş; yanına konduysa iki bağlantı kablosu. */

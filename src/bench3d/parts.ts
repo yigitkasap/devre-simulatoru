@@ -18,7 +18,9 @@ import {
   Vector3,
 } from 'three';
 import { LED_COLORS, LED_MODELS } from '../sim/devices/led';
+import { spdtThrow } from '../sim/devices/spdt';
 import { boolProp, numProp, strProp } from '../sim/netlist';
+import { formatSI } from '../sim/units';
 import type { DeviceType, Props } from '../sim/netlist';
 import {
   LEAD_Y,
@@ -237,6 +239,41 @@ export function diodeModel(): PartModel {
   return axial('diode', body, 1.03, 1.0);
 }
 
+/**
+ * Schottky diyot (DO-41, 1N5819): 1N4001 ile aynı gövde, gövdeye basılı yazıyla ayrılır (tasarım:
+ * parcalar-3b/newParts.ts). Doku silindirin çevresi boyunca; katot halkası +x (2. uç) tarafında.
+ */
+export function schottkyModel(props: Props): PartModel {
+  const text = typeof props.model === 'string' ? props.model : '1N5819';
+  const L = 2.05;
+  const R = 0.53;
+  const C = 2 * Math.PI * R;
+  const tex = canvasTexture(C, L, (c, W, H) => {
+    c.fillStyle = '#1c1d20';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = '#c8ccd0';
+    c.fillRect(0, H * 0.78, W, H * 0.14);
+    for (const cx of [W * 0.25, W * 0.75]) {
+      c.save();
+      c.translate(cx, H * 0.4);
+      c.rotate(Math.PI / 2);
+      c.fillStyle = '#d6dade';
+      c.font = `600 ${Math.round(W * 0.075)}px "IBM Plex Sans", system-ui, sans-serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(text, 0, 0);
+      c.restore();
+    }
+  }, 120);
+  const cap = mat('#1c1d20', 0.4);
+  const cyl = new Mesh(new CylinderGeometry(R, R, L, 28, 1, false), [new MeshStandardMaterial({ map: tex, roughness: 0.4 }), cap, cap]);
+  cyl.rotation.z = X_AXIS;
+  cyl.userData.ownsMaterial = true;
+  const body = new Group();
+  body.add(cyl);
+  return axial('schottky', body, 1.03, 1.0);
+}
+
 export function zenerModel(): PartModel {
   const body = new Group();
   body.add(axialCylinder(0.36, 1.5, mat('#d9792b', 0.05, 0, { transparent: true, opacity: 0.8 })));
@@ -414,6 +451,258 @@ export function switchModel(props: Props): PartModel {
     interaction: 'toggle',
     update(ctx) {
       set(boolProp(ctx.props, 'closed', false));
+      return false;
+    },
+  };
+}
+
+// --- Sıralı bacaklı gövdeler (köprü diyot, TO-220) --------------------------------------------------------------
+
+/** Ön yüzüne yazı çizilen kutu (ön yüz +z). */
+function frontTexBox(w: number, h: number, d: number, side: MeshStandardMaterial, draw: (c: CanvasRenderingContext2D, W: number, H: number) => void, ppu = 64): Mesh {
+  const tex = canvasTexture(w, h, draw, ppu);
+  const box = new Mesh(new BoxGeometry(w, h, d), [side, side, side, side, new MeshStandardMaterial({ map: tex, roughness: 0.5 }), side]);
+  box.userData.ownsMaterial = true;
+  return box;
+}
+
+/**
+ * Bacakları gerçek kılıftaki sırayla (soldan sağa `legs`: pin sırası) uçlarına bağlar. Breadboard'da
+ * uçlar bir satırdadır; yerleşim parçayı ters takmışsa (ilk bacağın deliği sağda) gövde arkasını döner.
+ */
+function inlineLegs(root: Group, anchors: readonly Vector3[], legs: readonly number[], pitch: number, y0: number, z: number): void {
+  const first = anchors[legs[0]!]!;
+  const last = anchors[legs[legs.length - 1]!]!;
+  const inRow = anchors.every((a) => Math.abs(a.z - first.z) < 0.1);
+  if (inRow && first.x > last.x) root.rotation.y = Math.PI;
+  const toLocal = (a: Vector3) => (root.rotation.y ? new Vector3(-a.x, a.y, -a.z) : a);
+  legs.forEach((pin, k) => root.add(legDown(new Vector3((k - (legs.length - 1) / 2) * pitch, y0, z), toLocal(anchors[pin]!), 0.12)));
+}
+
+// --- TO-220 regülatörler (7805, LM317): siyah gövde, delikli metal tırnak, 3 bacak (newParts.ts) ----------
+
+export function to220Model(type: DeviceType, text: string, subtitle: string, legs: readonly number[]): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors(type);
+  const w = 3.94;
+  const h = 3.62;
+  const t = 1.77;
+  const y0 = 2.6;
+  const body = new Group();
+  const box = frontTexBox(w, h, t, mat('#18191c', 0.5), (c, W, H) => {
+    c.fillStyle = '#18191c';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = '#d6dade';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `600 ${Math.round(H * 0.17)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.fillText(text, W / 2, H * 0.42);
+    c.font = `500 ${Math.round(H * 0.11)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.fillStyle = '#9aa1a9';
+    c.fillText(subtitle, W / 2, H * 0.64);
+  }, 96);
+  box.position.set(0, y0 + h / 2, 0.25);
+  body.add(box);
+  // Metal tırnak (arkada, gövdenin üstüne uzanır), delikli.
+  const tab = new Shape();
+  tab.moveTo(-w / 2, 0);
+  tab.lineTo(w / 2, 0);
+  tab.lineTo(w / 2, h + 2.48);
+  tab.lineTo(-w / 2, h + 2.48);
+  tab.lineTo(-w / 2, 0);
+  tab.holes.push(new Shape().absarc(0, h + 1.25, 0.72, 0, Math.PI * 2, true));
+  const tabGeo = new ExtrudeGeometry(tab, { depth: 0.51, bevelEnabled: false, curveSegments: 24 });
+  body.add(mesh(tabGeo, mat('#c9ced3', 0.32, 1), 0, y0, -t / 2 + 0.25 - 0.51 + 0.02));
+  // Bacaklar 1 birim aralıkla gövdeden aşağı, gerçek sırayla.
+  inlineLegs(body, anchors, legs, 1, y0, 0.25);
+  root.add(body);
+  return { root, anchors };
+}
+
+// --- Tristör (SCR, TO-92: MCR100-6): transistörle aynı gövde, yazı farklı (newParts.ts) ---------------------
+
+/** Bacak sırası düz (yazılı) yüze bakınca soldan K, G, A (onsemi MCR100/D, STYLE 10: 1 K, 2 G, 3 A). */
+export function scrModel(props: Props): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('scr');
+  const text = typeof props.model === 'string' ? props.model : 'MCR100-6';
+  const h = 1.8;
+  const y0 = 2.0;
+  const body = new Group();
+  body.add(mesh(new CylinderGeometry(0.95, 0.95, h, 24, 1, false, 0, Math.PI), mat('#1b1c1f', 0.45), 0, y0 + h / 2, 0));
+  body.add(mesh(new BoxGeometry(0.02, h, 1.9), mat('#1b1c1f', 0.45), 0, y0 + h / 2, 0));
+  const plate = labelPlate(text, 1.8, 0.5, { fg: '#cfd3d8' });
+  plate.rotation.set(0, -X_AXIS, 0);
+  plate.position.set(-0.02, y0 + h / 2, 0);
+  body.add(plate);
+  // Breadboard'da uçlar bir sütunda (yerel z boyunca); ters takıldıysa (K'nin deliği A'nınkinden sonra) gövde döner.
+  const order = [1, 2, 0];
+  const first = anchors[order[0]!]!;
+  const last = anchors[order[2]!]!;
+  const flip = Math.abs(first.x - last.x) < 0.1 && first.z > last.z;
+  if (flip) body.rotation.y = Math.PI;
+  root.add(body);
+  order.forEach((pin, k) => root.add(legDown(new Vector3(0.25 * (flip ? -1 : 1), y0, (k - 1) * 0.5 * (flip ? -1 : 1)), anchors[pin]!, 0.07)));
+  return { root, anchors };
+}
+
+// --- Optokuplör (PC817, DIP-4): krem gövde, 1. bacak noktası (newParts.ts) -------------------------------------
+
+/**
+ * Gövde uçlara göre yönlenir: LED tarafı (A, K) ile çıkış tarafı (C, E) karşılıklı kenarlarda. Masada
+ * şema pinleri, breadboard'da orta kanalın iki yanındaki delikler (A, K bir yanda; E, C öbür yanda).
+ */
+export function optoModel(props: Props): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('opto');
+  const [a, k, c, e] = anchors as [Vector3, Vector3, Vector3, Vector3];
+  const center = [a, k, c, e].reduce((s, p) => s.add(p), new Vector3()).multiplyScalar(0.25);
+  const across = c.clone().add(e).sub(a).sub(k).setY(0).normalize();
+  const along = k.clone().sub(a).setY(0).normalize();
+  const bw = 2.56;
+  const bd = 1.8;
+  const bh = 1.4;
+  const y0 = 0.9;
+  const text = typeof props.model === 'string' ? props.model : 'PC817';
+  const body = new Group();
+  const chip = new Mesh(new BoxGeometry(bd, bh, bw), mat('#e9e4d6', 0.55));
+  chip.position.y = y0 + bh / 2;
+  body.add(chip);
+  const plate = labelPlate(text, bw * 0.8, 0.6, { fg: '#26292e', bg: '#e9e4d6' });
+  plate.rotation.set(-Math.PI / 2, 0, Math.PI / 2);
+  plate.position.set(0, y0 + bh + 0.01, 0);
+  body.add(plate);
+  body.position.set(center.x, 0, center.z);
+  body.rotation.y = Math.atan2(-across.z, across.x);
+  root.add(body);
+  // 1. bacak noktası (A'nın köşesinde).
+  const dot = center.clone().addScaledVector(across, -bd / 2 + 0.3).addScaledVector(along, -bw / 2 + 0.35);
+  root.add(mesh(new CylinderGeometry(0.13, 0.13, 0.04, 14), mat('#26292e', 0.6), dot.x, y0 + bh + 0.02, dot.z));
+  // Bacaklar: gövdenin iki yanından, kendi uçlarına.
+  for (const [pin, side, row] of [[a, -1, -0.5], [k, -1, 0.5], [c, 1, -0.5], [e, 1, 0.5]] as const) {
+    const root0 = center.clone().addScaledVector(across, (side * bd) / 2).addScaledVector(along, row).setY(y0 + 0.4);
+    root.add(legDown(root0, pin, 0.1));
+  }
+  return { root, anchors };
+}
+
+// --- Köprü diyot (KBP tipi, düz sıralı 4 bacak: + ~ ~ −; tasarım: parcalar-3b/newParts.ts) -----------------
+
+export function bridgeModel(props: Props): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('bridge');
+  const text = typeof props.model === 'string' ? props.model : 'KBP307';
+  const w = 5.6;
+  const h = 4.4;
+  const t = 1.4;
+  const y0 = 1.8;
+  const box = frontTexBox(w, h, t, mat('#1b1c1f', 0.5), (c, W, H) => {
+    c.fillStyle = '#1b1c1f';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = '#d6dade';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.font = `600 ${Math.round(H * 0.15)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.fillText(text, W / 2, H * 0.32);
+    c.font = `700 ${Math.round(H * 0.17)}px "IBM Plex Sans", system-ui, sans-serif`;
+    ['+', '~', '~', '−'].forEach((m, i) => c.fillText(m, W * (0.2 + 0.2 * i), H * 0.78));
+  });
+  box.position.set(0, y0 + h / 2, 0);
+  const body = new Group();
+  body.add(box);
+  // Gerçek sıra soldan: +, ~, ~, − → şema pinleri 1, 0, 2, 3.
+  inlineLegs(body, anchors, [1, 0, 2, 3], 1.12, y0, 0);
+  root.add(body);
+  return { root, anchors };
+}
+
+// --- Çift yollu anahtar (SPDT): bugünkü kollu anahtarın gövdesi, üç bacak; kol bağlı ucun tersine yatar ---
+
+/**
+ * Tasarım: parcalar-3b/newParts.ts. Bacaklar gövdenin kenarında A, C, B sırasıyla (gerçek anahtardaki
+ * gibi ortak uç ortada); her bacak kendi ucuna (masada şema pinleri, breadboard'da delikler) iner.
+ */
+export function spdtModel(props: Props): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('spdt');
+  root.add(mesh(new BoxGeometry(4.4, 1.6, 2.6), mat('#22252a', 0.5), 0, 1.0, 0));
+  root.add(mesh(new CylinderGeometry(0.7, 0.7, 0.9, 20), M.steel(), 0, 2.2, 0));
+  const lever = new Group();
+  lever.userData.live = true;
+  lever.add(mesh(new CylinderGeometry(0.25, 0.32, 2.6, 14), M.steel(), 0, 1.3, 0));
+  lever.add(mesh(new SphereGeometry(0.34, 14, 10), M.steel(), 0, 2.6, 0));
+  lever.position.y = 2.5;
+  root.add(lever);
+  // A ve B'nin gövdedeki yanı: uçlarının z konumuna göre (C ortada).
+  const sideA = Math.sign(anchors[1]!.z - anchors[0]!.z) || -1;
+  const plateA = labelPlate('A', 0.8, 0.8, { fg: '#cfd3d8' });
+  plateA.position.set(1.6, 1.82, 0.75 * sideA);
+  const plateB = labelPlate('B', 0.8, 0.8, { fg: '#cfd3d8' });
+  plateB.position.set(1.6, 1.82, -0.75 * sideA);
+  root.add(plateA, plateB);
+  for (const [pin, z] of [[0, 0], [1, 0.9 * sideA], [2, -0.9 * sideA]] as const) {
+    root.add(mesh(new BoxGeometry(0.12, 0.6, 0.5), M.tin(), 1.6, 0.1, z));
+    const end = anchors[pin]!;
+    root.add(wirePath([new Vector3(1.6, 0.35, z), new Vector3(end.x, 0.35, z), new Vector3(end.x, 0.35, end.z), end], 0.13, M.tin(), 6));
+  }
+  // Kol, bağlı olduğu ucun TERSİNE yatar (gerçek kollu anahtardaki gibi).
+  const set = (to: string) => (lever.rotation.x = (to === 'b' ? -1 : 1) * sideA * -0.45);
+  set(spdtThrow(props));
+  return {
+    root,
+    anchors,
+    interaction: 'toggle',
+    update(ctx) {
+      set(spdtThrow(ctx.props));
+      return false;
+    },
+  };
+}
+
+// --- Basmalı düğme: 12 mm dokunmatik anahtar, renkli yuvarlak başlık; 4 bacak, ikişer içten bağlı --------------
+
+/**
+ * Tasarım: parcalar-3b/newParts.ts. Bacak çiftleri uçlara göre yerleşir: her ucun yanındaki ikiz bacak
+ * (içten bağlı) uçtan uca doğrultuya dik 2 delik ötede. Masada ikizler masaya iner; breadboard'da orta
+ * kanalın iki yanındaki deliklere (breadboard.ts, 'button').
+ */
+export function pushButtonModel(boardTwins: readonly Vector3[] = []): PartModel {
+  const root = new Group();
+  const anchors = pinAnchors('pushbutton');
+  const [a, b] = anchors as [Vector3, Vector3];
+  const L = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+  // İkizler: breadboard'da verilen delikler, masada uçlardan 2 birim yanda.
+  const side = boardTwins[0] ? Math.sign((boardTwins[0].x - a.x) * -(b.z - a.z) + (boardTwins[0].z - a.z) * (b.x - a.x)) || 1 : 1;
+  const n = new Vector3((-(b.z - a.z) / L) * side, 0, ((b.x - a.x) / L) * side);
+  const twins = boardTwins.length === 2 ? boardTwins.map((p) => p.clone()) : anchors.map((p) => p.clone().addScaledVector(n, 2));
+  const center = [a, b, ...twins].reduce((c, p) => c.add(p), new Vector3()).multiplyScalar(0.25);
+  const body = 4.72;
+  const bh = 1.45;
+  const y0 = 0.9;
+  root.add(mesh(new BoxGeometry(body, bh, body), mat('#1c1d20', 0.6), center.x, y0 + bh / 2, center.z));
+  root.add(mesh(new BoxGeometry(body + 0.05, 0.12, body + 0.05), M.steel(), center.x, y0 + bh + 0.06, center.z));
+  for (const [x, z] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]] as const) {
+    root.add(mesh(new CylinderGeometry(0.22, 0.22, 0.14, 10), mat('#0f1012', 0.7), center.x + x, y0 + bh + 0.13, center.z + z));
+  }
+  const cap = new Group();
+  cap.add(mesh(new CylinderGeometry(1.5, 1.6, 0.9, 32), mat('#c8312a', 0.4), 0, 0.45, 0));
+  cap.add(mesh(new CylinderGeometry(0.75, 0.75, 0.6, 16), mat('#2b2d31', 0.5), 0, -0.2, 0));
+  cap.position.set(center.x, 0, center.z);
+  cap.userData.live = true;
+  root.add(cap);
+  const press = (pressed: boolean) => (cap.position.y = y0 + bh + 0.12 + (pressed ? 0.2 : 0.55));
+  press(false);
+  // Bacaklar gövdenin köşelerinden: uçların yanındakiler uçlara, öbürleri ikizlere.
+  const u = new Vector3((b.x - a.x) / L, 0, (b.z - a.z) / L);
+  const corner = (along: number, side: number) => center.clone().addScaledVector(u, along * 2.26).addScaledVector(n, side * 0.98).setY(y0);
+  root.add(legDown(corner(-1, -1), a, 0.12), legDown(corner(1, -1), b, 0.12));
+  root.add(legDown(corner(-1, 1), twins[0]!, 0.12), legDown(corner(1, 1), twins[1]!, 0.12));
+  return {
+    root,
+    anchors,
+    interaction: 'press',
+    update(ctx) {
+      press(ctx.active && ctx.status?.pressed === true);
       return false;
     },
   };
@@ -663,6 +952,47 @@ export function sourceBoxModel(type: 'acsource', title: string): PartModel {
   box.userData.ownsMaterial = true;
   root.add(box);
   const anchors = pins.map((_, i) => new Vector3(i === 0 ? -(w / 2 - 1.0) : w / 2 - 1.0, 2.5, 0));
+  anchors.forEach((a, i) => root.add(bananaJack(a, i === 0 ? '#c8312a' : '#1d1f23')));
+  return { root, anchors };
+}
+
+/** DC akım kaynağı: AC kaynakla aynı kutu ailesi; yüzde ok ve değer (tasarım: parcalar-3b/newParts.ts). */
+export function currentSourceModel(props: Props): PartModel {
+  const root = new Group();
+  const value = formatSI(numProp(props, 'current', 1e-3), 'A', { trim: true, digits: 4 });
+  const w = 9.6;
+  const d = 4.8;
+  const top = canvasTexture(w, d, (c, W, H) => {
+    c.fillStyle = '#e9ecef';
+    c.fillRect(0, 0, W, H);
+    const cx = W / 2;
+    const cy = H * 0.42;
+    const R = H * 0.28;
+    c.strokeStyle = '#1d2733';
+    c.lineWidth = H * 0.045;
+    c.beginPath();
+    c.arc(cx, cy, R, 0, Math.PI * 2);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(cx - R * 0.6, cy);
+    c.lineTo(cx + R * 0.45, cy);
+    c.stroke();
+    c.fillStyle = '#1d2733';
+    c.beginPath();
+    c.moveTo(cx + R * 0.7, cy);
+    c.lineTo(cx + R * 0.3, cy - R * 0.28);
+    c.lineTo(cx + R * 0.3, cy + R * 0.28);
+    c.fill();
+    c.fillStyle = '#5f6b7a';
+    c.font = `600 ${Math.round(H * 0.15)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.fillText(`AKIM KAYNAĞI · ${value}`, W / 2, H * 0.92);
+  });
+  const box = new Mesh(new BoxGeometry(w, 2.4, d), [M.white(), M.white(), new MeshStandardMaterial({ map: top, roughness: 0.6 }), M.white(), M.white(), M.white()]);
+  box.position.y = 1.2;
+  box.userData.ownsMaterial = true;
+  root.add(box);
+  const anchors = [new Vector3(-(w / 2 - 1.0), 2.5, 0), new Vector3(w / 2 - 1.0, 2.5, 0)];
   anchors.forEach((a, i) => root.add(bananaJack(a, i === 0 ? '#c8312a' : '#1d1f23')));
   return { root, anchors };
 }

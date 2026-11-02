@@ -66,6 +66,7 @@ const SHORTABLE: ReadonlySet<DeviceType> = new Set<DeviceType>([
   'capacitor',
   'inductor',
   'diode',
+  'schottky',
   'zener',
   'led',
   'battery',
