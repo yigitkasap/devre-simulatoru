@@ -657,7 +657,7 @@ export function BoardPanel(props: BoardPanelProps) {
             {d.note}
           </p>
         </div>
-        {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} overlay={undefined} onClose={() => setLarge(false)} />}
+        {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} overlay={undefined} touch={touch} onClose={() => setLarge(false)} />}
       </div>
     );
   }
@@ -879,13 +879,13 @@ export function BoardPanel(props: BoardPanelProps) {
                 : d.stats(checks, session?.hints.length ?? 0)}
         </p>
       </div>
-      {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} overlay={overlay} onClose={() => setLarge(false)} />}
+      {large && <SchematicDialog doc={doc} connectivity={props.connectivity} settings={props.settings} overlay={overlay} touch={touch} onClose={() => setLarge(false)} />}
     </div>
   );
 }
 
 /** Şemanın büyük görünümü (değiştirilemez). */
-export function SchematicDialog({ doc, connectivity, settings, overlay, onClose }: { doc: CircuitDoc; connectivity: Connectivity; settings: Settings; overlay: ReactNode; onClose: () => void }) {
+export function SchematicDialog({ doc, connectivity, settings, overlay, touch = false, onClose }: { doc: CircuitDoc; connectivity: Connectivity; settings: Settings; overlay: ReactNode; touch?: boolean; onClose: () => void }) {
   const titleId = useId();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -893,18 +893,19 @@ export function SchematicDialog({ doc, connectivity, settings, overlay, onClose 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-6" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-scrim ${touch ? 'p-3' : 'p-6'}`} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex h-full max-h-[760px] w-full max-w-[1100px] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-xl">
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-line px-4">
           <h2 id={titleId} className="m-0 text-body font-semibold">
             {tr.tahta.schematic} <span className="font-normal text-muted">· {tr.tahta.locked}</span>
           </h2>
-          <button type="button" onClick={onClose} aria-label={tr.tahta.closeSchematic} className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-app">
+          <button type="button" onClick={onClose} aria-label={tr.tahta.closeSchematic} className={`flex items-center justify-center rounded-md hover:bg-app ${touch ? 'h-11 w-11' : 'h-9 w-9'}`}>
             <Icon name="close" />
           </button>
         </div>
         <div className="min-h-0 flex-1 bg-paper p-3">
-          <CircuitView doc={doc} connectivity={connectivity} frame={null} settings={settings} label={tr.tahta.schematicLabel} className="block h-full w-full" overlay={overlay} />
+          {/* Dokunmatikte okunur boyda çizilir, kutunun içinde kayar (CircuitView minWidth). */}
+          <CircuitView doc={doc} connectivity={connectivity} frame={null} settings={settings} label={tr.tahta.schematicLabel} className="block h-full w-full" overlay={overlay} {...(touch ? { minWidth: 720 } : {})} />
         </div>
       </div>
     </div>

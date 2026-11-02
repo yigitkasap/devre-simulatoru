@@ -2842,6 +2842,63 @@ try {
     await page.context().close();
   }
 
+  // --- Tahtada kur (telefon, T6): örnek kartından giriş, Şema penceresi, Teslimde kipindeki görev ----------
+  {
+    // Görev bağlantısı masaüstünde: Teslimde, Bağlı delikler kapalı.
+    const dctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await dctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const dp = await dctx.newPage();
+    await dp.goto(URL0, { waitUntil: 'networkidle' });
+    await dp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await dp.waitForTimeout(200);
+    await dp.getByRole('button', { name: 'Transistör anahtar: LED kollektörde', exact: true }).click(); await dp.waitForTimeout(400);
+    await dp.getByRole('button', { name: /^Dosya|^Transistör anahtar/ }).first().click(); await dp.waitForTimeout(150);
+    await dp.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await dp.waitForTimeout(300);
+    const dlg = dp.getByRole('dialog', { name: 'Görev oluştur' });
+    await dlg.getByRole('radio', { name: 'Tahtada kur' }).click();
+    await dlg.getByRole('textbox', { name: 'Görev adı' }).fill('Deney 9 · sınav');
+    await dlg.getByRole('radiogroup', { name: 'Denetle hakkı' }).getByRole('radio', { name: 'Teslimde' }).click();
+    await dlg.getByRole('switch', { name: /^Bağlı delikleri göster/ }).click();
+    const url = await dlg.getByRole('textbox', { name: 'Görev bağlantısı' }).inputValue();
+    await dctx.close();
+
+    const { page } = await phone();
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('searchbox', { name: 'Örnek ara' }).fill('Transistör anahtar: LED kollektörde'); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Transistör anahtar: LED kollektörde: tahtada kur' }).tap(); await page.waitForTimeout(1800);
+    const sheet = page.getByRole('region', { name: 'Tahtada kur', exact: true });
+    const entered = ((await sheet.textContent()) ?? '').includes('0 / 4 takılı');
+    await page.getByRole('button', { name: 'Şema', exact: true }).tap(); await page.waitForTimeout(500);
+    const small = async () => page.evaluate(() => [...document.querySelectorAll('button, input')].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && (r.height < 44 || r.width < 44); }).map((e) => `${(e.getAttribute('aria-label') ?? e.textContent ?? '').trim().slice(0, 24)} ${Math.round(e.getBoundingClientRect().width)}×${Math.round(e.getBoundingClientRect().height)}`));
+    const dialogSmall = await small();
+    const svgWidth = await page.getByRole('dialog').locator('svg[role=img]').evaluate((el) => el.getBoundingClientRect().width);
+    await page.getByRole('button', { name: 'Büyük şemayı kapat' }).tap(); await page.waitForTimeout(300);
+    check('Tahtada kur (telefon, T6): Örnekler’deki kartta “Tahtada kur” (tahta boş); Şema penceresi okunur boyda (≥ 700 px, kayar), dokunma hedefleri ≥ 44 px',
+      entered && dialogSmall.length === 0 && svgWidth >= 700 && (await page.getByRole('dialog').count()) === 0, `${entered} / ${dialogSmall.join(', ')} / ${Math.round(svgWidth)} px`);
+    // Görev (yeni sayfada; aynı sayfada yalnızca # değişir): Teslimde kipinde Denetle yok, Teslim et var; Çık ve
+    // Bağlı delikler yok; büyüteç yalnızca deliğin adını söyler.
+    const sp = await page.context().newPage();
+    sp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const scdp = await page.context().newCDPSession(sp);
+    await sp.goto(url, { waitUntil: 'networkidle' }); await sp.waitForTimeout(2000);
+    const tsheet = sp.getByRole('region', { name: 'Tahtada kur', exact: true });
+    const text = (await tsheet.textContent()) ?? '';
+    const rules = (await tsheet.getByRole('button', { name: 'Denetle', exact: true }).count()) === 0 && (await tsheet.getByRole('button', { name: 'Teslim et' }).count()) === 1 && text.includes('Bu görevde Denetle yok')
+      && (await sp.getByRole('button', { name: /Tahtada kur’dan çık/ }).count()) === 0 && (await tsheet.getByRole('button', { name: 'Bağlı delikler' }).count()) === 0;
+    await tsheet.getByRole('button', { name: 'R1: tahtaya tak' }).tap(); await sp.waitForTimeout(300);
+    const at = await sp.evaluate(() => {
+      const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
+      return { x: rect.left + (2 - 15.5) * t.scale + t.ox, y: rect.top + (-5.5 + 2) * t.scale + t.oy };
+    });
+    const t = touch(scdp);
+    await t.start(at.x, at.y); await sp.waitForTimeout(80); await t.move(at.x + 1, at.y); await sp.waitForTimeout(150);
+    const plainLabel = (await sp.getByText(/^2c$/).count()) === 1 && (await sp.getByText(/bağlı$/).count()) === 0;
+    await t.end(); await sp.waitForTimeout(200);
+    check('Tahtada kur (telefon, T6 öğrenci): Teslimde kipinde Denetle yok, Teslim et var; Çık ve Bağlı delikler gizli; büyüteç etiketi bağlı delikleri söylemiyor (yalnızca “2c”)',
+      rules && plainLabel, `${rules} ${plainLabel}`);
+    await page.context().close();
+  }
+
   // --- Sıkışık masaüstü (1100 px): defter 400 px, parça defterden eklenir (v3) ---------------
   const compact = await browser.newContext({ viewport: { width: 1100, height: 760 }, locale: 'tr-TR' });
   const cp = await compact.newPage();

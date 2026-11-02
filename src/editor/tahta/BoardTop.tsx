@@ -821,8 +821,12 @@ export function BoardTop(props: BoardTopProps) {
     const shown = group.map(toScreen).map(map);
     const pad = side * 0.85;
     const bad = occupied.has(name(hover)) && !(cabling?.kind === 'lead' && leadAt(hover)?.part === cabling.part && leadAt(hover)?.pin === cabling.pin);
-    const label =
-      hover.kind === 'strip' ? tr.tahta.loupeStrip(name(hover), name(group[0]!), name(group[group.length - 1]!)) : tr.tahta.loupeRail(name(hover), group.length);
+    // Bağlı delikler kapalıysa (görevde) etiket yalnızca deliğin adını söyler.
+    const label = !props.showConnected
+      ? name(hover)
+      : hover.kind === 'strip'
+        ? tr.tahta.loupeStrip(name(hover), name(group[0]!), name(group[group.length - 1]!))
+        : tr.tahta.loupeRail(name(hover), group.length);
     const clip = `buyutec-${Math.round(cx)}-${Math.round(cy)}`;
     return (
       <>

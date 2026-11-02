@@ -2239,7 +2239,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               </BottomSheet>
             </TouchUi.Provider>
           </div>
-          {boardSchema && <SchematicDialog doc={doc} connectivity={connectivity} settings={settings} overlay={sessionMarks(doc, boardSession)} onClose={() => setBoardSchema(false)} />}
+          {boardSchema && <SchematicDialog doc={doc} connectivity={connectivity} settings={settings} overlay={sessionMarks(doc, boardSession)} touch onClose={() => setBoardSchema(false)} />}
           {modals}
           {overlays}
           <Toast toast={toast} offset={sheetHeight + 12} onDone={hideToast} />
