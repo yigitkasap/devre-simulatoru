@@ -727,11 +727,12 @@ export function BoardTop(props: BoardTopProps) {
       const at = terminalPos(picked.part, picked.pin);
       if (at) overlays.push(<circle key="su1" cx={at.x} cy={at.y} r={13} fill="none" stroke="var(--color-accent)" strokeWidth={3} />);
     }
-    // Örnek yerleşim (saydam) ve Denetle işaretleri.
+    // Örnek yerleşim (saydam) ve Denetle işaretleri. Örnek yerleşimin yazısı tahtada değil (delik ve
+    // işaret örtüyordu), alttaki bildirim çubuğunda ve sorun kartında.
     (props.ghosts ?? []).forEach((g, gi) => {
-      const at = g.holes.flatMap(({ hole, tag }) => {
+      const at = g.holes.flatMap(({ hole }) => {
         const h = parseHole(hole, cols);
-        return h ? [{ h, tag, c: toScreen(h) }] : [];
+        return h ? [{ h, c: toScreen(h) }] : [];
       });
       if (at.length === 0) return;
       if (!g.lead && at.length >= 2) {
@@ -742,25 +743,13 @@ export function BoardTop(props: BoardTopProps) {
           <rect key={`ghost-body-${gi}`} x={Math.min(...xs) - pad} y={Math.min(...ys) - pad} width={Math.max(...xs) - Math.min(...xs) + 2 * pad} height={Math.max(...ys) - Math.min(...ys) + 2 * pad} rx={pad} fill="var(--color-accent)" fillOpacity={0.18} stroke="var(--color-accent)" strokeOpacity={0.7} strokeWidth={1.5} strokeDasharray="5 4" />,
         );
       }
-      at.forEach(({ h, tag, c }, i) => {
+      at.forEach(({ h }, i) => {
         overlays.push(<g key={`ghost-${gi}-${i}`} opacity={0.85}>{ring(h, 'var(--color-accent)', `gr-${gi}-${i}`, true, 2.2)}</g>);
-        overlays.push(
-          <text key={`ghost-t-${gi}-${i}`} x={c.x} y={c.y + r + 13} textAnchor="middle" paintOrder="stroke" stroke="var(--color-panel)" strokeWidth={3} strokeLinejoin="round" className="font-mono text-[11px] font-semibold" style={{ fill: 'var(--color-accent-ink)' }}>
-            {tag}
-          </text>,
-        );
       });
       for (const [i, e] of g.extra.entries()) {
         const h = parseHole(e, cols);
         if (h) overlays.push(<g key={`ghost-e-${gi}-${i}`} opacity={0.6}>{ring(h, 'var(--color-accent)', `ge-${gi}-${i}`, true, 1.5)}</g>);
       }
-      const cx = (Math.min(...at.map((q) => q.c.x)) + Math.max(...at.map((q) => q.c.x))) / 2;
-      const cy = Math.min(...at.map((q) => q.c.y));
-      overlays.push(
-        <text key={`ghost-l-${gi}`} x={cx} y={cy - r - 8} textAnchor="middle" paintOrder="stroke" stroke="var(--color-panel)" strokeWidth={4} strokeLinejoin="round" className="text-[12px] font-semibold" style={{ fill: 'var(--color-accent-ink)' }}>
-          {tr.tahta.denetle.ghostLabel(g.label)}
-        </text>,
-      );
     });
     const badge = (x: number, y: number, n: number, key: string) => (
       <g key={key}>

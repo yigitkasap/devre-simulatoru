@@ -2382,7 +2382,7 @@ export const tr = {
       levelsLabel: (opened: string) => `Açılan ipuçları: ${opened}`,
       next: ['', 'Yerini göster', 'Açıklamayı göster', 'Örnek yerleşim'] as readonly string[],
       exampleOn: 'Örnek yerleşim tahtada',
-      ghostLabel: (label: string) => `${label} · örnek yerleşim`,
+      ghostChip: (label: string, holes: string) => `${label} örnek yerleşim · ${holes}`,
       marksOn: 'tahtada ve şemada kırmızıyla işaretli',
       marksWire: 'tahtada kırmızıyla işaretli',
       marksNone: 'ipuçları sağ panelde',

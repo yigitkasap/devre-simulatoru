@@ -44,6 +44,21 @@ export function boardParts(doc: CircuitDoc, schematic: BreadboardPlan): Part[] {
   return doc.parts.filter((p) => mountOf(p.type) !== undefined).sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 }
 
+/** Örnek yerleşim (4. kademe): planBreadboard'un o parça için delikleri, ucun kısa adıyla ("C 2h"). */
+export function exampleHoles(doc: CircuitDoc, plan: BreadboardPlan, partId: string): { lead: boolean; holes: { hole: string; tag: string }[]; extra: string[] } | null {
+  const part = doc_part(doc, partId);
+  if (!part) return null;
+  const at = plan.onBoard.get(partId);
+  if (at) return { lead: false, holes: at.holes.map((h, i) => ({ hole: holeLabel(h, plan.cols), tag: terminalName(part, i) })), extra: (at.extraHoles ?? []).map((h) => holeLabel(h, plan.cols)) };
+  const leads = plan.leads.filter((l) => l.partId === partId);
+  return leads.length > 0 ? { lead: true, holes: leads.map((l) => ({ hole: holeLabel(l.hole, plan.cols), tag: terminalName(part, l.pin) })), extra: [] } : null;
+}
+
+/** Örnek yerleşimin yazısı: "1: 2c · 2: 6c", "C: 2h · B: 3h · E: 4h". */
+export function exampleText(doc: CircuitDoc, plan: BreadboardPlan, partId: string): string {
+  return (exampleHoles(doc, plan, partId)?.holes ?? []).map(({ tag, hole }) => `${tag}: ${hole}`).join(' · ');
+}
+
 /** Masadaki parçaların tahtaya gitmesi gereken kabloları (şemada bağlı uçlar; planın sırasıyla). */
 export function requiredLeads(schematic: BreadboardPlan): ReadonlyArray<{ readonly part: string; readonly pin: number; readonly net: string }> {
   return schematic.leads.map((l) => ({ part: l.partId, pin: l.pin, net: l.net }));
@@ -146,12 +161,8 @@ export function BoardStage(props: BoardStageProps) {
     ? located.flatMap(({ p }): BoardGhost[] => {
         const part = p.part ? doc_part(doc, p.part) : undefined;
         if (!part || !session || levelOf(session, p) < 4) return [];
-        const at = schematicPlan.onBoard.get(part.id);
-        if (at) {
-          return [{ label: part.label, lead: false, holes: at.holes.map((h, i) => ({ hole: holeLabel(h, plan.cols), tag: terminalName(part, i) })), extra: (at.extraHoles ?? []).map((h) => holeLabel(h, plan.cols)) }];
-        }
-        const leads = schematicPlan.leads.filter((l) => l.partId === part.id);
-        return [{ label: part.label, lead: true, holes: leads.map((l) => ({ hole: holeLabel(l.hole, plan.cols), tag: terminalName(part, l.pin) })), extra: [] }];
+        const at = exampleHoles(doc, schematicPlan, part.id);
+        return at ? [{ label: part.label, ...at }] : [];
       })
     : [];
 
@@ -422,7 +433,8 @@ export function BoardStage(props: BoardStageProps) {
             {tool('trash', tr.tahta.toolDelete, 'Del', selectedPart !== undefined || picked !== null, () => commands.current?.remove())}
           </div>
           {problems.length > 0 && !props.placing && !props.cabling && (
-            <div className="absolute bottom-[72px] left-1/2 z-20 flex max-w-[calc(100%-32px)] -translate-x-1/2 items-center gap-3 rounded-2xl bg-ink py-1.5 pr-1.5 pl-4 text-small whitespace-nowrap text-on-ink shadow-lg">
+            <div className="absolute bottom-[72px] left-1/2 z-20 flex max-w-[calc(100%-32px)] -translate-x-1/2 flex-col gap-1 rounded-2xl bg-ink py-1.5 pr-1.5 pl-4 text-small whitespace-nowrap text-on-ink shadow-lg">
+              <div className="flex items-center gap-3">
               <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full bg-danger" />
               <b className="font-semibold">{d.chip(problems.length)}</b>
               {(showMarks || located.length === 0) && <span className="truncate opacity-80">{located.length === 0 ? d.marksNone : located.every(({ p }) => p.wire) ? d.marksWire : d.marksOn}</span>}
@@ -431,6 +443,13 @@ export function BoardStage(props: BoardStageProps) {
                   {showMarks ? d.marksHide : d.marksShow}
                 </button>
               )}
+              </div>
+              {ghosts.map((g) => (
+                <p key={g.label} className="m-0 flex items-center gap-2 pr-3 pb-1 text-small">
+                  <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full border-2 border-dashed border-accent" />
+                  {d.ghostChip(g.label, g.holes.map(({ tag, hole }) => `${tag}: ${hole}`).join(' · '))}
+                </p>
+              ))}
             </div>
           )}
           <div role="group" aria-label={tr.toolbar.view} className="absolute right-4 bottom-4 z-20 flex items-center rounded-[10px] border border-line bg-panel p-[3px] shadow-sm">
@@ -521,7 +540,7 @@ export function sessionMarks(doc: CircuitDoc, session: BoardSession | null): Rea
 }
 
 /** Sorun kartı (T3): numara, kademeye göre başlık, açıklama, açılan ipuçları ve sonraki ipucu. */
-export function ProblemCard({ doc, problem, index, level, touch, onHint, cap = 4 }: { doc: CircuitDoc; problem: Problem; index: number; level: number; touch: boolean; onHint: (p: Problem) => void; cap?: number }) {
+export function ProblemCard({ doc, problem, index, level, touch, onHint, cap = 4, example = '' }: { doc: CircuitDoc; problem: Problem; index: number; level: number; touch: boolean; onHint: (p: Problem) => void; cap?: number; example?: string }) {
   const d = tr.tahta.denetle;
   // Görevin ipucu sınırı (T6): sınırın üstündeki kademeler görünmez.
   const max = Math.min(maxLevel(problem), cap);
@@ -555,9 +574,9 @@ export function ProblemCard({ doc, problem, index, level, touch, onHint, cap = 4
           </button>
         ) : (
           max === 4 && (
-            <span className="flex items-center gap-1.5 text-label text-muted">
-              <Icon name="eye" className="h-4 w-4" />
-              {d.exampleOn}
+            <span className="flex items-center gap-1.5 text-small text-ink-2">
+              <Icon name="eye" className="h-4 w-4 shrink-0" />
+              {example ? `${d.exampleOn}: ${example}` : d.exampleOn}
             </span>
           )
         )}
@@ -831,7 +850,7 @@ export function BoardPanel(props: BoardPanelProps) {
         {problems.length > 0 && (
           <ol className="m-0 flex list-none flex-col gap-2.5 p-0" aria-label={d.title(problems.length)}>
             {problems.map((p, i) => (
-              <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={level(p)} touch={touch} onHint={props.onHint} cap={props.maxHint ?? 4} />
+              <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={level(p)} touch={touch} onHint={props.onHint} cap={props.maxHint ?? 4} example={p.part ? exampleText(doc, schematicPlan, p.part) : ''} />
             ))}
           </ol>
         )}

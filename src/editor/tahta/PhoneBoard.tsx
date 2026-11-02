@@ -14,7 +14,7 @@ import { isFixed } from '../../tahta/rules';
 import { levelOf, sessionStats, solved, type BoardSession } from '../../tahta/session';
 import { Icon } from '../icons';
 import { partValueText } from '../PartView';
-import { boardParts, ProblemCard, requiredLeads, terminalName, type Cabling, type Placing } from './BoardMode';
+import { boardParts, exampleText, ProblemCard, requiredLeads, terminalName, type Cabling, type Placing } from './BoardMode';
 
 export interface PhoneBoardSheetProps {
   readonly doc: CircuitDoc;
@@ -231,7 +231,7 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
           <>
             <ol className="m-0 flex list-none flex-col gap-2.5 p-0" aria-label={d.title(problems.length)}>
               {problems.map((p, i) => (
-                <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={levelOf(session, p)} touch onHint={props.onHint} cap={props.maxHint ?? 4} />
+                <ProblemCard key={p.id} doc={doc} problem={p} index={i} level={levelOf(session, p)} touch onHint={props.onHint} cap={props.maxHint ?? 4} example={p.part ? exampleText(doc, schematicPlan, p.part) : ''} />
               ))}
             </ol>
           </>
