@@ -32,6 +32,7 @@ import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './
 import { ExampleDetails, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
 import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, selectionActions, useCommitField, WireDetails, type InspectTabProps, type PartPatch, type TaskParts } from './InspectTab';
+import { lm317Note } from './lm317Divider';
 import { stableReadout } from './liveReadout';
 import type { MessageItem } from './messages';
 import { SeverityMark, type MessageAction } from './MessagesTab';
@@ -757,7 +758,11 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
             )}
             <PrimaryControl {...props} values={values} locked={locked} />
             {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
-            <LiveTiles part={part} frame={frame} note={lm317Note(part, props.divider)} />
+            <LiveTiles
+              part={part}
+              frame={frame}
+              note={part.type === 'lm317' ? lm317Note(props.divider?.(part.id) ?? null, frame?.statuses.get(part.id)?.regulator?.current ?? 0) : undefined}
+            />
             {props.liveHidden && status !== 'stopped' && <p className="m-0 text-label leading-snug text-muted">{t.liveHiddenNote}</p>}
           </>
         )}
@@ -1027,15 +1032,6 @@ function ColorCode({ ohms }: { ohms: number }) {
 }
 
 /** Çalışırken Gerilim, Akım, Güç (ve türe özel öbür satırlar) karelerde; durmuşken yok. */
-/** LM317: ayar dirençleri bulunursa "Neden bu değer?" notunda formül sayılarla (Y3). */
-function lm317Note(part: Part, divider: NotebookProps['divider']): string | undefined {
-  if (part.type !== 'lm317') return undefined;
-  const d = divider?.(part.id);
-  if (!d || d.r1 <= 0) return undefined;
-  const ohm = (r: number) => formatSI(r, 'Ω', { trim: true, digits: 4 });
-  return tr.readout.lm317Formula(ohm(d.r1), ohm(d.r2), formatSI(1.25 * (1 + d.r2 / d.r1), 'V', { digits: 3 }));
-}
-
 function LiveTiles({ part, frame, note }: { part: Part; frame: SimFrame | null; note?: string | undefined }) {
   const rows = liveRows(part, frame);
   // Giriş yetmiyorsa uyarı notu kalır; öbür durumda formül notu.

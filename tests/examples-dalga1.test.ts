@@ -7,8 +7,10 @@ import { buildConnectivity } from '../src/model/connectivity';
 import { flipParts, updatePart } from '../src/model/docOps';
 import type { CircuitDoc } from '../src/model/types';
 import { CircuitSimulator } from '../src/sim';
+import { lm317Note } from '../src/editor/lm317Divider';
 import { schottkyLeakage } from '../src/sim/devices/schottky';
 import type { Netlist } from '../src/sim/netlist';
+import { formatSI } from '../src/sim/units';
 
 function load(id: ExampleId): CircuitDoc {
   const doc = exampleDoc(id);
@@ -93,6 +95,28 @@ describe('Parça Dalga 1 örnekleri: metinlerdeki sayılar', { timeout: 60_000 }
     // 100 Ω’da 0,25 W: yük direnci 0,5 W’lık seçildi, uyarı yok.
     expect(sim.runtimeDiagnostics).toEqual([]);
     expect(run(withProps(doc, 'R2', { resistance: 480 }), 0.02).status(idOf(doc, 'V1')).reading!).toBeCloseTo(3.77, 2);
+  });
+
+  it('LM317 kartı "Neden bu değer?": 1,25 V · (1 + R2 / R1) + I_ADJ · R2 = 5,036 V; yük regülasyonuyla kartın okuduğu 5,035 V', () => {
+    const doc = load('lm317-ayarli');
+    const card = (d: CircuitDoc) => {
+      const sim = run(d, 0.02);
+      const r = sim.status(idOf(d, 'U1')).regulator!;
+      const resistance = (label: string) => d.parts.find((p) => p.label === label)!.props.resistance as number;
+      return { note: lm317Note({ r1: resistance('R1'), r2: resistance('R2') }, r.current)!, output: formatSI(r.output, 'V', { digits: 4 }), dropout: r.dropout };
+    };
+    const { note, output } = card(doc);
+    expect(output).toBe('5,035 V');
+    expect(note).toContain('1,25 V · (1 + 720 Ω / 240 Ω) + 50 µA · 720 Ω = 5,036 V');
+    // Notun vardığı sonuç (son gerilim) kartın Çıkış satırıyla aynı.
+    const result = (text: string) => text.match(/\d+,\d+ V/g)!.at(-1);
+    expect(result(note)).toBe(output);
+    // Bırakmada kartta formül yerine uyarı çıkar: girişi aşmayan çıkışlar.
+    for (const r2 of [360, 480, 1200]) {
+      const other = card(withProps(withProps(doc, 'R2', { resistance: r2 }), 'RL', { powerRating: '2' }));
+      expect(other.dropout).toBe(false);
+      expect(result(other.note), `${r2} Ω: ${other.note}`).toBe(other.output);
+    }
   });
 
   it('Optokuplör: basılıyken LED 9,7 mA (1,22 V), çıkış doyumda (0,13 V), LED1 7,1 mA; R1 = 3,3 kΩ’da 1,18 mA ve 3,55 mA', () => {

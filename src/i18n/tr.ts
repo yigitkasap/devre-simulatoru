@@ -1716,9 +1716,11 @@ export const tr = {
     regulatorDropout: (needed: string) =>
       `Giriş yetmiyor: çıkışın ayarlanan değeri tutabilmesi için giriş, çıkışın en az ${needed} (bu akımda bırakma gerilimi) üstünde olmalı. Çıkış girişin ${needed} altında kalıyor.`,
     lm317Note: (needed: string) =>
-      `LM317 çıkışı ADJ ucunun 1,25 V üstünde tutar: Vout = 1,25 V · (1 + R2 / R1) (R1: OUT ile ADJ arası, R2: ADJ ile toprak arası). Giriş, çıkışın en az ${needed} (bu akımda bırakma gerilimi) üstünde olmalı.`,
-    lm317Formula: (r1: string, r2: string, vout: string) =>
-      `Vout = 1,25 V · (1 + R2 / R1) = 1,25 V · (1 + ${r2} / ${r1}) = ${vout}. R1: OUT ile ADJ arası (${r1}), R2: ADJ ile toprak arası (${r2}); ADJ akımı (≈ 50 µA) ihmal edildi.`,
+      `LM317 çıkışı ADJ ucunun 1,25 V üstünde tutar: V_{çıkış} = 1,25 V · (1 + R_{2} / R_{1}) + I_{ADJ} · R_{2} (R_{1}: OUT ile ADJ arası, R_{2}: ADJ ile toprak arası, I_{ADJ} ≈ 50 µA: ADJ ucundan R_{2}’ye akan akım). Giriş, çıkışın en az ${needed} (bu akımda bırakma gerilimi) üstünde olmalı.`,
+    /** `load`: çıkış akımı başvuru gerilimini yük regülasyonu kadar düşürür; sonucu değiştiriyorsa yazılır. */
+    lm317Formula: (r1: string, r2: string, adj: string, vout: string, load: { readonly current: string; readonly drop: string; readonly vout: string } | null) =>
+      `V_{çıkış} = 1,25 V · (1 + R_{2} / R_{1}) + I_{ADJ} · R_{2} = 1,25 V · (1 + ${r2} / ${r1}) + ${adj} · ${r2} = ${vout}. R_{1}: OUT ile ADJ arası, R_{2}: ADJ ile toprak arası, I_{ADJ}: ADJ ucundan R_{2}’ye akan akım.` +
+      (load ? ` Çıkış akımı (${load.current}) başvuru gerilimini yük regülasyonu kadar düşürür; çıkış ${load.drop} iner: ${load.vout}.` : ''),
     reg7805Note: (needed: string) =>
       `7805 çıkışı GND'ye göre 5 V'ta tutar; giriş çıkışın en az ${needed} (bu akımda bırakma gerilimi, ST veri sayfası) üstünde olmalı. Giriş − çıkış farkı ile akımın çarpımı ısı olarak harcanır.`,
     bridgeNote: 'Her yarım periyotta iki diyot seri iletir: çıkış, AC girişin anlık değerinden iki diyot gerilimi (KBP307’de 10 mA’de ≈ 0,64 V, 1 A’de ≈ 0,93 V her biri) kadar düşüktür.',
