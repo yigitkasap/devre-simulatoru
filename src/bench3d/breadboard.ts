@@ -595,13 +595,17 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
       jumpers.push({ net: n, a: stripHole(a, same ?? freeRow(a, pa) ?? pa[0]!), b: stripHole(b, same ?? freeRow(b, pb) ?? pb[0]!) });
     }
   }
-  // Aynı ağın kullandığı raylar (üst/alt, breadboard'lar arası) sol uçta birleştirilir.
+  // Aynı ağın kullandığı raylar (üst/alt, breadboard'lar arası) birleştirilir: besleme (+) sol uçta, öbürleri
+  // (toprak, −) sağ uçta. Aynı uçta olsalar iki köprü aynı sütunda üst üste biner (tepeden görünümde biri
+  // öbürünü ve 1. sütunun deliklerini örter).
+  const rightEdge = boardWidth(cols) / 2;
   for (const [n, used] of railsUsed) {
     const list = [...used].map((u) => u.split(':').map(Number) as [number, number]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const edge = roles.get(n) === 'supply' ? leftEdge : rightEdge;
     for (let i = 1; i < list.length; i++) {
       const [b0, r0] = list[i - 1]!;
       const [b1, r1] = list[i]!;
-      jumpers.push({ net: n, a: railHole(b0, r0, leftEdge), b: railHole(b1, r1, leftEdge) });
+      jumpers.push({ net: n, a: railHole(b0, r0, edge), b: railHole(b1, r1, edge) });
     }
   }
 

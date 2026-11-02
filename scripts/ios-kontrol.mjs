@@ -2668,7 +2668,7 @@ try {
     d.build = {
       cols: 30,
       parts: { [id('R1')]: { holes: ['6b', '6e'] }, [id('Q1')]: { holes: ['2h', '3h', '4h'] }, [id('R2')]: { holes: ['7h', '11h'] }, [id('LED1')]: { holes: ['12g', '11g'] } },
-      wires: [['6a', '3j', 'orange'], ['2j', '12j', 'yellow'], ['4j', rail('alt', '−', 4), 'black'], ['7j', rail('alt', '+', 8), 'red'], [rail('üst', '+', 2), rail('alt', '+', 2), 'red'], [rail('üst', '−', 2), rail('alt', '−', 2), 'black']].map(([a, b, color]) => ({ a, b, color })),
+      wires: [['6a', '3j', 'orange'], ['2j', '12j', 'yellow'], ['4j', rail('alt', '−', 4), 'black'], ['7j', rail('alt', '+', 8), 'red'], [rail('üst', '+', 2), rail('alt', '+', 2), 'red'], [rail('üst', '−', 30), rail('alt', '−', 30), 'black']].map(([a, b, color]) => ({ a, b, color })),
       leads: [['PS1', 0, rail('üst', '+', 4)], ['PS1', 1, rail('üst', '−', 4)], ['FG1', 1, '2a'], ['FG1', 2, rail('üst', '−', 18)], ['OSC1', 0, '2b'], ['OSC1', 1, '12f'], ['OSC1', 2, rail('üst', '−', 29)]].map(([label, pin, hole]) => ({ part: id(label), pin, hole })),
     };
     await bp.evaluate((x) => localStorage.setItem('devre-simulatoru:devre', JSON.stringify(x)), d);
