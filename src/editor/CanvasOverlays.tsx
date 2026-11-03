@@ -18,7 +18,7 @@ export interface MenuItem {
   readonly label: string;
   readonly onSelect: () => void;
   readonly tone?: 'danger' | 'accent';
-  /** Sağda gösterilen klavye kısayolu (R, F, Delete). */
+  /** Sağda gösterilen klavye kısayolu (R, F, Delete); dokunmatikte gösterilmez. */
   readonly shortcut?: string;
   /** Öncesine ayırıcı çizgi. */
   readonly separatorBefore?: boolean;
@@ -40,7 +40,7 @@ export function ContextMenu({
   /** Erişilebilir ad ("D1 menüsü"). */
   label: string;
   onClose: () => void;
-  /** Dokunmatik: satırlar en az 44 px. */
+  /** Dokunmatik: satırlar en az 44 px, klavye kısayolu yazısı yok. */
   touch?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -96,7 +96,7 @@ export function ContextMenu({
             }`}
           >
             <span>{item.label}</span>
-            {item.shortcut && <span className="font-mono text-label text-muted">{item.shortcut}</span>}
+            {item.shortcut && !touch && <span className="font-mono text-label text-muted">{item.shortcut}</span>}
           </button>
         </div>
       ))}

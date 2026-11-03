@@ -425,6 +425,7 @@ try {
     await tap(page, cdp, await screen(page, ...at.w5), 750);
     const menu = page.getByRole('menu', { name: 'Kablo menüsü' });
     const items = await menu.getByRole('menuitem').allTextContents();
+    const wireShortcuts = await menu.locator('[role=menuitem] > span:nth-child(2)').count();
     const magnifier = await page.locator('use[href^="#scene-"]').count();
     await shot(page, 'ios-kablo-menu.png');
     if (items.length > 0) await menu.getByRole('menuitem', { name: /^Sil/ }).tap();
@@ -437,6 +438,7 @@ try {
     await tap(page, cdp, await screen(page, r1.x, r1.y), 750);
     const partMenu = page.getByRole('menu', { name: 'R1 menüsü' });
     const partItems = await partMenu.getByRole('menuitem').allTextContents();
+    const partShortcuts = await partMenu.locator('[role=menuitem] > span:nth-child(2)').count();
     if (partItems.length > 0) await partMenu.getByRole('menuitem', { name: /^Sil/ }).tap();
     const afterPart = await doc(page);
     const partUndo = page.getByRole('status').filter({ hasText: 'R1 silindi.' }).getByRole('button', { name: 'Geri al' });
@@ -446,6 +448,8 @@ try {
     check('telefon: parçanın basılı tutma menüsündeki Sil de "R1 silindi. · Geri al" bildirimini çıkarıyor; Geri al parçayı geri getiriyor',
       afterPart.parts.length === before.parts.length - 1 && partToast && restored.parts.length === before.parts.length,
       `menü: ${partItems.join('|')} · ${before.parts.length} → ${afterPart.parts.length} → ${restored.parts.length} parça · bildirim ${partToast}`);
+    check('telefon: bağlam menülerinde (kablo ve parça) klavye kısayolu yazısı yok (Delete, R)',
+      wireShortcuts === 0 && partShortcuts === 0 && items.join('|') === 'Sil' && partItems.join('|') === 'Değer|Döndür|Sil', `kablo: ${items.join('|')} · R1: ${partItems.join('|')}`);
     // Ölç kipinde yapı kilitli: kablonun kartında da (parça kartındaki gibi) Sil yok.
     await page.locator('header').getByRole('button', { name: 'Geri al' }).tap(); await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
@@ -471,6 +475,8 @@ try {
     await page.mouse.click(pt.x, pt.y, { button: 'right' }); await page.waitForTimeout(300);
     const menu = page.getByRole('menu', { name: 'R1 menüsü' });
     const items = await menu.getByRole('menuitem').allTextContents();
+    const shortcuts = await menu.locator('[role=menuitem] > span:nth-child(2)').allTextContents();
+    check('masaüstü: sağ tık menüsünde klavye kısayolları yazılı (Döndür R, Sil Delete)', shortcuts.join('|') === 'R|Delete', shortcuts.join('|'));
     if (items.length > 0) await menu.getByRole('menuitem', { name: /^Sil/ }).click();
     const after = await doc(page);
     const undo = page.getByRole('status').filter({ hasText: 'R1 silindi.' }).getByRole('button', { name: 'Geri al' });
