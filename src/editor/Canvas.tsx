@@ -21,7 +21,7 @@ import { tr } from '../i18n/tr';
 import { CATALOG, isDeviceType, type Box } from '../model/catalog';
 import type { Connectivity } from '../model/connectivity';
 import { pinKey, wireKey } from '../model/connectivity';
-import { addPart, addWire, moveSelection, removeItems, replaceWirePoints, updatePart } from '../model/docOps';
+import { addPart, addWire, moveSelection, replaceWirePoints, updatePart } from '../model/docOps';
 import { partAxis, type FlowGraph } from '../model/flow';
 import {
   boxesIntersect,
@@ -192,7 +192,7 @@ export interface CanvasProps {
   readonly onRotate: (partIds: readonly string[]) => void;
   /** Yönlü parçaları ters çevir (uçlar yer değiştirir, kablolar yerinde kalır). */
   readonly onFlip: (partIds: readonly string[]) => void;
-  /** Öğeleri sil; bildirimde Geri al (bağlam menülerinin Sil'i: parça ve telefonda kablo). */
+  /** Öğeleri sil; bildirimde Geri al (bağlam menülerinin Sil'i ve Delete / Backspace). */
   readonly onDelete: (items: Selection) => void;
   /** Bu sayı değişince görünüm devreye sığdırılır (örnek ya da dosya yüklenince). */
   readonly fitRequest: number;
@@ -1553,7 +1553,8 @@ export function Canvas({
     } else if (key === 'delete' || key === 'backspace') {
       if (selection.parts.length === 0 && selection.wires.length === 0) return;
       e.preventDefault();
-      commit(removeItems(doc, selection.parts, selection.wires), EMPTY_SELECTION);
+      // Karttaki Sil gibi: bildirim ve Geri al; takılı ampermetre kaldırılır, kablo eski hâline döner.
+      onDelete(selection);
     } else if (key === 'r' && !ctrl) {
       if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
       else if (selection.parts.length > 0 && current.kind === 'idle') onRotate(selection.parts);

@@ -489,6 +489,78 @@ try {
     await ctx.close();
   }
 
+  // --- Klavyeyle silme (masaüstü): Delete / Backspace deleteSelection'dan (bildirim, Geri al, takılı ampermetre) --
+  {
+    const devre = readFileSync(new URL('../src/examples/rc-dolma.json', import.meta.url), 'utf8');
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, devre);
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const before = await doc(page);
+    const toastText = async () => (await page.getByRole('status').filter({ hasText: 'silindi' }).textContent().catch(() => '')) ?? '';
+    const undoToast = async () => {
+      const b = page.getByRole('status').filter({ hasText: 'silindi' }).getByRole('button', { name: 'Geri al' });
+      if ((await b.count()) === 1) await b.click();
+      await page.waitForTimeout(200);
+    };
+    // Tek kablo (C1 ile V1 arasındaki üst kablo) → Delete.
+    let pt = await screen(page, 38, -8); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    await page.keyboard.press('Delete');
+    const wireGone = await doc(page);
+    const wireToast = await toastText();
+    await undoToast();
+    const wireBack = (await doc(page)).wires.length === before.wires.length;
+    // Tek parça → Delete; iki parça (Shift) → Backspace.
+    const r1 = before.parts.find((x) => x.label === 'R1');
+    const c1 = before.parts.find((x) => x.label === 'C1');
+    pt = await screen(page, r1.x, r1.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    await page.keyboard.press('Delete');
+    const partGone = await doc(page);
+    const partToast = await toastText();
+    await undoToast();
+    pt = await screen(page, r1.x, r1.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    pt = await screen(page, c1.x, c1.y); await page.keyboard.down('Shift'); await page.mouse.click(pt.x, pt.y); await page.keyboard.up('Shift'); await page.waitForTimeout(200);
+    await page.keyboard.press('Backspace');
+    const twoGone = await doc(page);
+    const twoToast = await toastText();
+    await undoToast();
+    const all = await doc(page);
+    check('masaüstü: Delete / Backspace bildirimli siliyor ("Kablo silindi.", "R1 silindi.", "2 öğe silindi."); bildirimdeki Geri al geri getiriyor',
+      wireGone.wires.length === before.wires.length - 1 && wireToast.startsWith('Kablo silindi.') && wireBack &&
+        partGone.parts.length === before.parts.length - 1 && partToast.startsWith('R1 silindi.') &&
+        twoGone.parts.length === before.parts.length - 2 && twoToast.startsWith('2 öğe silindi.') &&
+        all.parts.length === before.parts.length && all.wires.length === before.wires.length,
+      `${wireToast} · ${partToast} · ${twoToast} · ${all.parts.length} parça, ${all.wires.length} kablo`);
+    await ctx.close();
+  }
+  // Takılı ampermetre (arıza görevi, ampermetre açık): defterdeki kapalı kartından seçilip Delete → kartındaki
+  // Sil gibi kaldırılır, kablo eski hâline döner.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.goto('about:blank'); await page.goto(faultUrl({ tools: { voltage: true, resistance: true, scope: true, ammeter: true } }), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const start = await doc(page);
+    let pt = await screen(page, 40, -16); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
+    await page.getByRole('menuitem', { name: 'Buraya ampermetre tak' }).click(); await page.waitForTimeout(600);
+    const plugged = await doc(page);
+    const meter = plugged.parts.find((x) => x.type === 'ammeter');
+    // Takılınca kartı açık gelir (içinde Sil): seçim kaldırılır, kapalı kartın açma düğmesiyle seçilir.
+    await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+    const opener = page.locator(`[data-card="${meter?.id}"] > button[aria-expanded="false"]`);
+    const closedCard = (await opener.count()) === 1;
+    if (closedCard) { await opener.click(); await page.waitForTimeout(400); }
+    await page.keyboard.press('Delete'); await page.waitForTimeout(300);
+    const removedToast = await page.getByText('Ampermetre kaldırıldı; kablo eski hâline döndü').count();
+    const unplugged = await doc(page);
+    check('masaüstü: takılı ampermetre seçiliyken Delete onu kartındaki Sil gibi kaldırıyor; kablo eski hâline dönüyor, bildirim çıkıyor',
+      meter !== undefined && closedCard && plugged.wires.length !== start.wires.length && !unplugged.parts.some((x) => x.type === 'ammeter') && JSON.stringify(unplugged.wires) === JSON.stringify(start.wires) && removedToast === 1,
+      `${meter?.label ?? 'ampermetre yok'} · kapalı kart ${closedCard} · kablo ${start.wires.length} → ${plugged.wires.length} → ${unplugged.wires.length} · bildirim ${removedToast}`);
+    await ctx.close();
+  }
+
   // --- Ölç kipi: kilit, kart, anahtar, canlı değer, durdurma sorusu ---------------------------
   {
     const { page, cdp } = await phone();
