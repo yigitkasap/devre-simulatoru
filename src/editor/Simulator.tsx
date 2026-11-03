@@ -1618,6 +1618,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       onRepair={sim.repair}
       onRotate={rotateSelection}
       onFlip={flipSelection}
+      onDelete={deleteSelection}
       fitRequest={fitRequest}
       keepVisible={selection.parts}
       phone={

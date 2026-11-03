@@ -400,6 +400,47 @@ try {
     await ctx.close();
   }
 
+  // --- Telefonda kablo silme: dokun → Kablo kartında Sil; basılı tut → menüde Sil; Ölç'te Sil yok ----------
+  {
+    const { page, cdp } = await phone();
+    await openExample(page, 'RC dolma');
+    const before = await doc(page);
+    // w4: C1 ile V1 arasındaki üst kablo; w5: alttaki dönüş kablosu (parçalardan uzak noktaları).
+    const at = { w4: [38, -8], w5: [16, 8] };
+    const wireCard = phoneNotebook(page).getByRole('heading', { name: 'Kablo', exact: true });
+    const cardDelete = phoneNotebook(page).getByRole('button', { name: 'Sil', exact: true });
+    await tap(page, cdp, await screen(page, ...at.w4)); await page.waitForTimeout(300);
+    const shownCard = (await wireCard.count()) === 1;
+    const box = await cardDelete.boundingBox({ timeout: 3000 }).catch(() => null);
+    if (box) await cardDelete.tap();
+    const afterCard = await doc(page);
+    const toast = page.getByRole('status').filter({ hasText: 'silindi' });
+    const toastText = (await toast.textContent().catch(() => '')) ?? '';
+    const toastUndo = toast.getByRole('button', { name: 'Geri al' });
+    check('telefon: kabloya dokununca Kablo kartında Sil var (en az 44 px); basınca kablo siliniyor, "silindi · Geri al" bildirimi çıkıyor',
+      shownCard && box !== null && box.width >= 44 && box.height >= 44 && afterCard.wires.length === before.wires.length - 1 && !afterCard.wires.some((w) => w.id === 'w4') && (await toastUndo.count()) === 1,
+      `${before.wires.length} → ${afterCard.wires.length} kablo · Sil ${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)} px · ${toastText}`);
+    if ((await toastUndo.count()) === 1) await toastUndo.tap();
+    check('telefon: bildirimdeki Geri al silinen kabloyu geri getiriyor', afterCard.wires.length === before.wires.length - 1 && (await doc(page)).wires.length === before.wires.length);
+    await tap(page, cdp, await screen(page, ...at.w5), 750);
+    const menu = page.getByRole('menu', { name: 'Kablo menüsü' });
+    const items = await menu.getByRole('menuitem').allTextContents();
+    const magnifier = await page.locator('use[href^="#scene-"]').count();
+    await shot(page, 'ios-kablo-menu.png');
+    if (items.length > 0) await menu.getByRole('menuitem', { name: /^Sil/ }).tap();
+    const afterMenu = await doc(page);
+    check('telefon: Kur’da kabloyu basılı tutunca menü ve büyüteç açılıyor, içinde Sil; basınca kablo siliniyor, bildirim çıkıyor',
+      items.length === 1 && items[0].startsWith('Sil') && magnifier === 1 && afterMenu.wires.length === before.wires.length - 1 && !afterMenu.wires.some((w) => w.id === 'w5') && (await page.getByRole('status').filter({ hasText: 'silindi' }).count()) === 1,
+      `menü: ${items.join('|')} · büyüteç ${magnifier} · ${before.wires.length} → ${afterMenu.wires.length} kablo`);
+    // Ölç kipinde yapı kilitli: kablonun kartında da (parça kartındaki gibi) Sil yok.
+    await page.locator('header').getByRole('button', { name: 'Geri al' }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
+    await tap(page, cdp, await screen(page, ...at.w4)); await page.waitForTimeout(300);
+    check('telefon: Ölç’te Kablo kartında Sil yok (parça kartındaki gibi)',
+      (await doc(page)).wires.length === before.wires.length && (await mode(page)).includes('Çalışıyor') && (await wireCard.count()) === 1 && (await cardDelete.count()) === 0, await mode(page));
+    await page.context().close();
+  }
+
   // --- Ölç kipi: kilit, kart, anahtar, canlı değer, durdurma sorusu ---------------------------
   {
     const { page, cdp } = await phone();

@@ -192,6 +192,8 @@ export interface CanvasProps {
   readonly onRotate: (partIds: readonly string[]) => void;
   /** Yönlü parçaları ters çevir (uçlar yer değiştirir, kablolar yerinde kalır). */
   readonly onFlip: (partIds: readonly string[]) => void;
+  /** Seçili öğeleri sil; bildirimde Geri al (telefonda kablonun basılı tutma menüsü). */
+  readonly onDelete?: () => void;
   /** Bu sayı değişince görünüm devreye sığdırılır (örnek ya da dosya yüklenince). */
   readonly fitRequest: number;
   /** Tuval küçülünce (alt sayfa açılınca) görünür tutulacak parçalar (seçili parça). */
@@ -384,6 +386,7 @@ export function Canvas({
   onRepair,
   onRotate,
   onFlip,
+  onDelete,
   fitRequest,
   keepVisible,
   phone = null,
@@ -430,7 +433,7 @@ export function Canvas({
     interactionRef.current = next;
     setInteractionState(next);
   };
-  const [menu, setMenu] = useState<{ partId: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ partId: string; x: number; y: number } | { wireId: string; x: number; y: number } | null>(null);
   /** Telefon: kalabalık bir noktaya dokununca "Burada N öğe var" seçicisi; büyüteç (basılı tutunca da). */
   const [picker, setPicker] = useState<{ x: number; y: number; options: readonly PickOption[] } | null>(null);
   const [magnifier, setMagnifier] = useState<{ x: number; y: number; g: Point } | null>(null);
@@ -1014,6 +1017,21 @@ export function Canvas({
         setMagnifier({ x: local.x, y: local.y, g });
       }, LONG_PRESS_MS);
     }
+    // Kur: kablo da basılı tutulunca bağlam menüsü (Sil); görevde kablolar kilitliyse menü yok.
+    if (hit?.kind === 'wire' && mode === 'kur' && onDelete && !wiringLocked && selectionActions(taskParts, [], 1).remove) {
+      phoneTimers.current.long = window.setTimeout(() => {
+        const state = interactionRef.current;
+        const still =
+          (state.kind === 'press' && state.pointerId === pointerId) ||
+          (state.kind === 'drag-segment' && state.pointerId === pointerId && state.delta.x === 0 && state.delta.y === 0);
+        if (!still) return;
+        phoneLongFired.current = true;
+        dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+        menuFromLongPress.current = true;
+        setMenu({ wireId: hit.wireId, x: local.x, y: local.y });
+        setMagnifier({ x: local.x, y: local.y, g });
+      }, LONG_PRESS_MS);
+    }
   };
 
   // --- İşaretçi olayları ---------------------------------------------------------------
@@ -1301,6 +1319,11 @@ export function Canvas({
       case 'drag-segment': {
         const delta = { x: Math.round(g.x - current.start.x), y: Math.round(g.y - current.start.y) };
         if (samePoint(delta, current.delta)) return;
+        if (menuFromLongPress.current) {
+          menuFromLongPress.current = false;
+          setMenu(null);
+          setMagnifier(null);
+        }
         setInteraction({ ...current, delta });
         const wire = current.before.wires.find((w) => w.id === current.wireId);
         if (!wire) return;
@@ -2297,7 +2320,21 @@ export function Canvas({
       {tapMenuState && (
         <ContextMenu x={tapMenuState.x} y={tapMenuState.y} items={tapMenuState.items} area={size} label={tapMenuState.label} onClose={() => setTapMenuState(null)} touch={phone !== null} />
       )}
-      {menu && (() => {
+      {menu && 'wireId' in menu && onDelete && doc.wires.some((w) => w.id === menu.wireId) && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={[{ label: tr.contextMenu.remove, shortcut: 'Delete', onSelect: onDelete, tone: 'danger' }]}
+          area={size}
+          label={tr.contextMenu.menu(tr.inspector.wire)}
+          touch={phone !== null}
+          onClose={() => {
+            setMenu(null);
+            setMagnifier(null);
+          }}
+        />
+      )}
+      {menu && 'partId' in menu && (() => {
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
         const burned = frame?.statuses.get(part.id)?.burned === true;

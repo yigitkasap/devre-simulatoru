@@ -363,8 +363,9 @@ function NumberField({
 
 // --- Kablo ve çoklu seçim -------------------------------------------------------------------
 
-export function WireDetails({ wireId, frame, onDelete, removable = true }: InspectTabProps & { wireId: string; removable?: boolean }) {
-  // Telefonda silme alt çubukta (Ölç kipinde yapı kilitli); görevde kablolar kilitliyse Sil yok.
+export function WireDetails({ wireId, frame, status, onDelete, removable = true }: InspectTabProps & { wireId: string; removable?: boolean }) {
+  // Dokunmatikte çalışırken devrenin yapısı kilitli (Ölç kipi): parça kartındaki gibi Sil yok. Görevde
+  // kablolar kilitliyse Sil yok.
   const touch = useTouchUi();
   const voltage = frame?.wireVoltages.get(wireId);
   // Salınan gerilim: pencerenin ortalaması büyük, uçları altında (anlık değer her karede zıplar).
@@ -381,12 +382,12 @@ export function WireDetails({ wireId, frame, onDelete, removable = true }: Inspe
           <Icon name="wire" className="h-6 w-6" />
         </span>
         <h2 className="flex-1 text-title font-semibold">{tr.inspector.wire}</h2>
-        {!touch && removable && (
+        {removable && !(touch && status !== 'stopped') && (
         <button
           type="button"
           onClick={onDelete}
           title={tr.toolbar.remove}
-          className="flex h-9 items-center gap-1.5 rounded-md border border-line-2 bg-panel px-2.5 text-small font-medium text-danger hover:bg-panel-2"
+          className={`flex items-center gap-1.5 rounded-md border border-line-2 bg-panel px-2.5 text-small font-medium text-danger hover:bg-panel-2 ${touch ? 'h-11' : 'h-9'}`}
         >
           <Icon name="trash" />
           {tr.toolbar.remove}
