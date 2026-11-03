@@ -400,6 +400,167 @@ try {
     await ctx.close();
   }
 
+  // --- Telefonda kablo silme: dokun → Kablo kartında Sil; basılı tut → menüde Sil; Ölç'te Sil yok ----------
+  {
+    const { page, cdp } = await phone();
+    await openExample(page, 'RC dolma');
+    const before = await doc(page);
+    // w4: C1 ile V1 arasındaki üst kablo; w5: alttaki dönüş kablosu (parçalardan uzak noktaları).
+    const at = { w4: [38, -8], w5: [16, 8] };
+    const wireCard = phoneNotebook(page).getByRole('heading', { name: 'Kablo', exact: true });
+    const cardDelete = phoneNotebook(page).getByRole('button', { name: 'Sil', exact: true });
+    await tap(page, cdp, await screen(page, ...at.w4)); await page.waitForTimeout(300);
+    const shownCard = (await wireCard.count()) === 1;
+    const box = await cardDelete.boundingBox({ timeout: 3000 }).catch(() => null);
+    if (box) await cardDelete.tap();
+    const afterCard = await doc(page);
+    const toast = page.getByRole('status').filter({ hasText: 'silindi' });
+    const toastText = (await toast.textContent().catch(() => '')) ?? '';
+    const toastUndo = toast.getByRole('button', { name: 'Geri al' });
+    check('telefon: kabloya dokununca Kablo kartında Sil var (en az 44 px); basınca kablo siliniyor, "silindi · Geri al" bildirimi çıkıyor',
+      shownCard && box !== null && box.width >= 44 && box.height >= 44 && afterCard.wires.length === before.wires.length - 1 && !afterCard.wires.some((w) => w.id === 'w4') && (await toastUndo.count()) === 1,
+      `${before.wires.length} → ${afterCard.wires.length} kablo · Sil ${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)} px · ${toastText}`);
+    if ((await toastUndo.count()) === 1) await toastUndo.tap();
+    check('telefon: bildirimdeki Geri al silinen kabloyu geri getiriyor', afterCard.wires.length === before.wires.length - 1 && (await doc(page)).wires.length === before.wires.length);
+    await tap(page, cdp, await screen(page, ...at.w5), 750);
+    const menu = page.getByRole('menu', { name: 'Kablo menüsü' });
+    const items = await menu.getByRole('menuitem').allTextContents();
+    const wireShortcuts = await menu.locator('[role=menuitem] > span:nth-child(2)').count();
+    const magnifier = await page.locator('use[href^="#scene-"]').count();
+    await shot(page, 'ios-kablo-menu.png');
+    if (items.length > 0) await menu.getByRole('menuitem', { name: /^Sil/ }).tap();
+    const afterMenu = await doc(page);
+    check('telefon: Kur’da kabloyu basılı tutunca menü ve büyüteç açılıyor, içinde Sil; basınca kablo siliniyor, bildirim çıkıyor',
+      items.length === 1 && items[0].startsWith('Sil') && magnifier === 1 && afterMenu.wires.length === before.wires.length - 1 && !afterMenu.wires.some((w) => w.id === 'w5') && (await page.getByRole('status').filter({ hasText: 'silindi' }).count()) === 1,
+      `menü: ${items.join('|')} · büyüteç ${magnifier} · ${before.wires.length} → ${afterMenu.wires.length} kablo`);
+    const menuToast = (await page.getByRole('status').filter({ hasText: 'silindi' }).textContent().catch(() => '')) ?? '';
+    check('telefon: tek kablo silinince bildirim "Kablo silindi." (karttan da menüden de)', toastText.startsWith('Kablo silindi.') && menuToast.startsWith('Kablo silindi.'), `${toastText} · ${menuToast}`);
+    // Parçanın basılı tutma menüsündeki Sil de bildirimli (deleteSelection); bildirimin Geri al'ı parçayı geri getirir.
+    const r1 = before.parts.find((x) => x.label === 'R1');
+    await tap(page, cdp, await screen(page, r1.x, r1.y), 750);
+    const partMenu = page.getByRole('menu', { name: 'R1 menüsü' });
+    const partItems = await partMenu.getByRole('menuitem').allTextContents();
+    const partShortcuts = await partMenu.locator('[role=menuitem] > span:nth-child(2)').count();
+    if (partItems.length > 0) await partMenu.getByRole('menuitem', { name: /^Sil/ }).tap();
+    const afterPart = await doc(page);
+    const partUndo = page.getByRole('status').filter({ hasText: 'R1 silindi.' }).getByRole('button', { name: 'Geri al' });
+    const partToast = (await partUndo.count()) === 1;
+    if (partToast) await partUndo.tap();
+    const restored = await doc(page);
+    check('telefon: parçanın basılı tutma menüsündeki Sil de "R1 silindi. · Geri al" bildirimini çıkarıyor; Geri al parçayı geri getiriyor',
+      afterPart.parts.length === before.parts.length - 1 && partToast && restored.parts.length === before.parts.length,
+      `menü: ${partItems.join('|')} · ${before.parts.length} → ${afterPart.parts.length} → ${restored.parts.length} parça · bildirim ${partToast}`);
+    check('telefon: bağlam menülerinde (kablo ve parça) klavye kısayolu yazısı yok (Delete, R)',
+      wireShortcuts === 0 && partShortcuts === 0 && items.join('|') === 'Sil' && partItems.join('|') === 'Değer|Döndür|Sil', `kablo: ${items.join('|')} · R1: ${partItems.join('|')}`);
+    // Ölç kipinde yapı kilitli: kablonun kartında da (parça kartındaki gibi) Sil yok.
+    await page.locator('header').getByRole('button', { name: 'Geri al' }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
+    await tap(page, cdp, await screen(page, ...at.w4)); await page.waitForTimeout(300);
+    check('telefon: Ölç’te Kablo kartında Sil yok (parça kartındaki gibi)',
+      (await doc(page)).wires.length === before.wires.length && (await mode(page)).includes('Çalışıyor') && (await wireCard.count()) === 1 && (await cardDelete.count()) === 0, await mode(page));
+    await tap(page, cdp, await screen(page, ...at.w4), 750);
+    const ask = page.getByRole('alertdialog', { name: 'Düzenlemek için durdurulsun mu?' });
+    check('telefon: Ölç’te kabloyu basılı tutunca parçadaki gibi "Düzenlemek için durdurulsun mu?" soruluyor; menü açılmıyor',
+      (await ask.count()) === 1 && (await page.getByRole('menu').count()) === 0);
+    await page.context().close();
+  }
+
+  // --- Bağlam menüsü (masaüstü): sağ tık menüsünün Sil'i bildirimli (Geri al) ---------------------
+  {
+    const one = { version: 1, parts: [{ id: 'a', type: 'resistor', label: 'R1', x: 0, y: 0, rotation: 0, props: { resistance: 100 } }], wires: [] };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, JSON.stringify(one));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const pt = await screen(page, 0, 0);
+    await page.mouse.click(pt.x, pt.y, { button: 'right' }); await page.waitForTimeout(300);
+    const menu = page.getByRole('menu', { name: 'R1 menüsü' });
+    const items = await menu.getByRole('menuitem').allTextContents();
+    const shortcuts = await menu.locator('[role=menuitem] > span:nth-child(2)').allTextContents();
+    check('masaüstü: sağ tık menüsünde klavye kısayolları yazılı (Döndür R, Sil Delete)', shortcuts.join('|') === 'R|Delete', shortcuts.join('|'));
+    if (items.length > 0) await menu.getByRole('menuitem', { name: /^Sil/ }).click();
+    const after = await doc(page);
+    const undo = page.getByRole('status').filter({ hasText: 'R1 silindi.' }).getByRole('button', { name: 'Geri al' });
+    const toast = (await undo.count()) === 1;
+    if (toast) await undo.click();
+    check('masaüstü: sağ tık menüsünün Sil’i "R1 silindi. · Geri al" bildirimini çıkarıyor; Geri al parçayı geri getiriyor',
+      after.parts.length === 0 && toast && (await doc(page)).parts.length === 1, `menü: ${items.join('|')} · bildirim ${toast}`);
+    await ctx.close();
+  }
+
+  // --- Klavyeyle silme (masaüstü): Delete / Backspace deleteSelection'dan (bildirim, Geri al, takılı ampermetre) --
+  {
+    const devre = readFileSync(new URL('../src/examples/rc-dolma.json', import.meta.url), 'utf8');
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, devre);
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const before = await doc(page);
+    const toastText = async () => (await page.getByRole('status').filter({ hasText: 'silindi' }).textContent().catch(() => '')) ?? '';
+    const undoToast = async () => {
+      const b = page.getByRole('status').filter({ hasText: 'silindi' }).getByRole('button', { name: 'Geri al' });
+      if ((await b.count()) === 1) await b.click();
+      await page.waitForTimeout(200);
+    };
+    // Tek kablo (C1 ile V1 arasındaki üst kablo) → Delete.
+    let pt = await screen(page, 38, -8); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    await page.keyboard.press('Delete');
+    const wireGone = await doc(page);
+    const wireToast = await toastText();
+    await undoToast();
+    const wireBack = (await doc(page)).wires.length === before.wires.length;
+    // Tek parça → Delete; iki parça (Shift) → Backspace.
+    const r1 = before.parts.find((x) => x.label === 'R1');
+    const c1 = before.parts.find((x) => x.label === 'C1');
+    pt = await screen(page, r1.x, r1.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    await page.keyboard.press('Delete');
+    const partGone = await doc(page);
+    const partToast = await toastText();
+    await undoToast();
+    pt = await screen(page, r1.x, r1.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    pt = await screen(page, c1.x, c1.y); await page.keyboard.down('Shift'); await page.mouse.click(pt.x, pt.y); await page.keyboard.up('Shift'); await page.waitForTimeout(200);
+    await page.keyboard.press('Backspace');
+    const twoGone = await doc(page);
+    const twoToast = await toastText();
+    await undoToast();
+    const all = await doc(page);
+    check('masaüstü: Delete / Backspace bildirimli siliyor ("Kablo silindi.", "R1 silindi.", "2 öğe silindi."); bildirimdeki Geri al geri getiriyor',
+      wireGone.wires.length === before.wires.length - 1 && wireToast.startsWith('Kablo silindi.') && wireBack &&
+        partGone.parts.length === before.parts.length - 1 && partToast.startsWith('R1 silindi.') &&
+        twoGone.parts.length === before.parts.length - 2 && twoToast.startsWith('2 öğe silindi.') &&
+        all.parts.length === before.parts.length && all.wires.length === before.wires.length,
+      `${wireToast} · ${partToast} · ${twoToast} · ${all.parts.length} parça, ${all.wires.length} kablo`);
+    await ctx.close();
+  }
+  // Takılı ampermetre (arıza görevi, ampermetre açık): defterdeki kapalı kartından seçilip Delete → kartındaki
+  // Sil gibi kaldırılır, kablo eski hâline döner.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.goto('about:blank'); await page.goto(faultUrl({ tools: { voltage: true, resistance: true, scope: true, ammeter: true } }), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    const start = await doc(page);
+    let pt = await screen(page, 40, -16); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
+    await page.getByRole('menuitem', { name: 'Buraya ampermetre tak' }).click(); await page.waitForTimeout(600);
+    const plugged = await doc(page);
+    const meter = plugged.parts.find((x) => x.type === 'ammeter');
+    // Takılınca kartı açık gelir (içinde Sil): seçim kaldırılır, kapalı kartın açma düğmesiyle seçilir.
+    await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+    const opener = page.locator(`[data-card="${meter?.id}"] > button[aria-expanded="false"]`);
+    const closedCard = (await opener.count()) === 1;
+    if (closedCard) { await opener.click(); await page.waitForTimeout(400); }
+    await page.keyboard.press('Delete'); await page.waitForTimeout(300);
+    const removedToast = await page.getByText('Ampermetre kaldırıldı; kablo eski hâline döndü').count();
+    const unplugged = await doc(page);
+    check('masaüstü: takılı ampermetre seçiliyken Delete onu kartındaki Sil gibi kaldırıyor; kablo eski hâline dönüyor, bildirim çıkıyor',
+      meter !== undefined && closedCard && plugged.wires.length !== start.wires.length && !unplugged.parts.some((x) => x.type === 'ammeter') && JSON.stringify(unplugged.wires) === JSON.stringify(start.wires) && removedToast === 1,
+      `${meter?.label ?? 'ampermetre yok'} · kapalı kart ${closedCard} · kablo ${start.wires.length} → ${plugged.wires.length} → ${unplugged.wires.length} · bildirim ${removedToast}`);
+    await ctx.close();
+  }
+
   // --- Ölç kipi: kilit, kart, anahtar, canlı değer, durdurma sorusu ---------------------------
   {
     const { page, cdp } = await phone();

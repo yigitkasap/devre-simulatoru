@@ -21,7 +21,7 @@ import { tr } from '../i18n/tr';
 import { CATALOG, isDeviceType, type Box } from '../model/catalog';
 import type { Connectivity } from '../model/connectivity';
 import { pinKey, wireKey } from '../model/connectivity';
-import { addPart, addWire, moveSelection, removeItems, replaceWirePoints, updatePart } from '../model/docOps';
+import { addPart, addWire, moveSelection, replaceWirePoints, updatePart } from '../model/docOps';
 import { partAxis, type FlowGraph } from '../model/flow';
 import {
   boxesIntersect,
@@ -107,7 +107,7 @@ export interface PhoneCanvas {
   readonly onExitConnect: () => void;
   /** Ölç kipinde bir parçaya dokunuldu (ölçümleri göster). */
   readonly onInspect: (partId: string) => void;
-  /** Ölç kipinde parçayı basılı tutmak: "Düzenlemek için durdurulsun mu?" */
+  /** Ölç kipinde parçayı ya da kabloyu basılı tutmak: "Düzenlemek için durdurulsun mu?" */
   readonly onEditAttempt: () => void;
   /** "Devre kilitli · dokun: incele" bilgisi gösterilsin mi. */
   readonly lockChip: boolean;
@@ -192,6 +192,8 @@ export interface CanvasProps {
   readonly onRotate: (partIds: readonly string[]) => void;
   /** Yönlü parçaları ters çevir (uçlar yer değiştirir, kablolar yerinde kalır). */
   readonly onFlip: (partIds: readonly string[]) => void;
+  /** Öğeleri sil; bildirimde Geri al (bağlam menülerinin Sil'i ve Delete / Backspace). */
+  readonly onDelete: (items: Selection) => void;
   /** Bu sayı değişince görünüm devreye sığdırılır (örnek ya da dosya yüklenince). */
   readonly fitRequest: number;
   /** Tuval küçülünce (alt sayfa açılınca) görünür tutulacak parçalar (seçili parça). */
@@ -384,6 +386,7 @@ export function Canvas({
   onRepair,
   onRotate,
   onFlip,
+  onDelete,
   fitRequest,
   keepVisible,
   phone = null,
@@ -430,7 +433,7 @@ export function Canvas({
     interactionRef.current = next;
     setInteractionState(next);
   };
-  const [menu, setMenu] = useState<{ partId: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{ partId: string; x: number; y: number } | { wireId: string; x: number; y: number } | null>(null);
   /** Telefon: kalabalık bir noktaya dokununca "Burada N öğe var" seçicisi; büyüteç (basılı tutunca da). */
   const [picker, setPicker] = useState<{ x: number; y: number; options: readonly PickOption[] } | null>(null);
   const [magnifier, setMagnifier] = useState<{ x: number; y: number; g: Point } | null>(null);
@@ -1014,6 +1017,27 @@ export function Canvas({
         setMagnifier({ x: local.x, y: local.y, g });
       }, LONG_PRESS_MS);
     }
+    // Kablo da parçadaki gibi: Kur'da basılı tutulunca bağlam menüsü (Sil; görevde kablolar kilitliyse menü
+    // yok), Ölç'te durdurma sorusu.
+    if (hit?.kind === 'wire' && (mode === 'olc' || (mode === 'kur' && !wiringLocked && selectionActions(taskParts, [], 1).remove))) {
+      phoneTimers.current.long = window.setTimeout(() => {
+        const state = interactionRef.current;
+        const still =
+          (state.kind === 'press' && state.pointerId === pointerId) ||
+          (state.kind === 'drag-segment' && state.pointerId === pointerId && state.delta.x === 0 && state.delta.y === 0);
+        if (!still) return;
+        phoneLongFired.current = true;
+        if (mode === 'olc') {
+          setInteraction({ kind: 'idle' });
+          phone?.onEditAttempt();
+          return;
+        }
+        dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+        menuFromLongPress.current = true;
+        setMenu({ wireId: hit.wireId, x: local.x, y: local.y });
+        setMagnifier({ x: local.x, y: local.y, g });
+      }, LONG_PRESS_MS);
+    }
   };
 
   // --- İşaretçi olayları ---------------------------------------------------------------
@@ -1301,6 +1325,11 @@ export function Canvas({
       case 'drag-segment': {
         const delta = { x: Math.round(g.x - current.start.x), y: Math.round(g.y - current.start.y) };
         if (samePoint(delta, current.delta)) return;
+        if (menuFromLongPress.current) {
+          menuFromLongPress.current = false;
+          setMenu(null);
+          setMagnifier(null);
+        }
         setInteraction({ ...current, delta });
         const wire = current.before.wires.find((w) => w.id === current.wireId);
         if (!wire) return;
@@ -1524,7 +1553,8 @@ export function Canvas({
     } else if (key === 'delete' || key === 'backspace') {
       if (selection.parts.length === 0 && selection.wires.length === 0) return;
       e.preventDefault();
-      commit(removeItems(doc, selection.parts, selection.wires), EMPTY_SELECTION);
+      // Karttaki Sil gibi: bildirim ve Geri al; takılı ampermetre kaldırılır, kablo eski hâline döner.
+      onDelete(selection);
     } else if (key === 'r' && !ctrl) {
       if (tool.kind === 'place') dispatch({ type: 'set-tool', tool: { ...tool, rotation: nextRotation(tool.rotation) } });
       else if (selection.parts.length > 0 && current.kind === 'idle') onRotate(selection.parts);
@@ -2297,7 +2327,21 @@ export function Canvas({
       {tapMenuState && (
         <ContextMenu x={tapMenuState.x} y={tapMenuState.y} items={tapMenuState.items} area={size} label={tapMenuState.label} onClose={() => setTapMenuState(null)} touch={phone !== null} />
       )}
-      {menu && (() => {
+      {menu && 'wireId' in menu && doc.wires.some((w) => w.id === menu.wireId) && (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={[{ label: tr.contextMenu.remove, shortcut: 'Delete', onSelect: () => onDelete({ parts: [], wires: [menu.wireId] }), tone: 'danger' }]}
+          area={size}
+          label={tr.contextMenu.menu(tr.inspector.wire)}
+          touch={phone !== null}
+          onClose={() => {
+            setMenu(null);
+            setMagnifier(null);
+          }}
+        />
+      )}
+      {menu && 'partId' in menu && (() => {
         const part = doc.parts.find((p) => p.id === menu.partId);
         if (!part) return null;
         const burned = frame?.statuses.get(part.id)?.burned === true;
@@ -2313,7 +2357,7 @@ export function Canvas({
                 {
                   label: tr.contextMenu.remove,
                   shortcut: 'Delete',
-                  onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
+                  onSelect: () => onDelete({ parts: [part.id], wires: [] }),
                   tone: 'danger' as const,
                   separatorBefore: !burned,
                 },
