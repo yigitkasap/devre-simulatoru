@@ -433,6 +433,8 @@ try {
     check('telefon: Kur’da kabloyu basılı tutunca menü ve büyüteç açılıyor, içinde Sil; basınca kablo siliniyor, bildirim çıkıyor',
       items.length === 1 && items[0].startsWith('Sil') && magnifier === 1 && afterMenu.wires.length === before.wires.length - 1 && !afterMenu.wires.some((w) => w.id === 'w5') && (await page.getByRole('status').filter({ hasText: 'silindi' }).count()) === 1,
       `menü: ${items.join('|')} · büyüteç ${magnifier} · ${before.wires.length} → ${afterMenu.wires.length} kablo`);
+    const menuToast = (await page.getByRole('status').filter({ hasText: 'silindi' }).textContent().catch(() => '')) ?? '';
+    check('telefon: tek kablo silinince bildirim "Kablo silindi." (karttan da menüden de)', toastText.startsWith('Kablo silindi.') && menuToast.startsWith('Kablo silindi.'), `${toastText} · ${menuToast}`);
     // Parçanın basılı tutma menüsündeki Sil de bildirimli (deleteSelection); bildirimin Geri al'ı parçayı geri getirir.
     const r1 = before.parts.find((x) => x.label === 'R1');
     await tap(page, cdp, await screen(page, r1.x, r1.y), 750);

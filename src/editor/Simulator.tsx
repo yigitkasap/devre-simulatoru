@@ -966,7 +966,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const count = items.parts.length + items.wires.length;
     if (count === 0) return;
     const one = count === 1 ? doc.parts.find((p) => p.id === items.parts[0]) : undefined;
-    const what = one ? one.label : tr.phone.items(count);
+    // Tek parça adıyla ("R1 silindi."), tek kablo "Kablo silindi.", birden çok öğe "N öğe silindi.".
+    const what = one ? one.label : count === 1 && items.wires.length === 1 ? tr.phone.wire : tr.phone.items(count);
     // Takılı ampermetre: kaldırılır, kablo eski hâline döner.
     const meter = one ? plugged.find((m) => m.part === one.id) : undefined;
     if (meter) {
