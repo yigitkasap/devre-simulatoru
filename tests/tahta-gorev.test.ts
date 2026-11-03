@@ -6,7 +6,7 @@ import { planBreadboard } from '../src/bench3d/breadboard';
 import { exampleDoc } from '../src/examples';
 import { DEFAULT_BOARD_TASK, parseTask, taskFromHash, taskUrl, type TaskDef } from '../src/model/task';
 import type { CircuitDoc } from '../src/model/types';
-import { checksLeft, keepLocked, leadKey, locksOf, startBuild, wireKey } from '../src/tahta/task';
+import { checksLeft, isLocked, keepLocked, leadKey, locksOf, startBuild, wireKey } from '../src/tahta/task';
 
 const idOf = (doc: CircuitDoc, label: string) => doc.parts.find((p) => p.label === label)!.id;
 const labelOf = (doc: CircuitDoc, id: string) => doc.parts.find((p) => p.id === id)!.label;
@@ -58,6 +58,14 @@ describe('Tahtada kur görevi (T6)', () => {
     };
     expect(keepLocked(student, locks)).toEqual(start);
     expect(student.wires.filter((w) => locks.wires.has(wireKey(w))).length).toBe(2);
+    // Seçili öğe kilitli mi (Döndür ve Sil pasif): hazır gelen Q1, köprü ve PS1 kablosu evet; öğrencinin taktıkları hayır.
+    expect(isLocked(locks, { kind: 'part', id: idOf(doc, 'Q1') })).toBe(true);
+    expect(isLocked(locks, { kind: 'part', id: idOf(doc, 'R1') })).toBe(false);
+    expect(isLocked(locks, { kind: 'wire', ...start.wires[0]! })).toBe(true);
+    expect(isLocked(locks, { kind: 'wire', a: '6a', b: '3j' })).toBe(false);
+    expect(isLocked(locks, { kind: 'lead', part: start.leads[0]!.part, pin: start.leads[0]!.pin })).toBe(true);
+    expect(isLocked(locks, { kind: 'lead', part: fg, pin: 1 })).toBe(false);
+    expect(isLocked(null, { kind: 'part', id: idOf(doc, 'Q1') })).toBe(false);
     // Boş başlangıçta kilit yok; boşaltınca tahta boş.
     const empty = startBuild(doc, plan, { ...DEFAULT_BOARD_TASK, start: 'empty' });
     expect(locksOf(empty)).toBeNull();

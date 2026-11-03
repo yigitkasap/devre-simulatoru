@@ -18,7 +18,7 @@ import { fixedHoles, isFixed, legRange, movePlaced, moveLeg, partHoles, placePar
 import { addWire, plugLead, removeWire, unplugLead, type WireResult } from '../../tahta/wiring';
 import { parseHole } from '../../bench3d/holes';
 import type { PinRef } from '../../tahta/check';
-import { leadKey, wireKey, type Locks } from '../../tahta/task';
+import { isLocked, leadKey, wireKey, type Locks } from '../../tahta/task';
 import { Icon } from '../icons';
 import { partValueText } from '../PartView';
 
@@ -362,9 +362,9 @@ export function BoardTop(props: BoardTopProps) {
     if ((placing && !placing.dragging) || cabling) input.current?.focus({ preventScroll: true });
   }, [placing?.partId, placing?.first, placing?.dragging, cabling?.kind, cabling?.kind === 'wire' ? cabling.from : null, cabling?.kind === 'lead' ? `${cabling.part}#${cabling.pin}` : null]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const lockedPart = (id: string) => props.locks?.parts.has(id) ?? false;
-  const lockedLead = (part: string, pin: number) => props.locks?.leads.has(leadKey(part, pin)) ?? false;
-  const lockedWire = (index: number) => (build.wires[index] ? (props.locks?.wires.has(wireKey(build.wires[index]!)) ?? false) : false);
+  const lockedPart = (id: string) => isLocked(props.locks, { kind: 'part', id });
+  const lockedLead = (part: string, pin: number) => isLocked(props.locks, { kind: 'lead', part, pin });
+  const lockedWire = (index: number) => (build.wires[index] ? isLocked(props.locks, { kind: 'wire', ...build.wires[index]! }) : false);
   const rotateSelected = () => {
     const p = selectedPart;
     if (!p || !build.parts[p.id]) return;
@@ -981,40 +981,42 @@ export function BoardTop(props: BoardTopProps) {
               {selectedPart.label}
               {partValueText(selectedPart) ? ` · ${partValueText(selectedPart)}` : ''}
             </span>
-            {lockedPart(selectedPart.id) ? (
+            {lockedPart(selectedPart.id) && (
               <span className={`flex items-center gap-1 px-2 text-small text-ink-2 ${h}`}>
                 <Icon name="lock" className="h-4 w-4" />
                 {tr.tahta.gorev.lockedShort}
               </span>
-            ) : (
-              <>
-                <button type="button" onClick={rotateSelected} className={`flex items-center gap-1 rounded-md px-2 text-small hover:bg-app ${h}`}>
-                  <Icon name="rotate" className="h-4 w-4" />
-                  {tr.tahta.toolRotate}
-                </button>
-                <button type="button" onClick={deleteSelected} className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft ${h}`}>
-                  <Icon name="trash" className="h-4 w-4" />
-                  {tr.tahta.toolDelete}
-                </button>
-              </>
             )}
+            {/* Kilitli parçada (görevde hazır geldi) Döndür ve Sil pasif. */}
+            <button type="button" onClick={rotateSelected} disabled={lockedPart(selectedPart.id)} className={`flex items-center gap-1 rounded-md px-2 text-small hover:bg-app disabled:text-stopped disabled:hover:bg-transparent ${h}`}>
+              <Icon name="rotate" className="h-4 w-4" />
+              {tr.tahta.toolRotate}
+            </button>
+            <button type="button" onClick={deleteSelected} disabled={lockedPart(selectedPart.id)} className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft disabled:text-stopped disabled:hover:bg-transparent ${h}`}>
+              <Icon name="trash" className="h-4 w-4" />
+              {tr.tahta.toolDelete}
+            </button>
           </div>
         )}
         {pickBox && picked && (
           <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[10px] border border-line bg-panel p-1 shadow-md" style={{ left: pickBox.x, top: pickBox.y }} onPointerDown={(e) => e.stopPropagation()}>
             {picked.kind === 'wire' && <span aria-hidden="true" className="ml-1.5 h-3 w-3 rounded-full ring-1 ring-line-2" style={{ background: WIRE_HEX[build.wires[picked.index]!.color] }} />}
             <span className="px-2 font-mono text-small font-semibold">{pickLabel}</span>
-            {(picked.kind === 'wire' ? lockedWire(picked.index) : lockedLead(picked.part, picked.pin)) ? (
+            {(picked.kind === 'wire' ? lockedWire(picked.index) : lockedLead(picked.part, picked.pin)) && (
               <span className={`flex items-center gap-1 px-2 text-small text-ink-2 ${h}`}>
                 <Icon name="lock" className="h-4 w-4" />
                 {tr.tahta.gorev.lockedShort}
               </span>
-            ) : (
-              <button type="button" onClick={deleteSelected} className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft ${h}`}>
-                <Icon name="trash" className="h-4 w-4" />
-                {picked.kind === 'wire' ? tr.tahta.toolDelete : tr.tahta.unplug}
-              </button>
             )}
+            <button
+              type="button"
+              onClick={deleteSelected}
+              disabled={picked.kind === 'wire' ? lockedWire(picked.index) : lockedLead(picked.part, picked.pin)}
+              className={`flex items-center gap-1 rounded-md px-2 text-small text-danger-ink hover:bg-danger-soft disabled:text-stopped disabled:hover:bg-transparent ${h}`}
+            >
+              <Icon name="trash" className="h-4 w-4" />
+              {picked.kind === 'wire' ? tr.tahta.toolDelete : tr.tahta.unplug}
+            </button>
           </div>
         )}
       </div>

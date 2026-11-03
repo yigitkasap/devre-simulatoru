@@ -2787,6 +2787,19 @@ try {
     const noPlay = ((await sp.getByRole('alert').allTextContents()).join(' ')).includes('Bu görevde Oynat kapalı');
     check('Tahtada kur (T6, öğrenci): bağlantı doğrudan bu kipte açılıyor; Çık ve Bağlı delikler gizli; Q1 hazır takılı (1 / 4 takılı); Oynat kapalı; “Denetle hakkı: 3”',
       text.includes('1 / 4 takılı') && text.includes('Deney 9 · tahtada kur') && locked && noPlay && text.includes('Denetle hakkı: 3'), `${locked} ${noPlay} ${text.slice(0, 80)}`);
+    // Kilitli (hazır gelen) Q1 seçiliyken araç çubuğundaki ve seçim çubuğundaki Döndür ve Sil pasif.
+    const q1At = await sp.evaluate(() => {
+      const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
+      return { x: rect.left + (3 - 15.5) * t.scale + t.ox, y: rect.top + (1.5 + 2) * t.scale + t.oy };
+    });
+    await sp.mouse.click(q1At.x, q1At.y); await sp.waitForTimeout(300);
+    const toolbar = sp.getByRole('toolbar', { name: 'Tahta araçları' });
+    const lockedTools = [await toolbar.getByRole('button', { name: /^Döndür/ }).isDisabled(), await toolbar.getByRole('button', { name: /^Sil/ }).isDisabled()];
+    const board = sp.locator('[role=region][aria-label^="Breadboard"] > div.z-10');
+    const lockedChip = [await board.getByRole('button', { name: 'Döndür', exact: true }).isDisabled(), await board.getByRole('button', { name: 'Sil', exact: true }).isDisabled()];
+    check('Tahtada kur (T6, öğrenci): kilitli (hazır gelen) Q1 seçiliyken araç çubuğundaki ve seçim çubuğundaki Döndür ve Sil pasif',
+      lockedTools.every(Boolean) && lockedChip.every(Boolean), `${lockedTools} / ${lockedChip}`);
+    await sp.keyboard.press('Escape'); await sp.waitForTimeout(150);
     for (let i = 0; i < 3; i++) { await panel.getByRole('button', { name: /^(Denetle|Yeniden denetle)$/ }).click(); await sp.waitForTimeout(250); }
     const spent = await panel.getByRole('button', { name: 'Yeniden denetle' }).isDisabled();
     await panel.getByRole('button', { name: 'Yerini göster' }).first().click(); await sp.waitForTimeout(150);
@@ -2910,6 +2923,15 @@ try {
     const text = (await tsheet.textContent()) ?? '';
     const rules = (await tsheet.getByRole('button', { name: 'Denetle', exact: true }).count()) === 0 && (await tsheet.getByRole('button', { name: 'Teslim et' }).count()) === 1 && text.includes('Bu görevde Denetle yok')
       && (await sp.getByRole('button', { name: /Tahtada kur’dan çık/ }).count()) === 0 && (await tsheet.getByRole('button', { name: 'Bağlı delikler' }).count()) === 0;
+    // Kilitli (hazır gelen) + ray köprüsüne dokununca seçim çubuğundaki Sil pasif. Dokunulan yer üst − rayı ile
+    // a satırı arası (z = −6,5): tahtanın ortası alttaki sayfanın altında kalır.
+    const bridge = await sp.evaluate(() => {
+      const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
+      return { x: rect.left - 14 * t.scale + t.ox, y: rect.top - 6.5 * t.scale + t.oy };
+    });
+    await tap(sp, scdp, bridge); await sp.waitForTimeout(300);
+    const lockedDelete = await sp.locator('[role=region][aria-label^="Breadboard"] > div.z-10').getByRole('button', { name: 'Sil', exact: true }).isDisabled({ timeout: 3000 }).catch(() => false);
+    check('Tahtada kur (telefon, T6 öğrenci): kilitli (hazır gelen) ray köprüsü seçiliyken seçim çubuğundaki Sil pasif', lockedDelete);
     await tsheet.getByRole('button', { name: 'R1: tahtaya tak' }).tap(); await sp.waitForTimeout(300);
     const at = await sp.evaluate(() => {
       const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();

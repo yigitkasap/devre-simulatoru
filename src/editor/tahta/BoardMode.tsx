@@ -18,7 +18,7 @@ import { GRID, type CircuitDoc, type Part } from '../../model/types';
 import type { Problem } from '../../tahta/check';
 import { countWord, formatDuration, problemShort, problemText, problemTitle } from '../../tahta/explain';
 import { levelOf, maxLevel, sessionStats, solved, type BoardSession } from '../../tahta/session';
-import { leadKey, wireKey, type Locks } from '../../tahta/task';
+import { isLocked, leadKey, wireKey, type Locks } from '../../tahta/task';
 import { BenchView, type BenchViewProps } from '../BenchView';
 import { CircuitView } from '../CircuitView';
 import { deviceSummary } from '../DeviceCards';
@@ -129,6 +129,9 @@ export function BoardStage(props: BoardStageProps) {
   const [palette, setPalette] = useState(false);
   const wireMode = props.cabling?.kind === 'wire' ? props.cabling : null;
   const pickedWire = picked?.kind === 'wire' ? build.wires[picked.index] : undefined;
+  // Görevde hazır gelen (kilitli) öğe seçiliyken Döndür, Sil ve kablonun rengi pasif.
+  const selectedLocked = selectedPart !== undefined && isLocked(props.locks, { kind: 'part', id: selectedPart.id });
+  const pickLocked = picked !== null && (picked.kind === 'wire' ? pickedWire !== undefined && isLocked(props.locks, { kind: 'wire', ...pickedWire }) : isLocked(props.locks, { kind: 'lead', part: picked.part, pin: picked.pin }));
   const showColor = wireMode !== null || pickedWire !== undefined;
   const currentColor: WireColor | null = wireMode ? wireMode.color : (pickedWire?.color ?? null);
   useEffect(() => {
@@ -416,7 +419,8 @@ export function BoardStage(props: BoardStageProps) {
                   aria-expanded={palette}
                   aria-label={`${tr.tahta.colorLabel}: ${currentColor ? tr.tahta.colors[currentColor] : tr.tahta.colorAuto}`}
                   onClick={() => setPalette((v) => !v)}
-                  className={`flex items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink shadow-sm hover:bg-panel-2 ${touch ? 'h-11' : 'h-10'}`}
+                  disabled={!wireMode && pickLocked}
+                  className={`flex items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink shadow-sm hover:bg-panel-2 disabled:text-stopped disabled:hover:bg-panel ${touch ? 'h-11' : 'h-10'}`}
                 >
                   <Swatch color={currentColor} />
                   {currentColor ? tr.tahta.colors[currentColor] : tr.tahta.colorAutoShort}
@@ -442,8 +446,8 @@ export function BoardStage(props: BoardStageProps) {
                 )}
               </div>
             )}
-            {tool('rotate', tr.tahta.toolRotate, 'R', selectedPart !== undefined, () => commands.current?.rotate())}
-            {tool('trash', tr.tahta.toolDelete, 'Del', selectedPart !== undefined || picked !== null, () => commands.current?.remove())}
+            {tool('rotate', tr.tahta.toolRotate, 'R', selectedPart !== undefined && !selectedLocked, () => commands.current?.rotate())}
+            {tool('trash', tr.tahta.toolDelete, 'Del', (selectedPart !== undefined && !selectedLocked) || (picked !== null && !pickLocked), () => commands.current?.remove())}
           </div>
           {problems.length > 0 && !props.placing && !props.cabling && (
             <div className="absolute bottom-[72px] left-1/2 z-20 flex max-w-[calc(100%-32px)] -translate-x-1/2 flex-col gap-1 rounded-2xl bg-ink py-1.5 pr-1.5 pl-4 text-small whitespace-nowrap text-on-ink shadow-lg">

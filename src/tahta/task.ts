@@ -42,6 +42,17 @@ export interface Locks {
 export const wireKey = (w: { readonly a: string; readonly b: string }) => `${w.a}|${w.b}`;
 export const leadKey = (part: string, pin: number) => `${part}#${pin}`;
 
+/** Tahtada seçili öğe: parça, ara kablo ya da alet kablosu. */
+export type LockItem = { readonly kind: 'part'; readonly id: string } | { readonly kind: 'wire'; readonly a: string; readonly b: string } | { readonly kind: 'lead'; readonly part: string; readonly pin: number };
+
+/** Öğe kilitli mi (görevde hazır geldi): Döndür ve Sil pasif, taşıma ve çıkarma yok. */
+export function isLocked(locks: Locks | null | undefined, item: LockItem): boolean {
+  if (!locks) return false;
+  if (item.kind === 'part') return locks.parts.has(item.id);
+  if (item.kind === 'wire') return locks.wires.has(wireKey(item));
+  return locks.leads.has(leadKey(item.part, item.pin));
+}
+
 /** Başlangıç tahtasındaki her şey kilitli; boş başlangıçta kilit yok (null). */
 export function locksOf(start: Build): Locks | null {
   const locks = { parts: new Set(Object.keys(start.parts)), wires: new Set(start.wires.map(wireKey)), leads: new Set(start.leads.map((l) => leadKey(l.part, l.pin))) };
