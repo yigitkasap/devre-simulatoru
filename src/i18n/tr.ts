@@ -10,7 +10,7 @@
 
 import { SITE_NAME } from '../config';
 import type { Diagnostic } from '../sim/diagnostics';
-import type { ExampleGroupId, ExampleId } from '../examples';
+import type { ExampleFolderId, ExampleGroupId, ExampleId } from '../examples';
 import type { FaultScenarioId } from '../examples/faultScenarios';
 import type { DeviceType } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
@@ -1849,6 +1849,15 @@ export const tr = {
       anahtar: 'Deney 9 · Transistörün anahtar olarak kullanılması',
       baraj: 'Proje · Baraj su seviyesi uyarısı',
     } as Record<ExampleGroupId, string>,
+    folders: {
+      akdeniz: {
+        title: 'Akdeniz Üniversitesi · Fizik Bölümü',
+        summary: (n: number) => `Temel Elektronik Laboratuvarı: 9 deney, baraj projesi, arıza bulma · ${n} devre`,
+        logoAlt: 'Akdeniz Üniversitesi logosu',
+      },
+    } as Record<ExampleFolderId, { title: string; summary: (n: number) => string; logoAlt: string }>,
+    /** Klasör görünümünden ana listeye dönüş. */
+    back: 'Bütün örnekler',
     texts: EXAMPLES,
     /** Defterdeki katlı örnek kartının kısa başlığı: ne yapılacağı ya da neye bakılacağı (v3). */
     cues: {

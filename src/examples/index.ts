@@ -76,7 +76,17 @@ import kopruDiyot from './kopru-diyot.json';
 import tristorMandal from './tristor-mandal.json';
 
 /**
- * Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir.
+ * Örnekler penceresindeki klasörler: içindeki gruplar ana listede değil, klasörün kendi görünümünde.
+ * Akdeniz Üniversitesi Fizik Bölümü'nün Temel Elektronik Laboratuvarı (site bu ders için yapıldı):
+ * föyün dokuz deneyi, baraj projesi ve föye dayanan arıza bulma görevleri. Adı tr.ts → examples.folders.
+ */
+export const EXAMPLE_FOLDERS = [{ id: 'akdeniz', logo: 'akdeniz-universitesi-96.png' }] as const;
+
+export type ExampleFolderId = (typeof EXAMPLE_FOLDERS)[number]['id'];
+
+/**
+ * Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir; `folder` olan
+ * gruplar o klasörde gösterilir (?ornek= adresleri ve örnek kimlikleri klasörden bağımsız).
  * "Deney" grupları Fizik 2. sınıf Elektronik Laboratuvarı föyünün dokuz deneyidir; devreler föydeki
  * parçalar ve değerlerle kuruludur. Grupların sonundaki Schottky, köprü diyot (KBP307) ve tristör
  * örnekleri deneyin konusunu Parça Dalga 1'in parçalarıyla sürdürür (föyde yoktur).
@@ -104,17 +114,17 @@ export const EXAMPLE_GROUPS = [
   { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici', '555-astabil', '555-monostabil', '555-ses', '7805-besleme', 'lm317-ayarli', 'optokuplor-led'] },
   // Arduino Uno: önceden derlenmiş örnek programlar (src/arduino/sketches).
   { id: 'arduino', ids: ['ard-blink', 'ard-dugme', 'ard-sayac', 'ard-trafik-isigi', 'ard-fade', 'ard-potansiyometre', 'ard-gece-lambasi', 'ard-termometre', 'ard-pwm-filtre', 'ard-melodi', 'ard-role'] },
-  { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi', 'schottky-1n4001'] },
-  { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac', 'kopru-diyot'] },
-  { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
-  { id: 'kirpici', ids: ['paralel-kirpici', 'cift-kirpici'] },
-  { id: 'fet-karakteristigi', ids: ['jfet-karakteristik'] },
-  { id: 'fet-yukseltec', ids: ['fet-yukseltec'] },
-  { id: 'bjt-yukseltec', ids: ['bjt-yukseltec'] },
-  { id: 'mosfet-yukseltec', ids: ['mosfet-yukseltec'] },
-  { id: 'anahtar', ids: ['bjt-anahtar', 'bjt-anahtar-emetor', 'tristor-mandal'] },
+  { id: 'diyot-karakteristigi', folder: 'akdeniz', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi', 'schottky-1n4001'] },
+  { id: 'dogrultucu', folder: 'akdeniz', ids: ['yarim-dalga', 'kopru-dogrultmac', 'kopru-diyot'] },
+  { id: 'kenetleyici', folder: 'akdeniz', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
+  { id: 'kirpici', folder: 'akdeniz', ids: ['paralel-kirpici', 'cift-kirpici'] },
+  { id: 'fet-karakteristigi', folder: 'akdeniz', ids: ['jfet-karakteristik'] },
+  { id: 'fet-yukseltec', folder: 'akdeniz', ids: ['fet-yukseltec'] },
+  { id: 'bjt-yukseltec', folder: 'akdeniz', ids: ['bjt-yukseltec'] },
+  { id: 'mosfet-yukseltec', folder: 'akdeniz', ids: ['mosfet-yukseltec'] },
+  { id: 'anahtar', folder: 'akdeniz', ids: ['bjt-anahtar', 'bjt-anahtar-emetor', 'tristor-mandal'] },
   // Proje: baraj su seviyesi uyarısı (ayrı sayfası da var: /baraj).
-  { id: 'baraj', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
+  { id: 'baraj', folder: 'akdeniz', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
 ] as const;
 
 export type ExampleGroupId = (typeof EXAMPLE_GROUPS)[number]['id'];
@@ -122,6 +132,24 @@ export type ExampleId = (typeof EXAMPLE_GROUPS)[number]['ids'][number];
 
 /** Bütün örnekler, pencerede göründükleri sırayla. */
 export const EXAMPLE_IDS: readonly ExampleId[] = EXAMPLE_GROUPS.flatMap((g) => g.ids);
+
+type ExampleGroup = (typeof EXAMPLE_GROUPS)[number];
+
+/** Grubun klasörü; ana listedeki gruplarda null. */
+export function groupFolder(id: ExampleGroupId): ExampleFolderId | null {
+  const group: ExampleGroup | undefined = EXAMPLE_GROUPS.find((g) => g.id === id);
+  return group && 'folder' in group ? group.folder : null;
+}
+
+/** Klasörün grupları (null: ana liste), pencerede bu sırayla. */
+export function folderGroups(folder: ExampleFolderId | null): readonly ExampleGroup[] {
+  return EXAMPLE_GROUPS.filter((g) => groupFolder(g.id) === folder);
+}
+
+/** Örneğin grubu. */
+export function exampleGroup(id: ExampleId): ExampleGroupId | undefined {
+  return EXAMPLE_GROUPS.find((g) => (g.ids as readonly ExampleId[]).includes(id))?.id;
+}
 
 const DATA: Record<ExampleId, unknown> = {
   'led-on-direnc': ledOnDirenc,
