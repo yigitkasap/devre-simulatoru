@@ -452,6 +452,10 @@ try {
     await tap(page, cdp, await screen(page, ...at.w4)); await page.waitForTimeout(300);
     check('telefon: Ölç’te Kablo kartında Sil yok (parça kartındaki gibi)',
       (await doc(page)).wires.length === before.wires.length && (await mode(page)).includes('Çalışıyor') && (await wireCard.count()) === 1 && (await cardDelete.count()) === 0, await mode(page));
+    await tap(page, cdp, await screen(page, ...at.w4), 750);
+    const ask = page.getByRole('alertdialog', { name: 'Düzenlemek için durdurulsun mu?' });
+    check('telefon: Ölç’te kabloyu basılı tutunca parçadaki gibi "Düzenlemek için durdurulsun mu?" soruluyor; menü açılmıyor',
+      (await ask.count()) === 1 && (await page.getByRole('menu').count()) === 0);
     await page.context().close();
   }
 

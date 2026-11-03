@@ -107,7 +107,7 @@ export interface PhoneCanvas {
   readonly onExitConnect: () => void;
   /** Ölç kipinde bir parçaya dokunuldu (ölçümleri göster). */
   readonly onInspect: (partId: string) => void;
-  /** Ölç kipinde parçayı basılı tutmak: "Düzenlemek için durdurulsun mu?" */
+  /** Ölç kipinde parçayı ya da kabloyu basılı tutmak: "Düzenlemek için durdurulsun mu?" */
   readonly onEditAttempt: () => void;
   /** "Devre kilitli · dokun: incele" bilgisi gösterilsin mi. */
   readonly lockChip: boolean;
@@ -1017,8 +1017,9 @@ export function Canvas({
         setMagnifier({ x: local.x, y: local.y, g });
       }, LONG_PRESS_MS);
     }
-    // Kur: kablo da basılı tutulunca bağlam menüsü (Sil); görevde kablolar kilitliyse menü yok.
-    if (hit?.kind === 'wire' && mode === 'kur' && !wiringLocked && selectionActions(taskParts, [], 1).remove) {
+    // Kablo da parçadaki gibi: Kur'da basılı tutulunca bağlam menüsü (Sil; görevde kablolar kilitliyse menü
+    // yok), Ölç'te durdurma sorusu.
+    if (hit?.kind === 'wire' && (mode === 'olc' || (mode === 'kur' && !wiringLocked && selectionActions(taskParts, [], 1).remove))) {
       phoneTimers.current.long = window.setTimeout(() => {
         const state = interactionRef.current;
         const still =
@@ -1026,6 +1027,11 @@ export function Canvas({
           (state.kind === 'drag-segment' && state.pointerId === pointerId && state.delta.x === 0 && state.delta.y === 0);
         if (!still) return;
         phoneLongFired.current = true;
+        if (mode === 'olc') {
+          setInteraction({ kind: 'idle' });
+          phone?.onEditAttempt();
+          return;
+        }
         dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
         menuFromLongPress.current = true;
         setMenu({ wireId: hit.wireId, x: local.x, y: local.y });
