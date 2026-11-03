@@ -192,8 +192,8 @@ export interface CanvasProps {
   readonly onRotate: (partIds: readonly string[]) => void;
   /** Yönlü parçaları ters çevir (uçlar yer değiştirir, kablolar yerinde kalır). */
   readonly onFlip: (partIds: readonly string[]) => void;
-  /** Seçili öğeleri sil; bildirimde Geri al (telefonda kablonun basılı tutma menüsü). */
-  readonly onDelete?: () => void;
+  /** Öğeleri sil; bildirimde Geri al (bağlam menülerinin Sil'i: parça ve telefonda kablo). */
+  readonly onDelete: (items: Selection) => void;
   /** Bu sayı değişince görünüm devreye sığdırılır (örnek ya da dosya yüklenince). */
   readonly fitRequest: number;
   /** Tuval küçülünce (alt sayfa açılınca) görünür tutulacak parçalar (seçili parça). */
@@ -1018,7 +1018,7 @@ export function Canvas({
       }, LONG_PRESS_MS);
     }
     // Kur: kablo da basılı tutulunca bağlam menüsü (Sil); görevde kablolar kilitliyse menü yok.
-    if (hit?.kind === 'wire' && mode === 'kur' && onDelete && !wiringLocked && selectionActions(taskParts, [], 1).remove) {
+    if (hit?.kind === 'wire' && mode === 'kur' && !wiringLocked && selectionActions(taskParts, [], 1).remove) {
       phoneTimers.current.long = window.setTimeout(() => {
         const state = interactionRef.current;
         const still =
@@ -2320,11 +2320,11 @@ export function Canvas({
       {tapMenuState && (
         <ContextMenu x={tapMenuState.x} y={tapMenuState.y} items={tapMenuState.items} area={size} label={tapMenuState.label} onClose={() => setTapMenuState(null)} touch={phone !== null} />
       )}
-      {menu && 'wireId' in menu && onDelete && doc.wires.some((w) => w.id === menu.wireId) && (
+      {menu && 'wireId' in menu && doc.wires.some((w) => w.id === menu.wireId) && (
         <ContextMenu
           x={menu.x}
           y={menu.y}
-          items={[{ label: tr.contextMenu.remove, shortcut: 'Delete', onSelect: onDelete, tone: 'danger' }]}
+          items={[{ label: tr.contextMenu.remove, shortcut: 'Delete', onSelect: () => onDelete({ parts: [], wires: [menu.wireId] }), tone: 'danger' }]}
           area={size}
           label={tr.contextMenu.menu(tr.inspector.wire)}
           touch={phone !== null}
@@ -2350,7 +2350,7 @@ export function Canvas({
                 {
                   label: tr.contextMenu.remove,
                   shortcut: 'Delete',
-                  onSelect: () => commit(removeItems(doc, [part.id], []), EMPTY_SELECTION),
+                  onSelect: () => onDelete({ parts: [part.id], wires: [] }),
                   tone: 'danger' as const,
                   separatorBefore: !burned,
                 },

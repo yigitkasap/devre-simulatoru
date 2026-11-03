@@ -98,7 +98,7 @@ import { useSettings } from './settings';
 import { ShareDialog, type ShareTab } from './ShareDialog';
 import { EmbedBar } from './embed/EmbedBar';
 import { speedLabel } from './SimBar';
-import { EMPTY_SELECTION, editorReducer, initialEditorState } from './state';
+import { EMPTY_SELECTION, editorReducer, initialEditorState, type Selection } from './state';
 import { Toast, useToast } from './Toast';
 import { DeskTopBar } from './TopBar';
 import { useTheme } from './theme';
@@ -958,19 +958,23 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const flipSelection = (ids: readonly string[]) => {
     if (ids.length > 0) dispatch({ type: 'commit', doc: flipParts(doc, new Set(ids)) });
   };
-  /** Seçili öğeleri siler; bildirimde Geri al (P00: "Geri al her silme bildiriminde"). */
-  const deleteSelection = () => {
-    const count = selection.parts.length + selection.wires.length;
+  /**
+   * Seçili öğeleri (bağlam menüsünden: menünün parçasını ya da kablosunu) siler; bildirimde Geri al
+   * (P00: "Geri al her silme bildiriminde").
+   */
+  const deleteSelection = (items: Selection = selection) => {
+    const count = items.parts.length + items.wires.length;
     if (count === 0) return;
-    const what = count === 1 && singlePart ? singlePart.label : tr.phone.items(count);
+    const one = count === 1 ? doc.parts.find((p) => p.id === items.parts[0]) : undefined;
+    const what = one ? one.label : tr.phone.items(count);
     // Takılı ampermetre: kaldırılır, kablo eski hâline döner.
-    const meter = count === 1 ? plugged.find((m) => m.part === selection.parts[0]) : undefined;
+    const meter = one ? plugged.find((m) => m.part === one.id) : undefined;
     if (meter) {
       unplugAmmeter(meter);
       return;
     }
     // Bildirim yalnızca silme kabul edilince (kilitli parçada bekçi "Bu parça görevde kilitli" der).
-    if (dispatch({ type: 'commit', doc: removeItems(doc, selection.parts, selection.wires), selection: EMPTY_SELECTION })) {
+    if (dispatch({ type: 'commit', doc: removeItems(doc, items.parts, items.wires), selection: EMPTY_SELECTION })) {
       showToast(tr.toast.deleted(what), 'info', { label: tr.toast.undo, run: () => dispatch({ type: 'undo' }) });
     }
   };
@@ -1401,7 +1405,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     onSlidePart: slidePartFromPanel,
     onRotate: rotateSelection,
     onFlip: flipSelection,
-    onDelete: deleteSelection,
+    onDelete: () => deleteSelection(),
     onRepair: sim.repair,
     onSelectPart: (partId: string) => {
       dispatch({ type: 'select', selection: { parts: [partId], wires: [] } });

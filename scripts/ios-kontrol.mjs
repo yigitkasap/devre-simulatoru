@@ -432,6 +432,20 @@ try {
     check('telefon: Kur’da kabloyu basılı tutunca menü ve büyüteç açılıyor, içinde Sil; basınca kablo siliniyor, bildirim çıkıyor',
       items.length === 1 && items[0].startsWith('Sil') && magnifier === 1 && afterMenu.wires.length === before.wires.length - 1 && !afterMenu.wires.some((w) => w.id === 'w5') && (await page.getByRole('status').filter({ hasText: 'silindi' }).count()) === 1,
       `menü: ${items.join('|')} · büyüteç ${magnifier} · ${before.wires.length} → ${afterMenu.wires.length} kablo`);
+    // Parçanın basılı tutma menüsündeki Sil de bildirimli (deleteSelection); bildirimin Geri al'ı parçayı geri getirir.
+    const r1 = before.parts.find((x) => x.label === 'R1');
+    await tap(page, cdp, await screen(page, r1.x, r1.y), 750);
+    const partMenu = page.getByRole('menu', { name: 'R1 menüsü' });
+    const partItems = await partMenu.getByRole('menuitem').allTextContents();
+    if (partItems.length > 0) await partMenu.getByRole('menuitem', { name: /^Sil/ }).tap();
+    const afterPart = await doc(page);
+    const partUndo = page.getByRole('status').filter({ hasText: 'R1 silindi.' }).getByRole('button', { name: 'Geri al' });
+    const partToast = (await partUndo.count()) === 1;
+    if (partToast) await partUndo.tap();
+    const restored = await doc(page);
+    check('telefon: parçanın basılı tutma menüsündeki Sil de "R1 silindi. · Geri al" bildirimini çıkarıyor; Geri al parçayı geri getiriyor',
+      afterPart.parts.length === before.parts.length - 1 && partToast && restored.parts.length === before.parts.length,
+      `menü: ${partItems.join('|')} · ${before.parts.length} → ${afterPart.parts.length} → ${restored.parts.length} parça · bildirim ${partToast}`);
     // Ölç kipinde yapı kilitli: kablonun kartında da (parça kartındaki gibi) Sil yok.
     await page.locator('header').getByRole('button', { name: 'Geri al' }).tap(); await page.waitForTimeout(300);
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
@@ -439,6 +453,28 @@ try {
     check('telefon: Ölç’te Kablo kartında Sil yok (parça kartındaki gibi)',
       (await doc(page)).wires.length === before.wires.length && (await mode(page)).includes('Çalışıyor') && (await wireCard.count()) === 1 && (await cardDelete.count()) === 0, await mode(page));
     await page.context().close();
+  }
+
+  // --- Bağlam menüsü (masaüstü): sağ tık menüsünün Sil'i bildirimli (Geri al) ---------------------
+  {
+    const one = { version: 1, parts: [{ id: 'a', type: 'resistor', label: 'R1', x: 0, y: 0, rotation: 0, props: { resistance: 100 } }], wires: [] };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, JSON.stringify(one));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const pt = await screen(page, 0, 0);
+    await page.mouse.click(pt.x, pt.y, { button: 'right' }); await page.waitForTimeout(300);
+    const menu = page.getByRole('menu', { name: 'R1 menüsü' });
+    const items = await menu.getByRole('menuitem').allTextContents();
+    if (items.length > 0) await menu.getByRole('menuitem', { name: /^Sil/ }).click();
+    const after = await doc(page);
+    const undo = page.getByRole('status').filter({ hasText: 'R1 silindi.' }).getByRole('button', { name: 'Geri al' });
+    const toast = (await undo.count()) === 1;
+    if (toast) await undo.click();
+    check('masaüstü: sağ tık menüsünün Sil’i "R1 silindi. · Geri al" bildirimini çıkarıyor; Geri al parçayı geri getiriyor',
+      after.parts.length === 0 && toast && (await doc(page)).parts.length === 1, `menü: ${items.join('|')} · bildirim ${toast}`);
+    await ctx.close();
   }
 
   // --- Ölç kipi: kilit, kart, anahtar, canlı değer, durdurma sorusu ---------------------------
