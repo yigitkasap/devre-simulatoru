@@ -15,6 +15,7 @@ import {
   MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
+  OrthographicCamera,
   PerspectiveCamera,
   PlaneGeometry,
   type PMREMGenerator,
@@ -55,6 +56,25 @@ export interface BenchCallbacks {
   onPress(partId: string, down: boolean): void;
   /** Kullanıcı kamerayı elle oynattı (kamera menüsü "Serbest"e döner). */
   onCamera?(): void;
+  /** Tepeden görünüm (Tahtada kur) kaydırıldı, yakınlaştı ya da boyutu değişti. */
+  onView?(): void;
+}
+
+/** Tepeden görünümde ekran = dünya · scale + (ox, oy) (piksel; x sağa, z aşağı). */
+export interface TopTransform {
+  readonly scale: number;
+  readonly ox: number;
+  readonly oy: number;
+}
+
+/** Tepeden görünümde sığdırırken boş bırakılacak kenarlar (piksel; üst çubuk, araç çubuğu). */
+export interface TopInsets {
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+  readonly left: number;
+  /** Telefonda (T5): yalnızca tahtanın yüksekliğine sığdırılır, sol kenarı görünür; tahta yatay kaydırılır, masadaki aletler ekran dışında. */
+  readonly boardOnly?: boolean;
 }
 
 /** Kamera görünümleri: Serbest (önden ve yukarıdan, 52°), Üstten, Önden (alçaktan). */
@@ -160,6 +180,14 @@ export class BenchScene {
   private readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(32, 1, 0.5, 4000);
+  /** Tahtada kur → Tepeden: dik (ortografik) kamera, tam tepeden; yörünge denetimi kapalı. */
+  private readonly ortho = new OrthographicCamera(-1, 1, 1, -1, 1, 1000);
+  /** Tepeden görünüm: ekranın ortasındaki dünya noktası ve ölçek (piksel / birim); null: 3B kamera. */
+  private topView: { cx: number; cz: number; scale: number } | null = null;
+  /** Tepeden sığdırma kartlar DOM'a gelmeden yapıldı (3B gövdelerle): kartlar gelince bir kez yeniden. */
+  private topFitPending = false;
+  private topInsets: TopInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+  private interactive = true;
   private readonly controls: OrbitControls;
   private readonly pmrem: PMREMGenerator;
   private readonly parts = new Map<string, Placed>();
@@ -259,7 +287,13 @@ export class BenchScene {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     if (this.fitted && !this.userMoved) this.fit(this.lastView);
+    if (this.topView) this.applyTop();
     this.dirty = true;
+  }
+
+  /** Çizimde ve seçimde kullanılan kamera. */
+  private get view(): PerspectiveCamera | OrthographicCamera {
+    return this.topView ? this.ortho : this.camera;
   }
 
   // --- Etiket katmanı ve akım noktaları -------------------------------------------------------------
@@ -286,6 +320,10 @@ export class BenchScene {
   private positionOverlay(): void {
     const el = this.overlay;
     if (!el) return;
+    if (this.topFitPending && this.topView && el.querySelector('[data-anchor="footprint"]')) {
+      this.topFitPending = false;
+      this.fitTop();
+    }
     const canvas = this.renderer.domElement;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
@@ -307,12 +345,32 @@ export class BenchScene {
     }));
     const p = new Vector3();
     const toScreen = (world: Vector3) => {
-      p.copy(world).project(this.camera);
+      p.copy(world).project(this.view);
       return { x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h, z: p.z };
     };
     // Uç harfleri: bacaklar ekranda çok yakınsa harfler aynı doğru üstünde en az 28 px arayla açılır.
     const pinSpots = new Map<HTMLElement, { x: number; y: number; z: number }>();
-    const pinNodes = items.filter((i) => i.node.dataset.pin !== undefined).map((i) => i.node);
+    // Tepeden görünümde masadaki parçanın kartı (data-anchor="footprint"): gövdenin ekrandaki genişliğinde
+    // (en az data-minw piksel), alt kenarı uçların 24 px altında, yüksekliği data-h piksel.
+    for (const item of items.filter((i) => i.node.dataset.anchor === 'footprint')) {
+      const placed = this.parts.get(item.node.dataset.id ?? '');
+      if (!placed) continue;
+      const box = new Box3().setFromObject(placed.model.root);
+      const corners = [box.min, box.max, new Vector3(box.min.x, box.max.y, box.max.z), new Vector3(box.max.x, box.min.y, box.min.z)].map(toScreen);
+      const left = Math.min(...corners.map((c) => c.x));
+      const right = Math.max(...corners.map((c) => c.x));
+      const width = Math.max(right - left, Number(item.node.dataset.minw ?? 0));
+      const pins = placed.anchors.map(toScreen);
+      const bottom = (pins.length > 0 ? Math.max(...pins.map((q) => q.y)) : Math.max(...corners.map((c) => c.y))) + 24;
+      const height = Number(item.node.dataset.h ?? bottom - Math.min(...corners.map((c) => c.y)));
+      const st = item.node.style;
+      st.transform = `translate(${Math.round((left + right) / 2 - width / 2)}px, ${Math.round(bottom - height)}px)`;
+      st.width = `${Math.round(width)}px`;
+      st.height = `${Math.round(height)}px`;
+      st.opacity = '1';
+    }
+    // Uç harfleri (data-exact: tam ucun üstünde, aralanmaz; Tepeden görünümde cihaz uçları).
+    const pinNodes = items.filter((i) => i.node.dataset.pin !== undefined && i.node.dataset.exact === undefined).map((i) => i.node);
     for (const id of new Set(pinNodes.map((n) => n.dataset.id ?? ''))) {
       const placed = this.parts.get(id);
       const nodes = pinNodes.filter((n) => n.dataset.id === id);
@@ -340,12 +398,18 @@ export class BenchScene {
     }
     for (const item of items) {
       const { node } = item;
+      if (node.dataset.anchor === 'footprint') continue;
       const placed = this.parts.get(node.dataset.id ?? '');
       const pin = node.dataset.pin;
       const world = placed ? (pin !== undefined ? placed.anchors[Number(pin)] : placed.top) : undefined;
       let show = false;
       if (world) {
         const { x, y, z } = pinSpots.get(node) ?? toScreen(world);
+        if (node.dataset.exact !== undefined) {
+          node.style.transform = `translate(${Math.round(x - item.w / 2)}px, ${Math.round(y - item.h / 2)}px)`;
+          node.style.opacity = z > -1 && z < 1 ? '1' : '0';
+          continue;
+        }
         const box = pin !== undefined ? { x0: x - item.w / 2, y0: y - item.h / 2 } : { x0: x - item.w / 2, y0: y - item.h - 4 };
         const rect = { ...box, x1: box.x0 + item.w, y1: box.y0 + item.h };
         const inView = z > -1 && z < 1 && rect.x1 > 0 && rect.y1 > 0 && rect.x0 < w && rect.y0 < h;
@@ -416,14 +480,16 @@ export class BenchScene {
 
   /** Dokunmaya (çekmece açıkken) kapalı: tuval sayfa kaydırmasına izin verir. */
   setInteractive(on: boolean): void {
-    this.controls.enabled = on;
+    this.interactive = on;
+    this.controls.enabled = on && !this.topView;
     this.renderer.domElement.style.touchAction = on ? 'none' : 'auto';
   }
 
   // --- Devre --------------------------------------------------------------------------------------
 
-  setDoc(doc: CircuitDoc): void {
-    const plan = planBreadboard(doc);
+  /** Devre; `override` verilirse (Tahtada kur: öğrencinin kurulumu) tezgâh onunla kurulur. */
+  setDoc(doc: CircuitDoc, override: BreadboardPlan | null = null): void {
+    const plan = override ?? planBreadboard(doc);
     const key = JSON.stringify([
       doc.parts.map(partKey),
       [...plan.onBoard.values()],
@@ -439,6 +505,7 @@ export class BenchScene {
     } else {
       this.layoutKey = key;
       this.rebuild(doc, plan);
+      this.applyTopLook();
       if (!this.fitted && doc.parts.length > 0) {
         this.fit();
         this.fitted = true;
@@ -481,6 +548,7 @@ export class BenchScene {
       shadow.position.set(0, 0.02, boardZ(b));
       shadow.scale.set(boardWidth(plan.cols) * 1.25, BB.depth * 1.6, 1);
       shadow.userData.ownsMaterial = true;
+      shadow.userData.shadow = true;
       this.boards.add(shadow);
     }
     for (const part of doc.parts) {
@@ -494,7 +562,7 @@ export class BenchScene {
     const holeTop = (h: Hole) => holeAt(h, plan.cols, BB.height);
     const jumperPaths: CablePath[] = [];
     for (const j of plan.jumpers) {
-      const jumper = jumperMesh(holeTop(j.a), holeTop(j.b), colorOf(j.net));
+      const jumper = jumperMesh(holeTop(j.a), holeTop(j.b), j.color ?? colorOf(j.net));
       this.cables.add(jumper);
       jumperPaths.push(cablePath(jumper.userData.curve as Curve<Vector3>));
     }
@@ -515,7 +583,7 @@ export class BenchScene {
         continue;
       }
       const to = holeTop(lead.hole);
-      const color = colorOf(lead.net);
+      const color = lead.color ?? colorOf(lead.net);
       const a1 = from.clone().add(new Vector3(0, 1.4, 0));
       const b1 = to.clone().add(new Vector3(0, 1.5, 0));
       const dist = a1.distanceTo(b1);
@@ -528,6 +596,22 @@ export class BenchScene {
       this.cables.add(mesh(plug, plugMat, from.x, from.y + 0.75, from.z));
       this.cables.add(mesh(plug, plugMat, to.x, to.y + 0.75, to.z));
       this.cables.add(rod(new Vector3(to.x, to.y - HOLE_DEPTH, to.z), to, 0.1, M.tin(), 6));
+    }
+    // Tahtada kur: takılmamış alet kabloları aletin önünde masaya sarkar (fişi masada).
+    for (const loose of plan.loose ?? []) {
+      const placed = this.parts.get(loose.partId);
+      const from = placed?.anchors[loose.pin];
+      if (!placed || !from) continue;
+      const center = new Box3().setFromObject(placed.group).getCenter(new Vector3());
+      const dir = new Vector3(from.x - center.x, 0, from.z - center.z);
+      if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+      dir.normalize();
+      const end = from.clone().addScaledVector(dir, 3.4).setY(0.4);
+      const curve = new CubicBezierCurve3(from.clone().add(new Vector3(0, 0.4, 0)), from.clone().addScaledVector(dir, 1.2).add(new Vector3(0, 1.4, 0)), end.clone().addScaledVector(dir, -0.6).add(new Vector3(0, 0.8, 0)), end);
+      this.cables.add(new Mesh(new TubeGeometry(curve, 16, 0.28, 8, false), mat(loose.color, 0.55)));
+      const tip = mesh(plug, plugMat, end.x, 0.4, end.z);
+      tip.rotation.set(Math.PI / 2, 0, -Math.atan2(dir.x, dir.z));
+      this.cables.add(tip);
     }
     this.cablePaths = [...paths, ...jumperPaths];
     this.cableAmps = new Float64Array(this.cablePaths.length);
@@ -656,6 +740,155 @@ export class BenchScene {
     this.dirty = true;
   }
 
+  // --- Tepeden görünüm (Tahtada kur) ----------------------------------------------------------------
+
+  /** Tepeden görünüm açık/kapalı. Açılınca tahtaya ve masadaki parçalara sığdırılır. */
+  setTop(on: boolean, insets?: TopInsets): void {
+    if (insets) this.topInsets = insets;
+    if (on === (this.topView !== null)) return;
+    this.topView = on ? { cx: 0, cz: 0, scale: 10 } : null;
+    this.controls.enabled = this.interactive && !on;
+    this.applyTopLook();
+    if (on) this.fitTop();
+    else {
+      this.dirty = true;
+      this.cb.onView?.();
+    }
+  }
+
+  /**
+   * Tepeden görünümde tahtanın tamamı ve masadaki aletlerin kartları görünsün, kullanılabilir alanı
+   * doldursun. Aletlerin 3B gövdesi tepeden görünmez (yerinde düz kart var): kartın ekrandaki yeri
+   * (positionOverlay: uçların 24 px altından data-h piksel yukarı, en az data-minw piksel genişlik)
+   * ölçeğe bağlı olduğu için sığan en büyük ölçek ikili aramayla bulunur.
+   */
+  fitTop(): void {
+    if (!this.topView) return;
+    const plan = this.plan;
+    const canvas = this.renderer.domElement;
+    const { top, right, bottom, left } = this.topInsets;
+    const w = Math.max(40, canvas.clientWidth - left - right);
+    const h = Math.max(40, canvas.clientHeight - top - bottom);
+    if (this.topInsets.boardOnly && plan) {
+      const half = boardWidth(plan.cols) / 2;
+      const z0 = -BB.depth / 2;
+      const z1 = boardZ(plan.boards - 1) + BB.depth / 2;
+      const scale = Math.min(60, h / ((z1 - z0) * 1.02));
+      const viewW = canvas.clientWidth / scale;
+      const viewH = canvas.clientHeight / scale;
+      this.topView = { scale, cx: -half - left / scale + viewW / 2 - 0.4, cz: z0 - top / scale + viewH / 2 - ((h / scale - (z1 - z0)) / 2) };
+      this.applyTop();
+      return;
+    }
+    const half = plan ? boardWidth(plan.cols) / 2 : 20;
+    const z0 = plan ? -BB.depth / 2 : -15;
+    const z1 = plan ? boardZ(plan.boards - 1) + BB.depth / 2 : 15;
+    // Kartlar: alet, gövdesinin x aralığı, uçlarının en büyük z'si; kartın en küçük genişliği ve yüksekliği (piksel).
+    const nodes = this.overlay ? [...this.overlay.querySelectorAll<HTMLElement>('[data-anchor="footprint"]')] : [];
+    const cards = (plan ? [...plan.table.keys()] : []).flatMap((id) => {
+      const placed = this.parts.get(id);
+      if (!placed) return [];
+      const box = new Box3().setFromObject(placed.model.root);
+      const node = nodes.find((n) => n.dataset.id === id);
+      const pinZ = placed.anchors.length > 0 ? Math.max(...placed.anchors.map((a) => a.z)) : box.max.z;
+      return [{ x0: box.min.x, x1: box.max.x, zTop: node ? null : box.min.z, pinZ, minW: Number(node?.dataset.minw ?? 0), h: Number(node?.dataset.h ?? 0) }];
+    });
+    this.topFitPending = cards.some((c) => c.zTop !== null);
+    const bounds = (scale: number) => {
+      let xa = -half;
+      let xb = half;
+      let za = z0;
+      let zb = z1;
+      for (const c of cards) {
+        const width = Math.max(c.x1 - c.x0, c.minW / scale);
+        const cx = (c.x0 + c.x1) / 2;
+        xa = Math.min(xa, cx - width / 2);
+        xb = Math.max(xb, cx + width / 2);
+        za = Math.min(za, c.zTop ?? c.pinZ + (24 - c.h) / scale);
+        zb = Math.max(zb, c.pinZ + 24 / scale);
+      }
+      return { xa, xb, za, zb };
+    };
+    let lo = 1;
+    let hi = 120;
+    for (let i = 0; i < 40; i++) {
+      const scale = (lo + hi) / 2;
+      const b = bounds(scale);
+      if ((b.xb - b.xa) * scale * 1.02 <= w && (b.zb - b.za) * scale * 1.02 <= h) lo = scale;
+      else hi = scale;
+    }
+    const scale = lo;
+    const b = bounds(scale);
+    // Ekranın ortası, kenarlar çıkarılınca kalan alanın ortasına göre kayar.
+    this.topView = { scale, cx: (b.xa + b.xb) / 2 - (left - right) / 2 / scale, cz: (b.za + b.zb) / 2 - (top - bottom) / 2 / scale };
+    this.applyTop();
+  }
+
+  /**
+   * Tepeden görünümde masadaki parçaların 3B modeli ve gölgeler gizlenir: cihazlar düz kartlarla
+   * çizilir (BoardMode), gölgeler dik kamerada gri leke bırakır. Kablolar uçların yerinden çıkar.
+   */
+  private applyTopLook(): void {
+    const top = this.topView !== null;
+    for (const [id, placed] of this.parts) {
+      const onTable = this.plan?.table.has(id) ?? false;
+      placed.group.visible = !(top && onTable);
+      placed.shadow.visible = !top;
+    }
+    for (const child of this.boards.children) if (child.userData.shadow) child.visible = !top;
+    this.dirty = true;
+  }
+
+  private applyTop(): void {
+    const v = this.topView;
+    if (!v) return;
+    const canvas = this.renderer.domElement;
+    const w = Math.max(1, canvas.clientWidth);
+    const h = Math.max(1, canvas.clientHeight);
+    this.ortho.left = -w / 2 / v.scale;
+    this.ortho.right = w / 2 / v.scale;
+    this.ortho.top = h / 2 / v.scale;
+    this.ortho.bottom = -h / 2 / v.scale;
+    this.ortho.position.set(v.cx, 400, v.cz);
+    this.ortho.up.set(0, 0, -1);
+    this.ortho.lookAt(v.cx, 0, v.cz);
+    this.ortho.updateProjectionMatrix();
+    this.dirty = true;
+    this.cb.onView?.();
+  }
+
+  /** Tepeden görünümde dünya (x, z) → ekran (piksel, tuvale göre) dönüşümü; 3B'de null. */
+  topTransform(): TopTransform | null {
+    const v = this.topView;
+    if (!v) return null;
+    const canvas = this.renderer.domElement;
+    return { scale: v.scale, ox: canvas.clientWidth / 2 - v.cx * v.scale, oy: canvas.clientHeight / 2 - v.cz * v.scale };
+  }
+
+  /** Tepeden görünümü ekranda (dx, dy) piksel kaydırır. */
+  panTop(dx: number, dy: number): void {
+    const v = this.topView;
+    if (!v) return;
+    this.topView = { ...v, cx: v.cx - dx / v.scale, cz: v.cz - dy / v.scale };
+    this.applyTop();
+  }
+
+  /** Tepeden görünümü (px, py) noktası yerinde kalacak biçimde yakınlaştırır (factor > 1) ya da uzaklaştırır. */
+  zoomTop(factor: number, px?: number, py?: number): void {
+    const v = this.topView;
+    if (!v) return;
+    const canvas = this.renderer.domElement;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    const sx = px ?? w / 2;
+    const sy = py ?? h / 2;
+    const wx = v.cx + (sx - w / 2) / v.scale;
+    const wz = v.cz + (sy - h / 2) / v.scale;
+    const scale = Math.min(120, Math.max(3, v.scale * factor));
+    this.topView = { scale, cx: wx - (sx - w / 2) / scale, cz: wz - (sy - h / 2) / scale };
+    this.applyTop();
+  }
+
   // --- Kamera ---------------------------------------------------------------------------------------
 
   /** Bütün devre görünsün: Serbest (önden ve yukarıdan, 52°), Üstten ya da Önden (alçaktan). */
@@ -723,7 +956,7 @@ export class BenchScene {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     const ray = new Raycaster();
-    ray.setFromCamera(ndc, this.camera);
+    ray.setFromCamera(ndc, this.view);
     const hits = ray.intersectObject(this.partsGroup, true);
     for (const hit of hits) {
       let o: Object3D | null = hit.object;
@@ -800,7 +1033,7 @@ export class BenchScene {
     if (!(this.dirty || moved || this.animating)) return;
     this.dirty = false;
     const t0 = performance.now();
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.render(this.scene, this.view);
     this.positionOverlay();
     this.stats.renderMs = performance.now() - t0;
     this.stats.frames++;

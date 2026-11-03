@@ -8,6 +8,19 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, us
 import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { buildConnectivity, pinKey, spotKey, wireKey } from '../model/connectivity';
+import { boardCircuit } from '../tahta/circuit';
+import { planFromBuild } from '../tahta/plan';
+import { planBreadboard } from '../bench3d/breadboard';
+import { emptyBuild, serializeBuild, type Build } from '../model/build';
+import { BoardPanel, BoardStage, SchematicDialog, sessionMarks, type BoardView, type Cabling, type Placing } from './tahta/BoardMode';
+import type { BoardCommands } from './tahta/BoardTop';
+import { PhoneBoardSheet } from './tahta/PhoneBoard';
+import { checkBuild, type Problem } from '../tahta/check';
+import { boardReport } from '../tahta/report';
+import { openHint, recordCheck, startSession, type BoardSession } from '../tahta/session';
+import { checksLeft, keepLocked, leadKey, locksOf, startBuild } from '../tahta/task';
+import { problemShort } from '../tahta/explain';
+import { groupOf } from './ExampleTab';
 import { maskFrame } from './fault/mask';
 import { insertAmmeter } from './fault/ammeter';
 import { METER_DISPLAY } from './PartView';
@@ -53,7 +66,7 @@ import { slug, TaskDialog } from './task/TaskDialog';
 import { goalText, measureTarget, targetName, targetParts } from './task/targets';
 import { Icon } from './icons';
 import { BottomSheet, SheetHeader, type SheetSize } from './BottomSheet';
-import { BenchView, ViewToggle, useViewMode } from './BenchView';
+import { BenchView, ViewToggle, useViewMode, type BenchViewProps } from './BenchView';
 import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type PhoneCanvas, type TapTarget } from './Canvas';
 import { CanvasControls, WiringControls } from './CanvasControls';
 import type { DeviceHooks } from './DeviceCards';
@@ -246,7 +259,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     setWrongReport(false);
   }, [task]);
   /** Tahminler kaydedilmeden simülasyon ve ölçüm kapalı (B1): Oynat'ta ve Analiz'de söylenen yazı. */
-  const gate = task?.predict && !predictions.locked ? tr.task.gate : null;
+  // Oynat'ın engeli: tahmin kaydedilmeden (B1) ya da Tahtada kur görevinde Oynat kapalıysa (T6).
+  const gate = task?.board && !task.board.allowPlay ? tr.tahta.gorev.noPlay : task?.predict && !predictions.locked ? tr.task.gate : null;
   const docRef = useRef(state.doc);
   docRef.current = state.doc;
   /** Reddedilen değişikliğin bildirimi (sürüklerken art arda gelmesin diye önizlemede seyrek). */
@@ -369,6 +383,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [helpOpen, setHelpOpen] = useState(false);
   /** Karta aktar penceresi (3B kart: delikli plaket ve baskı devre). */
   const [kartaOpen, setKartaOpen] = useState(false);
+  /** Karta aktar'ın açılacağı sekme (Tahtada kur → Lehim rehberine geç: delikli plaket). */
+  const [kartaTab, setKartaTab] = useState<'perf' | undefined>(undefined);
   const [tour, setTour] = useState<{ step: TourStep; parts: number; wires: number } | null>(null);
   const canvasRef = useRef<CanvasHandle>(null);
   const [viewMode, setViewMode] = useViewMode();
@@ -411,12 +427,50 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       return next;
     });
   }, []);
+  /**
+   * Tahtada kur kipi (T1–T6): şema değiştirilemez, öğrenci devreyi tahtaya kurar; Oynat şemayla değil
+   * tahtadaki kurulumla çalışır (tahta/circuit.ts). Kurulum belgede (doc.build) durur.
+   */
+  const [boardMode, setBoardMode] = useState(false);
+  const [boardView, setBoardView] = useState<BoardView>('top');
+  const [showConnected, setShowConnected] = useState(true);
+  const [boardSchema, setBoardSchema] = useState(false);
+  /** Takılmakta olan parça (panel ile tahta arasında ortak). */
+  const [placing, setPlacing] = useState<Placing | null>(null);
+  /** Kablo aracı ya da takılmakta olan alet kablosu (panelin çiplerinden de başlar). */
+  const [cabling, setCabling] = useState<Cabling | null>(null);
+  /** Tahtanın komutları (telefonda alttaki sayfa: delik adı yaz). */
+  const boardCommands = useRef<BoardCommands | null>(null);
+  /** Telefonda Tahtada kur'un alttaki sayfası (T5). */
+  const [boardSheet, setBoardSheet] = useState<SheetSize>('half');
+  // Tahtada kur görevi (T6) doğrudan bu kipte açılır; çıkış yok. Bağlı delikler kapalıysa öğrenci açamaz.
+  useEffect(() => {
+    if (!task?.board) return;
+    setBoardView('top');
+    setBoardSession((s) => s ?? startSession(Date.now()));
+    setBoardMode(true);
+    if (!task.board.showConnected) setShowConnected(false);
+  }, [task]);
+  // Telefonda takma ya da kablo bitince parça kutusu küçük konuma iner (T5: "Tak’a basınca kutu kapanır").
+  const wasPlacing = useRef(false);
+  useEffect(() => {
+    const now = placing !== null || cabling !== null;
+    if (wasPlacing.current && !now) setBoardSheet('peek');
+    wasPlacing.current = now;
+  }, [placing, cabling]);
+  /** Tahtada kur oturumu: Denetle denemeleri, ipuçları, süre (yeni belge yüklenince sıfırlanır). */
+  const [boardSession, setBoardSession] = useState<BoardSession | null>(null);
+  /** Şemanın breadboard planı: tahtanın boyu, masadaki yerler, alet kabloları (3B ya da Tahtada kur açıkken). */
+  const schematicPlan = useMemo(() => (boardMode || viewMode === 'bench' ? planBreadboard(doc) : null), [boardMode, viewMode, doc]);
+  const boardBuild = useMemo(() => (boardMode && schematicPlan ? (doc.build ?? emptyBuild(schematicPlan.cols)) : null), [boardMode, schematicPlan, doc.build]);
+  const board = useMemo(() => (boardBuild ? boardCircuit(doc, boardBuild) : null), [boardBuild, doc]);
+  const boardPlan = useMemo(() => (boardBuild && schematicPlan ? planFromBuild(doc, boardBuild, schematicPlan) : null), [boardBuild, schematicPlan, doc]);
   const simConnectivity = useMemo(() => {
-    const c = fault ? buildConnectivity(simDoc, activeFaults) : connectivity;
+    const c = board ? { netlist: board.netlist, junctions: [], unconnectedPins: board.loosePins, danglingEnds: [] } : fault ? buildConnectivity(simDoc, activeFaults) : connectivity;
     const netlist = fault ? wireMeter(c.netlist, meter.mode, meter.red, meter.black) : c.netlist;
     const elements = pressed.size === 0 ? netlist.elements : netlist.elements.map((e) => (pressed.has(e.id) ? { ...e, props: { ...e.props, pressed: true } } : e));
     return elements === c.netlist.elements ? c : { ...c, netlist: { ...netlist, elements } };
-  }, [fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black, pressed]);
+  }, [board, fault, simDoc, connectivity, activeFaults, meter.mode, meter.red, meter.black, pressed]);
   /** Otomatik göstergeler kapalı: kablo renkleri, akım noktaları, düğüm etiketleri, kartlardaki canlı değerler. */
   const hideLive = fault !== null && fault.hideIndicators && !repaired;
   /** Tezgâhta gözle görülen arızalar (karar 1): ters takılmış, yanlış değerli, yanmış parça. */
@@ -501,6 +555,92 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     return texts;
   }, [doc.parts, sim.status, simConnectivity]);
   /** Oynat: görevde tahminler kaydedilmediyse (B1) çalışmaz, nedenini söyler. */
+  /** Tahtada kur'a gir: tek tahtaya sığmayan devrede açılmaz (kullanıcı kararı). Simülasyon durur. */
+  const enterBoard = (target: CircuitDoc = doc) => {
+    const plan = target === doc ? (schematicPlan ?? planBreadboard(doc)) : planBreadboard(target);
+    if (plan.boards > 1) {
+      showToast(tr.tahta.tooBig, 'error');
+      return;
+    }
+    sim.stop();
+    dispatch({ type: 'select', selection: EMPTY_SELECTION });
+    setBoardView('top');
+    setBoardSession((s) => s ?? startSession(Date.now()));
+    setBoardMode(true);
+  };
+  const exitBoard = () => {
+    sim.stop();
+    setBoardSchema(false);
+    setPlacing(null);
+    setCabling(null);
+    setBoardMode(false);
+  };
+  /** Kurulumun karşılaştırma anahtarı: Denetle'den sonra değiştiyse sonuç eskimiştir. */
+  const boardKey = useMemo(() => (boardBuild ? JSON.stringify(serializeBuild(boardBuild)) : ''), [boardBuild]);
+  /** Denetle: tahtadaki bağlantılar şemayla karşılaştırılır; sonuç ve deneme oturuma yazılır. */
+  const checkBoard = () => {
+    if (!boardBuild || !schematicPlan) return;
+    const result = checkBuild(doc, boardBuild, schematicPlan);
+    setPlacing(null);
+    setCabling(null);
+    setBoardSession((s) => recordCheck(s ?? startSession(Date.now()), result, Date.now(), boardKey));
+  };
+  /** Sonuç (T4): rapor, lehim rehberi, tahtayı boşalt. */
+  const downloadBoardReport = () => {
+    if (!boardSession) return;
+    const body = { ...toSerializable(doc, analysis.doc), rapor: boardReport(doc, boardSession, circuitTitle, Date.now()) };
+    void saveFile(datedName(`${tr.tahta.denetle.file}-${slug(circuitTitle)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
+  };
+  const openSolderGuide = () => {
+    setKartaTab('perf');
+    setKartaOpen(true);
+  };
+  /** Tahtada kur görevi (T6): teslim dosyası (son kurulum devrede; her Denetle, ipuçları, süre, son durum). */
+  const submitBoardTask = () => {
+    if (!task?.board || !boardBuild || !schematicPlan) return;
+    const session = boardSession ?? startSession(Date.now());
+    const final = checkBuild(doc, boardBuild, schematicPlan).problems;
+    const body = {
+      ...toSerializable(doc, analysis.doc),
+      teslim: {
+        gorev: task.name,
+        tarih: new Date().toISOString(),
+        tahtada_kur: {
+          ...boardReport(doc, session, circuitTitle, Date.now()),
+          son_durum: final.length === 0 ? tr.tahta.denetle.solved : tr.tahta.denetle.unsolved(final.length),
+          son_sorunlar: final.map((p) => problemShort(doc, { id: p.id, kind: p.kind, part: p.part, wire: p.wire, onRail: p.onRail })),
+        },
+      },
+    };
+    void saveFile(datedName(`${tr.tahta.gorev.file}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(body, null, 2)}\n`], { type: 'application/json' }), phone);
+    showToast(tr.tahta.gorev.submitted, 'info');
+  };
+  // Görevde hazır gelenler kilitli (kullanıcı kararı): başlangıç tahtası görevden yeniden hesaplanır.
+  const boardLocks = useMemo(() => (task?.board && schematicPlan ? locksOf(startBuild(doc, schematicPlan, task.board)) : null), [task, schematicPlan, doc]);
+  const boardRules = task?.board
+    ? {
+        checksLeft: checksLeft(task.board, boardSession?.checks.length ?? 0),
+        submitOnly: task.board.checks === 'submit',
+        maxHint: task.board.maxHint,
+        onSubmit: submitBoardTask,
+      }
+    : {};
+  const resetBoard = () => {
+    if (!boardBuild) return;
+    setPlacing(null);
+    setCabling(null);
+    // Görevde yalnızca öğrencinin taktıkları kalkar; hazır gelenler yerinde kalır.
+    commitBuild(keepLocked(boardBuild, boardLocks));
+    setBoardSession(startSession(Date.now()));
+    showToast(tr.tahta.denetle.resetDone, 'info');
+  };
+  const boardHint = (problem: Problem) => setBoardSession((s) => (s ? openHint(s, problem, Date.now()) : s));
+  const boardMarks = (on: boolean) => setBoardSession((s) => (s ? { ...s, marks: on } : s));
+  /** Tahtadaki değişiklik: belgenin kurulum alanı (geri al / yinele kapsar). */
+  const commitBuild = (next: Build) => dispatch({ type: 'commit', doc: { ...doc, build: next } });
+  const boardSelected = boardMode && selection.parts.length === 1 ? selection.parts[0]! : null;
+  const selectOnBoard = (id: string | null) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION });
+
   const play = () => {
     if (gate) showToast(gate, 'error');
     else sim.play();
@@ -733,6 +873,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     rawDispatch({ type: 'set-tool', tool: { kind: 'select' } });
     setActiveExample(example);
     setConnect(null);
+    // Tahtada kur yeni belgede baştan başlar.
+    setBoardMode(false);
+    setPlacing(null);
+    setCabling(null);
+    setBoardSession(null);
     // Telefonda örneğin kartı defterin üstünde: şema kutusu ve defter görünür.
     setAddSheet(null);
     setSchematicFull(false);
@@ -1148,7 +1293,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const observer = new ResizeObserver((entries) => setPhoneAreaHeight(entries[0]?.contentRect.height ?? 0));
     observer.observe(el);
     return () => observer.disconnect();
-  }, [phone]);
+    // Tahtada kur telefonda ayrı bir düzen: alan öğesi değişir, yeniden izlenir.
+  }, [phone, boardMode]);
   useEffect(() => {
     if (!addSheet) setSheetHeight(0);
   }, [addSheet]);
@@ -1558,50 +1704,97 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   );
   // Şema | 3B: devre şemada kurulur; 3B tezgâhta aynı devre masada (izlenir, anahtar ve
   // potansiyometreyle oynanır).
+  // 3B tezgâhın ortak özellikleri (3B görünüm ve Tahtada kur).
+  const benchProps: Omit<BenchViewProps, 'onSchematic'> = {
+    doc,
+    connectivity,
+    frame: sim.frame,
+    ...(ohmTexts ? { ohmTexts } : {}),
+    ...(benchLook !== doc ? { look: benchLook } : {}),
+    ...(hideLive ? { labelFrame: shownFrame, liveHidden: true } : {}),
+    active: sim.status !== 'stopped',
+    running: sim.status === 'running',
+    selection: selection.parts,
+    overlayOpen,
+    touch: touchUi,
+    phone,
+    dark: theme === 'dark',
+    settings: shownSettings,
+    onSettings: updateSettings,
+    measured: measuredParts,
+    onKarta: () => setKartaOpen(true),
+    focusRequest: benchFocus,
+    onFocusDone: clearBenchFocus,
+    ...(phone ? { controlsInset: { right: 60, bottom: schematicFull ? 'calc(100px + env(safe-area-inset-bottom))' : 10 } } : {}),
+    callbacks: {
+      onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
+      onToggle: (id) => {
+        const part = doc.parts.find((p) => p.id === id);
+        if (part?.type === 'spdt') updatePartFromPanel(id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } });
+        else if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
+      },
+      onPress: pressButton,
+      onKnob: (id, position, done) => {
+        const part = doc.parts.find((p) => p.id === id);
+        if (part) slidePartFromPanel(id, { props: { ...part.props, position } }, done);
+      },
+    },
+  };
   const canvas = (
     <>
-      {viewMode === 'bench' ? (
-        <BenchView
-          doc={doc}
-          connectivity={connectivity}
-          frame={sim.frame}
-          {...(ohmTexts ? { ohmTexts } : {})}
-          {...(benchLook !== doc ? { look: benchLook } : {})}
-          {...(hideLive ? { labelFrame: shownFrame, liveHidden: true } : {})}
-          active={sim.status !== 'stopped'}
-          running={sim.status === 'running'}
-          selection={selection.parts}
-          overlayOpen={overlayOpen}
+      {boardMode && boardPlan && schematicPlan ? (
+        <BoardStage
+          view={boardView}
+          onView={setBoardView}
+          showConnected={showConnected}
+          onShowConnected={setShowConnected}
+          {...(task?.board ? { connectedLocked: !task.board.showConnected } : { onExit: exitBoard })}
+          plan={boardPlan}
+          schematicPlan={schematicPlan}
+          bench={{ ...benchProps, onSchematic: () => setBoardSchema(true) }}
           touch={touchUi}
-          phone={phone}
-          dark={theme === 'dark'}
-          settings={shownSettings}
-          onSettings={updateSettings}
-          measured={measuredParts}
-          onSchematic={() => setViewMode('schematic')}
-          onKarta={() => setKartaOpen(true)}
-          focusRequest={benchFocus}
-          onFocusDone={clearBenchFocus}
-          {...(phone ? { controlsInset: { right: 60, bottom: schematicFull ? 'calc(100px + env(safe-area-inset-bottom))' : 10 } } : {})}
-          callbacks={{
-            onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
-            onToggle: (id) => {
-              const part = doc.parts.find((p) => p.id === id);
-              if (part?.type === 'spdt') updatePartFromPanel(id, { props: { ...part.props, to: spdtThrow(part.props) === 'a' ? 'b' : 'a' } });
-              else if (part) updatePartFromPanel(id, { props: { ...part.props, closed: !part.props.closed } });
-            },
-            onPress: pressButton,
-            onKnob: (id, position, done) => {
-              const part = doc.parts.find((p) => p.id === id);
-              if (part) slidePartFromPanel(id, { props: { ...part.props, position } }, done);
-            },
+          build={boardBuild!}
+          onBuild={commitBuild}
+          placing={placing}
+          onPlacing={(next) => {
+            if (next) setCabling(null);
+            setPlacing(next);
           }}
+          cabling={cabling}
+          onCabling={(next) => {
+            if (next) setPlacing(null);
+            setCabling(next);
+          }}
+          selected={boardSelected}
+          onSelect={selectOnBoard}
+          session={boardSession}
+          buildKey={boardKey}
+          onMarks={boardMarks}
+          phone={phone}
+          locks={boardLocks}
+          commands={boardCommands}
+          onUndo={() => {
+            setPlacing(null);
+            setCabling(null);
+            dispatch({ type: 'undo' });
+          }}
+          onRedo={() => {
+            setPlacing(null);
+            setCabling(null);
+            dispatch({ type: 'redo' });
+          }}
+        />
+      ) : viewMode === 'bench' ? (
+        <BenchView
+          {...benchProps}
+          onSchematic={() => setViewMode('schematic')}
+          {...(doc.parts.length > 0 && !fault && !task ? { onBoard: () => enterBoard(), boardBlocked: schematicPlan && schematicPlan.boards > 1 ? tr.tahta.tooBig : null } : {})}
         />
       ) : (
         schematic
       )}
       {/* Telefonda Şema | 3B şema kutusunun sol üstünde; masaüstünde ve tablette 3B ve Şema sağ alttaki kutularda. */}
-      {phone && !connect && <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} />}
+      {phone && !connect && !boardMode && <ViewToggle mode={viewMode} onChange={setViewMode} touch={touchUi} />}
     </>
   );
 
@@ -1740,7 +1933,17 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       )}
       {kartaOpen && (
         <Suspense fallback={null}>
-          <KartaAktarDialog doc={doc} title={circuitTitle} phone={phone} dark={theme === 'dark'} onClose={() => setKartaOpen(false)} />
+          <KartaAktarDialog
+            doc={doc}
+            title={circuitTitle}
+            phone={phone}
+            dark={theme === 'dark'}
+            {...(kartaTab ? { tab: kartaTab } : {})}
+            onClose={() => {
+              setKartaOpen(false);
+              setKartaTab(undefined);
+            }}
+          />
         </Suspense>
       )}
       {helpOpen && <HelpDialog scale={settings.wireScale} onTour={startTour} onClose={() => setHelpOpen(false)} />}
@@ -1764,6 +1967,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         setExamplesOpen(false);
         loadExample(id);
       }}
+      onBoard={(id) => {
+        // Örnek açılır, tahta boş gelir (T6).
+        setExamplesOpen(false);
+        loadExample(id);
+        const next = exampleDoc(id);
+        if (next) enterBoard(next);
+      }}
       activeFault={fault?.scenario ?? null}
       onFault={(id) => {
         setExamplesOpen(false);
@@ -1781,6 +1991,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         traces={analysis.traces}
         draft={taskDraft}
         onDraft={setTaskDraft}
+        settings={settings}
         onClose={() => setTaskDialog(false)}
         notify={notify}
         onPickPlace={(row, which) => {
@@ -1817,7 +2028,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           <div className={`relative flex min-h-0 flex-1 ${stacked ? 'flex-col' : ''}`}>
             <main className="relative min-h-0 min-w-0 flex-1 bg-paper">
               {canvas}
-              {viewMode === 'schematic' && !phone && (
+              {viewMode === 'schematic' && !phone && !boardMode && (
                 <CanvasControls
                   onZoomOut={() => canvasRef.current?.zoomOut()}
                   onZoomIn={() => canvasRef.current?.zoomIn()}
@@ -1955,6 +2166,95 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         {shareDialogEl}
       </>
     );
+
+    // Telefonda Tahtada kur (T5): üst çubuk, bütün alanda tahta, alttaki tek sayfada parça kutusu, takma,
+    // Denetle ve sonuç. Oynat sayfanın alt şeridinde (tahtanın üstünde yüzen düğme delikleri örtüyordu);
+    // takarken yok.
+    if (boardMode && boardBuild && schematicPlan) {
+      return (
+        <div className="app-root flex flex-col overflow-hidden bg-panel-2" style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
+          {skipLink}
+          <PhoneHeader
+            title={circuitTitle}
+            status={sim.status}
+            time={sim.frame?.time ?? 0}
+            saveState={saveState}
+            canUndo={state.past.length > 0}
+            statusOpen={modal === 'status'}
+            moreOpen={modal === 'more'}
+            onStatus={() => setModal('status')}
+            onUndo={() => {
+              setPlacing(null);
+              setCabling(null);
+              dispatch({ type: 'undo' });
+            }}
+            onMore={() => setModal('more')}
+          />
+          <div ref={phoneAreaRef} className="relative flex min-h-0 flex-1 flex-col">
+            <main className="relative min-h-0 flex-1 bg-paper">{canvas}</main>
+            <TouchUi.Provider value>
+              <BottomSheet size={boardSheet} sizes={['peek', 'half']} halfRatio={0.62} label={tr.tahta.phone.sheet} areaHeight={phoneAreaHeight} onHeight={setSheetHeight} onSize={setBoardSheet}>
+                <PhoneBoardSheet
+                  doc={doc}
+                  build={boardBuild}
+                  schematicPlan={schematicPlan}
+                  session={boardSession}
+                  buildKey={boardKey}
+                  placing={placing}
+                  cabling={cabling}
+                  showConnected={showConnected}
+                  onShowConnected={setShowConnected}
+                  onPlace={(id) => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setCabling(null);
+                    setPlacing({ partId: id, first: null, turned: false, dragging: false });
+                    setBoardSheet('half');
+                  }}
+                  onLead={(part, pin) => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setPlacing(null);
+                    setCabling({ kind: 'lead', part, pin });
+                    setBoardSheet('half');
+                  }}
+                  onWire={() => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setPlacing(null);
+                    setCabling((c) => (c?.kind === 'wire' ? null : { kind: 'wire', from: null, color: null }));
+                  }}
+                  onCancel={() => {
+                    setPlacing(null);
+                    setCabling(null);
+                  }}
+                  onTypeHole={(text) => boardCommands.current?.typeHole(text) ?? false}
+                  onCheck={() => {
+                    checkBoard();
+                    setBoardSheet('half');
+                  }}
+                  onHint={boardHint}
+                  {...boardRules}
+                  {...(task?.board ? { connectedLocked: !task.board.showConnected } : {})}
+                  cue={activeExample ? tr.examples.cues[activeExample] : null}
+                  onReport={downloadBoardReport}
+                  onGuide={openSolderGuide}
+                  onReset={resetBoard}
+                  locks={boardLocks}
+                  status={sim.status}
+                  onPlay={play}
+                  onPause={sim.pause}
+                />
+              </BottomSheet>
+            </TouchUi.Provider>
+          </div>
+          {boardSchema && <SchematicDialog doc={doc} connectivity={connectivity} settings={settings} overlay={sessionMarks(doc, boardSession)} touch onClose={() => setBoardSchema(false)} />}
+          {modals}
+          {overlays}
+          <Toast toast={toast} offset={sheetHeight + 12} onDone={hideToast} />
+        </div>
+      );
+    }
 
     // Dikey ve yatay telefon (DP1–DP4): üst çubuk; şema kutusu (karta odaklanınca şerit, tam ekranda ya
     // da kablo bağlarken bütün alan); altında defter; yüzen düğmeler. Tuval kipler arasında aynı yerde
@@ -2148,14 +2448,18 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                 <span className="pl-[22px] text-label">{tr.fault.analysisNote}</span>
               </p>
             ) : (
-              (task || readOnly) && (
+              // Görev çipi şema tuvaline ait; Tahtada kur'da kendi üst çubuğu var.
+              (task || readOnly) &&
+              !boardMode && (
                 <p className="pointer-events-none absolute top-3 left-3 z-10 m-0 flex items-center gap-1.5 rounded-full border border-accent-line bg-accent-soft/95 px-3 py-1.5 text-small font-semibold text-accent-ink shadow-sm">
                   <Icon name={task ? 'target' : 'lock'} className="h-4 w-4" />
                   {task ? tr.task.mode(editableLabels) : tr.embed.mode}
                 </p>
               )
             )}
+            {/* Şemanın yakınlaştırma grubu Tahtada kur'da yok (tahtanın kendi grubu var). */}
             {viewMode === 'schematic' &&
+              !boardMode &&
               (connect ? (
                 <WiringControls
                   canUndo={state.past.length > 0}
@@ -2204,7 +2508,55 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               className="flex min-h-0 shrink-0 flex-col border-l border-line"
               style={{ width: layout.inspectorWidth }}
             >
-              {notebook}
+              {boardMode && boardBuild && schematicPlan ? (
+                <BoardPanel
+                  doc={doc}
+                  connectivity={connectivity}
+                  build={boardBuild}
+                  schematicPlan={schematicPlan}
+                  group={task?.board ? task.name : activeExample ? groupOf(activeExample).split(' · ')[0]! : ''}
+                  settings={settings}
+                  touch={tablet}
+                  large={boardSchema}
+                  onLarge={setBoardSchema}
+                  placing={placing}
+                  onPlace={(id, dragging) => {
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setCabling(null);
+                    setPlacing({ partId: id, first: null, turned: false, dragging });
+                  }}
+                  selected={boardSelected}
+                  onSelect={(id) => {
+                    setPlacing(null);
+                    setCabling(null);
+                    selectOnBoard(id);
+                  }}
+                  session={boardSession}
+                  buildKey={boardKey}
+                  onCheck={checkBoard}
+                  onHint={boardHint}
+                  {...boardRules}
+                  cue={activeExample ? tr.examples.cues[activeExample] : null}
+                  onReport={downloadBoardReport}
+                  onGuide={openSolderGuide}
+                  onReset={resetBoard}
+                  cabling={cabling}
+                  onLead={(part, pin) => {
+                    if (boardLocks?.leads.has(leadKey(part, pin))) {
+                      showToast(tr.tahta.gorev.lockedCable, 'info');
+                      return;
+                    }
+                    selectOnBoard(null);
+                    setBoardView('top');
+                    setPlacing(null);
+                    setCabling(cabling?.kind === 'lead' && cabling.part === part && cabling.pin === pin ? null : { kind: 'lead', part, pin });
+                  }}
+                  locks={boardLocks}
+                />
+              ) : (
+                notebook
+              )}
             </aside>
           )}
         </div>

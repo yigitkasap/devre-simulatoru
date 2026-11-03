@@ -2,6 +2,7 @@
 // (tamsayı); ekranda bir ızgara birimi GRID piksel olarak çizilir.
 
 import type { DeviceType, PropValue } from '../sim/netlist';
+import type { Build } from './build';
 
 export const DOC_VERSION = 1;
 
@@ -39,6 +40,8 @@ export interface CircuitDoc {
   readonly version: typeof DOC_VERSION;
   readonly parts: readonly Part[];
   readonly wires: readonly Wire[];
+  /** Tahtada kur: öğrencinin breadboard kurulumu (yoksa kurulum başlamamış). */
+  readonly build?: Build;
 }
 
 export function emptyDoc(): CircuitDoc {

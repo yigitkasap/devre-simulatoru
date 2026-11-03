@@ -4,6 +4,7 @@
 import type { DeviceType, PropValue } from '../sim/netlist';
 import { CATALOG } from './catalog';
 import { nextRotation, onSegmentInterior, partBounds, pinPositions, pointKey, samePoint } from './geometry';
+import { pruneBuild } from './build';
 import type { CircuitDoc, Part, Point, Rotation, Wire } from './types';
 import type { Box } from './catalog';
 import { moveEndpoint, normalizePoints, rerouteEndpoint, translatePoints } from './wires';
@@ -71,6 +72,8 @@ export function removeItems(doc: CircuitDoc, partIds: Iterable<string>, wireIds:
     ...doc,
     parts: doc.parts.filter((p) => !parts.has(p.id)),
     wires: doc.wires.filter((w) => !wires.has(w.id)),
+    // Silinen parça tahtadan da kalkar (numarası yeni bir parçaya verilebilir).
+    ...(doc.build ? { build: pruneBuild(doc.build, parts) } : {}),
   };
 }
 

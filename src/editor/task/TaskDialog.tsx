@@ -8,7 +8,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { tr } from '../../i18n/tr';
 import type { TraceDef } from '../../model/analysis';
-import { DEFAULT_FAULT_TOOLS, LINK_LIMIT, taskPayload, taskUrl, type FaultTask, type Target, type TargetOp, type TaskDef } from '../../model/task';
+import { planBreadboard } from '../../bench3d/breadboard';
+import { DEFAULT_BOARD_TASK, DEFAULT_FAULT_TOOLS, LINK_LIMIT, taskPayload, taskUrl, type BoardTask, type FaultTask, type Target, type TargetOp, type TaskDef } from '../../model/task';
+import { startBuild } from '../../tahta/task';
 import type { CircuitDoc } from '../../model/types';
 import { formatNumber } from '../../sim/units';
 import { datedName, saveFile } from '../analysis/format';
@@ -16,9 +18,11 @@ import { parseTheory } from '../analysis/table';
 import type { NetIndex } from '../analysis/traces';
 import { newId } from '../analysis/useAnalysis';
 import { Icon } from '../icons';
+import { DEFAULT_SETTINGS, type Settings } from '../settings';
 import { plainText } from '../Rich';
 import { useTouchUi } from '../touchUi';
 import { firstFault } from './faultRows';
+import { BoardFields } from './BoardFields';
 import { FaultFields } from './FaultFields';
 import { quantityKey, targetOptions, valueText } from './targets';
 
@@ -34,6 +38,8 @@ export interface TaskDialogProps {
   readonly notify: (message: string) => void;
   /** Arıza bulma: satırın yerini şemadan seç (pencere kapanır, seçince taslakla geri açılır). */
   readonly onPickPlace?: (row: number, which: 'at' | 'to') => void;
+  /** Şema çizim ayarları (Tahtada kur: seçili parçaların şeması). */
+  readonly settings?: Pick<Settings, 'resistorStyle' | 'wireScale'>;
 }
 
 /** Görev adından dosya adı: küçük harf, Türkçe harfler sadeleştirilmiş, tire ile. */
@@ -49,7 +55,7 @@ export function slug(text: string): string {
   );
 }
 
-export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, notify, onPickPlace }: TaskDialogProps) {
+export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, notify, onPickPlace, settings = DEFAULT_SETTINGS }: TaskDialogProps) {
   const t = tr.task.dialog;
   const titleId = useId();
   const touch = useTouchUi();
@@ -57,26 +63,34 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
   const [task, setTask] = useState<TaskDef>(
     () => draft ?? { name: title, instruction: '', editable: [], allowNew: false, targets: [], predict: false },
   );
-  /** Hedefli görev ya da arıza bulma (R4); arıza taslağı kip değişse de durur. */
-  const [mode, setMode] = useState<'target' | 'fault'>(() => (draft?.fault ? 'fault' : 'target'));
+  /** Hedefli görev, arıza bulma (R4) ya da Tahtada kur (T6); taslaklar kip değişse de durur. */
+  const [mode, setMode] = useState<'target' | 'fault' | 'board'>(() => (draft?.fault ? 'fault' : draft?.board ? 'board' : 'target'));
+  const [board, setBoard] = useState<BoardTask>(() => draft?.board ?? DEFAULT_BOARD_TASK);
+  const plan = useMemo(() => planBreadboard(doc), [doc]);
   const [fault, setFault] = useState<FaultTask>(() => {
     const first = firstFault(doc, idx);
     return draft?.fault ?? { symptom: '', faults: first ? [first] : [], tools: DEFAULT_FAULT_TOOLS, hideIndicators: true, askExpected: false };
   });
   useEffect(() => {
-    const { fault: _old, ...plain } = task;
-    onDraft(mode === 'fault' ? { ...plain, fault } : plain);
-  }, [task, fault, mode, onDraft]);
+    const { fault: _old, board: _board, ...plain } = task;
+    onDraft(mode === 'fault' ? { ...plain, fault } : mode === 'board' ? { ...plain, board } : plain);
+  }, [task, fault, board, mode, onDraft]);
   // Bağlantıda başlangıç devresinin adı da (görev adı silinirse öğrencinin üst çubuğunda o görünür).
   const named = title !== tr.phone.defaultName && title !== tr.phone.emptyName;
   const payloadTask = useMemo<TaskDef>(() => {
-    const { fault: _old, ...plain } = named ? { ...task, circuit: title } : task;
+    const { fault: _old, board: _board, ...plain } = named ? { ...task, circuit: title } : task;
     // Arıza bulmada devre kilitli (ampermetre eklenebiliyorsa yeni parça ve kablo açık); hedef ve tahmin yok.
-    return mode === 'fault' ? { ...plain, instruction: '', editable: [], targets: [], predict: false, allowNew: fault.tools.ammeter, fault } : plain;
-  }, [task, named, title, mode, fault]);
+    if (mode === 'fault') return { ...plain, instruction: '', editable: [], targets: [], predict: false, allowNew: fault.tools.ammeter, fault };
+    // Tahtada kur: şema kilitli; başlangıç tahtası görevin devresinde.
+    if (mode === 'board') return { ...plain, instruction: '', editable: [], targets: [], predict: false, allowNew: false, board };
+    return plain;
+  }, [task, named, title, mode, fault, board]);
+  /** Görevin devresi: Tahtada kur'da başlangıç tahtasıyla. */
+  const taskDoc = useMemo<CircuitDoc>(() => (mode === 'board' ? { ...doc, build: startBuild(doc, plan, board) } : doc), [mode, doc, plan, board]);
+  const blocked = mode === 'board' && plan.boards > 1;
   const set = (patch: Partial<TaskDef>) => setTask((x) => ({ ...x, ...patch }));
   const setTarget = (id: string, patch: Partial<Target>) => set({ targets: task.targets.map((x) => (x.id === id ? { ...x, ...patch } : x)) });
-  const url = useMemo(() => taskUrl(payloadTask, doc, window.location.href), [payloadTask, doc]);
+  const url = useMemo(() => taskUrl(payloadTask, taskDoc, window.location.href), [payloadTask, taskDoc]);
   const tooLong = url.length > LINK_LIMIT;
   const [copied, setCopied] = useState(false);
   const first = useRef<HTMLInputElement>(null);
@@ -91,7 +105,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
       notify(t.copyFailed);
     }
   };
-  const file = () => void saveFile(datedName(`${mode === 'fault' ? 'ariza' : 'gorev'}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(taskPayload(payloadTask, doc), null, 2)}\n`], { type: 'application/json' }));
+  const file = () => void saveFile(datedName(`${mode === 'fault' ? 'ariza' : mode === 'board' ? 'tahtada-kur' : 'gorev'}-${slug(task.name)}`, 'json'), new Blob([`${JSON.stringify(taskPayload(payloadTask, taskDoc), null, 2)}\n`], { type: 'application/json' }));
   const field = `w-full min-w-0 rounded-lg border border-line-2 bg-panel px-3 ${touch ? 'h-11 text-[16px]' : 'h-10 text-sm'}`;
   const parts = doc.parts.filter((p) => p.type !== 'ground');
   const unitOf = (target: Target) => options.find((o) => o.key === quantityKey(target.q))?.unit ?? '';
@@ -113,7 +127,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-6 pb-4">
           <span role="radiogroup" aria-label={tr.fault.dialog.modeLabel} className="flex shrink-0 rounded-xl bg-app p-1">
-            {(['target', 'fault'] as const).map((m) => (
+            {(['target', 'fault', 'board'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -122,7 +136,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
                 onClick={() => setMode(m)}
                 className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] text-small ${touch ? 'h-11' : 'h-9'} ${mode === m ? 'bg-ink font-semibold text-panel' : 'text-ink-2 hover:text-ink'}`}
               >
-                <Icon name={m === 'target' ? 'target' : 'wrench'} className="h-4 w-4" />
+                <Icon name={m === 'target' ? 'target' : m === 'fault' ? 'wrench' : 'board'} className="h-4 w-4" />
                 {tr.fault.dialog.modes[m]}
               </button>
             ))}
@@ -131,7 +145,9 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
             {t.name}
             <input ref={first} value={task.name} onChange={(e) => set({ name: e.target.value })} className={`${field} font-normal`} />
           </label>
-          {mode === 'fault' ? (
+          {mode === 'board' ? (
+            <BoardFields doc={doc} plan={plan} value={board} onChange={setBoard} touch={touch} settings={settings} />
+          ) : mode === 'fault' ? (
             <FaultFields doc={doc} idx={idx} value={fault} onChange={setFault} touch={touch} {...(onPickPlace ? { onPick: onPickPlace } : {})} />
           ) : (
           <>
@@ -214,12 +230,19 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
           )}
         </div>
         <div className="flex shrink-0 flex-col gap-2 border-t border-line px-6 py-4">
-          {tooLong && (
+          {blocked && (
+            <p role="alert" className="m-0 flex gap-2 rounded-lg border border-warn-line bg-warn-soft px-3 py-2 text-small text-warn">
+              <Icon name="warning" className="mt-px h-4 w-4 shrink-0" />
+              {tr.tahta.gorev.tooBigNote}
+            </p>
+          )}
+          {tooLong && !blocked && (
             <p role="alert" className="m-0 flex gap-2 rounded-lg border border-warn-line bg-warn-soft px-3 py-2 text-small text-warn">
               <Icon name="warning" className="mt-px h-4 w-4 shrink-0" />
               {t.tooLong(formatNumber(url.length / 1024, 1))}
             </p>
           )}
+          {!blocked && <>
           <div className="flex flex-wrap items-center gap-2">
             <input readOnly value={url} aria-label={t.link} onFocus={(e) => e.target.select()} className={`min-w-0 flex-1 rounded-lg bg-app px-3 font-mono text-label text-ink-2 ${touch ? 'h-11 text-[16px]' : 'h-11'}`} />
             <button type="button" onClick={() => void copy()} className={`flex shrink-0 items-center gap-1.5 rounded-[10px] px-4 text-small font-semibold h-11 ${tooLong ? 'border border-line-2 bg-panel text-ink' : 'bg-accent text-white'}`}>
@@ -238,6 +261,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
             </button>
             <span className="text-label text-muted">{t.size(formatNumber(url.length / 1024, 1))}</span>
           </div>
+          </>}
         </div>
       </div>
     </div>

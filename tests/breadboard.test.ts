@@ -90,4 +90,20 @@ describe('Breadboard yerleşimi', () => {
     expect(cols(r).some((c) => cols(led).includes(c))).toBe(true);
     expect([...plan.roles.values()]).toContain('ground');
   });
+
+  it('raylar arası köprüler üst üste binmez: besleme (+) sol uçta, toprak (−) sağ uçta', () => {
+    for (const id of EXAMPLE_IDS) {
+      const plan = planBreadboard(exampleDoc(id)!);
+      const bridges = plan.jumpers.filter((j) => j.a.kind === 'rail' && j.b.kind === 'rail');
+      const columns = bridges.map((j) => (j.a.kind === 'rail' ? `${j.a.board}:${j.a.k}` : ''));
+      expect(new Set(columns).size, id).toBe(columns.length);
+      // Uçtaki delik başka kabloyla doluysa köprü en yakın boş deliğe kayar: + sol yarıda, − sağ yarıda.
+      const half = railHoles(plan.cols) / 2;
+      for (const j of bridges) {
+        if (j.a.kind !== 'rail') continue;
+        const plus = j.a.rail === 0 || j.a.rail === 3;
+        expect(plus ? j.a.k < half : j.a.k >= half, `${id}: ${plus ? '+' : '−'} köprüsü ${j.a.k}`).toBe(true);
+      }
+    }
+  });
 });

@@ -82,6 +82,8 @@ export interface Jumper {
   readonly net: string;
   readonly a: Hole;
   readonly b: Hole;
+  /** Tahtada kur: öğrencinin seçtiği renk (yoksa ağın rengi). */
+  readonly color?: string;
 }
 
 /** Masadaki bir parçanın ucundan breadboard'a giden kablo. */
@@ -90,6 +92,8 @@ export interface Lead {
   readonly partId: string;
   readonly pin: number;
   readonly hole: Hole;
+  /** Tahtada kur: kablonun rengi (yoksa ağın rengi). */
+  readonly color?: string;
 }
 
 export type NetRole = 'ground' | 'supply';
@@ -105,6 +109,8 @@ export interface BreadboardPlan {
   /** Pin anahtarı (pinKey) → ağ. */
   readonly netOf: ReadonlyMap<string, string>;
   readonly roles: ReadonlyMap<string, NetRole>;
+  /** Tahtada kur: takılmamış alet kabloları (aletin önünde sarkar). */
+  readonly loose?: ReadonlyArray<{ readonly partId: string; readonly pin: number; readonly color: string }>;
 }
 
 /** Breadboard'a takılan parçaların takılışı ve iki bacaklılarda sütun aralığı. */
@@ -143,7 +149,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
  * Sıralı bacaklı parçalarda gerçek kılıftaki bacak sırası (soldan sağa, sütun sırasıyla) → pin. Yoksa
  * pin sırası (BC547'de C-B-E).
  */
-const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
+export const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
   spdt: [1, 0, 2], // A, C, B: ortak uç ortada
   bridge: [1, 0, 2, 3], // KBP: + ~ ~ −
   reg7805: [0, 1, 2], // TO-220: IN, GND, OUT
@@ -152,13 +158,13 @@ const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
 };
 
 /** DIP-8: parça pin sırası → entegre bacak numarası (1–8). */
-const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = {
+export const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = {
   opamp: [2, 3, 6, 7, 4], // LM741: −, +, OUT, V+, V− (1, 5, 8 boş)
   timer555: [1, 2, 3, 4, 5, 6, 7, 8],
 };
 
 /** DIP-4: parça pin sırası → bacak numarası (PC817: 1 A, 2 K, 3 E, 4 C; Sharp iç bağlantı şeması). */
-const DIP4_PINS: Partial<Record<DeviceType, readonly number[]>> = {
+export const DIP4_PINS: Partial<Record<DeviceType, readonly number[]>> = {
   opto: [1, 2, 4, 3],
 };
 
@@ -202,6 +208,16 @@ export function netColors(plan: BreadboardPlan): (net: string) => string {
 
 export function isOnBoard(type: DeviceType): boolean {
   return MOUNTS[type] !== undefined;
+}
+
+/** Breadboard'a takılan parçanın takılışı (masadaki parçada undefined). */
+export function mountOf(type: DeviceType): Mount | undefined {
+  return MOUNTS[type]?.mount;
+}
+
+/** Planın iki bacaklı parçaya verdiği sütun aralığı (Tahtada kur'da bacak aralığı sınırları bunun çevresinde). */
+export function planSpan(type: DeviceType): number | undefined {
+  return MOUNTS[type]?.span;
 }
 
 /** Şeridin parçalara ayrılan delik sayısı (kalanlar jumper'lara). */
@@ -579,13 +595,17 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
       jumpers.push({ net: n, a: stripHole(a, same ?? freeRow(a, pa) ?? pa[0]!), b: stripHole(b, same ?? freeRow(b, pb) ?? pb[0]!) });
     }
   }
-  // Aynı ağın kullandığı raylar (üst/alt, breadboard'lar arası) sol uçta birleştirilir.
+  // Aynı ağın kullandığı raylar (üst/alt, breadboard'lar arası) birleştirilir: besleme (+) sol uçta, öbürleri
+  // (toprak, −) sağ uçta. Aynı uçta olsalar iki köprü aynı sütunda üst üste biner (tepeden görünümde biri
+  // öbürünü ve 1. sütunun deliklerini örter).
+  const rightEdge = boardWidth(cols) / 2;
   for (const [n, used] of railsUsed) {
     const list = [...used].map((u) => u.split(':').map(Number) as [number, number]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const edge = roles.get(n) === 'supply' ? leftEdge : rightEdge;
     for (let i = 1; i < list.length; i++) {
       const [b0, r0] = list[i - 1]!;
       const [b1, r1] = list[i]!;
-      jumpers.push({ net: n, a: railHole(b0, r0, leftEdge), b: railHole(b1, r1, leftEdge) });
+      jumpers.push({ net: n, a: railHole(b0, r0, edge), b: railHole(b1, r1, edge) });
     }
   }
 
