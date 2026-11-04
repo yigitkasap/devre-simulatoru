@@ -29,7 +29,7 @@ import { ArduinoCardBody } from './ArduinoPanel';
 import { MultimeterCardBody } from './MultimeterCard';
 import { spdtThrow } from '../sim/devices/spdt';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
-import { ExampleDetails, groupOf } from './ExampleTab';
+import { ExampleDetails, ExtraTag, groupOf } from './ExampleTab';
 import { Icon, type IconName } from './icons';
 import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, selectionActions, useCommitField, WireDetails, type InspectTabProps, type PartPatch, type TaskParts } from './InspectTab';
 import { lm317Note } from './lm317Divider';
@@ -512,7 +512,10 @@ function ExampleCard({ id, onOpen, onClose }: { id: ExampleId; onOpen: (id: Exam
       >
         <Icon name="book" className="h-5 w-5 shrink-0 text-accent-ink" />
         <span className="flex min-w-0 flex-1 flex-col gap-px">
-          <span className="text-label font-semibold text-accent-ink">{tr.examples.tabBadge(groupOf(id))}</span>
+          <span className="text-label font-semibold text-accent-ink">
+            {tr.examples.tabBadge(groupOf(id))}
+            <ExtraTag id={id} className="ml-1.5" />
+          </span>
           <span className="text-sm font-semibold">{tr.examples.cues[id]}</span>
         </span>
         <Icon name={open ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0" />

@@ -2,7 +2,7 @@
 // (dayandığı fizik yasasıyla) ve günlük hayatta nerede kullanıldığı; altta önceki/sonraki örnek.
 
 import type { ReactNode } from 'react';
-import { EXAMPLE_GROUPS, EXAMPLE_IDS, type ExampleId } from '../examples';
+import { EXAMPLE_GROUPS, EXAMPLE_IDS, EXTRA_EXAMPLES, type ExampleId } from '../examples';
 import { tr } from '../i18n/tr';
 import { Icon } from './icons';
 import { Rich } from './Rich';
@@ -11,6 +11,12 @@ import { useTouchUi } from './touchUi';
 export function groupOf(id: ExampleId): string {
   const group = EXAMPLE_GROUPS.find((g) => (g.ids as readonly ExampleId[]).includes(id));
   return group ? tr.examples.groups[group.id] : '';
+}
+
+/** Föyde olmayan ek örneğin etiketi ("Föyde yok · ek"); öbür örneklerde yok. */
+export function ExtraTag({ id, className = '' }: { id: ExampleId; className?: string }) {
+  if (!EXTRA_EXAMPLES.has(id)) return null;
+  return <span className={`inline-block rounded-xs border border-line-2 px-1.5 py-px align-[2px] text-[11px] font-semibold whitespace-nowrap text-ink-2 ${className}`}>{tr.examples.extra}</span>;
 }
 
 /** Başlıklı metin bölümü (Ne işe yarar, Günlük hayatta). */

@@ -3,7 +3,7 @@
 // kimlikleri (?ornek= adresleri) ve sırası klasörden bağımsız.
 
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE_GROUPS, EXAMPLE_IDS, exampleGroup, folderGroups, groupFolder } from '../src/examples';
+import { EXAMPLE_GROUPS, EXAMPLE_IDS, EXTRA_EXAMPLES, exampleGroup, folderGroups, groupFolder, type ExampleId } from '../src/examples';
 import { FAULT_SCENARIOS, faultFolder } from '../src/examples/faultScenarios';
 
 describe('Örnek klasörleri', () => {
@@ -37,5 +37,17 @@ describe('Örnek klasörleri', () => {
     const outside = FAULT_SCENARIOS.filter((s) => faultFolder(s) === null).map((s) => s.id);
     expect(inFolder).toEqual(['ariza-diyot', 'ariza-dogrultucu', 'ariza-jfet', 'ariza-bjt']);
     expect(outside).toEqual(['ariza-led']);
+  });
+});
+
+describe('Föyde olmayan ek örnekler', () => {
+  it('her ek örnek bir deney grubunda ve grubunun sonunda (föydekilerden sonra)', () => {
+    for (const id of EXTRA_EXAMPLES) {
+      const group = EXAMPLE_GROUPS.find((g) => (g.ids as readonly string[]).includes(id))!;
+      expect(groupFolder(group.id), id).toBe('akdeniz');
+      const ids = group.ids as readonly ExampleId[];
+      const firstExtra = ids.findIndex((x) => EXTRA_EXAMPLES.has(x));
+      expect(ids.slice(firstExtra).every((x) => EXTRA_EXAMPLES.has(x)), group.id).toBe(true);
+    }
   });
 });

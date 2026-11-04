@@ -1858,6 +1858,8 @@ export const tr = {
     } as Record<ExampleFolderId, { title: string; summary: (n: number) => string; logoAlt: string }>,
     /** Klasör görünümünden ana listeye dönüş. */
     back: 'Bütün örnekler',
+    /** Föyde olmayan ek örneğin etiketi (pencerede ve örnek kartında). */
+    extra: 'Föyde yok · ek',
     texts: EXAMPLES,
     /** Defterdeki katlı örnek kartının kısa başlığı: ne yapılacağı ya da neye bakılacağı (v3). */
     cues: {

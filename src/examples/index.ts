@@ -88,8 +88,7 @@ export type ExampleFolderId = (typeof EXAMPLE_FOLDERS)[number]['id'];
  * Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir; `folder` olan
  * gruplar o klasörde gösterilir (?ornek= adresleri ve örnek kimlikleri klasörden bağımsız).
  * "Deney" grupları Fizik 2. sınıf Elektronik Laboratuvarı föyünün dokuz deneyidir; devreler föydeki
- * parçalar ve değerlerle kuruludur. Grupların sonundaki Schottky, köprü diyot (KBP307) ve tristör
- * örnekleri deneyin konusunu Parça Dalga 1'in parçalarıyla sürdürür (föyde yoktur).
+ * parçalar ve değerlerle kuruludur. Föyde olmayan ek örnekler (EXTRA_EXAMPLES) deney grubunun sonunda.
  */
 export const EXAMPLE_GROUPS = [
   {
@@ -129,6 +128,12 @@ export const EXAMPLE_GROUPS = [
 
 export type ExampleGroupId = (typeof EXAMPLE_GROUPS)[number]['id'];
 export type ExampleId = (typeof EXAMPLE_GROUPS)[number]['ids'][number];
+
+/**
+ * Föyde olmayan ama deneyin konusunu sürdüren ek örnekler: pencerede ve örnek kartında "Föyde yok · ek"
+ * etiketiyle, deney grubunun sonunda (Parça Dalga 1'in Schottky, KBP307 köprü ve tristör örnekleri).
+ */
+export const EXTRA_EXAMPLES: ReadonlySet<ExampleId> = new Set<ExampleId>(['schottky-1n4001', 'kopru-diyot', 'tristor-mandal']);
 
 /** Bütün örnekler, pencerede göründükleri sırayla. */
 export const EXAMPLE_IDS: readonly ExampleId[] = EXAMPLE_GROUPS.flatMap((g) => g.ids);

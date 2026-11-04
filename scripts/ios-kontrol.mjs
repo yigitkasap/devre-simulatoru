@@ -310,6 +310,11 @@ try {
     check('masaüstü (klasör): kart klavyeyle (Enter) açılıyor, odak klasörün başlığında; 40 px logo; Deney 1–9, Proje · Baraj (sayfa bağlantısıyla) ve föye dayanan 4 arıza görevi; numaralar 1’den',
       focusedTitle.includes('Akdeniz Üniversitesi · Fizik Bölümü') && folderLogo === 40 && deneys === 9 && folderGroups.some((t) => t.startsWith('Proje · Baraj')) && barajLink === 1 && folderFaults === 4 && folderFirst === '1' && !folderGroups.includes('Temel devreler'),
       `odak "${focusedTitle}" · logo ${folderLogo} px · ${deneys} deney · baraj bağlantısı ${barajLink} · arıza ${folderFaults} · ilk ${folderFirst}`);
+    const extraCard = (await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).textContent()) ?? '';
+    const plainCard = (await dlg.getByRole('button', { name: '1N4001: doğru akımda akım-gerilim ölçümü', exact: true }).textContent()) ?? '';
+    const extraTags = await dlg.getByText('Föyde yok · ek', { exact: true }).count();
+    check('masaüstü (klasör): föyde olmayan ek örneklerin kartında "Föyde yok · ek" etiketi (Schottky, KBP307, tristör…), föydekilerde yok',
+      extraCard.includes('Föyde yok · ek') && !plainCard.includes('Föyde yok · ek') && extraTags >= 3, `${extraTags} etiket`);
     // Geri: "Bütün örnekler" (klavyeyle) ana listeye döndürür, odak klasör kartında; Esc pencereyi kapatır.
     await dlg.getByRole('button', { name: 'Bütün örnekler' }).focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
     const backFocus = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
@@ -329,9 +334,15 @@ try {
     const inMain = (await card.count()) === 1;
     await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     check('masaüstü (klasör): klasördeki örnek (BC107 yükselteç) açıkken pencere klasörde açılıyor, örnek işaretli; ana listedeki örnek açıkken ana listede', inFolder && activeShown && inMain, `${inFolder} · ${activeShown} · ${inMain}`);
-    // Klasördeki arıza görevi açıkken de pencere klasörde açılır.
+    // Ek örneğin defterdeki örnek kartında da etiket.
     await openDialog();
     await card.click(); await page.waitForTimeout(300);
+    await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).click(); await page.waitForTimeout(500);
+    const exampleCard = (await notebook(page).getByRole('region', { name: /^Örnek ·/ }).textContent()) ?? '';
+    check('masaüstü (klasör): ek örneğin defterdeki örnek kartında da "Föyde yok · ek"; grup adı aynı (Örnek · Deney 1 · …)', exampleCard.includes('Föyde yok · ek') && exampleCard.includes('Örnek · Deney 1 · Diyot karakteristikleri'), exampleCard.slice(0, 80));
+    // Klasördeki arıza görevi açıkken de pencere klasörde açılır.
+    await openDialog();
+    if ((await card.count()) > 0) { await card.click(); await page.waitForTimeout(300); }
     await dlg.getByRole('button', { name: 'Arıza bul: JFET’ten akım geçmiyor' }).click(); await page.waitForTimeout(800);
     await openDialog();
     const faultFolder = (await dlg.getByRole('button', { name: 'Bütün örnekler' }).count()) === 1 && (await dlg.getByRole('button', { name: 'Arıza bul: JFET’ten akım geçmiyor' }).getAttribute('aria-pressed')) === 'true';
@@ -376,6 +387,8 @@ try {
         folderRows.filter((t) => /^Deney \d/.test(t)).length === 9 && folderRows.some((t) => t.startsWith('Proje · Baraj')) && folderRows.some((t) => t.startsWith('Arıza bul')) &&
         folderShown === rowCount && folderShown === groupSum(folderRows) && firstOpen && firstNumber === '1',
       `${await title()} · ${folderRows.length} grup · üstte ${folderShown} (satırda ${rowCount}) · ilk açık ${firstOpen} · ilk numara ${firstNumber}`);
+    const phoneExtra = (await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).textContent()) ?? '';
+    check('telefon (klasör): ek örnekte (Schottky) "Föyde yok · ek" etiketi', phoneExtra.includes('Föyde yok · ek'), phoneExtra.slice(0, 60));
     // Klasördeki arama yalnızca klasörde arar.
     const search = dlg.getByRole('searchbox', { name: 'Örnek ara' });
     await search.fill('LED'); await page.waitForTimeout(300);

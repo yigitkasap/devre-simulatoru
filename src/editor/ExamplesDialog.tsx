@@ -7,6 +7,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { EXAMPLE_FOLDERS, exampleGroup, folderGroups, groupFolder, type ExampleFolderId, type ExampleId } from '../examples';
 import { FAULT_SCENARIOS, faultFolder, faultScenario, type FaultScenarioId } from '../examples/faultScenarios';
 import { tr } from '../i18n/tr';
+import { ExtraTag } from './ExampleTab';
 import { Icon } from './icons';
 import { Rich } from './Rich';
 
@@ -182,7 +183,10 @@ function DesktopExamples({ activeExample, onLoad, onBoard, onFault, activeFault,
                           {number}
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-sm font-semibold">{texts.title}</span>
+                          <span className="block text-sm font-semibold">
+                            {texts.title}
+                            <ExtraTag id={id} className="ml-1.5" />
+                          </span>
                           <span className="mt-0.5 line-clamp-2 block text-xs leading-snug text-muted">
                             <Rich text={texts.description} />
                           </span>
@@ -376,6 +380,7 @@ function PhoneExamples({ activeExample, onLoad, onBoard, onFault, activeFault, o
                     <span className="min-w-0">
                       <b className="block text-[15px] font-semibold">
                         {texts.title}
+                        <ExtraTag id={id} className="ml-1.5" />
                         {active && (
                           <span className="ml-1.5 rounded-xs bg-accent px-1.5 py-px align-[2px] text-[11px] font-semibold text-white">{tr.phone.exampleOpen}</span>
                         )}
