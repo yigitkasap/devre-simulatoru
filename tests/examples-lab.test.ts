@@ -234,16 +234,22 @@ describe('Deney 4: kırpıcılar', () => {
 });
 
 describe('Deney 5: JFET karakteristikleri', () => {
-  it('BF245A, V_DS = 10 V: V_GS = 0’da ≈ 4,1 mA, −0,2 V’ta ≈ 3,2 mA, −0,4 V’ta ≈ 2,5 mA; −1,8 V’ta kesim', () => {
+  it('BF245A (Şekil-15: R_G = 10 kΩ, R_D = 100 Ω, V_DD = 10 V): V_GS = 0’da ≈ 4,12 mA (V_DS ≈ 9,59 V), −0,2 V’ta ≈ 3,23 mA, −0,4 V’ta ≈ 2,45 mA; −1,8 V’ta kesim', () => {
     const doc = load('jfet-karakteristik');
-    const id = (vgg: number) => run(withProps(doc, 'PS1', { voltage2: vgg }), 0).status(idOf(doc, 'A1')).reading!;
-    between(id(0), 4.1e-3, 4.18e-3);
-    between(id(0.2), 3.2e-3, 3.28e-3);
-    between(id(0.4), 2.42e-3, 2.49e-3);
-    // Kesimde yalnızca V_DS voltmetresinin (10 MΩ) akımı kalır.
-    expect(id(1.8)).toBeLessThan(2e-6);
-    const sim = run(withProps(doc, 'PS1', { voltage2: 0.4 }), 0);
-    between(sim.status(idOf(doc, 'V2')).reading!, -0.41, -0.39);
+    expect(doc.parts.find((p) => p.label === 'RG')!.props.resistance).toBe(10000);
+    expect(doc.parts.find((p) => p.label === 'RD')!.props.resistance).toBe(100);
+    expect(doc.parts.filter((p) => p.type === 'voltmeter')).toHaveLength(1);
+    const at = (vgg: number) => run(withProps(doc, 'PS1', { voltage2: vgg }), 0);
+    const id = (vgg: number) => at(vgg).status(idOf(doc, 'A1')).reading!;
+    between(id(0), 4.1e-3, 4.14e-3);
+    between(at(0).status(idOf(doc, 'V1')).reading!, 9.57, 9.61);
+    between(id(0.2), 3.2e-3, 3.26e-3);
+    between(id(0.4), 2.42e-3, 2.47e-3);
+    expect(id(1.8)).toBeLessThan(1e-6);
+    // V_GS = −V_GG: kapı akımı yok, R_G'de gerilim düşmez.
+    const sim = at(0.4);
+    const j = idOf(doc, 'J1');
+    between(sim.voltageAt(`${j}#1`)! - sim.voltageAt(`${j}#2`)!, -0.401, -0.399);
   });
 });
 

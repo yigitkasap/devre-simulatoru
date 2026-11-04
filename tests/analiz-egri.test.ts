@@ -58,7 +58,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     expect(curveAt(p!, 5)).toBeGreaterThan(1e-4);
   });
 
-  it('yük doğrusu: BC107 yükselteçte R_C = 5,6 kΩ, kaynak 12 V, Q doğrunun üstünde; JFET deneyinde R_D yok', () => {
+  it('yük doğrusu: BC107 yükselteçte R_C = 5,6 kΩ, kaynak 12 V, Q doğrunun üstünde; JFET deneyinde R_D ile drain arasında ampermetre var, doğru çizilmez', () => {
     const amp = exampleDoc('bjt-yukseltec')!;
     const q1 = amp.parts.find((p) => p.label === 'Q1')!;
     const labels = Object.fromEntries(amp.parts.map((p) => [p.id, p.label]));

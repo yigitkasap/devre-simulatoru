@@ -1391,7 +1391,7 @@ try {
     const loadSwitch = drawer.getByRole('switch', { name: /Yük doğrusu ve Q noktası/ });
     const marks = await page.locator('svg.schematic text').allTextContents();
     const chips = await drawer.getByRole('button', { name: /basamağını kaldır$/ }).count();
-    check('eğri izleyici (N3): BF245A çıkış ailesi Worker’da taranıyor (4 × 31); V_DS = 10 V’ta I_D 4,14 / 3,25 / 2,46 / 1,78 mA; R_D yokken yük doğrusu soluk; şemada "Taranan parça: J1"',
+    check('eğri izleyici (N3): BF245A çıkış ailesi Worker’da taranıyor (4 × 31); V_DS = 10 V’ta I_D 4,14 / 3,25 / 2,46 / 1,78 mA; R_D ile drain arasında ampermetre varken yük doğrusu soluk; şemada "Taranan parça: J1"',
       (await summary.textContent()) === '4 × 31 noktalık DC tarama' && /4,14.*3,25.*2,46.*1,78/.test(pill) && workers >= 1 && (await loadSwitch.isDisabled()) && ((await loadSwitch.textContent()) ?? '').includes('Devrede RD yok') &&
       marks.includes('Taranan parça: J1') && chips === 4 && (await drawer.getByRole('img', { name: 'Eğri izleyici: J1, 4 eğri' }).count()) === 1,
       `${await summary.textContent()} · ${pill.slice(0, 70)} · iş parçacığı ${workers}`);

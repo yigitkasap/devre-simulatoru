@@ -782,7 +782,7 @@ const FAULT_SCENARIO_TEXTS: Record<FaultScenarioId, FaultScenarioTexts> = {
     symptom: 'A1 neredeyse sıfır gösteriyor; V_{GS} = 0 V’ta I_{D} yaklaşık 4,1 mA olmalıydı.',
     found: {
       title: 'J1’in source bacağı temas etmiyordu',
-      text: 'Drain akımının dönüş yolu kopuk: akım J1’den toprağa ulaşamaz. A1 yalnızca V1’in 10 MΩ’undan geçen akımı gösterir (≈ 1 µA); V1 10,0 V okumaya devam eder, bu yüzden V_{DS} doğru görünür.',
+      text: 'Drain akımının dönüş yolu kopuk: akım J1’den toprağa ulaşamaz. A1 yalnızca µA’ın altında bir sızıntı gösterir; R_{D}’den akım geçmediği için V1 10,0 V okumaya devam eder, bu yüzden V_{DS} doğru görünür.',
       decisive: 'J1’in source bacağı topraktan 1,73 V yukarıda, bağlı olduğu toprak düğümü 0 V. Kapı 0 V’ta olduğundan V_{GS} ≈ −1,73 V, yani kısılma geriliminde (V_{P} = −1,74 V): kanal kapanır.',
     },
   },
@@ -1305,7 +1305,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   },
   'jfet-karakteristik': {
     title: 'BF245A: çıkış ve transfer karakteristiği',
-    description: `DC güç kaynağının 1. çıkışı (V_{DD} = 10 V) ampermetre üzerinden BF245A’nın drain’ini besliyor. 2. çıkış ters bağlı: + ucu source tarafındaki ortak hatta, − ucu kapıda; böylece V_{GS} = −V_{GG}. V1, V_{DS}’yi; V2, V_{GS}’yi ölçüyor. Başlangıçta V_{GG} = 0. Ortak hat kapı kablosunu keserek geçer: ${CROSSING}`,
+    description: `Föydeki Şekil-15: DC güç kaynağının 1. çıkışı (V_{DD} = 10 V) R_{D} = 100 Ω ve ampermetre üzerinden BF245A’nın drain’ini besliyor; source ortak hatta. 2. çıkış ters bağlı: − ucu R_{G} = 10 kΩ üzerinden kapıda, + ucu ortak hatta; böylece V_{GS} = −V_{GG} (kaynağın göstergesinden okunur). V1, ampermetreyle R_{D}’nin birleştiği nokta ile ortak hat arasında V_{DS}’yi ölçüyor. Başlangıçta V_{GG} = 0: I_{D} ≈ 4,12 mA, V_{DS} ≈ 9,59 V. Ortak hat V_{GG} kablosunu keserek geçer: ${CROSSING}`,
     purpose:
       'Kapı geriliminin drain akımını nasıl denetlediğini ölçer: JFET gerilimle kontrol edilen bir dirençtir ve kapısından neredeyse hiç akım geçmez. V_{DS} = 10 V’ta I_{D} ≈ 4,1 mA (V_{GS} = 0), ≈ 3,2 mA (−0,2 V) ve ≈ 2,5 mA (−0,4 V). Doyumda I_{D} = I_{DSS} · (1 − V_{GS} / V_{P})² · (1 + λV_{DS}); bu BF245A’da I_{DSS} ≈ 3,5 mA, V_{P} ≈ −1,74 V. Çıkış eğrisi için V_{DD}’yi 0–15 V arasında değiştir: önce omik bölge, sonra doyum. V_{GG}’yi akım sıfırlanana kadar artır: kısılma gerilimi ≈ 1,74 V.',
     everyday:
