@@ -94,6 +94,9 @@ async function pickExample(p, locate, touchUi = false) {
 async function openExample(page, name) {
   await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
   await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
+  // Açık örnek klasördeyse pencere klasörde açılır; ana ekrandaki arama klasörün içini de bulur.
+  const back = page.getByRole('button', { name: 'Bütün örnekler' });
+  if ((await back.count()) > 0) { await back.tap(); await page.waitForTimeout(300); }
   await page.getByRole('searchbox', { name: 'Örnek ara' }).fill(name); await page.waitForTimeout(200);
   await page.getByRole('button', { name, exact: true }).tap(); await page.waitForTimeout(600);
 }
@@ -255,6 +258,7 @@ try {
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
     check('örnekler açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
     await page.waitForTimeout(1000);
+    await page.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ }).tap(); await page.waitForTimeout(300);
     const group = page.getByRole('button', { name: /^Proje · Baraj su seviyesi uyarısı/ });
     await group.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
     await group.tap(); await page.waitForTimeout(300);
@@ -333,6 +337,72 @@ try {
     const faultFolder = (await dlg.getByRole('button', { name: 'Bütün örnekler' }).count()) === 1 && (await dlg.getByRole('button', { name: 'Arıza bul: JFET’ten akım geçmiyor' }).getAttribute('aria-pressed')) === 'true';
     check('masaüstü (klasör): klasördeki arıza görevi (JFET) açıkken pencere klasörde açılıyor, görev işaretli', faultFolder);
     await ctx.close();
+  }
+
+  // --- Örnekler: Akdeniz Üniversitesi klasörü (telefon) ---------------------------------------------
+  {
+    const { page } = await phone();
+    const openList = async () => {
+      await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
+      await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
+    };
+    await openList();
+    const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
+    const list = dlg.locator('.overflow-y-auto').first();
+    const row = dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ });
+    const title = async () => ((await dlg.locator('h2').textContent()) ?? '').trim();
+    const shown = async () => Number(((await dlg.locator('div.h-14 span.font-mono').textContent()) ?? '').trim());
+    const groupRows = async () => dlg.locator('section > button[aria-expanded]').allTextContents();
+    const groupSum = (rows) => rows.reduce((n, t) => n + Number(t.match(/(\d+)$/)?.[1] ?? 0), 0);
+    const cards = () => list.locator('li').count();
+    const firstLabel = (await list.locator(':scope > *').first().getAttribute('aria-label')) ?? '';
+    const rowBox = await row.boundingBox();
+    const rowLogo = Math.round((await row.locator('img').boundingBox())?.width ?? 0);
+    const rowCount = Number(((await row.locator('span.font-mono').textContent()) ?? '').trim());
+    const mainRows = await groupRows();
+    const mainShown = await shown();
+    check('telefon (klasör): listenin en üstünde logolu Akdeniz satırı (en az 56 px, logo 44 px, sayı, ok); ana listede deney grupları yok; sağ üstteki sayı görünen kartlar (örnek + arıza)',
+      firstLabel.startsWith('Akdeniz Üniversitesi · Fizik Bölümü') && rowBox !== null && rowBox.height >= 56 && rowLogo === 44 && rowCount > 0 && (await row.locator('svg').count()) === 1 &&
+        !mainRows.some((t) => /^Deney|^Proje/.test(t)) && mainRows.some((t) => t.startsWith('Temel devreler')) && mainShown === groupSum(mainRows),
+      `${Math.round(rowBox?.height ?? 0)} px · logo ${rowLogo} px · klasör ${rowCount} · üstte ${mainShown} = ${groupSum(mainRows)} · ${mainRows.length} grup`);
+    // Klasör ekranı: başlıkta geri oku ve klasörün adı; Deney 1–9, Proje · Baraj, arıza; ilk grup açık, numaralar 1'den.
+    await row.tap(); await page.waitForTimeout(400);
+    const folderRows = await groupRows();
+    const firstOpen = (await dlg.locator('section > button[aria-expanded]').first().getAttribute('aria-expanded')) === 'true';
+    const firstNumber = ((await list.locator('li span[aria-hidden="true"]').first().textContent()) ?? '').trim();
+    const folderShown = await shown();
+    check('telefon (klasör): satıra dokununca klasör ekranı (geri oku, "Akdeniz Üniversitesi · Fizik Bölümü"); Deney 1–9, Proje · Baraj ve arıza bul; sağ üstteki sayı klasördeki kartlar; ilk grup açık, numaralar 1’den',
+      (await title()) === 'Akdeniz Üniversitesi · Fizik Bölümü' && (await dlg.getByRole('button', { name: 'Bütün örnekler' }).count()) === 1 &&
+        folderRows.filter((t) => /^Deney \d/.test(t)).length === 9 && folderRows.some((t) => t.startsWith('Proje · Baraj')) && folderRows.some((t) => t.startsWith('Arıza bul')) &&
+        folderShown === rowCount && folderShown === groupSum(folderRows) && firstOpen && firstNumber === '1',
+      `${await title()} · ${folderRows.length} grup · üstte ${folderShown} (satırda ${rowCount}) · ilk açık ${firstOpen} · ilk numara ${firstNumber}`);
+    // Klasördeki arama yalnızca klasörde arar.
+    const search = dlg.getByRole('searchbox', { name: 'Örnek ara' });
+    await search.fill('LED'); await page.waitForTimeout(300);
+    const folderLed = (await dlg.getByRole('button', { name: 'LED: X-Y’de karakteristik', exact: true }).count()) === 1;
+    const mainLed = (await dlg.getByRole('button', { name: 'LED ve ön direnç', exact: true }).count()) === 0;
+    const ledShown = (await shown()) === (await cards());
+    check('telefon (klasör): klasör ekranındaki arama yalnızca klasörde arıyor (LED: deneydeki var, ana listedeki yok); sayı eşleşen kartlar', folderLed && mainLed && ledShown, `${folderLed} · ${mainLed} · ${await shown()}/${await cards()}`);
+    // Geri: ana ekran; ana ekrandaki arama klasördeki deneyi bulur (klasörün başlığı altında).
+    await dlg.getByRole('button', { name: 'Bütün örnekler' }).tap(); await page.waitForTimeout(300);
+    const backTitle = await title();
+    await search.fill('kenetleyici'); await page.waitForTimeout(300);
+    const found = (await dlg.getByRole('button', { name: 'Negatif kenetleyici', exact: true }).count()) === 1;
+    const heading = (await dlg.getByText('Akdeniz Üniversitesi · Fizik Bölümü', { exact: true }).count()) === 1;
+    const foundShown = (await shown()) === (await cards());
+    check('telefon (klasör): geri oku ana ekrana döndürüyor; ana ekrandaki arama klasördeki deneyi (Negatif kenetleyici) klasör başlığı altında buluyor; sayı eşleşen kartlar',
+      backTitle === 'Örnek devreler' && found && heading && foundShown, `${backTitle} · ${found} · ${heading} · ${await shown()}/${await cards()}`);
+    // Klasördeki örnek açıkken pencere klasörde, o grup açık açılır.
+    await search.fill(''); await page.waitForTimeout(200);
+    await row.tap(); await page.waitForTimeout(300);
+    await dlg.getByRole('button', { name: /^Deney 2 · Doğrultucular/ }).tap(); await page.waitForTimeout(300);
+    await dlg.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).tap(); await page.waitForTimeout(700);
+    await openList();
+    const reopenTitle = await title();
+    const groupOpen = (await dlg.getByRole('button', { name: /^Deney 2 · Doğrultucular/ }).getAttribute('aria-expanded')) === 'true';
+    const current = (await dlg.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).getAttribute('aria-current')) === 'true';
+    check('telefon (klasör): klasördeki örnek (Yarım dalga) açıkken pencere klasör ekranında, Deney 2 grubu açık, örnek işaretli', reopenTitle === 'Akdeniz Üniversitesi · Fizik Bölümü' && groupOpen && current, `${reopenTitle} · ${groupOpen} · ${current}`);
+    await page.context().close();
   }
 
   // --- Parça ekle sayfası: daha açık başlar, başlıktan çekilerek tam boy olur, aşağı çekince kapanır --
