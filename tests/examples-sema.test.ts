@@ -19,7 +19,7 @@ const CROSSINGS: Partial<Record<ExampleId, number>> = {
   'jfet-karakteristik': 1,
   'fet-yukseltec-kuplajli': 1,
   'bjt-yukseltec-kuplajli': 1,
-  'mosfet-yukseltec': 1,
+  'mosfet-yukseltec-rs': 1,
   'bjt-anahtar': 1,
   'baraj-cubuk': 2,
   'baraj-tek-isik': 4,

@@ -1436,7 +1436,7 @@ try {
     // MOSFET (kullanıcı kararı): yük doğrusu açıkken varsayılan basamaklar Q'daki V_GS'nin çevresinde;
     // kullanıcı bir basamağı silince onun seçtiği basamaklar kalır.
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /IRF510 ile ortak kaynaklı yükselteç/ }).first())).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /IRF510 yükselteç: R_S/ }).first())).click(); await page.waitForTimeout(500);
     // M1'in taraması bitene kadar (önceki parçanın sonucu ekranda kalabilir).
     await drawer.getByRole('button', { name: '3,83 V basamağını kaldır' }).waitFor({ timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(200);

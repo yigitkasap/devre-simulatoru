@@ -101,7 +101,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     const jl = loadLine(buildConnectivity(fet).netlist, j1.id, {})!;
     expect(Math.abs(jl.qStep!)).toBeLessThan(0.01);
     expect(supplyTo(jl.supply, 0.5)).toBe(15);
-    const mos = exampleDoc('mosfet-yukseltec')!;
+    const mos = exampleDoc('mosfet-yukseltec-rs')!;
     const m1 = mos.parts.find((p) => p.type === 'nmos')!;
     const ml = loadLine(buildConnectivity(mos).netlist, m1.id, {})!;
     // Kapı FG1'in 4,55 V ofsetinde, R_S = 1 kΩ: V_GS = 4,55 − R_S · k (V_GS − V_T)², V_T = 3,83 V,
@@ -116,7 +116,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     expect(Math.abs(curveAt(curves[4]!, ml.q[0]) / ml.q[1] - 1)).toBeLessThan(0.05);
   });
   it('MOSFET’te yük doğrusu açıkken varsayılan basamaklar Q’nun çevresinde: IRF510 yükselteçte 3,83 / 3,84 / 3,86 / 3,87 V; eğriler yük doğrusuyla aynı ölçekte', () => {
-    const mos = exampleDoc('mosfet-yukseltec')!;
+    const mos = exampleDoc('mosfet-yukseltec-rs')!;
     const m1 = mos.parts.find((p) => p.type === 'nmos')!;
     const ml = loadLine(buildConnectivity(mos).netlist, m1.id, {})!;
     expect(ml.threshold).toBeCloseTo(3.83, 6);

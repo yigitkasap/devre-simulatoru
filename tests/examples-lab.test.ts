@@ -312,8 +312,23 @@ describe('Deney 6–8: yükselteçler', () => {
     between(amplifier(doc, 'Q1', 1e6, 300e-6).gain, 115, 140);
   });
 
-  it('MOSFET (IRF510, R_D = 10 kΩ, R_S = 1 kΩ, offset 4,55 V): I_D ≈ 0,70 mA, kazanç ≈ 9,7, ters faz', () => {
+  it('MOSFET (Şekil-21: 10 kΩ seri, R_S yok, R_D = 1 kΩ, V_DD = 15 V, ofset 3,907 V): I_D ≈ 7,5 mA, V_DS ≈ 7,5 V; küçük işaret kazancı ≈ 172; 0,1 V t-t’de ≈ 2,25–13,97 V; ofsette 1 mV ≈ 0,19 V', () => {
     const doc = load('mosfet-yukseltec');
+    expect(doc.parts.some((p) => p.label === 'RS')).toBe(false);
+    const op = (offset: number) => run(withProps(withProps(doc, 'FG1', { amplitude: 0 }), 'FG1', { offset }), 0.002);
+    const q = op(3.907);
+    between(q.voltageAt(`${idOf(doc, 'M1')}#0`)!, 7.4, 7.6);
+    between(q.pinCurrents(idOf(doc, 'M1'))![0]!, 7.4e-3, 7.6e-3);
+    // Ofsetin hassasiyeti: 1 mV, V_DS'yi ≈ 0,19 V kaydırır.
+    between(op(3.906).voltageAt(`${idOf(doc, 'M1')}#0`)! - op(3.908).voltageAt(`${idOf(doc, 'M1')}#0`)!, 0.35, 0.42);
+    between(amplifier(withProps(doc, 'FG1', { amplitude: 0.01 }), 'M1', 1e3, 0.005).gain, 165, 180);
+    const big = amplifier(doc, 'M1', 1e3, 0.005).out;
+    between(big.max, 13.8, 14.1);
+    between(big.min, 2.1, 2.4);
+  });
+
+  it('MOSFET, R_S’li (ek, föyde yok: IRF510, R_D = 10 kΩ, R_S = 1 kΩ, offset 4,55 V): I_D ≈ 0,70 mA, kazanç ≈ 9,7, ters faz', () => {
+    const doc = load('mosfet-yukseltec-rs');
     const { sim, gain } = amplifier(doc, 'M1', 1e3, 0.05);
     between(gain, 9.5, 9.9);
     between(sim.pinCurrents(idOf(doc, 'M1'))![0]!, 0.68e-3, 0.72e-3);

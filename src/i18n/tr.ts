@@ -1347,7 +1347,16 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   },
   'mosfet-yukseltec': {
     title: 'IRF510 ile ortak kaynaklı yükselteç',
-    description: `V_{DD} = 15 V, R_{D} = 10 kΩ, R_{S} = 1 kΩ. Kapıyı fonksiyon üreteci doğrudan sürüyor: 4,55 V DC offset üzerine 1 kHz, 0,1 V tepe-tepe sinüs. IRF510’un eşiği ≈ 3,8 V olduğundan offset, transistörü küçük bir akımla iletime sokar. Osiloskobun A kanalı girişi (kapı; AC, 50 mV/bölme), B kanalı çıkışı (drain; AC, 0,5 V/bölme) gösteriyor. A’nın kablosu V_{DD} hattını keserek geçer: ${CROSSING}`,
+    description:
+      'Föydeki Şekil-21: fonksiyon üreteci (1 kHz, 0,1 V tepe-tepe sinüs, DC ofset 3,907 V) 10 kΩ üzerinden IRF510’un kapısına bağlı; source ortak hatta (R_{S} yok), drain R_{D} = 1 kΩ üzerinden V_{DD} = 15 V’a. Çalışma noktasını üretecin ofseti kurar: I_{D} ≈ 7,5 mA, V_{DS} ≈ 7,5 V. Ofset çok hassastır: 1 mV değişim V_{DS}’yi ≈ 0,19 V kaydırır. Küçük işaret kazancı ≈ 170; föydeki 0,1 V tepe-tepe girişte çıkış ≈ 2,3 V ile 14,0 V arasında, belirgin bozuk. Osiloskobun A kanalı girişi (AC, 0,05 V/bölme), B kanalı drain’i (AC, 2 V/bölme) gösteriyor.',
+    purpose:
+      'MOSFET’le gerilim yükseltir. I_{D} ≈ 0,70 mA, V_{DS} ≈ 7,3 V. Kazanç ≈ −9,7: A_{v} ≈ −R_{D} / (R_{S} + 1 / g_{m}), g_{m} = 2 · √(k · I_{D}) ≈ 59 mS. R_{S} negatif geri besleme yapar: kazancı transistörün dağınık özelliklerinden çok dirençlerin oranı belirler ve çalışma noktası kararlı olur. Çıkış girişle 180° ters fazlıdır. 1 V tepe-tepe girişte çıkış ≈ 3,2 V ile 12,9 V arasında salınır; kare yasası yüzünden iki yarı eşit değildir.',
+    everyday:
+      'IRF510 gibi güç MOSFET’leri çoğunlukla anahtar olarak motor sürücülerde, LED dimmerlerde ve güç kaynaklarında çalışır; amatör telsizciler onları kısa dalga verici yükselteçlerinde de kullanır. Bilgisayar işlemcilerindeki milyarlarca transistör de MOSFET’tir.',
+  },
+  'mosfet-yukseltec-rs': {
+    title: 'IRF510 yükselteç: R_S = 1 kΩ, R_D = 10 kΩ',
+    description: `Föyde yok (ek): V_{DD} = 15 V, R_{D} = 10 kΩ, R_{S} = 1 kΩ. Kapıyı fonksiyon üreteci doğrudan sürüyor: 4,55 V DC offset üzerine 1 kHz, 0,1 V tepe-tepe sinüs. IRF510’un eşiği ≈ 3,8 V olduğundan offset, transistörü küçük bir akımla iletime sokar. Osiloskobun A kanalı girişi (kapı; AC, 50 mV/bölme), B kanalı çıkışı (drain; AC, 0,5 V/bölme) gösteriyor. A’nın kablosu V_{DD} hattını keserek geçer: ${CROSSING}`,
     purpose:
       'MOSFET’le gerilim yükseltir. I_{D} ≈ 0,70 mA, V_{DS} ≈ 7,3 V. Kazanç ≈ −9,7: A_{v} ≈ −R_{D} / (R_{S} + 1 / g_{m}), g_{m} = 2 · √(k · I_{D}) ≈ 59 mS. R_{S} negatif geri besleme yapar: kazancı transistörün dağınık özelliklerinden çok dirençlerin oranı belirler ve çalışma noktası kararlı olur. Çıkış girişle 180° ters fazlıdır. 1 V tepe-tepe girişte çıkış ≈ 3,2 V ile 12,9 V arasında salınır; kare yasası yüzünden iki yarı eşit değildir.',
     everyday:
@@ -1961,6 +1970,7 @@ export const tr = {
       'bjt-yukseltec': 'Giriş ve çıkışı osiloskopta karşılaştır',
       'bjt-yukseltec-kuplajli': 'Giriş ve çıkışı osiloskopta karşılaştır',
       'mosfet-yukseltec': 'Kazancı osiloskopta ölç',
+      'mosfet-yukseltec-rs': 'Kazancı osiloskopta ölç',
       'bjt-anahtar': 'Girişi değiştir, LED’in tam yanmasını izle',
       'bjt-anahtar-emetor': 'LED neden sönük yanıyor?',
       'baraj-cubuk': 'Hazneyi doldur, ışıkların sırayla yanmasını izle',

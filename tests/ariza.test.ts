@@ -603,7 +603,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     expect(insertAmmeter(doc, w1.id, { x: 44, y: -14 })).toEqual({ error: 'crowded' });
   });
 
-  it('kollektör (drain) akımı o koldaki en az bir kablodan ölçülür; okunan değer simülasyondaki kollektör (drain) akımıyla aynı (bjt-yukseltec-kuplajli, bjt-anahtar, fet-yukseltec-kuplajli, mosfet-yukseltec)', () => {
+  it('kollektör (drain) akımı o koldaki en az bir kablodan ölçülür; okunan değer simülasyondaki kollektör (drain) akımıyla aynı (bjt-yukseltec-kuplajli, bjt-anahtar, fet-yukseltec-kuplajli, mosfet-yukseltec-rs)', () => {
     /** Koldaki kablolar (yalnızca kollektör ya da drain akımı geçen kısımları) ve transistör. */
     type Branch = { wire: (doc: CircuitDoc) => string; keep?: (at: { x: number; y: number }) => boolean };
     const branches: readonly { id: ExampleId; transistor: string; wires: readonly Branch[] }[] = [
@@ -611,7 +611,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
       { id: 'bjt-yukseltec-kuplajli', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -12), keep: (at) => (at.y === -16 && at.x > 36) || at.x === 44 }, { wire: (d) => wireAt(d, 44, 0) }] },
       { id: 'bjt-anahtar', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -18) }, { wire: (d) => wireAt(d, 44, -8) }, { wire: (d) => wireAt(d, 44, 2) }] },
       { id: 'fet-yukseltec-kuplajli', transistor: 'J1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
-      { id: 'mosfet-yukseltec', transistor: 'M1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
+      { id: 'mosfet-yukseltec-rs', transistor: 'M1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
     ];
     for (const { id, transistor, wires } of branches) {
       const doc = exampleDoc(id)!;

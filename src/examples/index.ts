@@ -76,6 +76,7 @@ import kopruDiyot from './kopru-diyot.json';
 import tristorMandal from './tristor-mandal.json';
 import seriKirpici from './seri-kirpici.json';
 import altKirpici from './alt-kirpici.json';
+import mosfetYukseltecRs from './mosfet-yukseltec-rs.json';
 import bjtYukseltecKuplajli from './bjt-yukseltec-kuplajli.json';
 import fetYukseltecKuplajli from './fet-yukseltec-kuplajli.json';
 
@@ -125,7 +126,7 @@ export const EXAMPLE_GROUPS = [
   { id: 'fet-karakteristigi', folder: 'akdeniz', ids: ['jfet-karakteristik'] },
   { id: 'fet-yukseltec', folder: 'akdeniz', ids: ['fet-yukseltec', 'fet-yukseltec-kuplajli'] },
   { id: 'bjt-yukseltec', folder: 'akdeniz', ids: ['bjt-yukseltec', 'bjt-yukseltec-kuplajli'] },
-  { id: 'mosfet-yukseltec', folder: 'akdeniz', ids: ['mosfet-yukseltec'] },
+  { id: 'mosfet-yukseltec', folder: 'akdeniz', ids: ['mosfet-yukseltec', 'mosfet-yukseltec-rs'] },
   { id: 'anahtar', folder: 'akdeniz', ids: ['bjt-anahtar', 'bjt-anahtar-emetor', 'tristor-mandal'] },
   // Proje: baraj su seviyesi uyarısı (ayrı sayfası da var: /baraj).
   { id: 'baraj', folder: 'akdeniz', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
@@ -138,7 +139,7 @@ export type ExampleId = (typeof EXAMPLE_GROUPS)[number]['ids'][number];
  * Föyde olmayan ama deneyin konusunu sürdüren ek örnekler: pencerede ve örnek kartında "Föyde yok · ek"
  * etiketiyle, deney grubunun sonunda (Parça Dalga 1'in Schottky, KBP307 köprü ve tristör örnekleri).
  */
-export const EXTRA_EXAMPLES: ReadonlySet<ExampleId> = new Set<ExampleId>(['schottky-1n4001', 'kopru-diyot', 'tristor-mandal', 'bjt-yukseltec-kuplajli', 'fet-yukseltec-kuplajli']);
+export const EXTRA_EXAMPLES: ReadonlySet<ExampleId> = new Set<ExampleId>(['schottky-1n4001', 'kopru-diyot', 'tristor-mandal', 'mosfet-yukseltec-rs', 'bjt-yukseltec-kuplajli', 'fet-yukseltec-kuplajli']);
 
 /** Bütün örnekler, pencerede göründükleri sırayla. */
 export const EXAMPLE_IDS: readonly ExampleId[] = EXAMPLE_GROUPS.flatMap((g) => g.ids);
@@ -213,6 +214,7 @@ const DATA: Record<ExampleId, unknown> = {
   'bjt-yukseltec': bjtYukseltec,
   'bjt-yukseltec-kuplajli': bjtYukseltecKuplajli,
   'mosfet-yukseltec': mosfetYukseltec,
+  'mosfet-yukseltec-rs': mosfetYukseltecRs,
   'bjt-anahtar': bjtAnahtar,
   'bjt-anahtar-emetor': bjtAnahtarEmetor,
   'baraj-cubuk': barajCubuk,
