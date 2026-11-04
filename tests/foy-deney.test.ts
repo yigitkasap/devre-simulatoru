@@ -32,6 +32,13 @@ const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; 
       'led-karakteristigi': { figure: 'Şekil-3', steps: ['3'], questions: ['3'] },
     },
   },
+  2: {
+    steps: ['1', '2', '3'],
+    figures: {
+      'yarim-dalga': { figure: 'Şekil-4a', steps: ['1', '2'], questions: ['1', '2'] },
+      'kopru-dogrultmac': { figure: 'Şekil-5a', steps: ['3'], questions: ['3'] },
+    },
+  },
 };
 
 /** Bir sayıyı kartlardaki gibi yazar: ondalık virgül, eksi işareti "−". */
@@ -199,5 +206,99 @@ describe('Deney 1: cevaplardaki sayılar', () => {
       `≈ ${num(led.max.v, 2)} V`,
     );
     expect(Math.abs(led.min.i)).toBeLessThan(1e-6);
+  });
+});
+
+/** Bir periyot boyunca (n örnekle) bir büyüklüğün en büyük, en küçük ve ortalama değeri. */
+function period(sim: CircuitSimulator, T: number, value: () => number, n = 2000) {
+  let max = Number.NEGATIVE_INFINITY;
+  let min = Number.POSITIVE_INFINITY;
+  let sum = 0;
+  for (let k = 0; k < n; k++) {
+    expect(sim.advance(T / n).ok).toBe(true);
+    const v = value();
+    max = Math.max(max, v);
+    min = Math.min(min, v);
+    sum += v;
+  }
+  return { max, min, avg: sum / n };
+}
+
+describe('Deney 2: cevaplardaki sayılar', () => {
+  /** Yarım dalga: R_L'nin gerilimi, 10 periyot sonra bir periyot boyunca. */
+  function halfWave(props: Record<string, number | boolean>, until?: number) {
+    let doc = load('yarim-dalga');
+    for (const [label, value] of Object.entries(props)) doc = withProps(doc, label.split('.')[0]!, { [label.split('.')[1]!]: value });
+    const f = doc.parts.find((p) => p.label === 'FG1')!.props.frequency as number;
+    const sim = run(doc, until ?? 10 / f);
+    const d = idOf(doc, 'D1');
+    return period(sim, 1 / f, () => sim.voltageAt(`${d}#1`)!);
+  }
+
+  it('Şekil-4a, 1. adım: 1 kHz’te tepe ≈ 2,36 V (3 V genlik), ortalama ≈ 0,69 V; frekans artınca ters toparlanmayla negatif yarı geçer; 5 V genlikte de aynı', () => {
+    const text = answer('yarim-dalga', '1');
+    const k1 = halfWave({});
+    says(text, `tepe ≈ ${num(k1.max, 2)} V`, `≈ ${num(3 - k1.max, 2)} V düşer`, `ortalaması ≈ ${num(k1.avg, 2)} V`, `≈ ${num(k1.max / Math.PI, 2)} V verir`);
+    for (const [f, label] of [
+      [1e4, '10 kHz’te'],
+      [1e5, '100 kHz’te'],
+      [1e6, '1 MHz’te'],
+    ] as const) {
+      const r = halfWave({ 'FG1.frequency': f });
+      says(text, `${label} ≈ ${num(r.min, 2)} V`);
+      if (f === 1e5) says(text, `100 kHz’te ≈ ${num(r.avg, 2)} V’a`);
+      if (f === 1e6) says(text, `1 MHz’te ≈ ${num(r.avg, 2)} V’a`);
+    }
+    const five = halfWave({ 'FG1.amplitude': 10 });
+    says(text, `tepe ≈ ${num(five.max, 2)} V, ortalama ≈ ${num(five.avg, 2)} V`);
+    for (const [f, label] of [
+      [1e4, '10 kHz’te'],
+      [1e5, '100 kHz’te'],
+      [1e6, '1 MHz’te'],
+    ] as const) {
+      const r = halfWave({ 'FG1.amplitude': 10, 'FG1.frequency': f });
+      says(text, `${label} ≈ ${num(r.min, 2)} V`);
+      if (f === 1e6) says(text, `1 MHz’te ortalama ≈ ${num(r.avg, 2)} V`);
+    }
+  });
+
+  it('Şekil-4a, 2. adım: 1 µF 1,03–2,20 V, 22 µF 1,75–1,81 V, 470 µF ≈ 1,78 V (≈ 3 mV); R_L = ∞’da ≈ 2,6–2,7 V ve dalgalanma yok', () => {
+    const text = answer('yarim-dalga', '2');
+    says(text, `ortalaması ≈ ${num(halfWave({}).avg, 2)} V`);
+    const c1 = halfWave({ 'S1.closed': true }, 0.2);
+    says(text, `1 µF’ta çıkış ${num(c1.min, 2)}–${num(c1.max, 2)} V`);
+    const c2 = halfWave({ 'S2.closed': true }, 0.2);
+    says(text, `22 µF’ta ${num(c2.min, 2)}–${num(c2.max, 2)} V (dalgalanma ≈ ${num(c2.max - c2.min, 2)} V; ΔV ≈ V_{DC} / (f · R_{L} · C) ≈ ${num(c2.avg / (1e3 * 1e3 * 22e-6), 2)} V)`);
+    const c3 = halfWave({ 'S3.closed': true }, 3);
+    says(text, `470 µF’ta ≈ ${num(c3.avg, 2)} V’ta, dalgalanma ≈ ${num((c3.max - c3.min) * 1e3, 0)} mV`);
+    for (const c of ['S1', 'S2', 'S3']) {
+      const open = halfWave({ [`${c}.closed`]: true, 'S4.closed': false }, c === 'S3' ? 3 : 0.2);
+      between(open.avg, 2.55, 2.7);
+      expect(open.max - open.min).toBeLessThan(5e-3);
+    }
+    says(text, '≈ 2,6–2,7 V’ta');
+  });
+
+  it('Şekil-5a, 3. adım: tepe ≈ 4,36 V (iki diyot × ≈ 0,32 V, ≈ 44 µA), ortalama ≈ 2,63 V, çıkış 2 kHz; pozitif yarıda D1 ile D3, negatif yarıda D2 ile D4', () => {
+    const doc = load('kopru-dogrultmac');
+    const text = answer('kopru-dogrultmac', '3');
+    const sim = run(doc, 0.01);
+    const rl = idOf(doc, 'RL');
+    const osc = idOf(doc, 'OSC1');
+    // İki yarıda da aynı tepe: çıkışın frekansı girişinkinin iki katı.
+    const first = period(sim, 0.5e-3, () => sim.measure(rl)!.voltage, 1000);
+    const second = period(sim, 0.5e-3, () => sim.measure(rl)!.voltage, 1000);
+    between(first.max - second.max, -0.01, 0.01);
+    const all = { max: first.max, avg: (first.avg + second.avg) / 2 };
+    says(text, `tepesi ≈ ${num(all.max, 2)} V`, `≈ ${num((all.max / 1e5) * 1e6, 0)} µA`, `≈ ${num((5 - all.max) / 2, 2)} V düşürür`, `Ortalaması ≈ ${num(all.avg, 2)} V`, `≈ ${num((2 * all.max) / Math.PI, 2)} V verir`, '2 kHz');
+    // Pozitif tepe (t = 11,25 ms) ve negatif tepe (11,75 ms): iletken diyotlar ve kanalların gerilimi.
+    const on = (label: string) => sim.measure(idOf(doc, label))!.current > 10e-6;
+    sim.runUntil(0.01125);
+    expect(['D1', 'D2', 'D3', 'D4'].filter(on)).toEqual(['D1', 'D3']);
+    const a = sim.voltageAt(`${osc}#0`)!;
+    sim.runUntil(0.01175);
+    expect(['D1', 'D2', 'D3', 'D4'].filter(on)).toEqual(['D2', 'D4']);
+    const b = sim.voltageAt(`${osc}#1`)!;
+    says(text, `≈ ${num(a, 2)} V’a çıkar`, `≈ ${num(b, 2)} V’a iner`);
   });
 });

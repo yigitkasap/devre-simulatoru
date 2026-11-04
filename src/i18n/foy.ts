@@ -74,6 +74,24 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
       },
     ],
   },
+  2: {
+    title: 'Doğrultucular',
+    aim: 'Diyotla yarım dalga ve tam dalga doğrultmaç kurup çalışmalarını incelemek.',
+    theory: [
+      {
+        text: 'Doğrultmaç alternatif akımı (AC) tek yönlü akıma (DC) çevirir. Yarım dalga doğrultmaçta (Şekil-4) diyot yalnızca girişin pozitif yarısında iletir: çıkış pozitif yarılardan oluşur, negatif yarılarda sıfırdır. V_{T} girişin tepe değeri olmak üzere ideal diyotta çıkışın ortalaması (DC değeri):',
+      },
+      { formula: 'V_{DC} = V_{T} / π  (yarım dalga)' },
+      {
+        text: 'Köprü tipi tam dalga doğrultmaçta (Şekil-5) dört diyot girişin iki yarısını da aynı yöne çevirir: her yarıda karşılıklı iki diyot iletir ve akım yükten hep aynı yönde geçer. Çıkış girişin iki katı frekansta tekrarlar, ortalaması da iki katına çıkar:',
+      },
+      { formula: 'V_{DC} = 2V_{T} / π  (tam dalga)' },
+      {
+        text: 'Gerçek diyotta her iletim yolunda bir diyot gerilimi (V_{D} ≈ 0,3–0,7 V, akıma göre) kaybolur: çıkışın tepesi yarım dalgada ≈ V_{T} − V_{D}, köprüde ≈ V_{T} − 2V_{D}. Yüke paralel bağlanan kondansatör tepelerde dolar, aralarda yükü besler; çıkış dalgalanan bir DC olur. f çıkıştaki tepelerin frekansı olmak üzere dalgalanma (tepe-tepe) yaklaşık:',
+      },
+      { formula: 'ΔV ≈ V_{DC} / (f · R_{L} · C)' },
+    ],
+  },
 };
 
 export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
@@ -172,6 +190,55 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
         question: 'Diyotu, Zener diyot ve Işıklı diyot (LED) ile değiştirerek bunların akım-gerilim eğrilerini elde ediniz. Aynı eğrileri osiloskobun normal ve xy modunda inceleyerek zener olayını gözleyiniz.',
         answer:
           'LED’in eğrisi diyodunkiyle aynı biçimdedir ama eşiği daha büyüktür: akım 0,1 mA’i ≈ 1,45 V’ta, 1 mA’i ≈ 1,61 V’ta geçer (1N4001’de 1 mA ≈ 0,47 V’ta). X-Y’de akım girişin ≈ 1,6 V’undan sonra başlar; en büyük akım ≈ 3,15 mA, o anda LED’in gerilimi ≈ 1,69 V. Ters yönde 5 V’ta akım geçmez: LED’de zener olayı görülmez (gerçek LED’lere ≈ 5 V’tan büyük ters gerilim uygulanmaz). Eşiğin büyük olmasının nedeni LED’in yarı iletkeninin yasak enerji aralığının silisyumunkinden büyük olmasıdır; aralığı geçen elektron bir foton yayar.',
+      },
+    ],
+  },
+  'yarim-dalga': {
+    experiment: 2,
+    figure: 'Şekil-4a',
+    steps: [
+      {
+        no: '1',
+        text: 'Diyotu (1N4001) ve R_{L} = 1 kΩ’u kullanarak Şekil-4a’daki yarım dalga doğrultmacı kur ve girişe 3 V genlikli sinüs uygula. Girişi ve çıkışı osiloskopta birlikte izlerken frekansı 1 kHz’ten 1 MHz’e yavaşça artır; değişimleri ve nedenlerini belirle. Aynısını 5 V genlik için yap.',
+        sim: 'Devre kurulu: FG1 1 kHz, 6 V tepe-tepe (3 V genlik); S4 kapalı (R_{L} bağlı), S1–S3 açık. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta, ikisi de 1 V/bölme. Oynat’a bas; cihaz rafında FG1’in frekansını 10 kHz, 100 kHz ve 1 MHz yap, her seferinde Oto’ya bas. 5 V genlik için tepe-tepe değeri 10 V yap.',
+      },
+      {
+        no: '2',
+        text: 'Çıkışa, R_{L}’ye paralel olarak 1 µF, 22 µF ve 470 µF’lık elektrolitik kondansatörleri sırayla bağla; girişi ve çıkışı birlikte izle. R_{L} olmadan (R_{L} = ∞) ne olduğuna bak ve sonuçları yorumla.',
+        sim: 'S1, S2 ve S3 sırasıyla 1 µF, 22 µF ve 470 µF’ı R_{L}’ye paralel bağlar: birini kapat, öbürlerini açık bırak. R_{L} = ∞ için S4’ü aç. 470 µF’ın dolması birkaç saniye sürer; dalgalanmayı görmek için B’yi AC kuplaja ve 10 mV/bölmeye al.',
+      },
+    ],
+    questions: [
+      {
+        step: '1',
+        question: 'Giriş ve çıkış dalga şekillerini osiloskopta aynı anda gözleyip frekansı 1 kHz’ten 1 MHz’e kadar yavaşça artırarak oluşan değişimleri belirleyiniz ve nedenlerini belirtiniz. Aynı işlemi 5V’luk giriş gerilimi için tekrarlayınız.',
+        answer:
+          '3 V genlikte, 1 kHz’te çıkış yalnızca pozitif yarılardan oluşur: tepe ≈ 2,36 V (girişin 3 V’undan diyotta ve üretecin 50 Ω’unda ≈ 0,64 V düşer), negatif yarılarda ≈ 0 V; ortalaması ≈ 0,69 V (ideal formül V_{T} / π tepeden ≈ 0,75 V verir; fark, diyodun eşiği aşılana kadar akım geçmemesinden). Frekans artınca her negatif yarının başında çıkış eksiye iner: 10 kHz’te ≈ −0,79 V, 100 kHz’te ≈ −2,91 V, 1 MHz’te ≈ −3,11 V. Ortalama 100 kHz’te ≈ 0,34 V’a, 1 MHz’te ≈ 0,05 V’a düşer: 1 MHz’te diyot artık doğrultmaz, giriş iki yönde de geçer. Nedeni Deney 1’deki ters toparlanmadır: iletimde biriken yük boşalana kadar (1N4001’in modelinde ≈ 5,8 µs) diyot ters yönde de iletir; yarım periyot bu süreye yaklaşınca (100 kHz’te 5 µs) negatif yarının çoğu geçer. 5 V genlikte de aynı: 1 kHz’te tepe ≈ 4,23 V, ortalama ≈ 1,28 V; ters tepe 10 kHz’te ≈ −1,41 V, 100 kHz’te ≈ −4,88 V, 1 MHz’te ≈ −5,07 V; 1 MHz’te ortalama ≈ 0,10 V.',
+      },
+      {
+        step: '2',
+        question: 'R_{L} direnci olmadan (R_{L} = ∞) ne olduğunu inceleyiniz. Sonuçları yorumlayınız.',
+        answer:
+          'Kondansatör tepelerde dolar, aralarda yükü besler; çıkış dalgalanan bir DC olur (1 kHz, 3 V genlik, R_{L} = 1 kΩ). Kondansatörsüz çıkışın ortalaması ≈ 0,69 V. 1 µF’ta çıkış 1,03–2,20 V arasında dalgalanır: R_{L} · C = 1 ms periyotla aynı, kondansatör aralarda epey boşalır. 22 µF’ta 1,75–1,81 V (dalgalanma ≈ 0,06 V; ΔV ≈ V_{DC} / (f · R_{L} · C) ≈ 0,08 V), 470 µF’ta ≈ 1,78 V’ta, dalgalanma ≈ 3 mV. Ortalama tepeden (2,36 V) küçüktür, çünkü kondansatör yalnızca tepelerin çevresinde kısa ve büyük akım darbeleriyle dolar ve bu darbeler diyotta ve üretecin 50 Ω’unda daha çok gerilim düşürür. R_{L} = ∞’da (S4 açık) kondansatörü boşaltacak yük yoktur: çıkış ≈ 2,6–2,7 V’ta neredeyse düz kalır, dalgalanma kaybolur ve akım çok küçük olduğundan çıkış tepeye daha yakındır. Yorum: kondansatör büyüdükçe ve yük akımı küçüldükçe çıkış düzgünleşir ve tepeye yaklaşır; güç kaynaklarında filtre kondansatörü bu yüzden büyük seçilir.',
+      },
+    ],
+  },
+  'kopru-dogrultmac': {
+    experiment: 2,
+    figure: 'Şekil-5a',
+    steps: [
+      {
+        no: '3',
+        text: 'Şekil-5a’daki köprü tipi tam dalga doğrultmacı 1N4001’lerle ve R_{L} = 100 kΩ ile kur. Girişe 5 V genlikli sinüs uygula; girişi ve çıkışı osiloskopta birlikte izleyip değerlendir.',
+        sim: 'Devre kurulu: FG1 1 kHz, 10 V tepe-tepe (5 V genlik), diyotlar föydeki numaralarla (D1–D4). Yükün iki ucu da topraktan farklı gerilimde: A yükün + ucunda, B − ucunda, COM üretecin COM’unda. Kip “A + B (ADD)”, B ters (INV): ekranda A − B, yani çıkış. Kipi “A ve B (Y-t)” yaparsan A ile B’yi ayrı ayrı görürsün.',
+      },
+    ],
+    questions: [
+      {
+        step: '3',
+        question: 'Girişe 5V genlikte sinüs sinyali uygulayınız. Giriş ve çıkışı osiloskopta aynı anda gözleyip değerlendiriniz.',
+        answer:
+          'Giriş ±5 V salınır; çıkış iki yarıda da pozitiftir. Pozitif yarıda D1 ile D3, negatif yarıda D2 ile D4 iletir; akım R_{L}’den hep aynı yönde geçer. Çıkışın tepesi ≈ 4,36 V: her yarıda iki diyot iletir ve 100 kΩ’da akım ≈ 44 µA kadar küçük olduğundan her biri ≈ 0,32 V düşürür. Çıkış her yarım periyotta tekrarlar: frekansı 2 kHz, girişinkinin iki katı. Ortalaması ≈ 2,63 V (ideal formül 2V_{T} / π tepeden ≈ 2,77 V verir; sıfır geçişlerinde giriş iki diyodun eşiğini aşana kadar çıkış 0’da kalır). Yükün iki ucu da topraktan farklı gerilimde olduğu için osiloskobun COM’u yükün bir ucuna bağlanamaz (COM şebeke toprağında); yük iki kanalla ölçülür. Y-t’de A (yükün + ucu) pozitif yarıda ≈ 4,68 V’a çıkar, B (− ucu) negatif yarıda ≈ −4,68 V’a iner; her biri öbür yarıda bir diyot gerilimi kadar sıfırdan ayrılır.',
       },
     ],
   },

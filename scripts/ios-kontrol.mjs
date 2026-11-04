@@ -428,7 +428,7 @@ try {
   // --- Föy kartı (örnek kartı): Deney N · Şekil-M, amaç, teorik bilgi (katlı), adımlar, föydeki sorular -------
   // Klasörde deney gruplarının başlığının altında tek satırlık amaç. LAB_AIMS: amacı yazılmış deney sayısı.
   {
-    const LAB_AIMS = 1;
+    const LAB_AIMS = 2;
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
