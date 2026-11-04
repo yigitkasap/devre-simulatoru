@@ -3,59 +3,13 @@
 
 import { describe, expect, it } from 'vitest';
 import { buildScopeView } from '../src/editor/scopeView';
-import { EXAMPLE_GROUPS, exampleDoc, type ExampleId } from '../src/examples';
+import { EXAMPLE_GROUPS } from '../src/examples';
 import { buildConnectivity } from '../src/model/connectivity';
-import { flipParts, updatePart } from '../src/model/docOps';
+import { flipParts } from '../src/model/docOps';
 import type { CircuitDoc } from '../src/model/types';
 import { tr } from '../src/i18n/tr';
 import { CircuitSimulator, OscilloscopeDevice, scopeSettings } from '../src/sim';
-
-function load(id: ExampleId): CircuitDoc {
-  const doc = exampleDoc(id);
-  expect(doc, id).not.toBeNull();
-  return doc!;
-}
-const idOf = (doc: CircuitDoc, label: string) => doc.parts.find((p) => p.label === label)!.id;
-function run(doc: CircuitDoc, until: number): CircuitSimulator {
-  const sim = new CircuitSimulator(buildConnectivity(doc).netlist);
-  expect(sim.runUntil(until).ok).toBe(true);
-  return sim;
-}
-function withProps(doc: CircuitDoc, label: string, props: Record<string, number | boolean | string>): CircuitDoc {
-  const part = doc.parts.find((p) => p.label === label)!;
-  return updatePart(doc, part.id, { props: { ...part.props, ...props } });
-}
-/** `duration` boyunca küçük adımlarla ilerleyip bir büyüklüğün uç değerlerini bulur. */
-function swing(sim: CircuitSimulator, value: () => number, duration: number, slice = 2e-5): { max: number; min: number } {
-  let max = Number.NEGATIVE_INFINITY;
-  let min = Number.POSITIVE_INFINITY;
-  const end = sim.time + duration;
-  while (sim.time < end - 1e-15) {
-    expect(sim.advance(slice).ok).toBe(true);
-    const v = value();
-    max = Math.max(max, v);
-    min = Math.min(min, v);
-  }
-  return { max, min };
-}
-/** Parça ucunun düğümü (netlist bağlantıları birleştirilmiş): iki uç aynı düğümde mi diye bakmak için. */
-function nodeOf(doc: CircuitDoc): (label: string, pin: number) => string {
-  const { netlist } = buildConnectivity(doc);
-  const parent = new Map<string, string>();
-  const find = (x: string): string => {
-    const up = parent.get(x) ?? x;
-    if (up === x) return x;
-    const root = find(up);
-    parent.set(x, root);
-    return root;
-  };
-  for (const l of netlist.links) parent.set(find(l.a), find(l.b));
-  return (label, pin) => find(netlist.elements.find((e) => e.id === idOf(doc, label))!.pins[pin]!);
-}
-const between = (value: number, lo: number, hi: number) => {
-  expect(value).toBeGreaterThan(lo);
-  expect(value).toBeLessThan(hi);
-};
+import { between, idOf, load, nodeOf, run, swing, withProps } from './ornek-yardimci';
 
 describe('Deney 1: diyot karakteristikleri', () => {
   it('1N4001 doğru akımda (Şekil-2, voltmetre 1 kΩ’un uçlarında): 5 V’ta V_D ≈ 0,56 V, I ≈ 4,44 mA, V_o ≈ 4,44 V; 10 V’ta ≈ 9,4 mA; ters yönde < 1 µA', () => {
@@ -357,8 +311,7 @@ describe('Föydeki sorular: cevaplardaki sayılar', () => {
     return { sim, out, gain: (out.max - out.min) / (fg.amplitude as number) };
   }
 
-  it('kartlarda soru var: Deney 1 (zener, 3. adım), Deney 7 (1. adım), Deney 8 (3., 4., 5. adım)', () => {
-    expect(tr.examples.texts['zener-karakteristigi'].questions!.map((q) => q.step)).toEqual(['Deney 1 · 3. adım']);
+  it('kartlarda soru var: Deney 7 (1. adım), Deney 8 (3., 4., 5. adım)', () => {
     expect(tr.examples.texts['bjt-yukseltec'].questions!.map((q) => q.step)).toEqual(['Deney 7 · 1. adım']);
     expect(tr.examples.texts['mosfet-yukseltec'].questions!.map((q) => q.step)).toEqual(['Deney 8 · 3. adım', 'Deney 8 · 4. adım', 'Deney 8 · 5. adım']);
   });

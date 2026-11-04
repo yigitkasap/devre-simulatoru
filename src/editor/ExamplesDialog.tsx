@@ -6,6 +6,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { EXAMPLE_FOLDERS, exampleGroup, folderGroups, groupFolder, type ExampleFolderId, type ExampleId } from '../examples';
 import { FAULT_SCENARIOS, faultFolder, faultScenario, type FaultScenarioId } from '../examples/faultScenarios';
+import { labAim } from '../i18n/foy';
 import { tr } from '../i18n/tr';
 import { ExtraTag } from './ExampleTab';
 import { Icon } from './icons';
@@ -159,7 +160,8 @@ function DesktopExamples({ activeExample, onLoad, onBoard, onFault, activeFault,
           )}
           {folderGroups(folder).map((group) => (
             <section key={group.id} className="mb-4 last:mb-1">
-              <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">{tr.examples.groups[group.id]}</h3>
+              <h3 className={`text-xs font-semibold tracking-wide text-muted uppercase ${labAim(group.id) ? 'mb-0.5' : 'mb-1.5'}`}>{tr.examples.groups[group.id]}</h3>
+              {labAim(group.id) && <p className="m-0 mb-1.5 text-xs text-ink-2">{labAim(group.id)}</p>}
               <ul className="grid gap-2 md:grid-cols-2">
                 {group.ids.map((id) => {
                   number += 1;
@@ -356,7 +358,10 @@ function PhoneExamples({ activeExample, onLoad, onBoard, onFault, activeFault, o
           className="flex min-h-[52px] w-full items-center gap-2.5 text-left text-[15px] font-semibold"
         >
           <Icon name={expanded ? 'chevronDown' : 'chevron'} className="h-[18px] w-[18px] shrink-0 text-muted" />
-          <span className="min-w-0 flex-1">{tr.examples.groups[group.id]}</span>
+          <span className="min-w-0 flex-1">
+            {tr.examples.groups[group.id]}
+            {labAim(group.id) && <span className="mt-0.5 block text-[13px] font-normal leading-snug text-ink-2">{labAim(group.id)}</span>}
+          </span>
           <span className="font-mono text-[13px] font-medium text-muted">{group.ids.length}</span>
         </button>
         {expanded && group.id === 'baraj' && <BarajLink touch />}

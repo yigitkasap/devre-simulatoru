@@ -339,7 +339,14 @@ try {
     await card.click(); await page.waitForTimeout(300);
     await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).click(); await page.waitForTimeout(500);
     const exampleCard = (await notebook(page).getByRole('region', { name: /^Örnek ·/ }).textContent()) ?? '';
-    check('masaüstü (klasör): ek örneğin defterdeki örnek kartında da "Föyde yok · ek"; grup adı aynı (Örnek · Deney 1 · …)', exampleCard.includes('Föyde yok · ek') && exampleCard.includes('Örnek · Deney 1 · Diyot karakteristikleri'), exampleCard.slice(0, 80));
+    check('masaüstü (klasör): ek örneğin defterdeki örnek kartında da "Föyde yok · ek"; grup adı aynı (Örnek · Deney 1 · …)', exampleCard.includes('Föyde yok · ek') && exampleCard.includes('Örnek · Deney 1 · Diyot karakteristiklerinin incelenmesi'), exampleCard.slice(0, 80));
+    // Ek örneğin kartı eski düzende: açıklama, "Ne işe yarar?", "Günlük hayatta"; föy kartının bölümleri yok.
+    const extraRegion = notebook(page).getByRole('region', { name: /^Örnek ·/ });
+    await extraRegion.getByRole('button').first().click(); await page.waitForTimeout(300);
+    const extraText = (await extraRegion.textContent()) ?? '';
+    check('masaüstü (klasör): ek örneğin (Schottky) kartı eski düzende: "Ne işe yarar?" ve "Günlük hayatta" var; Amaç, Teorik bilgi, Adımlar yok',
+      extraText.includes('Ne işe yarar?') && extraText.includes('Günlük hayatta') && !extraText.includes('Amaç') && (await extraRegion.getByRole('button', { name: 'Teorik bilgi' }).count()) === 0 && !extraText.includes('Simülasyonda:'),
+      extraText.slice(0, 60));
     // Klasördeki arıza görevi açıkken de pencere klasörde açılır.
     await openDialog();
     if ((await card.count()) > 0) { await card.click(); await page.waitForTimeout(300); }
@@ -418,25 +425,84 @@ try {
     await page.context().close();
   }
 
-  // --- Föydeki sorular (örnek kartı): soru, "Cevabı göster" ile açılan cevap ---------------------------
+  // --- Föy kartı (örnek kartı): Deney N · Şekil-M, amaç, teorik bilgi (katlı), adımlar, föydeki sorular -------
+  // Klasörde deney gruplarının başlığının altında tek satırlık amaç. LAB_AIMS: amacı yazılmış deney sayısı.
   {
+    const LAB_AIMS = 1;
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300);
-    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Zener diyot (5,6 V): X-Y’de karakteristik', exact: true }))).click(); await page.waitForTimeout(500);
-    await notebook(page).getByRole('region', { name: /^Örnek ·/ }).getByRole('button').first().click(); await page.waitForTimeout(300);
-    const qa = notebook(page).getByRole('region', { name: 'Föydeki sorular' });
-    const step = (await qa.locator('li span').first().textContent()) ?? '';
+    const zener = await pickExample(page, (p) => p.getByRole('button', { name: 'Zener diyot (5,6 V): X-Y’de karakteristik', exact: true }));
+    const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
+    const aims = await dlg.locator('section > h3').evaluateAll((hs) =>
+      hs.filter((h) => /^Deney \d/.test(h.textContent ?? '') && h.nextElementSibling?.tagName === 'P').map((h) => h.nextElementSibling.textContent));
+    const d1Aim = await dlg.locator('section > h3', { hasText: /^Deney 1 · Diyot karakteristiklerinin incelenmesi$/ }).locator('+ p').textContent().catch(() => '');
+    check(`föy kartı (masaüstü): klasörde deney gruplarının başlığının altında tek satırlık amaç (${LAB_AIMS} deney); Deney 1 föydeki adıyla`,
+      aims.length === LAB_AIMS && d1Aim === 'Diyotların akım-gerilim karakteristiklerini incelemek.', `${aims.length} · ${d1Aim}`);
+    await zener.click(); await page.waitForTimeout(500);
+    const region = notebook(page).getByRole('region', { name: 'Örnek · Deney 1 · Şekil-3' });
+    const labelled = (await region.count()) === 1;
+    await region.getByRole('button').first().click(); await page.waitForTimeout(300);
+    const text = (await region.textContent()) ?? '';
+    const theory = region.getByRole('button', { name: 'Teorik bilgi' });
+    const theoryClosed = (await theory.getAttribute('aria-expanded')) === 'false' && !text.includes('kT / q');
+    await theory.click(); await page.waitForTimeout(200);
+    const theoryOpen = (await theory.getAttribute('aria-expanded')) === 'true' && ((await region.textContent()) ?? '').includes('kT / q');
+    const steps = region.getByRole('region', { name: 'Adımlar' });
+    const stepText = (await steps.textContent()) ?? '';
+    const qa = region.getByRole('region', { name: 'Föydeki sorular' });
+    const label = (await qa.locator('li > span').first().textContent()) ?? '';
     const before = await qa.locator('div[id]').count();
-    const show = qa.getByRole('button', { name: 'Cevabı göster' });
-    await show.click(); await page.waitForTimeout(200);
+    await qa.getByRole('button', { name: 'Cevabı göster' }).click(); await page.waitForTimeout(200);
     const answer = (await qa.locator('div[id]').first().textContent()) ?? '';
-    const expanded = await qa.getByRole('button', { name: 'Cevabı gizle' }).getAttribute('aria-expanded');
-    check('örnek kartı (masaüstü): zenerde "Föydeki sorular" (Deney 1 · 3. adım); cevap kapalı, "Cevabı göster" açıyor (5 V genliğin neden kırmadığı)',
-      step === 'Deney 1 · 3. adım' && before === 0 && expanded === 'true' && answer.includes('5 V genlik bu zeneri kırmaya yetmez') && answer.includes('4,87 V'), `${step} · ${before} · ${expanded} · ${answer.slice(0, 50)}`);
+    const order = ['Amaç', 'Teorik bilgi', 'Adımlar', 'Föydeki sorular', 'Günlük hayatta'].map((t) => text.indexOf(t));
+    check('föy kartı (masaüstü): zenerin kartı "Örnek · Deney 1 · Şekil-3"; sırayla Amaç, Teorik bilgi, Adımlar, Föydeki sorular, Günlük hayatta; "Ne işe yarar?" yok',
+      labelled && order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])) && !text.includes('Ne işe yarar?'), `${labelled} · ${order.join(',')}`);
+    check('föy kartı (masaüstü): Teorik bilgi kapalı başlıyor, tıklayınca açılıyor (formüller)', theoryClosed && theoryOpen, `${theoryClosed} · ${theoryOpen}`);
+    check('föy kartı (masaüstü): adımda föydeki numara (3) ve "Simülasyonda:" satırı; soru "3. adım", cevap kapalı başlıyor ve "Cevabı göster" açıyor (5 V genliğin neden kırmadığı)',
+      stepText.includes('Simülasyonda:') && stepText.includes('zener olayını gözle') && label === '3. adım' && before === 0 && answer.includes('5 V genlik bu zeneri kırmaya yetmez') && answer.includes('4,87 V'),
+      `${label} · ${before} · ${answer.slice(0, 40)}`);
     await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    // Klasörde deney grubunun satırında amaç.
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
+    const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
+    await dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ }).tap(); await page.waitForTimeout(400);
+    const row = (await dlg.getByRole('button', { name: /^Deney 1 · Diyot karakteristiklerinin incelenmesi/ }).textContent()) ?? '';
+    check('föy kartı (telefon): klasörde Deney 1 satırında başlığın altında amaç', row.includes('Diyotların akım-gerilim karakteristiklerini incelemek.'), row.slice(0, 80));
+    // Klasöre girince ilk grup (Deney 1) açık gelir.
+    await dlg.getByRole('button', { name: '1N4001: X-Y’de akım-gerilim eğrisi', exact: true }).tap(); await page.waitForTimeout(600);
+    const card = phoneNotebook(page).getByRole('region', { name: 'Örnek · Deney 1 · Şekil-3' });
+    const labelled = (await card.count()) === 1;
+    await card.getByRole('button').first().tap(); await page.waitForTimeout(300);
+    const theory = card.getByRole('button', { name: 'Teorik bilgi' });
+    await theory.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
+    const theoryBox = await theory.boundingBox();
+    const theoryClosed = (await theory.getAttribute('aria-expanded')) === 'false';
+    await theory.tap(); await page.waitForTimeout(200);
+    const theoryOpen = (await theory.getAttribute('aria-expanded')) === 'true' && ((await card.textContent()) ?? '').includes('kT / q');
+    const stepNos = await card.getByRole('region', { name: 'Adımlar' }).locator('li > span').allTextContents();
+    const sims = await card.getByRole('region', { name: 'Adımlar' }).getByText('Simülasyonda:').count();
+    const qa = card.getByRole('region', { name: 'Föydeki sorular' });
+    const labels = await qa.locator('li > span').allTextContents();
+    const button = qa.getByRole('button', { name: 'Cevabı göster' }).first();
+    await button.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
+    const box = await button.boundingBox();
+    const closed = await qa.locator('div[id]').count();
+    await button.tap(); await page.waitForTimeout(200);
+    const answer = (await qa.locator('div[id]').first().textContent()) ?? '';
+    const text = (await card.textContent()) ?? '';
+    check('föy kartı (telefon): 1N4001 X-Y kartı "Örnek · Deney 1 · Şekil-3"; Amaç ve Günlük hayatta var; adımlar 2a, 2b, 2c, her birinde "Simülasyonda:"',
+      labelled && text.includes('Amaç') && text.includes('Günlük hayatta') && stepNos.join('|') === '2a|2b|2c' && sims === 3, `${labelled} · ${stepNos.join('|')} · ${sims}`);
+    check('föy kartı (telefon): Teorik bilgi en az 44 px, kapalı başlıyor ve dokununca açılıyor; "Cevabı göster" en az 44 px, cevap kapalı başlıyor ve açılıyor (≈ 4,23 mA); sayfa kaymıyor',
+      theoryBox !== null && theoryBox.height >= 44 && theoryClosed && theoryOpen && labels.join('|') === '2a. adım|2b. adım|2c. adım' && box !== null && box.height >= 44 && closed === 0 && answer.includes('4,23 mA') && !(await pageScrolls(page)),
+      `${Math.round(theoryBox?.height ?? 0)} px · ${theoryClosed}/${theoryOpen} · ${labels.join('|')} · ${Math.round(box?.height ?? 0)} px · ${answer.slice(0, 30)}`);
+    await page.context().close();
   }
   {
     const { page } = await phone();

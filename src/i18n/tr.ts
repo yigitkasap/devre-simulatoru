@@ -1222,14 +1222,6 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'Zenerin ters yönde belirli bir gerilimde iletime geçtiğini gösterir. Ters yönde ≈ −5,4 V’ta kırılır; en büyük ters akım ≈ 4,4 mA: I = (10 V − 5,4 V) / 1,05 kΩ (V_{Z} 20 mA için tanımlıdır, birkaç mA’de biraz daha düşüktür). Kırılmadan sonra akım değişse de gerilim neredeyse sabit kalır. İleri yönde sıradan bir diyot gibi ≈ 0,7 V’ta iletir (≈ 8,9 mA). Zener gerilimini 3,3 V ya da 9,1 V yapıp kırılmanın nasıl kaydığına bak.',
     everyday:
       'Zener diyotlar basit gerilim regülatörlerinde (ör. bir sensöre sabit 5,1 V vermek), aşırı gerilim korumasında ve referans gerilimi üreten devrelerde kullanılır. Telefon ve bilgisayar girişlerindeki koruma diyotları (TVS) aynı kırılma ilkesiyle çalışır.',
-    questions: [
-      {
-        step: 'Deney 1 · 3. adım',
-        question: 'Diyodu zener diyot ve LED ile değiştirerek akım-gerilim eğrilerini elde ediniz. Aynı eğrileri osiloskobun normal ve X-Y kipinde inceleyerek zener olayını gözleyiniz.',
-        answer:
-          'Föydeki 5 V genlik bu zeneri kırmaya yetmez: kırılma için ters yönde 5,6 V gerekir, üreteç ise en çok 5 V verir. Simülasyonda ters yönde en çok ≈ 4,87 V düşer ve yalnızca ≈ 0,12 mA geçer; X-Y’de sol kol neredeyse yatay kalır, sıradan bir diyottan farkı görülmez. Bu yüzden bu örnekte üreteç 20 V tepe-tepe (10 V genlik): ters yönde gerilim ≈ −5,37 V’ta sabitlenir ve ≈ 4,41 mA geçer; X-Y’de solda dik inen kol zener olayıdır. İleri yönde zener sıradan bir diyot gibidir: ≈ 0,68 V’ta ≈ 8,9 mA. Normal (Y-t) kipte B kanalı (1 kΩ’un gerilimi, yani akım) pozitif yarıda ≈ 8,9 V’a, negatif yarıda yalnızca ≈ −4,4 V’a ulaşır: negatif yarının fazlası zenerin üstünde kalır.',
-      },
-    ],
   },
   'led-karakteristigi': {
     title: 'LED: X-Y’de karakteristik',
@@ -1929,15 +1921,15 @@ export const tr = {
       ses: 'Ses ve koruma',
       entegreler: 'Entegreler',
       arduino: 'Arduino',
-      'diyot-karakteristigi': 'Deney 1 · Diyot karakteristikleri',
+      'diyot-karakteristigi': 'Deney 1 · Diyot karakteristiklerinin incelenmesi',
       dogrultucu: 'Deney 2 · Doğrultucular',
-      kenetleyici: 'Deney 3 · Kenetleyici ve gerilim katlayıcı',
-      kirpici: 'Deney 4 · Kırpıcılar',
-      'fet-karakteristigi': 'Deney 5 · FET karakteristikleri',
-      'fet-yukseltec': 'Deney 6 · JFET’li yükselteç',
-      'bjt-yukseltec': 'Deney 7 · BJT’li yükselteç',
-      'mosfet-yukseltec': 'Deney 8 · MOSFET’li yükselteç',
-      anahtar: 'Deney 9 · Transistörün anahtar olarak kullanılması',
+      kenetleyici: 'Deney 3 · Kenetleyici ve gerilim katlayıcılar',
+      kirpici: 'Deney 4 · Kırpıcı devreler',
+      'fet-karakteristigi': 'Deney 5 · FET karakteristiklerinin incelenmesi',
+      'fet-yukseltec': 'Deney 6 · FET yükselteci',
+      'bjt-yukseltec': 'Deney 7 · BJT’li temel yükselteç',
+      'mosfet-yukseltec': 'Deney 8 · MOSFET’li yükselteç devresi',
+      anahtar: 'Deney 9 · Transistörlerin anahtar olarak kullanılması',
       baraj: 'Proje · Baraj su seviyesi uyarısı',
     } as Record<ExampleGroupId, string>,
     folders: {
@@ -1954,6 +1946,18 @@ export const tr = {
     questionsTitle: 'Föydeki sorular',
     showAnswer: 'Cevabı göster',
     hideAnswer: 'Cevabı gizle',
+    /** Föy deneylerinin kartı (amaç, teorik bilgi, adımlar, föydeki sorular). */
+    lab: {
+      badge: (n: number, figure: string) => `Deney ${n} · ${figure}`,
+      aim: 'Amaç',
+      theory: 'Teorik bilgi',
+      steps: 'Adımlar',
+      inSim: 'Simülasyonda:',
+      step: (no: string) => (no === '' ? 'Deney' : `${no}. adım`),
+      pinout: (part: string, figure: string) => `${part}: bacak bağlantısı (föydeki ${figure})`,
+      leg: (n: number) => `${n}. bacak`,
+      openExample: (title: string) => `Örneği aç: ${title}`,
+    },
     texts: EXAMPLES,
     /** Defterdeki katlı örnek kartının kısa başlığı: ne yapılacağı ya da neye bakılacağı (v3). */
     cues: {

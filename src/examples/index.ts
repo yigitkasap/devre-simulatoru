@@ -141,6 +141,30 @@ export type ExampleId = (typeof EXAMPLE_GROUPS)[number]['ids'][number];
  */
 export const EXTRA_EXAMPLES: ReadonlySet<ExampleId> = new Set<ExampleId>(['schottky-1n4001', 'kopru-diyot', 'tristor-mandal', 'mosfet-yukseltec-rs', 'bjt-yukseltec-kuplajli', 'fet-yukseltec-kuplajli']);
 
+/**
+ * Föyün dokuz deneyi: grup → deney numarası. Deneyin metinleri (amaç, teorik bilgi) ve her şeklin
+ * adımlarıyla soruları i18n/foy.ts içindedir; ek örnekler (EXTRA_EXAMPLES) föyde olmadığı için
+ * şekil metinleri yoktur ve eski kart düzeninde kalır.
+ */
+export const LAB_EXPERIMENTS = {
+  'diyot-karakteristigi': 1,
+  dogrultucu: 2,
+  kenetleyici: 3,
+  kirpici: 4,
+  'fet-karakteristigi': 5,
+  'fet-yukseltec': 6,
+  'bjt-yukseltec': 7,
+  'mosfet-yukseltec': 8,
+  anahtar: 9,
+} as const satisfies Partial<Record<ExampleGroupId, number>>;
+
+export type LabExperimentNo = (typeof LAB_EXPERIMENTS)[keyof typeof LAB_EXPERIMENTS];
+
+/** Grubun föydeki deney numarası; föy deneyi olmayan gruplarda null. */
+export function labExperiment(id: ExampleGroupId): LabExperimentNo | null {
+  return (LAB_EXPERIMENTS as Partial<Record<ExampleGroupId, LabExperimentNo>>)[id] ?? null;
+}
+
 /** Bütün örnekler, pencerede göründükleri sırayla. */
 export const EXAMPLE_IDS: readonly ExampleId[] = EXAMPLE_GROUPS.flatMap((g) => g.ids);
 
