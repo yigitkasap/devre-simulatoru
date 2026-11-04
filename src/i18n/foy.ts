@@ -72,10 +72,10 @@ const BC107: LabPinout = {
   note: 'Metal kılıf (TO-18). Şekil-19a’daki gibi kılıfın tırnağına en yakın bacak 1 (emetör), ortadaki 2 (baz), öbür uçtaki 3 (kollektör); Central’ın BC107 kataloğundaki numaralama da aynı. Katalog sınırları: V_{CEO} 45 V, I_{C} 200 mA, P_{D} 600 mW.',
 };
 
-export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment>> = {
+export const LAB_EXPERIMENT_TEXTS: Record<LabExperimentNo, LabExperiment> = {
   1: {
     title: 'Diyot karakteristiklerinin incelenmesi',
-    aim: 'Diyotların akım-gerilim karakteristiklerini incelemek.',
+    aim: 'Diyodun akımının gerilimle nasıl değiştiğini (I-V eğrisini) ölçüp incelemek.',
     theory: [
       {
         text: 'Diyot akımı tek yönde geçirir. Anot katottan pozitifken (ileri besleme) akım kolayca geçer; tersinde (ters besleme) yalnızca çok küçük bir sızıntı akımı geçer. Föydeki Şekil-1’deki akım-gerilim eğrisi bu iki bölgeden oluşur; ileri yönde akım gerilimle üstel olarak artar:',
@@ -92,7 +92,7 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
   },
   2: {
     title: 'Doğrultucular',
-    aim: 'Diyotla yarım dalga ve tam dalga doğrultmaç kurup çalışmalarını incelemek.',
+    aim: 'Alternatif akımı diyotlarla yarım ve tam dalga doğrultup çıkışı incelemek.',
     theory: [
       {
         text: 'Doğrultmaç alternatif akımı (AC) tek yönlü akıma (DC) çevirir. Yarım dalga doğrultmaçta (Şekil-4) diyot yalnızca girişin pozitif yarısında iletir: çıkış pozitif yarılardan oluşur, negatif yarılarda sıfırdır. V_{T} girişin tepe değeri olmak üzere ideal diyotta çıkışın ortalaması (DC değeri):',
@@ -110,7 +110,7 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
   },
   3: {
     title: 'Kenetleyici ve gerilim katlayıcılar',
-    aim: 'Kenetleyici ve gerilim katlayıcı devreler kurup özelliklerini incelemek.',
+    aim: 'Diyot ve kondansatörle dalgayı kaydıran ve gerilimi katlayan devreleri incelemek.',
     theory: [
       {
         text: 'Kenetleyici (Şekil-6) bir kondansatör, bir diyot ve bir dirençten oluşur; çıkış diyodun uçlarından alınır. Girişe V_{1} ile −V_{2} arasında değişen bir kare dalga uygulansın. Giriş V_{1}’deyken diyot iletir, çıkış ≈ 0 olur ve kondansatör diyodun küçük direnci üzerinden çok çabuk V_{1}’e dolar (τ = R_{d} · C ≈ 0). Giriş −V_{2}’ye inince diyot kesime gider; kondansatör artık yalnızca R üzerinden boşalabilir (τ = R · C) ve gerilimini korur. Çıkış:',
@@ -128,7 +128,7 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
   },
   4: {
     title: 'Kırpıcı devreler',
-    aim: 'Kırpıcı devrelerin özelliklerini incelemek.',
+    aim: 'Kırpıcı devrelerin sinyali hangi seviyede ve nasıl kestiğini incelemek.',
     theory: [
       {
         text: 'Kırpıcı, girişin belirli bir seviyenin üstündeki ya da altındaki kısmını keser. Kesme seviyesi diyodun yönüne, devredeki DC kaynağın gerilimine ve devrenin biçimine bağlıdır. Şekil-11’de diyoda seri bir V_{G} kaynağı var; girişe tepe değeri V_{T} olan bir sinüs uygulansın (Şekil-12a). İdeal diyot yalnızca υ_{g} > V_{G} iken iletir:',
@@ -145,7 +145,7 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
   },
   5: {
     title: 'FET karakteristiklerinin incelenmesi',
-    aim: 'Eklem FET’i (JFET) tanımak, karakteristik eğrilerini çizip özelliklerini incelemek.',
+    aim: 'Eklem FET’in (JFET) akım-gerilim eğrilerini ölçüp çizmek ve parametrelerini bulmak.',
     theory: [
       {
         text: 'Eklem FET’te (JFET) drain ile source arasındaki yarı iletken kanaldan geçen I_{D} akımını hem V_{DS} hem de kapı ile source arasındaki ters gerilim V_{GS} denetler: V_{GS} eksildikçe kanal daralır. Şekil-14’te n kanallı JFET’in I_{D}–V_{DS} eğrileri var. V_{DS} küçükken kanal bir direnç gibidir ve I_{D} V_{DS} ile artar. V_{DS} belirli bir değeri aşınca (doyum bölgesi) kanal kısılır ve I_{D} artık neredeyse yalnızca V_{GS}’ye bağlıdır:',
@@ -159,7 +159,7 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
   },
   6: {
     title: 'FET yükselteci',
-    aim: 'JFET’li basit bir yükselteç tasarlayıp çalışmasını incelemek.',
+    aim: 'JFET’li bir yükselteci kazancı 10 olacak biçimde tasarlayıp çalışmasını incelemek.',
     theory: [
       { text: 'JFET’te i_{d} akımını kapıya uygulanan gerilim denetler. I_{DSS} ve V_{P} transistörün parametreleri, υ_{GS} kapı ile source arasındaki gerilim olmak üzere:' },
       { formula: 'i_{d} = I_{DSS} · (1 − υ_{GS} / V_{P})²', eq: 1 },
@@ -178,7 +178,7 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
   },
   7: {
     title: 'BJT’li temel yükselteç',
-    aim: 'BJT’li temel yükselteç devresi kurup özelliklerini incelemek.',
+    aim: 'BJT ile temel bir yükselteç kurup kazancını ve davranışını incelemek.',
     theory: [
       {
         text: 'BJT akım kazancı sağlar: küçük bir i_{b} baz akımı, kollektör ile emetör arasındaki çok daha büyük bir akımı denetler. Akım kazancı:',
@@ -197,7 +197,7 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
   },
   8: {
     title: 'MOSFET’li yükselteç devresi',
-    aim: 'MOSFET’li basit bir yükselteç tasarlayıp çalışmasını incelemek.',
+    aim: 'MOSFET’li bir yükselteci tasarlayıp kazancını, fazını ve bozulmasını incelemek.',
     theory: [
       { text: 'MOSFET’te drain akımını kapının gerilimi denetler; kapı ince bir oksitle yalıtıldığından kapıdan DC akım geçmez. Şekil-20’deki yükseltecin çıkışı, A sabit bir gerilim olmak üzere:' },
       { formula: 'υ_{DS} ≅ A − K_{υ} · υ_{S}', eq: 8 },
@@ -218,6 +218,24 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
       legs: ['Kapı (G)', 'Drain (D)', 'Source (S)'],
       note: 'TO-220 kılıf: yazılı yüz sana bakarken, bacaklar aşağıdayken soldan sağa 1 kapı, 2 drain, 3 source (Vishay kataloğunda da G D S). Metal sırt drain’e bağlıdır (Şekil-22a). Katalog sınırları: V_{DS} 100 V, V_{GS} ±20 V, I_{D} 5,6 A, P_{D} 43 W (kılıf 25 °C’ta).',
     },
+  },
+  9: {
+    title: 'Transistörlerin anahtar olarak kullanılması',
+    aim: 'Transistörün bir LED’i açıp kapatan anahtar olarak çalışmasını incelemek.',
+    theory: [
+      {
+        text: 'Transistör, kollektör ile emetör arasından geçen büyük akımı bazına verilen küçük bir akımla açıp kapatabildiği için anahtar olarak kullanılır. Şekil-23’te baz akımı sıfırken transistör C ile E arasında çok büyük bir direnç gibidir; V_{CC}’den gelen akımın hepsi R_{2}’den ve LED’den geçer ve LED yanar. Baz akımı verilince C-E direnci küçülür, akımın bir kısmı transistörden geçer ve C noktasının gerilimi düşer; bu gerilim LED’in eşiğinin altına inince LED’den akım geçmez ve LED söner. Baz akımı:',
+      },
+      { formula: 'I_{B} = (V_{S} − V_{BE}) / R_{1}' },
+      {
+        text: 'Kollektör devresinin verebileceği en büyük akım I_{C,doyum} ≈ (V_{CC} − V_{CE,doyum}) / R_{2}’dir. β · I_{B} bundan büyükse transistör doyuma girer: kapalı bir anahtar gibidir, V_{CE} ≈ 0,1 V’un altına iner.',
+      },
+      { formula: 'doyum: β · I_{B} > I_{C,doyum}' },
+      {
+        text: 'LED, Şekil-25’teki gibi emetöre seri bağlanırsa mantık tersine döner: transistörden akım geçerken LED yanar, geçmezken söner.',
+      },
+    ],
+    pinout: BC107,
   },
 };
 
@@ -721,6 +739,54 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       },
     ],
   },
+  'bjt-anahtar': {
+    experiment: 9,
+    figure: 'Şekil-24',
+    steps: [
+      {
+        no: '1',
+        text: 'Şekil-24’teki devreyi kur.',
+        sim: 'Devre kurulu: V_{CC} = 12 V (PS1) → R_{2} = 1 kΩ → kollektör; LED’in anodu kollektörde, katodu ortak hatta (transistöre paralel); R_{1} = 10 kΩ üretecin TTL ucundan baza; emetör ortak hatta. Oynat’a bas.',
+      },
+      {
+        no: '2',
+        text: 'Girişe üretecin “output pulse” çıkışından çok düşük frekanslı bir kare dalga uygula.',
+        sim: 'R_{1}, FG1’in TTL ucuna (föydeki “output pulse”) bağlı: 0 V ile 5 V arasında, FG1’in frekansında (1 Hz) bir kare dalga. Frekansı 0,5 Hz ya da 2 Hz yaparak yanıp sönmenin hızını değiştir.',
+      },
+      {
+        no: '3',
+        text: 'LED’in giriş hangi durumdayken yandığını gözle ve sonuçları yorumla.',
+        sim: 'LED1’in yanıp sönmesine bak; Q1’e tıklayıp bölgesini (Kesim, Doyum) ve akımlarını, LED1’e tıklayıp akımını oku.',
+      },
+    ],
+    questions: [
+      {
+        step: '3',
+        question: 'Devredeki LED giriş sinyali hangi durumdayken yanıyor gözlemleyiniz, sonuçları yorumlayınız.',
+        answer:
+          'LED giriş 0 V’tayken yanar, 5 V’tayken söner: devre bir tersleyicidir (DEĞİL kapısı). Giriş 0 V’ta baz akımı yoktur, transistör kesimdedir (C-E çok büyük bir direnç gibi); V_{CC}’den gelen akımın hepsi R_{2}’den ve LED’den geçer: ≈ 10,22 mA, LED’in (ve kollektörün) gerilimi ≈ 1,79 V. Giriş yüksekken (TTL ≈ 4,98 V) I_{B} = (4,98 V − 0,71 V) / 10 kΩ ≈ 0,43 mA. β · I_{B} ≈ 85 mA, kollektör devresinin verebileceği ≈ 12 mA’den çok büyük; transistör doyuma girer: I_{C} ≈ 11,95 mA, V_{CE} ≈ 0,05 V. Kollektörün gerilimi LED’in eşiğinin çok altına indiği için LED’den akım geçmez ve söner. Föydeki açıklamadaki gibi: transistörün direnci azaldıkça C noktasının gerilimi düşer, LED’in eşiğinin altına inince LED söner.',
+      },
+    ],
+  },
+  'bjt-anahtar-emetor': {
+    experiment: 9,
+    figure: 'Şekil-25',
+    steps: [
+      {
+        no: '4',
+        text: 'Şekil-25’teki devreyi kur ve bu devre için 1., 2. ve 3. adımları tekrarla.',
+        sim: 'Devre kurulu: kollektör doğrudan V_{CC} = 12 V’ta; emetör → R_{2} = 1 kΩ → LED → ortak hat; R_{1} = 10 kΩ FG1’in TTL ucundan baza (1 Hz kare dalga). Oynat’a bas; LED1’in ve Q1’in akımlarını Şekil-24’tekilerle karşılaştır.',
+      },
+    ],
+    questions: [
+      {
+        step: '4',
+        question: 'Şekil-25’teki devreyi kurunuz ve bu devre için 1, 2, 3 adımlarını tekrarlayınız.',
+        answer:
+          'Bu kez LED giriş 5 V’tayken yanar, 0 V’ta söner: LED transistörle seri, transistör iletince LED’den akım geçer. Ama LED sönük yanar: ≈ 2,55 mA, Şekil-24’teki ≈ 10,22 mA’in dörtte biri kadar. Transistör doyuma girmez, aktif bölgede kalır (V_{CE} ≈ 7,78 V): emetör bazı ≈ 0,66 V geriden izler (emetör izleyici) ve bazın gerilimi girişin 5 V’unu geçemez. Emetör ≈ 4,22 V’ta; akım I ≈ (4,22 V − 1,68 V) / 1 kΩ ≈ 2,55 mA (1,68 V LED’in gerilimi). Baz akımı yalnızca ≈ 12 µA (I_{C} / β). LED’in akımını artırmak için R_{2} küçültülür. Giriş 0 V’ta transistör kesimdedir ve LED’den akım geçmez.',
+      },
+    ],
+  },
 };
 
 /** Örneğin föydeki şekli; föy deneyi olmayan ve ek örneklerde null. */
@@ -731,5 +797,5 @@ export function labFigure(id: ExampleId): LabFigure | null {
 /** Deney grubunun amacı (klasörde grup başlığının altında); föy deneyi olmayan gruplarda null. */
 export function labAim(group: ExampleGroupId): string | null {
   const n = labExperiment(group);
-  return n === null ? null : (LAB_EXPERIMENT_TEXTS[n]?.aim ?? null);
+  return n === null ? null : LAB_EXPERIMENT_TEXTS[n].aim;
 }

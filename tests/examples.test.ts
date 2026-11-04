@@ -2,7 +2,8 @@
 // Paylaşım bağlantısı: sıkıştırma ve geri okuma.
 
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../src/examples';
+import { EXAMPLE_IDS, EXTRA_EXAMPLES, exampleDoc, type ExampleId } from '../src/examples';
+import { LAB_FIGURE_TEXTS } from '../src/i18n/foy';
 import { tr } from '../src/i18n/tr';
 import { buildConnectivity } from '../src/model/connectivity';
 import { flipParts, updatePart } from '../src/model/docOps';
@@ -57,7 +58,11 @@ describe('Örnekler', () => {
       // Hata ve uyarı yok; bilgi olabilir (ör. transformatörün yalıtılmış ikincilinin kendi sıfır noktası).
       expect(new CircuitSimulator(connectivity.netlist).topologyDiagnostics.filter((d) => d.severity !== 'info')).toEqual([]);
       const texts = tr.examples.texts[id];
-      for (const text of [texts.title, texts.description, texts.purpose, texts.everyday]) expect(text.length).toBeGreaterThan(5);
+      for (const text of [texts.title, texts.description, texts.everyday]) expect(text.length).toBeGreaterThan(5);
+      // "Ne işe yarar?" eski düzendeki kartlarda var; föy kartlarında yerini amaç ve teorik bilgi aldı.
+      const lab = !EXTRA_EXAMPLES.has(id) && LAB_FIGURE_TEXTS[id] !== undefined;
+      if (lab) expect(texts.purpose, id).toBeUndefined();
+      else expect(texts.purpose?.length ?? 0, id).toBeGreaterThan(5);
     });
   }
 

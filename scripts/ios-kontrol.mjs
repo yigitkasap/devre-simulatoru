@@ -428,7 +428,7 @@ try {
   // --- Föy kartı (örnek kartı): Deney N · Şekil-M, amaç, teorik bilgi (katlı), adımlar, föydeki sorular -------
   // Klasörde deney gruplarının başlığının altında tek satırlık amaç. LAB_AIMS: amacı yazılmış deney sayısı.
   {
-    const LAB_AIMS = 8;
+    const LAB_AIMS = 9;
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
@@ -440,7 +440,7 @@ try {
       hs.filter((h) => /^Deney \d/.test(h.textContent ?? '') && h.nextElementSibling?.tagName === 'P').map((h) => h.nextElementSibling.textContent));
     const d1Aim = await dlg.locator('section > h3', { hasText: /^Deney 1 · Diyot karakteristiklerinin incelenmesi$/ }).locator('+ p').textContent().catch(() => '');
     check(`föy kartı (masaüstü): klasörde deney gruplarının başlığının altında tek satırlık amaç (${LAB_AIMS} deney); Deney 1 föydeki adıyla`,
-      aims.length === LAB_AIMS && d1Aim === 'Diyotların akım-gerilim karakteristiklerini incelemek.', `${aims.length} · ${d1Aim}`);
+      aims.length === LAB_AIMS && d1Aim === 'Diyodun akımının gerilimle nasıl değiştiğini (I-V eğrisini) ölçüp incelemek.', `${aims.length} · ${d1Aim}`);
     await zener.click(); await page.waitForTimeout(500);
     const region = notebook(page).getByRole('region', { name: 'Örnek · Deney 1 · Şekil-3' });
     const labelled = (await region.count()) === 1;
@@ -490,7 +490,7 @@ try {
     const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
     await dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ }).tap(); await page.waitForTimeout(400);
     const row = (await dlg.getByRole('button', { name: /^Deney 1 · Diyot karakteristiklerinin incelenmesi/ }).textContent()) ?? '';
-    check('föy kartı (telefon): klasörde Deney 1 satırında başlığın altında amaç', row.includes('Diyotların akım-gerilim karakteristiklerini incelemek.'), row.slice(0, 80));
+    check('föy kartı (telefon): klasörde Deney 1 satırında başlığın altında amaç', row.includes('Diyodun akımının gerilimle nasıl değiştiğini (I-V eğrisini) ölçüp incelemek.'), row.slice(0, 80));
     // Klasöre girince ilk grup (Deney 1) açık gelir.
     await dlg.getByRole('button', { name: '1N4001: X-Y’de akım-gerilim eğrisi', exact: true }).tap(); await page.waitForTimeout(600);
     const card = phoneNotebook(page).getByRole('region', { name: 'Örnek · Deney 1 · Şekil-3' });

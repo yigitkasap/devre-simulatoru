@@ -1492,41 +1492,65 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   föydeki parçalar (1N4001, BC107, BF245A, IRF510, föydeki direnç ve kondansatör değerleri) ve
   laboratuvar cihazları (fonksiyon üreteci, iki çıkışlı DC güç kaynağı, osiloskop) kullanılır:
 
-  | Deney | Örnekler |
+  | Deney | Örnekler (föydeki şekil) |
   |---|---|
-  | 1 Diyot karakteristikleri | 1N4001 doğru akımda (güç kaynağı, ampermetre, voltmetre); 1N4001, 5,6 V zener ve LED X-Y'de |
-  | 2 Doğrultucular | Yarım dalga + 1 / 22 / 470 µF filtre (anahtarlarla); dört 1N4001'lik köprü, 100 kΩ |
-  | 3 Kenetleyici ve katlayıcı | Negatif ve pozitif kenetleyici (2,2 µF, 10 kΩ); iki 1N4001 + iki 10 µF ikileyici |
-  | 4 Kırpıcılar | 4 V öngerilimli paralel kırpıcı (güç kaynağı); 3 V ve −2 V çift yönlü kırpıcı (iki pil; laboratuvarda güç kaynağının iki çıkışı) |
-  | 5 FET karakteristikleri | BF245A: V_DD ve V_GG güç kaynağından, I_D ampermetreyle |
-  | 6–8 Yükselteçler | BF245A (R_D = 2,7 kΩ, kazanç ≈ 10), BC107 (R_B = 2,2 MΩ, R_C = 5,6 kΩ), IRF510 (R_D = 10 kΩ, R_S = 1 kΩ) |
-  | 9 Transistör anahtar | BC107, R1 = 10 kΩ, R2 = 1 kΩ, LED kollektörde ve emetörde; üretecin TTL çıkışı, 1 Hz |
+  | 1 Diyot karakteristikleri | 1N4001 doğru akımda (Şekil-2: güç kaynağı, ampermetre, voltmetre 1 kΩ'un uçlarında); 1N4001, 5,6 V zener ve LED X-Y'de (Şekil-3) |
+  | 2 Doğrultucular | Yarım dalga, 1 kHz + 1 / 22 / 470 µF ve R_L = ∞ (anahtarlarla; Şekil-4a); dört 1N4001'lik köprü, 100 kΩ (Şekil-5a) |
+  | 3 Kenetleyici ve katlayıcılar | Negatif ve pozitif kenetleyici (2,2 µF, 10 kΩ; Şekil-9a, b); tam dalga katlayıcı, iki 1N4001 + iki 10 µF (Şekil-10) |
+  | 4 Kırpıcı devreler | Şekil-13a–d: seri kırpıcı; 4 V öngerilimli paralel kırpıcı; 3 V ve 2 V'luk iki diyotlu iki devre (iki pil; laboratuvarda güç kaynağının iki çıkışı) |
+  | 5 FET karakteristikleri | BF245A (Şekil-15): V_DD ve V_GG güç kaynağından, I_D ampermetreyle, V_DS voltmetreyle |
+  | 6–8 Yükselteçler | BF245A (Şekil-17: R_D = 2,7 kΩ, R_g = 10 kΩ, kazanç ≈ 10,1), BC107 (Şekil-18: R_B = 10 kΩ, R_C = 1 kΩ, kayma 0,98 V, kazanç ≈ 16,3), IRF510 (Şekil-21: R_g = 10 kΩ, R_D = 1 kΩ, R_S yok, kayma 3,907 V) |
+  | 9 Transistör anahtar | BC107, R1 = 10 kΩ, R2 = 1 kΩ, LED kollektörde (Şekil-24) ve emetörde (Şekil-25); üretecin TTL çıkışı, 1 Hz |
 
-- **Föyden çıkarılamayan ayrıntılarda varsayımlar** (föyün tam metni elimizde değil; deney
-  listesi ve parça değerleri biliniyor):
+  Föyde olmayan ama deneyin konusunu sürdüren örnekler (Schottky, KBP307 köprü, tristör ve
+  yükselteçlerin eski kuplajlı / R_S'li devreleri) "Föyde yok · ek" etiketiyle deney grubunun
+  sonundadır.
+- **Föy kartları (2026-11-05):** Föydeki örneklerin defter kartı ayrı düzendedir: başlıkta
+  "Deney N · Şekil-M"; Amaç, Teorik bilgi (katlı; föydeki formüller ve denklem numaraları,
+  transistörün bacak bağlantısı), Adımlar (föydeki numaralarla, her adımın altında
+  "Simülasyonda:" satırı), Föydeki sorular (cevaplar katlı) ve Günlük hayatta. Bir deneyin birden
+  çok şekli varsa her şeklin kartında yalnızca o şekle ait adımlar ve sorular bulunur. Klasörde
+  her deney grubunun başlığının altında tek cümlelik amaç var. Metinler tipli yapıda
+  [`src/i18n/foy.ts`](src/i18n/foy.ts) içindedir; ek örnekler ve föy dışı örnekler eski düzende
+  (açıklama, "Ne işe yarar?", "Günlük hayatta") kalır.
+  - **Kaynak:** Elektronik Lab. Deney Föyü (21 sayfa, dokuz deney; depoda değil). Soruların metni
+    föyden kısa alıntıdır; amaç, teorik bilgi, adımlar ve cevaplar föyün anlamı ve sayılarıyla
+    yeniden yazıldı. Föydeki hatalar düzeltildi: Deney 6'da "IDDS" → I_DSS, "Şekil.1" →
+    Şekil-17; Deney 4'te çıkışın anlık değeri υ_ç = υ_g − V_G (föyde υ_T − υ_G, yani tepe değeri);
+    Deney 8'de V_T "I_D'yi sıfır yapan" gerilim. Deney 8'in (9) formülünün υ_GS = 0'da kutuplanan
+    azaltmalı tip için olduğu, IRF510'da K_υ = 2K(V_GS − V_T)R_d olduğu not edildi.
+  - **Bacak bağlantıları** föydeki şekillerle (Şekil-16, 19, 22) ve kataloglarla karşılaştırıldı:
+    BC107 (Central: 1 E, 2 B, 3 C) ve IRF510 (Vishay: G D S) föyle aynı; BF245A'da föy 1 kapı,
+    3 drain derken Philips kataloğu 1 drain, 3 kapı der (kartta not olarak).
+  - **Testler** ([`tests/foy-deney.test.ts`](tests/foy-deney.test.ts)): föyün iskeleti (dokuz
+    deney, şekiller, adım ve soru numaraları) testte ayrıca yazılıdır; bir deneyin amacı, teorik
+    bilgisi, bir adımı ya da bir sorunun cevabı eksikse test düşer. Cevaplardaki her sayı testte
+    simülasyonla ölçülür ve kartlardaki biçimiyle (ondalık virgül, "−") cevap metninde aranır.
+- **Föyün belirtmediği ayrıntılarda varsayımlar:**
   - **Zener:** Föy değerini vermiyor. Düzeni en çok benzeyen föyler (Bilecik ve Bandırma: 1N4001,
-    LED ve zener, 1 kΩ) 5,6 V (1N4734A) kullanıyor; ±10 V'luk üreteçle kırılma da net görünüyor.
-  - **X-Y düzeneği:** Klasik akım-gerilim çizici: osiloskobun COM'u eleman ile 1 kΩ'un
-    birleşiminde, B ters çevrilmiş; bu yüzden üreteç topraktan yalıtılmış. Üreteç topraklıysa
-    direnç iki toprak arasında kısa devre olur (metinde anlatılır).
-  - **Doğrultucularda 50 Hz:** 1 / 22 / 470 µF ile 1 kΩ, RC = 1 / 22 / 470 ms verir; 20 ms'lik
-    periyotla "filtre yok – orta – iyi" sırası en anlamlı bu frekansta.
-  - **Genlikler tepe-tepe:** Föydeki "0,5 V", "0,1 V" gibi giriş değerleri üretecin ön
-    panelindeki gibi tepe-tepe alındı; JFET'te 2 V'ta bozulma, MOSFET'te 1 V'ta belirgin
-    olmayan bozulma föydeki anlatımla tutuyor.
-  - **MOSFET yükselteci:** "IRF510, 10 kΩ, 1 kΩ" R_D = 10 kΩ, R_S = 1 kΩ olarak yorumlandı (kazanç
-    ≈ R_D / R_S ≈ 10); kapı, üretecin DC offset'iyle (4,55 V) sürülür.
-  - **Tasarım ödevleri** (JFET'te R_D, BJT'de R_B ve R_C) için birer çözüm konuldu; "Ne işe
-    yarar?" metni tasarım formülünü verir.
-- **Yükselteçlerde** BJT'nin kuplaj kondansatörünün başlangıç gerilimi çalışma noktasındaki
-  V_BE'dir (2,2 MΩ üzerinden dolması 22 s sürerdi); Oynat'a basınca kararlı çalışma görülür.
+    LED ve zener, 1 kΩ) 5,6 V (1N4734A) kullanıyor. Föydeki 5 V genlik bu zeneri kırmadığı için
+    örnekte üreteç 20 V tepe-tepe (nedeni föy kartındaki soruda).
+  - **Kenetleyici ve kırpıcılarda genlik:** Föy vermiyor; kenetleyicide 10 V, kırpıcılarda kırpma
+    seviyelerini aşsın diye 20 V tepe-tepe.
+  - **Genlikler:** Föydeki "~0,5 V", "~0,1 V" yükselteç girişleri üretecin ön panelindeki gibi
+    tepe-tepe alındı.
+  - **Çalışma noktaları:** Şekil-18 ve Şekil-21'de kuplaj kondansatörü yok; bazın ve kapının DC
+    gerilimini üretecin DC kayması verir (föyde "osilatörün DC-ofset düğmesi").
+  - **Tasarım ödevleri** (JFET'te V_DD, R_D, R_g; BJT'de R_B ve R_C) için birer çözüm konuldu;
+    formülle hesap ve ölçülen kazanç föy kartındaki 1. sorunun cevabında.
+  - **Referans toprak:** Föyün bazı şekillerinde toprak yok; her örnekte tek toprak kuralı için
+    dönüş hattına bir referans toprak kondu.
+- **Kuplajlı BJT yükseltecinde (ek örnek)** kuplaj kondansatörünün başlangıç gerilimi çalışma
+  noktasındaki V_BE'dir (2,2 MΩ üzerinden dolması 22 s sürerdi); Oynat'a basınca kararlı çalışma
+  görülür.
 - **Kullanılmayan cihaz çıkışları:** Üretecin kullanılmayan OUT ya da TTL çıkışı ve güç
   kaynağının iki ucu da boş olan çıkışı "boşta uç" uyarısı vermez (tek ucu bağlı çıkış uyarır).
 - **Osiloskobun AC kuplajı** artık girişte 1 MΩ ile seri ≈ 16 nF'lık kuplaj kondansatörü gibi
   davranır: doğru akım çekmez. Önceden AC kuplajda da 1 MΩ doğru akımda devreyi yüklüyordu;
   sabit öngerilimli BJT'nin bazına bağlanan prob baz akımının ≈ %12'sini çalıyordu.
 - Devreler `src/examples/*.json` dosyalarında, metinleri (başlık, açıklama, ne işe yarar, günlük
-  hayatta) `i18n/tr.ts` içindedir; böylece arayüz metinlerinin tamamı tek dosyada kalır.
+  hayatta) `i18n/tr.ts` içindedir; föy kartlarının amaç, teorik bilgi, adım ve soruları
+  uzunlukları yüzünden ayrı dosyada, `i18n/foy.ts`.
 - **Ne işe yarar ve günlük hayatta (kullanıcı isteği, 2026-10-17):** Örneklerdeki tahmin sorusu,
   isteğe bağlı tahmin alanı ve Oynat'la açılan cevap kaldırıldı. Örnek sekmesinde kurulum
   açıklamasının altında iki bölüm var: "Ne işe yarar?" (devrenin işlevi, dayandığı yasa — Ohm,

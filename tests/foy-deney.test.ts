@@ -22,7 +22,7 @@ interface FoySekil {
  * şekillerine dağıtılmıştır; aynı şekli kullanan örnekler (zener ve LED Şekil-3'ün diyot yerine
  * takılan parçaları) aynı adımı paylaşır.
  */
-const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; readonly figures: Partial<Record<ExampleId, FoySekil>> }>> = {
+const FOY: Record<LabExperimentNo, { readonly steps: readonly string[]; readonly figures: Partial<Record<ExampleId, FoySekil>> }> = {
   1: {
     steps: ['1', '2a', '2b', '2c', '3'],
     figures: {
@@ -81,6 +81,13 @@ const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; 
       'mosfet-yukseltec': { figure: 'Şekil-21', steps: ['1', '2', '3', '4', '5'], questions: ['3', '4', '5'] },
     },
   },
+  9: {
+    steps: ['1', '2', '3', '4'],
+    figures: {
+      'bjt-anahtar': { figure: 'Şekil-24', steps: ['1', '2', '3'], questions: ['3'] },
+      'bjt-anahtar-emetor': { figure: 'Şekil-25', steps: ['4'], questions: ['4'] },
+    },
+  },
 };
 
 /** Bir sayıyı kartlardaki gibi yazar: ondalık virgül, eksi işareti "−". */
@@ -98,24 +105,23 @@ function answer(id: ExampleId, step: string): string {
 }
 
 describe('Föy kartları: iskelet', () => {
-  for (const [no, deney] of Object.entries(FOY) as [string, NonNullable<(typeof FOY)[LabExperimentNo]>][]) {
+  for (const [no, deney] of Object.entries(FOY) as [string, (typeof FOY)[LabExperimentNo]][]) {
     const n = Number(no) as LabExperimentNo;
     it(`Deney ${n}: amaç, teorik bilgi, şekiller, adımlar ve sorular eksiksiz`, () => {
       const experiment = LAB_EXPERIMENT_TEXTS[n];
-      expect(experiment, `Deney ${n} bilgisi`).toBeDefined();
-      expect(experiment!.title.length).toBeGreaterThan(5);
+      expect(experiment.title.length).toBeGreaterThan(5);
       // Amaç tek satır: klasörde grup başlığının altında da çıkar.
-      expect(experiment!.aim.length).toBeGreaterThan(10);
-      expect(experiment!.aim.length).toBeLessThanOrEqual(90);
-      expect(experiment!.aim).not.toContain('\n');
-      expect(experiment!.theory.length).toBeGreaterThan(0);
-      expect(experiment!.theory.some((t) => 'formula' in t)).toBe(true);
-      if (n >= 5) expect(experiment!.pinout, `Deney ${n}: transistörün bacak bağlantısı`).toBeDefined();
+      expect(experiment.aim.length).toBeGreaterThan(10);
+      expect(experiment.aim.length).toBeLessThanOrEqual(90);
+      expect(experiment.aim).not.toContain('\n');
+      expect(experiment.theory.length).toBeGreaterThan(0);
+      expect(experiment.theory.some((t) => 'formula' in t)).toBe(true);
+      if (n >= 5) expect(experiment.pinout, `Deney ${n}: transistörün bacak bağlantısı`).toBeDefined();
 
       // Grup adı föydeki deney adı; klasörde amaç satırı.
       const group = (Object.keys(LAB_EXPERIMENTS) as (keyof typeof LAB_EXPERIMENTS)[]).find((g) => LAB_EXPERIMENTS[g] === n)!;
-      expect(tr.examples.groups[group]).toBe(`Deney ${n} · ${experiment!.title.charAt(0).toUpperCase()}${experiment!.title.slice(1)}`);
-      expect(labAim(group)).toBe(experiment!.aim);
+      expect(tr.examples.groups[group]).toBe(`Deney ${n} · ${experiment.title.charAt(0).toUpperCase()}${experiment.title.slice(1)}`);
+      expect(labAim(group)).toBe(experiment.aim);
 
       // Grubun föydeki bütün örneklerinin şekli var; ek örneklerin yok (eski kart düzeni).
       const ids = EXAMPLE_GROUPS.find((g) => g.id === group)!.ids as readonly ExampleId[];
@@ -147,6 +153,12 @@ describe('Föy kartları: iskelet', () => {
       expect([...covered].sort()).toEqual([...deney.steps].sort());
     });
   }
+
+  it('föyün dokuz deneyinin hepsi var; her deney grubu bir deney', () => {
+    expect(Object.keys(FOY).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(Object.values(LAB_EXPERIMENTS).sort()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(Object.keys(LAB_EXPERIMENT_TEXTS).map(Number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
 
   it('föyde olmayan deney numarası yok', () => {
     for (const figure of Object.values(LAB_FIGURE_TEXTS)) expect(FOY[figure!.experiment], `Deney ${figure!.experiment}`).toBeDefined();
@@ -806,5 +818,67 @@ describe('Deney 8: cevaplardaki sayılar', () => {
     says(text, `≈ ${num(a100.min, 2)} V ile ${num(a100.max, 2)} V`, `(oran ≈ ${num(a100.gain, 0)})`);
     // Pozitif yarıda en büyük akım V_DD / R_D ≈ 15 mA.
     between((15 - a100.min) / 1000, 14.9e-3, 15.1e-3);
+  });
+});
+
+describe('Deney 9: cevaplardaki sayılar', () => {
+  /** Girişin (TTL) yüksek (0,25 s) ve alçak (0,75 s) yarısında transistör ve LED. */
+  function both(id: 'bjt-anahtar' | 'bjt-anahtar-emetor') {
+    const doc = load(id);
+    const sim = run(doc, 0);
+    const q = idOf(doc, 'Q1');
+    const led = idOf(doc, 'LED1');
+    const at = (t: number) => {
+      sim.runUntil(t);
+      const [ic, ib] = sim.pinCurrents(q)!;
+      return {
+        ttl: sim.voltageAt(`${idOf(doc, 'FG1')}#1`)!,
+        ib: ib!,
+        ic: ic!,
+        vce: sim.measure(q)!.voltage,
+        vb: sim.voltageAt(`${q}#1`)!,
+        ve: sim.voltageAt(`${q}#2`)!,
+        region: sim.status(q).region,
+        led: sim.measure(led)!.current,
+        vled: sim.measure(led)!.voltage,
+      };
+    };
+    return { high: at(0.25), low: at(0.75) };
+  }
+
+  it('Şekil-24, 3. adım: giriş 0 V’ta LED ≈ 10,22 mA ile yanar (≈ 1,79 V), 5 V’ta doyum (I_B ≈ 0,43 mA, β·I_B ≈ 85 mA, I_C ≈ 11,95 mA, V_CE ≈ 0,05 V), LED söner', () => {
+    const text = answer('bjt-anahtar', '3');
+    const { high, low } = both('bjt-anahtar');
+    expect(low.region).toBe('cutoff');
+    says(text, `≈ ${num(low.led * 1e3, 2)} mA`, `gerilimi ≈ ${num(low.vled, 2)} V`);
+    expect(high.region).toBe('saturation');
+    expect(Math.abs(high.led)).toBeLessThan(1e-6);
+    const beta = load('bjt-anahtar').parts.find((p) => p.label === 'Q1')!.props.beta as number;
+    says(
+      text,
+      `TTL ≈ ${num(high.ttl, 2)} V`,
+      `(${num(high.ttl, 2)} V − ${num(high.vb, 2)} V) / 10 kΩ ≈ ${num(high.ib * 1e3, 2)} mA`,
+      `β · I_{B} ≈ ${num(beta * high.ib * 1e3, 0)} mA`,
+      `≈ ${num((12 - high.vce) / 1000 * 1e3, 0)} mA’den`,
+      `I_{C} ≈ ${num(high.ic * 1e3, 2)} mA, V_{CE} ≈ ${num(high.vce, 2)} V`,
+    );
+  });
+
+  it('Şekil-25, 4. adım: giriş 5 V’ta LED ≈ 2,55 mA (aktif, V_CE ≈ 7,78 V, emetör ≈ 4,22 V, V_BE ≈ 0,66 V, I_B ≈ 12 µA); 0 V’ta söner', () => {
+    const text = answer('bjt-anahtar-emetor', '4');
+    const { high, low } = both('bjt-anahtar-emetor');
+    const other = both('bjt-anahtar');
+    expect(high.region).toBe('active');
+    says(
+      text,
+      `≈ ${num(high.led * 1e3, 2)} mA, Şekil-24’teki ≈ ${num(other.low.led * 1e3, 2)} mA’in`,
+      `(V_{CE} ≈ ${num(high.vce, 2)} V)`,
+      `≈ ${num(high.vb - high.ve, 2)} V geriden`,
+      `Emetör ≈ ${num(high.ve, 2)} V’ta; akım I ≈ (${num(high.ve, 2)} V − ${num(high.vled, 2)} V) / 1 kΩ ≈ ${num(high.led * 1e3, 2)} mA`,
+      `≈ ${num(high.ib * 1e6, 0)} µA`,
+    );
+    between(other.low.led / high.led, 3.8, 4.2);
+    expect(low.region).toBe('cutoff');
+    expect(Math.abs(low.led)).toBeLessThan(1e-6);
   });
 });

@@ -206,7 +206,7 @@ function Steps({ figure }: { figure: LabFigure }) {
 
 /** Föy deneyinin kartı: amaç, teorik bilgi, adımlar, föydeki sorular, günlük hayatta. */
 function LabDetails({ id, figure, onOpen }: { id: ExampleId; figure: LabFigure; onOpen: (id: ExampleId) => void }) {
-  const experiment = LAB_EXPERIMENT_TEXTS[figure.experiment]!;
+  const experiment = LAB_EXPERIMENT_TEXTS[figure.experiment];
   return (
     <>
       <Section title={tr.examples.lab.aim} icon={<Icon name="target" className="h-4 w-4" />}>
@@ -265,7 +265,7 @@ export function ExampleDetails({ id, onOpen, onClose }: { id: ExampleId; onOpen:
               </svg>
             }
           >
-            <Rich text={texts.purpose} />
+            <Rich text={texts.purpose ?? ''} />
           </Section>
           <Section title={tr.examples.everyday} icon={EVERYDAY_ICON}>
             <Rich text={texts.everyday} />
