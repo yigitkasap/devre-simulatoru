@@ -127,7 +127,8 @@ describe('Deney 2: doğrultucular', () => {
     // R_L = ∞ (S4 açık): kondansatör tepeye yakın dolar ve boşalmaz.
     const open = run(withProps(withProps(doc, 'S4', { closed: false }), 'S2', { closed: true }), 0.1);
     between(swing(open, () => open.measure(idOf(doc, 'C2'))!.voltage, 0.004, 2e-6).min, 2.5, 2.6);
-  });
+    // 470 µF'ın oturması 1 kHz'te 1500 dönem sürer: paralel testlerde 5 s'yi aşabilir.
+  }, 30_000);
 
   it('Köprü (Şekil-5a, 5 V genlik, 1 kHz, D1–D4): 100 kΩ’da iki yarıda da ≈ 4,36 V tepe (A − B ölçümü doğru, prob toprağı toprakta)', () => {
     const doc = load('kopru-dogrultmac');
