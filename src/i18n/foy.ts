@@ -195,6 +195,30 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
     ],
     pinout: BC107,
   },
+  8: {
+    title: 'MOSFET’li yükselteç devresi',
+    aim: 'MOSFET’li basit bir yükselteç tasarlayıp çalışmasını incelemek.',
+    theory: [
+      { text: 'MOSFET’te drain akımını kapının gerilimi denetler; kapı ince bir oksitle yalıtıldığından kapıdan DC akım geçmez. Şekil-20’deki yükseltecin çıkışı, A sabit bir gerilim olmak üzere:' },
+      { formula: 'υ_{DS} ≅ A − K_{υ} · υ_{S}', eq: 8 },
+      { text: 'K_{υ} gerilim kazancıdır:' },
+      { formula: 'K_{υ} = −2K · R_{d} · V_{T}', eq: 9 },
+      {
+        text: 'V_{T}, altında drain akımı geçmeyen kapı gerilimidir (eşik; föyde “I_{DSS} akımını sıfır yapan” diye geçiyor, doğrusu I_{D}). K transistörün yapısına bağlı bir katsayıdır; µ taşıyıcıların hareketliliği (mobilite), ε yalıtkanın dielektrik sabiti, ω, T ve L kanalın geometrik büyüklükleri olmak üzere:',
+      },
+      { formula: 'K = µ · ε · ω / (2 · T · L)', eq: 10 },
+      {
+        text: '(9), kapısı υ_{GS} = 0’da kutuplanan, V_{T}’si eksi (azaltmalı tip) bir MOSFET içindir. IRF510 çoğaltmalı tiptir (V_{T} ≈ 3,83 V > 0): doyum bölgesinde I_{D} = K · (V_{GS} − V_{T})², kapı V_{T}’nin biraz üstünde kutuplanır ve kazanç aşağıdaki gibidir; iki ifade V_{GS} = 0’da aynıdır. R_{S} olmadığından çalışma noktasını yalnızca kapının DC gerilimi kurar.',
+      },
+      { formula: 'K_{υ} = 2K · (V_{GS} − V_{T}) · R_{d} = 2 · √(K · I_{D}) · R_{d}' },
+    ],
+    pinout: {
+      part: 'IRF510',
+      figure: 'Şekil-22',
+      legs: ['Kapı (G)', 'Drain (D)', 'Source (S)'],
+      note: 'TO-220 kılıf: yazılı yüz sana bakarken, bacaklar aşağıdayken soldan sağa 1 kapı, 2 drain, 3 source (Vishay kataloğunda da G D S). Metal sırt drain’e bağlıdır (Şekil-22a). Katalog sınırları: V_{DS} 100 V, V_{GS} ±20 V, I_{D} 5,6 A, P_{D} 43 W (kılıf 25 °C’ta).',
+    },
+  },
 };
 
 export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
@@ -643,6 +667,57 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
         question: 'Giriş sinyali olarak belirli bir frekansta (örneğin 1 kHz) kare dalga uygulayarak çıkış dalga şeklini gözleyiniz.',
         answer:
           'Çıkış ters çevrilmiş bir kare dalgadır: girişin yüksek yarısında kollektör ≈ 4,43 V, alçak yarısında ≈ 7,69 V (3,26 V tepe-tepe, kazanç yine ≈ 16,3). 1 kHz’te (yarım periyot 0,5 ms) kenarlar dik görünür. Zaman/bölmeyi 1 µs’ye indirince her kenarın ≈ 1 µs’de tamamlandığı görülür (yükselme süresi t_{r}, %10–%90). Bu, yükseltecin bant genişliğinden gelir: t_{r} ≈ 0,35 / f_{üst} ≈ 0,35 / 370 kHz ≈ 0,95 µs. Kare dalga çok sayıda harmonikten oluştuğu için yükseltecin yüksek frekans yanıtını tek bakışta gösterir.',
+      },
+    ],
+  },
+  'mosfet-yukseltec': {
+    experiment: 8,
+    figure: 'Şekil-21',
+    steps: [
+      {
+        no: '1',
+        text: 'Şekil-21’deki devreyi kur.',
+        sim: 'Devre kurulu: FG1 → 10 kΩ → IRF510’un kapısı; source ortak hatta (R_{S} yok); drain 1 kΩ üzerinden V_{DD} = 15 V’a (PS1). Föydeki şekilde kapının DC kutuplaması yok; burada çalışma noktasını üretecin DC kayması (3,907 V) kurar: V_{DS} ≈ 7,5 V, I_{D} ≈ 7,5 mA. Oynat’a bas.',
+      },
+      {
+        no: '2',
+        text: 'Girişe küçük genlikli (≈ 0,1 V) bir sinüs uygula; girişi ve çıkışı osiloskopta birlikte izle.',
+        sim: 'FG1 1 kHz, 0,1 V tepe-tepe. Osiloskop “A ve B (Y-t)” kipinde: A girişte (AC, 50 mV/bölme), B drain’de (AC, 2 V/bölme). Bozulmasız küçük işaret için tepe-tepe değeri 10 mV yap, A’yı 5 mV/bölmeye, B’yi 0,5 V/bölmeye al.',
+      },
+      {
+        no: '3',
+        text: 'Giriş ve çıkış genliklerini ölçüp gerilim kazancını bul.',
+        sim: 'Tepe-tepe değerleri ekranın altından oku. Frekansın etkisini görmek için FG1’in frekansını 100 Hz yap.',
+      },
+      {
+        no: '4',
+        text: 'Çıkış ile giriş arasındaki faz farkını bul.',
+        sim: 'Zaman/bölmeyi 0,1 ms yap; A’nın tepesi ile B’nin çukuru arasındaki süreyi oku: faz farkı = 180° + Δt / T · 360°.',
+      },
+      {
+        no: '5',
+        text: 'Girişin genliğini yavaşça ≈ 1 V’a kadar artırıp çıkışın biçimindeki değişimi izle; nasıl bir değişim olduğunu ve nedenini açıkla.',
+        sim: 'Cihaz rafında FG1’in tepe-tepe değerini 0,2 V, 0,5 V ve 1 V yap; B’yi DC kuplaja ve 5 V/bölmeye al.',
+      },
+    ],
+    questions: [
+      {
+        step: '3',
+        question: 'Giriş ve çıkış dalga genliklerini ölçerek gerilim kazancını belirleyiniz.',
+        answer:
+          '10 mV tepe-tepe girişte drain 6,62–8,35 V arasında, yani ≈ 1,72 V tepe-tepe salınır: K_{υ} ≈ 172 ve dalga bozulmaz. Hesap: çalışma noktasında I_{D} ≈ 7,49 mA, g_{m} = 2 · √(K · I_{D}) ≈ 0,193 S, K_{υ} ≈ g_{m} · R_{D} ≈ 193. 100 Hz’te ölçülen kazanç ≈ 191, hesaba çok yakın; 1 kHz’te küçük, çünkü kapının kapasitesi (drain-kapı kapasitesi Miller etkisiyle ≈ (1 + K_{υ}) kat büyür) 10 kΩ üzerinden dolar ve kapıya ulaşan sinyali azaltır. Föydeki 0,1 V tepe-tepe giriş bu kazanç için büyüktür: çıkış ≈ 2,25 V ile 13,97 V arasında salınır ve bozulur (kare yasası iki yarıyı eşit büyütmez; bu genlikte oran ≈ 117). Çalışma noktası da aynı nedenle hassastır: kaymadaki 1 mV, V_{DS}’yi ≈ 0,19 V kaydırır (3,907 V’ta 7,5 V; 3,897 V’ta ≈ 9,3 V; 3,917 V’ta ≈ 5,5 V).',
+      },
+      {
+        step: '4',
+        question: 'Çıkış ile giriş sinyalleri arasındaki faz farkını belirleyiniz.',
+        answer:
+          '≈ 180°: girişin pozitif tepesinde drain aşağı, negatif tepesinde yukarı gider (10 mV tepe-tepe girişin tepesinde ≈ 6,73 V, çukurunda ≈ 8,29 V). Kapı gerilimi artınca I_{D} artar, R_{D}’deki düşüm büyür ve drain’in gerilimi düşer; (8)’deki eksi işareti bu terslenmedir. Ölçülünce tam 180° değildir: 1 kHz’te drain’in çukuru girişin tepesinden ≈ 27° sonra gelir (faz farkı ≈ 207°); 100 Hz’te bu gecikme ≈ 3°’ye iner. Gecikmeyi 3. adımda anlatılan kapı kapasitesi yapar.',
+      },
+      {
+        step: '5',
+        question: 'Giriş sinyalinin genliğini yavaşça artırarak (~1 V’a kadar) çıkış dalga şeklindeki değişimi gözleyiniz. Nasıl bir değişim olmaktadır, nedenini açıklayınız.',
+        answer:
+          'Genlik büyüdükçe kazanç düşer ve çıkış önce asimetrik bozulur (0,05 V tepe-tepede 3,60–11,40 V, oran ≈ 156; 0,1 V’ta 2,25–13,97 V), sonra iki yandan kırpılır: 0,2 V’ta üst tepe V_{DD}’de düzleşir (0,68–14,99 V), 1 V’ta drain ≈ 0,01 V ile 14,99 V arasında, kare dalgaya benzer (oran ≈ 15). Negatif yarıda kapı eşiğin (≈ 3,83 V) altına iner, transistör kesime girer ve drain V_{DD}’ye çıkar; pozitif yarıda drain akımı R_{D}’nin izin verdiği en büyük değere (≈ 15 mA) ulaşır, transistör omik bölgeye girer ve drain ≈ 0 V’a iner.',
       },
     ],
   },

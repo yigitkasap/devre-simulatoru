@@ -428,7 +428,7 @@ try {
   // --- Föy kartı (örnek kartı): Deney N · Şekil-M, amaç, teorik bilgi (katlı), adımlar, föydeki sorular -------
   // Klasörde deney gruplarının başlığının altında tek satırlık amaç. LAB_AIMS: amacı yazılmış deney sayısı.
   {
-    const LAB_AIMS = 7;
+    const LAB_AIMS = 8;
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
@@ -523,8 +523,13 @@ try {
   {
     const { page } = await phone();
     await openExample(page, 'IRF510 ile ortak kaynaklı yükselteç');
-    const card = phoneNotebook(page).getByRole('region', { name: /^Örnek ·/ });
+    const card = phoneNotebook(page).getByRole('region', { name: 'Örnek · Deney 8 · Şekil-21' });
+    const labelled = (await card.count()) === 1;
     await card.getByRole('button').first().tap(); await page.waitForTimeout(300);
+    const theory = card.getByRole('button', { name: 'Teorik bilgi' });
+    await theory.scrollIntoViewIfNeeded(); await theory.tap(); await page.waitForTimeout(200);
+    const theoryText = (await card.textContent()) ?? '';
+    const legs = await card.locator('ol.grid > li').allTextContents();
     const qa = card.getByRole('region', { name: 'Föydeki sorular' });
     const steps = await qa.locator('li > span').allTextContents();
     const button = qa.getByRole('button', { name: 'Cevabı göster' }).first();
@@ -532,8 +537,11 @@ try {
     const box = await button.boundingBox();
     await button.tap(); await page.waitForTimeout(200);
     const answer = (await qa.locator('div[id]').first().textContent()) ?? '';
-    check('örnek kartı (telefon): MOSFET’te Deney 8’in üç sorusu; "Cevabı göster" en az 44 px; cevapta küçük işaret kazancı ≈ 172 ve ofset hassasiyeti; sayfa kaymıyor',
-      steps.join('|') === 'Deney 8 · 3. adım|Deney 8 · 4. adım|Deney 8 · 5. adım' && box !== null && box.height >= 44 && answer.includes('≈ 172') && answer.includes('0,19 V') && !(await pageScrolls(page)),
+    check('föy kartı (telefon): MOSFET kartı "Örnek · Deney 8 · Şekil-21"; Teorik bilgide föydeki (8)–(10) ve IRF510’un bacak bağlantısı (1 kapı, 2 drain, 3 source)',
+      labelled && theoryText.includes('(9)') && theoryText.includes('IRF510: bacak bağlantısı (föydeki Şekil-22)') && legs.join('|') === '1. bacakKapı (G)|2. bacakDrain (D)|3. bacakSource (S)',
+      `${labelled} · ${legs.join('|')}`);
+    check('föy kartı (telefon): Deney 8’in soruları 3., 4., 5. adım; "Cevabı göster" en az 44 px; cevapta küçük işaret kazancı ≈ 172 ve kaymanın hassasiyeti; sayfa kaymıyor',
+      steps.join('|') === '3. adım|4. adım|5. adım' && box !== null && box.height >= 44 && answer.includes('≈ 172') && answer.includes('0,19 V') && !(await pageScrolls(page)),
       `${steps.join('|')} · ${Math.round(box?.height ?? 0)} px · ${answer.slice(0, 40)}`);
     await page.context().close();
   }

@@ -75,6 +75,12 @@ const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; 
       'bjt-yukseltec': { figure: 'Şekil-18', steps: ['1', '2', '3', '4'], questions: ['1', '2', '3', '4'] },
     },
   },
+  8: {
+    steps: ['1', '2', '3', '4', '5'],
+    figures: {
+      'mosfet-yukseltec': { figure: 'Şekil-21', steps: ['1', '2', '3', '4', '5'], questions: ['3', '4', '5'] },
+    },
+  },
 };
 
 /** Bir sayıyı kartlardaki gibi yazar: ondalık virgül, eksi işareti "−". */
@@ -726,5 +732,79 @@ describe('Deney 7: cevaplardaki sayılar', () => {
     }
     between(t90 - t10, 0.7e-6, 1.3e-6);
     says(text, '≈ 1 µs’de', `≈ 0,35 / 370 kHz ≈ ${num(0.35 / 370e3 * 1e6, 2)} µs`);
+  });
+});
+
+describe('Deney 8: cevaplardaki sayılar', () => {
+  const mos = (props: Record<string, number>) => withProps(load('mosfet-yukseltec'), 'FG1', props);
+  /** 1 periyot boyunca drain; çukurun girişin tepesinden kaç derece sonra geldiği. */
+  function drain(props: Record<string, number>) {
+    const f = props.frequency ?? 1e3;
+    const doc = mos(props);
+    const sim = run(doc, 0.01 + 5 / f);
+    const m = idOf(doc, 'M1');
+    const fg = idOf(doc, 'FG1');
+    let tMin = 0;
+    let tIn = 0;
+    let lo = Number.POSITIVE_INFINITY;
+    let hi = Number.NEGATIVE_INFINITY;
+    let k = 0;
+    const r = period(sim, 1 / f, () => {
+      const v = sim.voltageAt(`${m}#0`)!;
+      const vi = sim.voltageAt(`${fg}#0`)!;
+      if (v < lo) {
+        lo = v;
+        tMin = k;
+      }
+      if (vi > hi) {
+        hi = vi;
+        tIn = k;
+      }
+      k += 1;
+      return v;
+    }, 4000);
+    return { ...r, gain: (r.max - r.min) / ((props.amplitude as number | undefined) ?? 0.1), lag: ((tMin - tIn) / 4000) * 360 };
+  }
+  const vds = (offset: number) => {
+    const doc = mos({ amplitude: 0, offset });
+    return run(doc, 0.005).measure(idOf(doc, 'M1'))!.voltage;
+  };
+
+  it('3. adım: 10 mV t-t’de K ≈ 172 (6,62–8,35 V); g_m ≈ 0,193 S, hesap ≈ 193, 100 Hz’te ≈ 191; 0,1 V t-t’de 2,25–13,97 V (≈ 117); 1 mV kayma ≈ 0,19 V', () => {
+    const text = answer('mosfet-yukseltec', '3');
+    const small = drain({ amplitude: 0.01 });
+    says(text, `drain ${num(small.min, 2)}–${num(small.max, 2)} V`, `≈ ${num(small.max - small.min, 2)} V tepe-tepe`, `K_{υ} ≈ ${num(small.gain, 0)} ve`);
+    const doc = mos({ amplitude: 0 });
+    const sim = run(doc, 0.005);
+    const id = sim.pinCurrents(idOf(doc, 'M1'))![0]!;
+    const k = doc.parts.find((p) => p.label === 'M1')!.props.k as number;
+    const gm = 2 * Math.sqrt(k * id);
+    says(text, `I_{D} ≈ ${num(id * 1e3, 2)} mA`, `≈ ${num(gm, 3)} S`, `≈ ${num(gm * 1000, 0)}. 100 Hz’te ölçülen kazanç ≈ ${num(drain({ amplitude: 0.01, frequency: 100 }).gain, 0)}`);
+    const big = drain({});
+    says(text, `≈ ${num(big.min, 2)} V ile ${num(big.max, 2)} V`, `oran ≈ ${num(big.gain, 0)})`);
+    says(text, `3,907 V’ta ${num(vds(3.907), 1)} V; 3,897 V’ta ≈ ${num(vds(3.897), 1)} V; 3,917 V’ta ≈ ${num(vds(3.917), 1)} V`, `≈ ${num((vds(3.897) - vds(3.917)) / 20, 2)} V kaydırır`);
+  }, 60_000);
+
+  it('4. adım: ≈ 180° (tepede ≈ 6,73 V, çukurda ≈ 8,29 V); 1 kHz’te çukur ≈ 27° gecikir, 100 Hz’te ≈ 3°', () => {
+    const text = answer('mosfet-yukseltec', '4');
+    const doc = mos({ amplitude: 0.01 });
+    const sim = run(doc, 0.00525);
+    const at = sim.voltageAt(`${idOf(doc, 'M1')}#0`)!;
+    sim.runUntil(0.00575);
+    says(text, `tepesinde ≈ ${num(at, 2)} V, çukurunda ≈ ${num(sim.voltageAt(`${idOf(doc, 'M1')}#0`)!, 2)} V`);
+    const lag = drain({ amplitude: 0.01 }).lag;
+    says(text, `≈ ${num(lag, 0)}° sonra gelir (faz farkı ≈ ${num(180 + lag, 0)}°)`, `≈ ${num(drain({ amplitude: 0.01, frequency: 100 }).lag, 0)}°’ye iner`);
+  }, 60_000);
+
+  it('5. adım: 0,05 V t-t 3,60–11,40 V (≈ 156); 0,2 V t-t 0,68–14,99 V; 1 V t-t ≈ 0,01–14,99 V (≈ 15)', () => {
+    const text = answer('mosfet-yukseltec', '5');
+    const a5 = drain({ amplitude: 0.05 });
+    says(text, `0,05 V tepe-tepede ${num(a5.min, 2)}–${num(a5.max, 2)} V, oran ≈ ${num(a5.gain, 0)}`);
+    const a20 = drain({ amplitude: 0.2 });
+    says(text, `(${num(a20.min, 2)}–${num(a20.max, 2)} V)`);
+    const a100 = drain({ amplitude: 1 });
+    says(text, `≈ ${num(a100.min, 2)} V ile ${num(a100.max, 2)} V`, `(oran ≈ ${num(a100.gain, 0)})`);
+    // Pozitif yarıda en büyük akım V_DD / R_D ≈ 15 mA.
+    between((15 - a100.min) / 1000, 14.9e-3, 15.1e-3);
   });
 });

@@ -256,9 +256,6 @@ export function ExampleDetails({ id, onOpen, onClose }: { id: ExampleId; onOpen:
           <p className="text-sm leading-[1.55] text-ink-2">
             <Rich text={texts.description} />
           </p>
-          {texts.questions && (
-            <Questions key={id} items={texts.questions.map((q) => ({ label: q.step, question: q.question, answer: q.answer }))} onOpen={onOpen} />
-          )}
 
           <Section
             title={tr.examples.purpose}

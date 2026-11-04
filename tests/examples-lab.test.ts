@@ -7,7 +7,6 @@ import { EXAMPLE_GROUPS } from '../src/examples';
 import { buildConnectivity } from '../src/model/connectivity';
 import { flipParts } from '../src/model/docOps';
 import type { CircuitDoc } from '../src/model/types';
-import { tr } from '../src/i18n/tr';
 import { CircuitSimulator, OscilloscopeDevice, scopeSettings } from '../src/sim';
 import { between, idOf, load, nodeOf, run, swing, withProps } from './ornek-yardimci';
 
@@ -302,7 +301,7 @@ describe('Deney 6–8: yükselteçler', () => {
   });
 });
 
-describe('Föydeki sorular: cevaplardaki sayılar', () => {
+describe('Deney 6–8: yükselteçlerin ek ölçümleri', () => {
   /** Yükseltecin kazancı (çıkış tepe-tepe / giriş tepe-tepe) ve çıkışın uçları. */
   function gainOf(doc: CircuitDoc, q: string, until: number) {
     const fg = doc.parts.find((p) => p.label === 'FG1')!.props;
@@ -310,10 +309,6 @@ describe('Föydeki sorular: cevaplardaki sayılar', () => {
     const out = swing(sim, () => sim.voltageAt(`${idOf(doc, q)}#0`)!, 2e-3, 1e-5);
     return { sim, out, gain: (out.max - out.min) / (fg.amplitude as number) };
   }
-
-  it('kartlarda soru var: Deney 8 (3., 4., 5. adım)', () => {
-    expect(tr.examples.texts['mosfet-yukseltec'].questions!.map((q) => q.step)).toEqual(['Deney 8 · 3. adım', 'Deney 8 · 4. adım', 'Deney 8 · 5. adım']);
-  });
 
   it('Deney 7: R_B = 8,2 kΩ ve ofset 0,928 V’ta V_CE ≈ 6,0 V, kazanç ≈ 19,5 (R_B = 10 kΩ’da 16,3)', () => {
     const doc = withProps(withProps(load('bjt-yukseltec'), 'RB', { resistance: 8200 }), 'FG1', { offset: 0.928 });

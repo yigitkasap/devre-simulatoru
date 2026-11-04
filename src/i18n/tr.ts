@@ -731,15 +731,6 @@ export interface ExampleTexts {
   readonly purpose: string;
   /** Günlük hayatta nerelerde kullanıldığı. */
   readonly everyday: string;
-  /** Föydeki sorular ve simülasyonda ölçülen sayılarla cevapları (kartta "Föydeki sorular"). */
-  readonly questions?: readonly ExampleQuestion[];
-}
-
-/** Föydeki bir soru: hangi deneyin hangi adımı, sorunun metni ve cevabı. */
-export interface ExampleQuestion {
-  readonly step: string;
-  readonly question: string;
-  readonly answer: string;
 }
 
 /**
@@ -1362,26 +1353,6 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'MOSFET’le gerilim yükseltir. R_{S} yok: çalışma noktasını yalnızca üretecin ofseti kurar; 3,907 V’ta I_{D} ≈ 7,5 mA, V_{DS} ≈ 7,5 V. Kazanç çok büyüktür: A_{v} ≈ −g_{m} · R_{D}, g_{m} = 2 · √(k · I_{D}) ≈ 0,19 S; ölçülen küçük işaret kazancı ≈ −172. Bu yüzden ofset çok hassastır: 1 mV değişim V_{DS}’yi ≈ 0,19 V kaydırır. Föydeki 0,1 V tepe-tepe girişte çıkış ≈ 2,3 V ile 14,0 V arasında salınır ve bozulur (kare yasası iki yarıyı eşit büyütmez); bozulmasız çıkış için girişi 10 mV tepe-tepeye indir: çıkış ≈ 1,7 V tepe-tepe. Çıkış girişle 180° ters fazlıdır.',
     everyday:
       'IRF510 gibi güç MOSFET’leri çoğunlukla anahtar olarak motor sürücülerde, LED dimmerlerde ve güç kaynaklarında çalışır; amatör telsizciler onları kısa dalga verici yükselteçlerinde de kullanır. Bilgisayar işlemcilerindeki milyarlarca transistör de MOSFET’tir.',
-    questions: [
-      {
-        step: 'Deney 8 · 3. adım',
-        question: 'Giriş ve çıkış dalga genliklerini ölçerek gerilim kazancını belirleyiniz.',
-        answer:
-          'Küçük işaret kazancı ≈ 172: 10 mV tepe-tepe girişte drain 6,63–8,36 V arasında, yani ≈ 1,72 V tepe-tepe salınır ve dalga bozulmaz. Kazanç bu kadar büyük, çünkü R_{S} yok: A_{v} ≈ −g_{m} · R_{D}, g_{m} = 2 · √(k · I_{D}) ≈ 0,19 S. Bu yüzden föydeki 0,1 V tepe-tepe giriş bu devre için büyüktür: çıkış ≈ 2,25 V ile 13,97 V arasında salınır ve bozulur (kare yasası iki yarıyı eşit büyütmez; bu genlikte ölçülen oran ≈ 117). Çalışma noktası da aynı nedenle hassastır: ofsetteki 1 mV değişim V_{DS}’yi ≈ 0,19 V kaydırır (3,907 V’ta V_{DS} ≈ 7,5 V; 3,897 V’ta ≈ 9,3 V; 3,917 V’ta ≈ 5,5 V).',
-      },
-      {
-        step: 'Deney 8 · 4. adım',
-        question: 'Çıkış ile giriş sinyalleri arasındaki faz farkını belirleyiniz.',
-        answer:
-          '180°: 10 mV tepe-tepe girişin pozitif tepesinde drain ≈ 6,73 V’a iner, negatif tepesinde ≈ 8,29 V’a çıkar. Kapı gerilimi artınca I_{D} artar, R_{D}’deki düşüm büyür ve drain gerilimi düşer.',
-      },
-      {
-        step: 'Deney 8 · 5. adım',
-        question: 'Giriş sinyalinin genliğini yavaşça artırarak (≈ 1 V’a kadar) çıkış dalga şeklindeki değişimi gözleyiniz. Nasıl bir değişim olmaktadır, nedenini açıklayınız.',
-        answer:
-          'Genlik büyüdükçe çıkış önce asimetrik bozulur (0,1 V tepe-tepede 2,25–13,97 V), sonra iki yandan kırpılır: 1 V tepe-tepede drain ≈ 0,01 V ile 15,0 V arasında, kare dalgaya benzer. Negatif yarıda kapı eşiğin (≈ 3,83 V) altına iner ve transistör kesime girer (drain = V_{DD}); pozitif yarıda drain akımı R_{D}’nin izin verdiği en büyük değere (≈ 15 mA) ulaşır ve transistör omik bölgeye girer.',
-      },
-    ],
   },
   'mosfet-yukseltec-rs': {
     title: 'IRF510 yükselteç: R_S = 1 kΩ, R_D = 10 kΩ',
