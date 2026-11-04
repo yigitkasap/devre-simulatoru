@@ -123,20 +123,17 @@ describe('Örnekler', () => {
     return { max, min };
   }
 
-  it('Yarım dalga doğrultmaç (föy): yükte ≈ 9,0 V tepe, DC voltmetre ≈ 2,8 V; ters diyotla negatif yarılar', () => {
+  it('Yarım dalga doğrultmaç (föy, Şekil-4a): yükte ≈ 2,36 V tepe; ters diyotla negatif yarılar', () => {
     const doc = load('yarim-dalga');
-    const sim = simulate(doc, 0.1);
-    const reading = sim.status(idOf(doc, 'V1')).reading!;
-    expect(reading).toBeGreaterThan(2.7);
-    expect(reading).toBeLessThan(2.85);
-    const { max, min } = swing(sim, idOf(doc, 'V1'), 0.02);
-    expect(max).toBeGreaterThan(8.9);
-    expect(max).toBeLessThan(9.05);
-    expect(min).toBeGreaterThan(-0.01);
-    const flipped = simulate(flipParts(doc, new Set([idOf(doc, 'D1')])), 0.1);
-    const reverse = swing(flipped, idOf(doc, 'V1'), 0.02);
-    expect(reverse.max).toBeLessThan(0.01);
-    expect(reverse.min).toBeLessThan(-8.9);
+    const sim = simulate(doc, 0.02);
+    const { max, min } = swing(sim, idOf(doc, 'RL'), 0.004);
+    expect(max).toBeGreaterThan(2.25);
+    expect(max).toBeLessThan(2.42);
+    expect(min).toBeGreaterThan(-0.05);
+    const flipped = simulate(flipParts(doc, new Set([idOf(doc, 'D1')])), 0.02);
+    const reverse = swing(flipped, idOf(doc, 'RL'), 0.004);
+    expect(reverse.max).toBeLessThan(0.05);
+    expect(reverse.min).toBeLessThan(-2.25);
   });
 
   it('Kare dalga ile RC: yarım periyot sonunda ≈ 9,93 V; 5 Hz’de kondansatör tam dolamaz', () => {

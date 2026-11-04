@@ -106,29 +106,37 @@ describe('Deney 1: diyot karakteristikleri', () => {
 });
 
 describe('Deney 2: doğrultucular', () => {
-  it('Yarım dalga filtreleri: 22 µF’ta ≈ 4,2–8,5 V (ortalama ≈ 6,2 V); 470 µF’ta dalgalanma ≈ 0,2 V, tepe ≈ 7,1 V', () => {
+  it('Yarım dalga (Şekil-4a, 3 V genlik, 1 kHz, voltmetre yok): tepe ≈ 2,36 V; 1 µF’ta ≈ 1,0–2,2 V; 22 µF’ta ≈ 1,75–1,81 V; 470 µF’ta dalgalanma ≈ 3 mV; R_L = ∞’da ≈ 2,55 V', () => {
     const doc = load('yarim-dalga');
-    const out = (sim: CircuitSimulator) => swing(sim, () => sim.measure(idOf(doc, 'RL'))!.voltage, 0.04, 1e-4);
-    const c1 = run(withProps(doc, 'S1', { closed: true }), 0.3);
-    expect(out(c1).min).toBeLessThan(0.01);
-    const c22 = run(withProps(doc, 'S2', { closed: true }), 0.5);
-    const r22 = out(c22);
-    between(r22.min, 4.1, 4.35);
-    between(r22.max, 8.4, 8.55);
-    between(c22.status(idOf(doc, 'V1')).reading!, 6.1, 6.35);
-    const c470 = run(withProps(doc, 'S3', { closed: true }), 1);
-    const r470 = out(c470);
-    between(r470.max - r470.min, 0.15, 0.3);
-    between(r470.max, 7.0, 7.2);
+    const fg = doc.parts.find((p) => p.type === 'funcgen')!;
+    expect([fg.props.amplitude, fg.props.frequency]).toEqual([6, 1000]);
+    expect(doc.parts.some((p) => p.type === 'voltmeter')).toBe(false);
+    const out = (sim: CircuitSimulator) => swing(sim, () => sim.measure(idOf(doc, 'RL'))!.voltage, 0.004, 2e-6);
+    const bare = out(run(doc, 0.02));
+    between(bare.max, 2.3, 2.42);
+    expect(bare.min).toBeGreaterThan(-0.05);
+    const r1 = out(run(withProps(doc, 'S1', { closed: true }), 0.05));
+    between(r1.min, 0.95, 1.1);
+    between(r1.max, 2.15, 2.25);
+    const r22 = out(run(withProps(doc, 'S2', { closed: true }), 0.1));
+    between(r22.min, 1.72, 1.78);
+    between(r22.max, 1.79, 1.84);
+    const r470 = out(run(withProps(doc, 'S3', { closed: true }), 1.5));
+    expect(r470.max - r470.min).toBeLessThan(0.01);
+    between(r470.max, 1.76, 1.8);
+    // R_L = ∞ (S4 açık): kondansatör tepeye yakın dolar ve boşalmaz.
+    const open = run(withProps(withProps(doc, 'S4', { closed: false }), 'S2', { closed: true }), 0.1);
+    between(swing(open, () => open.measure(idOf(doc, 'C2'))!.voltage, 0.004, 2e-6).min, 2.5, 2.6);
   });
 
-  it('Köprü: 100 kΩ’da iki yarıda da ≈ 9,3 V tepe (A − B ölçümü doğru, prob toprağı toprakta)', () => {
+  it('Köprü (Şekil-5a, 5 V genlik, 1 kHz, D1–D4): 100 kΩ’da iki yarıda da ≈ 4,36 V tepe (A − B ölçümü doğru, prob toprağı toprakta)', () => {
     const doc = load('kopru-dogrultmac');
-    const sim = run(doc, 0.105);
+    expect(['D1', 'D2', 'D3', 'D4'].every((l) => doc.parts.some((p) => p.label === l && p.props.model === '1N4001'))).toBe(true);
+    const sim = run(doc, 0.02025);
     const vl = () => sim.measure(idOf(doc, 'RL'))!.voltage;
-    between(vl(), 9.2, 9.35);
-    sim.runUntil(0.115);
-    between(vl(), 9.2, 9.35);
+    between(vl(), 4.3, 4.4);
+    sim.runUntil(0.02075);
+    between(vl(), 4.3, 4.4);
     const scope = doc.parts.find((p) => p.type === 'oscilloscope')!;
     expect(scopeSettings(scope.props).mode).toBe('add');
   });

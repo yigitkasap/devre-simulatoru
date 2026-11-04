@@ -366,15 +366,16 @@ describe('Hazır senaryolar (8. aşama): açıklamadaki sayılar simülatörde',
     expect(measure(ex, [], ...r1, 0.05).V1).toBeCloseTo(4.44, 2);
   });
 
-  it('köprüde D2 anot kopuk: R_L ortalaması 3,14 V (sağlam 5,73 V); anot bacağı −2,24 V, bağlı olduğu düğüm 0 V', () => {
+  it('köprüde D2 anot kopuk: R_L ortalaması 1,43 V (sağlam 2,62 V); anot bacağı −0,63 V, bağlı olduğu düğüm 0 V', () => {
     const ex = 'kopru-dogrultmac';
     const f = s['ariza-dogrultucu']!.faults;
     const rl = [pin(ex, 'RL', 0), pin(ex, 'RL', 1)] as const;
-    expect(measure(ex, f, ...rl, 0.2).mm).toBeCloseTo(3.14, 2);
-    expect(measure(ex, [], ...rl, 0.2).mm).toBeCloseTo(5.73, 2);
+    expect(measure(ex, f, ...rl, 0.2).mm).toBeCloseTo(1.43, 2);
+    expect(measure(ex, [], ...rl, 0.2).mm).toBeCloseTo(2.62, 2);
     const g = pin(ex, 'GND1', 0);
-    expect(measure(ex, f, pin(ex, 'D2', 0), g, 0.2).mm).toBeCloseTo(-2.24, 2);
-    const node = exampleDoc(ex)!.wires.find((w) => w.points.some((p) => p.x === 50 && p.y === -4))!;
+    expect(measure(ex, f, pin(ex, 'D2', 0), g, 0.2).mm).toBeCloseTo(-0.63, 2);
+    // D2'nin anodu köprünün alt ucunda (B): D3'ün katoduyla aynı kablo.
+    const node = exampleDoc(ex)!.wires.find((w) => w.points.some((p) => p.x === 28 && p.y === 6))!;
     expect(Math.abs(measure(ex, f, wireKey(node.id), g, 0.2).mm)).toBeLessThan(1e-6);
   });
 

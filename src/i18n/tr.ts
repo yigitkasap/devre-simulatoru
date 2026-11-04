@@ -772,8 +772,8 @@ const FAULT_SCENARIO_TEXTS: Record<FaultScenarioId, FaultScenarioTexts> = {
     symptom: 'Osiloskopta çıkışın tepeleri iki kat seyrek: köprü doğrultmaç yarım dalga doğrultucu gibi çalışıyor.',
     found: {
       title: 'D2’nin anot bacağı temas etmiyordu',
-      text: 'Köprünün D2’li kolu iletmez: girişin bir yarısında R_{L}’den akım geçmez, çıkış yarım dalgaya döner. R_{L}’deki ortalama gerilim 5,73 V yerine 3,14 V (V ⎓).',
-      decisive: 'D2’nin anot bacağı −2,24 V ⎓ okurken bağlı olduğu düğüm 0 V: aynı noktada iki farklı gerilim, bağlantının orada koptuğunu gösterir.',
+      text: 'Köprünün D2’li kolu iletmez: girişin bir yarısında R_{L}’den akım geçmez, çıkış yarım dalgaya döner. R_{L}’deki ortalama gerilim 2,62 V yerine 1,43 V (V ⎓).',
+      decisive: 'D2’nin anot bacağı −0,63 V ⎓ okurken bağlı olduğu düğüm 0 V: aynı noktada iki farklı gerilim, bağlantının orada koptuğunu gösterir.',
     },
   },
   'ariza-jfet': {
@@ -1225,7 +1225,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'yarim-dalga': {
     title: 'Yarım dalga doğrultmaç',
     description:
-      'Fonksiyon üreteci (50 Hz, 20 V tepe-tepe sinüs) bir 1N4001 üzerinden 1 kΩ’luk yükü besliyor. S1, S2 ve S3 anahtarları yüke 1 µF, 22 µF ve 470 µF’lık filtre kondansatörlerini bağlar. Osiloskobun A kanalı girişi, B kanalı yükün gerilimini gösteriyor; voltmetre yükün DC (ortalama) gerilimini ölçüyor.',
+      'Föydeki Şekil-4a: fonksiyon üreteci (1 kHz, 3 V genlik yani 6 V tepe-tepe sinüs) bir 1N4001 üzerinden 1 kΩ’luk yükü (R_{L}) besliyor; çıkışın tepesi ≈ 2,36 V. S4 yükü ayırır (R_{L} = ∞). S1, S2 ve S3 yüke paralel 1 µF, 22 µF ve 470 µF’lık elektrolitik kondansatörleri bağlar: 1 µF’ta çıkış ≈ 1,0–2,2 V, 22 µF’ta ≈ 1,75–1,81 V, 470 µF’ta dalgalanma ≈ 3 mV. Osiloskobun A kanalı girişi, B kanalı çıkışı gösteriyor; COM alt hatta.',
     purpose:
       'Alternatif akımı tek yönlü akıma çevirir. Diyot yalnızca pozitif yarılarda iletir: filtresiz tepe ≈ 9,0 V (üretecin 50 Ω’unda ve diyotta ≈ 1 V düşer), ortalama ≈ 2,8 V ≈ V_{tepe} / π. Anahtarları sırayla kapat: kondansatör tepelerde dolup aralarda yükü besler. 22 µF’ta (RC = 22 ms) çıkış ≈ 4,2 V ile 8,5 V arasında dalgalanır (ortalama ≈ 6,2 V); 470 µF’ta dalgalanma ≈ 0,2 V’a iner. Diyodu ters çevirirsen (F) negatif yarılar geçer.',
     everyday:
@@ -1234,7 +1234,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'kopru-dogrultmac': {
     title: 'Köprü tipi tam dalga doğrultmaç',
     description:
-      'Dört 1N4001’lik köprü, fonksiyon üretecinden (50 Hz, 20 V tepe-tepe) 100 kΩ’luk yükü besliyor. Yükün iki ucu da topraktan farklı gerilimde olduğu için osiloskop yükü iki kanalla ölçüyor: A yükün + ucunda, B − ucunda, COM üretecin COM’unda (sağ kolun ortası). B ters çevrilmiş ve ADD açık: ekranda A − B.',
+      'Föydeki Şekil-5a: dört 1N4001’lik köprü (D1–D4), fonksiyon üretecinden (1 kHz, 5 V genlik yani 10 V tepe-tepe) 100 kΩ’luk yükü besliyor; yükte iki yarıda da ≈ 4,36 V tepe, ortalama ≈ 2,6 V. Yükün iki ucu da topraktan farklı gerilimde olduğu için osiloskop yükü iki kanalla ölçüyor: A yükün + ucunda, B − ucunda, COM üretecin COM’unda. B ters çevrilmiş ve ADD açık: ekranda A − B.',
     purpose:
       'İki yarım dalgayı da aynı yöne çevirir (tam dalga doğrultma). Pozitif yarıda D1 ile D4, negatif yarıda D2 ile D3 iletir; yükten akım her zaman aynı yönde geçer. Tepe ≈ 9,3 V: her yarıda iki diyot iletir ve 100 kΩ’da akım küçük olduğundan her birinde ≈ 0,35 V düşer. Çıkış her yarım periyotta tekrarlar: 100 Hz. Bu yüzden aynı filtre kondansatörüyle dalgalanma yarım dalga doğrultmacınkinin yarısı kadardır.',
     everyday:

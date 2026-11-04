@@ -33,6 +33,8 @@ const CROSSINGS: Partial<Record<ExampleId, number>> = {
   // Köprü diyot tek gövde: uçlar çevresinde ~ + ~ − sırasıyla; kaynağın kabloları iki ~ ucuna, yükünküler
   // + ile − ucuna gider. Gövdenin dışından karşılıklı uçları birleştiren iki yol kesişmek zorunda.
   'kopru-diyot': 1,
+  // Föydeki Şekil-5a gibi: köprünün − ucundan çıkışın alt ucuna giden kablo üretecin alt kablosunu keser.
+  'kopru-dogrultmac': 1,
 };
 
 type Segment = readonly [Point, Point];

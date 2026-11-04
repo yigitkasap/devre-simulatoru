@@ -171,8 +171,9 @@ describe('Parça Dalga 1 örnekleri: metinlerdeki sayılar', { timeout: 60_000 }
     expect(c22.max).toBeCloseTo(8.72, 2);
     expect(c22.min).toBeCloseTo(6.32, 2);
     expect(filtered.status(idOf(doc, 'V1')).reading!).toBeCloseTo(7.59, 2);
-    // Yarım dalga örneği (aynı 22 µF ve 1 kΩ): dalgalanma ≈ 4,3 V, burada onun yarısına yakın.
-    const half = load('yarim-dalga');
+    // Yarım dalga örneği aynı koşullarda (50 Hz, 20 V t-t, 22 µF ve 1 kΩ): dalgalanma ≈ 4,3 V, burada onun
+    // yarısına yakın.
+    const half = withProps(load('yarim-dalga'), 'FG1', { frequency: 50, amplitude: 20 });
     const halfSim = run(withProps(half, 'S2', { closed: true }), 0.4);
     const h22 = swing(halfSim, () => halfSim.measure(idOf(half, 'RL'))!.voltage, 0.04);
     expect(h22.max - h22.min).toBeCloseTo(4.3, 1);
