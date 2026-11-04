@@ -78,6 +78,18 @@ const screen = (page, gx, gy) => page.evaluate(([x, y]) => {
 }, [gx, gy]);
 const doc = async (page) => { await page.waitForTimeout(500); return page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre'))); };
 const part = async (page, label) => (await doc(page)).parts.find((p) => p.label === label);
+/**
+ * Örnekler penceresinde bir örneğin (ya da arıza görevinin) düğmesi: görünmüyorsa Akdeniz Üniversitesi
+ * klasörüne girer ya da (açık örnek klasördeyken pencere klasörde açılır) ana listeye döner.
+ */
+async function pickExample(p, locate, touchUi = false) {
+  if ((await locate(p).count()) > 0) return locate(p);
+  const card = p.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ });
+  const go = (await card.count()) > 0 ? card.first() : p.getByRole('button', { name: 'Bütün örnekler' }).first();
+  if (touchUi) await go.tap(); else await go.click();
+  await p.waitForTimeout(250);
+  return locate(p);
+}
 /** Telefonda ⋯ → Örnekler; arayıp örneğe dokunarak açar. */
 async function openExample(page, name) {
   await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
@@ -254,6 +266,73 @@ try {
     const example = (await exampleCard.textContent().catch(() => '')) ?? '';
     check(`son gruptaki son örneğe ulaşılıp açılıyor; ne işe yaradığı defterin örnek kartında (${w}x${h})`, (await doc(page)).parts.some((p) => p.type === 'tank') && (await doc(page)).parts.some((p) => p.label === 'Q5') && example.includes('Ne işe yarar?') && example.includes('Günlük hayatta'));
     await page.context().close();
+  }
+
+  // --- Örnekler: Akdeniz Üniversitesi klasörü (masaüstü) -------------------------------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const openDialog = async () => { await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300); };
+    await openDialog();
+    const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
+    const list = dlg.locator('.overflow-y-auto').first();
+    const card = dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ });
+    const firstLabel = (await list.locator(':scope > *').first().getAttribute('aria-label')) ?? '';
+    const cardBox = await card.boundingBox();
+    const listBox = await list.boundingBox();
+    const logo = card.locator('img');
+    const logoBox = await logo.boundingBox();
+    const logoAlt = await logo.getAttribute('alt');
+    const mainGroups = await dlg.locator('h3').allTextContents();
+    const mainFaults = await dlg.getByRole('button', { name: /^Arıza bul:/ }).allTextContents();
+    const mainFirst = (await dlg.locator('li span[aria-hidden="true"]').first().textContent()) ?? '';
+    check('masaüstü (klasör): Örnekler’in en üstünde bütün genişlikte Akdeniz kartı (48 px logo, alt metni, "… · N devre"); ana listede deney grupları ve baraj yok, arıza bulmada yalnızca LED; numaralar 1’den',
+      firstLabel.startsWith('Akdeniz Üniversitesi · Fizik Bölümü') && /· \d+ devre$/.test(firstLabel) && cardBox !== null && listBox !== null && cardBox.width >= listBox.width - 40 &&
+        Math.round(logoBox?.width ?? 0) === 48 && logoAlt === 'Akdeniz Üniversitesi logosu' &&
+        mainGroups.includes('Temel devreler') && mainGroups.includes('Arduino') && !mainGroups.some((t) => /^Deney|^Proje/.test(t)) && mainFaults.length === 1 && mainFirst === '1',
+      `${firstLabel} · ${Math.round(cardBox?.width ?? 0)}/${Math.round(listBox?.width ?? 0)} px · logo ${Math.round(logoBox?.width ?? 0)} px · ${mainGroups.length} grup · arıza ${mainFaults.length} · ilk ${mainFirst}`);
+    // Klavyeyle: kart Enter'la açılır; odak klasörün başlığında.
+    await card.focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    const focusedTitle = await page.evaluate(() => (document.activeElement?.tagName === 'H3' ? document.activeElement.textContent : ''));
+    const folderGroups = await dlg.locator('h3').allTextContents();
+    const deneys = folderGroups.filter((t) => /^Deney \d/.test(t)).length;
+    const folderFaults = await dlg.getByRole('button', { name: /^Arıza bul:/ }).count();
+    const folderLogo = Math.round((await dlg.locator('img').first().boundingBox())?.width ?? 0);
+    const barajLink = await dlg.getByRole('link', { name: /^Baraj sayfasını aç/ }).count();
+    const folderFirst = (await dlg.locator('li span[aria-hidden="true"]').first().textContent()) ?? '';
+    check('masaüstü (klasör): kart klavyeyle (Enter) açılıyor, odak klasörün başlığında; 40 px logo; Deney 1–9, Proje · Baraj (sayfa bağlantısıyla) ve föye dayanan 4 arıza görevi; numaralar 1’den',
+      focusedTitle.includes('Akdeniz Üniversitesi · Fizik Bölümü') && folderLogo === 40 && deneys === 9 && folderGroups.some((t) => t.startsWith('Proje · Baraj')) && barajLink === 1 && folderFaults === 4 && folderFirst === '1' && !folderGroups.includes('Temel devreler'),
+      `odak "${focusedTitle}" · logo ${folderLogo} px · ${deneys} deney · baraj bağlantısı ${barajLink} · arıza ${folderFaults} · ilk ${folderFirst}`);
+    // Geri: "Bütün örnekler" (klavyeyle) ana listeye döndürür, odak klasör kartında; Esc pencereyi kapatır.
+    await dlg.getByRole('button', { name: 'Bütün örnekler' }).focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
+    const backFocus = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
+    await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+    check('masaüstü (klasör): "Bütün örnekler" ana listeye döndürüyor, odak klasör kartında; Esc pencereyi kapatıyor',
+      backFocus.startsWith('Akdeniz Üniversitesi') && (await page.getByRole('dialog', { name: 'Örnek devreler' }).count()) === 0, backFocus.slice(0, 40));
+    // Klasördeki örnek açıkken pencere doğrudan klasörde açılır; ana listedeki örnek açıkken ana listede.
+    await openDialog();
+    await card.click(); await page.waitForTimeout(300);
+    await dlg.getByRole('button', { name: 'BC107 ile ortak emetörlü yükselteç', exact: true }).click(); await page.waitForTimeout(500);
+    await openDialog();
+    const inFolder = (await dlg.getByRole('button', { name: 'Bütün örnekler' }).count()) === 1 && (await card.count()) === 0;
+    const activeShown = (await dlg.getByRole('button', { name: 'BC107 ile ortak emetörlü yükselteç', exact: true }).getAttribute('aria-pressed')) === 'true';
+    await dlg.getByRole('button', { name: 'Bütün örnekler' }).click(); await page.waitForTimeout(300);
+    await dlg.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(500);
+    await openDialog();
+    const inMain = (await card.count()) === 1;
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    check('masaüstü (klasör): klasördeki örnek (BC107 yükselteç) açıkken pencere klasörde açılıyor, örnek işaretli; ana listedeki örnek açıkken ana listede', inFolder && activeShown && inMain, `${inFolder} · ${activeShown} · ${inMain}`);
+    // Klasördeki arıza görevi açıkken de pencere klasörde açılır.
+    await openDialog();
+    await card.click(); await page.waitForTimeout(300);
+    await dlg.getByRole('button', { name: 'Arıza bul: JFET’ten akım geçmiyor' }).click(); await page.waitForTimeout(800);
+    await openDialog();
+    const faultFolder = (await dlg.getByRole('button', { name: 'Bütün örnekler' }).count()) === 1 && (await dlg.getByRole('button', { name: 'Arıza bul: JFET’ten akım geçmiyor' }).getAttribute('aria-pressed')) === 'true';
+    check('masaüstü (klasör): klasördeki arıza görevi (JFET) açıkken pencere klasörde açılıyor, görev işaretli', faultFolder);
+    await ctx.close();
   }
 
   // --- Parça ekle sayfası: daha açık başlar, başlıktan çekilerek tam boy olur, aşağı çekince kapanır --
@@ -789,7 +868,7 @@ try {
     check('tablette Kablo bağla: iki uca sırayla dokununca kablo; Bitti ile çıkılıyor', idle && wires === 1 && (await page.getByRole('button', { name: 'Kablo bağla' }).count()) === 1, `${wires} kablo`);
     // Ölç: toprağı olan bir örnek devre.
     await page.getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(300);
-    await page.getByRole('button', { name: 'LED ve ön direnç', exact: true }).tap(); await page.waitForTimeout(600);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'LED ve ön direnç', exact: true }), true)).tap(); await page.waitForTimeout(600);
     await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).tap(); await page.waitForTimeout(500);
     const before = await part(page, 'R1');
     s = await screen(page, before.x, before.y);
@@ -805,7 +884,7 @@ try {
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(300);
-    await page.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).tap(); await page.waitForTimeout(600);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }), true)).tap(); await page.waitForTimeout(600);
     const exampleCard = await notebook(page).getByRole('region', { name: /^Örnek ·/ }).count();
     await notebook(page).getByRole('button', { name: /^OSC1 ·/ }).tap(); await page.waitForTimeout(300);
     const rows = await notebook(page).getByRole('button', { name: /^A kuplaj: / }).count();
@@ -820,7 +899,7 @@ try {
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Gerilim bölücü', exact: true }))).click(); await page.waitForTimeout(500);
     await page.locator('#tuval').focus();
     const active = () => page.evaluate(() => {
       const el = document.activeElement;
@@ -869,7 +948,7 @@ try {
     const dp = await dctx.newPage();
     await dp.goto(URL0, { waitUntil: 'networkidle' });
     await dp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await dp.waitForTimeout(200);
-    await dp.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }).click(); await dp.waitForTimeout(500);
+    await (await pickExample(dp, (p) => p.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }))).click(); await dp.waitForTimeout(500);
     await dp.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await dp.waitForTimeout(600);
     for (const name of [/^OSC1 ·/, /^FG1 ·/]) {
       await notebook(dp).getByRole('button', { name }).click(); await dp.waitForTimeout(200);
@@ -896,7 +975,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: '555 ile yanıp sönen LED (astabil)' }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: '555 ile yanıp sönen LED (astabil)' }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: /^Dosya|^555/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Karta aktar/ }).click();
     const karta = page.getByRole('dialog', { name: 'Karta aktar' });
@@ -1002,7 +1081,7 @@ try {
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'LED ve ön direnç', exact: true }))).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: '3B', exact: true }).click();
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
     const main = await page.locator('main').boundingBox();
@@ -1050,7 +1129,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /^\d*RC dolma/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /^\d*RC dolma/ }).first())).click(); await page.waitForTimeout(500);
     const button = page.getByRole('button', { name: 'Analiz', exact: true });
     const examplesBox = await page.getByRole('button', { name: 'Örnekler', exact: true }).boundingBox();
     const buttonBox = await button.boundingBox();
@@ -1218,7 +1297,7 @@ try {
     page.on('worker', () => (workers += 1));
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /BF245A: çıkış ve transfer/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BF245A: çıkış ve transfer/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(200);
     const drawer = page.getByRole('region', { name: 'Analiz' });
     await drawer.getByRole('tab', { name: 'Eğri izleyici' }).click();
@@ -1246,7 +1325,7 @@ try {
     check('eğri izleyici: + ile basamak eklenince yeniden taranıyor (5 eğri); Transfer tek eğri; Yeniden tara ve İptal',
       five === '5 × 31 noktalık DC tarama' && /^1 × \d+ noktalık DC tarama$/.test(transfer ?? '') && (await drawer.getByRole('button', { name: 'Yeniden tara' }).isVisible()), `${five} · ${transfer} · iptal ${cancelVisible}`);
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
     await drawer.getByText(/noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(300);
     const bjtSwitch = drawer.getByRole('switch', { name: /Yük doğrusu ve Q noktası/ });
@@ -1273,7 +1352,7 @@ try {
     // MOSFET (kullanıcı kararı): yük doğrusu açıkken varsayılan basamaklar Q'daki V_GS'nin çevresinde;
     // kullanıcı bir basamağı silince onun seçtiği basamaklar kalır.
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /IRF510 ile ortak kaynaklı yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /IRF510 ile ortak kaynaklı yükselteç/ }).first())).click(); await page.waitForTimeout(500);
     // M1'in taraması bitene kadar (önceki parçanın sonucu ekranda kalabilir).
     await drawer.getByRole('button', { name: '3,83 V basamağını kaldır' }).waitFor({ timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(200);
@@ -1318,7 +1397,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(200);
     const drawer = page.getByRole('region', { name: 'Analiz' });
     await drawer.getByRole('tab', { name: 'Bode' }).click();
@@ -1448,7 +1527,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
     const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
@@ -1575,7 +1654,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
     const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
@@ -1804,7 +1883,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
     let dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
@@ -1991,12 +2070,16 @@ try {
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
     const dlg = page.getByRole('dialog');
-    const scenarios = await dlg.getByRole('button', { name: /^Arıza bul: / }).allInnerTexts();
+    // Föye dayanmayan senaryo (LED) ana listede, öbürleri Akdeniz Üniversitesi klasöründe.
+    const mainScenarios = await dlg.getByRole('button', { name: /^Arıza bul: / }).count();
+    await dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ }).click(); await page.waitForTimeout(200);
+    const folderScenarios = await dlg.getByRole('button', { name: /^Arıza bul: / }).count();
+    const scenarios = { length: mainScenarios + folderScenarios };
     await dlg.getByRole('button', { name: 'Arıza bul: Yükselteçte çıkış yok' }).click(); await page.waitForTimeout(600);
     const card = () => page.locator('[data-notebook="task"]').first();
     const head = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
     check('arıza (B2, 8. aşama): Örnekler’de "Arıza bul" grubu (5 hazır senaryo: temel devre, Deney 1, 2, 5, 7); BJT senaryosu kartta "Arıza bul · Deney 7", "Yükselteçte çıkış yok", belirti',
-      scenarios.length === 5 && head.startsWith('Arıza bul · Deney 7') && head.includes('Yükselteçte çıkış yok') && head.includes('Osiloskobun B kanalında sinyal yok.') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 1,
+      scenarios.length === 5 && mainScenarios === 1 && head.startsWith('Arıza bul · Deney 7') && head.includes('Yükselteçte çıkış yok') && head.includes('Osiloskobun B kanalında sinyal yok.') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 1,
       `${scenarios.length} · ${head.slice(0, 60)}`);
     await card().getByRole('button', { name: 'Arızayı bildir' }).click(); await page.waitForTimeout(300);
     const pt = await screen(page, 44, -4); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
@@ -2049,7 +2132,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: /RC dolma/ }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /RC dolma/ }).first())).click(); await page.waitForTimeout(500);
     const savedBefore = await page.evaluate(() => localStorage.getItem('devre-simulatoru:devre'));
     await page.getByRole('button', { name: /^Dosya|^RC dolma/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Paylaş/ }).click(); await page.waitForTimeout(300);
@@ -2165,7 +2248,7 @@ try {
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button').filter({ hasText: '555 ile yanıp sönen LED (astabil)' }).first().click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: '555 ile yanıp sönen LED (astabil)' }).first())).click(); await page.waitForTimeout(500);
     const sim = page.getByRole('region', { name: 'Simülasyon' });
     /** V1'in şemadaki göstergesi, defter kartı, 3B etiketi ve 3B aletin ekranı. */
     const readings = () => page.evaluate(() => {
@@ -2277,14 +2360,14 @@ try {
     check('Yardım penceresi dört sekmeli; simgeler sekmesi açılıyor', tabs === 4 && symbols.includes('Kablo gerilimi'), `${tabs} sekme`);
     await page.keyboard.press('Escape'); await page.waitForTimeout(150);
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Gerilim bölücü', exact: true }))).click(); await page.waitForTimeout(500);
     const undo = page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).getByRole('button', { name: 'Geri al' });
     const hadUndo = (await undo.count()) === 1;
     if (hadUndo) await undo.click();
     await page.waitForTimeout(300);
     check('örnek yüklenince bildirimde Geri al; dokununca önceki devre geri geliyor', hadUndo && (await doc(page)).parts.length === 0);
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(400);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Gerilim bölücü', exact: true }))).click(); await page.waitForTimeout(400);
     await page.getByRole('button', { name: 'Ayarlar', exact: true }).click(); await page.waitForTimeout(150);
     await page.getByRole('switch', { name: /Düğüm gerilimlerini yaz/ }).click(); await page.waitForTimeout(100);
     await page.keyboard.press('Escape');
@@ -2410,7 +2493,7 @@ try {
 
   // --- Masaüstü: İnceleme paneli (İncele, Örnek, Mesajlar) ----------------------------
   await dp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await dp.waitForTimeout(200);
-  await dp.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await dp.waitForTimeout(500);
+  await (await pickExample(dp, (p) => p.getByRole('button', { name: 'LED ve ön direnç', exact: true }))).click(); await dp.waitForTimeout(500);
   const exampleCard = notebook(dp).getByRole('region', { name: /^Örnek ·/ });
   const folded = (await exampleCard.textContent()) ?? '';
   await exampleCard.getByRole('button').first().click(); await dp.waitForTimeout(150);
@@ -2445,7 +2528,7 @@ try {
     ap.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await ap.goto(URL0, { waitUntil: 'networkidle' });
     await ap.getByRole('button', { name: 'Örnekler', exact: true }).click(); await ap.waitForTimeout(200);
-    await ap.getByRole('button', { name: 'Arduino: yanıp sönen LED', exact: true }).click(); await ap.waitForTimeout(500);
+    await (await pickExample(ap, (p) => p.getByRole('button', { name: 'Arduino: yanıp sönen LED', exact: true }))).click(); await ap.waitForTimeout(500);
     await ap.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click();
     await notebook(ap).getByRole('button', { name: /^ARD1 ·/ }).click();
     await ap.waitForFunction(() => /D13 · Çıkış/.test(document.querySelector('#defter')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {});
@@ -2467,7 +2550,7 @@ try {
   rp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await rp.goto(URL0, { waitUntil: 'networkidle' });
   await rp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await rp.waitForTimeout(200);
-  await rp.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }).click(); await rp.waitForTimeout(500);
+  await (await pickExample(rp, (p) => p.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }))).click(); await rp.waitForTimeout(500);
   const rackCanvas = await rp.locator('svg.schematic').boundingBox();
   const fgClosed = (await notebook(rp).getByRole('button', { name: /^FG1 ·/ }).textContent()) ?? '';
   check('masaüstü (v3): cihaz rafı yok, tuval alta kadar; kapalı üreteç kartında ayar özeti',
@@ -2534,7 +2617,7 @@ try {
   ep.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await ep.goto(URL0, { waitUntil: 'networkidle' });
   await ep.getByRole('button', { name: 'Örnekler', exact: true }).click(); await ep.waitForTimeout(200);
-  await ep.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await ep.waitForTimeout(400);
+  await (await pickExample(ep, (p) => p.getByRole('button', { name: 'LED ve ön direnç', exact: true }))).click(); await ep.waitForTimeout(400);
   await ep.getByRole('button', { name: 'Oynat' }).first().click(); await ep.waitForTimeout(400);
   await notebook(ep).getByRole('button', { name: /^R1 ·/ }).first().click();
   const r1Field = ep.getByLabel('Direnç', { exact: true });
@@ -2576,7 +2659,7 @@ try {
   tp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await tp.goto(URL0, { waitUntil: 'networkidle' });
   await tp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await tp.waitForTimeout(200);
-  await tp.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }).click(); await tp.waitForTimeout(400);
+  await (await pickExample(tp, (p) => p.getByRole('button', { name: 'Toprak tuzağı: köprüde prob toprağı', exact: true }))).click(); await tp.waitForTimeout(400);
   const earthLines = await tp.locator('svg.schematic g.earth-line path').count();
   const earthLabel = await tp.locator('svg.schematic g.earth-line text', { hasText: 'toprak hattı' }).count();
   const trapText = (await notebook(tp).textContent()) ?? '';
@@ -2663,7 +2746,7 @@ try {
     const inLibrary = await bp.getByRole('option', { name: /^Bobin/ }).count();
     await notebook(bp).getByRole('combobox', { name: /Parça ekle/ }).fill('');
     await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
-    await bp.getByRole('button', { name: 'RL devresi', exact: true }).click(); await bp.waitForTimeout(400);
+    await (await pickExample(bp, (p) => p.getByRole('button', { name: 'RL devresi', exact: true }))).click(); await bp.waitForTimeout(400);
     await bp.getByRole('button', { name: 'Oynat', exact: true }).last().click(); await bp.waitForTimeout(400);
     const box = await bp.locator('svg.schematic text', { hasText: /^S1$/ }).first().boundingBox();
     const toggle = async () => { await bp.mouse.click(box.x + box.width / 2, box.y + box.height + 12); await bp.waitForTimeout(600); };
@@ -2688,7 +2771,7 @@ try {
       bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
       await bp.goto(URL0, { waitUntil: 'networkidle' });
       await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
-      await bp.getByRole('button', { name, exact: true }).click(); await bp.waitForTimeout(400);
+      await (await pickExample(bp, (p) => p.getByRole('button', { name, exact: true }))).click(); await bp.waitForTimeout(400);
       await bp.getByRole('button', { name: 'Oynat', exact: true }).last().click(); await bp.waitForTimeout(800);
       return bp;
     };
@@ -2737,7 +2820,7 @@ try {
     bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await bp.goto(URL0, { waitUntil: 'networkidle' });
     await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
-    await bp.getByRole('button', { name: 'Transistör anahtar: LED kollektörde', exact: true }).click(); await bp.waitForTimeout(400);
+    await (await pickExample(bp, (p) => p.getByRole('button', { name: 'Transistör anahtar: LED kollektörde', exact: true }))).click(); await bp.waitForTimeout(400);
     await bp.getByRole('button', { name: '3B', exact: true }).first().click();
     await bp.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }); await bp.waitForTimeout(800);
     await bp.getByRole('button', { name: 'Tahtada kur', exact: true }).click(); await bp.waitForTimeout(1500);
@@ -2821,7 +2904,7 @@ try {
     bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await bp.goto(URL0, { waitUntil: 'networkidle' });
     await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
-    await bp.getByRole('button', { name: 'Transistör anahtar: LED kollektörde', exact: true }).click(); await bp.waitForTimeout(300);
+    await (await pickExample(bp, (p) => p.getByRole('button', { name: 'Transistör anahtar: LED kollektörde', exact: true }))).click(); await bp.waitForTimeout(300);
     // T3'teki kurulum: planBreadboard yerleşimi, yalnızca R1 6b–6e ve LED1 ters.
     const d = await doc(bp);
     const id = (label) => d.parts.find((p) => p.label === label).id;
@@ -2906,7 +2989,7 @@ try {
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await page.getByRole('button', { name: 'Transistör anahtar: LED kollektörde: tahtada kur' }).click(); await page.waitForTimeout(1500);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Transistör anahtar: LED kollektörde: tahtada kur' }))).click(); await page.waitForTimeout(1500);
     let panel = page.getByRole('region', { name: 'Tahtada kur paneli' });
     const entered = (await panel.count()) === 1 && ((await panel.textContent()) ?? '').includes('0 / 4 takılı') && ((await panel.textContent()) ?? '').includes('Deney 9');
     check('Tahtada kur (T6): Örnekler’de her kartta “Tahtada kur”: örnek açılıyor, tahta boş, şema sağ panelde', entered);
@@ -3049,7 +3132,7 @@ try {
     const dp = await dctx.newPage();
     await dp.goto(URL0, { waitUntil: 'networkidle' });
     await dp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await dp.waitForTimeout(200);
-    await dp.getByRole('button', { name: 'Transistör anahtar: LED kollektörde', exact: true }).click(); await dp.waitForTimeout(400);
+    await (await pickExample(dp, (p) => p.getByRole('button', { name: 'Transistör anahtar: LED kollektörde', exact: true }))).click(); await dp.waitForTimeout(400);
     await dp.getByRole('button', { name: /^Dosya|^Transistör anahtar/ }).first().click(); await dp.waitForTimeout(150);
     await dp.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await dp.waitForTimeout(300);
     const dlg = dp.getByRole('dialog', { name: 'Görev oluştur' });

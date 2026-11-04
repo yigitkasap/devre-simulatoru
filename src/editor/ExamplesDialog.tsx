@@ -1,10 +1,11 @@
 // Örnek devreler penceresi: üst çubuktaki "Örnekler" düğmesiyle açılır. Örnekler konularına göre
 // gruplanır; birine tıklayınca devre yüklenir ve pencere kapanır. Telefonda tam ekran, aramalı ve
-// açılır kapanır gruplu liste (tasarım: P12).
+// açılır kapanır gruplu liste (tasarım: P12). Klasördeki gruplar (Akdeniz Üniversitesi · Fizik Bölümü:
+// föyün deneyleri, baraj, arıza bulma) ana listede değil, klasörün kendi görünümünde.
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { EXAMPLE_GROUPS, type ExampleId } from '../examples';
-import { FAULT_SCENARIOS, type FaultScenarioId } from '../examples/faultScenarios';
+import { EXAMPLE_FOLDERS, EXAMPLE_GROUPS, exampleGroup, folderGroups, groupFolder, type ExampleFolderId, type ExampleId } from '../examples';
+import { FAULT_SCENARIOS, faultFolder, faultScenario, type FaultScenarioId } from '../examples/faultScenarios';
 import { tr } from '../i18n/tr';
 import { Icon } from './icons';
 import { Rich } from './Rich';
@@ -27,6 +28,27 @@ export function ExamplesDialog(props: ExamplesDialogProps) {
   return props.phone ? <PhoneExamples {...props} /> : <DesktopExamples {...props} />;
 }
 
+const BASE = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+
+/** Klasördeki devre sayısı: örnekler ve arıza bulma görevleri. */
+function folderCount(folder: ExampleFolderId): number {
+  return folderGroups(folder).reduce((n, g) => n + g.ids.length, 0) + FAULT_SCENARIOS.filter((s) => faultFolder(s) === folder).length;
+}
+
+/** Pencerenin açıldığı görünüm: açık örnek ya da arıza görevi bir klasördeyse o klasör. */
+function startFolder(activeExample: ExampleId | null, activeFault: string | null): ExampleFolderId | null {
+  const group = activeExample ? exampleGroup(activeExample) : undefined;
+  if (group) return groupFolder(group);
+  const scenario = activeFault ? faultScenario(activeFault) : undefined;
+  return scenario ? faultFolder(scenario) : null;
+}
+
+/** Klasörün logosu (96 px'lik kopya; 2× ekranda 48 px'e kadar keskin); ince çerçeve koyu zeminde de ayırır. */
+function FolderLogo({ folder, size }: { folder: ExampleFolderId; size: number }) {
+  const logo = EXAMPLE_FOLDERS.find((f) => f.id === folder)!.logo;
+  return <img src={`${BASE}${logo}`} alt={tr.examples.folders[folder].logoAlt} width={size} height={size} className="shrink-0 rounded-full ring-1 ring-line-2" style={{ width: size, height: size }} />;
+}
+
 /** Örnek kartındaki "Tahtada kur" (T6). */
 function BoardButton({ id, onBoard, className }: { id: ExampleId; onBoard: (id: ExampleId) => void; className: string }) {
   return (
@@ -45,11 +67,27 @@ function BoardButton({ id, onBoard, className }: { id: ExampleId; onBoard: (id: 
 function DesktopExamples({ activeExample, onLoad, onBoard, onFault, activeFault, onClose }: ExamplesDialogProps) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLButtonElement>(null);
+  const folderTitleRef = useRef<HTMLHeadingElement>(null);
+  const [folder, setFolder] = useState<ExampleFolderId | null>(() => startFolder(activeExample, activeFault));
+  const switched = useRef(false);
 
   useEffect(() => {
     closeRef.current?.focus();
   }, []);
+  // Görünüm değişince liste başa döner; odak klasörün başlığına (geri dönünce klasör kartına) gider.
+  useEffect(() => {
+    if (!switched.current) return;
+    listRef.current?.scrollTo({ top: 0 });
+    (folder ? folderTitleRef.current : cardRef.current)?.focus();
+  }, [folder]);
+  const show = (next: ExampleFolderId | null) => {
+    switched.current = true;
+    setFolder(next);
+  };
 
+  // Numaralar her görünümde 1'den başlar.
   let number = 0;
   return (
     <div
@@ -85,8 +123,40 @@ function DesktopExamples({ activeExample, onLoad, onBoard, onFault, activeFault,
             <Icon name="close" className="h-4 w-4" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
-          {EXAMPLE_GROUPS.map((group) => (
+        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+          {folder === null ? (
+            EXAMPLE_FOLDERS.map((f) => (
+              <button
+                key={f.id}
+                ref={cardRef}
+                type="button"
+                onClick={() => show(f.id)}
+                aria-label={`${tr.examples.folders[f.id].title}. ${tr.examples.folders[f.id].summary(folderCount(f.id))}`}
+                className="mb-4 flex w-full items-center gap-3.5 rounded-xl border border-line px-4 py-3 text-left hover:bg-app"
+              >
+                <FolderLogo folder={f.id} size={48} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold">{tr.examples.folders[f.id].title}</span>
+                  <span className="mt-0.5 block text-xs text-muted">{tr.examples.folders[f.id].summary(folderCount(f.id))}</span>
+                </span>
+                <Icon name="chevron" className="h-5 w-5 shrink-0 text-muted" />
+              </button>
+            ))
+          ) : (
+            <div className="mb-4">
+              <button type="button" onClick={() => show(null)} className="-ml-1.5 flex h-8 items-center gap-1 rounded-md px-1.5 text-sm font-medium text-accent-ink hover:bg-app">
+                <Icon name="chevron" className="h-4 w-4 rotate-180" />
+                {tr.examples.back}
+              </button>
+              <div className="mt-2 flex items-center gap-3">
+                <FolderLogo folder={folder} size={40} />
+                <h3 ref={folderTitleRef} tabIndex={-1} className="text-base font-semibold outline-none">
+                  {tr.examples.folders[folder].title}
+                </h3>
+              </div>
+            </div>
+          )}
+          {folderGroups(folder).map((group) => (
             <section key={group.id} className="mb-4 last:mb-1">
               <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-muted uppercase">{tr.examples.groups[group.id]}</h3>
               <ul className="grid gap-2 md:grid-cols-2">
@@ -130,7 +200,7 @@ function DesktopExamples({ activeExample, onLoad, onBoard, onFault, activeFault,
             <h3 className="mb-0.5 text-xs font-semibold tracking-wide text-muted uppercase">{tr.fault.group}</h3>
             <p className="m-0 mb-1.5 text-xs text-muted">{tr.fault.groupNote}</p>
             <ul className="grid gap-2 md:grid-cols-2">
-              {FAULT_SCENARIOS.map((s) => {
+              {FAULT_SCENARIOS.filter((s) => faultFolder(s) === folder).map((s) => {
                 const texts = tr.fault.scenarios[s.id];
                 const active = activeFault === s.id;
                 return (
@@ -165,10 +235,9 @@ function DesktopExamples({ activeExample, onLoad, onBoard, onFault, activeFault,
 
 /** Baraj projesinin ayrı sayfası (büyük sahne, ışık kulesi, kontroller). */
 function BarajLink({ touch = false }: { touch?: boolean }) {
-  const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
   return (
     <a
-      href={`${base}baraj/`}
+      href={`${BASE}baraj/`}
       className={`mt-2 flex items-center gap-2.5 rounded-lg border border-accent bg-accent-soft/60 text-left text-accent-ink hover:bg-accent-soft ${
         touch ? 'min-h-[52px] px-3 py-2.5' : 'px-3 py-2'
       }`}
