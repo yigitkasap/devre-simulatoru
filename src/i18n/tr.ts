@@ -1313,7 +1313,16 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   },
   'fet-yukseltec': {
     title: 'BF245A ile ortak kaynaklı yükselteç (kazanç 10)',
-    description: `Föydeki tasarım ödevinin bir çözümü: kapı R_{G} = 1 MΩ ile ortak hatta bağlı (V_{GS} = 0, I_{D} ≈ I_{DSS}), V_{DD} = 15 V, R_{D} = 2,7 kΩ. Giriş 1 µF ile kuplajlı: 1 kHz, 0,5 V tepe-tepe sinüs. Osiloskobun A kanalı girişi (kapı; AC kuplaj, 0,2 V/bölme), B kanalı çıkışı (drain; AC, 2 V/bölme) gösteriyor. A’nın kablosu V_{DD} hattını keserek geçer: ${CROSSING}`,
+    description:
+      'Föydeki Şekil-17: fonksiyon üreteci (1 kHz, 0,5 V tepe-tepe sinüs) R_{g} = 10 kΩ üzerinden BF245A’nın kapısına bağlı; source ortak hatta, drain R_{D} = 2,7 kΩ üzerinden V_{DD} = 15 V’a (güç kaynağının 1. çıkışı). Kondansatör ve kapıdan ortak hatta direnç yok: V_{GS} girişin kendisi, çalışma noktası V_{GS} = 0 (I_{D} ≈ 3,82 mA, V_{DS} ≈ 4,70 V). Kazanç ≈ 10: çıkış ≈ 5,0 V tepe-tepe, girişle ters fazlı. Osiloskobun A kanalı girişi (0,2 V/bölme), B kanalı drain’i (AC kuplaj, 1 V/bölme) gösteriyor.',
+    purpose:
+      'Küçük bir gerilim değişimini yaklaşık on kat büyütür. Kapıdaki küçük değişim drain akımını değiştirir; bu akım R_{D} üzerinde büyük bir gerilim değişimi oluşturur. Kazanç ≈ −10: A_{v} = −g_{m} · (R_{D} ∥ r_{o}), g_{m} = 2 · I_{D} / |V_{P}| ≈ 4,4 mS (I_{D} ≈ 3,8 mA). Eksi işareti, çıkışın girişle ters fazlı (180°) olduğunu söyler. Girişi 2 V tepe-tepeye çıkar: çıkış bozulur (≈ 1,2 V ile 14,5 V arası), çünkü transistör doğrusal bölgenin dışına çıkar.',
+    everyday:
+      'Elektro gitarların ve kondansatör mikrofonların içindeki ilk yükseltme katı çoğu zaman tek bir JFET’tir; radyo alıcılarının anten girişindeki düşük gürültülü yükselteçlerde de JFET kullanılır.',
+  },
+  'fet-yukseltec-kuplajli': {
+    title: 'BF245A yükselteç: kuplajlı, kapı 1 MΩ ile ortak hatta',
+    description: `Föyde yok (ek): föydeki tasarım ödevinin kuplaj kondansatörlü bir çözümü: kapı R_{G} = 1 MΩ ile ortak hatta bağlı (V_{GS} = 0, I_{D} ≈ I_{DSS}), V_{DD} = 15 V, R_{D} = 2,7 kΩ. Giriş 1 µF ile kuplajlı: 1 kHz, 0,5 V tepe-tepe sinüs. Osiloskobun A kanalı girişi (kapı; AC kuplaj, 0,2 V/bölme), B kanalı çıkışı (drain; AC, 2 V/bölme) gösteriyor. A’nın kablosu V_{DD} hattını keserek geçer: ${CROSSING}`,
     purpose:
       'Küçük bir gerilim değişimini yaklaşık on kat büyütür. Kapıdaki küçük değişim drain akımını değiştirir; bu akım R_{D} üzerinde büyük bir gerilim değişimi oluşturur. Kazanç ≈ −10: A_{v} = −g_{m} · (R_{D} ∥ r_{o}), g_{m} = 2 · I_{D} / |V_{P}| ≈ 4,4 mS (I_{D} ≈ 3,8 mA). Eksi işareti, çıkışın girişle ters fazlı (180°) olduğunu söyler. Girişi 2 V tepe-tepeye çıkar: çıkış bozulur (≈ 1,2 V ile 14,5 V arası), çünkü transistör doğrusal bölgenin dışına çıkar.',
     everyday:
@@ -1939,6 +1948,7 @@ export const tr = {
       'alt-kirpici': 'Osiloskopta sinyalin altının 2,5 V’ta kesilmesini izle',
       'jfet-karakteristik': 'Kapı gerilimini değiştir, drain akımını izle',
       'fet-yukseltec': 'Giriş ve çıkış genliklerini karşılaştır',
+      'fet-yukseltec-kuplajli': 'Giriş ve çıkış genliklerini karşılaştır',
       'bjt-yukseltec': 'Giriş ve çıkışı osiloskopta karşılaştır',
       'mosfet-yukseltec': 'Kazancı osiloskopta ölç',
       'bjt-anahtar': 'Girişi değiştir, LED’in tam yanmasını izle',

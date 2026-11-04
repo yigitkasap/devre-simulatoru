@@ -263,8 +263,22 @@ describe('Deney 6–8: yükselteçler', () => {
     return { sim, out, gain: (out.max - out.min) / 2 / vin };
   }
 
-  it('JFET (BF245A, R_D = 2,7 kΩ): I_D ≈ 3,8 mA, kazanç ≈ 10; 2 V tepe-tepe girişte bozulma', () => {
+  it('JFET (Şekil-17: R_g = 10 kΩ seri, R_D = 2,7 kΩ, V_DD = 15 V, kondansatörsüz): I_D ≈ 3,82 mA, V_DS ≈ 4,70 V, kazanç ≈ 10; 2 V tepe-tepe girişte bozulma', () => {
     const doc = load('fet-yukseltec');
+    expect(doc.parts.some((p) => p.type === 'capacitor')).toBe(false);
+    expect(doc.parts.find((p) => p.label === 'RG')!.props.resistance).toBe(10000);
+    const { sim, gain } = amplifier(doc, 'J1', 1e3, 0.05);
+    between(gain, 9.9, 10.2);
+    between(sim.pinCurrents(idOf(doc, 'J1'))![0]!, 3.75e-3, 3.9e-3);
+    between(sim.voltageAt(`${idOf(doc, 'J1')}#0`)!, 4.6, 4.8);
+    expect(sim.status(idOf(doc, 'J1')).region).toBe('saturation');
+    const big = amplifier(withProps(doc, 'FG1', { amplitude: 2 }), 'J1', 1e3, 0.05).out;
+    expect(big.max).toBeGreaterThan(12.5);
+    expect(big.min).toBeLessThan(1.3);
+  });
+
+  it('JFET, kuplajlı (ek, föyde yok: R_G = 1 MΩ, R_D = 2,7 kΩ): I_D ≈ 3,8 mA, kazanç ≈ 10; 2 V tepe-tepe girişte bozulma', () => {
+    const doc = load('fet-yukseltec-kuplajli');
     const { sim, gain } = amplifier(doc, 'J1', 1e3, 0.05);
     between(gain, 9.8, 10.3);
     between(sim.pinCurrents(idOf(doc, 'J1'))![0]!, 3.7e-3, 3.9e-3);

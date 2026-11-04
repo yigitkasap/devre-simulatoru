@@ -17,7 +17,7 @@ import type { CircuitDoc, Part, Point } from '../src/model/types';
  */
 const CROSSINGS: Partial<Record<ExampleId, number>> = {
   'jfet-karakteristik': 1,
-  'fet-yukseltec': 1,
+  'fet-yukseltec-kuplajli': 1,
   'bjt-yukseltec': 1,
   'mosfet-yukseltec': 1,
   'bjt-anahtar': 1,
