@@ -56,6 +56,14 @@ export interface LabFigure {
   readonly questions: readonly LabQuestion[];
 }
 
+/** BF245A’nın bacak bağlantısı (föydeki Şekil-16; Deney 5 ve 6). */
+const BF245A: LabPinout = {
+  part: 'BF245A',
+  figure: 'Şekil-16',
+  legs: ['Kapı (G)', 'Source (S)', 'Drain (D)'],
+  note: 'Föydeki numaralama Philips’in BF245A kataloğundakinden farklı: katalogda 1 drain, 2 source, 3 kapı. İkisinde de ortadaki bacak source’tur; BF245A simetrik olduğu için drain ile source yer değiştirse de çalışır, önemli olan kapıyı doğru bulmaktır. Takmadan önce elindeki parçanın kataloğuna bak. Katalog sınırları: V_{DS} en çok ±30 V, P_{tot} 300 mW.',
+};
+
 export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment>> = {
   1: {
     title: 'Diyot karakteristiklerinin incelenmesi',
@@ -139,12 +147,26 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
         text: 'I_{DSS}, V_{GS} = 0’daki doyum akımıdır; V_{P} kısılma gerilimidir (n kanalda eksi). V_{GS}, V_{P}’den daha eksi olunca kanal tamamen kapanır ve I_{D} = 0. Gerçek JFET’te doyum bölgesinde de akım V_{DS} ile hafifçe artar (kanal boyu modülasyonu, i_{d}’nin (1 + λ · V_{DS}) ile çarpılması). Kapı-kanal eklemi ters kutuplu olduğundan kapıdan akım geçmez (I_{G} ≈ 0), bu yüzden R_{G} üzerinde gerilim düşmez.',
       },
     ],
-    pinout: {
-      part: 'BF245A',
-      figure: 'Şekil-16',
-      legs: ['Kapı (G)', 'Source (S)', 'Drain (D)'],
-      note: 'Föydeki numaralama Philips’in BF245A kataloğundakinden farklı: katalogda 1 drain, 2 source, 3 kapı. İkisinde de ortadaki bacak source’tur; BF245A simetrik olduğu için drain ile source yer değiştirse de çalışır, önemli olan kapıyı doğru bulmaktır. Takmadan önce elindeki parçanın kataloğuna bak. Katalog sınırları: V_{DS} en çok ±30 V, P_{tot} 300 mW.',
-    },
+    pinout: BF245A,
+  },
+  6: {
+    title: 'FET yükselteci',
+    aim: 'JFET’li basit bir yükselteç tasarlayıp çalışmasını incelemek.',
+    theory: [
+      { text: 'JFET’te i_{d} akımını kapıya uygulanan gerilim denetler. I_{DSS} ve V_{P} transistörün parametreleri, υ_{GS} kapı ile source arasındaki gerilim olmak üzere:' },
+      { formula: 'i_{d} = I_{DSS} · (1 − υ_{GS} / V_{P})²', eq: 1 },
+      { text: 'Şekil-17’nin giriş katında kapıdan akım geçmez (i_{g} = 0), R_{g} üzerinde gerilim düşmez; kapının gerilimi girişin gerilimidir:' },
+      { formula: 'υ_{GS} = υ_{s}', eq: 2 },
+      { text: 'Çıkış katında drain’in gerilimi:' },
+      { formula: 'υ_{DS} = V_{DD} − i_{d} · R_{d}', eq: 3 },
+      { text: 'Bu üç ifadeden çıkış, A sabit bir gerilim ve K_{υ} gerilim kazancı olmak üzere:' },
+      { formula: 'υ_{DS} = A − K_{υ} · υ_{s}', eq: 4 },
+      { formula: 'K_{υ} = −2 · I_{DSS} · R_{d} / V_{P}', eq: 5 },
+      {
+        text: 'Çıkış, A gibi bir DC gerilimin üstüne K_{υ} kat büyütülerek binmiş giriş sinyalidir; (4)’teki eksi işareti çıkışın girişe göre 180° faz kaydığını gösterir. (5), υ_{GS} = 0 çalışma noktasındaki küçük işaret kazancıdır (V_{P} eksi olduğundan K_{υ} artıdır). Büyük sinyalde (1) karesel olduğu için iki yarı eşit büyümez ve çıkış bozulur.',
+      },
+    ],
+    pinout: BF245A,
   },
 };
 
@@ -483,6 +505,65 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
         question: 'Elde ettiğiniz sonuçlarla transistörün akım-gerilim karakteristik eğrisini grafik kağıdına çiziniz. Grafikten faydalanıp, transistör parametreleri I_{DSS} ve V_{P}’yi bulunuz.',
         answer:
           'I_{DSS}: V_{GS} = 0 eğrisinin doyum bölgesi düz değil, hafif eğimlidir (2 V’ta 3,64 mA, 15 V’ta 4,45 mA). Bu doğruyu V_{DS} = 0’a uzatınca I_{DSS} ≈ 3,52 mA bulunur (eğim ≈ 0,062 mA/V). V_{P}: 4. adımda doğrudan ≈ −1,74 V. Eğrilerden de bulunur: aynı V_{DS}’de (8 V) I_{D}(−0,2 V) / I_{D}(0) = 3,15 / 4,02 ≈ 0,78; formülden 1 − 0,2 / |V_{P}| = √0,78 → V_{P} ≈ −1,74 V. −0,4 V eğrisi de aynı sonucu verir. Bu değerler simülasyondaki BF245A modelinin I_{DSS} = 3,52 mA ve V_{P} = −1,74 V değerleriyle aynı; katalogda BF245A için I_{DSS} 2–6,5 mA.',
+      },
+    ],
+  },
+  'fet-yukseltec': {
+    experiment: 6,
+    figure: 'Şekil-17',
+    steps: [
+      {
+        no: '1',
+        text: 'Deney 5’te I_{DSS} ve V_{P}’sini bulduğun JFET’le gerilim kazancı 10 olan bir yükselteç tasarla: Şekil-17’deki devrede V_{DD}, R_{D} ve R_{g}’yi kazanç 10 olacak biçimde belirle.',
+        sim: 'Devre kurulu (tasarımın bir çözümü): V_{DD} = 15 V (PS1), R_{D} = 2,7 kΩ, R_{g} = 10 kΩ, BF245A (I_{DSS} = 3,52 mA, V_{P} = −1,74 V). Kendi tasarımını denemek için R_{D}’nin direncini ya da PS1’in gerilimini değiştir.',
+      },
+      {
+        no: '2',
+        text: 'Girişe küçük genlikli (≈ 0,5 V) bir sinüs uygula; girişi ve çıkışı osiloskopta birlikte izle. a) Genlikleri ölçüp gerilim kazancını deneysel olarak bul. b) Çıkış ile giriş arasındaki faz farkını bul.',
+        sim: 'FG1 1 kHz, 0,5 V tepe-tepe. Osiloskop “A ve B (Y-t)” kipinde: A girişte (DC, 0,2 V/bölme), B drain’de (AC kuplaj, 1 V/bölme). Oynat’a bas; tepe-tepe değerleri ekranın altındaki ölçümlerden oku.',
+      },
+      {
+        no: '3',
+        text: 'Girişin genliğini yavaşça ≈ 2 V’a kadar artırıp çıkışın biçimindeki değişimi izle; nasıl bir değişim olduğunu ve nedenini açıkla.',
+        sim: 'Cihaz rafında FG1’in tepe-tepe değerini 1 V, 2 V ve 4 V yap; B’yi DC kuplaja ve 5 V/bölmeye al, kırpılmanın hangi gerilimlerde olduğunu gör.',
+      },
+      {
+        no: '4',
+        text: '3. adımda görülen sorunları gidermek için Şekil-17’deki devrede nasıl bir değişiklik yapılabileceğini açıkla.',
+        sim: 'Üretecin DC kayması kapıyı kutuplar: kaymayı −0,5 V, R_{D}’yi 3,3 kΩ yapıp 3. adımı tekrarla. Kuplaj kondansatörlü çözüm cevaptaki ek örnekte.',
+      },
+    ],
+    questions: [
+      {
+        step: '1',
+        question: 'Bir önceki deneyde (Deney 5) I_{DSS} ve V_{P} karakteristiklerini belirlediğiniz JFET’leri kullanarak, gerilim kazancı 10 olacak şekilde bir yükselteç devresi tasarımlayınız. (Şekil-17’deki devrede V_{DD}, R_{D} ve R_{g}’yi devrenin kazancı 10 olacak şekilde belirleyiniz.)',
+        answer:
+          'Deney 5’te I_{DSS} ≈ 3,52 mA, V_{P} ≈ −1,74 V. (5)’ten K_{υ} = 10 için R_{d} = K_{υ} · |V_{P}| / (2 · I_{DSS}) = 10 · 1,74 V / (2 · 3,52 mA) ≈ 2,47 kΩ; en yakın büyük standart değer 2,7 kΩ (formül ≈ 10,9 verir). V_{GS} = 0’da I_{D} ≈ 3,81 mA (kanal boyu modülasyonu yüzünden I_{DSS}’ten biraz büyük). V_{DD} = 15 V seçilirse V_{DS} = 15 V − 3,81 mA · 2,7 kΩ ≈ 4,70 V: transistör doyum bölgesinde (V_{DS} > V_{GS} − V_{P} = 1,74 V) ve drain’in iki yöne salınacak yeri var. R_{g} = 10 kΩ: kapıdan akım geçmediği için kazancı etkilemez (eş. 2); kapı ileri kutuplanırsa akımı sınırlar. Ölçülen kazanç ≈ 10,1.',
+      },
+      {
+        step: '2a',
+        question: 'Giriş ve çıkış dalga genliklerini ölçerek gerilim kazancını deneysel olarak belirleyiniz.',
+        answer:
+          '0,5 V tepe-tepe girişte drain 2,11 V ile 7,14 V arasında, yani ≈ 5,03 V tepe-tepe salınır: K_{υ} ≈ 5,03 / 0,5 ≈ 10,1 (0,1 V tepe-tepe girişte de ≈ 10,1). Formül (5) ≈ 10,9 verir; ölçülen biraz küçük, çünkü kanal boyu modülasyonu drain’e R_{D}’ye paralel bir r_{o} ≈ 1 / (λ · I_{D}) ≈ 15 kΩ ekler: K_{υ} ≈ g_{m} · (R_{D} ∥ r_{o}). Bu genlikte bozulma küçük: çıkış dinlenme noktasının (4,70 V) ≈ 2,44 V üstüne, ≈ 2,59 V altına uzanır.',
+      },
+      {
+        step: '2b',
+        question: 'Çıkış ile giriş sinyalleri arasındaki faz farkını belirleyiniz.',
+        answer:
+          '180°: girişin pozitif tepesinde (+0,25 V) drain en alt noktasına (≈ 2,11 V) iner, negatif tepesinde en üste (≈ 7,14 V) çıkar. Kapı gerilimi artınca i_{d} artar, R_{D}’deki düşüm büyür ve drain’in gerilimi düşer; (4)’teki eksi işareti bu terslenmedir.',
+      },
+      {
+        step: '3',
+        question: 'Giriş sinyalinin genliğini yavaşça artırarak (~2 V’a kadar) çıkış dalga şeklindeki değişimi gözleyiniz. Nasıl bir değişim olmaktadır, nedenini açıklayınız.',
+        answer:
+          'Çıkış giderek bozulur ve kazanç düşer. 1 V tepe-tepe girişte çıkış 1,36–9,36 V (8,0 V tepe-tepe, kazanç ≈ 8,0): alt yarı yukarıdakinden kısadır. 2 V tepe-tepe girişte 1,20–12,87 V: altı düzleşir. Nedenleri: (i) girişin pozitif yarısında kapı-source eklemi ileri kutuplanır, kapı ≈ 0,66 V’ta kalır ve R_{g}’den ≈ 34 µA geçer; (ii) drain ≈ 1,2 V’a inince V_{DS} < V_{GS} − V_{P} olur, transistör doyumdan çıkar (omik bölge) ve akım daha fazla artamaz; (iii) negatif yarıda i_{d} karesel olarak azalır, iki yarı eşit büyümez. 4 V tepe-tepe girişte (2 V genlik) üstü de düzleşir: υ_{GS} V_{P}’nin (−1,74 V) altına inince kanal kapanır, i_{d} = 0 ve drain V_{DD}’ye (≈ 14,98 V) çıkar.',
+      },
+      {
+        step: '4',
+        question: 'Bir önceki adımda gözlenen sorunları gidermek için Şekil-17’deki devrede nasıl bir değişiklik yapılabilir? Açıklayınız.',
+        answer:
+          'Sorunlar: çalışma noktası υ_{GS} = 0’da (pozitif yarıda kapı iletir), karesel yasa ve çıkışın V_{DD}’ye sığmaması (2 V tepe-tepe × 10 = 20 V tepe-tepe > 15 V). Değişiklikler: (1) Çalışma noktasını V_{GS} < 0’a ve V_{DS} ≈ V_{DD} / 2’ye taşı: source ile ortak hat arasına bir R_{S} (kendiliğinden kutuplama; kazancı korumak için ona paralel bir C_{S}) ya da kapıya eksi bir DC. Simülasyonda üretecin DC kaymasını −0,5 V, R_{D}’yi 3,3 kΩ yapınca V_{DS} ≈ 8,23 V olur, 0,5 V tepe-tepe girişte kazanç ≈ 9,8 kalır ve 2 V tepe-tepe girişte bile kapı akımı ≈ 0,1 µA’de kalır. (2) Girişe bir kuplaj kondansatörü, kapıdan ortak hatta büyük bir direnç (1 MΩ) koy: kapı üretecin DC’sinden ayrılır. Aşağıdaki ek örnek bu biçimdedir; 2 V tepe-tepe girişte kapı-source eklemi kondansatörü doldurup çalışma noktasını kendiliğinden eksiye kaydırır (drain’in ortalaması 4,67 V’tan 7,89 V’a çıkar), ama çıkış yine 1,24–14,49 V arasında kırpılır. (3) Büyük bir girişi bozulmasız yükseltmek için kazancı düşür (R_{S}’yi köprülemeden bırak: K_{υ} ≈ R_{D} / (R_{S} + 1 / g_{m})) ya da V_{DD}’yi büyüt (BF245A’da en çok 30 V); ya da girişi küçük tut: 0,5 V tepe-tepe girişte çıkış bozulmaz.',
+        link: 'fet-yukseltec-kuplajli',
       },
     ],
   },

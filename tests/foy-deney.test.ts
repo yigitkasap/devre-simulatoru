@@ -63,6 +63,12 @@ const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; 
       'jfet-karakteristik': { figure: 'Şekil-15', steps: ['1', '2', '3', '4', '5'], questions: ['2', '3', '4', '5'] },
     },
   },
+  6: {
+    steps: ['1', '2', '3', '4'],
+    figures: {
+      'fet-yukseltec': { figure: 'Şekil-17', steps: ['1', '2', '3', '4'], questions: ['1', '2a', '2b', '3', '4'] },
+    },
+  },
 };
 
 /** Bir sayıyı kartlardaki gibi yazar: ondalık virgül, eksi işareti "−". */
@@ -520,5 +526,94 @@ describe('Deney 5: cevaplardaki sayılar', () => {
     }
     says(text, 'V_{P} ≈ −1,74 V');
     expect(load('jfet-karakteristik').parts.find((p) => p.label === 'J1')!.props).toMatchObject({ idss: 0.00352, pinchOff: -1.74 });
+  });
+});
+
+/** Yükselteç: `settle` sonra bir periyot (1 kHz) boyunca drain (ya da kollektör), kapının en büyük gerilimi ve R_g'nin akımı. */
+function amplifier(doc: CircuitDoc, out: string, settle = 0.05) {
+  const sim = run(doc, settle);
+  const q = idOf(doc, out);
+  const fg = idOf(doc, 'FG1');
+  const rg = doc.parts.find((p) => p.label === 'RG' || p.label === 'RB')!.id;
+  let atMin = 0;
+  let atMax = 0;
+  let gate = Number.NEGATIVE_INFINITY;
+  let ig = 0;
+  let lo = Number.POSITIVE_INFINITY;
+  let hi = Number.NEGATIVE_INFINITY;
+  const r = period(sim, 1e-3, () => {
+    const v = sim.voltageAt(`${q}#0`)!;
+    if (v < lo) {
+      lo = v;
+      atMin = sim.voltageAt(`${fg}#0`)!;
+    }
+    if (v > hi) {
+      hi = v;
+      atMax = sim.voltageAt(`${fg}#0`)!;
+    }
+    gate = Math.max(gate, sim.voltageAt(`${q}#1`)!);
+    ig = Math.max(ig, Math.abs(sim.measure(rg)!.current));
+    return v;
+  });
+  const amplitude = doc.parts.find((p) => p.label === 'FG1')!.props.amplitude as number;
+  return { ...r, gain: (r.max - r.min) / amplitude, atMin, atMax, gate, ig, sim };
+}
+
+describe('Deney 6: cevaplardaki sayılar', () => {
+  const fet = (props: Record<string, number>, rd?: number) => {
+    let doc = withProps(load('fet-yukseltec'), 'FG1', props);
+    if (rd !== undefined) doc = withProps(doc, 'RD', { resistance: rd });
+    return doc;
+  };
+  /** Dinlenme noktası (giriş 0): V_DS ve I_D. */
+  function rest(doc: CircuitDoc) {
+    const sim = run(withProps(doc, 'FG1', { amplitude: 0 }), 0.01);
+    const j = idOf(doc, 'J1');
+    return { vds: sim.measure(j)!.voltage, id: sim.pinCurrents(j)![0]! };
+  }
+
+  it('1. adım: R_d = 10 · 1,74 / (2 · 3,52 mA) ≈ 2,47 kΩ → 2,7 kΩ; V_GS = 0’da I_D ≈ 3,81 mA, V_DS ≈ 4,70 V; kazanç ≈ 10,1', () => {
+    const text = answer('fet-yukseltec', '1');
+    const doc = load('fet-yukseltec');
+    expect(doc.parts.find((p) => p.label === 'RD')!.props.resistance).toBe(2700);
+    expect(doc.parts.find((p) => p.label === 'RG')!.props.resistance).toBe(10000);
+    expect(doc.parts.find((p) => p.label === 'PS1')!.props.voltage1).toBe(15);
+    const op = rest(doc);
+    says(text, `≈ ${num((10 * 1.74) / (2 * 3.52e-3) / 1e3, 2)} kΩ`, `formül ≈ ${num((2 * 3.52e-3 * 2700) / 1.74, 1)} verir`, `I_{D} ≈ ${num(op.id * 1e3, 2)} mA`, `≈ ${num(op.vds, 2)} V`);
+    between(15 - op.id * 2700 - op.vds, -0.01, 0.01);
+    says(text, `kazanç ≈ ${num(amplifier(doc, 'J1').gain, 1)}`);
+  });
+
+  it('2a ve 2b: 0,5 V t-t’de drain 2,11–7,14 V (≈ 5,03 V t-t, K ≈ 10,1), r_o ≈ 15 kΩ; faz 180°', () => {
+    const doc = load('fet-yukseltec');
+    const r = amplifier(doc, 'J1');
+    const op = rest(doc);
+    const text = answer('fet-yukseltec', '2a');
+    says(text, `drain ${num(r.min, 2)} V ile ${num(r.max, 2)} V`, `≈ ${num(r.max - r.min, 2)} V tepe-tepe`, `≈ ${num(r.gain, 1)} (0,1 V`, `(${num(op.vds, 2)} V) ≈ ${num(r.max - op.vds, 2)} V üstüne, ≈ ${num(op.vds - r.min, 2)} V altına`);
+    says(text, `0,1 V tepe-tepe girişte de ≈ ${num(amplifier(fet({ amplitude: 0.1 }), 'J1').gain, 1)}`, `≈ ${num(1 / (0.0177 * op.id) / 1e3, 0)} kΩ`);
+    // Faz: drain'in en alt noktası girişin pozitif tepesinde, en üst noktası negatif tepesinde.
+    between(r.atMin, 0.24, 0.26);
+    between(r.atMax, -0.26, -0.24);
+    says(answer('fet-yukseltec', '2b'), '180°', `(≈ ${num(r.min, 2)} V)`, `(≈ ${num(r.max, 2)} V)`);
+  });
+
+  it('3. adım: 1 V t-t 1,36–9,36 V (≈ 8,0); 2 V t-t 1,20–12,87 V, kapı ≈ 0,66 V, ≈ 34 µA; 4 V t-t’de drain ≈ 14,98 V’a çıkar', () => {
+    const text = answer('fet-yukseltec', '3');
+    const one = amplifier(fet({ amplitude: 1 }), 'J1');
+    says(text, `çıkış ${num(one.min, 2)}–${num(one.max, 2)} V (${num(one.max - one.min, 1)} V tepe-tepe, kazanç ≈ ${num(one.gain, 1)})`);
+    const two = amplifier(fet({ amplitude: 2 }), 'J1');
+    says(text, `girişte ${num(two.min, 2)}–${num(two.max, 2)} V`, `kapı ≈ ${num(two.gate, 2)} V’ta`, `≈ ${num(two.ig * 1e6, 0)} µA`, `drain ≈ ${num(two.min, 1)} V’a`);
+    const four = amplifier(fet({ amplitude: 4 }), 'J1');
+    says(text, `(≈ ${num(four.max, 2)} V)`);
+  });
+
+  it('4. adım: kayma −0,5 V ve R_D = 3,3 kΩ’da V_DS ≈ 8,23 V, kazanç ≈ 9,8, 2 V t-t’de kapı akımı ≈ 0,1 µA; kuplajlı devre 2 V t-t’de ortalama 4,67 → 7,89 V, çıkış 1,24–14,49 V', () => {
+    const text = answer('fet-yukseltec', '4');
+    says(text, `V_{DS} ≈ ${num(rest(fet({ offset: -0.5 }, 3300)).vds, 2)} V`, `kazanç ≈ ${num(amplifier(fet({ offset: -0.5 }, 3300), 'J1').gain, 1)}`, `≈ ${num(amplifier(fet({ offset: -0.5, amplitude: 2 }, 3300), 'J1').ig * 1e6, 1)} µA’de`);
+    const coupled = (amplitude: number) => amplifier(withProps(load('fet-yukseltec-kuplajli'), 'FG1', { amplitude }), 'J1', 0.5);
+    const small = coupled(0.5);
+    const big = coupled(2);
+    says(text, `ortalaması ${num(small.avg, 2)} V’tan ${num(big.avg, 2)} V’a`, `çıkış yine ${num(big.min, 2)}–${num(big.max, 2)} V`);
+    expect(LAB_FIGURE_TEXTS['fet-yukseltec']!.questions.find((q) => q.step === '4')!.link).toBe('fet-yukseltec-kuplajli');
   });
 });

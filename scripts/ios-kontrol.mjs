@@ -428,7 +428,7 @@ try {
   // --- Föy kartı (örnek kartı): Deney N · Şekil-M, amaç, teorik bilgi (katlı), adımlar, föydeki sorular -------
   // Klasörde deney gruplarının başlığının altında tek satırlık amaç. LAB_AIMS: amacı yazılmış deney sayısı.
   {
-    const LAB_AIMS = 5;
+    const LAB_AIMS = 6;
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
@@ -464,6 +464,22 @@ try {
     check('föy kartı (masaüstü): adımda föydeki numara (3) ve "Simülasyonda:" satırı; soru "3. adım", cevap kapalı başlıyor ve "Cevabı göster" açıyor (5 V genliğin neden kırmadığı)',
       stepText.includes('Simülasyonda:') && stepText.includes('zener olayını gözle') && label === '3. adım' && before === 0 && answer.includes('5 V genlik bu zeneri kırmaya yetmez') && answer.includes('4,87 V'),
       `${label} · ${before} · ${answer.slice(0, 40)}`);
+    // Deney 6'nın 4. sorusunun cevabı ek örneği (kuplajlı JFET yükselteç) açıyor.
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'BF245A ile ortak kaynaklı yükselteç (kazanç 10)', exact: true }))).click(); await page.waitForTimeout(500);
+    const fetCard = notebook(page).getByRole('region', { name: 'Örnek · Deney 6 · Şekil-17' });
+    await fetCard.getByRole('button').first().click(); await page.waitForTimeout(300);
+    const fetQa = fetCard.getByRole('region', { name: 'Föydeki sorular' });
+    const fetLabels = await fetQa.locator('li > span').allTextContents();
+    await fetQa.getByRole('button', { name: 'Cevabı göster' }).last().click(); await page.waitForTimeout(200);
+    const link = fetQa.getByRole('button', { name: /^Örneği aç: / });
+    const linkText = (await link.textContent()) ?? '';
+    await link.click(); await page.waitForTimeout(700);
+    const opened = (await notebook(page).getByRole('region', { name: /^Örnek ·/ }).textContent()) ?? '';
+    check('föy kartı (masaüstü): Deney 6’da sorular 1, 2a, 2b, 3, 4. adım; 4. sorunun cevabındaki "Örneği aç" kuplajlı ek devreyi açıyor (kartı eski düzende, "Föyde yok · ek")',
+      fetLabels.join('|') === '1. adım|2a. adım|2b. adım|3. adım|4. adım' && linkText.includes('kuplajlı') && opened.includes('Föyde yok · ek') && (await page.title()).length > 0 &&
+        (await notebook(page).getByRole('region', { name: 'Örnek · Deney 6 · FET yükselteci' }).count()) === 1,
+      `${fetLabels.join('|')} · ${linkText.slice(0, 40)} · ${opened.slice(0, 50)}`);
     await ctx.close();
   }
   {
