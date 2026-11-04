@@ -1252,7 +1252,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'pozitif-kenetleyici': {
     title: 'Pozitif kenetleyici',
     description:
-      'Negatif kenetleyicinin aynısı; yalnızca 1N4001 ters bağlı (katodu çıkışta) ve elektrolitik kondansatörün + ucu çıkış tarafında. Üreteç 1 kHz, 10 V tepe-tepe sinüs; C = 2,2 µF, yük 10 kΩ.',
+      'Föydeki Şekil-9b: negatif kenetleyicinin aynısı; yalnızca 1N4001 ters bağlı (katodu çıkışta) ve elektrolitik kondansatörün + ucu çıkış tarafında. Üreteç 1 kHz, 10 V tepe-tepe sinüs; C = 2,2 µF, yük 10 kΩ. Kutup notu: föyde kondansatörün + işareti giriş tarafında çizilmiş; bu devrede kondansatör çıkış tarafı + olacak şekilde dolar (negatif tepede diyot iletir, giriş ≈ −5 V’tayken çıkış ≈ −0,6 V’ta tutulur), bu yüzden elektrolitiğin + ucu çıkış tarafında. Simülasyondaki yön doğru.',
     purpose:
       'Dalgayı yukarı kaydırır. Negatif tepede diyot iletir, kondansatör dolar ve dalgayı yukarı taşır: çıkış ≈ −0,56 V ile ≈ +9,1 V arasında salınır, en alt noktası bir diyot gerilimi kadar sıfırın altındadır. Kare dalgada ≈ −0,5 V ile +9,5 V. Diyoda seri bir DC kaynak eklersen kenetleme seviyesi o kadar kayar (öngerilimli kenetleyici).',
     everyday:
