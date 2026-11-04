@@ -1953,7 +1953,7 @@ export const tr = {
       theory: 'Teorik bilgi',
       steps: 'Adımlar',
       inSim: 'Simülasyonda:',
-      step: (no: string) => (no === '' ? 'Deney' : `${no}. adım`),
+      step: (no: string) => (no === '' ? 'Tek adım' : `${no}. adım`),
       pinout: (part: string, figure: string) => `${part}: bacak bağlantısı (föydeki ${figure})`,
       leg: (n: number) => `${n}. bacak`,
       openExample: (title: string) => `Örneği aç: ${title}`,

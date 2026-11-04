@@ -110,6 +110,23 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
       { text: 'Çıkıştan akım çekilirse kondansatörler aralarda boşalır: gerilim 2V_{T}’yi koruyamaz ve DC’nin üstüne bir AC bileşen (dalgalanma) biner.' },
     ],
   },
+  4: {
+    title: 'Kırpıcı devreler',
+    aim: 'Kırpıcı devrelerin özelliklerini incelemek.',
+    theory: [
+      {
+        text: 'Kırpıcı, girişin belirli bir seviyenin üstündeki ya da altındaki kısmını keser. Kesme seviyesi diyodun yönüne, devredeki DC kaynağın gerilimine ve devrenin biçimine bağlıdır. Şekil-11’de diyoda seri bir V_{G} kaynağı var; girişe tepe değeri V_{T} olan bir sinüs uygulansın (Şekil-12a). İdeal diyot yalnızca υ_{g} > V_{G} iken iletir:',
+      },
+      { formula: 'υ_{ç} = υ_{g} − V_{G}  (υ_{g} > V_{G}),   υ_{ç} = 0  (υ_{g} < V_{G})' },
+      {
+        text: 'Çıkış, girişin V_{G}’nin üstünde kalan kısmıdır; tepesi V_{T} − V_{G} (Şekil-12b; föyde çıkış υ_{ç} = υ_{T} − υ_{G} olarak yazılmış, bu çıkışın tepe değeridir). Kare dalga da aynı biçimde kırpılır (Şekil-12c, d).',
+      },
+      {
+        text: 'Şekil-13b–d’de diyot çıkışa paralel, sinyal 10 kΩ üzerinden gelir. Diyot iletince çıkışı bağlı kaynağın gerilimine (bir diyot gerilimi farkla) tutar ve çıkış o seviyeyi aşamaz; fazla gerilim 10 kΩ’un üzerine düşer. Gerçek diyotta kesme seviyesi V_{D} ≈ 0,5 V kadar kayar:',
+      },
+      { formula: 'V_{kesme} ≈ V_{kaynak} ± V_{D}' },
+    ],
+  },
 };
 
 export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
@@ -314,6 +331,82 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
         question: 'Vç gerilimini kondansatörler üzerindeki Vp gerilimlerini ayrı ayrı ölçerek belirleyiniz. Sonuçlarınızı açıklayınız.',
         answer:
           'Her kondansatör girişin tepesine yakın bir gerilime dolar: üst çıkış (A) ≈ +4,63 V, alt çıkış (B) ≈ −4,63 V, yani V_{p} ≈ 4,63 V ve V_{ç} = A − B ≈ 9,25 V ≈ 2V_{p}. V_{p}, girişin 5 V’luk tepesinden bir diyot gerilimi kadar (≈ 0,37 V; akım çok küçük olduğu için az) küçüktür. Pozitif yarıda D1 iletir ve C1’i, negatif yarıda D2 iletir ve C2’yi doldurur; D1 kesimdeyken C1 boşalamaz, iki gerilim seri toplanır. Kondansatörler bir anda dolmaz: V_{p} 5 ms’de ≈ 3,64 V, 20 ms’de ≈ 4,37 V, 0,1 s’de ≈ 4,58 V; tepeye yaklaştıkça diyot her periyotta ancak tepenin kısa bir anında iletir. Çıkışta osiloskoptan başka yük olmadığı için dalgalanma görülmez; çıkıştan akım çekilirse, föyde belirtildiği gibi gerilim düşer ve DC’nin üstüne AC bileşen biner.',
+      },
+    ],
+  },
+  'seri-kirpici': {
+    experiment: 4,
+    figure: 'Şekil-13a',
+    steps: [
+      {
+        no: '',
+        text: 'Şekil-13’teki devreleri kur; girişlere sinüs ve kare dalga uygula. Çıkışları osiloskopta izleyip ölçekli olarak çiz.',
+        sim: 'Devre kurulu: 1N4001’in katodu üreteçte, anodu çıkışta; 10 kΩ çıkıştan alt hatta. A ve B 5 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+      },
+    ],
+    questions: [
+      {
+        step: '',
+        question: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
+        answer:
+          'Diyot sinyalin yolunda seri durur ve yalnızca giriş negatifken iletir. Sinüste çıkış girişin negatif yarısıdır: ≈ −9,47 V’a iner (girişin −10 V’undan diyotta ≈ 0,5 V düşer); pozitif yarıda çıkış ≈ 0 V’ta kalır (10 kΩ onu sıfıra çeker). Kare dalgada çıkış negatif yarıda ≈ −9,47 V, pozitif yarıda 0 V. Girişin −10 V’tan +10 V’a sıçradığı anda çıkışta ≈ +10,4 V’a çıkan, ≈ 3–4 µs süren dar bir sivri görülür: iletimde biriken yük boşalana kadar diyot ters yönde de iletir (Deney 1’deki ters toparlanma). 0,5 ms/bölmede bu sivri ince bir çizgi gibidir; görmek için zaman/bölmeyi 2 µs’ye indir.',
+      },
+    ],
+  },
+  'paralel-kirpici': {
+    experiment: 4,
+    figure: 'Şekil-13b',
+    steps: [
+      {
+        no: '',
+        text: 'Şekil-13’teki devreleri kur; girişlere sinüs ve kare dalga uygula. Çıkışları osiloskopta izleyip ölçekli olarak çiz.',
+        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; 1N4001’in anodu çıkışta, katodu DC güç kaynağının 4 V’luk 1. çıkışında. A ve B 5 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+      },
+    ],
+    questions: [
+      {
+        step: '',
+        question: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
+        answer:
+          'Çıkış 4 V + V_{D}’yi geçmeye çalışınca diyot iletir ve fazla gerilim 10 kΩ’un üzerine düşer: pozitif tepeler ≈ 4,45 V’ta düz kesilir (diyottan ≈ 0,55 mA geçtiği için V_{D} ≈ 0,45 V). Negatif yarı olduğu gibi geçer: ≈ −9,90 V (osiloskobun 1 MΩ’luk girişi 10 kΩ ile küçük bir bölücü oluşturur). Kare dalgada çıkış iki seviyelidir: ≈ +4,45 V ve ≈ −9,90 V.',
+      },
+    ],
+  },
+  'cift-kirpici': {
+    experiment: 4,
+    figure: 'Şekil-13c',
+    steps: [
+      {
+        no: '',
+        text: 'Şekil-13’teki devreleri kur; girişlere sinüs ve kare dalga uygula. Çıkışları osiloskopta izleyip ölçekli olarak çiz.',
+        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; D1’in anodu çıkışta, katodu 3 V’luk pilin + ucunda; D2’nin katodu çıkışta, anodu 2 V’luk pilin − ucunda (pillerin öbür uçları alt hatta). A 5 V/bölme, B 2 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+      },
+    ],
+    questions: [
+      {
+        step: '',
+        question: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
+        answer:
+          'İki yönde de kırpar: çıkış 3 V + V_{D}’yi geçince D1, −(2 V + V_{D})’nin altına inince D2 iletir. Sinüs ≈ +3,46 V ile ≈ −2,46 V arasında, üstü ve altı düz kesilmiş bir dalgaya dönüşür; kare dalgada çıkış ≈ +3,46 V ve ≈ −2,46 V seviyeli bir kare dalgadır. Seviyeler kaynakların gerilimine bir diyot gerilimi (≈ 0,46 V) eklenerek bulunur.',
+      },
+    ],
+  },
+  'alt-kirpici': {
+    experiment: 4,
+    figure: 'Şekil-13d',
+    steps: [
+      {
+        no: '',
+        text: 'Şekil-13’teki devreleri kur; girişlere sinüs ve kare dalga uygula. Çıkışları osiloskopta izleyip ölçekli olarak çiz.',
+        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; iki diyodun da katodu çıkışta: D1’in anodu 3 V’luk pilin + ucunda, D2’nin anodu 2 V’luk pilin − ucunda. A 5 V/bölme, B 2 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+      },
+    ],
+    questions: [
+      {
+        step: '',
+        question: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
+        answer:
+          'İki diyot da katotla çıkışa bağlı: çıkış anotlarından birinin bir diyot gerilimi altına inince o diyot iletir. D1’in anodu +3 V’ta olduğundan çıkış ≈ +2,51 V’un (3 V − V_{D}) altına inemez; D2’nin anodu −2 V’ta, eşiği çok aşağıda kalır ve hiç iletmez. Üst tarafta kırpma yoktur: çıkış ≈ +2,51 V ile ≈ +9,90 V arasında salınır, sinüsün yalnızca üst kısmı geçer. Kare dalgada çıkış ≈ +9,90 V ile ≈ +2,51 V arasındadır.',
       },
     ],
   },

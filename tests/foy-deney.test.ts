@@ -47,6 +47,16 @@ const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; 
       'gerilim-katlayici': { figure: 'Şekil-10', steps: ['2'], questions: ['2'] },
     },
   },
+  // Deney 4'ün tek adımı numarasız ('').
+  4: {
+    steps: [''],
+    figures: {
+      'seri-kirpici': { figure: 'Şekil-13a', steps: [''], questions: [''] },
+      'paralel-kirpici': { figure: 'Şekil-13b', steps: [''], questions: [''] },
+      'cift-kirpici': { figure: 'Şekil-13c', steps: [''], questions: [''] },
+      'alt-kirpici': { figure: 'Şekil-13d', steps: [''], questions: [''] },
+    },
+  },
 };
 
 /** Bir sayıyı kartlardaki gibi yazar: ondalık virgül, eksi işareti "−". */
@@ -285,7 +295,7 @@ describe('Deney 2: cevaplardaki sayılar', () => {
       expect(open.max - open.min).toBeLessThan(5e-3);
     }
     says(text, '≈ 2,6–2,7 V’ta');
-  });
+  }, 60_000);
 
   it('Şekil-5a, 3. adım: tepe ≈ 4,36 V (iki diyot × ≈ 0,32 V, ≈ 44 µA), ortalama ≈ 2,63 V, çıkış 2 kHz; pozitif yarıda D1 ile D3, negatif yarıda D2 ile D4', () => {
     const doc = load('kopru-dogrultmac');
@@ -371,5 +381,75 @@ describe('Deney 3: cevaplardaki sayılar', () => {
     const b = sim.voltageAt(`${osc}#1`)!;
     says(text, `(A) ≈ +${num(a, 2)} V`, `(B) ≈ ${num(b, 2)} V`, `V_{p} ≈ ${num(a, 2)} V`, `A − B ≈ ${num(a - b, 2)} V`, `(≈ ${num(5 - a, 2)} V;`);
     says(text, `5 ms’de ≈ ${num(vp[0.005]!, 2)} V`, `20 ms’de ≈ ${num(vp[0.02]!, 2)} V`, `0,1 s’de ≈ ${num(vp[0.1]!, 2)} V`);
+  });
+});
+
+describe('Deney 4: cevaplardaki sayılar', () => {
+  /** 10 ms sonra bir periyot boyunca çıkış (B); kare dalgada her yarının ortası da. */
+  function clip(id: ExampleId, waveform: 'sine' | 'square') {
+    const doc = withProps(load(id), 'FG1', { waveform });
+    const sim = run(doc, 0.01);
+    const osc = idOf(doc, 'OSC1');
+    const values: number[] = [];
+    const out = period(sim, 1e-3, () => {
+      const v = sim.voltageAt(`${osc}#1`)!;
+      values.push(v);
+      return v;
+    }, 4000);
+    return { ...out, high: values[1000]!, low: values[3000]!, sim, doc };
+  }
+
+  it('Şekil-13a: sinüste ≈ −9,47 V ile 0; kare dalgada −10 → +10 V sıçramasında ≈ +10,4 V’luk, ≈ 3–4 µs’lik sivri (ters toparlanma)', () => {
+    const text = answer('seri-kirpici', '');
+    const sine = clip('seri-kirpici', 'sine');
+    says(text, `≈ ${num(sine.min, 2)} V’a iner`, `≈ ${num(10 + sine.min, 1)} V düşer`);
+    between(sine.high, -0.05, 0.05);
+    const square = clip('seri-kirpici', 'square');
+    says(text, `negatif yarıda ≈ ${num(square.low, 2)} V`, `≈ +${num(square.max, 1)} V’a`);
+    between(square.high, -0.05, 0.05);
+    // Sivrinin süresi: 10 ms'deki sıçramadan sonra çıkışın 5 V'un üstünde kaldığı süre.
+    const doc = withProps(load('seri-kirpici'), 'FG1', { waveform: 'square' });
+    const sim = run(doc, 0.009999);
+    const osc = idOf(doc, 'OSC1');
+    let above = 0;
+    for (let k = 0; k < 200; k++) {
+      sim.advance(0.1e-6);
+      if (sim.voltageAt(`${osc}#1`)! > 5) above += 0.1e-6;
+    }
+    between(above, 3e-6, 4e-6);
+    says(text, '≈ 3–4 µs süren');
+  });
+
+  it('Şekil-13b: pozitif tepeler ≈ 4,45 V’ta kesilir (≈ 0,55 mA, V_D ≈ 0,45 V), negatif yarı ≈ −9,90 V', () => {
+    const text = answer('paralel-kirpici', '');
+    const sine = clip('paralel-kirpici', 'sine');
+    says(text, `≈ ${num(sine.max, 2)} V’ta düz kesilir`, `V_{D} ≈ ${num(sine.max - 4, 2)} V`, `≈ ${num(sine.min, 2)} V (osiloskobun`);
+    // Tepede diyodun akımı: (10 V − 4,45 V) / 10 kΩ.
+    between((10 - sine.max) / 1e4, 0.5e-3, 0.6e-3);
+    says(text, '≈ 0,55 mA');
+    const square = clip('paralel-kirpici', 'square');
+    says(text, `≈ +${num(square.high, 2)} V ve ≈ ${num(square.low, 2)} V`);
+  });
+
+  it('Şekil-13c: çıkış ≈ +3,46 V ile ≈ −2,46 V arasında; kare dalgada aynı seviyeler', () => {
+    const text = answer('cift-kirpici', '');
+    const sine = clip('cift-kirpici', 'sine');
+    says(text, `≈ +${num(sine.max, 2)} V ile ≈ ${num(sine.min, 2)} V`, `(≈ ${num(sine.max - 3, 2)} V)`);
+    const square = clip('cift-kirpici', 'square');
+    says(text, `≈ +${num(square.high, 2)} V ve ≈ ${num(square.low, 2)} V seviyeli`);
+  });
+
+  it('Şekil-13d: çıkış ≈ +2,51 V’un altına inemez (D1), D2 hiç iletmez; ≈ +2,51 V ile ≈ +9,90 V arası', () => {
+    const text = answer('alt-kirpici', '');
+    const sine = clip('alt-kirpici', 'sine');
+    says(text, `≈ +${num(sine.min, 2)} V’un (3 V − V_{D})`, `≈ +${num(sine.min, 2)} V ile ≈ +${num(sine.max, 2)} V arasında`);
+    // D2 iletmez: akımı D1'in tepe akımının %2'sinden küçük ve ortalaması ≈ 0 (kalan ± ≈ 10 µA eklem
+    // kapasitesinin yamuk kuralı salınımı, işareti her adımda değişir).
+    const d1 = period(sine.sim, 1e-3, () => sine.sim.measure(idOf(sine.doc, 'D1'))!.current);
+    const d2 = period(sine.sim, 1e-3, () => sine.sim.measure(idOf(sine.doc, 'D2'))!.current);
+    expect(Math.max(d2.max, -d2.min)).toBeLessThan(0.02 * d1.max);
+    expect(Math.abs(d2.avg)).toBeLessThan(0.5e-6);
+    const square = clip('alt-kirpici', 'square');
+    says(text, `≈ +${num(square.high, 2)} V ile ≈ +${num(square.low, 2)} V arasındadır`);
   });
 });
