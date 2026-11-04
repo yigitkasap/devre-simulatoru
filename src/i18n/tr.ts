@@ -1364,7 +1364,8 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   },
   'bjt-anahtar': {
     title: 'Transistör anahtar: LED kollektörde',
-    description: `Fonksiyon üretecinin TTL (darbe) çıkışı 1 Hz’lik 0/5 V kare dalga veriyor; R_{1} = 10 kΩ BC107’nin bazını sürüyor. Kollektörde R_{2} = 1 kΩ ve kırmızı LED, V_{CC} = 12 V’a bağlı. Osiloskobun A kanalı girişi (TTL), B kanalı kollektörü (V_{CE}) gösteriyor. A’nın kablosu V_{CC} hattını keserek geçer: ${CROSSING}`,
+    description:
+      'Föydeki Şekil-24: fonksiyon üretecinin TTL (darbe) çıkışı 1 Hz’lik 0/5 V kare dalga veriyor; R_{1} = 10 kΩ BC107’nin bazını sürüyor, emetör ortak hatta. V_{CC} = 12 V, R_{2} = 1 kΩ üzerinden kollektöre bağlı; kırmızı LED’in anodu kollektörde, katodu ortak hatta (transistöre paralel). Giriş 5 V’ta transistör doyumda (I_{C} ≈ 12 mA, V_{CE} ≈ 0,05 V) ve LED söner; giriş 0 V’ta transistör kesimde, LED ≈ 10 mA ile yanar.',
     purpose:
       'Küçük bir baz akımıyla büyük bir yükü açıp kapatır. Giriş 5 V’ta I_{B} = (5 V − 0,7 V) / 10 kΩ ≈ 0,43 mA; β · I_{B} ≈ 86 mA olurdu, ama kollektör akımı en fazla (12 V − 1,8 V) / 1 kΩ ≈ 10 mA olabilir. Transistör doyuma girer: V_{CE} ≈ 0,04 V, LED’den ≈ 10 mA geçer. Giriş 0 V’ta baz akımı yoktur: transistör kesimde, LED sönük. Transistör ya tam açık ya tam kapalı olduğu için üzerinde çok az güç harcanır.',
     everyday:
@@ -1373,7 +1374,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'bjt-anahtar-emetor': {
     title: 'Transistör anahtar: LED emetörde',
     description:
-      'Aynı parçalar; bu kez kollektör doğrudan 12 V’ta, LED ve R_{2} = 1 kΩ emetör ile ortak hat arasında. Baz yine TTL çıkışından R_{1} = 10 kΩ ile sürülüyor.',
+      'Föydeki Şekil-25: aynı parçalar; bu kez kollektör doğrudan V_{CC} = 12 V’ta, emetörden sonra R_{2} = 1 kΩ, ardından LED, sonra ortak hat. Baz yine TTL çıkışından R_{1} = 10 kΩ ile sürülüyor. Giriş 5 V’ta LED’den ≈ 2,55 mA geçer (transistör aktif bölgede, V_{CE} ≈ 7,8 V); giriş 0 V’ta LED söner.',
     purpose:
       'Yük yanlış yerdeyken transistörün anahtar gibi çalışmadığını gösterir. LED’den yalnızca ≈ 2,6 mA geçer ve LED sönük yanar; transistör doyuma girmez, aktif bölgede kalır (V_{CE} ≈ 7,8 V). Emetör bazın ≈ 0,65 V altını izler (emetör izleyici): I_{E} ≈ (5 V − 0,65 V − V_{LED}) / (R_{2} + R_{1} / β) ≈ 2,5 mA. Akımı V_{CC} değil giriş gerilimi belirler; anahtar olarak kullanmak için yük kollektörde olmalıdır.',
     everyday:

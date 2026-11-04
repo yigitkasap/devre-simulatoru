@@ -609,7 +609,8 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     const branches: readonly { id: ExampleId; transistor: string; wires: readonly Branch[] }[] = [
       // Üst rayda RB'nin bağlandığı noktanın (36, -16) solundan RB akımı da geçer.
       { id: 'bjt-yukseltec-kuplajli', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -12), keep: (at) => (at.y === -16 && at.x > 36) || at.x === 44 }, { wire: (d) => wireAt(d, 44, 0) }] },
-      { id: 'bjt-anahtar', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -18) }, { wire: (d) => wireAt(d, 44, -8) }, { wire: (d) => wireAt(d, 44, 2) }] },
+      // Şekil-24: LED kolu R2'nin ucunda ayrılır; R2'nin altından kollektöre giden kablodan yalnızca I_C geçer.
+      { id: 'bjt-anahtar', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, 8) }] },
       { id: 'fet-yukseltec-kuplajli', transistor: 'J1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
       { id: 'mosfet-yukseltec-rs', transistor: 'M1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
     ];

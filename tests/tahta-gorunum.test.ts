@@ -27,14 +27,14 @@ describe('Kurulumun 3B yerleşimi', () => {
     expect(plan.jumpers.every((j) => Object.values(WIRE_HEX).includes(j.color!))).toBe(true);
   });
 
-  it('boş tahta: parça ve kablo yok, masadaki yerler var; panelde 4 parça ve 7 alet kablosu (T1)', () => {
+  it('boş tahta: parça ve kablo yok, masadaki yerler var; panelde 4 parça ve 4 alet kablosu (T1; Şekil-24: güç kaynağı ve üreteç)', () => {
     const plan = planFromBuild(doc, emptyBuild(30), schematic);
     expect(plan.onBoard.size).toBe(0);
     expect(plan.jumpers).toHaveLength(0);
     expect(plan.leads).toHaveLength(0);
-    expect(plan.table.size).toBe(3);
+    expect(plan.table.size).toBe(2);
     expect(boardParts(doc, schematic).map((p) => p.label)).toEqual(['R1', 'Q1', 'R2', 'LED1']);
     const leads = requiredLeads(schematic).map((l) => `${doc.parts.find((p) => p.id === l.part)!.label}#${l.pin}`);
-    expect(leads).toHaveLength(7);
+    expect(leads).toHaveLength(4);
   });
 });

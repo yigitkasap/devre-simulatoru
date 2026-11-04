@@ -37,6 +37,20 @@ function swing(sim: CircuitSimulator, value: () => number, duration: number, sli
   }
   return { max, min };
 }
+/** Parça ucunun düğümü (netlist bağlantıları birleştirilmiş): iki uç aynı düğümde mi diye bakmak için. */
+function nodeOf(doc: CircuitDoc): (label: string, pin: number) => string {
+  const { netlist } = buildConnectivity(doc);
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    const up = parent.get(x) ?? x;
+    if (up === x) return x;
+    const root = find(up);
+    parent.set(x, root);
+    return root;
+  };
+  for (const l of netlist.links) parent.set(find(l.a), find(l.b));
+  return (label, pin) => find(netlist.elements.find((e) => e.id === idOf(doc, label))!.pins[pin]!);
+}
 const between = (value: number, lo: number, hi: number) => {
   expect(value).toBeGreaterThan(lo);
   expect(value).toBeLessThan(hi);
@@ -175,21 +189,11 @@ describe('Deney 3: kenetleyici ve katlayıcı', () => {
     expect(Math.abs(c1! - c2!)).toBeLessThan(0.02);
     // Osiloskop: COM ortada, A üst çıkışta (+V_p), B alt çıkışta (−V_p).
     const scope = doc.parts.find((p) => p.type === 'oscilloscope')!;
-    const { netlist } = buildConnectivity(doc);
-    const parent = new Map<string, string>();
-    const find = (x: string): string => {
-      const up = parent.get(x) ?? x;
-      if (up === x) return x;
-      const root = find(up);
-      parent.set(x, root);
-      return root;
-    };
-    for (const l of netlist.links) parent.set(find(l.a), find(l.b));
-    const node = (part: string, pin: number) => find(netlist.elements.find((e) => e.id === part)!.pins[pin]!);
-    expect(node(scope.id, 0)).toBe(node(idOf(doc, 'C1'), 0));
-    expect(node(scope.id, 1)).toBe(node(idOf(doc, 'C2'), 1));
-    expect(node(scope.id, 2)).toBe(node(idOf(doc, 'C1'), 1));
-    expect(node(idOf(doc, 'FG1'), 2)).toBe(node(idOf(doc, 'C2'), 0));
+    const node = nodeOf(doc);
+    expect(node(scope.label, 0)).toBe(node('C1', 0));
+    expect(node(scope.label, 1)).toBe(node('C2', 1));
+    expect(node(scope.label, 2)).toBe(node('C1', 1));
+    expect(node('FG1', 2)).toBe(node('C2', 0));
   });
 });
 
@@ -344,27 +348,40 @@ describe('Deney 6–8: yükselteçler', () => {
 });
 
 describe('Deney 9: transistör anahtar', () => {
-  it('LED kollektörde: giriş 5 V’ta doyum (I_C ≈ 10 mA, V_CE ≈ 0,04 V); 0 V’ta kesim', () => {
+  it('Şekil-24 (LED transistöre paralel): TTL 5 V’ta doyum (I_C ≈ 11,95 mA, V_CE ≈ 0,05 V), LED söner; 0 V’ta kesim, LED ≈ 10,2 mA ile yanar', () => {
     const doc = load('bjt-anahtar');
+    expect(doc.parts.some((p) => p.type === 'oscilloscope')).toBe(false);
     const q = idOf(doc, 'Q1');
+    const led = idOf(doc, 'LED1');
     const sim = run(doc, 0.25);
     const [ic, ib] = sim.pinCurrents(q)!;
-    between(ic!, 9.9e-3, 10.4e-3);
+    between(ic!, 11.8e-3, 12.1e-3);
     between(ib!, 0.41e-3, 0.45e-3);
     expect(sim.measure(q)!.voltage).toBeLessThan(0.1);
     expect(sim.status(q).region).toBe('saturation');
+    expect(sim.measure(led)!.current).toBeLessThan(1e-6);
     sim.runUntil(0.75);
-    expect(Math.abs(sim.pinCurrents(q)![0]!)).toBeLessThan(1e-9);
+    // Kesimde kollektör akımı yalnızca eklem kapasitelerinin yamuk kuralı salınımı (± ≈ 5 µA, işareti
+    // her adımda değişir); LED'in akımının binde birinden az.
+    expect(Math.abs(sim.pinCurrents(q)![0]!)).toBeLessThan(1e-5);
     expect(sim.status(q).region).toBe('cutoff');
+    between(sim.measure(led)!.current, 10e-3, 10.4e-3);
   });
 
-  it('LED emetörde: transistör aktif bölgede kalır, LED’den yalnızca ≈ 2,6 mA geçer (V_CE ≈ 7,8 V)', () => {
+  it('Şekil-25 (emetör → R2 → LED → ortak hat): TTL 5 V’ta transistör aktif bölgede, LED’den ≈ 2,55 mA (V_CE ≈ 7,8 V); 0 V’ta söner', () => {
     const doc = load('bjt-anahtar-emetor');
     const q = idOf(doc, 'Q1');
+    // Sıra: emetör → R2 → LED'in anodu; LED'in katodu ortak hatta.
+    const node = nodeOf(doc);
+    expect(node('Q1', 2)).toBe(node('R2', 0));
+    expect(node('R2', 1)).toBe(node('LED1', 0));
+    expect(node('LED1', 1)).toBe(node('GND1', 0));
     const sim = run(doc, 0.25);
     between(sim.measure(idOf(doc, 'LED1'))!.current, 2.4e-3, 2.7e-3);
     expect(sim.status(q).region).toBe('active');
     between(sim.measure(q)!.voltage, 7.5, 8);
+    sim.runUntil(0.75);
+    expect(Math.abs(sim.measure(idOf(doc, 'LED1'))!.current)).toBeLessThan(1e-6);
   });
 });
 

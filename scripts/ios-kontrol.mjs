@@ -2912,8 +2912,8 @@ try {
     const panel = bp.getByRole('region', { name: 'Tahtada kur paneli' });
     const topOn = (await bp.getByRole('group', { name: 'Tahta görünümü' }).getByRole('button', { name: 'Tepeden' }).getAttribute('aria-pressed')) === 'true';
     const panelText = (await panel.textContent()) ?? '';
-    check('Tahtada kur (masaüstü): 3B araç çubuğundan açılıyor; Tepeden seçili, Çık var; panelde şema, 0 / 4 takılı ve 7 alet kablosu (T1)',
-      topOn && (await bp.getByRole('button', { name: /Tahtada kur’dan çık/ }).count()) === 1 && panelText.includes('Şemadaki devreyi tahtaya kur') && panelText.includes('0 / 4 takılı') && panelText.includes('0 / 7 takılı'), panelText.slice(0, 60));
+    check('Tahtada kur (masaüstü): 3B araç çubuğundan açılıyor; Tepeden seçili, Çık var; panelde şema, 0 / 4 takılı ve 4 alet kablosu (T1; Şekil-24: güç kaynağı ve üreteç)',
+      topOn && (await bp.getByRole('button', { name: /Tahtada kur’dan çık/ }).count()) === 1 && panelText.includes('Şemadaki devreyi tahtaya kur') && panelText.includes('0 / 4 takılı') && panelText.includes('0 / 4 takılı', panelText.indexOf('0 / 4 takılı') + 1), panelText.slice(0, 60));
     const holeXY = (name) => bp.evaluate((n) => {
       const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
       const m = /^(\d+)([a-j])$/.exec(n); const col = +m[1]; const row = 'abcdefghij'.indexOf(m[2]);
@@ -2974,8 +2974,8 @@ try {
     await bp.mouse.click(pin.x + pin.width / 2, pin.y + pin.height / 2); await bp.waitForTimeout(200);
     const leadChip = await bp.getByRole('group', { name: /kablosu · bir deliğe tak$/ }).count();
     await bp.keyboard.press('Escape'); await bp.waitForTimeout(150);
-    check('Tahtada kur: alet kablosu panelin çipinden başlatılıp delik adıyla takılıyor (1 / 7 takılı); karttaki uca tıklayınca da takma başlıyor',
-      lead === '20a' && ((await panel.textContent()) ?? '').includes('1 / 7 takılı') && leadChip === 1, `${lead} ${leadChip}`);
+    check('Tahtada kur: alet kablosu panelin çipinden başlatılıp delik adıyla takılıyor (1 / 4 takılı); karttaki uca tıklayınca da takma başlıyor',
+      lead === '20a' && ((await panel.textContent()) ?? '').includes('1 / 4 takılı') && leadChip === 1, `${lead} ${leadChip}`);
     await bp.getByRole('button', { name: /Tahtada kur’dan çık/ }).click(); await bp.waitForTimeout(400);
     check('Tahtada kur: Çık ile 3B tezgâha dönülüyor, kurulum devrede kalıyor', (await bp.getByRole('region', { name: 'Tahtada kur paneli' }).count()) === 0 && (await holesOf('Q1')) === '2h 3h 4h');
     await ctx.close();
@@ -2997,8 +2997,9 @@ try {
     d.build = {
       cols: 30,
       parts: { [id('R1')]: { holes: ['6b', '6e'] }, [id('Q1')]: { holes: ['2h', '3h', '4h'] }, [id('R2')]: { holes: ['7h', '11h'] }, [id('LED1')]: { holes: ['12g', '11g'] } },
-      wires: [['6a', '3j', 'orange'], ['2j', '12j', 'yellow'], ['4j', rail('alt', '−', 4), 'black'], ['7j', rail('alt', '+', 8), 'red'], [rail('üst', '+', 2), rail('alt', '+', 2), 'red'], [rail('üst', '−', 30), rail('alt', '−', 30), 'black']].map(([a, b, color]) => ({ a, b, color })),
-      leads: [['PS1', 0, rail('üst', '+', 4)], ['PS1', 1, rail('üst', '−', 4)], ['FG1', 1, '2a'], ['FG1', 2, rail('üst', '−', 18)], ['OSC1', 0, '2b'], ['OSC1', 1, '12f'], ['OSC1', 2, rail('üst', '−', 29)]].map(([label, pin, hole]) => ({ part: id(label), pin, hole })),
+      // Şekil-24: kollektör (2j) R2'nin ucuna ve LED'in anoduna (11j); LED'in katodu (12j) alt − rayına.
+      wires: [['6a', '3j', 'orange'], ['2j', '11j', 'yellow'], ['4j', rail('alt', '−', 4), 'black'], ['12j', rail('alt', '−', 12), 'black'], ['7j', rail('alt', '+', 8), 'red'], [rail('üst', '+', 2), rail('alt', '+', 2), 'red'], [rail('üst', '−', 30), rail('alt', '−', 30), 'black']].map(([a, b, color]) => ({ a, b, color })),
+      leads: [['PS1', 0, rail('üst', '+', 10)], ['PS1', 1, rail('üst', '−', 10)], ['FG1', 1, '2a'], ['FG1', 2, rail('üst', '−', 23)]].map(([label, pin, hole]) => ({ part: id(label), pin, hole })),
     };
     await bp.evaluate((x) => localStorage.setItem('devre-simulatoru:devre', JSON.stringify(x)), d);
     await bp.reload({ waitUntil: 'networkidle' });
@@ -3157,8 +3158,8 @@ try {
       return { x: rect.left + (col - 15.5) * t.scale + t.ox, y: rect.top + (row < 5 ? -5.5 + row : 1.5 + (row - 5)) * t.scale + t.oy };
     }, name);
     const pitch = await page.evaluate(() => window.__tezgah.topTransform().scale);
-    check('Tahtada kur (telefon): 3B’den açılıyor; tahta yüksekliğine sığıyor (delik aralığı ≥ 22 px, tahta yatay kayar); parça kutusu alttaki sayfada (0 / 4 takılı, Tak düğmeleri, 7 kablo çipi)',
-      sheetText.includes('Parça kutusu') && sheetText.includes('0 / 4 takılı') && (await sheet.getByRole('button', { name: /: tahtaya tak$/ }).count()) === 4 && (await sheet.getByRole('button', { name: /kablosunu tak$/ }).count()) === 7 && pitch >= 22,
+    check('Tahtada kur (telefon): 3B’den açılıyor; tahta yüksekliğine sığıyor (delik aralığı ≥ 22 px, tahta yatay kayar); parça kutusu alttaki sayfada (0 / 4 takılı, Tak düğmeleri, 4 kablo çipi)',
+      sheetText.includes('Parça kutusu') && sheetText.includes('0 / 4 takılı') && (await sheet.getByRole('button', { name: /: tahtaya tak$/ }).count()) === 4 && (await sheet.getByRole('button', { name: /kablosunu tak$/ }).count()) === 4 && pitch >= 22,
       `aralık ${pitch.toFixed(1)} px`);
     // Oynat tahtanın üstünde yüzmüyor: alttaki sayfanın içinde; takarken hiç yok.
     const playAtEntry = await page.getByRole('button', { name: 'Oynat', exact: true }).boundingBox();
