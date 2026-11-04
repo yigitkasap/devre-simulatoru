@@ -59,7 +59,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
   });
 
   it('yük doğrusu: BC107 yükselteçte R_C = 5,6 kΩ, kaynak 12 V, Q doğrunun üstünde; JFET deneyinde R_D ile drain arasında ampermetre var, doğru çizilmez', () => {
-    const amp = exampleDoc('bjt-yukseltec')!;
+    const amp = exampleDoc('bjt-yukseltec-kuplajli')!;
     const q1 = amp.parts.find((p) => p.label === 'Q1')!;
     const labels = Object.fromEntries(amp.parts.map((p) => [p.id, p.label]));
     const line = loadLine(buildConnectivity(amp).netlist, q1.id, labels)!;
@@ -74,7 +74,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     expect(loadLine(buildConnectivity(lab).netlist, jfet.id, {})).toBeNull();
   });
   it('Q basamağı (analiz düzeltmeleri, 9): BC107’de Q’daki gerçek I_B ≈ 5 µA ayrı bir eğri, öbür basamaklar aynı; aralık beslemeye (12 V) kadar', () => {
-    const amp = exampleDoc('bjt-yukseltec')!;
+    const amp = exampleDoc('bjt-yukseltec-kuplajli')!;
     const q1 = amp.parts.find((p) => p.label === 'Q1')!;
     const line = loadLine(buildConnectivity(amp).netlist, q1.id, {})!;
     // RB = 2,2 MΩ, V_BE ≈ 0,64 V: I_B = (12 − 0,64) / 2,2 MΩ ≈ 5,16 µA.
@@ -132,7 +132,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     expect(atQ(1)).toBeLessThan(ml.q[1]);
     expect(atQ(2)).toBeGreaterThan(ml.q[1]);
     // BJT ve JFET'te eşik yok: basamaklar değişmez.
-    const amp = exampleDoc('bjt-yukseltec')!;
+    const amp = exampleDoc('bjt-yukseltec-kuplajli')!;
     expect(loadLine(buildConnectivity(amp).netlist, amp.parts.find((p) => p.label === 'Q1')!.id, {})!.threshold).toBeNull();
   });
 });

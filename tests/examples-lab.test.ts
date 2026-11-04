@@ -288,9 +288,22 @@ describe('Deney 6–8: yükselteçler', () => {
     expect(big.min).toBeLessThan(1.5);
   });
 
-  it('BJT (BC107, R_B = 2,2 MΩ, R_C = 5,6 kΩ): I_C ≈ 1,05 mA, V_CE ≈ 6,1 V, kazanç ≈ 204; 1 MHz’te ≈ 127', () => {
-    // Gummel-Poon kartı (ters Early gerilimi VAR, FC = 0,96): eski Ebers-Moll modelinde 1,1 mA, 215, 150.
+  it('BJT (Şekil-18: R_B = 10 kΩ seri, R_C = 1 kΩ, V_CC = 12 V, ofset 0,98 V): I_C ≈ 5,98 mA, V_CE ≈ 6,0 V; tasarım K = β R_C / R_B = 20, ölçülen ≈ 16,3 (r_π ve küçük işaret β); 1 MHz’te ≈ 5,6', () => {
     const doc = load('bjt-yukseltec');
+    expect(doc.parts.some((p) => p.type === 'capacitor')).toBe(false);
+    const fg = doc.parts.find((p) => p.label === 'FG1')!.props;
+    expect([fg.offset, fg.amplitude, fg.attenuate]).toEqual([0.98, 0.2, false]);
+    const { sim, gain } = amplifier(doc, 'Q1', 1e3, 0.05);
+    between(gain, 16, 16.7);
+    between(sim.pinCurrents(idOf(doc, 'Q1'))![0]!, 5.85e-3, 6.1e-3);
+    between(sim.measure(idOf(doc, 'Q1'))!.voltage, 5.9, 6.15);
+    expect(sim.status(idOf(doc, 'Q1')).region).toBe('active');
+    between(amplifier(doc, 'Q1', 1e6, 30e-6).gain, 5.2, 6.1);
+  });
+
+  it('BJT, kuplajlı (ek, föyde yok: R_B = 2,2 MΩ, R_C = 5,6 kΩ): I_C ≈ 1,05 mA, V_CE ≈ 6,1 V, kazanç ≈ 204; 1 MHz’te ≈ 127', () => {
+    // Gummel-Poon kartı (ters Early gerilimi VAR, FC = 0,96): eski Ebers-Moll modelinde 1,1 mA, 215, 150.
+    const doc = load('bjt-yukseltec-kuplajli');
     const { sim, gain } = amplifier(doc, 'Q1');
     between(gain, 196, 212);
     between(sim.pinCurrents(idOf(doc, 'Q1'))![0]!, 1.0e-3, 1.09e-3);

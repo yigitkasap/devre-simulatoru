@@ -792,8 +792,8 @@ const FAULT_SCENARIO_TEXTS: Record<FaultScenarioId, FaultScenarioTexts> = {
     symptom: 'Osiloskobun B kanalında sinyal yok.',
     found: {
       title: 'RC’nin kollektör tarafındaki bacağı temas etmiyordu',
-      text: 'RC kopukken kollektöre besleme akımı gelemez; Q1 doyuma girer ve kollektör 6,4 mV’ta kalır, çıkışta sinyal oluşmaz. Baz 0,55 V’ta (sağlam devrede 0,64 V).',
-      decisive: 'RC’nin ucunda 11,99 V, hemen yanındaki kollektör düğümünde 6,4 mV. Aynı kabloda iki farklı gerilim, bağlantının tam arada koptuğunu gösterir. 11,99 V’un 12 V’tan az olması multimetrenin 10 MΩ iç direncinden.',
+      text: 'RC kopukken kollektöre besleme akımı gelemez; Q1 doyuma girer ve kollektör 6,3 mV’ta kalır (sağlam devrede 6,05 V), çıkışta sinyal oluşmaz. Baz 0,60 V’ta (sağlam devrede 0,68 V).',
+      decisive: 'RC’nin ucunda 12,00 V, hemen yanındaki kollektör düğümünde 6,3 mV. Aynı kabloda iki farklı gerilim, bağlantının tam arada koptuğunu gösterir.',
     },
   },
 };
@@ -1330,7 +1330,16 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   },
   'bjt-yukseltec': {
     title: 'BC107 ile ortak emetörlü yükselteç',
-    description: `Föydeki tasarımın bir çözümü: V_{CC} = 12 V, R_{B} = 2,2 MΩ (sabit baz akımı), R_{C} = 5,6 kΩ, β = 200. Üreteç 1 kHz sinüs, −20 dB zayıflatıcıyla 20 mV tepe-tepe; girişte 10 µF’lık kuplaj kondansatörü var. Osiloskobun A kanalı girişi (baz; AC, 5 mV/bölme), B kanalı çıkışı (kollektör; AC, 1 V/bölme) gösteriyor. A’nın kablosu V_{CC} hattını keserek geçer (bu devrede bir kesişme kaçınılmazdır): ${CROSSING}`,
+    description:
+      'Föydeki Şekil-18: fonksiyon üreteci (1 kHz, 0,2 V tepe-tepe sinüs, DC ofset 0,98 V) R_{B} = 10 kΩ üzerinden BC107’nin bazına bağlı; emetör ortak hatta, kollektör R_{C} = 1 kΩ üzerinden V_{CC} = 12 V’a (güç kaynağının 1. çıkışı). Kondansatör yok: çalışma noktasını üretecin ofseti kurar (I_{B} ≈ 29,5 µA, I_{C} ≈ 5,98 mA, V_{CE} ≈ 6,0 V). Tasarım: K = β · R_{C} / R_{B} = 200 · 1 kΩ / 10 kΩ = 20; ölçülen kazanç ≈ 16, çünkü bazın r_{π} ≈ 0,8 kΩ’u R_{B}’ye seri eklenir ve küçük işaret β’sı ≈ 180’dir. Osiloskobun A kanalı girişi (AC, 0,05 V/bölme), B kanalı kollektörü (AC, 1 V/bölme) gösteriyor.',
+    purpose:
+      'Küçük bir sinyali iki yüz kattan fazla büyütür. I_{B} = (12 V − 0,63 V) / 2,2 MΩ ≈ 5,2 µA ve I_{C} ≈ β · I_{B} ≈ 1,05 mA; V_{CE} ≈ 6,1 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −204: A_{v} ≈ −g_{m} · R_{C}, g_{m} = I_{C} / V_{T} ≈ 40 mS; çıkış ters fazlıdır. 1 MHz’te kazanç ≈ 127’ye düşer (kollektör-baz kapasitesi ve osiloskobun 25 pF’lık girişi). Girişi 100 mV tepe-tepeye çıkar: çıkış doyumla (≈ 0,1 V) ve kesimle (≈ 11,6 V) kırpılır. β’yı değiştirince çalışma noktası kayar: sabit baz akımlı öngerilim β’ya bağlıdır.',
+    everyday:
+      'Ortak emetörlü yükselteç radyoların, işitme cihazlarının, mikrofon ön yükselteçlerinin ve sensör devrelerinin temel yapı taşıdır; işlemsel yükselteç entegrelerinin içinde de aynı kat vardır.',
+  },
+  'bjt-yukseltec-kuplajli': {
+    title: 'BC107 yükselteç: kuplajlı, R_B = 2,2 MΩ',
+    description: `Föyde yok (ek): föydeki tasarımın kuplaj kondansatörlü bir çözümü: V_{CC} = 12 V, R_{B} = 2,2 MΩ (sabit baz akımı), R_{C} = 5,6 kΩ, β = 200. Üreteç 1 kHz sinüs, −20 dB zayıflatıcıyla 20 mV tepe-tepe; girişte 10 µF’lık kuplaj kondansatörü var. Osiloskobun A kanalı girişi (baz; AC, 5 mV/bölme), B kanalı çıkışı (kollektör; AC, 1 V/bölme) gösteriyor. A’nın kablosu V_{CC} hattını keserek geçer (bu devrede bir kesişme kaçınılmazdır): ${CROSSING}`,
     purpose:
       'Küçük bir sinyali iki yüz kattan fazla büyütür. I_{B} = (12 V − 0,63 V) / 2,2 MΩ ≈ 5,2 µA ve I_{C} ≈ β · I_{B} ≈ 1,05 mA; V_{CE} ≈ 6,1 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −204: A_{v} ≈ −g_{m} · R_{C}, g_{m} = I_{C} / V_{T} ≈ 40 mS; çıkış ters fazlıdır. 1 MHz’te kazanç ≈ 127’ye düşer (kollektör-baz kapasitesi ve osiloskobun 25 pF’lık girişi). Girişi 100 mV tepe-tepeye çıkar: çıkış doyumla (≈ 0,1 V) ve kesimle (≈ 11,6 V) kırpılır. β’yı değiştirince çalışma noktası kayar: sabit baz akımlı öngerilim β’ya bağlıdır.',
     everyday:
@@ -1950,6 +1959,7 @@ export const tr = {
       'fet-yukseltec': 'Giriş ve çıkış genliklerini karşılaştır',
       'fet-yukseltec-kuplajli': 'Giriş ve çıkış genliklerini karşılaştır',
       'bjt-yukseltec': 'Giriş ve çıkışı osiloskopta karşılaştır',
+      'bjt-yukseltec-kuplajli': 'Giriş ve çıkışı osiloskopta karşılaştır',
       'mosfet-yukseltec': 'Kazancı osiloskopta ölç',
       'bjt-anahtar': 'Girişi değiştir, LED’in tam yanmasını izle',
       'bjt-anahtar-emetor': 'LED neden sönük yanıyor?',

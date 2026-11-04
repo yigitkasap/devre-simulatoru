@@ -124,7 +124,7 @@ const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
  */
 const lz = createRequire(import.meta.url)('lz-string');
 const faultUrl = (fault = {}, base = URL0) => {
-  const devre = JSON.parse(readFileSync(new URL('../src/examples/bjt-yukseltec.json', import.meta.url), 'utf8'));
+  const devre = JSON.parse(readFileSync(new URL('../src/examples/bjt-yukseltec-kuplajli.json', import.meta.url), 'utf8'));
   const gorev = {
     // Görev oluştur'daki gibi: ampermetre eklenebiliyorsa yeni parça (yalnızca ampermetre) ve kablo açık.
     name: 'Deney 7 · arıza bul', instruction: '', editable: [], allowNew: fault.tools?.ammeter === true, targets: [], predict: false, circuit: 'BC107 ile ortak emetörlü yükselteç',
@@ -1409,7 +1409,7 @@ try {
     check('eğri izleyici: + ile basamak eklenince yeniden taranıyor (5 eğri); Transfer tek eğri; Yeniden tara ve İptal',
       five === '5 × 31 noktalık DC tarama' && /^1 × \d+ noktalık DC tarama$/.test(transfer ?? '') && (await drawer.getByRole('button', { name: 'Yeniden tara' }).isVisible()), `${five} · ${transfer} · iptal ${cancelVisible}`);
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 yükselteç: kuplajlı/ }).first())).click(); await page.waitForTimeout(500);
     await drawer.getByText(/noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(300);
     const bjtSwitch = drawer.getByRole('switch', { name: /Yük doğrusu ve Q noktası/ });
@@ -1481,7 +1481,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 yükselteç: kuplajlı/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(200);
     const drawer = page.getByRole('region', { name: 'Analiz' });
     await drawer.getByRole('tab', { name: 'Bode' }).click();
@@ -1558,7 +1558,7 @@ try {
   }
   {
     const { page } = await phone();
-    await openExample(page, 'BC107 ile ortak emetörlü yükselteç');
+    await openExample(page, 'BC107 yükselteç: kuplajlı, R_B = 2,2 MΩ');
     await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(400);
     const sheet = page.getByRole('region', { name: 'Analiz' });
@@ -1611,7 +1611,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 yükselteç: kuplajlı/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
     const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
@@ -1707,7 +1707,7 @@ try {
   }
   {
     const { page } = await phone();
-    await openExample(page, 'BC107 ile ortak emetörlü yükselteç');
+    await openExample(page, 'BC107 yükselteç: kuplajlı, R_B = 2,2 MΩ');
     await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Dosya', exact: true }).tap(); await page.waitForTimeout(400);
     await page.getByRole('button', { name: /^Görev oluştur/ }).tap(); await page.waitForTimeout(400);
@@ -1738,7 +1738,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 yükselteç: kuplajlı/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
     const dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
@@ -1834,7 +1834,7 @@ try {
   }
   {
     const { page } = await phone();
-    await openExample(page, 'BC107 ile ortak emetörlü yükselteç');
+    await openExample(page, 'BC107 yükselteç: kuplajlı, R_B = 2,2 MΩ');
     await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Dosya', exact: true }).tap(); await page.waitForTimeout(400);
     await page.getByRole('button', { name: /^Görev oluştur/ }).tap(); await page.waitForTimeout(400);
@@ -1967,7 +1967,7 @@ try {
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
-    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 ile ortak emetörlü yükselteç/ }).first())).click(); await page.waitForTimeout(500);
+    await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 yükselteç: kuplajlı/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: /^Dosya|^BC107/ }).first().click(); await page.waitForTimeout(150);
     await page.getByRole('menuitem', { name: /^Görev oluştur/ }).click(); await page.waitForTimeout(300);
     let dlg = page.getByRole('dialog', { name: 'Görev oluştur' });
@@ -2166,14 +2166,15 @@ try {
       scenarios.length === 5 && mainScenarios === 1 && head.startsWith('Arıza bul · Deney 7') && head.includes('Yükselteçte çıkış yok') && head.includes('Osiloskobun B kanalında sinyal yok.') && (await page.getByText('Arıza bulma · otomatik göstergeler kapalı').count()) === 1,
       `${scenarios.length} · ${head.slice(0, 60)}`);
     await card().getByRole('button', { name: 'Arızayı bildir' }).click(); await page.waitForTimeout(300);
-    const pt = await screen(page, 44, -4); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    // Şekil-18: R_C'nin kollektör tarafındaki (1.) bacağı üstte, (44, −12)'de.
+    const pt = await screen(page, 44, -12); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
     await card().getByRole('radio', { name: /^Kopuk bağlantı/ }).click();
     await card().getByRole('button', { name: 'Bildir', exact: true }).click(); await page.waitForTimeout(400);
     const found = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
     await card().getByRole('button', { name: 'Yeni arıza dene' }).click(); await page.waitForTimeout(600);
     const next = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
-    check('arıza (B2, 8. aşama): senaryonun kendi açıklaması ("RC’nin kollektör tarafındaki bacağı temas etmiyordu", belirleyici ölçüm 11,99 V ve 6,4 mV); Yeni arıza dene sıradaki senaryoyu açıyor',
-      found.includes('RC’nin kollektör tarafındaki bacağı temas etmiyordu') && found.includes('Belirleyici ölçüm: RC’nin ucunda 11,99 V') && next.startsWith('Arıza bul · Temel devre') && next.includes('LED yanmıyor'),
+    check('arıza (B2, 8. aşama): senaryonun kendi açıklaması ("RC’nin kollektör tarafındaki bacağı temas etmiyordu", belirleyici ölçüm 12,00 V ve 6,3 mV); Yeni arıza dene sıradaki senaryoyu açıyor',
+      found.includes('RC’nin kollektör tarafındaki bacağı temas etmiyordu') && found.includes('Belirleyici ölçüm: RC’nin ucunda 12,00 V') && next.startsWith('Arıza bul · Temel devre') && next.includes('LED yanmıyor'),
       `${found.slice(0, 60)} → ${next.slice(0, 40)}`);
     await ctx.close();
   }

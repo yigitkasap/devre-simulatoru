@@ -86,7 +86,7 @@ describe('Analiz: grafik kaydı', () => {
   });
 
   it('düğüm adı (analiz düzeltmeleri, 10): kaynağın ucu, transistörün ucu, öbür ucu toprakta parça, adlı uç', () => {
-    const amp = exampleDoc('bjt-yukseltec')!;
+    const amp = exampleDoc('bjt-yukseltec-kuplajli')!;
     const idx = netIndex(amp, buildConnectivity(amp));
     const at = (label: string, pin: number) => nodeName(pinKey(amp.parts.find((p) => p.label === label)!.id, pin), idx);
     // +12 V hattı (PS1 +, RB, RC): eskiden "RB 1. uç".
