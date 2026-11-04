@@ -801,7 +801,8 @@ try {
     await card.getByRole('button', { name: /^Gelişmiş ayarlar/ }).tap(); await sp.waitForTimeout(200);
     await card.getByRole('button', { name: 'Oto', exact: true }).tap(); await sp.waitForTimeout(200);
     const auto = (await part(sp, 'OSC1')).props;
-    check('Oto ayar 5 ms/bölme ve 5 V/bölme seçiyor', auto.timePerDiv === 0.005 && auto.voltsPerDivA === 5, `${auto.timePerDiv} s, ${auto.voltsPerDivA} V`);
+    // Yarım dalga (Şekil-4a): 1 kHz, 3 V genlik (6 V t-t).
+    check('Oto ayar 0,5 ms/bölme ve 1 V/bölme seçiyor (1 kHz, 6 V t-t)', auto.timePerDiv === 0.0005 && auto.voltsPerDivA === 1, `${auto.timePerDiv} s, ${auto.voltsPerDivA} V`);
     const list = sp.locator('#defter');
     const box = await list.boundingBox();
     const top0 = await list.evaluate((el) => el.scrollTop);
