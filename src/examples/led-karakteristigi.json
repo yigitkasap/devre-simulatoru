@@ -1,19 +1,19 @@
 {
   "version": 1,
   "parts": [
-    {"id": "p4", "type": "oscilloscope", "label": "OSC1", "x": 26, "y": -4, "rotation": 0, "props": {"timePerDiv": 0.001, "voltsPerDivA": 1, "voltsPerDivB": 1, "positionA": 0, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "xy", "invertB": true, "input": "real", "earthed": true}},
-    {"id": "p1", "type": "funcgen", "label": "FG1", "x": 0, "y": 0, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 10, "offset": 0, "duty": 50, "attenuate": false, "earthed": false}},
-    {"id": "p2", "type": "led", "label": "LED1", "x": 34, "y": -6, "rotation": 90, "props": {"color": "red"}},
-    {"id": "p3", "type": "resistor", "label": "R1", "x": 34, "y": 8, "rotation": 90, "props": {"resistance": 1000}},
-    {"id": "p5", "type": "ground", "label": "GND1", "x": 24, "y": 4, "rotation": 0, "props": {}}
+    {"id": "p1", "type": "funcgen", "label": "FG1", "x": 0, "y": 0, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 10, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
+    {"id": "p2", "type": "led", "label": "LED1", "x": 14, "y": -8, "rotation": 0, "props": {"color": "red"}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 24, "y": 0, "rotation": 90, "props": {"resistance": 1000}},
+    {"id": "p4", "type": "oscilloscope", "label": "OSC1", "x": 40, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.001, "voltsPerDivA": 1, "voltsPerDivB": 1, "positionA": 0, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "xy", "invertB": false, "input": "real", "earthed": true}},
+    {"id": "p5", "type": "ground", "label": "GND1", "x": 16, "y": 10, "rotation": 0, "props": {}}
   ],
   "wires": [
-    {"id": "w1", "points": [[5, -2], [8, -2], [8, -12], [34, -12], [34, -10]]},
-    {"id": "w2", "points": [[34, -2], [34, 4]]},
-    {"id": "w3", "points": [[5, 2], [8, 2], [8, 12], [34, 12]]},
-    {"id": "w4", "points": [[21, -6], [13, -6], [13, -12]]},
-    {"id": "w5", "points": [[21, -4], [15, -4], [15, 12]]},
-    {"id": "w6", "points": [[21, -2], [17, -2], [17, 2], [34, 2]]},
-    {"id": "w7", "points": [[24, 2], [24, 4]]}
+    {"id": "w1", "points": [[5, -2], [8, -2], [8, -8], [10, -8]]},
+    {"id": "w2", "points": [[18, -8], [24, -8], [24, -4]]},
+    {"id": "w3", "points": [[24, 4], [24, 8], [7, 8], [7, 2], [5, 2]]},
+    {"id": "w4", "points": [[35, -2], [31, -2], [31, -12], [8, -12], [8, -8]]},
+    {"id": "w5", "points": [[35, 0], [29, 0], [29, -8], [24, -8]]},
+    {"id": "w6", "points": [[35, 2], [33, 2], [33, 8], [24, 8]]},
+    {"id": "w7", "points": [[16, 8], [16, 10]]}
   ]
 }

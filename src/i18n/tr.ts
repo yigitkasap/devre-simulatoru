@@ -762,8 +762,8 @@ const FAULT_SCENARIO_TEXTS: Record<FaultScenarioId, FaultScenarioTexts> = {
     symptom: 'A1 neredeyse sıfır gösteriyor; diyodun iletmesi gerekirdi.',
     found: {
       title: 'D1 ters takılmıştı',
-      text: 'Katot beslemeye bakıyordu: ters kutuplanan diyot iletmez. Akım yalnızca voltmetrenin 10 MΩ’undan ve diyodun sızıntısından geçer (µA’lar); besleme geriliminin hepsi diyodun üstüne düşer.',
-      decisive: 'V1 diyodun üstünde 5,00 V okuyor (sağlam devrede 0,56 V); R1’in iki ucu arası 0,6 mV (sağlamda 4,4 V): akım yok, gerilim diyotta kalıyor.',
+      text: 'Katot beslemeye bakıyordu: ters kutuplanan diyot iletmez. Akım yalnızca diyodun sızıntısından geçer (µA’ın altında); besleme geriliminin hepsi diyodun üstüne düşer.',
+      decisive: 'Diyodun iki ucu arası 5,00 V (sağlam devrede 0,56 V); R1’in uçlarındaki V1 0,1 mV okuyor (sağlamda 4,44 V): akım yok, gerilim diyotta kalıyor.',
     },
   },
   'ariza-dogrultucu': {
@@ -1190,7 +1190,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'diyot-dc': {
     title: '1N4001: doğru akımda akım-gerilim ölçümü',
     description:
-      'Laboratuvar güç kaynağının 1. çıkışı (5 V), ampermetre ve 1 kΩ’luk direnç üzerinden bir 1N4001 diyodunu ileri yönde besliyor; akım alt hattan kaynağın − ucuna döner. Voltmetre diyodun gerilimini ölçüyor.',
+      'Föydeki Şekil-2: laboratuvar güç kaynağının 1. çıkışı (V_{i}, 0–5 V; açılışta 5 V) bir 1N4001 diyodunu ileri yönde besliyor; akım diyottan sonra ampermetreden ve 1 kΩ’luk dirençten geçip kaynağın − ucuna döner. Voltmetre direncin uçlarında (V_{o}): 5 V’ta I ≈ 4,44 mA, V_{o} ≈ 4,44 V; diyodun gerilimi V_{i} − V_{o} ≈ 0,56 V.',
     purpose:
       'Diyodun akım-gerilim ilişkisini nokta nokta ölçmeyi sağlar. 5 V’ta V_{D} ≈ 0,56 V ve I = (5 V − 0,56 V) / 1 kΩ ≈ 4,4 mA. Kaynağın gerilimini değiştirip föydeki tabloyu doldur: 0,5 V’ta I ≈ 0,13 mA (V_{D} ≈ 0,37 V), 1 V’ta ≈ 0,55 mA (0,45 V), 2 V’ta ≈ 1,5 mA (0,50 V), 10 V’ta ≈ 9,4 mA (0,60 V). Akım on kat artınca diyodun gerilimi yalnızca ≈ 0,12 V artar: karakteristik üsteldir (Shockley denklemi). Diyodu ters çevirince (F) akım 1 µA’in altına düşer.',
     everyday:
@@ -1199,7 +1199,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'diyot-karakteristigi': {
     title: '1N4001: X-Y’de akım-gerilim eğrisi',
     description:
-      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe sinüs) 1N4001 ile 1 kΩ’luk direnci seri besliyor. Osiloskop X-Y kipinde ve döngünün içinde: COM ucu diyot ile direncin birleştiği noktada (toprak burası), A (yatay, 1 V/bölme) diyodun gerilimini, ters çevrilmiş B (dikey, 1 V/bölme = 1 mA) direncin gerilimini yani akımı gösteriyor. Üreteç topraktan yalıtılmış (COM’u şebeke toprağına bağlı değil).',
+      'Föydeki Şekil-3: fonksiyon üreteci (1 kHz, 5 V genlik yani 10 V tepe-tepe sinüs) 1N4001 ile 1 kΩ’luk direnci seri besliyor. Osiloskop X-Y kipinde: A (yatay, 1 V/bölme) girişi (V_{i}), B (dikey, 1 V/bölme = 1 mA) 1 kΩ’un üst ucunu yani akımı gösteriyor; COM alt hatta, üretecin COM’unda. En büyük akım ≈ 4,2 mA.',
     purpose:
       'Diyodun akım-gerilim eğrisini ekranda tek seferde çizer. Akım ≈ 0,4 V’tan sonra belirginleşir; en büyük akım ≈ 4,2 mA, o anda V_{D} ≈ 0,56 V: I = (5 V − 0,56 V) / (1 kΩ + 50 Ω). Ters yönde akım yok denecek kadar azdır. Frekansı 10 kHz, 100 kHz ve 1 MHz yap: 1N4001 ileri yönde depoladığı yük yüzünden ters kutuplanınca bir süre ters akım geçirir (ters toparlanma; 100 kHz’te ≈ −4,8 mA) ve eğri ilmek açar. Üretecin COM’unu şebeke toprağına bağlarsan direnç iki toprak arasında kısa devre olur: B sıfırda kalır, diyottan ≈ 86 mA geçer.',
     everyday:
@@ -1208,7 +1208,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'zener-karakteristigi': {
     title: 'Zener diyot (5,6 V): X-Y’de karakteristik',
     description:
-      'Aynı düzenek; diyodun yerinde 5,6 V’luk bir zener (1N4734A gibi), üreteç 20 V tepe-tepe. A 2 V/bölme, B 1 V/bölme = 1 mA. Föy zenerin değerini vermiyor: laboratuvardaki zenerin değeri farklıysa özelliklerinden değiştir.',
+      'Aynı düzenek (Şekil-3); diyodun yerinde 5,6 V’luk bir zener (1N4734A gibi). Föydeki 5 V genlik bu zeneri kırmaya yetmez: ters yönde en çok ≈ 4,9 V düşer, akım ≈ 0,1 mA kalır. Bu yüzden üreteç 20 V tepe-tepe (10 V genlik): ters yönde ≈ −5,4 V’ta ≈ 4,4 mA geçer. A 2 V/bölme, B 2 V/bölme = 2 mA. Föy zenerin değerini vermiyor: laboratuvardaki zenerin değeri farklıysa özelliklerinden değiştir.',
     purpose:
       'Zenerin ters yönde belirli bir gerilimde iletime geçtiğini gösterir. Ters yönde ≈ −5,4 V’ta kırılır; en büyük ters akım ≈ 4,4 mA: I = (10 V − 5,4 V) / 1,05 kΩ (V_{Z} 20 mA için tanımlıdır, birkaç mA’de biraz daha düşüktür). Kırılmadan sonra akım değişse de gerilim neredeyse sabit kalır. İleri yönde sıradan bir diyot gibi ≈ 0,7 V’ta iletir (≈ 8,9 mA). Zener gerilimini 3,3 V ya da 9,1 V yapıp kırılmanın nasıl kaydığına bak.',
     everyday:
@@ -1216,7 +1216,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   },
   'led-karakteristigi': {
     title: 'LED: X-Y’de karakteristik',
-    description: 'Aynı düzenek; diyodun yerinde kırmızı bir LED, üreteç 10 V tepe-tepe. A 1 V/bölme, B 1 V/bölme = 1 mA.',
+    description: 'Aynı düzenek (Şekil-3); diyodun yerinde kırmızı bir LED, üreteç 10 V tepe-tepe (5 V genlik). A 1 V/bölme, B 1 V/bölme = 1 mA; en büyük akım ≈ 3,2 mA, o anda V_{F} ≈ 1,69 V.',
     purpose:
       'LED’in eşik geriliminin silisyum diyodunkinden büyük olduğunu gösterir. Kırmızı LED ≈ 1,5–1,7 V’ta iletir; en büyük akım ≈ 3,1 mA, o anda V_{F} ≈ 1,69 V. LED’in yarı iletkeninin yasak enerji aralığı daha büyüktür ve bu aralığı geçen elektronun yaydığı fotonun enerjisi rengi belirler (E = h · f). Rengi yeşil ya da mavi yap: dalga boyu kısaldıkça foton enerjisi ve eşik büyür. Ters yönde akım geçmez; gerçek LED’ler ≈ 5 V’tan büyük ters gerilime dayanamaz.',
     everyday:

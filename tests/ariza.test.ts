@@ -355,14 +355,15 @@ describe('Hazır senaryolar (8. aşama): açıklamadaki sayılar simülatörde',
     expect(measure(ex, [], pin(ex, 'R1', 0), pin(ex, 'R1', 1), 0.05).mm).toBeCloseTo(3.2, 1);
   });
 
-  it('diyot ters: V1 5,00 V (sağlam 0,56 V), R1 iki ucu 0,6 mV (sağlam 4,4 V)', () => {
+  it('diyot ters: diyodun uçları 5,00 V (sağlam 0,56 V), R1’in uçlarındaki V1 0,1 mV (sağlam 4,44 V)', () => {
     const ex = 'diyot-dc';
     const f = s['ariza-diyot']!.faults;
+    const d1 = [pin(ex, 'D1', 0), pin(ex, 'D1', 1)] as const;
     const r1 = [pin(ex, 'R1', 0), pin(ex, 'R1', 1)] as const;
-    expect(measure(ex, f, ...r1, 0.05).V1).toBeCloseTo(5.0, 2);
-    expect(measure(ex, [], ...r1, 0.05).V1).toBeCloseTo(0.56, 2);
-    expect(measure(ex, f, ...r1, 0.05).mm * 1000).toBeCloseTo(0.6, 1);
-    expect(measure(ex, [], ...r1, 0.05).mm).toBeCloseTo(4.4, 1);
+    expect(measure(ex, f, ...d1, 0.05).mm).toBeCloseTo(5.0, 2);
+    expect(measure(ex, [], ...d1, 0.05).mm).toBeCloseTo(0.56, 2);
+    expect(measure(ex, f, ...r1, 0.05).V1 * 1000).toBeCloseTo(0.1, 1);
+    expect(measure(ex, [], ...r1, 0.05).V1).toBeCloseTo(4.44, 2);
   });
 
   it('köprüde D2 anot kopuk: R_L ortalaması 3,14 V (sağlam 5,73 V); anot bacağı −2,24 V, bağlı olduğu düğüm 0 V', () => {

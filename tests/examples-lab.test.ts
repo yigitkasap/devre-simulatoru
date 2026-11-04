@@ -43,13 +43,14 @@ const between = (value: number, lo: number, hi: number) => {
 };
 
 describe('Deney 1: diyot karakteristikleri', () => {
-  it('1N4001 doğru akımda: 5 V’ta V_D ≈ 0,56 V, I ≈ 4,4 mA; 10 V’ta ≈ 9,4 mA; ters yönde < 1 µA', () => {
+  it('1N4001 doğru akımda (Şekil-2, voltmetre 1 kΩ’un uçlarında): 5 V’ta V_D ≈ 0,56 V, I ≈ 4,44 mA, V_o ≈ 4,44 V; 10 V’ta ≈ 9,4 mA; ters yönde < 1 µA', () => {
     const doc = load('diyot-dc');
     const at = (v: number) => run(withProps(doc, 'PS1', { voltage1: v }), 0);
     const five = at(5);
     between(five.measure(idOf(doc, 'D1'))!.voltage, 0.55, 0.57);
     between(five.status(idOf(doc, 'A1')).reading!, 4.4e-3, 4.48e-3);
-    between(five.status(idOf(doc, 'V1')).reading!, 0.55, 0.57);
+    between(five.status(idOf(doc, 'V1')).reading!, 4.4, 4.48);
+    between(five.measure(idOf(doc, 'R1'))!.voltage, 4.4, 4.48);
     const ten = at(10);
     between(ten.measure(idOf(doc, 'D1'))!.current, 9.35e-3, 9.45e-3);
     between(at(0.5).measure(idOf(doc, 'D1'))!.current, 0.12e-3, 0.135e-3);
@@ -57,8 +58,11 @@ describe('Deney 1: diyot karakteristikleri', () => {
     expect(Math.abs(reverse.status(idOf(doc, 'A1')).reading!)).toBeLessThan(1e-6);
   });
 
-  it('1N4001 X-Y: 1 kHz’te en büyük akım ≈ 4,2 mA (V_D ≈ 0,56 V); 100 kHz’te ≈ −4,8 mA ters akım; topraklı üreteçte R kısa devre', () => {
+  it('1N4001 X-Y (Şekil-3: A girişte, B 1 kΩ’un üst ucunda, COM alt hatta): 1 kHz’te en büyük akım ≈ 4,2 mA (V_D ≈ 0,56 V); 100 kHz’te ≈ −4,8 mA ters akım', () => {
     const doc = load('diyot-karakteristigi');
+    const fg = doc.parts.find((p) => p.type === 'funcgen')!;
+    expect(fg.props.amplitude).toBe(10);
+    expect(fg.props.earthed).toBe(true);
     const d = idOf(doc, 'D1');
     const sim = run(doc, 3e-3);
     const current = swing(sim, () => sim.measure(d)!.current, 2e-3, 1e-5);
@@ -68,15 +72,20 @@ describe('Deney 1: diyot karakteristikleri', () => {
     const scope = doc.parts.find((p) => p.type === 'oscilloscope')!;
     const view = buildScopeView((sim.device(scope.id) as OscilloscopeDevice).recorder, scopeSettings(scope.props), [true, true]);
     expect(view.xyPath.length).toBeGreaterThan(100);
+    expect(scope.props.mode).toBe('xy');
+    // B (1 kΩ’un üst ucu, COM’a göre) akımla aynı işaretli: ters çevrilmez.
+    expect(scope.props.invertB).toBe(false);
+    between(swing(sim, () => sim.measure(idOf(doc, 'R1'))!.voltage, 2e-3, 1e-5).max, 4.15, 4.3);
     const fast = run(withProps(doc, 'FG1', { frequency: 1e5 }), 30e-6);
     between(swing(fast, () => fast.measure(d)!.current, 20e-6, 1e-7).min, -5e-3, -4.5e-3);
-    const earthed = run(withProps(doc, 'FG1', { earthed: true }), 3e-3);
-    expect(Math.abs(swing(earthed, () => earthed.measure(idOf(doc, 'R1'))!.voltage, 1e-3, 1e-5).max)).toBeLessThan(1e-6);
-    expect(swing(earthed, () => earthed.measure(d)!.current, 1e-3, 1e-5).max).toBeGreaterThan(80e-3);
   });
 
-  it('Zener 5,6 V: ters yönde ≈ −5,4 V’ta ≈ 4,4 mA; ileri yönde ≈ 0,7 V’ta ≈ 8,9 mA', () => {
+  it('Zener 5,6 V: föydeki 5 V genlikte kırılmaz (≈ −4,9 V, ≈ 0,1 mA); 10 V genlikte ters yönde ≈ −5,4 V’ta ≈ 4,4 mA, ileri yönde ≈ 0,7 V’ta ≈ 8,9 mA', () => {
     const doc = load('zener-karakteristigi');
+    const small = run(withProps(doc, 'FG1', { amplitude: 10 }), 3e-3);
+    const smallV = swing(small, () => small.measure(idOf(doc, 'Z1'))!.voltage, 2e-3, 1e-5);
+    between(smallV.min, -4.95, -4.8);
+    expect(swing(small, () => small.measure(idOf(doc, 'Z1'))!.current, 2e-3, 1e-5).min).toBeGreaterThan(-0.2e-3);
     const z = idOf(doc, 'Z1');
     const sim = run(doc, 3e-3);
     const i = swing(sim, () => sim.measure(z)!.current, 2e-3, 1e-5);
@@ -87,7 +96,7 @@ describe('Deney 1: diyot karakteristikleri', () => {
     between(v.max, 0.65, 0.72);
   });
 
-  it('LED: en büyük akım ≈ 3,1 mA, o anda V_F ≈ 1,69 V', () => {
+  it('LED: en büyük akım ≈ 3,2 mA, o anda V_F ≈ 1,69 V', () => {
     const doc = load('led-karakteristigi');
     const led = idOf(doc, 'LED1');
     const sim = run(doc, 3e-3);
