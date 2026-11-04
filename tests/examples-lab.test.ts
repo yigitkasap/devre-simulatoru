@@ -160,15 +160,35 @@ describe('Deney 3: kenetleyici ve katlayıcı', () => {
     between(positive.min, -0.62, -0.5);
   });
 
-  it('Gerilim katlayıcı: 5 ms’de ≈ 4,9 V, 50 ms’de ≈ 8,7 V, sonunda ≈ 9,1 V', () => {
+  it('Gerilim katlayıcı (Şekil-10, tam dalga): iki kondansatör eşit dolar; V_ç = 2V_p 5 ms’de ≈ 7,3 V, 50 ms’de ≈ 9,05 V, 0,3 s’de ≈ 9,24 V', () => {
     const doc = load('gerilim-katlayici');
-    const c2 = idOf(doc, 'C2');
+    const vp = (sim: CircuitSimulator) => [sim.measure(idOf(doc, 'C1'))!.voltage, sim.measure(idOf(doc, 'C2'))!.voltage];
+    const out = (sim: CircuitSimulator) => vp(sim)[0]! + vp(sim)[1]!;
     const sim = run(doc, 0.005);
-    between(sim.measure(c2)!.voltage, 4.7, 5.05);
+    between(out(sim), 7.2, 7.4);
     sim.runUntil(0.05);
-    between(sim.measure(c2)!.voltage, 8.6, 8.8);
+    between(out(sim), 8.95, 9.15);
     sim.runUntil(0.3);
-    between(sim.measure(c2)!.voltage, 9.05, 9.2);
+    between(out(sim), 9.15, 9.3);
+    const [c1, c2] = vp(sim);
+    expect(Math.abs(c1! - c2!)).toBeLessThan(0.02);
+    // Osiloskop: COM ortada, A üst çıkışta (+V_p), B alt çıkışta (−V_p).
+    const scope = doc.parts.find((p) => p.type === 'oscilloscope')!;
+    const { netlist } = buildConnectivity(doc);
+    const parent = new Map<string, string>();
+    const find = (x: string): string => {
+      const up = parent.get(x) ?? x;
+      if (up === x) return x;
+      const root = find(up);
+      parent.set(x, root);
+      return root;
+    };
+    for (const l of netlist.links) parent.set(find(l.a), find(l.b));
+    const node = (part: string, pin: number) => find(netlist.elements.find((e) => e.id === part)!.pins[pin]!);
+    expect(node(scope.id, 0)).toBe(node(idOf(doc, 'C1'), 0));
+    expect(node(scope.id, 1)).toBe(node(idOf(doc, 'C2'), 1));
+    expect(node(scope.id, 2)).toBe(node(idOf(doc, 'C1'), 1));
+    expect(node(idOf(doc, 'FG1'), 2)).toBe(node(idOf(doc, 'C2'), 0));
   });
 });
 

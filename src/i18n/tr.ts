@@ -1261,7 +1261,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
   'gerilim-katlayici': {
     title: 'Gerilim katlayıcı (ikileyici)',
     description:
-      'Fonksiyon üreteci (1 kHz, 10 V tepe-tepe yani 5 V tepe sinüs), iki 1N4001 ve iki 10 µF’lık kondansatörden oluşan yarım dalga gerilim ikileyiciyi besliyor. Osiloskobun A kanalı girişi, B kanalı çıkışı (C2) gösteriyor.',
+      'Föydeki Şekil-10: fonksiyon üreteci (1 kHz, 5 V genlik yani 10 V tepe-tepe sinüs), iki 1N4001 ve iki 10 µF’lık elektrolitik kondansatörden oluşan tam dalga gerilim katlayıcıyı besliyor. Üretecin üst ucu iki diyodun birleştiği noktada, alt ucu kondansatörlerin ortasında. Her kondansatör ≈ 4,6 V’a (V_{p}) dolar; çıkışta V_{ç} = 2V_{p} ≈ 9,2 V. Osiloskobun COM’u ortada, A üst çıkışta (+V_{p}), B alt çıkışta (−V_{p}); ADD ve B’yi ters çevirince ekranda A − B = V_{ç}.',
     purpose:
       'Girişin tepe geriliminin yaklaşık iki katında bir DC gerilim üretir. C1 ile D1 bir kenetleyicidir: girişi ≈ 0 V ile 9,5 V arasına kaydırır. D2 ile C2 bir tepe dedektörüdür: bu dalganın tepesini C2’ye yükler. Çıkış ≈ 9,1 V ≈ 2 · 5 V − 2 · V_{D}; C2 ilk 5 ms’de ≈ 4,9 V’a, 50 ms’de ≈ 8,7 V’a ulaşır. Çıkışa bir yük direnci (ör. 10 kΩ) bağla: gerilim düşer ve dalgalanır, çünkü katlayıcı ancak küçük akım verebilir.',
     everyday:

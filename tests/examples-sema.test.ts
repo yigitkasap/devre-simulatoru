@@ -35,6 +35,9 @@ const CROSSINGS: Partial<Record<ExampleId, number>> = {
   'kopru-diyot': 1,
   // Föydeki Şekil-5a gibi: köprünün − ucundan çıkışın alt ucuna giden kablo üretecin alt kablosunu keser.
   'kopru-dogrultmac': 1,
+  // Föydeki Şekil-10 gibi üretecin alt kablosu X düğümünü keser; osiloskobun B (alt çıkış) ve COM (orta)
+  // uçlarının sırası çıkışlarınkiyle ters.
+  'gerilim-katlayici': 2,
 };
 
 type Segment = readonly [Point, Point];
