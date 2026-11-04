@@ -1,9 +1,9 @@
 // Defterin örnek kartının içeriği (tasarım: M05a, M05b; v3): devrenin kurulumu, ne işe yaradığı
 // (dayandığı fizik yasasıyla) ve günlük hayatta nerede kullanıldığı; altta önceki/sonraki örnek.
 
-import type { ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { EXAMPLE_GROUPS, EXAMPLE_IDS, EXTRA_EXAMPLES, type ExampleId } from '../examples';
-import { tr } from '../i18n/tr';
+import { tr, type ExampleQuestion } from '../i18n/tr';
 import { Icon } from './icons';
 import { Rich } from './Rich';
 import { useTouchUi } from './touchUi';
@@ -28,6 +28,55 @@ function Section({ title, icon, children }: { title: string; icon: ReactNode; ch
         {title}
       </h3>
       <p className="text-sm leading-[1.55]">{children}</p>
+    </section>
+  );
+}
+
+/** Föydeki sorular: her sorunun cevabı "Cevabı göster" ile açılır (öğretmen ne zaman açılacağına karar verir). */
+function Questions({ items }: { items: readonly ExampleQuestion[] }) {
+  const touch = useTouchUi();
+  const base = useId();
+  const [shown, setShown] = useState<ReadonlySet<number>>(new Set());
+  const toggle = (i: number) =>
+    setShown((s) => {
+      const next = new Set(s);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  return (
+    <section aria-label={tr.examples.questionsTitle} className="flex flex-col gap-3 rounded-lg border border-line bg-panel-2 px-3.5 py-3">
+      <h3 className="flex items-center gap-1.5 text-label font-semibold text-accent-ink">
+        <Icon name="help" className="h-4 w-4" />
+        {tr.examples.questionsTitle}
+      </h3>
+      <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
+        {items.map((q, i) => {
+          const open = shown.has(i);
+          return (
+            <li key={q.step + i} className="flex flex-col gap-1.5">
+              <span className="text-label font-semibold text-muted">{q.step}</span>
+              <p className="text-sm leading-[1.55]">
+                <Rich text={q.question} />
+              </p>
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls={`${base}-${i}`}
+                onClick={() => toggle(i)}
+                className={`self-start rounded-md border border-line-2 bg-panel px-2.5 text-small font-medium hover:bg-app ${touch ? 'h-11' : 'h-8'}`}
+              >
+                {open ? tr.examples.hideAnswer : tr.examples.showAnswer}
+              </button>
+              {open && (
+                <div id={`${base}-${i}`} className="rounded-[10px] border border-ok-line bg-ok-soft px-3.5 py-2.5 text-sm leading-[1.55]">
+                  <Rich text={q.answer} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
     </section>
   );
 }
@@ -57,6 +106,7 @@ export function ExampleDetails({ id, onOpen, onClose }: { id: ExampleId; onOpen:
       <p className="text-sm leading-[1.55] text-ink-2">
         <Rich text={texts.description} />
       </p>
+      {texts.questions && <Questions key={id} items={texts.questions} />}
 
       <Section
         title={tr.examples.purpose}

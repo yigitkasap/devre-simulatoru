@@ -731,6 +731,15 @@ export interface ExampleTexts {
   readonly purpose: string;
   /** Günlük hayatta nerelerde kullanıldığı. */
   readonly everyday: string;
+  /** Föydeki sorular ve simülasyonda ölçülen sayılarla cevapları (kartta "Föydeki sorular"). */
+  readonly questions?: readonly ExampleQuestion[];
+}
+
+/** Föydeki bir soru: hangi deneyin hangi adımı, sorunun metni ve cevabı. */
+export interface ExampleQuestion {
+  readonly step: string;
+  readonly question: string;
+  readonly answer: string;
 }
 
 /**
@@ -1213,6 +1222,14 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'Zenerin ters yönde belirli bir gerilimde iletime geçtiğini gösterir. Ters yönde ≈ −5,4 V’ta kırılır; en büyük ters akım ≈ 4,4 mA: I = (10 V − 5,4 V) / 1,05 kΩ (V_{Z} 20 mA için tanımlıdır, birkaç mA’de biraz daha düşüktür). Kırılmadan sonra akım değişse de gerilim neredeyse sabit kalır. İleri yönde sıradan bir diyot gibi ≈ 0,7 V’ta iletir (≈ 8,9 mA). Zener gerilimini 3,3 V ya da 9,1 V yapıp kırılmanın nasıl kaydığına bak.',
     everyday:
       'Zener diyotlar basit gerilim regülatörlerinde (ör. bir sensöre sabit 5,1 V vermek), aşırı gerilim korumasında ve referans gerilimi üreten devrelerde kullanılır. Telefon ve bilgisayar girişlerindeki koruma diyotları (TVS) aynı kırılma ilkesiyle çalışır.',
+    questions: [
+      {
+        step: 'Deney 1 · 3. adım',
+        question: 'Diyodu zener diyot ve LED ile değiştirerek akım-gerilim eğrilerini elde ediniz. Aynı eğrileri osiloskobun normal ve X-Y kipinde inceleyerek zener olayını gözleyiniz.',
+        answer:
+          'Föydeki 5 V genlik bu zeneri kırmaya yetmez: kırılma için ters yönde 5,6 V gerekir, üreteç ise en çok 5 V verir. Simülasyonda ters yönde en çok ≈ 4,87 V düşer ve yalnızca ≈ 0,12 mA geçer; X-Y’de sol kol neredeyse yatay kalır, sıradan bir diyottan farkı görülmez. Bu yüzden bu örnekte üreteç 20 V tepe-tepe (10 V genlik): ters yönde gerilim ≈ −5,37 V’ta sabitlenir ve ≈ 4,41 mA geçer; X-Y’de solda dik inen kol zener olayıdır. İleri yönde zener sıradan bir diyot gibidir: ≈ 0,68 V’ta ≈ 8,9 mA. Normal (Y-t) kipte B kanalı (1 kΩ’un gerilimi, yani akım) pozitif yarıda ≈ 8,9 V’a, negatif yarıda yalnızca ≈ −4,4 V’a ulaşır: negatif yarının fazlası zenerin üstünde kalır.',
+      },
+    ],
   },
   'led-karakteristigi': {
     title: 'LED: X-Y’de karakteristik',
@@ -1316,7 +1333,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     description:
       'Föydeki Şekil-17: fonksiyon üreteci (1 kHz, 0,5 V tepe-tepe sinüs) R_{g} = 10 kΩ üzerinden BF245A’nın kapısına bağlı; source ortak hatta, drain R_{D} = 2,7 kΩ üzerinden V_{DD} = 15 V’a (güç kaynağının 1. çıkışı). Kondansatör ve kapıdan ortak hatta direnç yok: V_{GS} girişin kendisi, çalışma noktası V_{GS} = 0 (I_{D} ≈ 3,82 mA, V_{DS} ≈ 4,70 V). Kazanç ≈ 10: çıkış ≈ 5,0 V tepe-tepe, girişle ters fazlı. Osiloskobun A kanalı girişi (0,2 V/bölme), B kanalı drain’i (AC kuplaj, 1 V/bölme) gösteriyor.',
     purpose:
-      'Küçük bir gerilim değişimini yaklaşık on kat büyütür. Kapıdaki küçük değişim drain akımını değiştirir; bu akım R_{D} üzerinde büyük bir gerilim değişimi oluşturur. Kazanç ≈ −10: A_{v} = −g_{m} · (R_{D} ∥ r_{o}), g_{m} = 2 · I_{D} / |V_{P}| ≈ 4,4 mS (I_{D} ≈ 3,8 mA). Eksi işareti, çıkışın girişle ters fazlı (180°) olduğunu söyler. Girişi 2 V tepe-tepeye çıkar: çıkış bozulur (≈ 1,2 V ile 14,5 V arası), çünkü transistör doğrusal bölgenin dışına çıkar.',
+      'Küçük bir gerilim değişimini yaklaşık on kat büyütür. Kapıda öngerilim yok: V_{GS} girişin kendisidir, çalışma noktası V_{GS} = 0 (I_{D} ≈ 3,82 mA, V_{DS} ≈ 4,70 V). Kapıdaki küçük değişim drain akımını değiştirir; bu akım R_{D} üzerinde büyük bir gerilim değişimi oluşturur. Föydeki K = 2 · I_{DSS} · R_{D} / |V_{P}| = 2 · 3,52 mA · 2,7 kΩ / 1,74 V ≈ 10,9; ölçülen kazanç ≈ −10,1 (0,5 V tepe-tepe girişte çıkış ≈ 5,0 V tepe-tepe), çünkü transistörün çıkış direnci r_{o} R_{D}’ye paralel gelir. Eksi işareti, çıkışın girişle ters fazlı (180°) olduğunu söyler. Girişi büyüttükçe kazanç düşer: 1 V tepe-tepede ≈ 8; 2 V tepe-tepede çıkış ≈ 1,2 V ile 12,9 V arasında bozulur, çünkü pozitif yarıda drain gerilimi düşüp transistör omik bölgeye girer, negatif yarıda akım kesime yaklaşır.',
     everyday:
       'Elektro gitarların ve kondansatör mikrofonların içindeki ilk yükseltme katı çoğu zaman tek bir JFET’tir; radyo alıcılarının anten girişindeki düşük gürültülü yükselteçlerde de JFET kullanılır.',
   },
@@ -1333,9 +1350,17 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     description:
       'Föydeki Şekil-18: fonksiyon üreteci (1 kHz, 0,2 V tepe-tepe sinüs, DC ofset 0,98 V) R_{B} = 10 kΩ üzerinden BC107’nin bazına bağlı; emetör ortak hatta, kollektör R_{C} = 1 kΩ üzerinden V_{CC} = 12 V’a (güç kaynağının 1. çıkışı). Kondansatör yok: çalışma noktasını üretecin ofseti kurar (I_{B} ≈ 29,5 µA, I_{C} ≈ 5,98 mA, V_{CE} ≈ 6,0 V). Tasarım: K = β · R_{C} / R_{B} = 200 · 1 kΩ / 10 kΩ = 20; ölçülen kazanç ≈ 16, çünkü bazın r_{π} ≈ 0,8 kΩ’u R_{B}’ye seri eklenir ve küçük işaret β’sı ≈ 180’dir. Osiloskobun A kanalı girişi (AC, 0,05 V/bölme), B kanalı kollektörü (AC, 1 V/bölme) gösteriyor.',
     purpose:
-      'Küçük bir sinyali iki yüz kattan fazla büyütür. I_{B} = (12 V − 0,63 V) / 2,2 MΩ ≈ 5,2 µA ve I_{C} ≈ β · I_{B} ≈ 1,05 mA; V_{CE} ≈ 6,1 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −204: A_{v} ≈ −g_{m} · R_{C}, g_{m} = I_{C} / V_{T} ≈ 40 mS; çıkış ters fazlıdır. 1 MHz’te kazanç ≈ 127’ye düşer (kollektör-baz kapasitesi ve osiloskobun 25 pF’lık girişi). Girişi 100 mV tepe-tepeye çıkar: çıkış doyumla (≈ 0,1 V) ve kesimle (≈ 11,6 V) kırpılır. β’yı değiştirince çalışma noktası kayar: sabit baz akımlı öngerilim β’ya bağlıdır.',
+      'Küçük bir sinyali yaklaşık 16 kat büyütür. Kondansatör yok: üretecin 0,98 V’luk ofseti R_{B} üzerinden I_{B} ≈ 29,5 µA verir; I_{C} ≈ 5,98 mA, V_{CE} ≈ 6,0 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −16,3: A_{v} ≈ −β_{ac} · R_{C} / (R_{B} + r_{π}), β_{ac} ≈ 180, r_{π} = β_{ac} · V_{T} / I_{C} ≈ 0,8 kΩ; çıkış ters fazlıdır. 1 MHz’te kazanç ≈ 5,6’ya düşer (kollektör-baz kapasitesi). Ofset çalışma noktasını belirler: 20 mV değişim V_{CE}’yi ≈ 0,33 V kaydırır, ofset sıfırken transistör kesimdedir. Girişi 0,6 V tepe-tepeye çıkar: çıkış ≈ 1,5 V ile 11,0 V arasında salınır, kazanç ≈ 15,8’e iner.',
     everyday:
       'Ortak emetörlü yükselteç radyoların, işitme cihazlarının, mikrofon ön yükselteçlerinin ve sensör devrelerinin temel yapı taşıdır; işlemsel yükselteç entegrelerinin içinde de aynı kat vardır.',
+    questions: [
+      {
+        step: 'Deney 7 · 1. adım',
+        question: 'Transistörünüzün β’sını öğrenerek Şekil-18’deki yükselteç devresini gerilim kazancı 20 olacak şekilde tasarımlayınız.',
+        answer:
+          'Föydeki K = β · R_{C} / R_{B} formülüyle: BC107’de β = 200, R_{C} = 1 kΩ, R_{B} = 10 kΩ → K = 200 · 1 kΩ / 10 kΩ = 20. Çıkış iki yöne eşit salınsın diye V_{CE} ≈ V_{CC} / 2 = 6 V: I_{C} ≈ 6 V / 1 kΩ = 6 mA, I_{B} ≈ 6 mA / 200 = 30 µA, üretecin ofseti ≈ V_{BE} + I_{B} · R_{B} ≈ 0,68 V + 0,30 V ≈ 0,98 V. Simülasyonda ölçülen kazanç 16,3 (0,2 V tepe-tepe girişte kollektör 4,41–7,68 V). Fark iki yerden gelir: bazın kendi direnci r_{π} = β_{ac} · V_{T} / I_{C} ≈ 0,8 kΩ, R_{B}’ye seri eklenir; küçük işarette β (β_{ac} ≈ 180) DC β’dan (≈ 203) küçüktür. Düzeltilmiş hesap K ≈ β_{ac} · R_{C} / (R_{B} + r_{π} + 50 Ω) ≈ 16,4 (50 Ω üretecin çıkış direnci). Kazancı 20’ye yaklaştırmak için R_{B}’yi küçültüp ofseti yeniden ayarla: R_{B} = 8,2 kΩ ve ofset 0,928 V’ta V_{CE} = 6,0 V, I_{C} = 6,0 mA; ölçülen kazanç 19,5 (0,2 V tepe-tepe girişte kollektör 4,10–8,00 V).',
+      },
+    ],
   },
   'bjt-yukseltec-kuplajli': {
     title: 'BC107 yükselteç: kuplajlı, R_B = 2,2 MΩ',
@@ -1350,9 +1375,29 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     description:
       'Föydeki Şekil-21: fonksiyon üreteci (1 kHz, 0,1 V tepe-tepe sinüs, DC ofset 3,907 V) 10 kΩ üzerinden IRF510’un kapısına bağlı; source ortak hatta (R_{S} yok), drain R_{D} = 1 kΩ üzerinden V_{DD} = 15 V’a. Çalışma noktasını üretecin ofseti kurar: I_{D} ≈ 7,5 mA, V_{DS} ≈ 7,5 V. Ofset çok hassastır: 1 mV değişim V_{DS}’yi ≈ 0,19 V kaydırır. Küçük işaret kazancı ≈ 170; föydeki 0,1 V tepe-tepe girişte çıkış ≈ 2,3 V ile 14,0 V arasında, belirgin bozuk. Osiloskobun A kanalı girişi (AC, 0,05 V/bölme), B kanalı drain’i (AC, 2 V/bölme) gösteriyor.',
     purpose:
-      'MOSFET’le gerilim yükseltir. I_{D} ≈ 0,70 mA, V_{DS} ≈ 7,3 V. Kazanç ≈ −9,7: A_{v} ≈ −R_{D} / (R_{S} + 1 / g_{m}), g_{m} = 2 · √(k · I_{D}) ≈ 59 mS. R_{S} negatif geri besleme yapar: kazancı transistörün dağınık özelliklerinden çok dirençlerin oranı belirler ve çalışma noktası kararlı olur. Çıkış girişle 180° ters fazlıdır. 1 V tepe-tepe girişte çıkış ≈ 3,2 V ile 12,9 V arasında salınır; kare yasası yüzünden iki yarı eşit değildir.',
+      'MOSFET’le gerilim yükseltir. R_{S} yok: çalışma noktasını yalnızca üretecin ofseti kurar; 3,907 V’ta I_{D} ≈ 7,5 mA, V_{DS} ≈ 7,5 V. Kazanç çok büyüktür: A_{v} ≈ −g_{m} · R_{D}, g_{m} = 2 · √(k · I_{D}) ≈ 0,19 S; ölçülen küçük işaret kazancı ≈ −172. Bu yüzden ofset çok hassastır: 1 mV değişim V_{DS}’yi ≈ 0,19 V kaydırır. Föydeki 0,1 V tepe-tepe girişte çıkış ≈ 2,3 V ile 14,0 V arasında salınır ve bozulur (kare yasası iki yarıyı eşit büyütmez); bozulmasız çıkış için girişi 10 mV tepe-tepeye indir: çıkış ≈ 1,7 V tepe-tepe. Çıkış girişle 180° ters fazlıdır.',
     everyday:
       'IRF510 gibi güç MOSFET’leri çoğunlukla anahtar olarak motor sürücülerde, LED dimmerlerde ve güç kaynaklarında çalışır; amatör telsizciler onları kısa dalga verici yükselteçlerinde de kullanır. Bilgisayar işlemcilerindeki milyarlarca transistör de MOSFET’tir.',
+    questions: [
+      {
+        step: 'Deney 8 · 3. adım',
+        question: 'Giriş ve çıkış dalga genliklerini ölçerek gerilim kazancını belirleyiniz.',
+        answer:
+          'Küçük işaret kazancı ≈ 172: 10 mV tepe-tepe girişte drain 6,63–8,36 V arasında, yani ≈ 1,72 V tepe-tepe salınır ve dalga bozulmaz. Kazanç bu kadar büyük, çünkü R_{S} yok: A_{v} ≈ −g_{m} · R_{D}, g_{m} = 2 · √(k · I_{D}) ≈ 0,19 S. Bu yüzden föydeki 0,1 V tepe-tepe giriş bu devre için büyüktür: çıkış ≈ 2,25 V ile 13,97 V arasında salınır ve bozulur (kare yasası iki yarıyı eşit büyütmez; bu genlikte ölçülen oran ≈ 117). Çalışma noktası da aynı nedenle hassastır: ofsetteki 1 mV değişim V_{DS}’yi ≈ 0,19 V kaydırır (3,907 V’ta V_{DS} ≈ 7,5 V; 3,897 V’ta ≈ 9,3 V; 3,917 V’ta ≈ 5,5 V).',
+      },
+      {
+        step: 'Deney 8 · 4. adım',
+        question: 'Çıkış ile giriş sinyalleri arasındaki faz farkını belirleyiniz.',
+        answer:
+          '180°: 10 mV tepe-tepe girişin pozitif tepesinde drain ≈ 6,73 V’a iner, negatif tepesinde ≈ 8,29 V’a çıkar. Kapı gerilimi artınca I_{D} artar, R_{D}’deki düşüm büyür ve drain gerilimi düşer.',
+      },
+      {
+        step: 'Deney 8 · 5. adım',
+        question: 'Giriş sinyalinin genliğini yavaşça artırarak (≈ 1 V’a kadar) çıkış dalga şeklindeki değişimi gözleyiniz. Nasıl bir değişim olmaktadır, nedenini açıklayınız.',
+        answer:
+          'Genlik büyüdükçe çıkış önce asimetrik bozulur (0,1 V tepe-tepede 2,25–13,97 V), sonra iki yandan kırpılır: 1 V tepe-tepede drain ≈ 0,01 V ile 15,0 V arasında, kare dalgaya benzer. Negatif yarıda kapı eşiğin (≈ 3,83 V) altına iner ve transistör kesime girer (drain = V_{DD}); pozitif yarıda drain akımı R_{D}’nin izin verdiği en büyük değere (≈ 15 mA) ulaşır ve transistör omik bölgeye girer.',
+      },
+    ],
   },
   'mosfet-yukseltec-rs': {
     title: 'IRF510 yükselteç: R_S = 1 kΩ, R_D = 10 kΩ',
@@ -1906,6 +1951,9 @@ export const tr = {
     back: 'Bütün örnekler',
     /** Föyde olmayan ek örneğin etiketi (pencerede ve örnek kartında). */
     extra: 'Föyde yok · ek',
+    questionsTitle: 'Föydeki sorular',
+    showAnswer: 'Cevabı göster',
+    hideAnswer: 'Cevabı gizle',
     texts: EXAMPLES,
     /** Defterdeki katlı örnek kartının kısa başlığı: ne yapılacağı ya da neye bakılacağı (v3). */
     cues: {

@@ -7,6 +7,7 @@ import { EXAMPLE_GROUPS, exampleDoc, type ExampleId } from '../src/examples';
 import { buildConnectivity } from '../src/model/connectivity';
 import { flipParts, updatePart } from '../src/model/docOps';
 import type { CircuitDoc } from '../src/model/types';
+import { tr } from '../src/i18n/tr';
 import { CircuitSimulator, OscilloscopeDevice, scopeSettings } from '../src/sim';
 
 function load(id: ExampleId): CircuitDoc {
@@ -344,6 +345,52 @@ describe('Deney 6–8: yükselteçler', () => {
     const big = amplifier(withProps(doc, 'FG1', { amplitude: 1 }), 'M1', 1e3, 0.05).out;
     between(big.max, 12.6, 13.1);
     between(big.min, 3.0, 3.35);
+  });
+});
+
+describe('Föydeki sorular: cevaplardaki sayılar', () => {
+  /** Yükseltecin kazancı (çıkış tepe-tepe / giriş tepe-tepe) ve çıkışın uçları. */
+  function gainOf(doc: CircuitDoc, q: string, until: number) {
+    const fg = doc.parts.find((p) => p.label === 'FG1')!.props;
+    const sim = run(doc, until);
+    const out = swing(sim, () => sim.voltageAt(`${idOf(doc, q)}#0`)!, 2e-3, 1e-5);
+    return { sim, out, gain: (out.max - out.min) / (fg.amplitude as number) };
+  }
+
+  it('kartlarda soru var: Deney 1 (zener, 3. adım), Deney 7 (1. adım), Deney 8 (3., 4., 5. adım)', () => {
+    expect(tr.examples.texts['zener-karakteristigi'].questions!.map((q) => q.step)).toEqual(['Deney 1 · 3. adım']);
+    expect(tr.examples.texts['bjt-yukseltec'].questions!.map((q) => q.step)).toEqual(['Deney 7 · 1. adım']);
+    expect(tr.examples.texts['mosfet-yukseltec'].questions!.map((q) => q.step)).toEqual(['Deney 8 · 3. adım', 'Deney 8 · 4. adım', 'Deney 8 · 5. adım']);
+  });
+
+  it('Deney 7: R_B = 8,2 kΩ ve ofset 0,928 V’ta V_CE ≈ 6,0 V, kazanç ≈ 19,5 (R_B = 10 kΩ’da 16,3)', () => {
+    const doc = withProps(withProps(load('bjt-yukseltec'), 'RB', { resistance: 8200 }), 'FG1', { offset: 0.928 });
+    const op = run(withProps(doc, 'FG1', { amplitude: 0 }), 2e-3);
+    between(op.measure(idOf(doc, 'Q1'))!.voltage, 5.9, 6.1);
+    const { out, gain } = gainOf(doc, 'Q1', 5e-3);
+    between(gain, 19.3, 19.8);
+    between(out.min, 4.0, 4.2);
+    between(out.max, 7.9, 8.1);
+  });
+
+  it('Deney 8: faz 180° (10 mV t-t: + tepede ≈ 6,73 V, − tepede ≈ 8,29 V); 1 V t-t’de ≈ 0,01–15,0 V', () => {
+    const small = withProps(load('mosfet-yukseltec'), 'FG1', { amplitude: 0.01 });
+    const sim = run(small, 0.00525);
+    between(sim.voltageAt(`${idOf(small, 'M1')}#0`)!, 6.65, 6.8);
+    sim.runUntil(0.00575);
+    between(sim.voltageAt(`${idOf(small, 'M1')}#0`)!, 8.2, 8.35);
+    const { out } = gainOf(withProps(load('mosfet-yukseltec'), 'FG1', { amplitude: 1 }), 'M1', 5e-3);
+    expect(out.min).toBeLessThan(0.05);
+    expect(out.max).toBeGreaterThan(14.95);
+  });
+
+  it('Deney 6: 1 V t-t girişte kazanç ≈ 8; çıkış girişle ters fazlı', () => {
+    between(gainOf(withProps(load('fet-yukseltec'), 'FG1', { amplitude: 1 }), 'J1', 0.05).gain, 7.8, 8.2);
+    const doc = load('fet-yukseltec');
+    const sim = run(doc, 0.05025);
+    const atPositive = sim.voltageAt(`${idOf(doc, 'J1')}#0`)!;
+    sim.runUntil(0.05075);
+    expect(sim.voltageAt(`${idOf(doc, 'J1')}#0`)! - atPositive).toBeGreaterThan(4);
   });
 });
 

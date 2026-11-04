@@ -418,6 +418,44 @@ try {
     await page.context().close();
   }
 
+  // --- Föydeki sorular (örnek kartı): soru, "Cevabı göster" ile açılan cevap ---------------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Zener diyot (5,6 V): X-Y’de karakteristik', exact: true }))).click(); await page.waitForTimeout(500);
+    await notebook(page).getByRole('region', { name: /^Örnek ·/ }).getByRole('button').first().click(); await page.waitForTimeout(300);
+    const qa = notebook(page).getByRole('region', { name: 'Föydeki sorular' });
+    const step = (await qa.locator('li span').first().textContent()) ?? '';
+    const before = await qa.locator('div[id]').count();
+    const show = qa.getByRole('button', { name: 'Cevabı göster' });
+    await show.click(); await page.waitForTimeout(200);
+    const answer = (await qa.locator('div[id]').first().textContent()) ?? '';
+    const expanded = await qa.getByRole('button', { name: 'Cevabı gizle' }).getAttribute('aria-expanded');
+    check('örnek kartı (masaüstü): zenerde "Föydeki sorular" (Deney 1 · 3. adım); cevap kapalı, "Cevabı göster" açıyor (5 V genliğin neden kırmadığı)',
+      step === 'Deney 1 · 3. adım' && before === 0 && expanded === 'true' && answer.includes('5 V genlik bu zeneri kırmaya yetmez') && answer.includes('4,87 V'), `${step} · ${before} · ${expanded} · ${answer.slice(0, 50)}`);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'IRF510 ile ortak kaynaklı yükselteç');
+    const card = phoneNotebook(page).getByRole('region', { name: /^Örnek ·/ });
+    await card.getByRole('button').first().tap(); await page.waitForTimeout(300);
+    const qa = card.getByRole('region', { name: 'Föydeki sorular' });
+    const steps = await qa.locator('li > span').allTextContents();
+    const button = qa.getByRole('button', { name: 'Cevabı göster' }).first();
+    await button.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
+    const box = await button.boundingBox();
+    await button.tap(); await page.waitForTimeout(200);
+    const answer = (await qa.locator('div[id]').first().textContent()) ?? '';
+    check('örnek kartı (telefon): MOSFET’te Deney 8’in üç sorusu; "Cevabı göster" en az 44 px; cevapta küçük işaret kazancı ≈ 172 ve ofset hassasiyeti; sayfa kaymıyor',
+      steps.join('|') === 'Deney 8 · 3. adım|Deney 8 · 4. adım|Deney 8 · 5. adım' && box !== null && box.height >= 44 && answer.includes('≈ 172') && answer.includes('0,19 V') && !(await pageScrolls(page)),
+      `${steps.join('|')} · ${Math.round(box?.height ?? 0)} px · ${answer.slice(0, 40)}`);
+    await page.context().close();
+  }
+
   // --- Parça ekle sayfası: daha açık başlar, başlıktan çekilerek tam boy olur, aşağı çekince kapanır --
   {
     const { page, cdp } = await phone();
