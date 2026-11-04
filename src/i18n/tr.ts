@@ -1345,14 +1345,6 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'Küçük bir sinyali yaklaşık 16 kat büyütür. Kondansatör yok: üretecin 0,98 V’luk ofseti R_{B} üzerinden I_{B} ≈ 29,5 µA verir; I_{C} ≈ 5,98 mA, V_{CE} ≈ 6,0 V olduğundan çıkış iki yöne de salınabilir. Kazanç ≈ −16,3: A_{v} ≈ −β_{ac} · R_{C} / (R_{B} + r_{π}), β_{ac} ≈ 180, r_{π} = β_{ac} · V_{T} / I_{C} ≈ 0,8 kΩ; çıkış ters fazlıdır. 1 MHz’te kazanç ≈ 5,6’ya düşer (kollektör-baz kapasitesi). Ofset çalışma noktasını belirler: 20 mV değişim V_{CE}’yi ≈ 0,33 V kaydırır, ofset sıfırken transistör kesimdedir. Girişi 0,6 V tepe-tepeye çıkar: çıkış ≈ 1,5 V ile 11,0 V arasında salınır, kazanç ≈ 15,8’e iner.',
     everyday:
       'Ortak emetörlü yükselteç radyoların, işitme cihazlarının, mikrofon ön yükselteçlerinin ve sensör devrelerinin temel yapı taşıdır; işlemsel yükselteç entegrelerinin içinde de aynı kat vardır.',
-    questions: [
-      {
-        step: 'Deney 7 · 1. adım',
-        question: 'Transistörünüzün β’sını öğrenerek Şekil-18’deki yükselteç devresini gerilim kazancı 20 olacak şekilde tasarımlayınız.',
-        answer:
-          'Föydeki K = β · R_{C} / R_{B} formülüyle: BC107’de β = 200, R_{C} = 1 kΩ, R_{B} = 10 kΩ → K = 200 · 1 kΩ / 10 kΩ = 20. Çıkış iki yöne eşit salınsın diye V_{CE} ≈ V_{CC} / 2 = 6 V: I_{C} ≈ 6 V / 1 kΩ = 6 mA, I_{B} ≈ 6 mA / 200 = 30 µA, üretecin ofseti ≈ V_{BE} + I_{B} · R_{B} ≈ 0,68 V + 0,30 V ≈ 0,98 V. Simülasyonda ölçülen kazanç 16,3 (0,2 V tepe-tepe girişte kollektör 4,41–7,68 V). Fark iki yerden gelir: bazın kendi direnci r_{π} = β_{ac} · V_{T} / I_{C} ≈ 0,8 kΩ, R_{B}’ye seri eklenir; küçük işarette β (β_{ac} ≈ 180) DC β’dan (≈ 203) küçüktür. Düzeltilmiş hesap K ≈ β_{ac} · R_{C} / (R_{B} + r_{π} + 50 Ω) ≈ 16,4 (50 Ω üretecin çıkış direnci). Kazancı 20’ye yaklaştırmak için R_{B}’yi küçültüp ofseti yeniden ayarla: R_{B} = 8,2 kΩ ve ofset 0,928 V’ta V_{CE} = 6,0 V, I_{C} = 6,0 mA; ölçülen kazanç 19,5 (0,2 V tepe-tepe girişte kollektör 4,10–8,00 V).',
-      },
-    ],
   },
   'bjt-yukseltec-kuplajli': {
     title: 'BC107 yükselteç: kuplajlı, R_B = 2,2 MΩ',

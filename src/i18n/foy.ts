@@ -64,6 +64,14 @@ const BF245A: LabPinout = {
   note: 'Föydeki numaralama Philips’in BF245A kataloğundakinden farklı: katalogda 1 drain, 2 source, 3 kapı. İkisinde de ortadaki bacak source’tur; BF245A simetrik olduğu için drain ile source yer değiştirse de çalışır, önemli olan kapıyı doğru bulmaktır. Takmadan önce elindeki parçanın kataloğuna bak. Katalog sınırları: V_{DS} en çok ±30 V, P_{tot} 300 mW.',
 };
 
+/** BC107’nin bacak bağlantısı (föydeki Şekil-19; Deney 7 ve 9). */
+const BC107: LabPinout = {
+  part: 'BC107',
+  figure: 'Şekil-19',
+  legs: ['Emetör (E)', 'Baz (B)', 'Kollektör (C)'],
+  note: 'Metal kılıf (TO-18). Şekil-19a’daki gibi kılıfın tırnağına en yakın bacak 1 (emetör), ortadaki 2 (baz), öbür uçtaki 3 (kollektör); Central’ın BC107 kataloğundaki numaralama da aynı. Katalog sınırları: V_{CEO} 45 V, I_{C} 200 mA, P_{D} 600 mW.',
+};
+
 export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment>> = {
   1: {
     title: 'Diyot karakteristiklerinin incelenmesi',
@@ -167,6 +175,25 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
       },
     ],
     pinout: BF245A,
+  },
+  7: {
+    title: 'BJT’li temel yükselteç',
+    aim: 'BJT’li temel yükselteç devresi kurup özelliklerini incelemek.',
+    theory: [
+      {
+        text: 'BJT akım kazancı sağlar: küçük bir i_{b} baz akımı, kollektör ile emetör arasındaki çok daha büyük bir akımı denetler. Akım kazancı:',
+      },
+      { formula: 'β = i_{c} / i_{b},   i_{e} = i_{b} + i_{c}' },
+      {
+        text: 'Transistörlerin β’sı 10 ile 1000 arasında değişir; i_{b}’deki küçük bir değişim i_{c}’de β kat büyük bir değişime yol açar. Gerilim yükselteci olarak kullanılınca (Şekil-18) giriş gerilimi R_{B} üzerinden baz akımına, kollektör akımı da R_{C} üzerinden gerilime dönüştürülür; böylece υ_{s} ile υ_{ce} denetlenir. A bir sabit olmak üzere:',
+      },
+      { formula: 'K_{υ} = β · R_{c} / R_{b}', eq: 6 },
+      { formula: 'υ_{ç} = A − K_{υ} · υ_{s}', eq: 7 },
+      {
+        text: 'Eksi işaret çıkışın girişe göre 180° ters fazlı olduğunu gösterir. (6), bazın kendi direncini (r_{π} = β · V_{T} / I_{C}, V_{T} ≈ 26 mV) R_{B}’nin yanında ihmal eder; daha doğru hesap K_{υ} ≈ β · R_{C} / (R_{B} + r_{π}). Çalışma noktası, çıkış iki yöne eşit salınabilsin diye V_{CE} ≈ V_{CC} / 2 seçilir; Şekil-18’de kuplaj kondansatörü olmadığından bazın DC akımını üretecin DC kayması (ofset) verir.',
+      },
+    ],
+    pinout: BC107,
   },
 };
 
@@ -564,6 +591,58 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
         answer:
           'Sorunlar: çalışma noktası υ_{GS} = 0’da (pozitif yarıda kapı iletir), karesel yasa ve çıkışın V_{DD}’ye sığmaması (2 V tepe-tepe × 10 = 20 V tepe-tepe > 15 V). Değişiklikler: (1) Çalışma noktasını V_{GS} < 0’a ve V_{DS} ≈ V_{DD} / 2’ye taşı: source ile ortak hat arasına bir R_{S} (kendiliğinden kutuplama; kazancı korumak için ona paralel bir C_{S}) ya da kapıya eksi bir DC. Simülasyonda üretecin DC kaymasını −0,5 V, R_{D}’yi 3,3 kΩ yapınca V_{DS} ≈ 8,23 V olur, 0,5 V tepe-tepe girişte kazanç ≈ 9,8 kalır ve 2 V tepe-tepe girişte bile kapı akımı ≈ 0,1 µA’de kalır. (2) Girişe bir kuplaj kondansatörü, kapıdan ortak hatta büyük bir direnç (1 MΩ) koy: kapı üretecin DC’sinden ayrılır. Aşağıdaki ek örnek bu biçimdedir; 2 V tepe-tepe girişte kapı-source eklemi kondansatörü doldurup çalışma noktasını kendiliğinden eksiye kaydırır (drain’in ortalaması 4,67 V’tan 7,89 V’a çıkar), ama çıkış yine 1,24–14,49 V arasında kırpılır. (3) Büyük bir girişi bozulmasız yükseltmek için kazancı düşür (R_{S}’yi köprülemeden bırak: K_{υ} ≈ R_{D} / (R_{S} + 1 / g_{m})) ya da V_{DD}’yi büyüt (BF245A’da en çok 30 V); ya da girişi küçük tut: 0,5 V tepe-tepe girişte çıkış bozulmaz.',
         link: 'fet-yukseltec-kuplajli',
+      },
+    ],
+  },
+  'bjt-yukseltec': {
+    experiment: 7,
+    figure: 'Şekil-18',
+    steps: [
+      {
+        no: '1',
+        text: 'Transistörünün β’sını öğrenerek Şekil-18’deki yükselteci gerilim kazancı 20 olacak biçimde tasarla.',
+        sim: 'Devre kurulu (tasarımın bir çözümü): V_{CC} = 12 V (PS1), R_{B} = 10 kΩ, R_{C} = 1 kΩ, BC107 (β = 200). β’yı Q1’in özelliklerinden okuyabilir, R_{B}’yi ya da R_{C}’yi değiştirerek kendi tasarımını deneyebilirsin.',
+      },
+      {
+        no: '2',
+        text: 'Üretecin DC kayma (ofset) düğmesini kullanarak girişi (sinüs) ve çıkışı osiloskopta izle; devrenin gerilim kazancını bul.',
+        sim: 'FG1 1 kHz, 0,2 V tepe-tepe sinüs, DC kayma 0,98 V. Osiloskop “A ve B (Y-t)” kipinde: A girişte (AC, 50 mV/bölme), B kollektörde (AC, 1 V/bölme). Oynat’a bas; tepe-tepe değerleri ekranın altından oku. Çalışma noktasını görmek için B’yi DC kuplaja al ya da Q1’e tıklayıp V_{CE}’yi oku; kaymayı değiştirip V_{CE}’nin nasıl kaydığına bak.',
+      },
+      {
+        no: '3',
+        text: 'Girişin genliğini ve frekansını artırarak çıkıştaki, dolayısıyla kazançtaki değişimi incele.',
+        sim: 'Cihaz rafında FG1’in tepe-tepe değerini 0,4 V, 0,6 V, 0,8 V ve 1 V yap; sonra 0,2 V’a dönüp frekansı 10 kHz, 100 kHz, 500 kHz ve 1 MHz yap (her seferinde Oto’ya bas).',
+      },
+      {
+        no: '4',
+        text: 'Girişe belirli bir frekansta (ör. 1 kHz) kare dalga uygulayıp çıkışın biçimini izle.',
+        sim: 'FG1’in dalga biçimini Kare yap (1 kHz, 0,2 V tepe-tepe). Kenarlara yakından bakmak için zaman/bölmeyi 1 µs’ye indir.',
+      },
+    ],
+    questions: [
+      {
+        step: '1',
+        question: 'Transistörünüzün β’sını öğrenerek, Şekil-18’deki yükselteç devresini gerilim kazancı 20 olacak şekilde tasarımlayınız.',
+        answer:
+          'Föydeki (6) K_{υ} = β · R_{C} / R_{B} formülüyle: BC107’de β = 200, R_{C} = 1 kΩ, R_{B} = 10 kΩ → K_{υ} = 200 · 1 kΩ / 10 kΩ = 20. Çıkış iki yöne eşit salınsın diye V_{CE} ≈ V_{CC} / 2 = 6 V: I_{C} ≈ 6 V / 1 kΩ = 6 mA, I_{B} ≈ 6 mA / 200 = 30 µA, üretecin kayması ≈ V_{BE} + I_{B} · R_{B} ≈ 0,68 V + 0,30 V ≈ 0,98 V. Simülasyonda ölçülen kazanç 16,3 (0,2 V tepe-tepe girişte kollektör 4,43–7,69 V). Fark iki yerden gelir: bazın kendi direnci r_{π} = β_{ac} · V_{T} / I_{C} ≈ 0,8 kΩ, R_{B}’ye seri eklenir; küçük işarette β (β_{ac} ≈ 179) DC β’dan (≈ 203) küçüktür. Düzeltilmiş hesap K_{υ} ≈ β_{ac} · R_{C} / (R_{B} + r_{π} + 50 Ω) ≈ 16,5 (50 Ω üretecin çıkış direnci). Kazancı 20’ye yaklaştırmak için R_{B}’yi küçültüp kaymayı yeniden ayarla: R_{B} = 8,2 kΩ ve kayma 0,928 V’ta V_{CE} = 6,0 V, I_{C} = 6,0 mA; ölçülen kazanç 19,5 (0,2 V tepe-tepe girişte kollektör 4,10–8,00 V).',
+      },
+      {
+        step: '2',
+        question: 'Giriş (sinüs dalga) ve çıkış sinyallerini osilatörün DC-ofset düğmesini kullanarak osiloskopta gözleyiniz ve devrenin gerilim kazancını belirleyiniz.',
+        answer:
+          'Kayma bazın DC akımını, yani çalışma noktasını belirler: 0,98 V’ta V_{CE} ≈ 6,02 V, I_{C} ≈ 5,98 mA, I_{B} ≈ 29,5 µA (β_{DC} ≈ 203). Çalışma noktası kaymaya çok duyarlıdır: 0,9 V’ta V_{CE} ≈ 7,35 V, 1,05 V’ta ≈ 4,90 V; kaymadaki her 0,1 V, V_{CE}’yi ≈ 1,6 V kaydırır (kazanç kadar, çünkü kayma da bir giriş gerilimidir). 0,2 V tepe-tepe girişte kollektör 4,43 V ile 7,69 V arasında, yani 3,26 V tepe-tepe salınır: K_{υ} ≈ 16,3. Çıkış girişle ters fazlıdır (180°): girişin pozitif tepesinde kollektör en alttadır.',
+      },
+      {
+        step: '3',
+        question: 'Giriş sinyalinin genliğini ve frekansını arttırarak çıkış sinyalinde, dolayısı ile gerilim kazancındaki, değişimi inceleyiniz.',
+        answer:
+          'Genlik (1 kHz): 0,4 V tepe-tepe girişte kazanç ≈ 16,2, 0,6 V’ta ≈ 15,8 (kollektör 1,50–10,98 V): iki yarı eşit büyümez, çünkü kollektör akımı baz-emetör geriliminin üstel fonksiyonudur. 0,8 V’ta alt tepe ≈ 0,23 V’ta düzleşir (doyum), kazanç ≈ 14,6; 1 V’ta üst tepe de V_{CC}’de (≈ 11,99 V) düzleşir (kesim), kazanç ≈ 11,8. Frekans (0,2 V tepe-tepe): kazanç 10 kHz’te ≈ 16,3, 100 kHz’te ≈ 15,7, 500 kHz’te ≈ 9,7, 1 MHz’te ≈ 5,6. Yüksek frekansta transistörün iç kapasiteleri, özellikle Miller etkisiyle (1 + K_{υ}) kat büyüyen baz-kollektör kapasitesi, bazı R_{B} üzerinden besleyen sinyali azaltır. Kazanç 350 kHz ile 400 kHz arasında 1 kHz’teki değerin 1/√2’sine (≈ 11,5) iner: üst kesim frekansı ≈ 370 kHz.',
+      },
+      {
+        step: '4',
+        question: 'Giriş sinyali olarak belirli bir frekansta (örneğin 1 kHz) kare dalga uygulayarak çıkış dalga şeklini gözleyiniz.',
+        answer:
+          'Çıkış ters çevrilmiş bir kare dalgadır: girişin yüksek yarısında kollektör ≈ 4,43 V, alçak yarısında ≈ 7,69 V (3,26 V tepe-tepe, kazanç yine ≈ 16,3). 1 kHz’te (yarım periyot 0,5 ms) kenarlar dik görünür. Zaman/bölmeyi 1 µs’ye indirince her kenarın ≈ 1 µs’de tamamlandığı görülür (yükselme süresi t_{r}, %10–%90). Bu, yükseltecin bant genişliğinden gelir: t_{r} ≈ 0,35 / f_{üst} ≈ 0,35 / 370 kHz ≈ 0,95 µs. Kare dalga çok sayıda harmonikten oluştuğu için yükseltecin yüksek frekans yanıtını tek bakışta gösterir.',
       },
     ],
   },

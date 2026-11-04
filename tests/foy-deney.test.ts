@@ -69,6 +69,12 @@ const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; 
       'fet-yukseltec': { figure: 'Şekil-17', steps: ['1', '2', '3', '4'], questions: ['1', '2a', '2b', '3', '4'] },
     },
   },
+  7: {
+    steps: ['1', '2', '3', '4'],
+    figures: {
+      'bjt-yukseltec': { figure: 'Şekil-18', steps: ['1', '2', '3', '4'], questions: ['1', '2', '3', '4'] },
+    },
+  },
 };
 
 /** Bir sayıyı kartlardaki gibi yazar: ondalık virgül, eksi işareti "−". */
@@ -615,5 +621,110 @@ describe('Deney 6: cevaplardaki sayılar', () => {
     const big = coupled(2);
     says(text, `ortalaması ${num(small.avg, 2)} V’tan ${num(big.avg, 2)} V’a`, `çıkış yine ${num(big.min, 2)}–${num(big.max, 2)} V`);
     expect(LAB_FIGURE_TEXTS['fet-yukseltec']!.questions.find((q) => q.step === '4')!.link).toBe('fet-yukseltec-kuplajli');
+  });
+});
+
+describe('Deney 7: cevaplardaki sayılar', () => {
+  const bjt = (props: Record<string, number | string>, rb?: number) => {
+    let doc = withProps(load('bjt-yukseltec'), 'FG1', props);
+    if (rb !== undefined) doc = withProps(doc, 'RB', { resistance: rb });
+    return doc;
+  };
+  /** Dinlenme noktası (giriş 0, kayma `offset`): V_CE, I_C, I_B, V_BE. */
+  function rest(offset: number, rb?: number) {
+    const doc = bjt({ amplitude: 0, offset }, rb);
+    const sim = run(doc, 0.005);
+    const q = idOf(doc, 'Q1');
+    const [ic, ib] = sim.pinCurrents(q)!;
+    return { vce: sim.measure(q)!.voltage, ic: ic!, ib: ib!, vbe: sim.voltageAt(`${q}#1`)! };
+  }
+  const gainAt = (props: Record<string, number | string>, rb?: number) => {
+    const f = (props.frequency as number | undefined) ?? 1e3;
+    const doc = bjt(props, rb);
+    const sim = run(doc, 0.005 + 20 / f);
+    const q = idOf(doc, 'Q1');
+    const r = period(sim, 1 / f, () => sim.voltageAt(`${q}#0`)!);
+    return { ...r, gain: (r.max - r.min) / ((props.amplitude as number | undefined) ?? 0.2) };
+  };
+
+  it('1. adım: K = 200 · 1 kΩ / 10 kΩ = 20, kayma ≈ 0,68 + 0,30 ≈ 0,98 V; ölçülen 16,3; β_ac ≈ 179, r_π ≈ 0,8 kΩ, düzeltilmiş ≈ 16,5; R_B = 8,2 kΩ’da ≈ 19,5', () => {
+    const text = answer('bjt-yukseltec', '1');
+    const doc = load('bjt-yukseltec');
+    expect(doc.parts.find((p) => p.label === 'Q1')!.props.beta).toBe(200);
+    expect(doc.parts.find((p) => p.label === 'FG1')!.props.offset).toBe(0.98);
+    const op = rest(0.98);
+    says(text, `≈ ${num(op.vbe, 2)} V + ${num(op.ib * 1e4, 2)} V ≈ 0,98 V`);
+    const g = gainAt({});
+    says(text, `kazanç ${num(g.gain, 1)} (0,2 V tepe-tepe girişte kollektör ${num(g.min, 2)}–${num(g.max, 2)} V)`);
+    // Küçük işaret β'sı: kaymayı ±10 mV değiştirince ΔI_C / ΔI_B.
+    const lo = rest(0.97);
+    const hi = rest(0.99);
+    const bac = (hi.ic - lo.ic) / (hi.ib - lo.ib);
+    const rpi = (bac * 0.025852) / op.ic;
+    says(text, `β_{ac} ≈ ${num(bac, 0)}`, `(≈ ${num(op.ic / op.ib, 0)})`, `≈ ${num(rpi / 1e3, 1)} kΩ`, `≈ ${num((bac * 1000) / (10000 + rpi + 50), 1)} (50 Ω`);
+    const op82 = rest(0.928, 8200);
+    const g82 = gainAt({ offset: 0.928 }, 8200);
+    says(text, `V_{CE} = ${num(op82.vce, 1)} V, I_{C} = ${num(op82.ic * 1e3, 1)} mA`, `kazanç ${num(g82.gain, 1)}`, `kollektör ${num(g82.min, 2)}–${num(g82.max, 2)} V`);
+  });
+
+  it('2. adım: 0,98 V’ta V_CE ≈ 6,02 V, I_C ≈ 5,98 mA, I_B ≈ 29,5 µA; 0,9 V → 7,35 V, 1,05 V → 4,90 V; K ≈ 16,3, 180°', () => {
+    const text = answer('bjt-yukseltec', '2');
+    const op = rest(0.98);
+    says(text, `V_{CE} ≈ ${num(op.vce, 2)} V, I_{C} ≈ ${num(op.ic * 1e3, 2)} mA, I_{B} ≈ ${num(op.ib * 1e6, 1)} µA (β_{DC} ≈ ${num(op.ic / op.ib, 0)})`);
+    const a = rest(0.9).vce;
+    const b = rest(1.05).vce;
+    says(text, `0,9 V’ta V_{CE} ≈ ${num(a, 2)} V, 1,05 V’ta ≈ ${num(b, 2)} V`, `≈ ${num(((a - b) / 0.15) * 0.1, 1)} V kaydırır`);
+    const g = gainAt({});
+    says(text, `kollektör ${num(g.min, 2)} V ile ${num(g.max, 2)} V arasında, yani ${num(g.max - g.min, 2)} V tepe-tepe`, `K_{υ} ≈ ${num(g.gain, 1)}`);
+    // Faz: girişin pozitif tepesinde (t = 10,25 ms) kollektör en altta.
+    const doc = load('bjt-yukseltec');
+    const sim = run(doc, 0.01025);
+    between(sim.voltageAt(`${idOf(doc, 'Q1')}#0`)!, g.min - 0.02, g.min + 0.05);
+  });
+
+  it('3. adım: genlikle kazanç 16,2 → 11,8 (doyum ve kesim); frekansla 16,3 → 5,6; üst kesim 350–400 kHz arasında', () => {
+    const text = answer('bjt-yukseltec', '3');
+    const k0 = gainAt({}).gain;
+    says(text, `0,4 V tepe-tepe girişte kazanç ≈ ${num(gainAt({ amplitude: 0.4 }).gain, 1)}`);
+    const a6 = gainAt({ amplitude: 0.6 });
+    says(text, `0,6 V’ta ≈ ${num(a6.gain, 1)} (kollektör ${num(a6.min, 2)}–${num(a6.max, 2)} V)`);
+    const a8 = gainAt({ amplitude: 0.8 });
+    says(text, `≈ ${num(a8.min, 2)} V’ta düzleşir (doyum), kazanç ≈ ${num(a8.gain, 1)}`);
+    const a10 = gainAt({ amplitude: 1 });
+    says(text, `(≈ ${num(a10.max, 2)} V) düzleşir (kesim), kazanç ≈ ${num(a10.gain, 1)}`);
+    for (const [f, label] of [
+      [1e4, '10 kHz’te'],
+      [1e5, '100 kHz’te'],
+      [5e5, '500 kHz’te'],
+      [1e6, '1 MHz’te'],
+    ] as const) {
+      says(text, `${label} ≈ ${num(gainAt({ frequency: f }).gain, 1)}`);
+    }
+    expect(gainAt({ frequency: 3.5e5 }).gain).toBeGreaterThan(k0 / Math.SQRT2);
+    expect(gainAt({ frequency: 4e5 }).gain).toBeLessThan(k0 / Math.SQRT2);
+    says(text, `(≈ ${num(k0 / Math.SQRT2, 1)})`);
+  }, 60_000);
+
+  it('4. adım: kare dalgada kollektör ≈ 4,43 / 7,69 V; yükselme süresi ≈ 1 µs (0,35 / 370 kHz ≈ 0,95 µs)', () => {
+    const text = answer('bjt-yukseltec', '4');
+    const doc = bjt({ waveform: 'square' });
+    const q = idOf(doc, 'Q1');
+    const sim = run(doc, 0.01);
+    const r = period(sim, 1e-3, () => sim.voltageAt(`${q}#0`)!);
+    says(text, `kollektör ≈ ${num(r.min, 2)} V, alçak yarısında ≈ ${num(r.max, 2)} V (${num(r.max - r.min, 2)} V tepe-tepe`);
+    // 10,5 ms'de giriş düşer, kollektör yükselir: %10'dan %90'a geçen süre.
+    const edge = run(doc, 0.0104999);
+    const lo = r.min + 0.1 * (r.max - r.min);
+    const hi = r.min + 0.9 * (r.max - r.min);
+    let t10 = Number.NaN;
+    let t90 = Number.NaN;
+    for (let k = 0; k < 200; k++) {
+      edge.advance(0.02e-6);
+      const v = edge.voltageAt(`${q}#0`)!;
+      if (Number.isNaN(t10) && v >= lo) t10 = edge.time;
+      if (Number.isNaN(t90) && v >= hi) t90 = edge.time;
+    }
+    between(t90 - t10, 0.7e-6, 1.3e-6);
+    says(text, '≈ 1 µs’de', `≈ 0,35 / 370 kHz ≈ ${num(0.35 / 370e3 * 1e6, 2)} µs`);
   });
 });

@@ -311,8 +311,7 @@ describe('Föydeki sorular: cevaplardaki sayılar', () => {
     return { sim, out, gain: (out.max - out.min) / (fg.amplitude as number) };
   }
 
-  it('kartlarda soru var: Deney 7 (1. adım), Deney 8 (3., 4., 5. adım)', () => {
-    expect(tr.examples.texts['bjt-yukseltec'].questions!.map((q) => q.step)).toEqual(['Deney 7 · 1. adım']);
+  it('kartlarda soru var: Deney 8 (3., 4., 5. adım)', () => {
     expect(tr.examples.texts['mosfet-yukseltec'].questions!.map((q) => q.step)).toEqual(['Deney 8 · 3. adım', 'Deney 8 · 4. adım', 'Deney 8 · 5. adım']);
   });
 
