@@ -714,6 +714,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     }
     expect(placed).toBeGreaterThan(100);
     expect(beside).toBeGreaterThan(10);
-  });
+    // Bütün örnekleri (74) dolaşır: paralel testlerde 5 s'yi aşabilir.
+  }, 30_000);
 });
 
