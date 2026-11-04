@@ -127,6 +127,25 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
       { formula: 'V_{kesme} ≈ V_{kaynak} ± V_{D}' },
     ],
   },
+  5: {
+    title: 'FET karakteristiklerinin incelenmesi',
+    aim: 'Eklem FET’i (JFET) tanımak, karakteristik eğrilerini çizip özelliklerini incelemek.',
+    theory: [
+      {
+        text: 'Eklem FET’te (JFET) drain ile source arasındaki yarı iletken kanaldan geçen I_{D} akımını hem V_{DS} hem de kapı ile source arasındaki ters gerilim V_{GS} denetler: V_{GS} eksildikçe kanal daralır. Şekil-14’te n kanallı JFET’in I_{D}–V_{DS} eğrileri var. V_{DS} küçükken kanal bir direnç gibidir ve I_{D} V_{DS} ile artar. V_{DS} belirli bir değeri aşınca (doyum bölgesi) kanal kısılır ve I_{D} artık neredeyse yalnızca V_{GS}’ye bağlıdır:',
+      },
+      { formula: 'i_{d} = I_{DSS} · (1 − υ_{GS} / V_{P})²,   V_{DS} ≥ V_{GS} − V_{P}' },
+      {
+        text: 'I_{DSS}, V_{GS} = 0’daki doyum akımıdır; V_{P} kısılma gerilimidir (n kanalda eksi). V_{GS}, V_{P}’den daha eksi olunca kanal tamamen kapanır ve I_{D} = 0. Gerçek JFET’te doyum bölgesinde de akım V_{DS} ile hafifçe artar (kanal boyu modülasyonu, i_{d}’nin (1 + λ · V_{DS}) ile çarpılması). Kapı-kanal eklemi ters kutuplu olduğundan kapıdan akım geçmez (I_{G} ≈ 0), bu yüzden R_{G} üzerinde gerilim düşmez.',
+      },
+    ],
+    pinout: {
+      part: 'BF245A',
+      figure: 'Şekil-16',
+      legs: ['Kapı (G)', 'Source (S)', 'Drain (D)'],
+      note: 'Föydeki numaralama Philips’in BF245A kataloğundakinden farklı: katalogda 1 drain, 2 source, 3 kapı. İkisinde de ortadaki bacak source’tur; BF245A simetrik olduğu için drain ile source yer değiştirse de çalışır, önemli olan kapıyı doğru bulmaktır. Takmadan önce elindeki parçanın kataloğuna bak. Katalog sınırları: V_{DS} en çok ±30 V, P_{tot} 300 mW.',
+    },
+  },
 };
 
 export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
@@ -407,6 +426,63 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
         question: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
         answer:
           'İki diyot da katotla çıkışa bağlı: çıkış anotlarından birinin bir diyot gerilimi altına inince o diyot iletir. D1’in anodu +3 V’ta olduğundan çıkış ≈ +2,51 V’un (3 V − V_{D}) altına inemez; D2’nin anodu −2 V’ta, eşiği çok aşağıda kalır ve hiç iletmez. Üst tarafta kırpma yoktur: çıkış ≈ +2,51 V ile ≈ +9,90 V arasında salınır, sinüsün yalnızca üst kısmı geçer. Kare dalgada çıkış ≈ +9,90 V ile ≈ +2,51 V arasındadır.',
+      },
+    ],
+  },
+  'jfet-karakteristik': {
+    experiment: 5,
+    figure: 'Şekil-15',
+    steps: [
+      {
+        no: '1',
+        text: 'Şekil-15’teki devreyi kur.',
+        sim: 'Devre kurulu: PS1’in 1. çıkışı V_{DD}; R_{D} = 100 Ω ve A1 üzerinden drain’i besler, source ortak hatta. 2. çıkış ters bağlı: − ucu R_{G} = 10 kΩ üzerinden kapıda, böylece V_{GS} = −V_{GG} (2. çıkışın göstergesi). V1 V_{DS}’yi, A1 I_{D}’yi gösterir. Oynat’a bas.',
+      },
+      {
+        no: '2',
+        text: 'V_{GS}’yi 0 V yap. V_{DS}’yi 0’dan 8 V’a kadar 0,2 V, 8–15 V arasında 1 V adımlarla artır ve her adımda I_{D}’yi oku. Transistörün zarar görmemesi için V_{DS}, I_{D} ve V_{DS} · I_{D} kataloğundaki sınırları aşmamalı.',
+        sim: 'PS1’in 2. çıkışı 0 V (V_{GS} = 0). Cihaz rafında PS1’in 1. çıkışını (V_{DD}) artırarak V1’de istenen V_{DS}’yi bul, A1’de I_{D}’yi oku. V_{DD} = V_{DS} + I_{D} · 100 Ω: 15 V’luk V_{DS} için V_{DD} ≈ 15,45 V.',
+      },
+      {
+        no: '3',
+        text: 'V_{GS} = −0,2 V ve V_{GS} = −0,4 V için deneyi tekrarla.',
+        sim: 'PS1’in 2. çıkışını 0,2 V, sonra 0,4 V yap (V_{GS} = −0,2 V ve −0,4 V) ve 2. adımı tekrarla.',
+      },
+      {
+        no: '4',
+        text: 'I_{D}’yi sıfır yapan V_{GS}’yi (= V_{P}) ölç.',
+        sim: 'V_{DD}’yi 10 V’ta bırak; PS1’in 2. çıkışını A1 sıfır gösterene kadar artır. V_{P} = −V_{GG}.',
+      },
+      {
+        no: '5',
+        text: 'Sonuçlarla transistörün akım-gerilim eğrilerini grafik kâğıdına çiz; grafikten I_{DSS} ile V_{P}’yi bul.',
+        sim: '2. ve 3. adımdaki tablolardan her V_{GS} için I_{D}–V_{DS} eğrisini çiz. I_{DSS} ile V_{P}’yi bulmanın yolu soruda.',
+      },
+    ],
+    questions: [
+      {
+        step: '2',
+        question: 'V_{GS} gerilimini sıfır volt alınız. V_{DS} gerilimini sıfır volttan başlayarak 8 V’a kadar 0,2 V aralıklarla, 8–15 V arasında da 1 V aralıklarla arttırınız ve her adımda I_{D}’yi okuyunuz.',
+        answer:
+          'Simülasyonda V_{GS} = 0 için (V_{DS} → I_{D}): 0,2 V → 0,77 mA; 0,4 V → 1,44 mA; 0,6 V → 2,03 mA; 1 V → 2,93 mA; 1,4 V → 3,47 mA; 1,8 V → 3,63 mA; 2 V → 3,64 mA; 4 V → 3,77 mA; 8 V → 4,02 mA; 10 V → 4,14 mA; 15 V → 4,45 mA. V_{DS} ≈ 1,7 V’a kadar I_{D} hızla artar (kanal direnç gibi); sonra eğri yataylaşır (doyum): 2 V’tan 15 V’a akım yalnızca ≈ %22 artar. Kırılma noktası V_{DS} = V_{GS} − V_{P} = 1,74 V. Güvenlik: en büyük güç 15 V · 4,45 mA ≈ 67 mW; BF245A’nın kataloğunda P_{tot} 300 mW, V_{DS} en çok 30 V, yani sınırların çok altında.',
+      },
+      {
+        step: '3',
+        question: 'V_{GS} gerilimini V_{GS} = −0,2 V ve V_{GS} = −0,4 V alarak yukarıdaki deneyi her bir V_{GS} değeri için tekrarlayınız.',
+        answer:
+          'V_{GS} = −0,2 V (V_{DS} → I_{D}): 0,2 V → 0,67 mA; 1 V → 2,46 mA; 2 V → 2,85 mA; 8 V → 3,15 mA; 15 V → 3,49 mA. V_{GS} = −0,4 V: 0,2 V → 0,58 mA; 1 V → 1,99 mA; 2 V → 2,16 mA; 8 V → 2,38 mA; 15 V → 2,64 mA. V_{GS} eksildikçe eğriler aşağı iner ve doyum daha küçük V_{DS}’de başlar (V_{GS} − V_{P}: −0,2 V’ta 1,54 V, −0,4 V’ta 1,34 V). Kapıdan akım geçmez (≈ 10 pA), bu yüzden V_{GS} kaynağın gösterdiği değere tam eşittir.',
+      },
+      {
+        step: '4',
+        question: 'I_{D} akımını sıfır yapan V_{GS} (= V_{P}) değerini ölçünüz.',
+        answer:
+          'V_{DD} = 10 V’ta I_{D}, V_{GS} = −1,5 V’ta ≈ 79 µA, −1,6 V’ta ≈ 27 µA, −1,7 V’ta ≈ 2,2 µA, −1,72 V’ta ≈ 0,55 µA; −1,74 V’ta sıfırdır. V_{P} ≈ −1,74 V. Akım V_{P}’ye yaklaşırken karesel olarak sıfıra indiğinden, ampermetrenin çözünürlüğüne göre okunan değer biraz daha az eksi çıkabilir (1 µA çözünürlükte ≈ −1,72 V).',
+      },
+      {
+        step: '5',
+        question: 'Elde ettiğiniz sonuçlarla transistörün akım-gerilim karakteristik eğrisini grafik kağıdına çiziniz. Grafikten faydalanıp, transistör parametreleri I_{DSS} ve V_{P}’yi bulunuz.',
+        answer:
+          'I_{DSS}: V_{GS} = 0 eğrisinin doyum bölgesi düz değil, hafif eğimlidir (2 V’ta 3,64 mA, 15 V’ta 4,45 mA). Bu doğruyu V_{DS} = 0’a uzatınca I_{DSS} ≈ 3,52 mA bulunur (eğim ≈ 0,062 mA/V). V_{P}: 4. adımda doğrudan ≈ −1,74 V. Eğrilerden de bulunur: aynı V_{DS}’de (8 V) I_{D}(−0,2 V) / I_{D}(0) = 3,15 / 4,02 ≈ 0,78; formülden 1 − 0,2 / |V_{P}| = √0,78 → V_{P} ≈ −1,74 V. −0,4 V eğrisi de aynı sonucu verir. Bu değerler simülasyondaki BF245A modelinin I_{DSS} = 3,52 mA ve V_{P} = −1,74 V değerleriyle aynı; katalogda BF245A için I_{DSS} 2–6,5 mA.',
       },
     ],
   },

@@ -57,6 +57,12 @@ const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; 
       'alt-kirpici': { figure: 'Şekil-13d', steps: [''], questions: [''] },
     },
   },
+  5: {
+    steps: ['1', '2', '3', '4', '5'],
+    figures: {
+      'jfet-karakteristik': { figure: 'Şekil-15', steps: ['1', '2', '3', '4', '5'], questions: ['2', '3', '4', '5'] },
+    },
+  },
 };
 
 /** Bir sayıyı kartlardaki gibi yazar: ondalık virgül, eksi işareti "−". */
@@ -451,5 +457,68 @@ describe('Deney 4: cevaplardaki sayılar', () => {
     expect(Math.abs(d2.avg)).toBeLessThan(0.5e-6);
     const square = clip('alt-kirpici', 'square');
     says(text, `≈ +${num(square.high, 2)} V ile ≈ +${num(square.low, 2)} V arasındadır`);
+  });
+});
+
+describe('Deney 5: cevaplardaki sayılar', () => {
+  /** Şekil-15: V_DD ve V_GG'de V1 (V_DS) ve A1 (I_D). */
+  function point(vdd: number, vgg: number) {
+    const doc = withProps(load('jfet-karakteristik'), 'PS1', { voltage1: vdd, voltage2: vgg });
+    const sim = run(doc, 0);
+    return { vds: sim.status(idOf(doc, 'V1')).reading!, id: sim.status(idOf(doc, 'A1')).reading!, sim, doc };
+  }
+  /** V_DS istenen değere gelene kadar V_DD'yi (ikiye bölerek) ayarlar. */
+  function atVds(vds: number, vgg: number) {
+    let lo = 0;
+    let hi = 20;
+    for (let k = 0; k < 30; k++) {
+      const mid = (lo + hi) / 2;
+      if (point(mid, vgg).vds < vds) lo = mid;
+      else hi = mid;
+    }
+    return { ...point((lo + hi) / 2, vgg), vdd: (lo + hi) / 2 };
+  }
+  const row = (vds: number, id: number) => `${num(vds, vds % 1 === 0 ? 0 : 1)} V → ${num(id * 1e3, 2)} mA`;
+
+  it('2. adım: V_GS = 0 tablosu; doyum ≈ 1,7 V’tan sonra, 2 → 15 V’ta ≈ %22 artış; 15 V’ta ≈ 67 mW', () => {
+    const text = answer('jfet-karakteristik', '2');
+    const table = new Map<number, number>();
+    for (const v of [0.2, 0.4, 0.6, 1, 1.4, 1.8, 2, 4, 8, 10, 15]) {
+      table.set(v, atVds(v, 0).id);
+      says(text, row(v, table.get(v)!));
+    }
+    says(text, `≈ %${num((table.get(15)! / table.get(2)! - 1) * 100, 0)} artar`, `15 V · ${num(table.get(15)! * 1e3, 2)} mA ≈ ${num(15 * table.get(15)! * 1e3, 0)} mW`);
+    // 15 V'luk V_DS için V_DD ≈ 15,45 V ("Simülasyonda:" satırı).
+    between(atVds(15, 0).vdd, 15.4, 15.5);
+    expect(LAB_FIGURE_TEXTS['jfet-karakteristik']!.steps[1]!.sim).toContain('V_{DD} ≈ 15,45 V');
+  });
+
+  it('3. adım: V_GS = −0,2 V ve −0,4 V tabloları; kapı akımı ≈ 10 pA', () => {
+    const text = answer('jfet-karakteristik', '3');
+    for (const vgg of [0.2, 0.4]) for (const v of [0.2, 1, 2, 8, 15]) says(text, row(v, atVds(v, vgg).id));
+    const { sim, doc } = point(10, 0.4);
+    expect(Math.abs(sim.measure(idOf(doc, 'RG'))!.current)).toBeLessThan(50e-12);
+    says(text, '≈ 10 pA');
+  });
+
+  it('4. adım: −1,5 V ≈ 79 µA, −1,6 V ≈ 27 µA, −1,7 V ≈ 2,2 µA, −1,72 V ≈ 0,55 µA, −1,74 V’ta sıfır', () => {
+    const text = answer('jfet-karakteristik', '4');
+    says(text, `−1,5 V’ta ≈ ${num(point(10, 1.5).id * 1e6, 0)} µA`, `−1,6 V’ta ≈ ${num(point(10, 1.6).id * 1e6, 0)} µA`, `−1,7 V’ta ≈ ${num(point(10, 1.7).id * 1e6, 1)} µA`, `−1,72 V’ta ≈ ${num(point(10, 1.72).id * 1e6, 2)} µA`);
+    expect(point(10, 1.74).id).toBeLessThan(1e-9);
+  });
+
+  it('5. adım: doyum doğrusunu V_DS = 0’a uzatınca I_DSS ≈ 3,52 mA; oranlardan V_P ≈ −1,74 V', () => {
+    const text = answer('jfet-karakteristik', '5');
+    const i2 = atVds(2, 0).id;
+    const i15 = atVds(15, 0).id;
+    const slope = (i15 - i2) / 13;
+    says(text, `2 V’ta ${num(i2 * 1e3, 2)} mA, 15 V’ta ${num(i15 * 1e3, 2)} mA`, `I_{DSS} ≈ ${num((i2 - 2 * slope) * 1e3, 2)} mA`, `eğim ≈ ${num(slope * 1e3, 3)} mA/V`);
+    for (const vgg of [0.2, 0.4]) {
+      const ratio = atVds(8, vgg).id / atVds(8, 0).id;
+      between(vgg / (1 - Math.sqrt(ratio)), 1.73, 1.75);
+      if (vgg === 0.2) says(text, `≈ ${num(ratio, 2)}`);
+    }
+    says(text, 'V_{P} ≈ −1,74 V');
+    expect(load('jfet-karakteristik').parts.find((p) => p.label === 'J1')!.props).toMatchObject({ idss: 0.00352, pinchOff: -1.74 });
   });
 });
