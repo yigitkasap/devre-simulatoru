@@ -8,7 +8,7 @@ import { LAB_EXPERIMENT_TEXTS, LAB_FIGURE_TEXTS, labAim } from '../src/i18n/foy'
 import { tr } from '../src/i18n/tr';
 import type { CircuitDoc } from '../src/model/types';
 import type { CircuitSimulator } from '../src/sim';
-import { between, idOf, load, run, withProps } from './ornek-yardimci';
+import { between, idOf, load, nodeOf, run, withProps } from './ornek-yardimci';
 
 /** Föydeki bir şekil: şekil numarası, o şekle ait adımlar ve soruların adımları (föydeki sırayla). */
 interface FoySekil {
@@ -37,6 +37,14 @@ const FOY: Partial<Record<LabExperimentNo, { readonly steps: readonly string[]; 
     figures: {
       'yarim-dalga': { figure: 'Şekil-4a', steps: ['1', '2'], questions: ['1', '2'] },
       'kopru-dogrultmac': { figure: 'Şekil-5a', steps: ['3'], questions: ['3'] },
+    },
+  },
+  3: {
+    steps: ['1', '2'],
+    figures: {
+      'negatif-kenetleyici': { figure: 'Şekil-9a', steps: ['1'], questions: ['1'] },
+      'pozitif-kenetleyici': { figure: 'Şekil-9b', steps: ['1'], questions: ['1'] },
+      'gerilim-katlayici': { figure: 'Şekil-10', steps: ['2'], questions: ['2'] },
     },
   },
 };
@@ -300,5 +308,68 @@ describe('Deney 2: cevaplardaki sayılar', () => {
     expect(['D1', 'D2', 'D3', 'D4'].filter(on)).toEqual(['D2', 'D4']);
     const b = sim.voltageAt(`${osc}#1`)!;
     says(text, `≈ ${num(a, 2)} V’a çıkar`, `≈ ${num(b, 2)} V’a iner`);
+  });
+});
+
+describe('Deney 3: cevaplardaki sayılar', () => {
+  /** Kenetleyici: 0,2 s sonra bir periyot boyunca A (giriş) ve B (çıkış). */
+  function clamp(id: 'negatif-kenetleyici' | 'pozitif-kenetleyici', waveform: 'sine' | 'square') {
+    const doc = withProps(load(id), 'FG1', { waveform });
+    const sim = run(doc, 0.2);
+    const osc = idOf(doc, 'OSC1');
+    const out = period(sim, 1e-3, () => sim.voltageAt(`${osc}#1`)!);
+    const input = period(sim, 1e-3, () => sim.voltageAt(`${osc}#0`)!);
+    return { out, input, sim, osc };
+  }
+
+  it('Şekil-9a: sinüste çıkış ≈ +0,57 / −9,11 V (tepe-tepe girişinkiyle aynı), kare dalgada ≈ +0,52 / −9,52 V, alt seviyede ≈ 0,2 V eğim; ilk periyotta alt tepe ≈ −8,49 V', () => {
+    const text = answer('negatif-kenetleyici', '1');
+    const sine = clamp('negatif-kenetleyici', 'sine');
+    says(text, `≈ +${num(sine.out.max, 2)} V ile ≈ ${num(sine.out.min, 2)} V`, `(≈ ${num(sine.out.max - sine.out.min, 1)} V)`, `ortalaması ≈ ${num(sine.out.avg, 2)} V`);
+    between(sine.out.max - sine.out.min - (sine.input.max - sine.input.min), -0.1, 0.1);
+    const square = clamp('negatif-kenetleyici', 'square');
+    says(text, `≈ +${num(square.out.max, 2)} V ile ≈ ${num(square.out.min, 2)} V`);
+    // Alt seviyedeki eğim: negatif yarının başı ile sonu (t = 0,2 s + 0,5…1 ms).
+    const doc = withProps(load('negatif-kenetleyici'), 'FG1', { waveform: 'square' });
+    const sim = run(doc, 0.20055);
+    const osc = idOf(doc, 'OSC1');
+    const start = sim.voltageAt(`${osc}#1`)!;
+    sim.runUntil(0.20098);
+    between(sim.voltageAt(`${osc}#1`)! - start, 0.15, 0.25);
+    says(text, '≈ 0,2 V yükselir');
+    // İlk periyot.
+    const first = run(load('negatif-kenetleyici'), 0);
+    says(text, `alt tepe ≈ ${num(period(first, 1e-3, () => first.voltageAt(`${idOf(load('negatif-kenetleyici'), 'OSC1')}#1`)!).min, 2)} V`);
+  });
+
+  it('Şekil-9b: sinüste ≈ −0,57 / +9,11 V, kare dalgada ≈ −0,52 / +9,53 V; kondansatörün çıkış tarafı +', () => {
+    const text = answer('pozitif-kenetleyici', '1');
+    const sine = clamp('pozitif-kenetleyici', 'sine');
+    says(text, `≈ ${num(sine.out.min, 2)} V ile ≈ +${num(sine.out.max, 2)} V`, `ortalaması ≈ +${num(sine.out.avg, 2)} V`);
+    const square = clamp('pozitif-kenetleyici', 'square');
+    says(text, `≈ ${num(square.out.min, 2)} V ile ≈ +${num(square.out.max, 2)} V`, '≈ 0,2 V düşer');
+    // Elektrolitiğin + ucu (0. uç) çıkış tarafında ve pozitif dolu.
+    const doc = load('pozitif-kenetleyici');
+    const node = nodeOf(doc);
+    expect(node('C1', 0)).toBe(node('D1', 1));
+    between(run(doc, 0.2).measure(idOf(doc, 'C1'))!.voltage, 3.5, 5);
+  });
+
+  it('Şekil-10: V_p ≈ 4,63 V, V_ç = A − B ≈ 9,25 V; dolma 5 ms ≈ 3,64 V, 20 ms ≈ 4,37 V, 0,1 s ≈ 4,58 V', () => {
+    const doc = load('gerilim-katlayici');
+    const text = answer('gerilim-katlayici', '2');
+    const osc = idOf(doc, 'OSC1');
+    const sim = run(doc, 0);
+    const vp: Record<string, number> = {};
+    for (const t of [0.005, 0.02, 0.1, 0.5]) {
+      sim.runUntil(t);
+      vp[t] = sim.voltageAt(`${osc}#0`)!;
+      // İki kondansatör aynı gerilime dolar.
+      between(vp[t]! + sim.voltageAt(`${osc}#1`)!, -0.01, 0.01);
+    }
+    const a = vp[0.5]!;
+    const b = sim.voltageAt(`${osc}#1`)!;
+    says(text, `(A) ≈ +${num(a, 2)} V`, `(B) ≈ ${num(b, 2)} V`, `V_{p} ≈ ${num(a, 2)} V`, `A − B ≈ ${num(a - b, 2)} V`, `(≈ ${num(5 - a, 2)} V;`);
+    says(text, `5 ms’de ≈ ${num(vp[0.005]!, 2)} V`, `20 ms’de ≈ ${num(vp[0.02]!, 2)} V`, `0,1 s’de ≈ ${num(vp[0.1]!, 2)} V`);
   });
 });

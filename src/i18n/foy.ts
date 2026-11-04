@@ -92,6 +92,24 @@ export const LAB_EXPERIMENT_TEXTS: Partial<Record<LabExperimentNo, LabExperiment
       { formula: 'ΔV ≈ V_{DC} / (f · R_{L} · C)' },
     ],
   },
+  3: {
+    title: 'Kenetleyici ve gerilim katlayıcılar',
+    aim: 'Kenetleyici ve gerilim katlayıcı devreler kurup özelliklerini incelemek.',
+    theory: [
+      {
+        text: 'Kenetleyici (Şekil-6) bir kondansatör, bir diyot ve bir dirençten oluşur; çıkış diyodun uçlarından alınır. Girişe V_{1} ile −V_{2} arasında değişen bir kare dalga uygulansın. Giriş V_{1}’deyken diyot iletir, çıkış ≈ 0 olur ve kondansatör diyodun küçük direnci üzerinden çok çabuk V_{1}’e dolar (τ = R_{d} · C ≈ 0). Giriş −V_{2}’ye inince diyot kesime gider; kondansatör artık yalnızca R üzerinden boşalabilir (τ = R · C) ve gerilimini korur. Çıkış:',
+      },
+      { formula: 'V_{ç} = V_{g} − V_{C},  V_{C} ≈ V_{1}  →  V_{ç}: 0 ile −(V_{1} + V_{2}) arası' },
+      {
+        text: 'R · C, dalganın yarım periyodundan çok büyükse kondansatör pek boşalmaz ve çıkış negatif bölgeye “kenetlenir” (Şekil-7b): dalganın biçimi ve tepe-tepe değeri değişmez, yalnızca DC seviyesi kayar. Diyot ters bağlanırsa dalga pozitif bölgeye kenetlenir (pozitif kenetleyici).',
+      },
+      {
+        text: 'Gerilim katlayıcıda (Şekil-8) girişin pozitif yarısında D1 iletir ve C1 girişin tepe değerine (V_{T}) dolar; negatif yarısında D2 iletir ve C2 de V_{T}’ye dolar. D1 kesimde olduğu için C1 bu sırada boşalamaz; iki kondansatörün gerilimi seri toplanır:',
+      },
+      { formula: 'V_{ç} = V_{C1} + V_{C2} = 2V_{T}' },
+      { text: 'Çıkıştan akım çekilirse kondansatörler aralarda boşalır: gerilim 2V_{T}’yi koruyamaz ve DC’nin üstüne bir AC bileşen (dalgalanma) biner.' },
+    ],
+  },
 };
 
 export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
@@ -239,6 +257,63 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
         question: 'Girişe 5V genlikte sinüs sinyali uygulayınız. Giriş ve çıkışı osiloskopta aynı anda gözleyip değerlendiriniz.',
         answer:
           'Giriş ±5 V salınır; çıkış iki yarıda da pozitiftir. Pozitif yarıda D1 ile D3, negatif yarıda D2 ile D4 iletir; akım R_{L}’den hep aynı yönde geçer. Çıkışın tepesi ≈ 4,36 V: her yarıda iki diyot iletir ve 100 kΩ’da akım ≈ 44 µA kadar küçük olduğundan her biri ≈ 0,32 V düşürür. Çıkış her yarım periyotta tekrarlar: frekansı 2 kHz, girişinkinin iki katı. Ortalaması ≈ 2,63 V (ideal formül 2V_{T} / π tepeden ≈ 2,77 V verir; sıfır geçişlerinde giriş iki diyodun eşiğini aşana kadar çıkış 0’da kalır). Yükün iki ucu da topraktan farklı gerilimde olduğu için osiloskobun COM’u yükün bir ucuna bağlanamaz (COM şebeke toprağında); yük iki kanalla ölçülür. Y-t’de A (yükün + ucu) pozitif yarıda ≈ 4,68 V’a çıkar, B (− ucu) negatif yarıda ≈ −4,68 V’a iner; her biri öbür yarıda bir diyot gerilimi kadar sıfırdan ayrılır.',
+      },
+    ],
+  },
+  'negatif-kenetleyici': {
+    experiment: 3,
+    figure: 'Şekil-9a',
+    steps: [
+      {
+        no: '1',
+        text: 'Şekil-9’daki devreleri kur; girişlerine 1 kHz’lik önce sinüs, sonra kare dalga uygula. Giriş ve çıkış sinyallerini osiloskopta birlikte izleyip ölçekli olarak çiz.',
+        sim: 'Devre kurulu: FG1 1 kHz, 10 V tepe-tepe sinüs; C = 2,2 µF, 1N4001’in anodu çıkışta, R = 10 kΩ. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta, ikisi de DC kuplaj, 5 V/bölme; zaman/bölme 0,5 ms. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+      },
+    ],
+    questions: [
+      {
+        step: '1',
+        question: 'Girişlerine 1KHz frekanslı önce sinüs daha sonra kare dalga uygulayınız. Giriş ve çıkış sinyallerini osiloskopta aynı anda gözleyerek ölçekli olarak çiziniz.',
+        answer:
+          'Sinüste (10 V tepe-tepe) giriş ±5 V salınırken çıkış ≈ +0,57 V ile ≈ −9,11 V arasında salınır: biçim ve tepe-tepe değer (≈ 9,7 V) aynı, dalga yalnızca aşağı kaymıştır (ortalaması ≈ −4,16 V). Pozitif tepede diyot iletir ve kondansatör girişin tepesine yakın bir gerilime dolar; bu gerilim girişe seri bir pil gibi bütün dalgayı aşağı taşır. Üst seviye 0 değil ≈ +0,57 V’tur: diyodun iletim gerilimi. Oynat’a bastıktan sonra kenetleme birkaç periyotta oturur (ilk periyotta alt tepe ≈ −8,49 V). Kare dalgada (±5 V) çıkış ≈ +0,52 V ile ≈ −9,52 V arasında bir kare dalgadır: föydeki Şekil-7b’deki gibi 0 ile −(V_{1} + V_{2}) = −10 V arası, diyot gerilimi kadar yukarıda. Alt seviyede kondansatör 10 kΩ üzerinden biraz boşalır: yarım periyotta ≈ 0,2 V yükselir. R · C = 22 ms, yarım periyottan (0,5 ms) çok büyük olduğu için bu eğim küçüktür. 5 V/bölmede çıkış sıfırın hemen üstünden yaklaşık iki bölme aşağıya uzanır.',
+      },
+    ],
+  },
+  'pozitif-kenetleyici': {
+    experiment: 3,
+    figure: 'Şekil-9b',
+    steps: [
+      {
+        no: '1',
+        text: 'Şekil-9’daki devreleri kur; girişlerine 1 kHz’lik önce sinüs, sonra kare dalga uygula. Giriş ve çıkış sinyallerini osiloskopta birlikte izleyip ölçekli olarak çiz.',
+        sim: 'Devre kurulu: negatif kenetleyicinin aynısı, 1N4001’in katodu çıkışta. Kutup notu: föydeki Şekil-9b’de kondansatörün + işareti giriş tarafında çizilmiş; bu devrede kondansatör çıkış tarafı + olacak şekilde dolar, bu yüzden elektrolitiğin + ucu çıkış tarafında (simülasyondaki yön doğru). Osiloskop A girişte, B çıkışta, 5 V/bölme; kare dalga için FG1’in dalga biçimini Kare yap.',
+      },
+    ],
+    questions: [
+      {
+        step: '1',
+        question: 'Girişlerine 1KHz frekanslı önce sinüs daha sonra kare dalga uygulayınız. Giriş ve çıkış sinyallerini osiloskopta aynı anda gözleyerek ölçekli olarak çiziniz.',
+        answer:
+          'Negatif kenetleyicinin aynası: sinüste çıkış ≈ −0,57 V ile ≈ +9,11 V arasında salınır (ortalaması ≈ +4,16 V); dalga yukarı kaymıştır, en alt noktası bir diyot gerilimi kadar sıfırın altındadır. Negatif tepede diyot iletir ve kondansatör dolar; kondansatörün çıkış tarafı + olur. Kare dalgada (±5 V) çıkış ≈ −0,52 V ile ≈ +9,53 V arasında bir kare dalgadır; üst seviyede kondansatör 10 kΩ üzerinden biraz boşalır, yarım periyotta ≈ 0,2 V düşer. Diyoda seri bir DC kaynak eklenirse kenetleme seviyesi o kadar kayar (öngerilimli kenetleyici).',
+      },
+    ],
+  },
+  'gerilim-katlayici': {
+    experiment: 3,
+    figure: 'Şekil-10',
+    steps: [
+      {
+        no: '2',
+        text: 'Şekil-10’daki gerilim katlayıcıyı kur (elektrolitik kondansatörlerin kutuplarına dikkat). Girişe 5 V’luk sinüs uygulayıp çıkışı izle. V_{ç}’yi, kondansatörlerin V_{p} gerilimlerini ayrı ayrı ölçerek belirle; sonuçlarını açıkla.',
+        sim: 'Devre kurulu: FG1 1 kHz, 10 V tepe-tepe (5 V genlik); C1 ve C2 10 µF elektrolitik (C1’in + ucu üst çıkışta, C2’nin − ucu alt çıkışta). Osiloskobun COM’u ortada (kondansatörlerin birleştiği düğümde): A üst çıkışı (+V_{p}), B alt çıkışı (−V_{p}) gösterir, 2 V/bölme. V_{ç} için kipi “A + B (ADD)” yap ve B’yi ters çevir (INV): ekranda A − B = V_{ç}.',
+      },
+    ],
+    questions: [
+      {
+        step: '2',
+        question: 'Vç gerilimini kondansatörler üzerindeki Vp gerilimlerini ayrı ayrı ölçerek belirleyiniz. Sonuçlarınızı açıklayınız.',
+        answer:
+          'Her kondansatör girişin tepesine yakın bir gerilime dolar: üst çıkış (A) ≈ +4,63 V, alt çıkış (B) ≈ −4,63 V, yani V_{p} ≈ 4,63 V ve V_{ç} = A − B ≈ 9,25 V ≈ 2V_{p}. V_{p}, girişin 5 V’luk tepesinden bir diyot gerilimi kadar (≈ 0,37 V; akım çok küçük olduğu için az) küçüktür. Pozitif yarıda D1 iletir ve C1’i, negatif yarıda D2 iletir ve C2’yi doldurur; D1 kesimdeyken C1 boşalamaz, iki gerilim seri toplanır. Kondansatörler bir anda dolmaz: V_{p} 5 ms’de ≈ 3,64 V, 20 ms’de ≈ 4,37 V, 0,1 s’de ≈ 4,58 V; tepeye yaklaştıkça diyot her periyotta ancak tepenin kısa bir anında iletir. Çıkışta osiloskoptan başka yük olmadığı için dalgalanma görülmez; çıkıştan akım çekilirse, föyde belirtildiği gibi gerilim düşer ve DC’nin üstüne AC bileşen biner.',
       },
     ],
   },
