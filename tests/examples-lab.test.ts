@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { buildScopeView } from '../src/editor/scopeView';
-import { exampleDoc, type ExampleId } from '../src/examples';
+import { EXAMPLE_GROUPS, exampleDoc, type ExampleId } from '../src/examples';
 import { buildConnectivity } from '../src/model/connectivity';
 import { flipParts, updatePart } from '../src/model/docOps';
 import type { CircuitDoc } from '../src/model/types';
@@ -194,6 +194,18 @@ describe('Deney 3: kenetleyici ve katlayıcı', () => {
 });
 
 describe('Deney 4: kırpıcılar', () => {
+  it('föydeki sıra: Şekil-13a, 13b, 13c, 13d', () => {
+    expect(EXAMPLE_GROUPS.find((g) => g.id === 'kirpici')!.ids).toEqual(['seri-kirpici', 'paralel-kirpici', 'cift-kirpici', 'alt-kirpici']);
+  });
+
+  it('Seri kırpıcı (13a, katot üreteçte): yalnızca negatif yarı geçer, ≈ −9,47 V', () => {
+    const doc = load('seri-kirpici');
+    const sim = run(doc, 0.01);
+    const out = swing(sim, () => sim.voltageAt(`${idOf(doc, 'D1')}#0`)!, 0.004, 1e-5);
+    expect(out.max).toBeLessThan(0.15);
+    between(out.min, -9.55, -9.4);
+  });
+
   it('4 V öngerilimli kırpıcı: ≈ 4,45 V’ta kırpar, negatif yarı geçer', () => {
     const doc = load('paralel-kirpici');
     const sim = run(doc, 0.01);
@@ -208,6 +220,16 @@ describe('Deney 4: kırpıcılar', () => {
     const out = swing(sim, () => sim.voltageAt(`${idOf(doc, 'D1')}#0`)!, 0.004, 1e-5);
     between(out.max, 3.4, 3.5);
     between(out.min, -2.52, -2.42);
+  });
+
+  it('13d (iki diyot da katotla çıkışta): D1 altı ≈ 2,51 V’ta keser, üstü geçer; D2 hiç iletmez', () => {
+    const doc = load('alt-kirpici');
+    const sim = run(doc, 0.01);
+    const out = swing(sim, () => sim.voltageAt(`${idOf(doc, 'D1')}#1`)!, 0.004, 1e-5);
+    between(out.min, 2.45, 2.55);
+    between(out.max, 9.85, 9.95);
+    // D2 hep ters kutuplu (≈ −4,5 ile −11,9 V); içinden yalnızca eklem kapasitesinin µA'lık akımı geçer.
+    expect(swing(sim, () => sim.measure(idOf(doc, 'D2'))!.voltage, 0.004, 1e-5).max).toBeLessThan(-4);
   });
 });
 

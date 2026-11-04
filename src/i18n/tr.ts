@@ -1267,6 +1267,15 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     everyday:
       'Mikrodalga fırınların yüksek gerilim beslemesi, lazer yazıcıların ve fotokopi makinelerinin yüksek gerilim katları, sinek öldürücü raketler ve Geiger sayaçları gerilim katlayıcıyla (çok katlı Cockcroft-Walton) yüksek gerilim üretir.',
   },
+  'seri-kirpici': {
+    title: 'Seri kırpıcı',
+    description:
+      'Föydeki Şekil-13a: fonksiyon üreteci (1 kHz, 20 V tepe-tepe sinüs) bir 1N4001’e bağlı; diyodun katodu üreteçte, anodu çıkışta, 10 kΩ çıkıştan alt hatta. Osiloskobun A kanalı girişi, B kanalı çıkışı gösteriyor. Çıkış ≈ −9,47 V ile 0 V arasında: yalnızca negatif yarılar geçer.',
+    purpose:
+      'Diyot sinyalin yolunda seri durur: girişin anoda göre negatif olduğu yarıda iletir, öbür yarıda keser. Çıkışa girişin negatif yarısı, diyodun eşik gerilimi (≈ 0,5 V) kadar küçülerek gelir; pozitif yarı 10 kΩ üzerinden sıfıra çekilir. Diyodu ters çevirirsen pozitif yarılar geçer.',
+    everyday:
+      'Yarım dalga doğrultmacın ta kendisidir: şarj aletlerinde, sinyalin yalnızca bir yönünü almak gereken dedektörlerde (ör. radyonun genlik dedektörü) ve kutup koruma devrelerinde kullanılır.',
+  },
   'paralel-kirpici': {
     title: 'Öngerilimli paralel kırpıcı (4 V)',
     description:
@@ -1284,6 +1293,15 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
       'Sinyali iki yönden sınırlar ve bir pencerenin içinde tutar. Pozitif tepelerde D1 iletir (3 V + V_{D}), negatif tepelerde D2 iletir (−2 V − V_{D}): çıkış ≈ +3,46 V ile ≈ −2,47 V arasında kalır. Pillerin gerilimini değiştirip pencerenin nasıl kaydığına bak.',
     everyday:
       'Ölçü aletlerinin ve ses kartlarının girişleri bu tür çift diyotla korunur; radyo ve televizyon yayınlarında sinyalin belirli bir genliği aşmaması için sınırlayıcı (limiter) olarak kullanılır.',
+  },
+  'alt-kirpici': {
+    title: 'İki diyot da çıkışa katotla (3 V ve 2 V)',
+    description:
+      'Föydeki Şekil-13d: Şekil-13c’nin aynısı, yalnızca D1 ters: anodu 3 V’luk B1 pilinin + ucunda, katodu çıkışta. D2’nin anodu ters bağlı 2 V’luk B2 pilinin − ucunda (−2 V), katodu çıkışta. Üreteç 1 kHz, 20 V tepe-tepe; 10 kΩ seri. Çıkış ≈ +2,51 V ile +9,90 V arasında.',
+    purpose:
+      'D1, çıkış 3 V − V_{D} ≈ 2,5 V’un altına inmek isteyince iletir ve çıkışı orada tutar: sinyalin altı kesilir, üstü olduğu gibi geçer. D2 hiç iletmez, çünkü çıkış hiçbir zaman −2 V − V_{D}’ye inemez. Bu devre, diyot yönlerinin kırpma seviyesini nasıl belirlediğini Şekil-13c ile karşılaştırarak görmek içindir.',
+    everyday:
+      'Bir sinyalin belirli bir gerilimin altına inmesini engelleyen alt sınırlayıcılar, ölçü girişlerini ters gerilime karşı korur ve video sinyallerinde siyah seviyesini sabitlemekte kullanılır.',
   },
   'jfet-karakteristik': {
     title: 'BF245A: çıkış ve transfer karakteristiği',
@@ -1915,8 +1933,10 @@ export const tr = {
       'negatif-kenetleyici': 'Osiloskopta dalganın aşağı kaymasını izle',
       'pozitif-kenetleyici': 'Osiloskopta dalganın yukarı kaymasını izle',
       'gerilim-katlayici': 'Çıkışın girişin iki katına çıkmasını izle',
+      'seri-kirpici': 'Osiloskopta yalnızca negatif yarıların geçtiğini izle',
       'paralel-kirpici': 'Osiloskopta 4 V’un üstünün kesilmesini izle',
       'cift-kirpici': 'Osiloskopta iki yönden kırpılmayı izle',
+      'alt-kirpici': 'Osiloskopta sinyalin altının 2,5 V’ta kesilmesini izle',
       'jfet-karakteristik': 'Kapı gerilimini değiştir, drain akımını izle',
       'fet-yukseltec': 'Giriş ve çıkış genliklerini karşılaştır',
       'bjt-yukseltec': 'Giriş ve çıkışı osiloskopta karşılaştır',

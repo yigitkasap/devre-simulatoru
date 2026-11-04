@@ -74,6 +74,8 @@ import optokuplorLed from './optokuplor-led.json';
 import schottky1n4001 from './schottky-1n4001.json';
 import kopruDiyot from './kopru-diyot.json';
 import tristorMandal from './tristor-mandal.json';
+import seriKirpici from './seri-kirpici.json';
+import altKirpici from './alt-kirpici.json';
 
 /**
  * Örnekler penceresindeki klasörler: içindeki gruplar ana listede değil, klasörün kendi görünümünde.
@@ -116,7 +118,8 @@ export const EXAMPLE_GROUPS = [
   { id: 'diyot-karakteristigi', folder: 'akdeniz', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi', 'schottky-1n4001'] },
   { id: 'dogrultucu', folder: 'akdeniz', ids: ['yarim-dalga', 'kopru-dogrultmac', 'kopru-diyot'] },
   { id: 'kenetleyici', folder: 'akdeniz', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
-  { id: 'kirpici', folder: 'akdeniz', ids: ['paralel-kirpici', 'cift-kirpici'] },
+  // Föydeki sıra: Şekil-13a, 13b, 13c, 13d.
+  { id: 'kirpici', folder: 'akdeniz', ids: ['seri-kirpici', 'paralel-kirpici', 'cift-kirpici', 'alt-kirpici'] },
   { id: 'fet-karakteristigi', folder: 'akdeniz', ids: ['jfet-karakteristik'] },
   { id: 'fet-yukseltec', folder: 'akdeniz', ids: ['fet-yukseltec'] },
   { id: 'bjt-yukseltec', folder: 'akdeniz', ids: ['bjt-yukseltec'] },
@@ -200,6 +203,8 @@ const DATA: Record<ExampleId, unknown> = {
   'gerilim-katlayici': gerilimKatlayici,
   'paralel-kirpici': paralelKirpici,
   'cift-kirpici': ciftKirpici,
+  'seri-kirpici': seriKirpici,
+  'alt-kirpici': altKirpici,
   'jfet-karakteristik': jfetKarakteristik,
   'fet-yukseltec': fetYukseltec,
   'bjt-yukseltec': bjtYukseltec,

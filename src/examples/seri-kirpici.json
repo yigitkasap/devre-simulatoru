@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "parts": [
+    {"id": "p1", "type": "funcgen", "label": "FG1", "x": 0, "y": 0, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 20, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
+    {"id": "p2", "type": "diode", "label": "D1", "x": 14, "y": -8, "rotation": 180, "props": {"model": "1N4001"}},
+    {"id": "p3", "type": "resistor", "label": "R1", "x": 24, "y": 0, "rotation": 90, "props": {"resistance": 10000}},
+    {"id": "p4", "type": "oscilloscope", "label": "OSC1", "x": 40, "y": 0, "rotation": 0, "props": {"timePerDiv": 0.0005, "voltsPerDivA": 5, "voltsPerDivB": 5, "positionA": 0, "positionB": 0, "couplingA": "dc", "couplingB": "dc", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
+    {"id": "p5", "type": "ground", "label": "GND1", "x": 8, "y": 8, "rotation": 0, "props": {}}
+  ],
+  "wires": [
+    {"id": "w1", "points": [[5, -2], [8, -2], [8, -8], [10, -8]]},
+    {"id": "w2", "points": [[18, -8], [24, -8], [24, -4]]},
+    {"id": "w3", "points": [[24, 4], [24, 8], [8, 8], [8, 2], [5, 2]]},
+    {"id": "w4", "points": [[8, -8], [8, -12], [32, -12], [32, -2], [35, -2]]},
+    {"id": "w5", "points": [[24, -8], [30, -8], [30, 0], [35, 0]]},
+    {"id": "w6", "points": [[24, 8], [33, 8], [33, 2], [35, 2]]}
+  ]
+}
