@@ -21,6 +21,7 @@ import { ek } from '../i18n/ek';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { CATALOG, withProp, type NumberPropDef, type PropDef } from '../model/catalog';
 import { operable } from '../model/task';
+import { partTitle } from '../model/docOps';
 import type { Part } from '../model/types';
 import type { DeviceType, PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
@@ -33,7 +34,7 @@ import { spdtThrow } from '../sim/devices/spdt';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
 import { ExampleDetails, ExtraTag, groupOf, labBadge } from './ExampleTab';
 import { Icon, type IconName } from './icons';
-import { FieldError, fieldTone, LabelField, MultiSelection, PropField, RACK_DEVICES, selectionActions, useCommitField, WireDetails, type InspectTabProps, type PartPatch, type TaskParts } from './InspectTab';
+import { FieldError, fieldTone, LabelField, MultiSelection, NoteField, PropField, RACK_DEVICES, selectionActions, useCommitField, WireDetails, type InspectTabProps, type PartPatch, type TaskParts } from './InspectTab';
 import { lm317Note } from './lm317Divider';
 import { stableReadout } from './liveReadout';
 import type { MessageItem } from './messages';
@@ -746,12 +747,13 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
           data-nav
           onClick={() => onSelectPart(part.id)}
           aria-expanded={false}
-          aria-label={`${t.openCard(part.label, typeName)}${reading ? `, ${reading.main}` : value ? `, ${value}` : ''}`}
+          aria-label={`${t.openCard(partTitle(part), typeName)}${reading ? `, ${reading.main}` : value ? `, ${value}` : ''}`}
           className={`flex shrink-0 items-center gap-3 px-3 text-left hover:bg-panel-2 ${touch ? 'min-h-14' : 'min-h-[52px]'}`}
         >
           <IconBox type={part.type} resistorStyle={settings.resistorStyle} />
           <span className="min-w-0 flex-1 truncate">
-            <span className="font-mono text-sm font-semibold">{part.label}</span>{' '}
+            <span className="font-mono text-sm font-semibold">{part.label}</span>
+            {part.note && <span className="text-sm font-medium text-ink-2"> {part.note}</span>}{' '}
             <span className="text-small text-muted">
               {typeName}
               {reading && value ? ` ${value}` : ''}
@@ -781,7 +783,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
   }
 
   return (
-    <section data-card={part.id} data-notebook="card" data-nav tabIndex={-1} aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 border-l-[3px] border-accent bg-panel pt-3 pr-3.5 pb-3.5 pl-[11px]">
+    <section data-card={part.id} data-notebook="card" data-nav tabIndex={-1} aria-label={`${partTitle(part)} · ${typeName}`} className="flex shrink-0 flex-col gap-3 border-l-[3px] border-accent bg-panel pt-3 pr-3.5 pb-3.5 pl-[11px]">
       <OpenCardHeader
         {...props}
         fixed={locked ? 'locked' : props.taskParts?.plugged?.has(part.id) ? 'plugged' : null}
@@ -871,7 +873,8 @@ function OpenCardHeader({
     <div className="flex items-center gap-2">
       <SymbolIcon type={part.type} resistorStyle={settings.resistorStyle} className="max-h-[18px] w-[34px] shrink-0 text-accent-ink" />
       <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
-        {part.label} <span className="font-normal text-muted">· {tr.devices.names[part.type]}</span>
+        {part.label}
+        {part.note && <span className="font-medium text-ink-2"> {part.note}</span>} <span className="font-normal text-muted">· {tr.devices.names[part.type]}</span>
       </h3>
       {badges}
       {onFocus3d &&
@@ -1169,6 +1172,7 @@ function MoreSettings({ part, doc, values, status, onUpdatePart, onFlip, locked 
       {open && (
         <div id={id} className="flex flex-col gap-3 pt-1">
           {field(null, <LabelField label={part.label} otherLabels={otherLabels} inputRef={undefined} onCommit={(label) => onUpdatePart(part.id, { label })} />)}
+          {field(null, <NoteField key="note" note={part.note ?? ''} onCommit={(note) => onUpdatePart(part.id, { note })} />)}
           {rest.map((prop) =>
             field(
               prop.key,

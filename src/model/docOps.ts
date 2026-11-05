@@ -53,14 +53,30 @@ export function addWire(doc: CircuitDoc, points: readonly Point[]): { doc: Circu
   return { doc: { ...doc, wires: [...doc.wires, { id, points: clean }] }, id };
 }
 
+/** Parçanın notunun en çok uzunluğu (karakter). */
+export const NOTE_MAX = 24;
+
+/** Etiket ve not birlikte ("S4 · D (8)"); notsuz parçada yalnızca etiket. Kartta, 3B'de, Tahtada kur'da. */
+export function partTitle(part: Pick<Part, 'label' | 'note'>): string {
+  return part.note ? `${part.label} · ${part.note}` : part.label;
+}
+
+/** Parçanın adını, notunu ya da değerlerini değiştirir. Boş not alanı kaldırır. */
 export function updatePart(
   doc: CircuitDoc,
   id: string,
-  patch: { label?: string; props?: Readonly<Record<string, PropValue>> },
+  patch: { label?: string; note?: string; props?: Readonly<Record<string, PropValue>> },
 ): CircuitDoc {
   return {
     ...doc,
-    parts: doc.parts.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    parts: doc.parts.map((p) => {
+      if (p.id !== id) return p;
+      const next = { ...p, ...patch };
+      if (patch.note === undefined) return next;
+      const note = patch.note.trim().slice(0, NOTE_MAX);
+      const { note: _old, ...rest } = next;
+      return note ? { ...rest, note } : rest;
+    }),
   };
 }
 

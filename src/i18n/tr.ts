@@ -3511,6 +3511,10 @@ export const tr = {
   properties: {
     title: (label: string, type: string) => `${label} · ${type}`,
     name: 'Ad',
+    note: 'Not',
+    noteOptional: 'isteğe bağlı',
+    notePlaceholder: 'ör. Toplam',
+    noteHint: (max: number) => `Şemada adın altında görünür; en çok ${max} karakter.`,
     ok: 'Tamam',
     cancel: 'İptal',
     fieldLabel,

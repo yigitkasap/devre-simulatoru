@@ -20,6 +20,7 @@ import { cardReading, useSlowFrame } from './Notebook';
 import { partValueText } from './PartView';
 import type { Settings } from './settings';
 import type { SimFrame } from './useSimulation';
+import { partTitle } from '../model/docOps';
 
 const Bench3D = lazy(() => import('../bench3d/Bench3D'));
 
@@ -376,7 +377,7 @@ function BenchLabel({ part, frame, measured, selected }: { part: Part; frame: Si
       className={`absolute top-0 left-0 flex flex-col rounded-lg px-2.5 py-1.5 leading-tight whitespace-nowrap opacity-0 shadow-md ${selected ? 'bg-accent text-white' : 'bg-ink text-on-ink'}`}
     >
       <span className="text-[13px] font-semibold">
-        {part.label} · {partValueText(part) || tr.devices.names[part.type]}
+        {partTitle(part)} · {partValueText(part) || tr.devices.names[part.type]}
       </span>
       {reading && (
         <span className={`font-mono tabular ${reading.big ? 'text-[17px] font-medium' : 'text-[12px] opacity-85'}`}>

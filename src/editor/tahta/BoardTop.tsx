@@ -21,6 +21,7 @@ import type { PinRef } from '../../tahta/check';
 import { isLocked, leadKey, wireKey, type Locks } from '../../tahta/task';
 import { Icon } from '../icons';
 import { partValueText } from '../PartView';
+import { partTitle } from '../../model/docOps';
 
 /** Takılmakta olan parça: iki bacaklıda ilk bacağın deliği; `turned`: R (bacak sırası / kılıf 180°). */
 export interface Placing {
@@ -971,14 +972,14 @@ export function BoardTop(props: BoardTopProps) {
         )}
         {hoverBox && hoveredPart && (
           <span className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-lg bg-ink px-2.5 py-1 text-small font-semibold whitespace-nowrap text-on-ink shadow-md" style={{ left: hoverBox.x, top: hoverBox.y }}>
-            {hoveredPart.label}
+            {partTitle(hoveredPart)}
             {partValueText(hoveredPart) ? ` · ${partValueText(hoveredPart)}` : ''}
           </span>
         )}
         {selectedBox && selectedPart && (
           <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-lg border border-line bg-panel p-1 shadow-md" style={{ left: selectedBox.x, top: selectedBox.y }} onPointerDown={(e) => e.stopPropagation()}>
             <span className="px-2 text-small font-semibold">
-              {selectedPart.label}
+              {partTitle(selectedPart)}
               {partValueText(selectedPart) ? ` · ${partValueText(selectedPart)}` : ''}
             </span>
             {lockedPart(selectedPart.id) && (
@@ -1080,7 +1081,7 @@ export function BoardTop(props: BoardTopProps) {
       {placing && placingPart && !props.phone && (
         <div className="absolute bottom-[72px] left-1/2 z-20 flex max-w-[calc(100%-32px)] -translate-x-1/2 flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl bg-ink py-1.5 pr-2 pl-4 text-small whitespace-nowrap text-on-ink shadow-lg" role="group" aria-label={tr.tahta.placePart(placingPart.label)}>
           <b className="font-semibold">
-            {placingPart.label} {partValueText(placingPart)}
+            {partTitle(placingPart)} {partValueText(placingPart)}
           </b>
           <span className="opacity-40">|</span>
           {isFixed(placingPart.type) ? (

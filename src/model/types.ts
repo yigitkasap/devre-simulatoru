@@ -23,6 +23,11 @@ export interface Part {
   readonly type: DeviceType;
   /** Tuvalde görünen ad (R1, B1...). */
   readonly label: string;
+  /**
+   * İsteğe bağlı kısa not (en çok NOTE_MAX karakter; ör. "Toplam", "D (8)"). Şemada etiketin altında,
+   * kartta, 3B'de ve Tahtada kur'da etiketin yanında; KiCad referansına, PCB yazısına ve ağ adlarına girmez.
+   */
+  readonly note?: string;
   readonly x: number;
   readonly y: number;
   /** Saat yönünde döndürme (ekranda y aşağı doğru). */

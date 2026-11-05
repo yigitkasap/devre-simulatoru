@@ -4,7 +4,7 @@
 // {
 //   "version": 1,
 //   "parts": [{ "id": "p1", "type": "resistor", "label": "R1", "x": 0, "y": 0, "rotation": 0,
-//               "props": { "resistance": 1000 } }],
+//               "props": { "resistance": 1000 }, "note": "Toplam" }],   (note isteğe bağlı)
 //   "wires": [{ "id": "w1", "points": [[4, 0], [10, 0]] }],
 //   "build": { ... }   (Tahtada kur; isteğe bağlı, model/build.ts)
 // }
@@ -13,6 +13,7 @@ import type { PropValue } from '../sim/netlist';
 import { serializeAnalysis, type AnalysisDoc } from './analysis';
 import { parseBuild, serializeBuild } from './build';
 import { isDeviceType } from './catalog';
+import { NOTE_MAX } from './docOps';
 import { DOC_VERSION, type CircuitDoc, type Part, type Point, type Rotation, type Wire } from './types';
 import { normalizePoints } from './wires';
 
@@ -22,6 +23,7 @@ interface SerializedDoc {
     id: string;
     type: string;
     label: string;
+    note?: string;
     x: number;
     y: number;
     rotation: number;
@@ -43,6 +45,7 @@ export function toSerializable(doc: CircuitDoc, analysis?: AnalysisDoc): Seriali
       id: p.id,
       type: p.type,
       label: p.label,
+      ...(p.note ? { note: p.note } : {}),
       x: p.x,
       y: p.y,
       rotation: p.rotation,
@@ -82,7 +85,7 @@ export function parseDoc(value: unknown): CircuitDoc | null {
   const outParts: Part[] = [];
   for (const raw of parts) {
     if (!isRecord(raw)) return null;
-    const { id, type, label, x, y, rotation, props } = raw;
+    const { id, type, label, x, y, rotation, props, note } = raw;
     if (typeof id !== 'string' || id === '' || ids.has(id)) return null;
     if (!isDeviceType(type) || typeof label !== 'string' || !isCoord(x) || !isCoord(y)) return null;
     if (typeof rotation !== 'number' || !ROTATIONS.includes(rotation) || !isRecord(props)) return null;
@@ -91,7 +94,9 @@ export function parseDoc(value: unknown): CircuitDoc | null {
       if ((typeof v === 'number' && Number.isFinite(v)) || typeof v === 'string' || typeof v === 'boolean') cleanProps[key] = v;
     }
     ids.add(id);
-    outParts.push({ id, type, label: label.slice(0, 24), x, y, rotation: rotation as Rotation, props: cleanProps });
+    // Not isteğe bağlı: yoksa (eski devreler) ya da metin değilse alan hiç eklenmez.
+    const cleanNote = typeof note === 'string' ? note.trim().slice(0, NOTE_MAX) : '';
+    outParts.push({ id, type, label: label.slice(0, 24), ...(cleanNote ? { note: cleanNote } : {}), x, y, rotation: rotation as Rotation, props: cleanProps });
   }
 
   const wireIds = new Set<string>();

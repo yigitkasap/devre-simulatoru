@@ -17,6 +17,7 @@ import type { SimStatus } from '../useSimulation';
 import type { Locks } from '../../tahta/task';
 import { partValueText } from '../PartView';
 import { boardParts, exampleText, ProblemCard, requiredLeads, terminalName, type Cabling, type Placing } from './BoardMode';
+import { partTitle } from '../../model/docOps';
 
 export interface PhoneBoardSheetProps {
   readonly doc: CircuitDoc;
@@ -99,7 +100,7 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
     const part = placing ? doc.parts.find((p) => p.id === placing.partId) : undefined;
     const leadPart = cabling?.kind === 'lead' ? doc.parts.find((p) => p.id === cabling.part) : undefined;
     const title = part
-      ? `${part.label}${partValueText(part) ? ` · ${partValueText(part)}` : ''}`
+      ? `${partTitle(part)}${partValueText(part) ? ` · ${partValueText(part)}` : ''}`
       : leadPart && cabling?.kind === 'lead'
         ? tr.tahta.phone.leadTitle(`${leadPart.label} ${terminalName(leadPart, cabling.pin)}`)
         : tr.tahta.wireTool;
@@ -337,6 +338,7 @@ function BoxBody(
             <li key={part.id} className="flex min-h-12 items-center gap-3 rounded-lg border border-line bg-panel pr-1.5 pl-3">
               <b className="w-11 shrink-0 text-[15px] font-semibold">{part.label}</b>
               <span className="min-w-0 flex-1 truncate text-[15px] text-ink-2">
+                {part.note && <b className="font-semibold text-ink">{part.note} · </b>}
                 {tr.devices.names[part.type]}
                 {value ? ` ${value}` : ''}
               </span>

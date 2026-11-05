@@ -6,6 +6,7 @@ import { useEffect, useId, useState, type ReactNode, type Ref } from 'react';
 import { tr } from '../i18n/tr';
 import { CATALOG, type NumberPropDef, type PropDef } from '../model/catalog';
 import type { CircuitDoc, Part } from '../model/types';
+import { NOTE_MAX } from '../model/docOps';
 import { LED_MODELS, type LedColor } from '../sim/devices/led';
 import type { PropValue } from '../sim/netlist';
 import { formatEditable, formatSI } from '../sim/units';
@@ -20,6 +21,8 @@ import type { SimFrame, SimStatus } from './useSimulation';
 
 export interface PartPatch {
   readonly label?: string;
+  /** Boş metin notu kaldırır. */
+  readonly note?: string;
   readonly props?: Record<string, PropValue>;
 }
 
@@ -184,6 +187,46 @@ export function LabelField({
         />
       </div>
       {field.error && <FieldError id={`${id}-e`} error={field.error} />}
+    </div>
+  );
+}
+
+/** Parçanın isteğe bağlı notu (ör. "Toplam"): Enter'da ya da odak çıkınca uygulanır, boşsa kalkar. */
+export function NoteField({ note, onCommit }: { note: string; onCommit: (note: string) => void }) {
+  const id = useId();
+  const field = useCommitField(
+    note,
+    (text) => ({ value: text.trim().slice(0, NOTE_MAX) }),
+    (value) => {
+      if (value !== note) onCommit(value);
+      return value;
+    },
+  );
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-small font-medium">
+        {tr.properties.note} <span className="font-normal text-muted">({tr.properties.noteOptional})</span>
+      </label>
+      <div className={`${FIELD_BOX} ${fieldTone(false)}`}>
+        <input
+          id={id}
+          value={field.text}
+          maxLength={NOTE_MAX}
+          autoComplete="off"
+          placeholder={tr.properties.notePlaceholder}
+          aria-describedby={`${id}-h`}
+          onChange={(e) => field.setText(e.target.value)}
+          onBlur={field.commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') field.commit();
+            if (e.key === 'Escape') field.revert();
+          }}
+          className="h-full min-w-0 flex-1 bg-transparent px-2.5 text-[15px] outline-none"
+        />
+      </div>
+      <span id={`${id}-h`} className="text-label text-muted">
+        {tr.properties.noteHint(NOTE_MAX)}
+      </span>
     </div>
   );
 }

@@ -143,6 +143,10 @@ export interface PartViewProps {
 }
 
 const LABEL_STYLE = { fontFamily: 'var(--font-sans)', fontSize: 11 } as const;
+/** Not: etiketin altında küçük ve soluk. */
+const NOTE_STYLE = { fontFamily: 'var(--font-sans)', fontSize: 9.5 } as const;
+/** Not satırının yüksekliği (px). */
+const NOTE_H = 11;
 
 export const PartView = memo(function PartView({
   part,
@@ -173,7 +177,7 @@ export const PartView = memo(function PartView({
   const displayRect = meterDisplayRect(part, displayFlip);
   const displayX = displayRect.x * GRID - part.x * GRID;
   const displayY = displayRect.y * GRID - part.y * GRID;
-  const { anchor, nameX, nameY, valueY } = labelLayout(part, displayFlip);
+  const { anchor, nameX, nameY, valueY, noteY } = labelLayout(part, displayFlip);
 
   return (
     <g transform={`translate(${part.x * GRID} ${part.y * GRID})`} style={{ color }}>
@@ -228,6 +232,11 @@ export const PartView = memo(function PartView({
           {part.label}
         </text>
       )}
+      {noteY !== null && !hideValue && (
+        <text x={nameX} y={noteY} textAnchor={anchor} style={NOTE_STYLE} fill="var(--color-muted)" opacity={0.8} data-note="">
+          {part.note}
+        </text>
+      )}
       {value && !isMeter && !hideValue && (
         <text x={nameX} y={valueY} textAnchor={anchor} style={LABEL_STYLE} fill="var(--color-muted)" className="tabular">
           {value}
@@ -237,11 +246,29 @@ export const PartView = memo(function PartView({
   );
 });
 
+type LabelLayout = { anchor: 'middle' | 'start' | 'end'; nameX: number; nameY: number; valueY: number };
+
 /**
- * Ad ve değer yazılarının yeri (px, parçanın konumuna göre): yatay parçada ad üstte, değer altta;
- * dikey parçada ikisi de sağda. Ölçü aletinde ad ekranın karşı tarafında.
+ * Ad, not ve değer yazılarının yeri (px, parçanın konumuna göre; yazının taban çizgisi). Not (varsa)
+ * adın hemen altında: ad gövdenin üstündeyse ad bir satır yukarı çıkar, not adın yerine gelir; ad
+ * gövdenin altındaysa (ölçü aleti) not onun altına; yandaysa ad, not ve değer üst üste ortalanır.
  */
-export function labelLayout(part: Part, displayFlip: boolean): { anchor: 'middle' | 'start' | 'end'; nameX: number; nameY: number; valueY: number } {
+export function labelLayout(part: Part, displayFlip: boolean): LabelLayout & { noteY: number | null } {
+  const base = baseLabelLayout(part, displayFlip);
+  if (!part.note) return { ...base, noteY: null };
+  const box = rotatedBox(CATALOG[part.type].bounds, part.rotation, { x: 0, y: 0 });
+  const top = box.y * GRID;
+  const bottom = (box.y + box.h) * GRID;
+  if (base.nameY < top || base.valueY === base.nameY) return { ...base, nameY: base.nameY - NOTE_H, noteY: base.nameY };
+  if (base.nameY > bottom) return { ...base, noteY: base.nameY + NOTE_H };
+  return { ...base, nameY: base.nameY - NOTE_H / 2, noteY: base.nameY + NOTE_H / 2, valueY: base.valueY + NOTE_H / 2 };
+}
+
+/**
+ * Ad ve değer yazılarının yeri (notsuz): yatay parçada ad üstte, değer altta; dikey parçada ikisi de
+ * sağda. Ölçü aletinde ad ekranın karşı tarafında.
+ */
+function baseLabelLayout(part: Part, displayFlip: boolean): LabelLayout {
   const def = CATALOG[part.type];
   const box = rotatedBox(def.bounds, part.rotation, { x: 0, y: 0 });
   const left = box.x * GRID;
@@ -284,15 +311,20 @@ const TEXT_H = 11.5;
 /** Parçanın tuvaldeki yazılarının kutuları (ızgara birimi; harf sayısından yaklaşık genişlik). */
 export function partTextBoxes(part: Part, displayFlip: boolean): Box[] {
   const def = CATALOG[part.type];
-  const { anchor, nameX, nameY, valueY } = labelLayout(part, displayFlip);
+  const { anchor, nameX, nameY, valueY, noteY } = labelLayout(part, displayFlip);
   const isMeter = METER_DISPLAY.has(part.type);
-  const box = (text: string, x: number, baseline: number): Box => {
-    const w = text.length * CHAR_W;
+  const box = (text: string, x: number, baseline: number, scale = 1): Box => {
+    const w = text.length * CHAR_W * scale;
     const left = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
-    return { x: part.x + left / GRID, y: part.y + (baseline - TEXT_ASCENT) / GRID, w: w / GRID, h: TEXT_H / GRID };
+    return { x: part.x + left / GRID, y: part.y + (baseline - TEXT_ASCENT * scale) / GRID, w: w / GRID, h: (TEXT_H * scale) / GRID };
   };
   const value = partValueText(part);
-  return [...(def.showLabel ? [box(part.label, nameX, nameY)] : []), ...(value && !isMeter ? [box(value, nameX, valueY)] : [])];
+  const noteScale = NOTE_STYLE.fontSize / LABEL_STYLE.fontSize;
+  return [
+    ...(def.showLabel ? [box(part.label, nameX, nameY)] : []),
+    ...(value && !isMeter ? [box(value, nameX, valueY)] : []),
+    ...(part.note && noteY !== null ? [box(part.note, nameX, noteY, noteScale)] : []),
+  ];
 }
 
 const CHARGE_LENGTH = 30;

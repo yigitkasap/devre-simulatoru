@@ -26,6 +26,7 @@ import { Icon, type IconName } from '../icons';
 import { partValueText } from '../PartView';
 import type { Settings } from '../settings';
 import { BoardTop, pickedIn, Swatch, terminalName, type BoardCommands, type BoardGhost, type BoardMark, type Cabling, type Pick, type Placing } from './BoardTop';
+import { partTitle } from '../../model/docOps';
 
 export type { Cabling, Placing } from './BoardTop';
 export { terminalName } from './BoardTop';
@@ -198,7 +199,7 @@ export function BoardStage(props: BoardStageProps) {
             className="absolute top-0 left-0 flex flex-col items-center gap-1 overflow-hidden rounded-xl border border-line-2 bg-panel px-2 pt-2 text-center opacity-0 shadow-sm"
           >
             <span className="w-full truncate rounded-md bg-panel-2 px-2 py-1 text-[12px] leading-tight font-semibold">
-              {part.label} · {tr.devices.names[part.type]}
+              {partTitle(part)} · {tr.devices.names[part.type]}
               {summary && <span className="block truncate font-mono text-[11px] font-normal text-ink-2">{summary}</span>}
             </span>
           </div>
@@ -781,6 +782,7 @@ export function BoardPanel(props: BoardPanelProps) {
                     {part.label}
                   </b>
                   <span className="min-w-0 flex-1 truncate text-small text-ink-2">
+                    {part.note && <b className="font-semibold text-ink">{part.note} · </b>}
                     {tr.devices.names[part.type]}
                     {value ? ` ${value}` : ''}
                   </span>
