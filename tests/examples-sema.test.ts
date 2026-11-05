@@ -146,12 +146,8 @@ describe('Örnek şemaları', () => {
     }
   });
 
-  // Eski örnek: P1'in değer yazısı ("10 kΩ · %50") Arduino'nun 3V3 bacağının ucuna değiyor.
-  const TEXT_OVERLAP_ALLOWED: ReadonlySet<ExampleId> = new Set(['ard-potansiyometre']);
-
   it('parçaların yazıları (ad, değer) birbirine ve başka parçaların gövdesine binmiyor', () => {
     for (const id of EXAMPLE_IDS) {
-      if (TEXT_OVERLAP_ALLOWED.has(id)) continue;
       const doc = exampleDoc(id)!;
       const texts = doc.parts.flatMap((part) => {
         const others = doc.parts.filter((o) => o !== part).map(partBounds);
