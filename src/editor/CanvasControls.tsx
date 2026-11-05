@@ -36,7 +36,7 @@ export function CanvasControls({
   );
   return (
     <div className={`absolute bottom-4 z-10 flex items-center gap-2 ${side === 'left' ? 'left-4' : 'right-4 flex-row-reverse'}`}>
-      <div role="group" aria-label={tr.toolbar.view} className={`flex items-stretch overflow-hidden rounded-md border border-line bg-panel shadow-md ${touch ? 'h-11' : 'h-9'}`}>
+      <div role="group" aria-label={tr.toolbar.zoomLevel} className={`flex items-stretch overflow-hidden rounded-md border border-line bg-panel shadow-md ${touch ? 'h-11' : 'h-9'}`}>
         {button('minus', tr.toolbar.zoomOut, onZoomOut)}
         <span role="status" title={tr.toolbar.zoomLevel} className="flex min-w-[52px] items-center justify-center font-mono text-label text-ink-2 tabular">
           <span className="sr-only">{tr.toolbar.zoomLevel}: </span>%{zoom}
