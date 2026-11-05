@@ -106,7 +106,7 @@ export function FuncGenControls({
       <div
         role="img"
         aria-label={`${tr.rack.frequency}: ${freq}`}
-        className="flex items-baseline justify-between rounded-[10px] bg-lcd-bg px-3.5 py-2 shadow-[inset_0_2px_6px_rgba(0,0,0,0.4)]"
+        className="flex items-baseline justify-between rounded-lg bg-lcd-bg px-3.5 py-2 shadow-[inset_0_2px_6px_rgba(0,0,0,0.4)]"
       >
         <span className="text-label text-lcd-dim">{tr.rack.frequency}</span>
         <span className="font-mono text-lcd-fg tabular">
@@ -124,7 +124,7 @@ export function FuncGenControls({
               role="radio"
               aria-checked={checked}
               onClick={() => !checked && onChange({ waveform: w })}
-              className={`flex min-w-0 flex-1 ${touch ? 'h-14' : 'h-12'} flex-col items-center justify-center gap-0.5 rounded-[10px] text-[13px] ${
+              className={`flex min-w-0 flex-1 ${touch ? 'h-14' : 'h-12'} flex-col items-center justify-center gap-0.5 rounded-md text-[13px] ${
                 checked ? 'border-2 border-ink bg-panel font-semibold' : 'border border-rack-line bg-key font-medium'
               }`}
             >
@@ -205,7 +205,7 @@ export function FuncGenControls({
         touch={touch}
       />
       <ToggleRow label={tr.rack.earthed} note={tr.phone.earthedNote} checked={s.earthed} onChange={(earthed) => onChange({ earthed })} touch={touch} />
-      <p className="rounded-[10px] bg-panel px-3 py-2.5 text-[13px] leading-normal text-ink-2">
+      <p className="rounded-lg bg-panel px-3 py-2.5 text-[13px] leading-normal text-ink-2">
         <HintText text={output === null ? tr.phone.outputStopped : tr.phone.output(`${output.approx ? '≈ ' : ''}${formatSI(output.value, 'V', { digits: 3 })}`)} />
       </p>
       <Jacks>

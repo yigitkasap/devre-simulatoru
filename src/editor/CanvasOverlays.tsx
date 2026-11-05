@@ -66,7 +66,7 @@ export function ContextMenu({
       ref={ref}
       role="menu"
       aria-label={label}
-      className="absolute z-30 rounded-[10px] border border-line bg-panel p-1 text-sm shadow-md"
+      className="absolute z-30 rounded-lg border border-line bg-panel p-1 text-sm shadow-md"
       style={{ left: pos.left, top: pos.top, width }}
       onKeyDown={(e) => {
         const buttons = [...e.currentTarget.querySelectorAll<HTMLElement>('[role=menuitem]')];

@@ -124,7 +124,7 @@ export function FileSheet(props: FileSheetProps) {
             </span>
           )}
         </div>
-        <button type="button" onClick={props.onClose} aria-label={tr.phone.close} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-muted active:bg-app">
+        <button type="button" onClick={props.onClose} aria-label={tr.phone.close} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted active:bg-app">
           <Icon name="close" />
         </button>
       </div>
@@ -144,7 +144,7 @@ export function FileSheet(props: FileSheetProps) {
                 value={link}
                 aria-label={tr.phone.shareLink}
                 onFocus={(e) => e.target.setSelectionRange(0, e.target.value.length)}
-                className="w-full resize-none rounded-[10px] border border-line-2 bg-panel-2 px-2.5 py-2 font-mono text-base leading-snug break-all text-ink"
+                className="w-full resize-none rounded-lg border border-line-2 bg-panel-2 px-2.5 py-2 font-mono text-base leading-snug break-all text-ink"
               />
               <span className="font-mono text-[12.5px] text-muted" role="status">
                 {copy === 'failed' ? tr.shareDialog.copyFailed : copy === 'copied' ? tr.shareDialog.copied : tr.shareDialog.length(link.length)}
@@ -317,7 +317,7 @@ export function StatusSheet({
           <b className="text-[18px] font-semibold">{tr.phone.statusTitle}</b>
           <span className={`text-[12.5px] tabular ${status === 'running' ? 'text-ok-ink' : status === 'paused' ? 'text-warn' : 'text-muted'}`}>{line}</span>
         </div>
-        <button type="button" onClick={onClose} aria-label={tr.phone.close} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-muted active:bg-app">
+        <button type="button" onClick={onClose} aria-label={tr.phone.close} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted active:bg-app">
           <Icon name="close" />
         </button>
       </div>

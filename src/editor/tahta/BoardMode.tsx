@@ -267,7 +267,7 @@ export function BoardStage(props: BoardStageProps) {
       onClick={run}
       aria-keyshortcuts={key}
       {...(pressed !== undefined ? { 'aria-pressed': pressed } : {})}
-      className={`flex items-center gap-2 rounded-[10px] border px-3 text-small font-semibold shadow-sm disabled:text-stopped disabled:hover:bg-panel ${pressed ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-panel text-ink hover:bg-panel-2'} ${touch ? 'h-11' : 'h-10'}`}
+      className={`flex items-center gap-2 rounded-md border px-3 text-small font-semibold shadow-sm disabled:text-stopped disabled:hover:bg-panel ${pressed ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-panel text-ink hover:bg-panel-2'} ${touch ? 'h-11' : 'h-10'}`}
     >
       <Icon name={icon} className="h-[18px] w-[18px]" />
       {label}
@@ -324,11 +324,11 @@ export function BoardStage(props: BoardStageProps) {
       {/* Telefonda üst çubuk (T5): Tahtada kur · Tepeden | 3B · Şema · ✕. */}
       {phone && (
         <div className="absolute top-2 right-2 left-2 z-20 flex items-center gap-1.5">
-          <span className="flex h-11 shrink-0 items-center gap-1.5 rounded-[10px] bg-accent px-2.5 text-[13px] font-semibold text-white shadow-sm">
+          <span className="flex h-11 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-2.5 text-[13px] font-semibold text-white shadow-sm">
             <Icon name="board" className="h-4 w-4" />
             {tr.tahta.mode}
           </span>
-          <div role="group" aria-label={tr.tahta.viewGroup} className="flex shrink-0 rounded-[10px] border border-line bg-panel p-[2px] shadow-sm">
+          <div role="group" aria-label={tr.tahta.viewGroup} className="flex shrink-0 rounded-lg border border-line bg-panel p-[2px] shadow-sm">
             {(['top', 'bench'] as const).map((v) => (
               <button
                 key={v}
@@ -346,7 +346,7 @@ export function BoardStage(props: BoardStageProps) {
             {tr.tahta.schematic}
           </button>
           {props.onExit && (
-            <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink">
+            <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink">
               <Icon name="close" className="h-5 w-5" />
             </button>
           )}
@@ -356,11 +356,11 @@ export function BoardStage(props: BoardStageProps) {
       {/* Üst çubuk (T1): Tahtada kur · Tepeden | 3B ... Bağlı delikleri göster · Çık. */}
       {!phone && <div className="pointer-events-none absolute top-3 right-3 left-3 z-20 flex items-start justify-between gap-2">
         <div className="pointer-events-auto flex items-center gap-2">
-          <span className={`flex items-center gap-2 rounded-[10px] bg-accent px-3 font-semibold text-white shadow-sm ${h} text-small`}>
+          <span className={`flex items-center gap-2 rounded-lg bg-accent px-3 font-semibold text-white shadow-sm ${h} text-small`}>
             <Icon name="board" className="h-[18px] w-[18px]" />
             {tr.tahta.mode}
           </span>
-          <div role="group" aria-label={tr.tahta.viewGroup} className="flex rounded-[10px] border border-line bg-panel p-[3px] shadow-sm">
+          <div role="group" aria-label={tr.tahta.viewGroup} className="flex rounded-lg border border-line bg-panel p-[3px] shadow-sm">
             {(['top', 'bench'] as const).map((v) => (
               <button
                 key={v}
@@ -377,7 +377,7 @@ export function BoardStage(props: BoardStageProps) {
         </div>
         <div className="pointer-events-auto flex items-center gap-2">
           {top && !props.connectedLocked && (
-            <label className={`flex cursor-pointer items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-medium shadow-sm ${h}`}>
+            <label className={`flex cursor-pointer items-center gap-2 rounded-md border border-line bg-panel px-3 text-small font-medium shadow-sm ${h}`}>
               {tr.tahta.showConnected}
               <input type="checkbox" role="switch" checked={props.showConnected} onChange={(e) => props.onShowConnected(e.target.checked)} className="peer sr-only" />
               <span aria-hidden="true" className="relative h-5 w-9 rounded-full bg-line-2 transition-colors peer-checked:bg-accent peer-focus-visible:outline-2 peer-focus-visible:outline-accent">
@@ -386,13 +386,13 @@ export function BoardStage(props: BoardStageProps) {
             </label>
           )}
           {solved(props.session, props.buildKey) && (
-            <span className={`flex items-center gap-1.5 rounded-[10px] border border-ok-line bg-ok-soft px-3 text-small font-semibold text-ok-ink shadow-sm ${h}`}>
+            <span className={`flex items-center gap-1.5 rounded-lg border border-ok-line bg-ok-soft px-3 text-small font-semibold text-ok-ink shadow-sm ${h}`}>
               <Icon name="check" className="h-4 w-4" />
               {tr.tahta.denetle.solvedPill}
             </span>
           )}
           {props.onExit && (
-            <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className={`flex items-center gap-1.5 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold shadow-sm hover:bg-panel-2 ${h}`}>
+            <button type="button" onClick={props.onExit} aria-label={tr.tahta.exitLabel} className={`flex items-center gap-1.5 rounded-md border border-line bg-panel px-3 text-small font-semibold shadow-sm hover:bg-panel-2 ${h}`}>
               <Icon name="close" className="h-4 w-4" />
               {tr.tahta.exit}
             </button>
@@ -420,7 +420,7 @@ export function BoardStage(props: BoardStageProps) {
                   aria-label={`${tr.tahta.colorLabel}: ${currentColor ? tr.tahta.colors[currentColor] : tr.tahta.colorAuto}`}
                   onClick={() => setPalette((v) => !v)}
                   disabled={!wireMode && pickLocked}
-                  className={`flex items-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink shadow-sm hover:bg-panel-2 disabled:text-stopped disabled:hover:bg-panel ${touch ? 'h-11' : 'h-10'}`}
+                  className={`flex items-center gap-2 rounded-md border border-line bg-panel px-3 text-small font-semibold text-ink shadow-sm hover:bg-panel-2 disabled:text-stopped disabled:hover:bg-panel ${touch ? 'h-11' : 'h-10'}`}
                 >
                   <Swatch color={currentColor} />
                   {currentColor ? tr.tahta.colors[currentColor] : tr.tahta.colorAutoShort}
@@ -469,7 +469,7 @@ export function BoardStage(props: BoardStageProps) {
               ))}
             </div>
           )}
-          <div role="group" aria-label={tr.toolbar.view} className="absolute right-4 bottom-4 z-20 flex items-center rounded-[10px] border border-line bg-panel p-[3px] shadow-sm">
+          <div role="group" aria-label={tr.toolbar.view} className="absolute right-4 bottom-4 z-20 flex items-center rounded-lg border border-line bg-panel p-[3px] shadow-sm">
             {(
               [
                 ['minus', tr.toolbar.zoomOut, () => scene?.zoomTop(0.8)],
@@ -586,7 +586,7 @@ export function ProblemCard({ doc, problem, index, level, touch, onHint, cap = 4
           <button
             type="button"
             onClick={() => onHint(problem)}
-            className={`flex items-center gap-1.5 rounded-[10px] px-3 text-small font-semibold ${h} ${level === 3 ? 'border border-line bg-panel text-ink hover:bg-panel-2' : 'bg-accent-soft text-accent-ink hover:bg-accent-soft/70'}`}
+            className={`flex items-center gap-1.5 rounded-md px-3 text-small font-semibold ${h} ${level === 3 ? 'border border-line bg-panel text-ink hover:bg-panel-2' : 'bg-accent-soft text-accent-ink hover:bg-accent-soft/70'}`}
           >
             <Icon name={level === 1 ? 'target' : level === 2 ? 'bulb' : 'eye'} className="h-4 w-4" />
             {d.next[level]}
@@ -638,7 +638,7 @@ export function BoardPanel(props: BoardPanelProps) {
       [d.rows.problems, stats.problems.length > 0 ? stats.problems.map((p) => problemShort(doc, p)).join(' · ') : d.none],
       [d.rows.time, formatDuration(stats.duration)],
     ];
-    const action = `flex w-full items-center justify-center gap-2 rounded-[10px] border border-line bg-panel px-3 text-small font-semibold text-ink hover:bg-panel-2 ${touch ? 'h-12' : 'h-11'}`;
+    const action = `flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-panel px-3 text-small font-semibold text-ink hover:bg-panel-2 ${touch ? 'h-12' : 'h-11'}`;
     return (
       <div className="flex min-h-0 flex-1 flex-col" role="region" aria-label={tr.tahta.panelLabel}>
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-4 pb-4 *:shrink-0">
@@ -770,7 +770,7 @@ export function BoardPanel(props: BoardPanelProps) {
                     window.addEventListener('pointerup', () => window.removeEventListener('pointermove', onMove), { once: true });
                   }}
                   onClick={() => (at ? props.onSelect(part.id) : props.onPlace(part.id, false))}
-                  className={`flex w-full items-center gap-3 rounded-[10px] border px-3 text-left ${touch ? 'min-h-12' : 'min-h-11'} ${isPlacing || isSelected ? 'border-accent bg-accent-soft' : mark !== undefined && marks ? 'border-danger-line bg-danger-soft/40 hover:bg-danger-soft/60' : 'border-line bg-panel hover:bg-panel-2'} ${at ? '' : 'cursor-grab'}`}
+                  className={`flex w-full items-center gap-3 rounded-lg border px-3 text-left ${touch ? 'min-h-12' : 'min-h-11'} ${isPlacing || isSelected ? 'border-accent bg-accent-soft' : mark !== undefined && marks ? 'border-danger-line bg-danger-soft/40 hover:bg-danger-soft/60' : 'border-line bg-panel hover:bg-panel-2'} ${at ? '' : 'cursor-grab'}`}
                 >
                   <b className="flex w-12 shrink-0 items-center gap-1.5 text-small font-semibold">
                     {mark !== undefined && marks && (
@@ -880,7 +880,7 @@ export function BoardPanel(props: BoardPanelProps) {
             type="button"
             aria-expanded={showBox}
             onClick={() => setBoxOpen(!showBox)}
-            className={`flex w-full items-center justify-between gap-2 rounded-[10px] border border-line bg-panel px-3 text-left text-small font-medium text-ink-2 hover:bg-panel-2 ${touch ? 'min-h-12' : 'min-h-10'}`}
+            className={`flex w-full items-center justify-between gap-2 rounded-md border border-line bg-panel px-3 text-left text-small font-medium text-ink-2 hover:bg-panel-2 ${touch ? 'min-h-12' : 'min-h-10'}`}
           >
             {d.box(placed, parts.length, leadsPlaced, leads.length)}
             <Icon name={showBox ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0 text-muted" />
@@ -896,7 +896,7 @@ export function BoardPanel(props: BoardPanelProps) {
             type="button"
             onClick={props.onCheck}
             disabled={props.checksLeft === 0}
-            className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-[10px] bg-accent font-semibold whitespace-nowrap text-white hover:bg-accent/90 disabled:opacity-50 ${touch ? 'h-12' : 'h-11'}`}
+            className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-md bg-accent font-semibold whitespace-nowrap text-white hover:bg-accent/90 disabled:opacity-50 ${touch ? 'h-12' : 'h-11'}`}
           >
             <Icon name="check" className="h-[18px] w-[18px]" />
             {checks === 0 ? d.check : d.again}
@@ -906,7 +906,7 @@ export function BoardPanel(props: BoardPanelProps) {
           <button
             type="button"
             onClick={props.onSubmit}
-            className={`flex items-center justify-center gap-2 rounded-[10px] px-4 font-semibold whitespace-nowrap ${props.submitOnly ? 'flex-1 bg-accent text-white hover:bg-accent/90' : 'shrink-0 border border-line bg-panel text-ink hover:bg-panel-2'} ${touch ? 'h-12' : 'h-11'}`}
+            className={`flex items-center justify-center gap-2 rounded-md px-4 font-semibold whitespace-nowrap ${props.submitOnly ? 'flex-1 bg-accent text-white hover:bg-accent/90' : 'shrink-0 border border-line bg-panel text-ink hover:bg-panel-2'} ${touch ? 'h-12' : 'h-11'}`}
           >
             <Icon name="upload" className="h-[18px] w-[18px]" />
             {tr.tahta.gorev.submit}

@@ -67,7 +67,7 @@ export function CanvasControls({
 
 /** Tablet, Bağla kipi: tuvalin sağ altında Geri al, Seçimi bırak ve Bitti. */
 export function WiringControls({ canUndo, hasStart, onUndo, onClear, onDone }: { canUndo: boolean; hasStart: boolean; onUndo: () => void; onClear: () => void; onDone: () => void }) {
-  const button = 'flex h-11 items-center gap-2 rounded-[10px] border border-line-2 bg-panel px-3.5 text-sm font-medium shadow-sm active:bg-app disabled:text-stopped';
+  const button = 'flex h-11 items-center gap-2 rounded-md border border-line-2 bg-panel px-3.5 text-sm font-medium shadow-sm active:bg-app disabled:text-stopped';
   return (
     <div role="group" aria-label={tr.phone.wiringTitle} className="absolute right-4 bottom-4 z-10 flex items-center gap-2">
       <button type="button" onClick={onUndo} disabled={!canUndo} className={button}>
@@ -77,7 +77,7 @@ export function WiringControls({ canUndo, hasStart, onUndo, onClear, onDone }: {
       <button type="button" onClick={onClear} disabled={!hasStart} className={button}>
         {tr.phone.clearStart}
       </button>
-      <button type="button" onClick={onDone} className="h-11 rounded-[10px] bg-ink px-4 text-sm font-semibold text-on-ink shadow-sm active:brightness-125">
+      <button type="button" onClick={onDone} className="h-11 rounded-md bg-ink px-4 text-sm font-semibold text-on-ink shadow-sm active:brightness-125">
         {tr.phone.done}
       </button>
     </div>

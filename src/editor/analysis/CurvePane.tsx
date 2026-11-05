@@ -163,7 +163,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
         </select>
       </label>
       {family === 'fet' && (
-        <div role="radiogroup" aria-label={t.modeLabel} className="flex gap-0.5 rounded-[10px] bg-app p-[3px]">
+        <div role="radiogroup" aria-label={t.modeLabel} className="flex gap-0.5 rounded-lg bg-app p-[3px]">
           {(['output', 'transfer'] as const).map((mode) => (
             <button
               key={mode}

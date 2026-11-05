@@ -42,7 +42,7 @@ function Section({ title, icon, children }: { title: string; icon: ReactNode; ch
 }
 
 const EVERYDAY_ICON = (
-  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M3 9.5L10 3l7 6.5M5 8v9h10V8M8.5 17v-5h3v5" />
   </svg>
 );
@@ -155,7 +155,7 @@ function StepsAndQuestions({ figure, onOpen }: { figure: LabFigure; onOpen: (id:
                       {open ? tr.examples.hideAnswer : tr.examples.showAnswer}
                     </button>
                     {open && (
-                      <div id={`${base}-${i}`} className="flex flex-col gap-2 rounded-[10px] border border-ok-line bg-ok-soft px-3.5 py-2.5 text-sm leading-[1.55]">
+                      <div id={`${base}-${i}`} className="flex flex-col gap-2 rounded-lg border border-ok-line bg-ok-soft px-3.5 py-2.5 text-sm leading-[1.55]">
                         <p>
                           <Rich text={step.answer} />
                         </p>
@@ -233,7 +233,7 @@ export function ExampleDetails({ id, onOpen, onClose }: { id: ExampleId; onOpen:
           <Section
             title={tr.examples.purpose}
             icon={
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M11 2L4 11h5l-1 7 7-9h-5l1-7z" />
               </svg>
             }

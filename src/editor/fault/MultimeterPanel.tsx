@@ -30,7 +30,7 @@ export interface MultimeterProps {
 export function MeterModes({ mode, onMode, tools, touch }: Pick<MultimeterProps, 'mode' | 'onMode' | 'tools'> & { touch: boolean }) {
   const t = tr.fault.meter;
   return (
-    <span role="radiogroup" aria-label={t.modeLabel} className="flex rounded-[10px] bg-app p-0.5">
+    <span role="radiogroup" aria-label={t.modeLabel} className="flex rounded-lg bg-app p-0.5">
       {(['dc', 'ac', 'ohm'] as const).map((m) => {
         const allowed = m === 'ohm' ? tools.resistance : tools.voltage;
         return (

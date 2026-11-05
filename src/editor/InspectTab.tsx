@@ -399,7 +399,7 @@ export function WireDetails({ wireId, frame, status, onDelete, removable = true 
           {spoken}
         </p>
         <SectionTitle>{tr.inspector.live}</SectionTitle>
-        <div className="flex flex-col gap-0.5 rounded-[10px] border border-line px-3 py-2.5">
+        <div className="flex flex-col gap-0.5 rounded-lg border border-line px-3 py-2.5">
           <span className="text-label text-muted">
             {tr.inspector.wireVoltage}
             {range && ` · ${tr.inspector.wireAverage}`}

@@ -146,7 +146,7 @@ export function Stepper({
 
   return (
     <div
-      className={`flex items-stretch overflow-hidden border bg-panel ${touch ? 'h-[46px] rounded-[10px]' : 'h-9 rounded-md'} ${
+      className={`flex items-stretch overflow-hidden border bg-panel ${touch ? 'h-[46px] rounded-lg' : 'h-9 rounded-md'} ${
         invalid ? 'border-danger' : 'border-rack-line'
       } ${disabled ? 'opacity-50' : ''}`}
     >
@@ -234,7 +234,7 @@ export function Segmented<T extends string>({
       aria-label={label}
       aria-disabled={disabled || undefined}
       onKeyDown={onKeyDown}
-      className={`flex gap-0.5 bg-seg p-0.5 ${touch ? 'rounded-[10px]' : 'rounded-md'} ${disabled ? 'opacity-50' : ''} ${className}`}
+      className={`flex gap-0.5 bg-seg p-0.5 ${touch ? 'rounded-lg' : 'rounded-md'} ${disabled ? 'opacity-50' : ''} ${className}`}
     >
       {options.map((option) => {
         const checked = option.value === value;

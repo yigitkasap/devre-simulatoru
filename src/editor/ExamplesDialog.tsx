@@ -295,7 +295,7 @@ function DesktopExamples(props: ExamplesDialogProps) {
           <h2 id={titleId} className="m-0 w-[220px] shrink-0 text-[19px] font-semibold">
             {tr.examples.dialogTitle}
           </h2>
-          <label className="mx-auto flex h-10 w-full max-w-[520px] min-w-0 items-center gap-2 rounded-[10px] border border-line-2 bg-panel px-3 text-muted focus-within:border-accent">
+          <label className="mx-auto flex h-10 w-full max-w-[520px] min-w-0 items-center gap-2 rounded-md border border-line-2 bg-panel px-3 text-muted focus-within:border-accent">
             <Icon name="search" className="h-[18px] w-[18px] shrink-0" />
             <input
               ref={searchRef}
@@ -309,9 +309,10 @@ function DesktopExamples(props: ExamplesDialogProps) {
               aria-label={t().searchLabel}
               aria-describedby={`${titleId}-hint`}
               placeholder={t().searchPlaceholder}
-              className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+              className="peer min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-muted"
             />
-            <kbd id={`${titleId}-hint`} title={t().searchHint} className="rounded border border-line-2 px-1.5 font-mono text-[11px] text-muted">
+            {/* Kutu odaktayken "/" işareti gizlenir (kısayol zaten oraya götürdü). */}
+            <kbd id={`${titleId}-hint`} title={t().searchHint} className="rounded border border-line-2 px-1.5 font-mono text-[11px] text-muted peer-focus:hidden">
               <span className="sr-only">{t().searchHint}</span>
               <span aria-hidden="true">/</span>
             </kbd>
@@ -519,11 +520,11 @@ function PhoneExamples(props: ExamplesDialogProps) {
     <div role="dialog" aria-modal="true" aria-label={tr.examples.dialogTitle} className="fixed inset-0 z-50 flex flex-col bg-panel" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-14 shrink-0 items-center gap-1 px-2">
         {opened ? (
-          <button type="button" onClick={() => show(null)} aria-label={t().back} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] active:bg-app">
+          <button type="button" onClick={() => show(null)} aria-label={t().back} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md active:bg-app">
             <Icon name="chevron" className="h-[22px] w-[22px] rotate-180" />
           </button>
         ) : (
-          <button type="button" onClick={onClose} aria-label={tr.examples.dialogClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] active:bg-app">
+          <button type="button" onClick={onClose} aria-label={tr.examples.dialogClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md active:bg-app">
             <Icon name="close" />
           </button>
         )}
@@ -537,7 +538,7 @@ function PhoneExamples(props: ExamplesDialogProps) {
       </div>
       {!opened && (
         <div className="shrink-0 px-4 pb-3">
-          <label className="flex h-12 items-center gap-2 rounded-[10px] border border-line-2 px-3 text-muted focus-within:border-accent">
+          <label className="flex h-12 items-center gap-2 rounded-md border border-line-2 px-3 text-muted focus-within:border-accent">
             <Icon name="search" className="h-[18px] w-[18px] shrink-0" />
             <input
               type="search"

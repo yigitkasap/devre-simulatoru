@@ -45,7 +45,7 @@ export function FlowIcon({ kind, size = 14 }: { kind: 'drain' | 'stop' | 'fill';
 /** "Tüm devre" sekmesi: üst üste üç kat. */
 export function FloorsIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
       <rect x="3" y="3" width="14" height="4" rx="1" />
       <rect x="3" y="8" width="14" height="4" rx="1" />
       <rect x="3" y="13" width="14" height="4" rx="1" />

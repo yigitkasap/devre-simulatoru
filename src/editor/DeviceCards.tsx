@@ -137,7 +137,7 @@ function CycleButton<T extends string>({ label, options, value, onChange }: { la
       onClick={() => onChange(next.value)}
       aria-label={`${label}: ${current.text}`}
       title={`${label}: ${current.text} → ${next.text}`}
-      className="h-[46px] w-[72px] shrink-0 rounded-[10px] border border-line-2 bg-panel px-1 text-small font-semibold whitespace-nowrap active:bg-app"
+      className="h-[46px] w-[72px] shrink-0 rounded-md border border-line-2 bg-panel px-1 text-small font-semibold whitespace-nowrap active:bg-app"
     >
       {current.text}
     </button>

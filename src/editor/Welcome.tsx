@@ -76,7 +76,7 @@ export function WelcomeDialog({ variant, onExamples, onBlank, onTour, onExample,
               i === 0 ? 'border-2 border-accent bg-accent-soft/50' : 'border border-line hover:bg-panel-2'
             }`}
           >
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] ${i === 0 ? 'bg-accent text-white' : 'bg-app text-ink'}`}>
+            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${i === 0 ? 'bg-accent text-white' : 'bg-app text-ink'}`}>
               <Icon name={o.icon} />
             </span>
             <span className="flex flex-col">

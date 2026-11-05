@@ -134,7 +134,7 @@ function CsvMenu({ api, g, touch }: { api: AnalysisApi; g: Graph; touch: boolean
         aria-expanded={open}
         aria-label={t.csvMenu}
         onClick={() => setOpen((o) => !o)}
-        className={`flex shrink-0 items-center gap-1.5 rounded-[10px] bg-accent px-3.5 text-small font-semibold text-white hover:brightness-105 ${touch ? 'h-11' : 'h-9'}`}
+        className={`flex shrink-0 items-center gap-1.5 rounded-md bg-accent px-3.5 text-small font-semibold text-white hover:brightness-105 ${touch ? 'h-11' : 'h-9'}`}
       >
         <Icon name="download" className="h-4 w-4" />
         {t.csv}
@@ -198,7 +198,7 @@ export function AnalysisDrawer(
     else return;
     e.preventDefault();
   };
-  const btn = `flex shrink-0 items-center justify-center gap-1.5 rounded-[10px] text-small font-semibold ${touch ? 'h-11' : 'h-9'}`;
+  const btn = `flex shrink-0 items-center justify-center gap-1.5 rounded-md text-small font-semibold ${touch ? 'h-11' : 'h-9'}`;
   const actions: ReactNode =
     api.tab === 'graph' ? (
       <>
@@ -336,7 +336,7 @@ function Tabs({ api, idBase, touch, full = false, short = false }: { api: Analys
     refs.current[tab]?.focus();
   };
   return (
-    <div role="tablist" aria-label={tr.analysis.tabsLabel} onKeyDown={onKey} className={`flex gap-0.5 rounded-[12px] bg-app p-[3px] ${full ? 'w-full' : 'shrink-0'}`}>
+    <div role="tablist" aria-label={tr.analysis.tabsLabel} onKeyDown={onKey} className={`flex gap-0.5 rounded-lg bg-app p-[3px] ${full ? 'w-full' : 'shrink-0'}`}>
       {ANALYSIS_TABS.map((tab) => {
         const on = api.tab === tab;
         return (
@@ -352,7 +352,7 @@ function Tabs({ api, idBase, touch, full = false, short = false }: { api: Analys
             aria-controls={`${idBase}-panel`}
             tabIndex={on ? 0 : -1}
             onClick={() => api.setTab(tab)}
-            className={`flex items-center justify-center gap-1.5 rounded-[10px] px-3 text-small font-medium whitespace-nowrap ${touch ? 'h-11' : 'h-9'} ${full ? 'min-w-0 flex-1' : ''} ${
+            className={`flex items-center justify-center gap-1.5 rounded-md px-3 text-small font-medium whitespace-nowrap ${touch ? 'h-11' : 'h-9'} ${full ? 'min-w-0 flex-1' : ''} ${
               on ? 'bg-ink font-semibold text-on-ink' : 'text-ink-2 hover:bg-panel-2'
             }`}
           >
@@ -455,7 +455,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
         >
           <Icon name={props.status === 'running' ? 'pause' : 'play'} />
         </button>
-        <button type="button" onClick={props.onClose} aria-label={tr.analysis.close} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-muted active:bg-app">
+        <button type="button" onClick={props.onClose} aria-label={tr.analysis.close} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted active:bg-app">
           <Icon name="close" />
         </button>
       </div>
@@ -519,17 +519,17 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
       {api.tab === 'bode' && !api.gate && (
         <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
           {api.bode.progress ? (
-            <button type="button" onClick={api.bode.cancel} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold">
+            <button type="button" onClick={api.bode.cancel} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel text-[15px] font-semibold">
               <Icon name="stop" className="h-4 w-4" />
               {`${tr.analysis.bode.cancel} · ${api.bode.progress.done} / ${api.bode.progress.total}`}
             </button>
           ) : (
-            <button type="button" onClick={api.bode.run} disabled={!api.bode.input || !api.bode.output} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
+            <button type="button" onClick={api.bode.run} disabled={!api.bode.input || !api.bode.output} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
               <Icon name="undo" className="h-4 w-4" />
               {tr.analysis.bode.rerun}
             </button>
           )}
-          <button type="button" onClick={() => saveBode(api.bode, api.separator, true)} disabled={api.bode.points.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
+          <button type="button" onClick={() => saveBode(api.bode, api.separator, true)} disabled={api.bode.points.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
             <Icon name="share" className="h-4 w-4" />
             {tr.analysis.graph.csvShare}
           </button>
@@ -538,17 +538,17 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
       {api.tab === 'curve' && !api.gate && (
         <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
           {api.tracer.progress ? (
-            <button type="button" onClick={api.tracer.cancel} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold">
+            <button type="button" onClick={api.tracer.cancel} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel text-[15px] font-semibold">
               <Icon name="stop" className="h-4 w-4" />
               {`${tr.analysis.curve.cancel} · ${api.tracer.progress.done} / ${api.tracer.progress.total}`}
             </button>
           ) : (
-            <button type="button" onClick={api.tracer.run} disabled={!api.tracer.part} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
+            <button type="button" onClick={api.tracer.run} disabled={!api.tracer.part} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
               <Icon name="undo" className="h-4 w-4" />
               {tr.analysis.curve.rerun}
             </button>
           )}
-          <button type="button" onClick={() => saveCurves(api.tracer, api.separator, true)} disabled={!api.tracer.result} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
+          <button type="button" onClick={() => saveCurves(api.tracer, api.separator, true)} disabled={!api.tracer.result} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
             <Icon name="share" className="h-4 w-4" />
             {tr.analysis.graph.csvShare}
           </button>
@@ -556,11 +556,11 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
       )}
       {api.tab === 'table' && (
         <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
-          <button type="button" onClick={() => void g.copyTable()} disabled={api.doc.rows.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
+          <button type="button" onClick={() => void g.copyTable()} disabled={api.doc.rows.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
             <Icon name="copy" className="h-4 w-4" />
             {tr.analysis.table.copy}
           </button>
-          <button type="button" onClick={() => g.tableFile(true)} disabled={api.doc.rows.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
+          <button type="button" onClick={() => g.tableFile(true)} disabled={api.doc.rows.length === 0} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
             <Icon name="share" className="h-4 w-4" />
             {tr.analysis.graph.csvShare}
           </button>
@@ -568,11 +568,11 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
       )}
       {api.tab === 'graph' && (
         <div className="flex shrink-0 gap-2 border-t border-line px-4 pt-3" style={{ paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' }}>
-          <button type="button" onClick={g.toTable} disabled={!g.span} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
+          <button type="button" onClick={g.toTable} disabled={!g.span} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50">
             <Icon name="plus" className="h-4 w-4" />
             {t.toTable}
           </button>
-          <button type="button" onClick={() => g.csv(true)} disabled={!g.span} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
+          <button type="button" onClick={() => g.csv(true)} disabled={!g.span} className="flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent text-[15px] font-semibold text-white disabled:opacity-50">
             <Icon name="share" className="h-4 w-4" />
             {t.csvShare}
           </button>

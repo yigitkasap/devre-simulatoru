@@ -208,7 +208,7 @@ export function SheetHeader({ title, onClose, closeLabel, children }: { title?: 
           type="button"
           onClick={onClose}
           aria-label={closeLabel ?? tr.phone.close}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-muted active:bg-app"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted active:bg-app"
         >
           <Icon name="close" />
         </button>

@@ -28,7 +28,7 @@ export function BoardFields({ doc, plan, value, onChange, touch, settings }: { d
           role="radio"
           aria-checked={current === k}
           onClick={() => pick(k)}
-          className={`flex flex-1 items-center justify-center rounded-[10px] px-1 text-small ${h} ${current === k ? 'bg-panel font-semibold text-ink shadow-sm' : 'text-ink-2 hover:text-ink'}`}
+          className={`flex flex-1 items-center justify-center rounded-md px-1 text-small ${h} ${current === k ? 'bg-panel font-semibold text-ink shadow-sm' : 'text-ink-2 hover:text-ink'}`}
         >
           {name}
         </button>

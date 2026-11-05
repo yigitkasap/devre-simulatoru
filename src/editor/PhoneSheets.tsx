@@ -123,7 +123,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-4">
       {chainTo && (
-        <div className="flex min-h-10 shrink-0 items-center gap-2 rounded-[10px] bg-accent-soft py-0.5 pr-0.5 pl-3 text-sm text-accent-ink">
+        <div className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg bg-accent-soft py-0.5 pr-0.5 pl-3 text-sm text-accent-ink">
           <Icon name="wire" className="h-[18px] w-[18px] shrink-0" />
           <span className="min-w-0 flex-1">
             <HintText text={tr.phone.chain(chainTo)} />
@@ -132,13 +132,13 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
             type="button"
             onClick={onChainOff}
             aria-label={tr.phone.chainOff}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] active:bg-panel/60"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md active:bg-panel/60"
           >
             <Icon name="close" className="h-[18px] w-[18px]" />
           </button>
         </div>
       )}
-      <label className="flex h-11 shrink-0 items-center gap-2 rounded-[10px] border border-line-2 px-3 text-muted focus-within:border-accent">
+      <label className="flex h-11 shrink-0 items-center gap-2 rounded-md border border-line-2 px-3 text-muted focus-within:border-accent">
         <Icon name="search" className="h-[18px] w-[18px] shrink-0" />
         <span className="sr-only">{tr.library.searchLabel}</span>
         <input

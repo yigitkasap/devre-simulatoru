@@ -325,7 +325,7 @@ export default function BarajSahnesi3B({ level, wet, lamps, running, textPx, sca
           }`}
           style={{ bottom: hostW < 640 ? 'calc(16px + env(safe-area-inset-bottom))' : undefined }}
         >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <rect x="2.5" y="2.5" width="15" height="15" rx="2" strokeDasharray="3 2.2" />
             <path d="M6 14V9h3.5v5H13V6" />
           </svg>

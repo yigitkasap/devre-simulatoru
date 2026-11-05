@@ -21,7 +21,7 @@ export function statusLine(status: SimStatus, time: number, saveState: SaveState
   return `${tr.phone.statusLine[status]} · ${formatSI(time, 's', { digits: 3 })}`;
 }
 
-const iconButton = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-ink active:bg-app disabled:text-stopped';
+const iconButton = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-ink active:bg-app disabled:text-stopped';
 
 export interface PhoneHeaderProps {
   readonly title: string;
@@ -162,7 +162,7 @@ export function WiringHeader({ step, text, onDone }: { step: 1 | 2; text: string
           <Icon name="chevron" className="rotate-180" />
         </button>
         <span className="min-w-0 flex-1 truncate text-[17px] font-semibold">{tr.phone.wiringTitle}</span>
-        <button type="button" onClick={onDone} className="h-10 shrink-0 rounded-[10px] bg-ink px-4 text-[15px] font-semibold text-on-ink active:brightness-125">
+        <button type="button" onClick={onDone} className="h-10 shrink-0 rounded-md bg-ink px-4 text-[15px] font-semibold text-on-ink active:brightness-125">
           {tr.phone.done}
         </button>
       </header>

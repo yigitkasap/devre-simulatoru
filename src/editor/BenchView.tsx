@@ -212,7 +212,7 @@ export function BenchView(props: BenchViewProps) {
   const lettered = single ? doc.parts.find((p) => p.id === single && LETTERED.has(p.type)) : undefined;
 
   const button = (pressed: boolean | undefined, extra = '') =>
-    `pointer-events-auto flex items-center justify-center gap-1.5 rounded-[10px] border bg-panel font-semibold shadow-sm ${
+    `pointer-events-auto flex items-center justify-center gap-1.5 rounded-md border bg-panel font-semibold shadow-sm ${
       pressed ? 'border-accent-line text-accent-ink' : 'border-line text-ink hover:bg-panel-2'
     } ${touch ? 'h-11' : 'h-9'} ${extra}`;
   const iconOnly = phone ? 'w-11' : 'px-3 text-small';
@@ -338,7 +338,7 @@ export function BenchView(props: BenchViewProps) {
             disabled={Boolean(props.boardBlocked)}
             title={props.boardBlocked ?? tr.tahta.enter}
             aria-label={phone ? tr.tahta.enter : undefined}
-            className={`pointer-events-auto flex items-center justify-center gap-1.5 rounded-[10px] bg-accent font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-50 ${touch ? 'h-11' : 'h-9'} ${iconOnly}`}
+            className={`pointer-events-auto flex items-center justify-center gap-1.5 rounded-md bg-accent font-semibold text-white shadow-sm hover:brightness-110 disabled:opacity-50 ${touch ? 'h-11' : 'h-9'} ${iconOnly}`}
           >
             <Icon name="board" className="h-[18px] w-[18px]" />
             {!phone && tr.tahta.enter}
@@ -346,7 +346,7 @@ export function BenchView(props: BenchViewProps) {
         )}
         </div>
         {!phone && (
-          <div role="group" aria-label={tr.toolbar.view} className="pointer-events-auto flex items-center rounded-[10px] border border-line bg-panel p-[3px] shadow-sm">
+          <div role="group" aria-label={tr.toolbar.view} className="pointer-events-auto flex items-center rounded-lg border border-line bg-panel p-[3px] shadow-sm">
             {viewButton('minus', tr.toolbar.zoomOut, () => setZoom((z) => ({ n: z.n + 1, factor: 1.25 })))}
             {viewButton('plus', tr.toolbar.zoomIn, () => setZoom((z) => ({ n: z.n + 1, factor: 0.8 })))}
             {viewButton('fit', tr.bench.fit, () => pickCamera(cameraLabel === 'part' ? 'free' : cameraLabel))}
@@ -416,7 +416,7 @@ function CameraMenu({ choice, canFocus, phone, touch, onPick }: { choice: Camera
         aria-expanded={open}
         aria-label={label}
         title={label}
-        className={`flex items-center justify-center gap-1.5 rounded-[10px] border border-line bg-panel text-ink shadow-sm hover:bg-panel-2 ${touch ? 'h-11' : 'h-9'} ${phone ? 'w-11' : 'px-3 text-small'}`}
+        className={`flex items-center justify-center gap-1.5 rounded-md border border-line bg-panel text-ink shadow-sm hover:bg-panel-2 ${touch ? 'h-11' : 'h-9'} ${phone ? 'w-11' : 'px-3 text-small'}`}
       >
         <Icon name="camera" className="h-[18px] w-[18px]" />
         {!phone && (

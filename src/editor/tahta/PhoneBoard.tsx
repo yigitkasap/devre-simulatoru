@@ -57,7 +57,7 @@ export interface PhoneBoardSheetProps {
   readonly onPause: () => void;
 }
 
-const BUTTON = 'flex h-12 items-center justify-center gap-2 rounded-[12px] px-3 text-[15px] font-semibold';
+const BUTTON = 'flex h-12 items-center justify-center gap-2 rounded-lg px-3 text-[15px] font-semibold';
 
 /** Sayfanın içi kendi içinde kayar (sayfa ve ekran kaymaz); ana düğmeler altta sabit. */
 function Layout({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
@@ -78,7 +78,7 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
       type="button"
       onClick={running ? props.onPause : props.onPlay}
       aria-label={running ? tr.sim.pause : props.status === 'paused' ? tr.phone.resume : tr.sim.play}
-      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[12px] ${running ? 'bg-ink text-on-ink' : 'bg-ok text-white'}`}
+      className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${running ? 'bg-ink text-on-ink' : 'bg-ok text-white'}`}
     >
       <Icon name={running ? 'pause' : 'play'} className="h-5 w-5" />
     </button>
@@ -131,7 +131,7 @@ export function PhoneBoardSheet(props: PhoneBoardSheetProps) {
               spellCheck={false}
               autoComplete="off"
               autoCapitalize="off"
-              className="h-12 min-w-0 flex-1 rounded-[12px] border border-line-2 bg-panel px-3 font-mono text-base text-ink outline-none focus:border-accent"
+              className="h-12 min-w-0 flex-1 rounded-lg border border-line-2 bg-panel px-3 font-mono text-base text-ink outline-none focus:border-accent"
             />
             <button type="submit" className={`${BUTTON} bg-accent text-white`}>
               {tr.tahta.phone.plug}
@@ -334,7 +334,7 @@ function BoxBody(
           const at = build.parts[part.id];
           const value = partValueText(part);
           return (
-            <li key={part.id} className="flex min-h-12 items-center gap-3 rounded-[12px] border border-line bg-panel pr-1.5 pl-3">
+            <li key={part.id} className="flex min-h-12 items-center gap-3 rounded-lg border border-line bg-panel pr-1.5 pl-3">
               <b className="w-11 shrink-0 text-[15px] font-semibold">{part.label}</b>
               <span className="min-w-0 flex-1 truncate text-[15px] text-ink-2">
                 {tr.devices.names[part.type]}

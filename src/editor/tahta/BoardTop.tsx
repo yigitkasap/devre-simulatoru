@@ -976,7 +976,7 @@ export function BoardTop(props: BoardTopProps) {
           </span>
         )}
         {selectedBox && selectedPart && (
-          <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[10px] border border-line bg-panel p-1 shadow-md" style={{ left: selectedBox.x, top: selectedBox.y }} onPointerDown={(e) => e.stopPropagation()}>
+          <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-lg border border-line bg-panel p-1 shadow-md" style={{ left: selectedBox.x, top: selectedBox.y }} onPointerDown={(e) => e.stopPropagation()}>
             <span className="px-2 text-small font-semibold">
               {selectedPart.label}
               {partValueText(selectedPart) ? ` · ${partValueText(selectedPart)}` : ''}
@@ -999,7 +999,7 @@ export function BoardTop(props: BoardTopProps) {
           </div>
         )}
         {pickBox && picked && (
-          <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-[10px] border border-line bg-panel p-1 shadow-md" style={{ left: pickBox.x, top: pickBox.y }} onPointerDown={(e) => e.stopPropagation()}>
+          <div className="absolute z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-lg border border-line bg-panel p-1 shadow-md" style={{ left: pickBox.x, top: pickBox.y }} onPointerDown={(e) => e.stopPropagation()}>
             {picked.kind === 'wire' && <span aria-hidden="true" className="ml-1.5 h-3 w-3 rounded-full ring-1 ring-line-2" style={{ background: WIRE_HEX[build.wires[picked.index]!.color] }} />}
             <span className="px-2 font-mono text-small font-semibold">{pickLabel}</span>
             {(picked.kind === 'wire' ? lockedWire(picked.index) : lockedLead(picked.part, picked.pin)) && (

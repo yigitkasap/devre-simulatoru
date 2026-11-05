@@ -60,14 +60,14 @@ export function MultimeterCardBody({
         ? m.testVoltage(`${formatNumber(OHM_TEST_VOLTAGE, 1)} V`)
         : m.internalV(formatSI(VOLTMETER_DEFAULTS.resistance, 'Ω', { trim: true }));
   const probe = (pin: number, label: string) => (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-[10px] bg-app px-3 py-2">
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-lg bg-app px-3 py-2">
       <span className="text-label text-muted">{label}</span>
       <span className="truncate font-mono text-[15px]">{pinNode?.(part.id, pin) ?? '–'}</span>
     </span>
   );
   return (
     <>
-      <span role="radiogroup" aria-label={t.modeLabel} className="flex rounded-[10px] bg-app p-0.5">
+      <span role="radiogroup" aria-label={t.modeLabel} className="flex rounded-lg bg-app p-0.5">
         {MULTIMETER_MODES.map((k) => (
           <button
             key={k}
@@ -87,7 +87,7 @@ export function MultimeterCardBody({
         {probe(0, m.red)}
         {probe(1, m.black)}
       </span>
-      <p className={`m-0 rounded-[10px] px-3 py-2 text-label leading-snug ${reading.note ? 'bg-warn-soft text-warn' : 'bg-accent-soft text-ink-2'}`}>{reading.note ?? m.note}</p>
+      <p className={`m-0 rounded-lg px-3 py-2 text-label leading-snug ${reading.note ? 'bg-warn-soft text-warn' : 'bg-accent-soft text-ink-2'}`}>{reading.note ?? m.note}</p>
       <span className="flex items-baseline justify-between text-small">
         <span className="text-muted">{internal.label}</span>
         <span className="font-mono">{internal.value}</span>

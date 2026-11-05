@@ -916,7 +916,7 @@ function HoldButton({ pressed, onPress, touch }: { pressed: boolean; onPress: (d
       }}
       onKeyUp={(e) => isKey(e.key) && onPress(false)}
       onBlur={() => onPress(false)}
-      className={`flex select-none items-center justify-center rounded-[10px] text-[15px] font-semibold text-on-ink ${touch ? 'h-14' : 'h-12'} ${pressed ? 'bg-accent' : 'bg-ink'}`}
+      className={`flex select-none items-center justify-center rounded-md text-[15px] font-semibold text-on-ink ${touch ? 'h-14' : 'h-12'} ${pressed ? 'bg-accent' : 'bg-ink'}`}
     >
       {pressed ? t.holding : t.hold}
     </button>
@@ -1006,7 +1006,7 @@ function ValueStepper({
         {label}
       </label>
       <div className="flex flex-wrap items-center gap-2">
-        <div className={`flex items-center overflow-hidden rounded-[9px] border bg-panel ${touch ? 'h-12' : 'h-11'} ${fieldTone(Boolean(error))} ${disabled ? 'bg-panel-2' : ''}`}>
+        <div className={`flex items-center overflow-hidden rounded-md border bg-panel ${touch ? 'h-12' : 'h-11'} ${fieldTone(Boolean(error))} ${disabled ? 'bg-panel-2' : ''}`}>
           <button
             type="button"
             disabled={down === null}

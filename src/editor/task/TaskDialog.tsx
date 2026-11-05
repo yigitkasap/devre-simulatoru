@@ -134,7 +134,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
                 role="radio"
                 aria-checked={mode === m}
                 onClick={() => setMode(m)}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-[10px] text-small ${touch ? 'h-11' : 'h-9'} ${mode === m ? 'bg-ink font-semibold text-panel' : 'text-ink-2 hover:text-ink'}`}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-md text-small ${touch ? 'h-11' : 'h-9'} ${mode === m ? 'bg-ink font-semibold text-panel' : 'text-ink-2 hover:text-ink'}`}
               >
                 <Icon name={m === 'target' ? 'target' : m === 'fault' ? 'wrench' : 'board'} className="h-4 w-4" />
                 {tr.fault.dialog.modes[m]}
@@ -245,7 +245,7 @@ export function TaskDialog({ doc, title, idx, traces, draft, onDraft, onClose, n
           {!blocked && <>
           <div className="flex flex-wrap items-center gap-2">
             <input readOnly value={url} aria-label={t.link} onFocus={(e) => e.target.select()} className={`min-w-0 flex-1 rounded-lg bg-app px-3 font-mono text-label text-ink-2 ${touch ? 'h-11 text-[16px]' : 'h-11'}`} />
-            <button type="button" onClick={() => void copy()} className={`flex shrink-0 items-center gap-1.5 rounded-[10px] px-4 text-small font-semibold h-11 ${tooLong ? 'border border-line-2 bg-panel text-ink' : 'bg-accent text-white'}`}>
+            <button type="button" onClick={() => void copy()} className={`flex shrink-0 items-center gap-1.5 rounded-md px-4 text-small font-semibold h-11 ${tooLong ? 'border border-line-2 bg-panel text-ink' : 'bg-accent text-white'}`}>
               <Icon name="copy" className="h-4 w-4" />
               {copied ? t.copiedShort : t.copy}
             </button>

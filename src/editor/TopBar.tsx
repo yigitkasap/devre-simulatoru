@@ -35,7 +35,7 @@ function PanelToggle({ side, label, open, onPanel, touch = false }: { side: keyo
       aria-label={label}
       title={label}
       aria-pressed={open}
-      className={`flex shrink-0 items-center justify-center rounded-md transition-colors ${touch ? 'h-11 w-11 rounded-[10px]' : 'h-10 w-10 desk:h-9 desk:w-9'} ${
+      className={`flex shrink-0 items-center justify-center rounded-md transition-colors ${touch ? 'h-11 w-11 rounded-md' : 'h-10 w-10 desk:h-9 desk:w-9'} ${
         open ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-app'
       }`}
     >
@@ -366,7 +366,7 @@ export function SettingsFields({
     <div className="flex flex-col gap-4">
       <section className="flex flex-col gap-2">
         <span className={section}>{tr.settings.resistorStyle}</span>
-        <div role="radiogroup" aria-label={tr.settings.resistorStyle} className="flex gap-0.5 rounded-[9px] bg-seg p-0.5">
+        <div role="radiogroup" aria-label={tr.settings.resistorStyle} className="flex gap-0.5 rounded-md bg-seg p-0.5">
           {(['zigzag', 'iec'] as const).map((style) => (
             <button key={style} type="button" role="radio" aria-checked={settings.resistorStyle === style} onClick={() => onChange({ resistorStyle: style })} className={segment(settings.resistorStyle === style)}>
               <svg viewBox="-44 -12 88 24" className="h-4 w-11" aria-hidden="true">
@@ -386,7 +386,7 @@ export function SettingsFields({
       </section>
       <section className="flex flex-col gap-2">
         <span className={section}>{tr.settings.wireScale}</span>
-        <div role="radiogroup" aria-label={tr.settings.wireScale} className="flex flex-col gap-0.5 rounded-[9px] bg-seg p-0.5">
+        <div role="radiogroup" aria-label={tr.settings.wireScale} className="flex flex-col gap-0.5 rounded-md bg-seg p-0.5">
           {(['classic', 'colorblind'] as const).map((scale) => (
             <button
               key={scale}
@@ -686,7 +686,7 @@ export function ThemeMenu({ choice, theme, onChange, touch = false }: { choice: 
         aria-expanded={open}
         aria-label={label}
         title={label}
-        className={`flex shrink-0 items-center justify-center transition-colors ${touch ? 'h-11 w-11 rounded-[10px]' : 'h-10 w-10 rounded-md'} ${
+        className={`flex shrink-0 items-center justify-center transition-colors ${touch ? 'h-11 w-11 rounded-md' : 'h-10 w-10 rounded-md'} ${
           open ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-app'
         }`}
       >

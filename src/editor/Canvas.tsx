@@ -2233,7 +2233,7 @@ export function Canvas({
               </span>
             </div>
           )}
-          <div className="pointer-events-none absolute bottom-3 left-3 flex gap-3 rounded-[10px] border border-line bg-panel/90 px-2.5 py-1.5 text-label text-ink-2" aria-hidden="true">
+          <div className="pointer-events-none absolute bottom-3 left-3 flex gap-3 rounded-lg border border-line bg-panel/90 px-2.5 py-1.5 text-label text-ink-2" aria-hidden="true">
             <span className="flex items-center gap-1.5">
               <i className="block h-3 w-3 rounded-full bg-accent" />
               {tr.phone.legendStart}
@@ -2259,7 +2259,7 @@ export function Canvas({
         </span>
       )}
       {interaction.kind === 'wiring' && desk && (
-        <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-[10px] border border-line bg-panel px-3 py-2 text-small text-ink-2">
+        <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-small text-ink-2">
           {tr.canvas.dropHint}
           <span className="text-line-2" aria-hidden="true">
             ·
@@ -2652,7 +2652,7 @@ function Picker({
         ref={listRef}
         role="listbox"
         aria-label={tr.phone.pickerLabel(n)}
-        className="absolute inset-x-6 overflow-hidden rounded-[14px] border border-line bg-panel shadow-[0_10px_30px_rgba(29,39,51,0.22)]"
+        className="absolute inset-x-6 overflow-hidden rounded-lg border border-line bg-panel shadow-[0_10px_30px_rgba(29,39,51,0.22)]"
         style={{ top }}
       >
         <div className="px-3.5 pt-2.5 pb-1.5 text-[13px] font-semibold text-muted">{tr.phone.pickerTitle(n)}</div>

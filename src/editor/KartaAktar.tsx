@@ -267,7 +267,7 @@ function PrimaryButton({ title, note, icon, onClick, disabled }: { title: string
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex min-h-[54px] w-full items-center gap-3 rounded-[14px] px-[18px] py-2 text-left ${
+      className={`flex min-h-[54px] w-full items-center gap-3 rounded-lg px-[18px] py-2 text-left ${
         disabled ? 'border border-dashed border-line-2 bg-panel-2 text-muted' : 'bg-accent text-white shadow-[0_6px_16px_rgba(31,111,235,0.28)] hover:brightness-105'
       }`}
     >
@@ -778,19 +778,19 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
     </span>
   );
   const prevButton = (h: string) => (
-    <button type="button" aria-label={t.plaket.prev} title={t.plaket.prev} disabled={current === 0} onClick={() => go(-1)} className={`flex shrink-0 items-center justify-center rounded-[14px] border border-line-2 hover:bg-panel-2 disabled:opacity-40 ${h}`}>
+    <button type="button" aria-label={t.plaket.prev} title={t.plaket.prev} disabled={current === 0} onClick={() => go(-1)} className={`flex shrink-0 items-center justify-center rounded-lg border border-line-2 hover:bg-panel-2 disabled:opacity-40 ${h}`}>
       <Icon name="chevron" className="h-5 w-5 rotate-180" />
     </button>
   );
   const nextButton = (h: string) => (
-    <button type="button" onClick={next} className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent px-4 text-[16px] font-semibold text-white shadow-[0_6px_16px_rgba(31,111,235,0.28)] hover:brightness-105 ${h}`}>
+    <button type="button" onClick={next} className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[16px] font-semibold text-white shadow-[0_6px_16px_rgba(31,111,235,0.28)] hover:brightness-105 ${h}`}>
       <span className="truncate">{last ? t.plaket.finish : t.plaket.next(nextRef)}</span>
       {!last && <Icon name="chevron" className="h-5 w-5 shrink-0" />}
     </button>
   );
 
   const startButton = (h: string) => (
-    <button type="button" onClick={start} className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[14px] bg-accent px-4 text-[16px] font-semibold text-white shadow-[0_6px_16px_rgba(31,111,235,0.28)] hover:brightness-105 ${h}`}>
+    <button type="button" onClick={start} className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-4 text-[16px] font-semibold text-white shadow-[0_6px_16px_rgba(31,111,235,0.28)] hover:brightness-105 ${h}`}>
       <span className="truncate">{t.plaket.start}</span>
       <Icon name="chevron" className="h-5 w-5 shrink-0" />
     </button>
@@ -939,7 +939,7 @@ function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { d
               type="button"
               onClick={action}
               {...(icon === 'printer' ? {} : { 'aria-pressed': on })}
-              className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] text-small ${on ? 'bg-accent-soft font-semibold text-accent-ink' : 'text-ink-2 hover:bg-panel-2'}`}
+              className={`flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md text-small ${on ? 'bg-accent-soft font-semibold text-accent-ink' : 'text-ink-2 hover:bg-panel-2'}`}
             >
               <Icon name={icon} className="h-4 w-4" />
               {label}
@@ -1063,7 +1063,7 @@ export default function KartaAktarDialog({ doc, title, phone, dark, tab: initial
           <div className="flex justify-end">{close}</div>
         </header>
         <div id="karta-govde" role="tabpanel" aria-labelledby={`karta-sekme-${tab}`} className="flex min-h-0 flex-1 px-3 pb-3">
-          {tab === 'pcb' ? <PcbTab key="pcb" {...tabProps} sceneClass="min-w-0 flex-1 rounded-[14px]" /> : <PerfTab key="perf" {...tabProps} sceneClass="min-w-0 flex-1 rounded-[14px]" />}
+          {tab === 'pcb' ? <PcbTab key="pcb" {...tabProps} sceneClass="min-w-0 flex-1 rounded-lg" /> : <PerfTab key="perf" {...tabProps} sceneClass="min-w-0 flex-1 rounded-lg" />}
         </div>
       </div>
     </div>
