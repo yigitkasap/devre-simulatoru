@@ -200,6 +200,7 @@ export function WiringFooter({ canUndo, hasStart, onUndo, onClear }: { canUndo: 
  * yerine "Düzenlemek için durdur" ve Devam et. Arıza bulmada ve kilitli görevde Parça ve Kablo yok.
  */
 export function PhoneBottomBar({
+  compact = false,
   status,
   time,
   canEdit,
@@ -213,6 +214,8 @@ export function PhoneBottomBar({
   onStop,
   onSpeed,
 }: {
+  /** Yatay telefon: düğmeler 44 px, kenar payları küçük (defter ve şema yer kazanır). */
+  compact?: boolean;
   status: SimStatus;
   time: number;
   /** Parça eklenebilir mi (Kur kipinde, kilitli görev ve arıza bulma dışında). */
@@ -228,14 +231,14 @@ export function PhoneBottomBar({
   onStop: () => void;
   onSpeed: () => void;
 }) {
-  const base = 'flex h-[52px] min-w-0 items-center justify-center gap-2 rounded-md px-2 text-[15px] font-semibold';
+  const base = `flex min-w-0 items-center justify-center gap-2 rounded-md px-2 text-[15px] font-semibold ${compact ? 'h-11' : 'h-[52px]'}`;
   const outline = `${base} flex-1 border border-line-2 bg-panel text-ink active:bg-panel-2 disabled:text-stopped`;
   const green = `${base} flex-[1.6] bg-ok px-3 text-white active:brightness-110`;
   return (
     <nav
       aria-label={tr.phone.bottomBar}
-      className="flex shrink-0 items-center gap-2 border-t border-line bg-panel px-3 pt-3"
-      style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
+      className={`flex shrink-0 items-center gap-2 border-t border-line bg-panel px-3 ${compact ? 'pt-1.5' : 'pt-3'}`}
+      style={{ paddingBottom: `calc(${compact ? 6 : 12}px + env(safe-area-inset-bottom))` }}
     >
       {status === 'running' ? (
         <>

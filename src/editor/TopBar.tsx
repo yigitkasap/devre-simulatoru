@@ -178,6 +178,12 @@ function SettingsPanel({
       className="absolute top-[calc(100%+6px)] right-0 z-50 flex w-[380px] max-w-[calc(100vw-1rem)] flex-col gap-4 rounded-xl border border-line bg-panel px-[18px] py-4 shadow-lg"
       role="dialog"
       aria-label={tr.settings.title}
+      // Esc yakalama aşamasında: içindeki alanların tuş işleyicileri olayı durdursa da pencere kapanır.
+      onKeyDownCapture={(e) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        onClose();
+      }}
     >
       <div className="flex items-center justify-between">
         <b className="text-base font-semibold">{tr.settings.title}</b>

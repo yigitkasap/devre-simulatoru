@@ -1504,7 +1504,7 @@ export const tr = {
     saved: 'Tarayıcıda kaydedildi',
     saveFailed: 'Kaydedilemedi',
     saveFailedTitle:
-      'Bu tarayıcı devreyi saklamıyor (gizli pencere ya da kapalı site verisi). Devreyi korumak için Dosya → JSON olarak dışa aktar.',
+      'Bu tarayıcı devreyi saklamıyor (gizli pencere ya da kapalı site verisi). Devreyi korumak için devre menüsünden Bilgisayara indir.',
   },
   settings: {
     title: 'Ayarlar',
@@ -1539,7 +1539,7 @@ export const tr = {
     label: 'Devre şeması',
     empty: 'Başlamak için sağdaki defterde “Parça ekle”ye bas ve bir parça adı yaz.',
     emptyAction: 'Örneklerden başla',
-    emptyMobile: 'Parça eklemek için alttaki **Parça ekle** düğmesine dokun.',
+    emptyMobile: 'Parça eklemek için alttaki **Parça** düğmesine dokun.',
     wiringActive: 'Kablo çiziliyor: bir pine ya da kabloya dokun',
     cancelWire: 'İptal',
     dropHint: 'Uca bırak: bağla',
@@ -3689,18 +3689,18 @@ export const tr = {
     end: 'Turu bitir',
     finish: 'Bitti',
     close: 'Turu kapat',
-    done: 'Tur bitti. Yardım her zaman ? ile ya da üst çubuktaki Yardım düğmesiyle açılır.',
+    done: 'Tur bitti. Yardım her zaman ? ile ya da Daha fazla menüsündeki Yardım ile açılır.',
     steps: [
       {
         title: 'Parça ekle',
         desktop: 'Sağdaki defterde **Parça ekle**ye bas, parçanın adını yaz ve Enter’a bas (ya da defterin altındaki **Bütün parçalar**).',
-        phone: 'Sol alttaki **Parça ekle** düğmesine dokun ve bir parça seç.',
+        phone: 'Alttaki **Parça** düğmesine dokun ve bir parça seç.',
         tablet: 'Sağdaki defterde **Parça ekle**ye dokun, parçanın adını yaz (ya da defterin altındaki **Bütün parçalar**’a dokun).',
       },
       {
         title: 'Kablo çek',
         desktop: 'Bir parçanın **ucuna** tıkla, sonra bağlanacağı uca tıkla. Köşe için aradaki boşluğa tıkla.',
-        phone: 'Şemadaki **Kablo bağla**’ya ya da bir uca dokun; sonra iki uca sırayla dokun.',
+        phone: 'Alttaki **Kablo**’ya ya da bir uca dokun; sonra iki uca sırayla dokun.',
         tablet: '**Kablo bağla**’ya ya da bir parçanın ucuna dokun; sonra iki uca sırayla dokun.',
       },
       {
@@ -3763,7 +3763,7 @@ export const tr = {
       removeTarget: (n: string) => `${n} hedefini sil`,
       nodeHint: 'Düğüm gerilimleri toprağa göredir. İki düğüm arası gerilim için önce Analiz → Grafik’te o iki düğüm arasına iz ekle.',
       visible: 'Hedefler bağlantının ve dosyanın içinde durur, öğrenci görebilir. Alıştırma ve ön hazırlık için uygundur; notlu sınav için değil, bu onay not vermez.',
-      tooLong: (kb: string) => `Bağlantı çok uzun (${kb} KB): bazı e-posta ve öğrenme sistemleri kesebilir. Görev dosyasını (.json) kullan; öğrenci simülatörde Dosya → JSON dosyası içe aktar ile açar.`,
+      tooLong: (kb: string) => `Bağlantı çok uzun (${kb} KB): bazı e-posta ve öğrenme sistemleri kesebilir. Görev dosyasını (.json) kullan; öğrenci simülatörde devre menüsünden Bilgisayardan aç ile açar.`,
       link: 'Görev bağlantısı',
       copy: 'Bağlantıyı kopyala',
       copiedShort: 'Kopyalandı',
