@@ -1,7 +1,7 @@
 // Örneklerin şema kalitesi: kablolar dik ve parçaların gövdesinden geçmez, parçalar üst üste
 // binmez, devre başına tek toprak sembolü vardır ve dönüş akımı kablodan döner (toprak hattı
 // yalnızca toprak tuzağında çizilir). Kablo kesişmesi yalnızca topolojik olarak kaçınılmaz olan
-// örneklerde, sayısı sınırlı olarak bulunur (README, "Örnek şemaları").
+// örneklerde, sayısı sınırlı olarak bulunur (docs/KARARLAR.md, "Örnek şemaları").
 
 import { describe, expect, it } from 'vitest';
 import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../src/examples';

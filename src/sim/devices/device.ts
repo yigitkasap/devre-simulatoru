@@ -13,7 +13,7 @@
 //
 // İntegrasyon: kondansatör, bobin ve eklem yükleri yamuk (trapez) kuralıyla integre edilir; ilk
 // adımda ve süreksizliklerden (kare dalga kenarı, anahtar, değer değişimi) sonraki adımda geri
-// Euler (StepContext.trap = false). Ayrıntı ve gerekçe: README, "Fizik 4".
+// Euler (StepContext.trap = false). Ayrıntı ve gerekçe: docs/KARARLAR.md, "Fizik 4".
 
 import type { DiagnosticCode } from '../diagnostics';
 import { MnaSystem, nodeVoltage } from '../mna';

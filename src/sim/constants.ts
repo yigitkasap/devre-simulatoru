@@ -1,4 +1,4 @@
-// Çözücünün sayısal sabitleri. Değerlerin gerekçesi README'de "Kararlar" bölümünde.
+// Çözücünün sayısal sabitleri. Değerlerin gerekçesi docs/KARARLAR.md'de, "Kararlar" bölümünde.
 
 /** Isıl gerilim VT = k·T/q; T = 300 K için ≈ 25,85 mV. */
 export const THERMAL_VOLTAGE = (1.380649e-23 * 300) / 1.602176634e-19;

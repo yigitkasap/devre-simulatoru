@@ -1,4 +1,4 @@
-// Gerçek parçaların sınırları (Fizik 5). Değerler üretici belgelerindendir; kaynaklar README'de,
+// Gerçek parçaların sınırları (Fizik 5). Değerler üretici belgelerindendir; kaynaklar docs/KARARLAR.md'de,
 // "Fizik 5". Sınır aşılınca yalnızca uyarı verilir: bozulmanın nasıl ve ne zaman olacağına dair
 // veri sayfalarında dayanak yok (yanma modellenmez).
 

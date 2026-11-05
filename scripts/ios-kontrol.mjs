@@ -1,5 +1,5 @@
 // iOS / dokunmatik kontrol listesi. Tuvale, alt sayfalara ya da olay işleyicilerine dokunan her
-// değişiklikten sonra çalıştırılır (README → "Dokunmatik ekran ve iOS Safari").
+// değişiklikten sonra çalıştırılır (docs/KARARLAR.md → "Dokunmatik ekran ve iOS Safari").
 //
 //   npm run dev                          (ayrı bir terminalde)
 //   npm run ios-kontrol [-- <adres> [<ekran-görüntüsü-klasörü>]]

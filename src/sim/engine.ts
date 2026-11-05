@@ -792,7 +792,7 @@ export class CircuitSimulator {
   }
 
   /**
-   * Geçici çözüm: uyarlanır zaman adımıyla ilerletir (README, "Fizik 4").
+   * Geçici çözüm: uyarlanır zaman adımıyla ilerletir (docs/KARARLAR.md, "Fizik 4").
    *   - Adım, bir sonraki kırılma noktasına (kare dalga kenarı, üçgenin köşesi) taşmaz; tam üstüne
    *     denk gelir ve o adımda kaynaklar kenarın hemen öncesindeki değeriyle çözülür. Ardından gelen
    *     adım geri Euler'dir (yamuk kuralı süreksizlikte salınım yapabilir).
