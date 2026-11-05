@@ -47,7 +47,7 @@ function run(doc: CircuitDoc, faults: readonly Fault[], meter?: string, seconds 
 const reading = (sim: CircuitSimulator, id: string) => sim.status(id).reading ?? NaN;
 
 describe('Arıza bulma: arıza netlist kurulurken uygulanır', () => {
-  const doc = exampleDoc('bjt-yukseltec')!;
+  const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
   const RC = partId(doc, 'RC');
   const Q1 = partId(doc, 'Q1');
   const open: Fault = { kind: 'open', at: { part: RC, pin: 1 } };
@@ -143,7 +143,7 @@ describe('Arıza bulma: arıza netlist kurulurken uygulanır', () => {
 });
 
 describe('Arıza bulma görevi: bağlantıdan okuma ve otomatik göstergeler', () => {
-  const doc = exampleDoc('bjt-yukseltec')!;
+  const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
   const base = { name: 'Deney 7 · arıza bul', instruction: '', editable: [], allowNew: false, targets: [], predict: false };
 
   it('görev: belirti, arızalar, ölçü aletleri; eksik alanlarda varsayılan (göstergeler gizli, aletler V Ω osiloskop)', () => {
@@ -185,7 +185,7 @@ describe('Arıza bulma görevi: bağlantıdan okuma ve otomatik göstergeler', (
 });
 
 describe('Multimetre (R1): uçların adları, Ω, simülasyondaki yeri', () => {
-  const doc = exampleDoc('bjt-yukseltec')!;
+  const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
   const part = (label: string) => doc.parts.find((p) => p.label === label)!;
   const RC = part('RC').id;
   const collector = doc.wires.find((w) => w.points.some((p) => p.x === 44 && p.y === 0))!;
@@ -246,7 +246,7 @@ describe('Ölçüm günlüğü (4. aşama)', () => {
 });
 
 describe('Bildirim ve "Bulundu" (5. aşama)', () => {
-  const doc = exampleDoc('bjt-yukseltec')!;
+  const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
   const idx = netIndex(doc, buildConnectivity(doc));
   const id = (label: string) => doc.parts.find((p) => p.label === label)!.id;
   const [RC, Q1] = [id('RC'), id('Q1')];
@@ -290,7 +290,7 @@ describe('Bildirim ve "Bulundu" (5. aşama)', () => {
 });
 
 describe('Görev oluştur → Arıza bulma (6. aşama, R4)', () => {
-  const doc = exampleDoc('bjt-yukseltec')!;
+  const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
   const idx = netIndex(doc, buildConnectivity(doc));
   const id = (label: string) => doc.parts.find((p) => p.label === label)!.id;
   const [RC, C1] = [id('RC'), id('C1')];
@@ -355,25 +355,27 @@ describe('Hazır senaryolar (8. aşama): açıklamadaki sayılar simülatörde',
     expect(measure(ex, [], pin(ex, 'R1', 0), pin(ex, 'R1', 1), 0.05).mm).toBeCloseTo(3.2, 1);
   });
 
-  it('diyot ters: V1 5,00 V (sağlam 0,56 V), R1 iki ucu 0,6 mV (sağlam 4,4 V)', () => {
+  it('diyot ters: diyodun uçları 5,00 V (sağlam 0,56 V), R1’in uçlarındaki V1 0,1 mV (sağlam 4,44 V)', () => {
     const ex = 'diyot-dc';
     const f = s['ariza-diyot']!.faults;
+    const d1 = [pin(ex, 'D1', 0), pin(ex, 'D1', 1)] as const;
     const r1 = [pin(ex, 'R1', 0), pin(ex, 'R1', 1)] as const;
-    expect(measure(ex, f, ...r1, 0.05).V1).toBeCloseTo(5.0, 2);
-    expect(measure(ex, [], ...r1, 0.05).V1).toBeCloseTo(0.56, 2);
-    expect(measure(ex, f, ...r1, 0.05).mm * 1000).toBeCloseTo(0.6, 1);
-    expect(measure(ex, [], ...r1, 0.05).mm).toBeCloseTo(4.4, 1);
+    expect(measure(ex, f, ...d1, 0.05).mm).toBeCloseTo(5.0, 2);
+    expect(measure(ex, [], ...d1, 0.05).mm).toBeCloseTo(0.56, 2);
+    expect(measure(ex, f, ...r1, 0.05).V1 * 1000).toBeCloseTo(0.1, 1);
+    expect(measure(ex, [], ...r1, 0.05).V1).toBeCloseTo(4.44, 2);
   });
 
-  it('köprüde D2 anot kopuk: R_L ortalaması 3,14 V (sağlam 5,73 V); anot bacağı −2,24 V, bağlı olduğu düğüm 0 V', () => {
+  it('köprüde D2 anot kopuk: R_L ortalaması 1,43 V (sağlam 2,62 V); anot bacağı −0,63 V, bağlı olduğu düğüm 0 V', () => {
     const ex = 'kopru-dogrultmac';
     const f = s['ariza-dogrultucu']!.faults;
     const rl = [pin(ex, 'RL', 0), pin(ex, 'RL', 1)] as const;
-    expect(measure(ex, f, ...rl, 0.2).mm).toBeCloseTo(3.14, 2);
-    expect(measure(ex, [], ...rl, 0.2).mm).toBeCloseTo(5.73, 2);
+    expect(measure(ex, f, ...rl, 0.2).mm).toBeCloseTo(1.43, 2);
+    expect(measure(ex, [], ...rl, 0.2).mm).toBeCloseTo(2.62, 2);
     const g = pin(ex, 'GND1', 0);
-    expect(measure(ex, f, pin(ex, 'D2', 0), g, 0.2).mm).toBeCloseTo(-2.24, 2);
-    const node = exampleDoc(ex)!.wires.find((w) => w.points.some((p) => p.x === 50 && p.y === -4))!;
+    expect(measure(ex, f, pin(ex, 'D2', 0), g, 0.2).mm).toBeCloseTo(-0.63, 2);
+    // D2'nin anodu köprünün alt ucunda (B): D3'ün katoduyla aynı kablo.
+    const node = exampleDoc(ex)!.wires.find((w) => w.points.some((p) => p.x === 28 && p.y === 6))!;
     expect(Math.abs(measure(ex, f, wireKey(node.id), g, 0.2).mm)).toBeLessThan(1e-6);
   });
 
@@ -389,14 +391,17 @@ describe('Hazır senaryolar (8. aşama): açıklamadaki sayılar simülatörde',
     expect(measure(ex, f, pin(ex, 'J1', 2), g, 0.05).mm).toBeCloseTo(1.73, 2);
   });
 
-  it('BJT: RC kopuk; kollektör 6,4 mV, RC ucu 11,99 V, baz 0,55 V', () => {
+  it('BJT (Şekil-18): RC kopuk; kollektör 6,3 mV (sağlam 6,05 V), RC ucu 12,00 V, baz 0,60 V (sağlam 0,68 V)', () => {
     const ex = 'bjt-yukseltec';
     const f = s['ariza-bjt']!.faults;
     const g = pin(ex, 'GND1', 0);
-    const w = exampleDoc(ex)!.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === 0))!;
-    expect(measure(ex, f, wireKey(w.id), g, 0.2, true).mm * 1000).toBeCloseTo(6.4, 1);
-    expect(measure(ex, f, pin(ex, 'RC', 1), g, 0.2, true).mm).toBeCloseTo(11.99, 2);
-    expect(measure(ex, f, pin(ex, 'Q1', 1), g, 0.2, true).mm).toBeCloseTo(0.55, 2);
+    // Kollektörden R_C'ye giden kablo (osiloskobun B kablosu (44, −14)'te ayrılır).
+    const w = exampleDoc(ex)!.wires.find((x) => x.points.some((p) => p.x === 44 && p.y === -14))!;
+    expect(measure(ex, f, wireKey(w.id), g, 0.2, true).mm * 1000).toBeCloseTo(6.3, 1);
+    expect(measure(ex, [], wireKey(w.id), g, 0.2, true).mm).toBeCloseTo(6.05, 1);
+    expect(measure(ex, f, pin(ex, 'RC', 1), g, 0.2, true).mm).toBeCloseTo(12.0, 2);
+    expect(measure(ex, f, pin(ex, 'Q1', 1), g, 0.2, true).mm).toBeCloseTo(0.6, 2);
+    expect(measure(ex, [], pin(ex, 'Q1', 1), g, 0.2, true).mm).toBeCloseTo(0.68, 2);
   });
 });
 
@@ -468,7 +473,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
   });
 
   it("elle kablo reddedilir (\"Yeni parça eklenebilir\" açık olsa da): kopuk bacağın yanına çekilen kablo, PS1'in boştaki 2+ ucundan çekilen kablo, kablo silme ve taşıma", () => {
-    const doc = exampleDoc('bjt-yukseltec')!;
+    const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
     const task: TaskDef = { ...withAmmeter, fault: { ...withAmmeter.fault!, faults: [{ kind: 'open', at: { part: partId(doc, 'RC'), pin: 1 } }] } };
     // RC'nin kopuk bacağı (44, -4) ile kollektör düğümü arasına yandan kablo.
     const bypass = addWire(doc, [{ x: 44, y: -4 }, { x: 47, y: -4 }, { x: 47, y: -2 }, { x: 44, y: -2 }]).doc;
@@ -517,7 +522,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
   });
 
   it('A1 tıklanan yerde kablonun üstünde, kablonun yönünde oturur; kollektör → OSC1 B kablosunda OSC1 A kablosuna ve RC yazısına binmez', () => {
-    const doc = exampleDoc('bjt-yukseltec')!;
+    const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
     const w11 = doc.wires.find((w) => w.points[0]!.x === 44 && w.points[0]!.y === -2)!;
     const w10 = doc.wires.find((w) => w.points.at(-1)!.x === 58 && w.points.at(-1)!.y === -4)!;
     for (const x of [46, 50, 54, 57]) {
@@ -545,7 +550,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
   const emitterWire = (doc: CircuitDoc) => doc.wires.find((x) => x.points[0]!.x === 44 && x.points[0]!.y === 8)!;
 
   it('"Buraya ampermetre tak": kısa kablo parçasında (emiter kablosu) yanına konur, iki bağlantı kablosu; emiter akımını ölçer (≈ kollektör akımı), devre değişmez; kaldırınca kablo eski hâline döner', () => {
-    const doc = exampleDoc('bjt-yukseltec')!;
+    const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
     const w = emitterWire(doc);
     const r = plug(doc, w.id, { x: 44, y: 12 });
     expect(r.doc.parts.find((p) => p.id === r.meter.part)!.type).toBe('ammeter');
@@ -561,7 +566,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
   });
 
   it('kablo ucundaki arıza ikinci yarıya taşınır; kopuk emiter bacağında ampermetre sıfıra yakın akım gösterir; kayıt saklanıp geri okunur', () => {
-    const doc = exampleDoc('bjt-yukseltec')!;
+    const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
     const w = emitterWire(doc);
     const r = plug(doc, w.id, { x: 44, y: 12 });
     expect(remapFaults([{ kind: 'open', at: { wire: w.id, end: 1 } }], [r.meter])).toEqual([{ kind: 'open', at: { wire: r.meter.half, end: 1 } }]);
@@ -583,7 +588,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
   });
 
   it('üst rayda RB bağlantısının sağı: ampermetre bağlantıyla köşe arasında kablonun üstünde, göstergesi altta (üstte OSC1 A kablosu); solunda bağlantının solunda kalır; tam bağlantıda takılmaz', () => {
-    const doc = exampleDoc('bjt-yukseltec')!;
+    const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
     const w1 = doc.wires.find((x) => x.points.at(-1)!.x === 44 && x.points.at(-1)!.y === -12)!;
     // Eskiden şemanın en üstüne gidip OSC1 A kablosunu kesiyordu.
     const right = plug(doc, w1.id, { x: 39, y: -16 });
@@ -598,15 +603,16 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     expect(insertAmmeter(doc, w1.id, { x: 44, y: -14 })).toEqual({ error: 'crowded' });
   });
 
-  it('kollektör (drain) akımı o koldaki en az bir kablodan ölçülür; okunan değer simülasyondaki kollektör (drain) akımıyla aynı (bjt-yukseltec, bjt-anahtar, fet-yukseltec, mosfet-yukseltec)', () => {
+  it('kollektör (drain) akımı o koldaki en az bir kablodan ölçülür; okunan değer simülasyondaki kollektör (drain) akımıyla aynı (bjt-yukseltec-kuplajli, bjt-anahtar, fet-yukseltec-kuplajli, mosfet-yukseltec-rs)', () => {
     /** Koldaki kablolar (yalnızca kollektör ya da drain akımı geçen kısımları) ve transistör. */
     type Branch = { wire: (doc: CircuitDoc) => string; keep?: (at: { x: number; y: number }) => boolean };
     const branches: readonly { id: ExampleId; transistor: string; wires: readonly Branch[] }[] = [
       // Üst rayda RB'nin bağlandığı noktanın (36, -16) solundan RB akımı da geçer.
-      { id: 'bjt-yukseltec', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -12), keep: (at) => (at.y === -16 && at.x > 36) || at.x === 44 }, { wire: (d) => wireAt(d, 44, 0) }] },
-      { id: 'bjt-anahtar', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -18) }, { wire: (d) => wireAt(d, 44, -8) }, { wire: (d) => wireAt(d, 44, 2) }] },
-      { id: 'fet-yukseltec', transistor: 'J1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
-      { id: 'mosfet-yukseltec', transistor: 'M1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
+      { id: 'bjt-yukseltec-kuplajli', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, -12), keep: (at) => (at.y === -16 && at.x > 36) || at.x === 44 }, { wire: (d) => wireAt(d, 44, 0) }] },
+      // Şekil-24: LED kolu R2'nin ucunda ayrılır; R2'nin altından kollektöre giden kablodan yalnızca I_C geçer.
+      { id: 'bjt-anahtar', transistor: 'Q1', wires: [{ wire: (d) => wireAt(d, 44, 8) }] },
+      { id: 'fet-yukseltec-kuplajli', transistor: 'J1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
+      { id: 'mosfet-yukseltec-rs', transistor: 'M1', wires: [{ wire: (d) => wireAt(d, 44, -12) }, { wire: (d) => wireAt(d, 44, 0) }] },
     ];
     for (const { id, transistor, wires } of branches) {
       const doc = exampleDoc(id)!;
@@ -708,6 +714,7 @@ describe('Arıza bulmada ampermetre (hoca izin verdiyse)', () => {
     }
     expect(placed).toBeGreaterThan(100);
     expect(beside).toBeGreaterThan(10);
-  });
+    // Bütün örnekleri (74) dolaşır: paralel testlerde 5 s'yi aşabilir.
+  }, 30_000);
 });
 

@@ -58,8 +58,8 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     expect(curveAt(p!, 5)).toBeGreaterThan(1e-4);
   });
 
-  it('yük doğrusu: BC107 yükselteçte R_C = 5,6 kΩ, kaynak 12 V, Q doğrunun üstünde; JFET deneyinde R_D yok', () => {
-    const amp = exampleDoc('bjt-yukseltec')!;
+  it('yük doğrusu: BC107 yükselteçte R_C = 5,6 kΩ, kaynak 12 V, Q doğrunun üstünde; JFET deneyinde R_D ile drain arasında ampermetre var, doğru çizilmez', () => {
+    const amp = exampleDoc('bjt-yukseltec-kuplajli')!;
     const q1 = amp.parts.find((p) => p.label === 'Q1')!;
     const labels = Object.fromEntries(amp.parts.map((p) => [p.id, p.label]));
     const line = loadLine(buildConnectivity(amp).netlist, q1.id, labels)!;
@@ -74,7 +74,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     expect(loadLine(buildConnectivity(lab).netlist, jfet.id, {})).toBeNull();
   });
   it('Q basamağı (analiz düzeltmeleri, 9): BC107’de Q’daki gerçek I_B ≈ 5 µA ayrı bir eğri, öbür basamaklar aynı; aralık beslemeye (12 V) kadar', () => {
-    const amp = exampleDoc('bjt-yukseltec')!;
+    const amp = exampleDoc('bjt-yukseltec-kuplajli')!;
     const q1 = amp.parts.find((p) => p.label === 'Q1')!;
     const line = loadLine(buildConnectivity(amp).netlist, q1.id, {})!;
     // RB = 2,2 MΩ, V_BE ≈ 0,64 V: I_B = (12 − 0,64) / 2,2 MΩ ≈ 5,16 µA.
@@ -101,7 +101,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     const jl = loadLine(buildConnectivity(fet).netlist, j1.id, {})!;
     expect(Math.abs(jl.qStep!)).toBeLessThan(0.01);
     expect(supplyTo(jl.supply, 0.5)).toBe(15);
-    const mos = exampleDoc('mosfet-yukseltec')!;
+    const mos = exampleDoc('mosfet-yukseltec-rs')!;
     const m1 = mos.parts.find((p) => p.type === 'nmos')!;
     const ml = loadLine(buildConnectivity(mos).netlist, m1.id, {})!;
     // Kapı FG1'in 4,55 V ofsetinde, R_S = 1 kΩ: V_GS = 4,55 − R_S · k (V_GS − V_T)², V_T = 3,83 V,
@@ -116,7 +116,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     expect(Math.abs(curveAt(curves[4]!, ml.q[0]) / ml.q[1] - 1)).toBeLessThan(0.05);
   });
   it('MOSFET’te yük doğrusu açıkken varsayılan basamaklar Q’nun çevresinde: IRF510 yükselteçte 3,83 / 3,84 / 3,86 / 3,87 V; eğriler yük doğrusuyla aynı ölçekte', () => {
-    const mos = exampleDoc('mosfet-yukseltec')!;
+    const mos = exampleDoc('mosfet-yukseltec-rs')!;
     const m1 = mos.parts.find((p) => p.type === 'nmos')!;
     const ml = loadLine(buildConnectivity(mos).netlist, m1.id, {})!;
     expect(ml.threshold).toBeCloseTo(3.83, 6);
@@ -132,7 +132,7 @@ describe('Analiz: eğri izleyici', { timeout: 30_000 }, () => {
     expect(atQ(1)).toBeLessThan(ml.q[1]);
     expect(atQ(2)).toBeGreaterThan(ml.q[1]);
     // BJT ve JFET'te eşik yok: basamaklar değişmez.
-    const amp = exampleDoc('bjt-yukseltec')!;
+    const amp = exampleDoc('bjt-yukseltec-kuplajli')!;
     expect(loadLine(buildConnectivity(amp).netlist, amp.parts.find((p) => p.label === 'Q1')!.id, {})!.threshold).toBeNull();
   });
 });

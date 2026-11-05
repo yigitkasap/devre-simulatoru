@@ -74,12 +74,26 @@ import optokuplorLed from './optokuplor-led.json';
 import schottky1n4001 from './schottky-1n4001.json';
 import kopruDiyot from './kopru-diyot.json';
 import tristorMandal from './tristor-mandal.json';
+import seriKirpici from './seri-kirpici.json';
+import altKirpici from './alt-kirpici.json';
+import mosfetYukseltecRs from './mosfet-yukseltec-rs.json';
+import bjtYukseltecKuplajli from './bjt-yukseltec-kuplajli.json';
+import fetYukseltecKuplajli from './fet-yukseltec-kuplajli.json';
 
 /**
- * Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir.
+ * Örnekler penceresindeki klasörler: içindeki gruplar ana listede değil, klasörün kendi görünümünde.
+ * Akdeniz Üniversitesi Fizik Bölümü'nün Temel Elektronik Laboratuvarı (site bu ders için yapıldı):
+ * föyün dokuz deneyi, baraj projesi ve föye dayanan arıza bulma görevleri. Adı tr.ts → examples.folders.
+ */
+export const EXAMPLE_FOLDERS = [{ id: 'akdeniz', logo: 'akdeniz-universitesi-96.png' }] as const;
+
+export type ExampleFolderId = (typeof EXAMPLE_FOLDERS)[number]['id'];
+
+/**
+ * Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir; `folder` olan
+ * gruplar o klasörde gösterilir (?ornek= adresleri ve örnek kimlikleri klasörden bağımsız).
  * "Deney" grupları Fizik 2. sınıf Elektronik Laboratuvarı föyünün dokuz deneyidir; devreler föydeki
- * parçalar ve değerlerle kuruludur. Grupların sonundaki Schottky, köprü diyot (KBP307) ve tristör
- * örnekleri deneyin konusunu Parça Dalga 1'in parçalarıyla sürdürür (föyde yoktur).
+ * parçalar ve değerlerle kuruludur. Föyde olmayan ek örnekler (EXTRA_EXAMPLES) deney grubunun sonunda.
  */
 export const EXAMPLE_GROUPS = [
   {
@@ -104,24 +118,73 @@ export const EXAMPLE_GROUPS = [
   { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici', '555-astabil', '555-monostabil', '555-ses', '7805-besleme', 'lm317-ayarli', 'optokuplor-led'] },
   // Arduino Uno: önceden derlenmiş örnek programlar (src/arduino/sketches).
   { id: 'arduino', ids: ['ard-blink', 'ard-dugme', 'ard-sayac', 'ard-trafik-isigi', 'ard-fade', 'ard-potansiyometre', 'ard-gece-lambasi', 'ard-termometre', 'ard-pwm-filtre', 'ard-melodi', 'ard-role'] },
-  { id: 'diyot-karakteristigi', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi', 'schottky-1n4001'] },
-  { id: 'dogrultucu', ids: ['yarim-dalga', 'kopru-dogrultmac', 'kopru-diyot'] },
-  { id: 'kenetleyici', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
-  { id: 'kirpici', ids: ['paralel-kirpici', 'cift-kirpici'] },
-  { id: 'fet-karakteristigi', ids: ['jfet-karakteristik'] },
-  { id: 'fet-yukseltec', ids: ['fet-yukseltec'] },
-  { id: 'bjt-yukseltec', ids: ['bjt-yukseltec'] },
-  { id: 'mosfet-yukseltec', ids: ['mosfet-yukseltec'] },
-  { id: 'anahtar', ids: ['bjt-anahtar', 'bjt-anahtar-emetor', 'tristor-mandal'] },
+  { id: 'diyot-karakteristigi', folder: 'akdeniz', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi', 'schottky-1n4001'] },
+  { id: 'dogrultucu', folder: 'akdeniz', ids: ['yarim-dalga', 'kopru-dogrultmac', 'kopru-diyot'] },
+  { id: 'kenetleyici', folder: 'akdeniz', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
+  // Föydeki sıra: Şekil-13a, 13b, 13c, 13d.
+  { id: 'kirpici', folder: 'akdeniz', ids: ['seri-kirpici', 'paralel-kirpici', 'cift-kirpici', 'alt-kirpici'] },
+  { id: 'fet-karakteristigi', folder: 'akdeniz', ids: ['jfet-karakteristik'] },
+  { id: 'fet-yukseltec', folder: 'akdeniz', ids: ['fet-yukseltec', 'fet-yukseltec-kuplajli'] },
+  { id: 'bjt-yukseltec', folder: 'akdeniz', ids: ['bjt-yukseltec', 'bjt-yukseltec-kuplajli'] },
+  { id: 'mosfet-yukseltec', folder: 'akdeniz', ids: ['mosfet-yukseltec', 'mosfet-yukseltec-rs'] },
+  { id: 'anahtar', folder: 'akdeniz', ids: ['bjt-anahtar', 'bjt-anahtar-emetor', 'tristor-mandal'] },
   // Proje: baraj su seviyesi uyarısı (ayrı sayfası da var: /baraj).
-  { id: 'baraj', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
+  { id: 'baraj', folder: 'akdeniz', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
 ] as const;
 
 export type ExampleGroupId = (typeof EXAMPLE_GROUPS)[number]['id'];
 export type ExampleId = (typeof EXAMPLE_GROUPS)[number]['ids'][number];
 
+/**
+ * Föyde olmayan ama deneyin konusunu sürdüren ek örnekler: pencerede ve örnek kartında "Föyde yok · ek"
+ * etiketiyle, deney grubunun sonunda (Parça Dalga 1'in Schottky, KBP307 köprü ve tristör örnekleri).
+ */
+export const EXTRA_EXAMPLES: ReadonlySet<ExampleId> = new Set<ExampleId>(['schottky-1n4001', 'kopru-diyot', 'tristor-mandal', 'mosfet-yukseltec-rs', 'bjt-yukseltec-kuplajli', 'fet-yukseltec-kuplajli']);
+
+/**
+ * Föyün dokuz deneyi: grup → deney numarası. Deneyin metinleri (amaç, teorik bilgi) ve her şeklin
+ * adımlarıyla soruları i18n/foy.ts içindedir; ek örnekler (EXTRA_EXAMPLES) föyde olmadığı için
+ * şekil metinleri yoktur ve eski kart düzeninde kalır.
+ */
+export const LAB_EXPERIMENTS = {
+  'diyot-karakteristigi': 1,
+  dogrultucu: 2,
+  kenetleyici: 3,
+  kirpici: 4,
+  'fet-karakteristigi': 5,
+  'fet-yukseltec': 6,
+  'bjt-yukseltec': 7,
+  'mosfet-yukseltec': 8,
+  anahtar: 9,
+} as const satisfies Partial<Record<ExampleGroupId, number>>;
+
+export type LabExperimentNo = (typeof LAB_EXPERIMENTS)[keyof typeof LAB_EXPERIMENTS];
+
+/** Grubun föydeki deney numarası; föy deneyi olmayan gruplarda null. */
+export function labExperiment(id: ExampleGroupId): LabExperimentNo | null {
+  return (LAB_EXPERIMENTS as Partial<Record<ExampleGroupId, LabExperimentNo>>)[id] ?? null;
+}
+
 /** Bütün örnekler, pencerede göründükleri sırayla. */
 export const EXAMPLE_IDS: readonly ExampleId[] = EXAMPLE_GROUPS.flatMap((g) => g.ids);
+
+type ExampleGroup = (typeof EXAMPLE_GROUPS)[number];
+
+/** Grubun klasörü; ana listedeki gruplarda null. */
+export function groupFolder(id: ExampleGroupId): ExampleFolderId | null {
+  const group: ExampleGroup | undefined = EXAMPLE_GROUPS.find((g) => g.id === id);
+  return group && 'folder' in group ? group.folder : null;
+}
+
+/** Klasörün grupları (null: ana liste), pencerede bu sırayla. */
+export function folderGroups(folder: ExampleFolderId | null): readonly ExampleGroup[] {
+  return EXAMPLE_GROUPS.filter((g) => groupFolder(g.id) === folder);
+}
+
+/** Örneğin grubu. */
+export function exampleGroup(id: ExampleId): ExampleGroupId | undefined {
+  return EXAMPLE_GROUPS.find((g) => (g.ids as readonly ExampleId[]).includes(id))?.id;
+}
 
 const DATA: Record<ExampleId, unknown> = {
   'led-on-direnc': ledOnDirenc,
@@ -167,10 +230,15 @@ const DATA: Record<ExampleId, unknown> = {
   'gerilim-katlayici': gerilimKatlayici,
   'paralel-kirpici': paralelKirpici,
   'cift-kirpici': ciftKirpici,
+  'seri-kirpici': seriKirpici,
+  'alt-kirpici': altKirpici,
   'jfet-karakteristik': jfetKarakteristik,
   'fet-yukseltec': fetYukseltec,
+  'fet-yukseltec-kuplajli': fetYukseltecKuplajli,
   'bjt-yukseltec': bjtYukseltec,
+  'bjt-yukseltec-kuplajli': bjtYukseltecKuplajli,
   'mosfet-yukseltec': mosfetYukseltec,
+  'mosfet-yukseltec-rs': mosfetYukseltecRs,
   'bjt-anahtar': bjtAnahtar,
   'bjt-anahtar-emetor': bjtAnahtarEmetor,
   'baraj-cubuk': barajCubuk,

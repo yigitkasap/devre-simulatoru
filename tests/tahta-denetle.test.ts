@@ -51,10 +51,10 @@ describe('Sorun türleri (Deney 9, transistör anahtar)', () => {
     expect(r1!.onRail).toBe(false);
     // Şemada R1, FG1'in TTL çıkışı ile Q1'in bazı arasında.
     expect(r1!.pins.map((p) => `${labelOf(doc, p.expected!.part)}#${p.expected!.pin}`)).toEqual(['FG1#1', 'Q1#1']);
-    // LED1'in anodu (12g) şemada R2'ye, katodu (11g) kollektöre bağlı.
+    // Şekil-24: LED1 transistöre paralel; anodu (12g) şemada kollektöre (ve R2'ye), katodu (11g) emetöre bağlı.
     expect(led!.pins.map((p) => p.hole)).toEqual(['12g', '11g']);
-    expect(`${labelOf(doc, led!.pins[0]!.expected!.part)}#${led!.pins[0]!.expected!.pin}`).toBe('R2#1');
-    expect(labelOf(doc, led!.pins[1]!.expected!.part)).toBe('Q1');
+    expect(`${labelOf(doc, led!.pins[0]!.expected!.part)}#${led!.pins[0]!.expected!.pin}`).toBe('Q1#0');
+    expect(`${labelOf(doc, led!.pins[1]!.expected!.part)}#${led!.pins[1]!.expected!.pin}`).toBe('Q1#2');
   });
 
   it('ters takılmış: transistörün bacak sırası, aletin kabloları (yer değiştirmiş)', () => {
@@ -72,13 +72,13 @@ describe('Sorun türleri (Deney 9, transistör anahtar)', () => {
     const { [R2]: _, ...rest } = right.parts;
     const box = checkBuild(doc, { ...right, parts: rest }, plan).problems;
     expect(box.map((p) => [labelOf(doc, p.part), p.kind, p.inBox])).toEqual([['R2', 'notConnected', true]]);
-    const osc = right.leads.find((l) => labelOf(doc, l.part) === 'OSC1' && l.pin === 1)!;
-    const unplugged = checkBuild(doc, { ...right, leads: right.leads.filter((l) => l !== osc) }, plan).problems;
-    expect(unplugged.map((p) => [labelOf(doc, p.part), p.kind, p.pins.map((q) => q.hole)])).toEqual([['OSC1', 'notConnected', [null]]]);
-    // R2'nin 2. ucu boş bir şeritte (15h): LED1'in anoduna bağlı değil.
+    const com = right.leads.find((l) => labelOf(doc, l.part) === 'FG1' && l.pin === 2)!;
+    const unplugged = checkBuild(doc, { ...right, leads: right.leads.filter((l) => l !== com) }, plan).problems;
+    expect(unplugged.map((p) => [labelOf(doc, p.part), p.kind, p.pins.map((q) => q.hole)])).toEqual([['FG1', 'notConnected', [null]]]);
+    // R2'nin 2. ucu boş bir şeritte (15h): kollektöre (ve LED1'in anoduna) bağlı değil.
     const floating = checkBuild(doc, withHoles(right, R2, ['7h', '15h']), plan).problems;
     expect(floating.map((p) => [labelOf(doc, p.part), p.kind])).toEqual([['R2', 'notConnected']]);
-    expect(floating[0]!.pins.map((p) => [p.pin, p.hole, labelOf(doc, p.expected?.part ?? null), p.joined])).toEqual([[1, '15h', 'LED1', null]]);
+    expect(floating[0]!.pins.map((p) => [p.pin, p.hole, labelOf(doc, p.expected?.part ?? null), p.joined])).toEqual([[1, '15h', 'Q1', null]]);
   });
 
   it('fazladan bağlantı: başka ağın şeridindeki bacak; iki ağı birleştiren ara kablo kendisi sorun', () => {
@@ -100,7 +100,7 @@ describe('Sorun türleri (Deney 9, transistör anahtar)', () => {
   it('boş tahta: her parça ve her alet kablosu bağlı değil', () => {
     const empty: Build = { cols: right.cols, parts: {}, wires: [], leads: [] };
     const problems = checkBuild(doc, empty, plan).problems;
-    expect(problems.map((p) => labelOf(doc, p.part))).toEqual(['R1', 'Q1', 'R2', 'LED1', 'PS1', 'FG1', 'OSC1']);
+    expect(problems.map((p) => labelOf(doc, p.part))).toEqual(['R1', 'Q1', 'R2', 'LED1', 'PS1', 'FG1']);
     expect(problems.every((p) => p.kind === 'notConnected')).toBe(true);
   });
 });
@@ -206,7 +206,7 @@ describe('Sorun kartının metinleri (T3)', () => {
       'R1’in bacakları 6b ve 6e’de. Aynı şeritteki beş delik birbirine bağlıdır: direncin iki ucu aynı düğüme düşer, R1 devre dışı kalır. Şemada R1, FG1’in TTL darbe çıkışı ile Q1’in baz (B) ucu arasında.',
     );
     expect(problemText(doc, led!)).toBe(
-      'LED1 ters takılmış: anot ucu 12g’de, katot ucu 11g’de. Şemada anot ucu R2’nin 2. ucu ile, katot ucu Q1’in kollektör (C) ucu ile aynı düğümde. LED’in uzun bacağı anottur.',
+      'LED1 ters takılmış: anot ucu 12g’de, katot ucu 11g’de. Şemada anot ucu Q1’in kollektör (C) ucu ile, katot ucu Q1’in emetör (E) ucu ile aynı düğümde. LED’in uzun bacağı anottur.',
     );
     const q = checkBuild(doc, withHoles(right, idOf(doc, 'Q1'), ['4h', '3h', '2h']), plan).problems[0]!;
     expect(problemTitle(doc, q, 0, 3)).toBe('Q1 · bacak sırası yanlış');
@@ -215,9 +215,9 @@ describe('Sorun kartının metinleri (T3)', () => {
     expect(problemTitle(doc, wire, 0, 2)).toBe('2d – 7i kablosu çevresinde');
     expect(problemText(doc, wire)).toMatch(/^2d – 7i kablosu iki ayrı düğümü birleştiriyor: bir yanında .+, öbür yanında .+ var\. Şemada bunlar bağlı değil\.$/);
     const { [idOf(doc, 'R2')]: _, ...rest } = right.parts;
-    expect(problemText(doc, checkBuild(doc, { ...right, parts: rest }, plan).problems[0]!)).toMatch(/^R2 kutuda; henüz tahtaya takılmadı\. Şemada R2, .+ ile LED1’in anot ucu arasında\.$/);
+    expect(problemText(doc, checkBuild(doc, { ...right, parts: rest }, plan).problems[0]!)).toBe('R2 kutuda; henüz tahtaya takılmadı. Şemada R2, PS1’in 1. çıkışının + ucu ile Q1’in kollektör (C) ucu arasında.');
     const floating = checkBuild(doc, withHoles(right, idOf(doc, 'R2'), ['7h', '15h']), plan).problems[0]!;
-    expect(problemText(doc, floating)).toBe('R2’nin 2. ucu (15h) LED1’in anot ucu ile bağlı değil: tahtada aralarında bağlantı yok.');
+    expect(problemText(doc, floating)).toMatch(/^R2’nin 2\. ucu \(15h\) Q1’in kollektör \(C\) ucu ile bağlı değil: tahtada aralarında bağlantı yok\.$/);
   });
 
   it('delik ekleri ve sayılar', () => {

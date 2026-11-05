@@ -9,7 +9,7 @@ import { exampleDoc } from '../src/examples';
 import bode from './veri/veri-bc107-bode.json';
 
 function ampRequest(from: number, to: number, points: number): BodeRequest {
-  const doc = exampleDoc('bjt-yukseltec')!;
+  const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
   const fg = doc.parts.find((p) => p.type === 'funcgen')!;
   const osc = doc.parts.find((p) => p.type === 'oscilloscope')!;
   return {

@@ -3,7 +3,7 @@
 // açıklamadaki sayılar simülatörde ölçüldü (tests/ariza.test.ts aynı sayıları denetler).
 
 import type { Fault } from '../model/faults';
-import type { ExampleGroupId, ExampleId } from '.';
+import { groupFolder, type ExampleFolderId, type ExampleGroupId, type ExampleId } from '.';
 
 export interface FaultScenario {
   readonly id: string;
@@ -31,4 +31,9 @@ export type FaultScenarioId = (typeof FAULT_SCENARIOS)[number]['id'];
 
 export function faultScenario(id: string): FaultScenario | undefined {
   return FAULT_SCENARIOS.find((s) => s.id === id);
+}
+
+/** Senaryonun klasörü: deneyinin grubunun klasörü (föye dayanmayan senaryo ana listede, null). */
+export function faultFolder(scenario: FaultScenario): ExampleFolderId | null {
+  return groupFolder(scenario.group);
 }

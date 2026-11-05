@@ -2,7 +2,8 @@
 // Paylaşım bağlantısı: sıkıştırma ve geri okuma.
 
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../src/examples';
+import { EXAMPLE_IDS, EXTRA_EXAMPLES, exampleDoc, type ExampleId } from '../src/examples';
+import { LAB_FIGURE_TEXTS } from '../src/i18n/foy';
 import { tr } from '../src/i18n/tr';
 import { buildConnectivity } from '../src/model/connectivity';
 import { flipParts, updatePart } from '../src/model/docOps';
@@ -57,7 +58,11 @@ describe('Örnekler', () => {
       // Hata ve uyarı yok; bilgi olabilir (ör. transformatörün yalıtılmış ikincilinin kendi sıfır noktası).
       expect(new CircuitSimulator(connectivity.netlist).topologyDiagnostics.filter((d) => d.severity !== 'info')).toEqual([]);
       const texts = tr.examples.texts[id];
-      for (const text of [texts.title, texts.description, texts.purpose, texts.everyday]) expect(text.length).toBeGreaterThan(5);
+      for (const text of [texts.title, texts.description, texts.everyday]) expect(text.length).toBeGreaterThan(5);
+      // "Ne işe yarar?" eski düzendeki kartlarda var; föy kartlarında yerini amaç ve teorik bilgi aldı.
+      const lab = !EXTRA_EXAMPLES.has(id) && LAB_FIGURE_TEXTS[id] !== undefined;
+      if (lab) expect(texts.purpose, id).toBeUndefined();
+      else expect(texts.purpose?.length ?? 0, id).toBeGreaterThan(5);
     });
   }
 
@@ -123,20 +128,17 @@ describe('Örnekler', () => {
     return { max, min };
   }
 
-  it('Yarım dalga doğrultmaç (föy): yükte ≈ 9,0 V tepe, DC voltmetre ≈ 2,8 V; ters diyotla negatif yarılar', () => {
+  it('Yarım dalga doğrultmaç (föy, Şekil-4a): yükte ≈ 2,36 V tepe; ters diyotla negatif yarılar', () => {
     const doc = load('yarim-dalga');
-    const sim = simulate(doc, 0.1);
-    const reading = sim.status(idOf(doc, 'V1')).reading!;
-    expect(reading).toBeGreaterThan(2.7);
-    expect(reading).toBeLessThan(2.85);
-    const { max, min } = swing(sim, idOf(doc, 'V1'), 0.02);
-    expect(max).toBeGreaterThan(8.9);
-    expect(max).toBeLessThan(9.05);
-    expect(min).toBeGreaterThan(-0.01);
-    const flipped = simulate(flipParts(doc, new Set([idOf(doc, 'D1')])), 0.1);
-    const reverse = swing(flipped, idOf(doc, 'V1'), 0.02);
-    expect(reverse.max).toBeLessThan(0.01);
-    expect(reverse.min).toBeLessThan(-8.9);
+    const sim = simulate(doc, 0.02);
+    const { max, min } = swing(sim, idOf(doc, 'RL'), 0.004);
+    expect(max).toBeGreaterThan(2.25);
+    expect(max).toBeLessThan(2.42);
+    expect(min).toBeGreaterThan(-0.05);
+    const flipped = simulate(flipParts(doc, new Set([idOf(doc, 'D1')])), 0.02);
+    const reverse = swing(flipped, idOf(doc, 'RL'), 0.004);
+    expect(reverse.max).toBeLessThan(0.05);
+    expect(reverse.min).toBeLessThan(-2.25);
   });
 
   it('Kare dalga ile RC: yarım periyot sonunda ≈ 9,93 V; 5 Hz’de kondansatör tam dolamaz', () => {

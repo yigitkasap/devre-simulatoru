@@ -1,27 +1,24 @@
 {
   "version": 1,
   "parts": [
-    {"id": "p8", "type": "oscilloscope", "label": "OSC1", "x": 63, "y": -2, "rotation": 0, "props": {"timePerDiv": 0.0005, "voltsPerDivA": 0.2, "voltsPerDivB": 2, "positionA": 0, "positionB": 0, "couplingA": "ac", "couplingB": "ac", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
-    {"id": "p5", "type": "funcgen", "label": "FG1", "x": 16, "y": 6, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 0.5, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
-    {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 0, "y": -8, "rotation": 0, "props": {"voltage1": 15, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
-    {"id": "p2", "type": "ground", "label": "GND1", "x": 7, "y": 16, "rotation": 0, "props": {}},
-    {"id": "p3", "type": "resistor", "label": "RD", "x": 44, "y": -8, "rotation": 90, "props": {"resistance": 2700.0}},
-    {"id": "p4", "type": "njfet", "label": "J1", "x": 42, "y": 4, "rotation": 0, "props": {"model": "BF245A", "idss": 0.00352, "pinchOff": -1.74}},
-    {"id": "p6", "type": "capacitor", "label": "C1", "x": 27, "y": 4, "rotation": 0, "props": {"capacitance": 1e-06, "initialVoltage": 0, "kind": "film"}},
-    {"id": "p7", "type": "resistor", "label": "RG", "x": 35, "y": 10, "rotation": 90, "props": {"resistance": 1000000.0}}
+    {"id": "p5", "type": "funcgen", "label": "FG1", "x": 0, "y": 0, "rotation": 0, "props": {"waveform": "sine", "frequency": 1000, "amplitude": 0.5, "offset": 0, "duty": 50, "attenuate": false, "earthed": true}},
+    {"id": "p7", "type": "resistor", "label": "RG", "x": 14, "y": -6, "rotation": 0, "props": {"resistance": 10000}},
+    {"id": "p4", "type": "njfet", "label": "J1", "x": 26, "y": -6, "rotation": 0, "props": {"model": "BF245A", "idss": 0.00352, "pinchOff": -1.74}},
+    {"id": "p3", "type": "resistor", "label": "RD", "x": 44, "y": -8, "rotation": 90, "props": {"resistance": 2700}},
+    {"id": "p1", "type": "dcsupply", "label": "PS1", "x": 34, "y": 4, "rotation": 0, "props": {"voltage1": 15, "currentLimit1": 0.1, "voltage2": 0, "currentLimit2": 0.1}},
+    {"id": "p8", "type": "oscilloscope", "label": "OSC1", "x": 60, "y": -6, "rotation": 0, "props": {"timePerDiv": 0.0005, "voltsPerDivA": 0.2, "voltsPerDivB": 1, "positionA": 0, "positionB": 0, "couplingA": "dc", "couplingB": "ac", "trigger": "A", "mode": "yt", "invertB": false, "input": "real", "earthed": true}},
+    {"id": "p2", "type": "ground", "label": "GND1", "x": 8, "y": 12, "rotation": 0, "props": {}}
   ],
   "wires": [
-    {"id": "w1", "points": [[5, -11], [9, -11], [9, -16], [44, -16], [44, -12]]},
-    {"id": "w2", "points": [[5, -9], [7, -9], [7, 16], [56, 16]]},
-    {"id": "w3", "points": [[44, -4], [44, 0]]},
-    {"id": "w4", "points": [[44, 8], [44, 16]]},
-    {"id": "w5", "points": [[21, 4], [23, 4]]},
-    {"id": "w6", "points": [[31, 4], [38, 4]]},
-    {"id": "w7", "points": [[35, 4], [35, 6]]},
-    {"id": "w8", "points": [[35, 14], [35, 16]]},
-    {"id": "w9", "points": [[21, 8], [23, 8], [23, 16]]},
-    {"id": "w10", "points": [[32, 4], [32, -20], [54, -20], [54, -4], [58, -4]]},
-    {"id": "w11", "points": [[44, -2], [58, -2]]},
-    {"id": "w12", "points": [[58, 0], [56, 0], [56, 16]]}
+    {"id": "w1", "points": [[5, -2], [8, -2], [8, -6], [10, -6]]},
+    {"id": "w2", "points": [[18, -6], [22, -6]]},
+    {"id": "w3", "points": [[28, -10], [28, -14], [44, -14], [44, -12]]},
+    {"id": "w4", "points": [[44, -4], [44, 1], [39, 1]]},
+    {"id": "w5", "points": [[39, 3], [46, 3], [46, 12]]},
+    {"id": "w6", "points": [[28, -2], [28, 12]]},
+    {"id": "w7", "points": [[5, 2], [8, 2], [8, 12], [53, 12]]},
+    {"id": "w8", "points": [[8, -6], [8, -18], [52, -18], [52, -8], [55, -8]]},
+    {"id": "w9", "points": [[44, -14], [50, -14], [50, -6], [55, -6]]},
+    {"id": "w10", "points": [[55, -4], [53, -4], [53, 12]]}
   ]
 }

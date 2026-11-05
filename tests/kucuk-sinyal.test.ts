@@ -26,7 +26,7 @@ const rcRequest: BodeRequest = { netlist: rc, source: 'FG', input: { a: 'in', b:
 
 /** BC107 ortak emetörlü yükselteç (föy örneği); `amplitude` üretecin tepe-tepe değeri (−20 dB zayıflatıcıdan önce). */
 function ampRequest(from: number, to: number, points: number, amplitude?: number): BodeRequest {
-  const doc = exampleDoc('bjt-yukseltec')!;
+  const doc = exampleDoc('bjt-yukseltec-kuplajli')!;
   const fg = doc.parts.find((p) => p.type === 'funcgen')!;
   const osc = doc.parts.find((p) => p.type === 'oscilloscope')!;
   const parts = amplitude === undefined ? doc.parts : doc.parts.map((p) => (p.id === fg.id ? { ...p, props: { ...p.props, amplitude } } : p));

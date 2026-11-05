@@ -10,7 +10,7 @@ import { netIndex } from '../src/editor/analysis/traces';
 import { goalText, readPrediction, targetOptions } from '../src/editor/task/targets';
 import { plainText } from '../src/editor/Rich';
 
-const amp = exampleDoc('bjt-yukseltec')!;
+const amp = exampleDoc('bjt-yukseltec-kuplajli')!;
 const id = (label: string) => amp.parts.find((p) => p.label === label)!.id;
 const task: TaskDef = {
   name: 'Deney 7 · BJT yükselteç tasarımı',

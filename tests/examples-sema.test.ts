@@ -11,16 +11,15 @@ import { partBounds, pinPositions } from '../src/model/geometry';
 import type { CircuitDoc, Part, Point } from '../src/model/types';
 
 /**
- * İzin verilen kesişme sayısı. Yükselteçlerde ve transistör anahtarda osiloskobun giriş kablosu
+ * İzin verilen kesişme sayısı. Föyde olmayan eski (ek) yükselteçlerde osiloskobun giriş kablosu
  * besleme hattını keser (transistör, osiloskop ve besleme üç düğüme birden bağlıdır: K3,3);
  * JFET karakteristiğinde güç kaynağının uç sırası; barajda üç seviye bandı.
  */
 const CROSSINGS: Partial<Record<ExampleId, number>> = {
   'jfet-karakteristik': 1,
-  'fet-yukseltec': 1,
-  'bjt-yukseltec': 1,
-  'mosfet-yukseltec': 1,
-  'bjt-anahtar': 1,
+  'fet-yukseltec-kuplajli': 1,
+  'bjt-yukseltec-kuplajli': 1,
+  'mosfet-yukseltec-rs': 1,
   'baraj-cubuk': 2,
   'baraj-tek-isik': 4,
   // İşlemsel yükselteçte uç sırası (−, V+, çıkış, V−, +): geri besleme V+ kablosunu, toprak hattı V−
@@ -33,6 +32,11 @@ const CROSSINGS: Partial<Record<ExampleId, number>> = {
   // Köprü diyot tek gövde: uçlar çevresinde ~ + ~ − sırasıyla; kaynağın kabloları iki ~ ucuna, yükünküler
   // + ile − ucuna gider. Gövdenin dışından karşılıklı uçları birleştiren iki yol kesişmek zorunda.
   'kopru-diyot': 1,
+  // Föydeki Şekil-5a gibi: köprünün − ucundan çıkışın alt ucuna giden kablo üretecin alt kablosunu keser.
+  'kopru-dogrultmac': 1,
+  // Föydeki Şekil-10 gibi üretecin alt kablosu X düğümünü keser; osiloskobun B (alt çıkış) ve COM (orta)
+  // uçlarının sırası çıkışlarınkiyle ters.
+  'gerilim-katlayici': 2,
 };
 
 type Segment = readonly [Point, Point];
