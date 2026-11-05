@@ -47,6 +47,10 @@ const LOGIC_MODEL_NOTES: Record<string, string> = {
   ...Object.fromEntries(
     Object.entries(LS_DOCS).map(([n, [name, doc, tpd]]) => [`74LS${n}`, `74LS${n} (TI ${name}, ${doc}): ${LS_COMMON} Gecikme t_{PLH} / t_{PHL} tipik ${tpd} ns.`]),
   ),
+  '74HC74':
+    `74HC74 (TI SN74HC74, SCLS094F): ${HC_COMMON} CLK, P̅R̅E̅ ya da C̅L̅R̅ → Q gecikmesi 4,5 V’ta tipik 20 ns; en çok 31 MHz (4,5 V, 25 °C). Kurulum ve tutma süreleri modellenmez.`,
+  '74LS74A':
+    `74LS74A (TI SN74LS74A, SDLS119): ${LS_COMMON} P̅R̅E̅ ve C̅L̅R̅ iki birim yüktür (0,8 mA). Gecikme t_{PLH} 13 / t_{PHL} 25 ns (tipik); en çok 25 MHz. Kurulum ve tutma süreleri modellenmez.`,
 };
 
 export interface DiagnosticContext {
@@ -108,6 +112,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ic7408: '4 × VE kapısı',
   ic7432: '4 × VEYA kapısı',
   ic7486: '4 × ÖZEL VEYA kapısı',
+  ic7474: '2 × D flip-flop',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -163,6 +168,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ic7408: 'VE entegresinin',
   ic7432: 'VEYA entegresinin',
   ic7486: 'ÖZEL VEYA entegresinin',
+  ic7474: 'flip-flop entegresinin',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -746,6 +752,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Dört iki girişli VEYA kapısı (DIP-14): girişlerden en az biri 1 iken çıkış 1’dir. 14. bacak VCC, 7. bacak GND.',
   ic7486:
     'Dört iki girişli ÖZEL VEYA (XOR) kapısı (DIP-14): girişler farklıyken çıkış 1’dir. İkili toplamada toplam basamağını verir. 14. bacak VCC, 7. bacak GND.',
+  ic7474:
+    'İki D flip-flop (DIP-14): saatin (CLK) yükselen kenarında D’deki seviyeyi Q’ya alır ve bir sonraki kenara kadar saklar; Q̅ her zaman Q’nun tersidir. P̅R̅E̅ (ön kurma) Q’yu 1, C̅L̅R̅ (silme) 0 yapar: ikisi de etkin düşük ve saatten bağımsızdır, kullanılmıyorsa 1’e bağlanır.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -1870,6 +1878,7 @@ export const tr = {
         : `I_{C} = CTR · I_{F} = ${ctr} (${ic}). LED ile çıkış arasında elektriksel bağ yok; bağı ışık kurar.`,
     logicSupply: 'Besleme (VCC − GND)',
     logicSupplyCurrent: 'Besleme akımı',
+    logicQ: '1Q · 2Q',
     logicUnpowered: 'Entegre beslenmiyor: çıkışlar sürülmüyor.',
     regInput: 'Giriş',
     regOutput: 'Çıkış',
@@ -3056,6 +3065,7 @@ export const tr = {
       ic7408: 'VE entegreleri',
       ic7432: 'VEYA entegreleri',
       ic7486: 'ÖZEL VEYA entegreleri',
+      ic7474: 'D flip-flop entegreleri',
     } satisfies Record<DeviceType, string>,
   },
   // Arayüz v4: masaüstü üst çubuğu ve menüleri (devre menüsü, Daha fazla).

@@ -52,6 +52,11 @@ export function LogicDetails({ part, frame }: { part: Part; frame: SimFrame | nu
     <div className="flex flex-col gap-3">
       {logic && !logic.powered && <p className="m-0 rounded-md border border-warn-line bg-warn-soft px-3 py-2 text-label leading-snug text-ink-2">{t().unpowered}</p>}
       {isGateChip(type) && <TruthTable part={part} levels={logic?.powered ? logic.levels : null} />}
+      {type === 'ic7474' && logic?.powered && logic.q && (
+        <p className="m-0 font-mono text-[15px] tabular">
+          {logic.q.map((q, k) => `${k + 1}Q = ${q}`).join(' · ')}
+        </p>
+      )}
       <section aria-label={t().pinsTitle} className="flex flex-col gap-1.5">
         <span className="text-label font-semibold text-muted">{t().pinsTitle}</span>
         <table className={`w-full border-collapse ${touch ? 'text-[14px]' : 'text-[13px]'}`}>

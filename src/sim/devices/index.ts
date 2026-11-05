@@ -231,6 +231,7 @@ export { BRIDGE_DEFAULTS, BRIDGE_MODELS, BridgeDevice } from './bridge';
 export { SCR_DEFAULTS, SCR_IGT, SCR_IH, SCR_IL, SCR_MODELS, ScrDevice } from './scr';
 export {
   curveAt,
+  FlipFlop7474Device,
   GateIcDevice,
   LOGIC_FAMILIES,
   LogicIcDevice,

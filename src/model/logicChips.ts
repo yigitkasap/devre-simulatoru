@@ -87,10 +87,10 @@ export function gateOutput(kind: GateKind, inputs: readonly number[]): number {
   }
 }
 
-/** Model seçimi: aynı işlevin 74HC ve 74LS sürümü (ör. 74HC08 / 74LS08). 7486'nın LS'si 74LS86A. */
-export function gateModels(type: GateChipType): readonly string[] {
+/** Model seçimi: aynı işlevin 74HC ve 74LS sürümü (ör. 74HC08 / 74LS08). 7486 ve 7474'ün LS'si A sürümü. */
+export function gateModels(type: GateChipType | 'ic7474'): readonly string[] {
   const n = type.slice(4);
-  return [`74HC${n}`, type === 'ic7486' ? `74LS${n}A` : `74LS${n}`];
+  return [`74HC${n}`, type === 'ic7486' || type === 'ic7474' ? `74LS${n}A` : `74LS${n}`];
 }
 
 /**
@@ -119,11 +119,20 @@ function gateDef(type: GateChipType): LogicChipDef {
   };
 }
 
-export const LOGIC_CHIPS: Readonly<Record<GateChipType, LogicChipDef>> = {
+export const LOGIC_CHIPS: Readonly<Record<GateChipType | 'ic7474', LogicChipDef>> = {
   ...(Object.fromEntries(GATE_CHIP_TYPES.map((t) => [t, gateDef(t)])) as Record<GateChipType, LogicChipDef>),
+  // SN74HC74 / SN74LS74A: 1CLR̄ 1D 1CLK 1PRĒ 1Q 1Q̄ GND 2Q̄ 2Q 2PRĒ 2CLK 2D 2CLR̄ VCC.
+  ic7474: {
+    names: ['1CLR', '1D', '1CLK', '1PRE', '1Q', '1Q', 'GND', '2Q', '2Q', '2PRE', '2CLK', '2D', '2CLR', 'VCC'],
+    vcc: 14,
+    gnd: 7,
+    inputs: [1, 2, 3, 4, 13, 12, 11, 10],
+    outputs: [5, 6, 9, 8],
+    bars: [1, 4, 6, 8, 10, 13],
+  },
 };
 
-export type LogicChipType = GateChipType;
+export type LogicChipType = GateChipType | 'ic7474';
 
 export const LOGIC_CHIP_TYPES = Object.keys(LOGIC_CHIPS) as LogicChipType[];
 

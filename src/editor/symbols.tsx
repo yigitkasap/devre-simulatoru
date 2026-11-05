@@ -13,7 +13,7 @@ import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { ANION_COLOR, CATION_COLOR, ionsOnLine, jiggle, seeded, type IonView, type PlacedIon } from './ions';
-import { GateIc } from './logicSymbols';
+import { FlipFlopIc, GateIc } from './logicSymbols';
 import type { ResistorStyle } from './settings';
 
 /** Simülasyon sırasında sembolün görünümünü değiştiren değerler (Aşama 3-4). */
@@ -1328,6 +1328,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
     case 'ic7432':
     case 'ic7486':
       return <GateIc type={type} model={String(partProp(type, props, 'model'))} rotation={rotation} levels={live?.levels} />;
+    case 'ic7474':
+      return <FlipFlopIc model={String(partProp(type, props, 'model'))} rotation={rotation} levels={live?.levels} />;
     case 'scr':
       return <Scr on={live?.on ?? false} />;
   }

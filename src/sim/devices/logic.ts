@@ -815,20 +815,21 @@ const LS_TPD: Readonly<Record<GateChipType, { readonly lh: number; readonly hl: 
  * 74LS besleme akımı (V_CC = 5,25 V, tipik): LS00 I_CCH 0,8 / I_CCL 2,4 mA, LS02 1,6 / 2,8, LS04
  * 1,2 / 3,6, LS08 2,4 / 4,4, LS32 3,1 / 4,9 mA; LS86A I_CC 6,1 mA (girişler toprakta); LS74A 4 mA.
  */
-const LS_ICC: Readonly<Record<GateChipType, { readonly high: number; readonly low: number }>> = {
+const LS_ICC: Readonly<Record<GateChipType | 'ic7474', { readonly high: number; readonly low: number }>> = {
   ic7400: { high: 0.8e-3, low: 2.4e-3 },
   ic7402: { high: 1.6e-3, low: 2.8e-3 },
   ic7404: { high: 1.2e-3, low: 3.6e-3 },
   ic7408: { high: 2.4e-3, low: 4.4e-3 },
   ic7432: { high: 3.1e-3, low: 4.9e-3 },
   ic7486: { high: 6.1e-3, low: 6.1e-3 },
+  ic7474: { high: 4e-3, low: 4e-3 },
 };
 
-function lsExtras(type: GateChipType, model: string): ChipExtras {
+function lsExtras(type: GateChipType | 'ic7474', model: string): ChipExtras {
   if (logicFamily(model) !== 'LS') return {};
   const inputs = LOGIC_CHIPS[type].inputs;
   // LS86A'nın bütün girişleri, LS74A'nın PRĒ ve CLR̄'si iki birim yük (I_IL −0,8 mA, I_IH 40 µA).
-  const double = type === 'ic7486' ? inputs : [];
+  const double = type === 'ic7486' ? inputs : type === 'ic7474' ? [1, 4, 10, 13] : [];
   return {
     icc: LS_ICC[type],
     inputLoad: inputs.map((p) => (double.includes(p) ? 2 : 1)),
@@ -868,6 +869,66 @@ export class GateIcDevice extends LogicIcDevice {
   }
 }
 
+// --- 7474: iki D flip-flop ------------------------------------------------------------------------------
+
+/**
+ * 7474: yükselen kenarda D'yi alan iki D flip-flop; PRĒ ve CLR̄ etkin düşük, saatten bağımsız
+ * (SN74HC74 SCLS094F ve SN74LS74A SDLS119 fonksiyon tablosu). PRĒ = CLR̄ = 0 iken Q ve Q̄ ikisi de 1
+ * (veri sayfası: kararsız, bırakılınca kalmaz; bırakılınca son durum). Açılışta Q = 0 (veri sayfası
+ * açılış durumunu vermez). Gecikme: 74HC CLK veya PRĒ/CLR̄ → Q, Q̄ t_pd 70 / 20 / 15 ns (2 / 4,5 / 6 V);
+ * 74LS74A t_PLH 13, t_PHL 25 ns. Girişlerin sırası: 1CLR̄ 1D 1CLK 1PRĒ 2CLR̄ 2D 2CLK 2PRĒ; çıkışlar
+ * 1Q 1Q̄ 2Q 2Q̄.
+ */
+const HC74_TPD: ReadonlyArray<readonly [number, number]> = [
+  [2, 70e-9],
+  [4.5, 20e-9],
+  [6, 15e-9],
+];
+
+export class FlipFlop7474Device extends LogicIcDevice {
+  readonly type = 'ic7474' as const;
+  /** Flip-flopların Q'su. */
+  q = [0, 0];
+
+  constructor(init: DeviceInit) {
+    const model = modelOf(init, gateModels('ic7474'));
+    super(init, 'ic7474', model, lsExtras('ic7474', model));
+  }
+
+  protected override resetState(): void {
+    this.q = [0, 0];
+  }
+
+  protected evaluate(levels: readonly number[], previous: readonly number[]): number[] {
+    const outs: number[] = [];
+    for (let k = 0; k < 2; k++) {
+      const [clr, clk, pre] = [levels[4 * k]!, levels[4 * k + 2]!, levels[4 * k + 3]!];
+      if (pre === 0 && clr === 0) {
+        outs.push(1, 1);
+        continue;
+      }
+      if (pre === 0) this.q[k] = 1;
+      else if (clr === 0) this.q[k] = 0;
+      else if (previous[4 * k + 2] === 0 && clk === 1) this.q[k] = previous[4 * k + 1]!;
+      outs.push(this.q[k]!, 1 - this.q[k]!);
+    }
+    return outs;
+  }
+
+  protected delay(vcc: number, _out: number, level: number): number {
+    return this.family === 'LS' ? (level === 1 ? 13e-9 : 25e-9) : lerp(vcc, HC74_TPD);
+  }
+
+  protected override details() {
+    return { q: [...this.q] };
+  }
+
+  protected override adoptLogic(prev: LogicIcDevice): void {
+    if (prev instanceof FlipFlop7474Device) this.q = [...prev.q];
+  }
+}
+
+
 /** Entegrenin model seçenekleri (katalog). */
 export function logicModels(type: LogicChipType): readonly string[] {
   return gateModels(type);
@@ -884,4 +945,5 @@ export const LOGIC_IC_MODELS: Readonly<Record<LogicChipType, DeviceModel>> = {
   ic7408: model('ic7408', (init) => new GateIcDevice(init, 'ic7408')),
   ic7432: model('ic7432', (init) => new GateIcDevice(init, 'ic7432')),
   ic7486: model('ic7486', (init) => new GateIcDevice(init, 'ic7486')),
+  ic7474: model('ic7474', (init) => new FlipFlop7474Device(init)),
 };

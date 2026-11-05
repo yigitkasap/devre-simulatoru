@@ -211,3 +211,56 @@ describe('Yayılma gecikmesi', () => {
   });
 });
 
+describe('7474: D flip-flop', () => {
+  /** 1. flip-flop: D, PRĒ, CLR̄ sabit; saat 1 kHz kare dalga (ilk yarım periyot 1, ilk yükselen kenar 1 ms'de) ya da 0. */
+  const ff = (model: string, d: number, pre: number, clr: number, clock: boolean): Builder =>
+    powered()
+      .add('ic7474', 'U1', pins('ic7474', { 1: clr ? 'vcc' : 'gnd', 2: d ? 'vcc' : 'gnd', 3: clock ? 'clk' : 'gnd', 4: pre ? 'vcc' : 'gnd', 5: 'q', 6: 'qn', 7: 'gnd', 10: 'vcc', 11: 'gnd', 12: 'gnd', 13: 'vcc', 14: 'vcc' }), { model })
+      .add('acsource', 'S1', ['clk', 'gnd'], { waveform: 'square', frequency: 1e3, amplitude: 2.5, offset: 2.5, internalResistance: 0 })
+      .resistor('RQ', 'q', 'gnd', 1e6)
+      .resistor('RN', 'qn', 'gnd', 1e6);
+  const outs = (sim: CircuitSimulator) => {
+    const l = sim.status('U1').logic!;
+    return [l.levels[4], l.levels[5]];
+  };
+
+  for (const model of gateModels('ic7474')) {
+    it(`${model}: Q yalnızca CLK’ın yükselen kenarında D’yi alır; Q̄ tersi`, () => {
+      const sim = new CircuitSimulator(ff(model, 1, 1, 1, true).build());
+      sim.advance(0.9e-3);
+      expect(outs(sim)).toEqual([0, 1]);
+      sim.advance(0.2e-3);
+      expect(outs(sim)).toEqual([1, 0]);
+      expect(sim.status('U1').logic!.q).toEqual([1, 0]);
+      // D = 0 iken kenar gelmedikçe Q değişmez.
+      const hold = new CircuitSimulator(ff(model, 0, 1, 1, false).build());
+      hold.advance(2e-3);
+      expect(outs(hold)).toEqual([0, 1]);
+    });
+
+    it(`${model}: PRĒ = 0 → Q = 1, CLR̄ = 0 → Q = 0 (saatsiz); ikisi 0 iken Q ve Q̄ ikisi de 1`, () => {
+      expect(outs(run(ff(model, 0, 0, 1, false)))).toEqual([1, 0]);
+      expect(outs(run(ff(model, 1, 1, 0, true), 1.5e-3))).toEqual([0, 1]);
+      expect(outs(run(ff(model, 0, 0, 0, false)))).toEqual([1, 1]);
+    });
+  }
+
+  it('frekans bölücü (Q̄ → D): çıkış saatin yarı frekansında', () => {
+    const sim = new CircuitSimulator(
+      powered()
+        .add('ic7474', 'U1', pins('ic7474', { 1: 'vcc', 2: 'qn', 3: 'clk', 4: 'vcc', 5: 'q', 6: 'qn', 7: 'gnd', 10: 'vcc', 11: 'gnd', 12: 'gnd', 13: 'vcc', 14: 'vcc' }), { model: '74HC74' })
+        .add('acsource', 'S1', ['clk', 'gnd'], { waveform: 'square', frequency: 1e3, amplitude: 2.5, offset: 2.5, internalResistance: 0 })
+        .resistor('RQ', 'q', 'gnd', 1e6)
+        .build(),
+    );
+    const q: number[] = [];
+    sim.advance(0.5e-3);
+    for (let k = 0; k < 8; k++) {
+      sim.advance(1e-3);
+      q.push(sim.status('U1').logic!.q![0]!);
+    }
+    // Her yükselen kenarda (1, 2, 3 … ms) Q döner; kenarların arasında (1,5; 2,5 … ms) okunur: 1, 0, 1, 0 …
+    expect(q).toEqual([1, 0, 1, 0, 1, 0, 1, 0]);
+  });
+});
+

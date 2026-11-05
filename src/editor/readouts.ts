@@ -226,13 +226,15 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
     case 'ic7404':
     case 'ic7408':
     case 'ic7432':
-    case 'ic7486': {
+    case 'ic7486':
+    case 'ic7474': {
       const l = status.logic;
       if (!l) return { title, rows: [] };
       const rows: ReadoutRow[] = [
         { label: t.logicSupply, value: v(l.supply) },
         { label: t.logicSupplyCurrent, value: a(m.current) },
       ];
+      if (l.powered && l.q) rows.push({ label: t.logicQ, value: l.q.join(' · ') });
       return { title, rows, ...(l.powered ? {} : { note: t.logicUnpowered }) };
     }
     case 'timer555': {

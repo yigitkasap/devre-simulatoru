@@ -130,6 +130,58 @@ export function GateIc({ type, model, rotation, levels }: { type: GateChipType; 
 }
 
 /**
+ * 7474: kutunun içinde iki flip-flop bloğu (1. flip-flop sol yanın bacaklarında, 2. sağ yanın).
+ * Blokta D, saat üçgeni, Q, Q̄; PRĒ ve CLR̄ girişlerinde değil dairesi.
+ */
+export function FlipFlopIc({ model, rotation, levels }: { model: string; rotation: Rotation; levels?: readonly (number | null)[] }) {
+  const count = 14;
+  const blocks = [
+    { s: 1, pins: { clr: 1, d: 2, clk: 3, pre: 4, q: 5, qn: 6 } },
+    { s: -1, pins: { clr: 13, d: 12, clk: 11, pre: 10, q: 9, qn: 8 } },
+  ];
+  return (
+    <g>
+      <DipBox type="ic7474" model={model} rotation={rotation} levels={levels} />
+      {blocks.map(({ s, pins }, k) => {
+        const ys = Object.values(pins).map((p) => dipPinY(p, count));
+        const y0 = Math.min(...ys) - 9;
+        const y1 = Math.max(...ys) + 9;
+        const inner = s * -50;
+        const outer = s * -14;
+        const x = Math.min(inner, outer);
+        const lead = (p: number, bubble: boolean) => {
+          const y = dipPinY(p, count);
+          return (
+            <g key={p}>
+              <path d={`M${s * -EDGE},${y}H${inner - s * (bubble ? 6 : 0)}`} fill="none" stroke="currentColor" strokeWidth={1.2} />
+              {bubble && <circle cx={inner - s * 3} cy={y} r={3} style={PAPER} stroke="currentColor" strokeWidth={1.2} />}
+            </g>
+          );
+        };
+        const label = (p: number, text: string, bar = false) => (
+          <Text key={`t${p}`} x={inner + s * 3} y={dipPinY(p, count)} rotation={rotation} size={6} anchor={s > 0 ? 'start' : 'end'} bar={bar}>
+            {text}
+          </Text>
+        );
+        const yClk = dipPinY(pins.clk, count);
+        return (
+          <g key={k}>
+            {[pins.clr, pins.d, pins.clk, pins.pre, pins.q, pins.qn].map((p) => lead(p, p === pins.clr || p === pins.pre))}
+            <rect x={x} y={y0} width={36} height={y1 - y0} rx={2} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+            <path d={`M${inner},${yClk - 4}L${inner + s * 6},${yClk}L${inner},${yClk + 4}`} fill="none" stroke="currentColor" strokeWidth={1.2} />
+            {label(pins.clr, 'CLR', true)}
+            {label(pins.d, 'D')}
+            {label(pins.pre, 'PRE', true)}
+            {label(pins.q, 'Q')}
+            {label(pins.qn, 'Q', true)}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/**
  * DIP kutusu: bacak çizgileri, çentik, bacak numaraları (içte) ve adları (dışta, etkin düşükler üstü
  * çizgili); 1 olan bacakta turuncu nokta.
  */

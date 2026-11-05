@@ -903,7 +903,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'semiconductors', types: ['diode', 'zener', 'led', 'bridge', 'schottky', 'scr'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'ics', types: ['opamp', 'timer555', 'arduino', 'reg7805', 'lm317', 'opto'] },
-  { id: 'logic', types: ['ic7400', 'ic7402', 'ic7404', 'ic7408', 'ic7432', 'ic7486'] },
+  { id: 'logic', types: ['ic7400', 'ic7402', 'ic7404', 'ic7408', 'ic7432', 'ic7486', 'ic7474'] },
   { id: 'switches', types: ['switch', 'pushbutton', 'spdt', 'relay', 'fuse'] },
   { id: 'outputs', types: ['lamp', 'motor', 'speaker', 'buzzer'] },
   { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },
