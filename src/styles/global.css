@@ -198,6 +198,12 @@
   --color-tr-4: #7c3aed;
   --color-tr-5: #a16207;
   --color-tr-6: #0e7490;
+  /* Logo ("düğüm dalgası", Logo.tsx ve public/favicon.svg): koyu kare, beyaz dalga, turuncu düğümler;
+     koyu temada karenin 1 px kenarı görünür ve düğümler biraz açılır. */
+  --color-logo-bg: #1d2733;
+  --color-logo-wave: #ffffff;
+  --color-logo-dot: #f05a28;
+  --color-logo-frame: transparent;
 }
 
 /* Koyu tema: <html data-theme="dark"> (Ayarlar → Tema: Sistem / Açık / Koyu; theme.ts). Her belirtecin
@@ -205,6 +211,8 @@
    4,3:1, yazı tonları (-ink, muted) koyu panelde en az 6:1. Yazdırırken her zaman açık tema. */
 @media screen {
   :root[data-theme='dark'] {
+    --color-logo-dot: #f26a3d;
+    --color-logo-frame: #3b4754;
     color-scheme: dark;
     --color-app: #0e1318;
     --color-panel: #161c23;

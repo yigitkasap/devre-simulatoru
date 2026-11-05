@@ -12,6 +12,7 @@ import type { FocusPanels } from './fullscreen';
 import { Icon, type IconName } from './icons';
 import type { Settings, ThemeChoice } from './settings';
 import { SpeedOptions, speedLabel, StatusMark } from './SimBar';
+import { Logo } from './Logo';
 import type { Theme } from './theme';
 import type { SimStatus } from './useSimulation';
 
@@ -38,22 +39,6 @@ function PanelToggle({ side, label, open, onPanel, touch = false }: { side: keyo
     >
       <Icon name={side === 'left' ? 'sideLeft' : 'sideRight'} />
     </button>
-  );
-}
-
-/** Sitenin simgesi: koyu kare üzerinde turuncu dalga. */
-export function Logo() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 44 44" aria-hidden="true" className="shrink-0 max-desk:h-6 max-desk:w-6">
-      <rect width="44" height="44" rx="9" fill="#1d2733" />
-      <path
-        d="M8 22c3.5-10 7-10 10.5 0s7 10 10.5 0 5-8 7-6"
-        fill="none"
-        stroke="#f05a28"
-        strokeWidth="3.4"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }
 

@@ -11,17 +11,8 @@ import { formatSI } from '../sim/units';
 import type { SaveState } from './autosave';
 import { HintText } from './HintStrip';
 import { Icon } from './icons';
+import { Logo } from './Logo';
 import type { SimStatus } from './useSimulation';
-
-/** Sitenin simgesi: koyu kare üzerinde turuncu dalga. */
-function Logo() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 44 44" aria-hidden="true" className="shrink-0">
-      <rect width="44" height="44" rx="9" fill="#1d2733" />
-      <path d="M8 22c3.5-10 7-10 10.5 0s7 10 10.5 0 5-8 7-6" fill="none" stroke="#f05a28" strokeWidth="3.6" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 /** Üst çubuktaki durum satırı: "Kur · kaydedildi", "Çalışıyor · 2,58 s". */
 export function statusLine(status: SimStatus, time: number, saveState: SaveState): string {
@@ -54,7 +45,7 @@ export function PhoneHeader(props: PhoneHeaderProps) {
     <header className="shrink-0 border-b border-line bg-panel" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <h1 className="sr-only">{tr.site.name}</h1>
       <div className="flex h-14 items-center gap-2 pr-2 pl-3">
-        <Logo />
+        <Logo size={30} />
         <button
           type="button"
           onClick={props.onStatus}

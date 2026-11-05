@@ -4,7 +4,7 @@
 import { tr } from '../../i18n/tr';
 import type { SimStatus } from '../useSimulation';
 import { Icon } from '../icons';
-import { Logo } from '../TopBar';
+import { Logo } from '../Logo';
 import { useTouchUi } from '../touchUi';
 
 export function EmbedBar({
