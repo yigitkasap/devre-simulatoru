@@ -1,9 +1,10 @@
-// Defterin sonundaki parça ekleme satırı (tasarım v3: D1) ve "Bütün parçalar" penceresi.
+// Defterde parça ekleme (arayüz v4): "Parçalar" başlığındaki "+ Parça ekle" arama kutusunu açar; defterin
+// altındaki "Bütün parçalar (N)" kategorili ızgarayı açar.
 //
-// Satıra yazınca adı eşleşen parçalar ve o parçayı içeren örnekler listelenir; Enter (ya da tıklama)
-// vurgulu parçayı ekler, oklar vurguyu taşır, Esc temizler. Açık bir kartın boşta ucu varsa parça
-// o uca bağlı eklenir ("zincirle ekle"), yoksa şemanın görünen alanında boş bir yere. Altındaki
-// "Bütün parçalara göz at" kategorili ızgarayı açar.
+// Kutuya yazınca adı eşleşen parçalar ve o parçayı içeren örnekler listelenir; Enter (ya da tıklama)
+// vurgulu parçayı ekler, oklar vurguyu taşır, Esc önce yazıyı temizler, boşken kutuyu kapatır. Açık bir
+// kartın boşta ucu varsa parça o uca bağlı eklenir ("zincirle ekle"), yoksa şemanın görünen alanında boş
+// bir yere.
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../examples';
@@ -50,12 +51,14 @@ export interface AddPartRowProps {
   readonly allowed?: ReadonlySet<DeviceType> | null;
 }
 
-export function AddPartRow({ settings, chainTo, onAdd, onOpenExample, allowed = null }: AddPartRowProps) {
+/** "+ Parça ekle"yle açılan arama kutusu: açılınca odaklanır; boşken Esc ya da odak çıkınca kapanır. */
+export function AddPartSearch({ settings, chainTo, onAdd, onOpenExample, allowed = null, onClose }: AddPartRowProps & { onClose: () => void }) {
   const types = useMemo(() => (allowed ? ALL_TYPES.filter((type) => allowed.has(type)) : ALL_TYPES), [allowed]);
   const touch = useTouchUi();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
-  const [gridOpen, setGridOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => inputRef.current?.focus(), []);
   const listId = useId();
   const q = normalize(query.trim());
   const parts = useMemo(() => (q ? types.filter((type) => normalize(tr.devices.names[type]).includes(q)).slice(0, MAX_PARTS) : []), [q, types]);
@@ -78,18 +81,25 @@ export function AddPartRow({ settings, chainTo, onAdd, onOpenExample, allowed = 
     } else if (e.key === 'Enter') {
       e.preventDefault();
       choose(active);
-    } else if (e.key === 'Escape' && query) {
+    } else if (e.key === 'Escape') {
       e.stopPropagation();
-      setQuery('');
+      if (query) setQuery('');
+      else onClose();
     }
   };
   const open = q !== '';
   return (
     <>
-      <div data-tour="parts" className={`flex shrink-0 flex-col overflow-hidden rounded-lg bg-panel ${open ? 'border-2 border-accent' : 'border border-line focus-within:border-accent'}`}>
-        <label className={`flex items-center gap-2.5 px-3.5 ${touch ? 'h-14' : 'h-[52px]'} ${open ? 'border-b border-line' : ''}`}>
-          <Icon name="plus" className="h-[18px] w-[18px] shrink-0 text-accent" />
+      <div
+        className={`flex shrink-0 flex-col overflow-hidden rounded-lg border bg-panel ${open ? 'border-accent' : 'border-line focus-within:border-accent'}`}
+        onBlur={(e) => {
+          if (!query && !e.currentTarget.contains(e.relatedTarget as Node | null)) onClose();
+        }}
+      >
+        <label className={`flex items-center gap-2.5 px-3 ${touch ? 'h-14' : 'h-11'} ${open ? 'border-b border-line' : ''}`}>
+          <Icon name="search" className="h-4 w-4 shrink-0 text-muted" />
           <input
+            ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
@@ -150,10 +160,21 @@ export function AddPartRow({ settings, chainTo, onAdd, onOpenExample, allowed = 
           </div>
         )}
       </div>
+    </>
+  );
+}
+
+/** Defterin altında "Bütün parçalar (N)": kategorili ızgarayı açar. */
+export function BrowseAllParts({ settings, chainTo, onAdd, allowed = null }: AddPartRowProps) {
+  const types = useMemo(() => (allowed ? ALL_TYPES.filter((type) => allowed.has(type)) : ALL_TYPES), [allowed]);
+  const touch = useTouchUi();
+  const [gridOpen, setGridOpen] = useState(false);
+  return (
+    <>
       <button
         type="button"
         onClick={() => setGridOpen(true)}
-        className={`flex shrink-0 items-center gap-2 self-start px-1 text-small text-accent-ink hover:underline ${touch ? 'h-11' : 'h-10'}`}
+        className={`flex shrink-0 items-center gap-2 self-start px-0.5 text-small font-medium text-accent-ink hover:underline ${touch ? 'h-11' : 'h-9'}`}
       >
         <Icon name="parts" className="h-4 w-4" />
         {t.browseAll(types.length)}

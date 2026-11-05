@@ -1537,7 +1537,7 @@ export const tr = {
   },
   canvas: {
     label: 'Devre şeması',
-    empty: 'Başlamak için sağdaki defterin sonundaki “Parça ekle” satırına bir parça adı yaz.',
+    empty: 'Başlamak için sağdaki defterde “Parça ekle”ye bas ve bir parça adı yaz.',
     emptyAction: 'Örneklerden başla',
     emptyMobile: 'Parça eklemek için alttaki **Parça ekle** düğmesine dokun.',
     wiringActive: 'Kablo çiziliyor: bir pine ya da kabloya dokun',
@@ -2818,7 +2818,14 @@ export const tr = {
   notebook: {
     label: 'Defter: devredeki parçalar',
     title: 'Devredeki parçalar',
+    partsTitle: 'Parçalar',
     count: (n: number) => `${n} parça`,
+    problemCount: (n: number, kind: 'error' | 'warning') => `${n} ${kind === 'error' ? 'hata' : 'uyarı'}`,
+    addButton: 'Parça ekle',
+    exampleOpenLab: 'Föy kartını aç',
+    exampleOpen: 'Açıklamayı aç',
+    exampleNext: 'Sonraki örnek',
+    exampleCollapse: 'Kartı küçült',
     openCard: (label: string, type: string) => `${label} · ${type}: kartı aç`,
     collapse: 'Kartı küçült',
     hold: 'Basılı tut',
@@ -2841,7 +2848,7 @@ export const tr = {
     addLabel: 'Parça ekle: adını yaz, Enter’a bas',
     addFree: 'Şemada boş yere eklenir',
     addChained: (pinOf: string) => `${toDative(pinOf)} bağlanır`,
-    browseAll: (n: number) => `Bütün parçalara göz at (${n})`,
+    browseAll: (n: number) => `Bütün parçalar (${n})`,
     allParts: 'Bütün parçalar',
     scopeAdvanced: 'Gelişmiş: konum, ters çevirme, tetikleme, şebeke toprağı',
     scopeAdvancedShort: 'Gelişmiş ayarlar',
@@ -3565,7 +3572,7 @@ export const tr = {
     mouse: 'Fare',
     touch: 'Dokunma (telefon, tablet)',
     mouseRows: [
-      ['Parça ekle', 'Defterin sonundaki satıra parçanın adını yaz, Enter’a bas; açık kartın boştaki ucuna bağlı eklenir. “Bütün parçalara göz at” kategorili listeyi açar.'],
+      ['Parça ekle', 'Defterin “Parçalar” başlığındaki “Parça ekle”ye bas, parçanın adını yaz, Enter’a bas; açık kartın boştaki ucuna bağlı eklenir. Defterin altındaki “Bütün parçalar” kategorili listeyi açar.'],
       ['Tıkla', 'Seçer; kartı sağdaki defterde açılır.'],
       ['Shift + tıkla', 'Seçime ekler ya da çıkarır.'],
       ['Uca tıkla', 'Kablo başlar; köşeler için tıkla, bir uca ya da kabloya tıklayınca biter.'],
@@ -3680,9 +3687,9 @@ export const tr = {
     steps: [
       {
         title: 'Parça ekle',
-        desktop: 'Sağdaki defterin sonundaki **Parça ekle** satırına parçanın adını yaz ve Enter’a bas (ya da **Bütün parçalara göz at**).',
+        desktop: 'Sağdaki defterde **Parça ekle**ye bas, parçanın adını yaz ve Enter’a bas (ya da defterin altındaki **Bütün parçalar**).',
         phone: 'Sol alttaki **Parça ekle** düğmesine dokun ve bir parça seç.',
-        tablet: 'Sağdaki defterin sonundaki **Parça ekle** satırına parçanın adını yaz (ya da **Bütün parçalara göz at**’a dokun).',
+        tablet: 'Sağdaki defterde **Parça ekle**ye dokun, parçanın adını yaz (ya da defterin altındaki **Bütün parçalar**’a dokun).',
       },
       {
         title: 'Kablo çek',

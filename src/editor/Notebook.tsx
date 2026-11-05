@@ -16,7 +16,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { resistorBands, resistorColorCode } from '../bench3d/bands';
-import type { ExampleId } from '../examples';
+import { EXAMPLE_IDS, type ExampleId } from '../examples';
 import { ek } from '../i18n/ek';
 import { tr, type DiagnosticContext } from '../i18n/tr';
 import { CATALOG, withProp, type NumberPropDef, type PropDef } from '../model/catalog';
@@ -36,7 +36,7 @@ import { lm317Note } from './lm317Divider';
 import { stableReadout } from './liveReadout';
 import type { MessageItem } from './messages';
 import { SeverityMark, type MessageAction } from './MessagesTab';
-import { AddPartRow, type AddPartRowProps } from './NotebookAdd';
+import { AddPartSearch, BrowseAllParts, type AddPartRowProps } from './NotebookAdd';
 import { notebookEntries, type NotebookEntry } from './notebookOrder';
 import { partValueText } from './PartView';
 import { currentProp, partNote, presetLabel, stepValue, validateNumber, valuePresets } from './propertyForm';
@@ -252,6 +252,7 @@ export function Notebook(props: NotebookProps) {
     }
     return map;
   }, [doc.parts, openId, slow, status, settings, floating, measured, issues, callbacks, touch]);
+  const [adding, setAdding] = useState(false);
   const card = (part: Part) => (part.id === openId ? <PartCard key={part.id} {...props} onClearSelection={closeOpen} part={part} open /> : closed.get(part.id));
 
   const renderEntry = (entry: NotebookEntry): ReactNode => {
@@ -281,30 +282,53 @@ export function Notebook(props: NotebookProps) {
     );
   };
 
+  // Başlıktaki sorun durumu: hata ve uyarılar (Kur kipinde boşta uçlar sayılmaz; kartlarında rozet var).
+  const calm = status === 'stopped' && props.issues.size === 0;
+  const problems = props.messages.filter((m) => m.severity !== 'info' && !(calm && m.code === 'floating-pin'));
+  const errors = problems.filter((m) => m.severity === 'error').length;
   return (
     <div
       id="defter"
       ref={listRef}
       onKeyDown={onNavKeys}
-      className={`flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain bg-panel-2 ${touch ? 'p-3' : 'p-4'}`}
+      className={`flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain bg-panel ${touch ? 'p-3' : 'p-4'}`}
       style={props.phone ? { paddingBottom: 'calc(104px + env(safe-area-inset-bottom))' } : undefined}
     >
       {props.taskCard}
-      <Problems {...props} listRef={listRef} />
       {props.example.id && <ExampleCard id={props.example.id} onOpen={props.example.onOpen} onClose={props.example.onClose} />}
-      <div className="flex items-baseline justify-between px-0.5 pb-0.5">
-        <h2 className="text-[17px] font-semibold">{t.title}</h2>
-        <span className="text-small text-muted">
+      <Problems {...props} listRef={listRef} />
+      <div className={`flex items-center gap-2 px-0.5 ${touch ? 'min-h-11' : 'min-h-8'}`}>
+        <h2 className="text-[15px] font-semibold">{t.partsTitle}</h2>
+        <span className="rounded-full bg-panel-2 px-2 font-mono text-label leading-5 text-ink-2 tabular" aria-label={t.count(doc.parts.length)}>
+          {doc.parts.length}
+        </span>
+        <span className={`flex min-w-0 items-center gap-1 truncate text-small ${props.liveHidden ? 'text-muted' : problems.length === 0 ? 'text-ok-ink' : errors > 0 ? 'text-danger-ink' : 'text-warn'}`}>
           {props.liveHidden ? (
             t.liveHidden
-          ) : (
+          ) : problems.length === 0 ? (
             <>
-              {t.count(doc.parts.length)}
-              {status !== 'stopped' && !props.messages.some((m) => m.severity !== 'info') ? ` · ${t.noProblems}` : ''}
+              <Icon name="check" className="h-4 w-4 shrink-0" />
+              {t.noProblems}
             </>
+          ) : (
+            t.problemCount(errors > 0 ? errors : problems.length, errors > 0 ? 'error' : 'warning')
           )}
         </span>
+        <span className="flex-1" />
+        {props.add && (
+          <button
+            type="button"
+            data-tour="parts"
+            onClick={() => setAdding((a) => !a)}
+            aria-expanded={adding}
+            className={`flex shrink-0 items-center gap-1.5 rounded-md border border-line-2 px-2.5 text-sm font-medium ${touch ? 'h-11' : 'h-8'} ${adding ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-panel-2'}`}
+          >
+            <Icon name="plus" className="h-4 w-4" />
+            {t.addButton}
+          </button>
+        )}
       </div>
+      {adding && props.add && <AddPartSearch {...props.add} settings={settings} onClose={() => setAdding(false)} />}
       {openId === null && others > 0 && (
         <div className="flex flex-col gap-4 rounded-lg border-2 border-accent bg-panel px-3.5 py-3">
           {selection.parts.length === 0 && selection.wires.length === 1 ? (
@@ -314,8 +338,12 @@ export function Notebook(props: NotebookProps) {
           )}
         </div>
       )}
-      {doc.parts.length === 0 ? <p className="px-0.5 text-small text-muted">{t.empty}</p> : entries.map(renderEntry)}
-      {props.add && <AddPartRow {...props.add} settings={settings} />}
+      {doc.parts.length === 0 ? (
+        <p className="px-0.5 text-small text-muted">{t.empty}</p>
+      ) : (
+        <div className="flex shrink-0 flex-col divide-y divide-line overflow-hidden rounded-lg border border-line bg-panel">{entries.map(renderEntry)}</div>
+      )}
+      {props.add && <BrowseAllParts {...props.add} settings={settings} />}
     </div>
   );
 }
@@ -493,38 +521,55 @@ function InfoCard(props: NotebookProps & { item: MessageItem }) {
   );
 }
 
-/** Açık örnek: katlı kart ("Örnek · grup" ve kısa başlık); açılınca açıklama, metinler, önceki / sonraki. */
+/**
+ * Açık örnek: üstte tek şerit (accent-soft): mono üst yazı ("DENEY 6 · ŞEKİL-17" ya da grubun adı), örneğin
+ * cümlesi, "Föy kartını aç" ve "Sonraki örnek". Föy kartı açılınca şerit kartın kendisi olur.
+ */
 function ExampleCard({ id, onOpen, onClose }: { id: ExampleId; onOpen: (id: ExampleId) => void; onClose: () => void }) {
   const touch = useTouchUi();
   const [open, setOpen] = useState(false);
   const bodyId = useId();
-  // Başka örnek açılınca kart katlı başlar.
+  // Başka örnek açılınca şerit katlı başlar.
   useEffect(() => setOpen(false), [id]);
-  // Föy deneylerinde başlık deneyin numarası ve şekli ("Örnek · Deney 1 · Şekil-3").
-  const badge = tr.examples.tabBadge(labBadge(id) ?? groupOf(id));
+  const lab = labBadge(id);
+  const badge = tr.examples.tabBadge(lab ?? groupOf(id));
+  const next = EXAMPLE_IDS[EXAMPLE_IDS.indexOf(id) + 1];
+  const link = `inline-flex items-center gap-1 rounded-xs text-small font-semibold text-accent-ink underline-offset-2 hover:underline ${touch ? 'min-h-11' : 'min-h-7'}`;
   return (
-    <section data-notebook="example" aria-label={badge} className="flex shrink-0 flex-col rounded-lg border border-line bg-panel">
-      <button
-        type="button"
-        data-nav
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-controls={bodyId}
-        className={`flex items-center gap-3 px-3.5 py-2.5 text-left ${touch ? 'min-h-14' : ''}`}
-      >
-        <Icon name="book" className="h-5 w-5 shrink-0 text-accent-ink" />
-        <span className="flex min-w-0 flex-1 flex-col gap-px">
-          <span className="text-label font-semibold text-accent-ink">
-            {badge}
-            <ExtraTag id={id} className="ml-1.5" />
-          </span>
-          <span className="text-sm font-semibold">{tr.examples.cues[id]}</span>
+    <section data-notebook="example" aria-label={badge} className="flex shrink-0 flex-col gap-1 rounded-lg bg-accent-soft px-3.5 py-3">
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 font-mono text-[11px] font-medium tracking-[0.06em] text-accent-ink">
+          {(lab ?? groupOf(id)).toLocaleUpperCase('tr-TR')}
+          <ExtraTag id={id} className="ml-1.5" />
         </span>
-        <Icon name={open ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0" />
-      </button>
-      {open && (
-        <div id={bodyId} className="flex flex-col gap-3 px-3.5 pb-3">
+        {open && (
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label={t.exampleCollapse}
+            title={t.exampleCollapse}
+            className={`flex shrink-0 items-center justify-center rounded-md text-accent-ink hover:bg-panel/60 ${touch ? 'h-11 w-11' : 'h-7 w-7'}`}
+          >
+            <Icon name="chevronUp" className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <p className="text-sm leading-snug font-semibold text-ink">{tr.examples.cues[id]}</p>
+      {open ? (
+        <div id={bodyId} className="flex flex-col gap-3 pt-2">
           <ExampleDetails id={id} onOpen={onOpen} onClose={onClose} />
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-x-4">
+          <button type="button" data-nav onClick={() => setOpen(true)} aria-expanded={false} aria-controls={bodyId} className={link}>
+            {lab ? t.exampleOpenLab : t.exampleOpen}
+          </button>
+          {next && (
+            <button type="button" onClick={() => onOpen(next)} className={link}>
+              {t.exampleNext}
+              <Icon name="chevron" className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       )}
     </section>
@@ -572,7 +617,7 @@ function GroupRow({
   // Rozet: sorunlu üyelerin adları (yanmış ya da boşta ucu olan).
   const flagged = entry.parts.filter((p) => issues.has(p.id) || frame?.statuses.get(p.id)?.burned === true || (status === 'stopped' && (floating.get(p.id) ?? 0) > 0));
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col">
       <button
         type="button"
         data-nav
@@ -580,21 +625,30 @@ function GroupRow({
         aria-expanded={open}
         aria-controls={id}
         aria-label={t.groupToggle(name, entry.parts.length)}
-        className="flex h-14 shrink-0 items-center gap-3 rounded-lg border border-line bg-panel px-3.5 text-left hover:border-line-2"
+        className="flex h-[52px] shrink-0 items-center gap-3 px-3 text-left hover:bg-panel-2"
       >
-        <SymbolIcon type={entry.type} resistorStyle={settings.resistorStyle} className="max-h-[18px] w-[30px] shrink-0" />
-        <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">
+        <IconBox type={entry.type} resistorStyle={settings.resistorStyle} />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
           {name} <span className="font-normal text-muted">· {labels}</span>
         </span>
         {flagged.length > 0 && <Badge tone={flagged.some((p) => issues.get(p.id) === 'error') ? 'danger' : 'warn'}>{flagged.map((p) => p.label).join(', ')}</Badge>}
         <Icon name={open ? 'chevronUp' : 'chevronDown'} className="h-4 w-4 shrink-0" />
       </button>
       {open && (
-        <div id={id} className="flex flex-col gap-2 border-l-2 border-line pl-3">
+        <div id={id} className="flex flex-col divide-y divide-line border-t border-line bg-panel-2/50 pl-4">
           {children}
         </div>
       )}
     </div>
+  );
+}
+
+/** Satırın solundaki 28 px simge kutusu. */
+function IconBox({ type, resistorStyle }: { type: Part['type']; resistorStyle: NotebookProps['settings']['resistorStyle'] }) {
+  return (
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-panel-2" aria-hidden="true">
+      <SymbolIcon type={type} resistorStyle={resistorStyle} className="max-h-[14px] w-[20px]" />
+    </span>
   );
 }
 
@@ -682,19 +736,21 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
 
   if (!open) {
     return (
-      <div data-card={part.id} data-notebook="card" className={`flex shrink-0 flex-col rounded-lg border bg-panel hover:border-line-2 ${editable ? 'border-accent-line shadow-[inset_3px_0_0_var(--color-accent)]' : 'border-line'}`}>
+      <div data-card={part.id} data-notebook="card" className={`flex shrink-0 flex-col ${editable ? 'border-l-[3px] border-accent' : ''}`}>
         <button
           type="button"
           data-nav
           onClick={() => onSelectPart(part.id)}
           aria-expanded={false}
           aria-label={`${t.openCard(part.label, typeName)}${reading ? `, ${reading.main}` : value ? `, ${value}` : ''}`}
-          className={`flex shrink-0 items-center gap-3 px-3.5 text-left ${touch ? 'min-h-[60px]' : 'h-[60px]'}`}
+          className={`flex shrink-0 items-center gap-3 px-3 text-left hover:bg-panel-2 ${touch ? 'min-h-14' : 'min-h-[52px]'}`}
         >
-          <SymbolIcon type={part.type} resistorStyle={settings.resistorStyle} className="max-h-[18px] w-[34px] shrink-0" />
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-[15px] font-semibold">
-              {part.label} <span className="font-normal text-muted">· {typeName}{reading && value ? ` ${value}` : ''}</span>
+          <IconBox type={part.type} resistorStyle={settings.resistorStyle} />
+          <span className="min-w-0 flex-1 truncate">
+            <span className="font-mono text-sm font-semibold">{part.label}</span>{' '}
+            <span className="text-small text-muted">
+              {typeName}
+              {reading && value ? ` ${value}` : ''}
             </span>
           </span>
           {badges}
@@ -711,17 +767,17 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
           ) : summary ? (
             <span className="shrink-0 font-mono text-[13px] text-ink-2 tabular">{summary}</span>
           ) : (
-            value && <span className={`shrink-0 text-[15px] ${/\d/.test(value) ? 'font-mono tabular' : 'text-ink-2'}`}>{value}</span>
+            value && <span className="shrink-0 font-mono text-sm text-ink-2 tabular">{value}</span>
           )}
           {taskMark}
         </button>
-        {sliderRows.length > 0 && <div className="flex flex-col gap-2 px-3.5 pb-3">{sliderRows}</div>}
+        {sliderRows.length > 0 && <div className="flex flex-col gap-2 px-3 pb-3">{sliderRows}</div>}
       </div>
     );
   }
 
   return (
-    <section data-card={part.id} data-notebook="card" data-nav tabIndex={-1} aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 rounded-lg border-2 border-accent bg-panel px-3.5 pt-3 pb-3.5">
+    <section data-card={part.id} data-notebook="card" data-nav tabIndex={-1} aria-label={`${part.label} · ${typeName}`} className="flex shrink-0 flex-col gap-3 border-l-[3px] border-accent bg-panel pt-3 pr-3.5 pb-3.5 pl-[11px]">
       <OpenCardHeader
         {...props}
         fixed={locked ? 'locked' : props.taskParts?.plugged?.has(part.id) ? 'plugged' : null}

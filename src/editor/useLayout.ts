@@ -37,11 +37,12 @@ function layoutFor(width: number, height: number): Layout {
   if (width <= PHONE_MAX_WIDTH || (short && coarse)) {
     return { kind: 'phone', landscape: short, libraryWidth: 256, inspectorWidth: 0 };
   }
-  if (coarse) return { kind: 'tablet', landscape: false, libraryWidth: 340, inspectorWidth: width < 1280 ? 400 : 500 };
+  // Defter (arayüz v4) her genişlikte 400 px.
+  if (coarse) return { kind: 'tablet', landscape: false, libraryWidth: 340, inspectorWidth: 400 };
   if (width < 1280) return { kind: 'compact', landscape: false, libraryWidth: 256, inspectorWidth: 400 };
   return width < 1440
-    ? { kind: 'desktop', landscape: false, libraryWidth: 232, inspectorWidth: 500 }
-    : { kind: 'desktop', landscape: false, libraryWidth: 256, inspectorWidth: 500 };
+    ? { kind: 'desktop', landscape: false, libraryWidth: 232, inspectorWidth: 400 }
+    : { kind: 'desktop', landscape: false, libraryWidth: 256, inspectorWidth: 400 };
 }
 
 export function useLayout(): Layout {
