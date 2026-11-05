@@ -1574,6 +1574,69 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     everyday:
       'Laboratuvar güç kaynaklarında, ayarlı adaptörlerde ve hazır regülatörü bulunmayan gerilimler için kullanılır. R2 yerine bir potansiyometre konunca çıkış 1,25 V’tan girişin biraz altına kadar ayarlanabilir.',
   },
+  've-kapisi': {
+    title: 'VE kapısının doğruluk tablosu (74HC08)',
+    description:
+      'Solda 5 V’luk pil. S1 ve S2 anahtarları kapanınca U1’in (74HC08) 1A ve 1B girişlerini 5 V’a bağlar; açıkken R1 ve R2 (10 kΩ, aşağı çekme dirençleri) girişleri 0 V’ta tutar. 1Y çıkışı R3 (330 Ω) üzerinden LED1’i sürer. Kullanılmayan girişler toprakta, 14. bacak (VCC) 5 V’ta, 7. bacak (GND) toprakta. Oynat’a bas, anahtarları aç ve kapa; U1’in kartında doğruluk tablosunun o anki satırı vurgulu.',
+    purpose:
+      'VE kapısının çıkışı yalnızca iki giriş de 1 iken 1’dir: dört satırdan yalnızca 1 · 1’de LED yanar. O zaman 1Y 4,60 V verir (çıkışın içinde ≈ 46 Ω’luk düşüm; veri sayfası 4,5 V’ta 4 mA’de tipik 4,3 V verir) ve LED’den 8,59 mA geçer. Aşağı çekme direnci olmasaydı açık anahtardaki giriş boşta kalırdı: CMOS girişi akım çekmez, durumu belirsizdir (simülasyon uyarır). Modeli 74LS08 yap: TTL girişi kendisi akım verir (0,4 V’ta 0,4 mA). S2 açıkken 10 kΩ bu girişi ancak 1,67 V’a çekebilir; 0 için en çok 0,8 V gerektiğinden giriş belirsizdir ve 1 okunur: LED yanık kalır (1Y 3,35 V, LED 4,93 mA). R2’yi 1 kΩ yap: giriş 0,40 V’a iner ve 0 okunur. Hiçbir yere bağlanmamış 74LS girişi ≈ 2,6 V’ta kalır ve 1 okunur.',
+    everyday:
+      'VE mantığı “iki koşul birden” gereken her yerde: pres, iki elle aynı anda basılan iki düğmeyle çalışır (eller makinenin dışında kalır); çamaşır makinesi kapı kapalı ve program seçiliyken başlar; arabanın marşı vites boştayken ve frene basılıyken döner. Sayısal devrelerdeki toplayıcılar ve karşılaştırıcılar da VE kapılarından kurulur.',
+  },
+  'nand-kapilar': {
+    title: 'NAND ile DEĞİL ve VE (74HC00)',
+    description:
+      'Tek bir 74HC00 (dört NAND kapısı). S1 (A) ve S2 (B) anahtarları 10 kΩ aşağı çekme dirençleriyle. 1. kapı A ile B’nin NAND’ını alır; 2. kapının iki girişi birleşik: DEĞİL gibi çalışıp 1. kapının çıkışını tersler, 2Y A VE B’dir (LED1, yeşil). 4. kapının iki girişi de A’ya bağlı: 4Y DEĞİL A’dır (LED2, kırmızı). 3. kapı kullanılmıyor, girişleri toprakta.',
+    purpose:
+      'NAND “evrensel” kapıdır: girişleri birleştirilmiş NAND bir DEĞİL kapısıdır (1 ile 1’in NAND’ı 0, 0 ile 0’ınki 1), NAND’ın ardına bir DEĞİL koyunca VE çıkar. A = B = 1 iken 1Y 0, 2Y 1 olur: LED1’den 7,74 mA geçer (yeşil LED’in ileri gerilimi kırmızınınkinden büyük olduğu için LED2’nin 8,59 mA’inden az). A = 0 iken LED2 yanar. VEYA da NAND’la kurulur: girişleri önce DEĞİL’leyip NAND’a vermek yeter (De Morgan kuralı).',
+    everyday:
+      'Entegre üreticileri uzun yıllar karmaşık devreleri tek tip kapıdan, NAND’dan kurdu: tek tip kapı tek tip üretim demektir. Telefonların ve bellek kartlarının hafızası (NAND flash) da adını bu kapıdan alır.',
+  },
+  'yarim-toplayici': {
+    title: 'Yarım toplayıcı (74HC86 + 74HC08)',
+    description:
+      'A (S1) ve B (S2) iki ikili basamak; girişler 10 kΩ aşağı çekme dirençli. U1 (74HC86, ÖZEL VEYA) toplamı, U2 (74HC08, VE) eldeyi verir: LED1 (yeşil) toplam S, LED2 (kırmızı) elde C. A ve B, U1’in üstünden U2’nin girişlerine gider. Anahtarlarla dört durumu dene.',
+    purpose:
+      'İki bitin toplamı: 0 + 0 = 0, 0 + 1 = 1 + 0 = 1 (S = 1), 1 + 1 = 10₂ (S = 0, elde C = 1). Toplam basamağı ÖZEL VEYA’dır (girişler farklıyken 1), elde VE’dir. Toplam 1 iken LED1’den 7,74 mA, elde 1 iken LED2’den 8,59 mA geçer. Önceki basamağın eldesini de toplayan tam toplayıcı iki yarım toplayıcı ve bir VEYA kapısıyla kurulur; sekiz tam toplayıcı yan yana 8 bitlik iki sayıyı toplar.',
+    everyday:
+      'Her işlemcinin aritmetik birimi toplayıcılardan kuruludur: hesap makinesindeki, telefondaki ve bilgisayardaki her toplama, çıkarma ve çarpma sonunda ÖZEL VEYA ve VE kapılarına iner.',
+  },
+  'sr-mandal': {
+    title: 'NAND ile SR mandal (74HC00)',
+    description:
+      'İki NAND kapısı birbirinin girişine bağlı: 1Y (Q̅) 2A’ya, 2Y (Q) 1B’ye. BT1 (kur, S̅) 2B’yi, BT2 (sil, R̅) 1A’yı toprağa çeker; bırakılınca R2 ve R1 (10 kΩ, yukarı çekme dirençleri) bu girişleri 5 V’ta tutar. LED1 Q’yu gösterir. Oynat’a bas; BT2’ye bas bırak, sonra BT1’e bas bırak.',
+    purpose:
+      'Mandal bir bitlik bellektir: BT2’ye basınca Q = 0 olur, bırakınca da 0 kalır; BT1’e basınca Q = 1 olur (LED1 8,59 mA) ve öyle kalır. İki düğme de bırakılmışken (S̅ = R̅ = 1) iki kapı birbirini tutar. İkisine birden basılırsa Q ve Q̅ ikisi de 1 olur (izin verilmeyen durum); bırakınca mandal iki durumdan birine düşer, hangisine düşeceği gerçek entegrede belli değildir (simülasyonda Q = 1). Açılıştaki durum da belli değildir; simülasyon Q = 1 ile başlar.',
+    everyday:
+      'Makinelerin start-stop (çalıştır-durdur) düğmeleri, “basınca açılıp bırakınca açık kalan” devreler ve bütün flip-flop ve bellek hücreleri mandal ilkesine dayanır. Mekanik anahtarların kontak sıçramasını (titreşimini) temizlemek için de SR mandal kullanılır.',
+  },
+  'frekans-bolucu': {
+    title: 'D flip-flopla frekans bölücü (555 + 74HC74)',
+    description:
+      'Solda 555 astabil (RA 1 kΩ, RB 6,8 kΩ, C1 100 nF, 5 V) ≈ 1 kHz kare dalga üretir ve U2’nin (74HC74) 1CLK girişini sürer. 1Q̅ 1D’ye bağlı: her yükselen kenarda flip-flop kendi tersini alır. 1P̅R̅E̅ ve 1C̅L̅R̅ 5 V’ta (etkisiz); kullanılmayan 2. flip-flopun girişleri de 5 V’ta. Osiloskobun A kanalı 1Q’yu, B kanalı saati gösterir (1 ms/bölme).',
+    purpose:
+      'Saatin her yükselen kenarında Q değişir: Q’nun bir periyodu saatin iki periyodu kadardır, frekans yarıya iner. Simülasyonda saat 970 Hz (periyot 1,03 ms; formül 1,44 / ((RA + 2RB) · C) ≈ 986 Hz), Q 485 Hz. Q’yu ikinci flip-flopun saatine verirsen frekans dörde, dört flip-flopla on altıya bölünür (ikili sayıcı). Q’nun kenarı saatin kenarından 74HC74’ün yayılma gecikmesi kadar (5 V’ta ≈ 18 ns) sonra gelir.',
+    everyday:
+      'Saatlerdeki kuvars kristali 32 768 Hz’te titreşir; on beş flip-flop bunu 2¹⁵’e bölerek tam 1 Hz’lik saniye vuruşunu üretir. Bilgisayarlarda da işlemcinin ve belleğin saatleri tek bir kristalin frekansının bölünüp çarpılmasıyla elde edilir.',
+  },
+  'yuruyen-isik': {
+    title: 'Yürüyen ışık (555 + CD4017)',
+    description:
+      'Solda 555 astabil (RA 1 kΩ, RB 68 kΩ, C1 2,2 µF, 5 V) ≈ 5 Hz saat üretir; U2 (CD4017) saatin her yükselen kenarında bir sayar ve Q0…Q9 çıkışlarından yalnızca sayımınkini 1 yapar. On LED sayım sırasıyla (LED0 … LED9) altta; katotları ortak hatta, R1 (220 Ω) üzerinden toprağa (bir anda yalnızca biri yandığı için tek direnç yeter). RESET ve CLOCK INHIBIT toprakta.',
+    purpose:
+      'Işık LED0’dan LED9’a yürür ve başa döner: simülasyonda her adım 213 ms (4,69 Hz; formül 1,44 / ((RA + 2RB) · C) ≈ 4,8 Hz). Yanan LED’den 3,29 mA geçer: CD4017’nin çıkışı zayıftır (5 V’ta 3,2 mA verirken çıkış 2,5 V’a düşer), akımı R1 ile çıkışın kendisi birlikte sınırlar. CO (elde) 0–4’te 1, 5–9’da 0: on adımda bir yükselir, ikinci bir CD4017’yi sürerek 100’e kadar sayılır. RESET’i 5 V’a bağla: ışık LED0’da durur.',
+    everyday:
+      'Reklam panolarındaki koşan ışıklar, trafikteki yön okları ve eski müzik setlerindeki ses düzeyi göstergeleri sıra sıra yanar. Sayıcının bir çıkışı RESET’e bağlanırsa daha az adımda başa döner: Q6 RESET’e bağlıysa sayaç 0–5 arasında döner (elektronik zar).',
+  },
+  'bcd-7-segment': {
+    title: 'BCD’den 7 segmente (CD4511 + gösterge)',
+    description:
+      'Dört çift yollu anahtar (S1 = A = 1, S2 = B = 2, S3 = C = 4, S4 = D = 8) U1’in (CD4511) BCD girişlerini sürer: B konumunda giriş 5 V’a (1), A konumunda toprağa (0) bağlanır; böylece giriş hiçbir zaman boşta kalmaz. U1’in a…g çıkışları birer 220 Ω’luk dirençle ortak katotlu göstergeye (DS1, SC56-11EWA) gider; ortak katot toprakta. L̅T̅ ve B̅L̅ 5 V’ta (etkisiz), LE toprakta (mandal açık). Başta S1 ve S3 B konumunda: 1 + 4 = 5.',
+    purpose:
+      'Kod çözücü dört bitlik ikili sayıyı yedi segmentin açık-kapalı desenine çevirir. Yanan her segmentten 10,0 mA geçer: CD4511’in çıkışı 10 mA verirken 4,10 V’tadır (veri sayfası), segmentte 1,90 V düşer, kalan 2,20 V 220 Ω’da 10 mA eder. 9’dan büyük kodlarda (1010–1111) gösterge söner. B̅L̅’yi toprağa bağla: gösterge kararır; L̅T̅’yi toprağa bağla: bütün segmentler yanar (8, lamba testi). LE’yi 5 V’a bağla: mandal son kodu tutar, anahtarlar etkisiz kalır. Ön direnci olmayan segment 30 mA’i aşar ve yanar.',
+    everyday:
+      'Saatler, termometreler, akaryakıt pompaları, asansör kat göstergeleri ve fırın zamanlayıcıları rakamları yedi segmentle gösterir. Mikrodenetleyiciler bu kod çözmeyi yazılımla yapar; birçok basamaklı göstergelerde CD4511 gibi kod çözücüler hâlâ kullanılır.',
+  },
   'optokuplor-led': {
     title: 'Optokuplörle yalıtılmış LED',
     description:
@@ -2090,6 +2153,7 @@ export const tr = {
       sensorler: 'Ayarlı parçalar ve sensörler',
       ses: 'Ses ve koruma',
       entegreler: 'Entegreler',
+      lojik: 'Lojik devreler',
       arduino: 'Arduino',
       'diyot-karakteristigi': 'Deney 1 · Diyot karakteristiklerinin incelenmesi',
       dogrultucu: 'Deney 2 · Doğrultucular',
@@ -2196,6 +2260,13 @@ export const tr = {
       '7805-besleme': 'Pili 6 V yap, çıkışın 5 V’u bırakmasını izle',
       'lm317-ayarli': 'R2’yi değiştir, çıkışı formülle karşılaştır',
       'optokuplor-led': 'BT1’e basılı tut: kablosuz bağlı LED’in yanmasını izle',
+      've-kapisi': 'Anahtarları aç ve kapa: LED yalnızca ikisi de kapalıyken yanar',
+      'nand-kapilar': 'A ve B’yi değiştir: LED1 = A VE B, LED2 = DEĞİL A',
+      'yarim-toplayici': 'A ve B’yi değiştir: LED1 toplam, LED2 elde',
+      'sr-mandal': 'BT1’e basıp bırak: LED1 yanık kalır; BT2 söndürür',
+      'frekans-bolucu': 'Osiloskopta saati (B) ve yarı frekanslı Q’yu (A) karşılaştır',
+      'yuruyen-isik': 'Işığın LED0’dan LED9’a yürüyüp başa dönmesini izle',
+      'bcd-7-segment': 'Anahtarlarla 0–9 arası bir sayı kur, göstergede izle',
       'schottky-1n4001': 'İki diyodun ileri gerilimini karşılaştır',
       'kopru-diyot': 'S1’i kapat, dalgalanmanın küçülmesini izle',
       'tristor-mandal': 'BT1’e bas ve bırak: LED neden yanık kalıyor?',

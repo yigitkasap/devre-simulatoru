@@ -7,6 +7,13 @@ import { parseDoc } from '../model/serialize';
 import type { CircuitDoc } from '../model/types';
 import ampermetreEtkisi from './ampermetre-etkisi.json';
 import ardBlink from './ard-blink.json';
+import bcd7Segment from './bcd-7-segment.json';
+import frekansBolucu from './frekans-bolucu.json';
+import nandKapilar from './nand-kapilar.json';
+import srMandal from './sr-mandal.json';
+import veKapisi from './ve-kapisi.json';
+import yarimToplayici from './yarim-toplayici.json';
+import yuruyenIsik from './yuruyen-isik.json';
 import ardDugme from './ard-dugme.json';
 import ardSayac from './ard-sayac.json';
 import ardTrafikIsigi from './ard-trafik-isigi.json';
@@ -116,6 +123,8 @@ export const EXAMPLE_GROUPS = [
   { id: 'sensorler', ids: ['potansiyometre', 'ldr-gece-lambasi', 'ntc-termometre', 'lamba-ani-akim'] },
   { id: 'ses', ids: ['hoparlor', 'buzzer-sicaklik', 'sigorta'] },
   { id: 'entegreler', ids: ['opamp-evirmeyen', 'opamp-eviren', 'opamp-karsilastirici', '555-astabil', '555-monostabil', '555-ses', '7805-besleme', 'lm317-ayarli', 'optokuplor-led'] },
+  // Lojik entegreler (Dalga 2): kapılar, flip-flop, sayıcı, 7 segment kod çözücü.
+  { id: 'lojik', ids: ['ve-kapisi', 'nand-kapilar', 'yarim-toplayici', 'sr-mandal', 'frekans-bolucu', 'yuruyen-isik', 'bcd-7-segment'] },
   // Arduino Uno: önceden derlenmiş örnek programlar (src/arduino/sketches).
   { id: 'arduino', ids: ['ard-blink', 'ard-dugme', 'ard-sayac', 'ard-trafik-isigi', 'ard-fade', 'ard-potansiyometre', 'ard-gece-lambasi', 'ard-termometre', 'ard-pwm-filtre', 'ard-melodi', 'ard-role'] },
   { id: 'diyot-karakteristigi', folder: 'akdeniz', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi', 'schottky-1n4001'] },
@@ -258,6 +267,13 @@ const DATA: Record<ExampleId, unknown> = {
   '7805-besleme': besleme7805,
   'lm317-ayarli': lm317Ayarli,
   'optokuplor-led': optokuplorLed,
+  've-kapisi': veKapisi,
+  'nand-kapilar': nandKapilar,
+  'yarim-toplayici': yarimToplayici,
+  'sr-mandal': srMandal,
+  'frekans-bolucu': frekansBolucu,
+  'yuruyen-isik': yuruyenIsik,
+  'bcd-7-segment': bcd7Segment,
   'schottky-1n4001': schottky1n4001,
   'kopru-diyot': kopruDiyot,
   'tristor-mandal': tristorMandal,

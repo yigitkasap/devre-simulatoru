@@ -2,6 +2,7 @@
 // Paylaşım bağlantısı: sıkıştırma ve geri okuma.
 
 import { describe, expect, it } from 'vitest';
+import { LOGIC_CHIPS, isLogicChip } from '../src/model/logicChips';
 import { EXAMPLE_IDS, EXTRA_EXAMPLES, exampleDoc, type ExampleId } from '../src/examples';
 import { LAB_FIGURE_TEXTS } from '../src/i18n/foy';
 import { tr } from '../src/i18n/tr';
@@ -46,6 +47,9 @@ describe('Örnekler', () => {
         // Arduino'nun kullanılmayan pinleri (GND'lerden birinin bağlı olduğunu topoloji denetler).
         ...doc.parts.filter((p) => p.type === 'arduino').flatMap((p) => Array.from({ length: 22 }, (_, k) => `${p.id}#${k}`)),
         ...doc.parts.filter((p) => p.type === 'funcgen').flatMap((p) => [`${p.id}#0`, `${p.id}#1`]),
+        // Lojik entegrenin kullanılmayan çıkışları (girişleri bağlı olmalı) ve göstergenin kullanılmayan noktası (DP).
+        ...doc.parts.flatMap((p) => (isLogicChip(p.type) ? LOGIC_CHIPS[p.type].outputs.map((n) => `${p.id}#${n - 1}`) : [])),
+        ...doc.parts.filter((p) => p.type === 'seg7').map((p) => `${p.id}#7`),
         ...doc.parts
           .filter((p) => p.type === 'dcsupply')
           .flatMap((p) => [0, 2].filter((k) => open.has(`${p.id}#${k}`) && open.has(`${p.id}#${k + 1}`)).flatMap((k) => [`${p.id}#${k}`, `${p.id}#${k + 1}`])),

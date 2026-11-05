@@ -20,7 +20,7 @@ describe('Örnek klasörleri', () => {
       'anahtar',
       'baraj',
     ]);
-    expect(folderGroups(null).map((g) => g.id)).toEqual(['temel', 'aletler', 'elektromanyetizma', 'sensorler', 'ses', 'entegreler', 'arduino']);
+    expect(folderGroups(null).map((g) => g.id)).toEqual(['temel', 'aletler', 'elektromanyetizma', 'sensorler', 'ses', 'entegreler', 'lojik', 'arduino']);
   });
 
   it('her grup tam bir yerde; örnek kimlikleri ve sırası değişmedi', () => {

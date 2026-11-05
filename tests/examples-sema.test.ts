@@ -37,6 +37,21 @@ const CROSSINGS: Partial<Record<ExampleId, number>> = {
   // Föydeki Şekil-10 gibi üretecin alt kablosu X düğümünü keser; osiloskobun B (alt çıkış) ve COM (orta)
   // uçlarının sırası çıkışlarınkiyle ters.
   'gerilim-katlayici': 2,
+  // Lojik devreler: her giriş hem beslemeye (anahtar) hem toprağa (aşağı çekme direnci) bağlı ve
+  // entegrenin bacak sırası işlevine göre değil (girişler, çıkışlar ve kullanılmayan bacaklar
+  // karışık): girişlerin hatları birbirinin dikey kolunu, kullanılmayan bacakları beslemeye ya da
+  // toprağa bağlayan kablolar giriş hatlarını keser. Entegrenin öbür yanındaki bacağa giden hat
+  // VCC kablosunu keser (VCC sağ üst köşede).
+  've-kapisi': 1,
+  'nand-kapilar': 2,
+  'yarim-toplayici': 4,
+  'sr-mandal': 2,
+  // 7474'ün sol yanında CLR̄, D, CLK, PRĒ, Q, Q̄ sırası: Q̄ → D ve PRĒ'nin beslemesi saati keser.
+  'frekans-bolucu': 4,
+  // LED'ler sayım sırasıyla (Q0 … Q9), CD4017'nin bacakları Q5 Q1 Q0 Q2 Q6 Q7 Q3 / Q9 Q4 Q8 sırasıyla.
+  'yuruyen-isik': 16,
+  // CD4511'in çıkış sırası f g a b c d e; göstergenin a … g; L̅T̅, B̅L̅ ve LE girişlerin arasında.
+  'bcd-7-segment': 12,
 };
 
 type Segment = readonly [Point, Point];
