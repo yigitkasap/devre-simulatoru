@@ -1,6 +1,6 @@
 // Tahtada kur (T1–T6): şemadaki devre tepeden görünen breadboard'a kurulur. Bu dosya kipin tuval alanını
 // (üst çubuk, Tepeden | 3B, tahta, masadaki cihazların kartları, araç çubuğu) ve sağ panelini (şema, parça
-// kutusu, alet kabloları, Denetle) kurar. Kararlar docs/tasarim-v3/README.md → "Tahtada kur".
+// kutusu, alet kabloları, Denetle) kurar. Kararlar docs/KARARLAR.md → "Tahtada kur (2026-11-02)".
 //
 // Tepeden görünüm 3B sahnenin dik (ortografik) kamerasıdır (kullanıcı kararı); masadaki cihazlar bu
 // görünümde ön panelleri ve uçları görünen düz kartlardır. 3B'de yalnızca bakılır.

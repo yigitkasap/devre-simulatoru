@@ -2315,3 +2315,26 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   hedef değerlendirme, hedef seçenekleri, kilit kuralları; `tests/gomme.test.ts`: gömme adresi ve
   iframe kodu, adres ayarları, salt okunur kural; ios-kontrol "Analiz", "Bode", "görev" ve "gömme"
   maddeleri.
+
+### Tahtada kur (2026-11-02)
+
+Şemadaki devre, tepeden görünen breadboard'a öğrencinin kendisi tarafından kurulur; Denetle kurulumu
+şemayla karşılaştırır, Oynat tahtadaki bağlantılarla çalışır (yanlış kurulum yanlış çalışır). Tasarım:
+`docs/tasarim-v3/README.md` → "Tahtada kur (T1–T6)".
+
+- **Kod:** kip `src/editor/tahta/BoardMode.tsx` (masaüstü), `PhoneBoard.tsx` (telefon), `BoardTop.tsx`;
+  kurulum kaydı `src/model/build.ts` (devre dosyasının `build` alanı; şemayı değiştirmez, geri al ve
+  yinele onu da kapsar); takma kuralları `src/tahta/rules.ts`, kablolar `wiring.ts`, Denetle `check.ts`,
+  sorun metinleri `explain.ts`, oturum ve ipuçları `session.ts`, görev `task.ts`, rapor `report.ts`,
+  kurulumdan netlist `circuit.ts`, 3B yerleşim `plan.ts`; şemanın yerleşim planı
+  `src/bench3d/breadboard.ts` (`planBreadboard`).
+- **Kullanıcı kararları:**
+  - Tepeden görünüm 3B sahnenin dik (ortografik) kamerasıdır; masadaki cihazlar bu görünümde ön
+    panelleri ve uçları görünen düz kartlardır. 3B'de yalnızca bakılır.
+  - Yalnızca tek breadboard'a sığan devrelerde açılır (sığmayanda düğme kapalı, açıklamalı).
+  - Oynat'ın sıfır düğümü, şemada topraklı uçların çoğunun bulunduğu tahta düğümüdür.
+  - Denetle: iki ayrı düğümü birleştiren ara kablo kendisi sorundur; potansiyometrenin uçlarının,
+    çift yollu anahtarın A / B uçlarının ve alet kablolarının yer değiştirmesi ters takılmış sayılır.
+  - Görevde hazır gelen parça ve kablolar kilitlidir (taşınmaz, döndürülmez, silinmez; Tahtayı boşalt
+    yalnızca öğrencininkileri kaldırır). "Güç rayları bağlı": güç kaynaklarının raylara giden
+    kabloları ve raylar arası kablolar takılı gelir.
