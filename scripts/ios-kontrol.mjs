@@ -78,25 +78,15 @@ const screen = (page, gx, gy) => page.evaluate(([x, y]) => {
 }, [gx, gy]);
 const doc = async (page) => { await page.waitForTimeout(500); return page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre'))); };
 const part = async (page, label) => (await doc(page)).parts.find((p) => p.label === label);
-/**
- * Örnekler penceresinde bir örneğin (ya da arıza görevinin) düğmesi: görünmüyorsa Akdeniz Üniversitesi
- * klasörüne girer ya da (açık örnek klasördeyken pencere klasörde açılır) ana listeye döner.
- */
-async function pickExample(p, locate, touchUi = false) {
-  if ((await locate(p).count()) > 0) return locate(p);
-  const card = p.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ });
-  const go = (await card.count()) > 0 ? card.first() : p.getByRole('button', { name: 'Bütün örnekler' }).first();
-  if (touchUi) await go.tap(); else await go.click();
-  await p.waitForTimeout(250);
+/** Örnekler penceresinde bir örneğin (ya da arıza görevinin) düğmesi (masaüstünde bütün gruplar tek listede). */
+async function pickExample(p, locate) {
   return locate(p);
 }
 /** Telefonda ⋯ → Örnekler; arayıp örneğe dokunarak açar. */
 async function openExample(page, name) {
   await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
   await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
-  // Açık örnek klasördeyse pencere klasörde açılır; ana ekrandaki arama klasörün içini de bulur.
-  const back = page.getByRole('button', { name: 'Bütün örnekler' });
-  if ((await back.count()) > 0) { await back.tap(); await page.waitForTimeout(300); }
+  // Ana ekrandaki arama bütün grupları arar.
   await page.getByRole('searchbox', { name: 'Örnek ara' }).fill(name); await page.waitForTimeout(200);
   await page.getByRole('button', { name, exact: true }).tap(); await page.waitForTimeout(600);
 }
@@ -252,7 +242,7 @@ try {
     const { page, cdp } = await phone(w, h);
     await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
-    const list = page.getByRole('dialog', { name: 'Örnek devreler' }).locator('.overflow-y-auto');
+    const list = page.getByRole('dialog', { name: 'Örnekler' }).locator('.overflow-y-auto');
     const box = await list.boundingBox();
     await drag(page, cdp, { x: box.x + box.width / 2, y: box.y + box.height - 40 }, { x: box.x + box.width / 2, y: box.y + 40 });
     await page.waitForTimeout(300);
@@ -261,8 +251,7 @@ try {
     const touchAction = await page.evaluate(() => getComputedStyle(document.querySelector('svg.schematic')).touchAction);
     check('örnekler açıkken tuvalin touch-action değeri none değil', touchAction !== 'none', touchAction);
     await page.waitForTimeout(1000);
-    await page.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ }).tap(); await page.waitForTimeout(300);
-    const group = page.getByRole('button', { name: /^Proje · Baraj su seviyesi uyarısı/ });
+    const group = page.getByRole('button', { name: /^Baraj projesi,/ });
     await group.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
     await group.tap(); await page.waitForTimeout(300);
     const last = page.getByRole('button', { name: 'Baraj uyarısı: tek ışık', exact: true });
@@ -275,156 +264,345 @@ try {
     await page.context().close();
   }
 
-  // --- Örnekler: Akdeniz Üniversitesi klasörü (masaüstü) -------------------------------------------
+  // --- Örnekler penceresi (masaüstü): yan liste, tek kayan liste, kartlarda küçük şema, arama -----------------
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
     await page.goto(URL0, { waitUntil: 'networkidle' });
-    const openDialog = async () => { await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300); };
+    const openDialog = async () => { await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(400); };
     await openDialog();
-    const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
-    const list = dlg.locator('.overflow-y-auto').first();
-    const card = dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ });
-    const firstLabel = (await list.locator(':scope > *').first().getAttribute('aria-label')) ?? '';
-    const cardBox = await card.boundingBox();
-    const listBox = await list.boundingBox();
-    const logo = card.locator('img');
-    const logoBox = await logo.boundingBox();
-    const logoAlt = await logo.getAttribute('alt');
-    const mainGroups = await dlg.locator('h3').allTextContents();
-    const mainFaults = await dlg.getByRole('button', { name: /^Arıza bul:/ }).allTextContents();
-    const mainFirst = (await dlg.locator('li span[aria-hidden="true"]').first().textContent()) ?? '';
-    check('masaüstü (klasör): Örnekler’in en üstünde bütün genişlikte Akdeniz kartı (48 px logo, alt metni, "… · N devre"); ana listede deney grupları ve baraj yok, arıza bulmada yalnızca LED; numaralar 1’den',
-      firstLabel.startsWith('Akdeniz Üniversitesi · Fizik Bölümü') && /· \d+ devre$/.test(firstLabel) && cardBox !== null && listBox !== null && cardBox.width >= listBox.width - 40 &&
-        Math.round(logoBox?.width ?? 0) === 48 && logoAlt === 'Akdeniz Üniversitesi logosu' &&
-        mainGroups.includes('Temel devreler') && mainGroups.includes('Arduino') && !mainGroups.some((t) => /^Deney|^Proje/.test(t)) && mainFaults.length === 1 && mainFirst === '1',
-      `${firstLabel} · ${Math.round(cardBox?.width ?? 0)}/${Math.round(listBox?.width ?? 0)} px · logo ${Math.round(logoBox?.width ?? 0)} px · ${mainGroups.length} grup · arıza ${mainFaults.length} · ilk ${mainFirst}`);
-    // Klavyeyle: kart Enter'la açılır; odak klasörün başlığında.
-    await card.focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
-    const focusedTitle = await page.evaluate(() => (document.activeElement?.tagName === 'H3' ? document.activeElement.textContent : ''));
-    const folderGroups = await dlg.locator('h3').allTextContents();
-    const deneys = folderGroups.filter((t) => /^Deney \d/.test(t)).length;
-    const folderFaults = await dlg.getByRole('button', { name: /^Arıza bul:/ }).count();
-    const folderLogo = Math.round((await dlg.locator('img').first().boundingBox())?.width ?? 0);
-    const barajLink = await dlg.getByRole('link', { name: /^Baraj sayfasını aç/ }).count();
-    const folderFirst = (await dlg.locator('li span[aria-hidden="true"]').first().textContent()) ?? '';
-    check('masaüstü (klasör): kart klavyeyle (Enter) açılıyor, odak klasörün başlığında; 40 px logo; Deney 1–9, Proje · Baraj (sayfa bağlantısıyla) ve föye dayanan 4 arıza görevi; numaralar 1’den',
-      focusedTitle.includes('Akdeniz Üniversitesi · Fizik Bölümü') && folderLogo === 40 && deneys === 9 && folderGroups.some((t) => t.startsWith('Proje · Baraj')) && barajLink === 1 && folderFaults === 4 && folderFirst === '1' && !folderGroups.includes('Temel devreler'),
-      `odak "${focusedTitle}" · logo ${folderLogo} px · ${deneys} deney · baraj bağlantısı ${barajLink} · arıza ${folderFaults} · ilk ${folderFirst}`);
+    const dlg = page.getByRole('dialog', { name: 'Örnekler' });
+    const nav = dlg.getByRole('navigation', { name: 'Örnek grupları' });
+    const list = dlg.locator('nav + div');
+    const search = dlg.getByRole('searchbox', { name: 'Örnek ara' });
+    const rows = nav.locator('button[data-row]');
+    const row = (short) => nav.getByRole('button', { name: new RegExp(`^${short},`) });
+    const currentRow = async () => ((await nav.locator('button[aria-current="true"]').getAttribute('aria-label').catch(() => '')) ?? '').split(',')[0];
+    /** Listenin üstündeki grup: başı listenin üstünü geçmiş son grup. */
+    const topSection = () => list.evaluate((el) => {
+      const top = el.getBoundingClientRect().top; let key = '';
+      for (const s of el.querySelectorAll('[data-section]')) if (s.getBoundingClientRect().top - top <= 24) key = s.dataset.section;
+      return key;
+    });
+
+    // 1. Pencere, başlık satırı, yan liste.
+    const box = await dlg.boundingBox();
+    const radius = await dlg.evaluate((el) => getComputedStyle(el).borderTopLeftRadius);
+    const header = await dlg.locator('header').boundingBox();
+    const headerText = (await dlg.locator('header').textContent()) ?? '';
+    const searchBox = await dlg.locator('header label').boundingBox();
+    const placeholder = await search.getAttribute('placeholder');
+    const focusedSearch = await search.evaluate((el) => document.activeElement === el);
+    const oldHint = await dlg.getByText(/^Bir örneğe tıkla/).count();
+    check('masaüstü (Örnekler): pencere ≈ 1160 px, ekrana sığan yükseklik, köşe 16 px; 68 px başlık satırında "Örnekler", arama (en çok 520 px, yer tutucu, açılışta odakta), toplam devre sayısı ve kapat; eski açıklama satırı yok',
+      box !== null && Math.abs(box.width - 1160) <= 1 && box.height <= 900 - 40 && box.height >= 900 - 60 && radius === '16px' && Math.round(header?.height ?? 0) === 68 &&
+        headerText.startsWith('Örnekler') && /\d+ devre/.test(headerText) && searchBox !== null && searchBox.width <= 520 && searchBox.width >= 480 &&
+        placeholder === 'Devre, parça ya da deney ara' && focusedSearch && (await dlg.getByRole('button', { name: 'Örnekler penceresini kapat' }).count()) === 1 && oldHint === 0,
+      `${Math.round(box?.width ?? 0)}x${Math.round(box?.height ?? 0)} · ${radius} · başlık ${Math.round(header?.height ?? 0)} px · arama ${Math.round(searchBox?.width ?? 0)} px · odak ${focusedSearch}`);
+    const navBox = await nav.boundingBox();
+    const navBg = await nav.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const panel2 = await page.evaluate(() => { const d = document.createElement('div'); d.className = 'bg-panel-2'; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; });
+    const logo = nav.locator('img');
+    const logoW = Math.round((await logo.boundingBox())?.width ?? 0);
+    const navText = (await nav.textContent()) ?? '';
+    const marks = await rows.evaluateAll((bs) => bs.map((b) => b.querySelector('span')?.textContent ?? ''));
+    const labels = await rows.evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label') ?? ''));
+    const folderShorts = labels.slice(0, 11).map((l) => l.split(',')[0]);
+    const navHeights = await rows.evaluateAll((bs) => bs.map((b) => Math.round(b.getBoundingClientRect().height)));
+    check('masaüstü (Örnekler): solda 264 px yan liste (panel-2 zemini, nav): 36 px Akdeniz logosu, "Akdeniz Üniversitesi" / "Fizik · Elektronik Lab föyü"; gruplar tek satır (numara 1–9, P, !; kısa ad; sayı), çizgi, "Genel" ve genel gruplar',
+      Math.round(navBox?.width ?? 0) === 264 && navBg === panel2 && logoW === 36 && (await logo.getAttribute('alt')) === 'Akdeniz Üniversitesi logosu' &&
+        navText.includes('Akdeniz Üniversitesi') && navText.includes('Fizik · Elektronik Lab föyü') && navText.includes('Genel') && (await nav.locator('hr').count()) === 1 &&
+        marks.slice(0, 11).join('') === '123456789P!' &&
+        folderShorts.join('|') === 'Diyot karakteristikleri|Doğrultucular|Kenetleyici ve katlayıcı|Kırpıcılar|FET karakteristikleri|FET yükselteci|BJT’li yükselteç|MOSFET’li yükselteç|Transistör anahtar|Baraj projesi|Arıza bulma' &&
+        labels.slice(11).some((l) => l.startsWith('Temel devreler,')) && labels.every((l) => /, \d+ devre$/.test(l)) && navHeights.every((h) => h === 36),
+      `${Math.round(navBox?.width ?? 0)} px · ${navBg}/${panel2} · logo ${logoW} · ${marks.join('')} · ${labels.length} satır`);
+
+    // Şemalar yalnızca görünür olunca çizilir.
+    const states = await dlg.locator('[data-preview]').evaluateAll((ps) => ps.map((p) => p.dataset.preview));
+    const waiting = states.filter((s) => s === 'waiting').length;
+    const arduino = dlg.locator('section[data-section="arduino"] [data-preview]').last();
+    const arduinoBefore = await arduino.getAttribute('data-preview');
+    await list.evaluate((el) => el.scrollTo({ top: el.scrollHeight })); await page.waitForTimeout(600);
+    const arduinoAfter = await arduino.getAttribute('data-preview');
+    check('masaüstü (Örnekler): kartların şeması görünür olunca çiziliyor (açılışta uzaktakiler bekliyor, kaydırınca çiziliyor)',
+      waiting > 20 && arduinoBefore === 'waiting' && arduinoAfter === 'drawn', `${states.length} kart · ${waiting} bekliyor · son ${arduinoBefore} → ${arduinoAfter}`);
+    // 2. Yan listeden gruba git; kaydırınca vurgu görünen gruba geçer.
+    await row('Kırpıcılar').click(); await page.waitForTimeout(400);
+    const afterClick = await topSection();
+    const clickCurrent = await currentRow();
+    const clickAria = await row('Kırpıcılar').getAttribute('aria-current');
+    const clickBg = await row('Kırpıcılar').evaluate((el) => getComputedStyle(el).backgroundColor);
+    const accentSoft = await page.evaluate(() => { const d = document.createElement('div'); d.className = 'bg-accent-soft'; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; });
+    check('masaüstü (Örnekler): yan listede "Kırpıcılar"a tıklayınca içerik o gruba kayıyor; satır vurgulu (accent-soft zemin, aria-current)',
+      afterClick === 'kirpici' && clickCurrent === 'Kırpıcılar' && clickAria === 'true' && clickBg === accentSoft, `${afterClick} · ${clickCurrent} · ${clickBg}`);
+    const lb = await list.boundingBox();
+    await page.mouse.move(lb.x + lb.width / 2, lb.y + lb.height / 2);
+    for (let i = 0; i < 6; i++) { await page.mouse.wheel(0, 420); await page.waitForTimeout(120); }
+    await page.waitForTimeout(400);
+    const scrolledTop = await topSection();
+    const scrolledCurrent = await currentRow();
+    const scrolledKey = (await nav.locator('button[aria-current="true"]').count()) === 1 ? scrolledTop : '';
+    const keyShort = labels[(await list.evaluate((el) => [...el.querySelectorAll('[data-section]')].map((s) => s.dataset.section))).indexOf(scrolledTop)]?.split(',')[0];
+    check('masaüstü (Örnekler): fareyle kaydırınca yan listedeki vurgu o an görünen gruba geçiyor (tek satır aria-current)',
+      scrolledTop !== 'kirpici' && scrolledKey !== '' && scrolledCurrent === keyShort, `${scrolledTop} · ${scrolledCurrent}`);
+    // En alta inince son grup vurgulu.
+    await list.evaluate((el) => el.scrollTo({ top: el.scrollHeight })); await page.waitForTimeout(300);
+    const bottomCurrent = await currentRow();
+    check('masaüstü (Örnekler): listenin sonunda son grup vurgulu', bottomCurrent === labels[labels.length - 1].split(',')[0], bottomCurrent);
+
+    // 3. Grup başlığı ve kartlar.
+    await row('Diyot karakteristikleri').click(); await page.waitForTimeout(400);
+    const first = dlg.locator('section[data-section="diyot-karakteristigi"]');
+    const overline = (await first.locator('p').first().textContent()) ?? '';
+    const h3 = first.locator('h3');
+    const h3Size = await h3.evaluate((el) => getComputedStyle(el).fontSize);
+    const firstHead = (await first.locator(':scope > div').first().textContent()) ?? '';
+    const cols = await first.locator('ul').evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+    const gap = await first.locator('ul').evaluate((el) => getComputedStyle(el).rowGap + '/' + getComputedStyle(el).columnGap);
+    const general = dlg.locator('section[data-section="temel"]');
+    const generalOverline = await general.locator(':scope > div p.font-mono').count();
+    check('masaüstü (Örnekler): grup başlığında mono üst yazı (DENEY 1), föydeki tam ad (19 px), amaç cümlesi ve sağda "N devre"; genel gruplarda üst yazı yok; kartlar 3 sütun, aralık 16 px',
+      overline === 'DENEY 1' && (await h3.textContent()) === 'Diyot karakteristiklerinin incelenmesi' && h3Size === '19px' &&
+        firstHead.includes('Diyodun akımının gerilimle nasıl değiştiğini (I-V eğrisini) ölçüp incelemek.') && /\d+ devre$/.test(firstHead) &&
+        generalOverline === 0 && cols === 3 && gap === '16px/16px',
+      `${overline} · ${h3Size} · ${cols} sütun · ${gap} · genel üst yazı ${generalOverline}`);
+    const zenerCard = first.locator('li').filter({ has: page.getByRole('button', { name: 'Zener diyot (5,6 V): X-Y’de karakteristik', exact: true }) });
+    const zenerOpen = zenerCard.getByRole('button', { name: 'Zener diyot (5,6 V): X-Y’de karakteristik', exact: true });
+    const zenerText = (await zenerCard.textContent()) ?? '';
+    const preview = zenerCard.locator('[data-preview]');
+    const previewH = Math.round((await preview.boundingBox())?.height ?? 0);
+    const drawn = (await preview.getAttribute('data-preview')) === 'drawn' && (await preview.locator('svg').count()) > 0;
+    const previewInOpen = await zenerOpen.locator('[data-preview]').count();
+    const cardRadius = await zenerCard.evaluate((el) => getComputedStyle(el).borderTopLeftRadius);
+    const titleStyle = await zenerOpen.locator('span.leading-snug.font-semibold').evaluate((el) => `${getComputedStyle(el).fontSize}/${getComputedStyle(el).fontWeight}`);
+    const cueSize = await zenerOpen.locator('span.text-muted').last().evaluate((el) => getComputedStyle(el).fontSize);
+    const shape = await zenerCard.locator('span.font-mono').first().textContent().catch(() => '');
+    const description = 'diyodun yerinde 5,6 V’luk bir zener';
+    const board = zenerCard.getByRole('button', { name: 'Zener diyot (5,6 V): X-Y’de karakteristik: tahtada kur' });
+    const boardBox = await board.boundingBox();
+    const cardBox = await zenerCard.boundingBox();
+    const boardBg = await board.evaluate((el) => getComputedStyle(el).backgroundColor);
+    check('masaüstü (Örnekler): kart (köşe 12 px): üstte 128 px küçük şema (kartın "aç" düğmesinin içinde, çizilmiş), mono "Şekil-3" çipi, başlık 15 px yarı kalın, altında 13 px cümle; uzun açıklama ve numaralı daire yok; altta sağda zeminsiz "Tahtada kur" ayrı düğme',
+      cardRadius === '12px' && previewH === 128 && drawn && previewInOpen === 1 && shape === 'Şekil-3' && titleStyle === '15px/600' && cueSize === '13px' &&
+        !zenerText.includes(description) && (await zenerCard.locator('span.rounded-full').count()) === 0 &&
+        boardBox !== null && cardBox !== null && boardBox.x + boardBox.width >= cardBox.x + cardBox.width - 16 && boardBox.y + boardBox.height >= cardBox.y + cardBox.height - 12 &&
+        boardBg === 'rgba(0, 0, 0, 0)' && ((await board.textContent()) ?? '').includes('Tahtada kur'),
+      `${cardRadius} · şema ${previewH} px ${drawn} · ${shape} · ${titleStyle} · ${cueSize} · tahta ${boardBg}`);
     const extraCard = (await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).textContent()) ?? '';
-    const plainCard = (await dlg.getByRole('button', { name: '1N4001: doğru akımda akım-gerilim ölçümü', exact: true }).textContent()) ?? '';
-    const extraTags = await dlg.getByText('Föyde yok · ek', { exact: true }).count();
-    check('masaüstü (klasör): föyde olmayan ek örneklerin kartında "Föyde yok · ek" etiketi (Schottky, KBP307, tristör…), föydekilerde yok',
-      extraCard.includes('Föyde yok · ek') && !plainCard.includes('Föyde yok · ek') && extraTags >= 3, `${extraTags} etiket`);
-    // Geri: "Bütün örnekler" (klavyeyle) ana listeye döndürür, odak klasör kartında; Esc pencereyi kapatır.
-    await dlg.getByRole('button', { name: 'Bütün örnekler' }).focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(300);
-    const backFocus = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
+    const plainCard = (await dlg.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).textContent()) ?? '';
+    const generalCard = (await dlg.getByRole('button', { name: 'Gerilim bölücü', exact: true }).textContent()) ?? '';
+    check('masaüstü (Örnekler): föyde olmayan ek örnekte "Föyde yok · ek" (Schottky), föy örneğinde şekil çipi (Yarım dalga: Şekil-4), genel örnekte çip yok',
+      extraCard.includes('Föyde yok · ek') && !extraCard.includes('Şekil-') && /Şekil-\d/.test(plainCard) && !plainCard.includes('Föyde yok') && !generalCard.includes('Şekil-') && !generalCard.includes('Föyde yok'),
+      `${extraCard.slice(0, 40)} · ${plainCard.slice(0, 40)}`);
+    // Baraj grubunun başlığının yanında sayfa bağlantısı; arıza görevleri aynı kartla.
+    const barajLink = dlg.locator('section[data-section="baraj"] > div').first().getByRole('link', { name: /Baraj sayfası/ });
+    const barajHref = await barajLink.getAttribute('href').catch(() => '');
+    const faults = dlg.getByRole('button', { name: /^Arıza bul: / });
+    const faultText = (await faults.filter({ hasText: 'Yükselteçte çıkış yok' }).textContent()) ?? '';
+    const faultPreview = await faults.first().locator('[data-preview]').count();
+    check('masaüstü (Örnekler): baraj grubunun başlığının yanında küçük "Baraj sayfası" bağlantısı; arıza görevleri aynı kartla (şema, "Arıza" çipi, deney adı, belirti)',
+      (await barajLink.count()) === 1 && /baraj\/$/.test(barajHref ?? '') && (await faults.count()) === 5 && faultPreview === 1 &&
+        faultText.includes('Arıza') && faultText.includes('Deney 7') && faultText.includes('Osiloskobun B kanalında sinyal yok'),
+      `${barajHref} · ${await faults.count()} arıza · ${faultText.slice(0, 60)}`);
+
+    // 4. Arama.
+    await search.fill('zener'); await page.waitForTimeout(400);
+    const zenerResults = (await list.locator(':scope > p').first().textContent()) ?? '';
+    const zenerShown = await list.locator('li').count();
+    const mark = await dlg.locator('li mark').first().textContent().catch(() => '');
+    const markBg = await dlg.locator('li mark').first().evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => '');
+    const warnSoft = await page.evaluate(() => { const d = document.createElement('div'); d.className = 'bg-warn-soft'; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; });
+    const disabledRows = await nav.locator('button[data-row]:disabled').count();
+    const diodeRow = (await row('Diyot karakteristikleri').getAttribute('aria-label')) ?? '';
+    const disabledClick = await nav.locator('button[data-row]:disabled').first().evaluate((el) => getComputedStyle(el).opacity);
+    check('masaüstü (Örnekler): "zener" araması: üstte "“zener” için N sonuç", başlıktaki eşleşme warn-soft zeminle işaretli; yan listede sayılar eşleşmeye dönüyor, eşleşmeyenler soluk ve tıklanamaz',
+      zenerResults === `“zener” için ${zenerShown} sonuç` && zenerShown >= 1 && mark?.toLowerCase() === 'zener' && markBg === warnSoft &&
+        disabledRows > 10 && /, [1-9]\d* devre$/.test(diodeRow) && Number(disabledClick) < 0.5,
+      `${zenerResults} · ${mark} ${markBg} · ${disabledRows} soluk · ${diodeRow}`);
+    await search.fill('555'); await page.waitForTimeout(400);
+    const has555 = await dlg.getByRole('button', { name: '555 ile yanıp sönen LED (astabil)', exact: true }).count();
+    await search.fill('DOGRULTMAC'); await page.waitForTimeout(400);
+    const hasBridge = await dlg.getByRole('button', { name: 'Köprü tipi tam dalga doğrultmaç', exact: true }).count();
+    check('masaüstü (Örnekler): arama parça adlarında da ("555") ve Türkçe karakterlere duyarsız ("DOGRULTMAC" → Köprü tipi tam dalga doğrultmaç)', has555 === 1 && hasBridge === 1, `${has555} · ${hasBridge}`);
+    await search.fill('qqqzzz'); await page.waitForTimeout(300);
+    const empty = (await list.textContent()) ?? '';
+    await dlg.getByRole('button', { name: 'Aramayı temizle' }).click(); await page.waitForTimeout(300);
+    const cleared = (await search.inputValue()) === '' && (await search.evaluate((el) => document.activeElement === el)) && (await list.locator('li').count()) > 60;
+    check('masaüstü (Örnekler): sonuç yoksa kısa boş durum ve "Aramayı temizle"; temizleyince bütün liste geri geliyor, odak aramada', empty.includes('Bu aramayla eşleşen devre yok.') && cleared, `${empty.slice(0, 40)} · ${cleared}`);
+
+    // 5. Klavye: "/" aramaya gider, Tab sırası, yan listede ok tuşları.
+    await zenerOpen.focus(); await page.keyboard.press('/'); await page.waitForTimeout(100);
+    const slash = await search.evaluate((el) => document.activeElement === el);
+    await page.keyboard.press('Tab');
+    const tab1 = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
+    await page.keyboard.press('Tab');
+    const tab2 = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
+    await page.keyboard.press('ArrowDown');
+    const down = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
+    await page.keyboard.press('End');
+    const end = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
+    await page.keyboard.press('Home');
+    const home = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
+    await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter'); await page.waitForTimeout(400);
+    const enterTop = await topSection();
+    check('masaüstü (Örnekler): "/" aramaya gidiyor; Tab: arama → kapat → yan liste; yan listede ↓, End, Home odağı taşıyor, Enter gruba kaydırıyor',
+      slash && tab1 === 'Örnekler penceresini kapat' && tab2.startsWith('Diyot karakteristikleri,') && down.startsWith('Doğrultucular,') &&
+        end === labels[labels.length - 1] && home === labels[0] && enterTop === 'kenetleyici',
+      `${slash} · ${tab1} · ${tab2} · ${down} · ${end} · ${home} · ${enterTop}`);
     await page.keyboard.press('Escape'); await page.waitForTimeout(300);
-    check('masaüstü (klasör): "Bütün örnekler" ana listeye döndürüyor, odak klasör kartında; Esc pencereyi kapatıyor',
-      backFocus.startsWith('Akdeniz Üniversitesi') && (await page.getByRole('dialog', { name: 'Örnek devreler' }).count()) === 0, backFocus.slice(0, 40));
-    // Klasördeki örnek açıkken pencere doğrudan klasörde açılır; ana listedeki örnek açıkken ana listede.
+    const closed = (await page.getByRole('dialog', { name: 'Örnekler' }).count()) === 0;
+
+    // 6. Açık örnek: liste ona kayar, kartta "Açık", 2 px accent kenarlık ve accent-soft halka; yan listede grubu.
     await openDialog();
-    await card.click(); await page.waitForTimeout(300);
-    await dlg.getByRole('button', { name: 'BC107 ile ortak emetörlü yükselteç', exact: true }).click(); await page.waitForTimeout(500);
+    await dlg.getByRole('button', { name: 'BC107 ile ortak emetörlü yükselteç', exact: true }).click(); await page.waitForTimeout(600);
     await openDialog();
-    const inFolder = (await dlg.getByRole('button', { name: 'Bütün örnekler' }).count()) === 1 && (await card.count()) === 0;
-    const activeShown = (await dlg.getByRole('button', { name: 'BC107 ile ortak emetörlü yükselteç', exact: true }).getAttribute('aria-pressed')) === 'true';
-    await dlg.getByRole('button', { name: 'Bütün örnekler' }).click(); await page.waitForTimeout(300);
-    await dlg.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(500);
+    const active = dlg.locator('li[data-active]');
+    const activeBox = await active.boundingBox();
+    const listBox = await list.boundingBox();
+    const inView = activeBox !== null && listBox !== null && activeBox.y >= listBox.y && activeBox.y + activeBox.height <= listBox.y + listBox.height;
+    const activeText = (await active.textContent()) ?? '';
+    const ring = await active.evaluate((el) => `${getComputedStyle(el).borderTopWidth} ${getComputedStyle(el).boxShadow}`);
+    const activeCurrent = await active.getByRole('button', { name: 'BC107 ile ortak emetörlü yükselteç', exact: true }).getAttribute('aria-current');
+    check('masaüstü (Örnekler): Esc kapatıyor; açık örnekle (BC107) açılınca liste ona kayıyor; kartında mavi "Açık" çipi, accent kenarlık + accent-soft halka, aria-current; yan listede grubu vurgulu',
+      closed && inView && activeText.includes('Açık') && /1px/.test(ring) && /0px 0px 0px 1px/.test(ring) && /0px 0px 0px 4px/.test(ring) && activeCurrent === 'true' && (await currentRow()) === 'BJT’li yükselteç',
+      `${closed} · görünür ${inView} · ${ring.slice(0, 80)} · ${await currentRow()}`);
+    await shot(page, 'ios-ornekler-masaustu.png');
+    // Açık arıza görevi de işaretli, liste ona kayar.
+    await dlg.getByRole('button', { name: 'Arıza bul: JFET’ten akım geçmiyor' }).click(); await page.waitForTimeout(800);
     await openDialog();
-    const inMain = (await card.count()) === 1;
-    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
-    check('masaüstü (klasör): klasördeki örnek (BC107 yükselteç) açıkken pencere klasörde açılıyor, örnek işaretli; ana listedeki örnek açıkken ana listede', inFolder && activeShown && inMain, `${inFolder} · ${activeShown} · ${inMain}`);
-    // Ek örneğin defterdeki örnek kartında da etiket.
-    await openDialog();
-    await card.click(); await page.waitForTimeout(300);
+    const activeFault = dlg.locator('li[data-active]');
+    const faultBox = await activeFault.boundingBox();
+    const faultInView = faultBox !== null && listBox !== null && faultBox.y >= listBox.y && faultBox.y + faultBox.height <= listBox.y + listBox.height;
+    check('masaüstü (Örnekler): açık arıza görevi (JFET) işaretli, liste ona kayıyor, yan listede "Arıza bulma"',
+      faultInView && ((await activeFault.textContent()) ?? '').includes('Açık') && (await currentRow()) === 'Arıza bulma', `${faultInView} · ${await currentRow()}`);
+    // Ek örneğin defterdeki örnek kartında da etiket; kartı eski düzende.
     await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).click(); await page.waitForTimeout(500);
     const exampleCard = (await notebook(page).getByRole('region', { name: /^Örnek ·/ }).textContent()) ?? '';
-    check('masaüstü (klasör): ek örneğin defterdeki örnek kartında da "Föyde yok · ek"; grup adı aynı (Örnek · Deney 1 · …)', exampleCard.includes('Föyde yok · ek') && exampleCard.includes('Örnek · Deney 1 · Diyot karakteristiklerinin incelenmesi'), exampleCard.slice(0, 80));
-    // Ek örneğin kartı eski düzende: açıklama, "Ne işe yarar?", "Günlük hayatta"; föy kartının bölümleri yok.
+    check('masaüstü (Örnekler): ek örneğin defterdeki örnek kartında da "Föyde yok · ek"; grup adı aynı (Örnek · Deney 1 · …)', exampleCard.includes('Föyde yok · ek') && exampleCard.includes('Örnek · Deney 1 · Diyot karakteristiklerinin incelenmesi'), exampleCard.slice(0, 80));
     const extraRegion = notebook(page).getByRole('region', { name: /^Örnek ·/ });
     await extraRegion.getByRole('button').first().click(); await page.waitForTimeout(300);
     const extraText = (await extraRegion.textContent()) ?? '';
-    check('masaüstü (klasör): ek örneğin (Schottky) kartı eski düzende: "Ne işe yarar?" ve "Günlük hayatta" var; Amaç, Teorik bilgi, Adımlar yok',
+    check('masaüstü (Örnekler): ek örneğin (Schottky) kartı eski düzende: "Ne işe yarar?" ve "Günlük hayatta" var; Amaç, Teorik bilgi, Adımlar yok',
       extraText.includes('Ne işe yarar?') && extraText.includes('Günlük hayatta') && !extraText.includes('Amaç') && (await extraRegion.getByRole('button', { name: 'Teorik bilgi' }).count()) === 0 && !extraText.includes('Simülasyonda:'),
       extraText.slice(0, 60));
-    // Klasördeki arıza görevi açıkken de pencere klasörde açılır.
+    // Dar pencerede 2 sütun.
+    await page.setViewportSize({ width: 1024, height: 768 }); await page.waitForTimeout(300);
     await openDialog();
-    if ((await card.count()) > 0) { await card.click(); await page.waitForTimeout(300); }
-    await dlg.getByRole('button', { name: 'Arıza bul: JFET’ten akım geçmiyor' }).click(); await page.waitForTimeout(800);
-    await openDialog();
-    const faultFolder = (await dlg.getByRole('button', { name: 'Bütün örnekler' }).count()) === 1 && (await dlg.getByRole('button', { name: 'Arıza bul: JFET’ten akım geçmiyor' }).getAttribute('aria-pressed')) === 'true';
-    check('masaüstü (klasör): klasördeki arıza görevi (JFET) açıkken pencere klasörde açılıyor, görev işaretli', faultFolder);
+    const narrowCols = await dlg.locator('section[data-section] ul').first().evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+    const narrowBox = await dlg.boundingBox();
+    check('masaüstü (Örnekler): dar pencerede (1024 px) kartlar 2 sütun, pencere ekrana sığıyor', narrowCols === 2 && narrowBox !== null && narrowBox.width <= 1024 - 40 && narrowBox.height <= 768, `${narrowCols} sütun · ${Math.round(narrowBox?.width ?? 0)}x${Math.round(narrowBox?.height ?? 0)}`);
     await ctx.close();
   }
 
-  // --- Örnekler: Akdeniz Üniversitesi klasörü (telefon) ---------------------------------------------
+  // --- Örnekler penceresi (telefon): iki adımlı gezinme ------------------------------------------------------
   {
     const { page } = await phone();
     const openList = async () => {
       await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
-      await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
+      await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(500);
     };
     await openList();
-    const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
-    const list = dlg.locator('.overflow-y-auto').first();
-    const row = dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ });
+    const dlg = page.getByRole('dialog', { name: 'Örnekler' });
     const title = async () => ((await dlg.locator('h2').textContent()) ?? '').trim();
-    const shown = async () => Number(((await dlg.locator('div.h-14 span.font-mono').textContent()) ?? '').trim());
-    const groupRows = async () => dlg.locator('section > button[aria-expanded]').allTextContents();
-    const groupSum = (rows) => rows.reduce((n, t) => n + Number(t.match(/(\d+)$/)?.[1] ?? 0), 0);
-    const cards = () => list.locator('li').count();
-    const firstLabel = (await list.locator(':scope > *').first().getAttribute('aria-label')) ?? '';
-    const rowBox = await row.boundingBox();
-    const rowLogo = Math.round((await row.locator('img').boundingBox())?.width ?? 0);
-    const rowCount = Number(((await row.locator('span.font-mono').textContent()) ?? '').trim());
-    const mainRows = await groupRows();
-    const mainShown = await shown();
-    check('telefon (klasör): listenin en üstünde logolu Akdeniz satırı (en az 56 px, logo 44 px, sayı, ok); ana listede deney grupları yok; sağ üstteki sayı görünen kartlar (örnek + arıza)',
-      firstLabel.startsWith('Akdeniz Üniversitesi · Fizik Bölümü') && rowBox !== null && rowBox.height >= 56 && rowLogo === 44 && rowCount > 0 && (await row.locator('svg').count()) === 1 &&
-        !mainRows.some((t) => /^Deney|^Proje/.test(t)) && mainRows.some((t) => t.startsWith('Temel devreler')) && mainShown === groupSum(mainRows),
-      `${Math.round(rowBox?.height ?? 0)} px · logo ${rowLogo} px · klasör ${rowCount} · üstte ${mainShown} = ${groupSum(mainRows)} · ${mainRows.length} grup`);
-    // Klasör ekranı: başlıkta geri oku ve klasörün adı; Deney 1–9, Proje · Baraj, arıza; ilk grup açık, numaralar 1'den.
-    await row.tap(); await page.waitForTimeout(400);
-    const folderRows = await groupRows();
-    const firstOpen = (await dlg.locator('section > button[aria-expanded]').first().getAttribute('aria-expanded')) === 'true';
-    const firstNumber = ((await list.locator('li span[aria-hidden="true"]').first().textContent()) ?? '').trim();
-    const folderShown = await shown();
-    check('telefon (klasör): satıra dokununca klasör ekranı (geri oku, "Akdeniz Üniversitesi · Fizik Bölümü"); Deney 1–9, Proje · Baraj ve arıza bul; sağ üstteki sayı klasördeki kartlar; ilk grup açık, numaralar 1’den',
-      (await title()) === 'Akdeniz Üniversitesi · Fizik Bölümü' && (await dlg.getByRole('button', { name: 'Bütün örnekler' }).count()) === 1 &&
-        folderRows.filter((t) => /^Deney \d/.test(t)).length === 9 && folderRows.some((t) => t.startsWith('Proje · Baraj')) && folderRows.some((t) => t.startsWith('Arıza bul')) &&
-        folderShown === rowCount && folderShown === groupSum(folderRows) && firstOpen && firstNumber === '1',
-      `${await title()} · ${folderRows.length} grup · üstte ${folderShown} (satırda ${rowCount}) · ilk açık ${firstOpen} · ilk numara ${firstNumber}`);
-    const phoneExtra = (await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).textContent()) ?? '';
-    check('telefon (klasör): ek örnekte (Schottky) "Föyde yok · ek" etiketi', phoneExtra.includes('Föyde yok · ek'), phoneExtra.slice(0, 60));
-    // Klasördeki arama yalnızca klasörde arar.
+    const headCount = async () => Number(((await dlg.locator('div.h-14 > span.font-mono').textContent()) ?? '').trim());
+    const groups = dlg.locator('button[data-group]');
     const search = dlg.getByRole('searchbox', { name: 'Örnek ara' });
-    await search.fill('LED'); await page.waitForTimeout(300);
-    const folderLed = (await dlg.getByRole('button', { name: 'LED: X-Y’de karakteristik', exact: true }).count()) === 1;
-    const mainLed = (await dlg.getByRole('button', { name: 'LED ve ön direnç', exact: true }).count()) === 0;
-    const ledShown = (await shown()) === (await cards());
-    check('telefon (klasör): klasör ekranındaki arama yalnızca klasörde arıyor (LED: deneydeki var, ana listedeki yok); sayı eşleşen kartlar', folderLed && mainLed && ledShown, `${folderLed} · ${mainLed} · ${await shown()}/${await cards()}`);
-    // Geri: ana ekran; ana ekrandaki arama klasördeki deneyi bulur (klasörün başlığı altında).
-    await dlg.getByRole('button', { name: 'Bütün örnekler' }).tap(); await page.waitForTimeout(300);
-    const backTitle = await title();
+    /** Penceredeki bütün düğme ve bağlantıların en küçük yüksekliği. */
+    const minTarget = () => dlg.locator('button, a').evaluateAll((els) => Math.min(...els.filter((e) => e.getClientRects().length > 0).map((e) => Math.round(e.getBoundingClientRect().height))));
+    // 1. Ana ekran.
+    const closeBtn = await dlg.getByRole('button', { name: 'Örnekler penceresini kapat' }).boundingBox();
+    const searchH = Math.round((await dlg.locator('label').boundingBox())?.height ?? 0);
+    const folderBox = dlg.getByRole('region', { name: 'Akdeniz Üniversitesi' });
+    const folderText = (await folderBox.locator(':scope > div').first().textContent()) ?? '';
+    const logoW = Math.round((await folderBox.locator('img').boundingBox())?.width ?? 0);
+    const folderRadius = await folderBox.evaluate((el) => getComputedStyle(el).borderTopLeftRadius);
+    const rowHeights = await groups.evaluateAll((bs) => bs.map((b) => Math.round(b.getBoundingClientRect().height)));
+    const rowLabels = await groups.evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label') ?? ''));
+    const firstRow = groups.first();
+    const firstRowText = (await firstRow.textContent()) ?? '';
+    const chevrons = await groups.evaluateAll((bs) => bs.every((b) => b.querySelector('svg') !== null));
+    const folderRows = await folderBox.locator('button[data-group]').count();
+    const generalRows = await dlg.getByRole('region', { name: 'Genel' }).locator('button[data-group]').count();
+    const homeTotal = await headCount();
+    const activeRows = await dlg.getByRole('button', { name: /^Açık örneğin grubuna git:/ }).count();
+    check('telefon (Örnekler): ana ekran: başlıkta Kapat (44 px), "Örnekler", toplam sayı; 48 px arama; yuvarlak köşeli Akdeniz kutusu (40 px logo, "Akdeniz Üniversitesi", "Fizik · Elektronik Lab föyü · 31 devre") ve 11 grup satırı; "Genel" ve genel gruplar; satırlar ≥ 48 px (numara, kısa ad, sayı, ok); açık örnek yokken açık satırı yok',
+      Math.round(closeBtn?.height ?? 0) === 44 && Math.round(closeBtn?.width ?? 0) === 44 && (await title()) === 'Örnekler' && homeTotal === rowLabels.reduce((n, l) => n + Number(l.match(/, (\d+) devre$/)?.[1] ?? 0), 0) && searchH === 48 &&
+        logoW === 40 && folderText.includes('Akdeniz Üniversitesi') && folderText.includes('Fizik · Elektronik Lab föyü · 31 devre') && folderRadius === '16px' &&
+        folderRows === 11 && generalRows >= 6 && rowHeights.every((h) => h >= 48) && chevrons && firstRowText.startsWith('1Diyot karakteristikleri') &&
+        rowLabels[0].startsWith('Diyot karakteristikleri,') && activeRows === 0,
+      `kapat ${Math.round(closeBtn?.height ?? 0)} · arama ${searchH} · logo ${logoW} · ${folderRadius} · ${folderRows}+${generalRows} satır · en kısa ${Math.min(...rowHeights)} · toplam ${homeTotal}`);
+    // 2. Grup ekranı.
+    await dlg.getByRole('button', { name: /^Kırpıcılar,/ }).tap(); await page.waitForTimeout(500);
+    const back = dlg.getByRole('button', { name: 'Gruplara dön' });
+    const backBox = await back.boundingBox();
+    const overline = (await dlg.locator('div.h-14 p').textContent().catch(() => '')) ?? '';
+    const groupTitle = await title();
+    const headingFocused = await dlg.locator('h2').evaluate((el) => document.activeElement === el);
+    const listText = (await dlg.locator('.overflow-y-auto').textContent()) ?? '';
+    const cards = dlg.locator('li');
+    const cardBoxes = await cards.evaluateAll((ls) => ls.map((l) => { const r = l.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.width)]; }));
+    const groupCount = await headCount();
+    const searchHidden = (await search.count()) === 0;
+    const first = cards.first();
+    const fBox = await first.boundingBox();
+    const chipBox = await first.locator('span.font-mono').first().boundingBox();
+    const previewH = Math.round((await first.locator('[data-preview]').boundingBox())?.height ?? 0);
+    const boardH = Math.round((await first.getByRole('button', { name: /: tahtada kur$/ }).boundingBox())?.height ?? 0);
+    const groupMin = await minTarget();
+    const buttonsPerCard = await cards.evaluateAll((ls) => ls.map((l) => l.querySelectorAll('button').length));
+    check('telefon (Örnekler): gruba dokununca grup ekranı: geri oku (44 px), üst yazı DENEY 4, föydeki ad, sağda sayı, odak başlıkta; amaç cümlesi; kartlar tek sütun (112 px şema, sağ üstte Şekil çipi, 44 px "Tahtada kur"); kart başına iki düğme (aç, Tahtada kur); bütün hedefler ≥ 44 px',
+      Math.round(backBox?.height ?? 0) === 44 && overline === 'DENEY 4' && groupTitle === 'Kırpıcı devreler' && headingFocused && searchHidden &&
+        listText.includes('Kırpıcı') && groupCount === cardBoxes.length && cardBoxes.length === 4 && cardBoxes.every(([x, w]) => x === cardBoxes[0][0] && w === cardBoxes[0][1]) &&
+        previewH === 112 && chipBox !== null && fBox !== null && chipBox.y - fBox.y <= 12 && fBox.x + fBox.width - (chipBox.x + chipBox.width) <= 12 && boardH === 44 &&
+        buttonsPerCard.every((n) => n === 2) && groupMin >= 44,
+      `${overline} · ${groupTitle} · odak ${headingFocused} · ${cardBoxes.length} kart · şema ${previewH} · tahta ${boardH} · en küçük hedef ${groupMin}`);
+    const aim = (await dlg.locator('.overflow-y-auto > p').first().textContent().catch(() => '')) ?? '';
+    check('telefon (Örnekler): grup ekranında başlığın altında föyün amaç cümlesi', aim.length > 20 && aim.endsWith('.'), aim.slice(0, 60));
+    await shot(page, 'ios-ornekler-telefon-grup.png');
+    // 3. Geri: ana ekran, odak grubun satırında.
+    await back.tap(); await page.waitForTimeout(400);
+    const backFocus = (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) ?? '';
+    check('telefon (Örnekler): geri oku ana ekrana döndürüyor, odak grubun satırında', (await title()) === 'Örnekler' && backFocus.startsWith('Kırpıcılar,'), backFocus);
+    const homeMin = await minTarget();
+    check('telefon (Örnekler): ana ekranda bütün hedefler ≥ 44 px', homeMin >= 44, `${homeMin} px`);
+    // 4. Arama her şeyi arar; sonuçlar grup başlıklarıyla.
+    await search.fill('555'); await page.waitForTimeout(400);
+    const resultLine = (await dlg.locator('.overflow-y-auto > p').first().textContent()) ?? '';
+    const resultCards = await dlg.locator('li').count();
+    const resultHeads = await dlg.locator('section h3').allTextContents();
+    const searchCount = await headCount();
+    check('telefon (Örnekler): ana ekrandaki arama ("555") sonuçları grup başlıklarıyla kart listesi olarak gösteriyor; başlıktaki sayı eşleşme sayısı',
+      resultLine === `“555” için ${resultCards} sonuç` && resultCards >= 3 && resultHeads.length >= 1 && searchCount === resultCards && (await groups.count()) === 0,
+      `${resultLine} · ${resultHeads.join(' | ')}`);
     await search.fill('kenetleyici'); await page.waitForTimeout(300);
-    const found = (await dlg.getByRole('button', { name: 'Negatif kenetleyici', exact: true }).count()) === 1;
-    const heading = (await dlg.getByText('Akdeniz Üniversitesi · Fizik Bölümü', { exact: true }).count()) === 1;
-    const foundShown = (await shown()) === (await cards());
-    check('telefon (klasör): geri oku ana ekrana döndürüyor; ana ekrandaki arama klasördeki deneyi (Negatif kenetleyici) klasör başlığı altında buluyor; sayı eşleşen kartlar',
-      backTitle === 'Örnek devreler' && found && heading && foundShown, `${backTitle} · ${found} · ${heading} · ${await shown()}/${await cards()}`);
-    // Klasördeki örnek açıkken pencere klasörde, o grup açık açılır.
-    await search.fill(''); await page.waitForTimeout(200);
-    await row.tap(); await page.waitForTimeout(300);
-    await dlg.getByRole('button', { name: /^Deney 2 · Doğrultucular/ }).tap(); await page.waitForTimeout(300);
-    await dlg.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).tap(); await page.waitForTimeout(700);
+    const deneyHead = await dlg.getByText('DENEY 3', { exact: true }).count();
+    const negatif = await dlg.getByRole('button', { name: 'Negatif kenetleyici', exact: true }).count();
+    await search.fill('qqqzzz'); await page.waitForTimeout(300);
+    const emptyText = (await dlg.locator('.overflow-y-auto').textContent()) ?? '';
+    const clear = dlg.getByRole('button', { name: 'Aramayı temizle' });
+    const clearH = Math.round((await clear.boundingBox())?.height ?? 0);
+    await clear.tap(); await page.waitForTimeout(300);
+    check('telefon (Örnekler): klasördeki deney de bulunuyor (kenetleyici → DENEY 3 başlığı altında); boş durumda 44 px "Aramayı temizle" ana ekrana döndürüyor',
+      deneyHead === 1 && negatif === 1 && emptyText.includes('Bu aramayla eşleşen devre yok.') && clearH === 44 && (await groups.count()) > 15,
+      `${deneyHead} · ${negatif} · ${clearH} px · ${await groups.count()} satır`);
+    // 5. Açık örnek: ana ekranın üstünde accent-soft satır; dokununca grubu, kart işaretli.
+    await dlg.getByRole('button', { name: /^Doğrultucular,/ }).tap(); await page.waitForTimeout(400);
+    await dlg.getByRole('button', { name: 'Köprü tipi tam dalga doğrultmaç', exact: true }).tap(); await page.waitForTimeout(800);
     await openList();
-    const reopenTitle = await title();
-    const groupOpen = (await dlg.getByRole('button', { name: /^Deney 2 · Doğrultucular/ }).getAttribute('aria-expanded')) === 'true';
-    const current = (await dlg.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).getAttribute('aria-current')) === 'true';
-    check('telefon (klasör): klasördeki örnek (Yarım dalga) açıkken pencere klasör ekranında, Deney 2 grubu açık, örnek işaretli', reopenTitle === 'Akdeniz Üniversitesi · Fizik Bölümü' && groupOpen && current, `${reopenTitle} · ${groupOpen} · ${current}`);
+    const activeRow = dlg.getByRole('button', { name: /^Açık örneğin grubuna git:/ });
+    const activeText = (await activeRow.textContent().catch(() => '')) ?? '';
+    const activeBg = await activeRow.evaluate((el) => getComputedStyle(el).backgroundColor).catch(() => '');
+    const accentSoft = await page.evaluate(() => { const d = document.createElement('div'); d.className = 'bg-accent-soft'; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; });
+    const activeFirst = await dlg.locator('.overflow-y-auto > *').first().evaluate((el) => el.getAttribute('aria-label') ?? '');
+    await activeRow.tap(); await page.waitForTimeout(500);
+    const card = dlg.locator('li[data-active]');
+    const cardText = (await card.textContent().catch(() => '')) ?? '';
+    const current = await card.getByRole('button', { name: 'Köprü tipi tam dalga doğrultmaç', exact: true }).getAttribute('aria-current').catch(() => null);
+    check('telefon (Örnekler): açık örnek varken en üstte accent-soft satır ("Açık · Köprü tipi tam dalga doğrultmaç · Deney 2"); dokununca grubu, kart "Açık" çipli ve aria-current',
+      activeText === 'AçıkKöprü tipi tam dalga doğrultmaç · Deney 2' && activeBg === accentSoft && activeFirst.startsWith('Açık örneğin grubuna git:') && (await title()) === 'Doğrultucular' && cardText.includes('Açık') && current === 'true',
+      `${activeText} · ${activeBg} · ${await title()} · ${current}`);
     await page.context().close();
   }
 
@@ -438,11 +616,12 @@ try {
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300);
     const zener = await pickExample(page, (p) => p.getByRole('button', { name: 'Zener diyot (5,6 V): X-Y’de karakteristik', exact: true }));
-    const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
-    const aims = await dlg.locator('section > h3').evaluateAll((hs) =>
-      hs.filter((h) => /^Deney \d/.test(h.textContent ?? '') && h.nextElementSibling?.tagName === 'P').map((h) => h.nextElementSibling.textContent));
-    const d1Aim = await dlg.locator('section > h3', { hasText: /^Deney 1 · Diyot karakteristiklerinin incelenmesi$/ }).locator('+ p').textContent().catch(() => '');
-    check(`föy kartı (masaüstü): klasörde deney gruplarının başlığının altında tek satırlık amaç (${LAB_AIMS} deney); Deney 1 föydeki adıyla`,
+    const dlg = page.getByRole('dialog', { name: 'Örnekler' });
+    // Deney gruplarının başlığı: üst yazı DENEY N, föydeki ad, altında amaç.
+    const aims = await dlg.locator('section[data-section]').evaluateAll((ss) =>
+      ss.filter((x) => /^DENEY \d$/.test(x.querySelector('p')?.textContent ?? '')).map((x) => x.querySelector('h3')?.parentElement?.nextElementSibling?.textContent ?? ''));
+    const d1Aim = aims[0] ?? '';
+    check(`föy kartı (masaüstü): deney gruplarının başlığının altında tek satırlık amaç (${LAB_AIMS} deney); Deney 1 föydeki adıyla`,
       aims.length === LAB_AIMS && d1Aim === 'Diyodun akımının gerilimle nasıl değiştiğini (I-V eğrisini) ölçüp incelemek.', `${aims.length} · ${d1Aim}`);
     await zener.click(); await page.waitForTimeout(500);
     const region = notebook(page).getByRole('region', { name: 'Örnek · Deney 1 · Şekil-3' });
@@ -486,14 +665,13 @@ try {
   }
   {
     const { page } = await phone();
-    // Klasörde deney grubunun satırında amaç.
+    // Deney grubunun ekranında başlığın altında amaç.
     await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(400);
-    const dlg = page.getByRole('dialog', { name: 'Örnek devreler' });
-    await dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ }).tap(); await page.waitForTimeout(400);
-    const row = (await dlg.getByRole('button', { name: /^Deney 1 · Diyot karakteristiklerinin incelenmesi/ }).textContent()) ?? '';
-    check('föy kartı (telefon): klasörde Deney 1 satırında başlığın altında amaç', row.includes('Diyodun akımının gerilimle nasıl değiştiğini (I-V eğrisini) ölçüp incelemek.'), row.slice(0, 80));
-    // Klasöre girince ilk grup (Deney 1) açık gelir.
+    const dlg = page.getByRole('dialog', { name: 'Örnekler' });
+    await dlg.getByRole('button', { name: /^Diyot karakteristikleri,/ }).tap(); await page.waitForTimeout(500);
+    const row = (await dlg.textContent()) ?? '';
+    check('föy kartı (telefon): Deney 1 grubunun ekranında başlığın altında amaç', row.includes('Diyodun akımının gerilimle nasıl değiştiğini (I-V eğrisini) ölçüp incelemek.'), row.slice(0, 80));
     await dlg.getByRole('button', { name: '1N4001: X-Y’de akım-gerilim eğrisi', exact: true }).tap(); await page.waitForTimeout(600);
     const card = phoneNotebook(page).getByRole('region', { name: 'Örnek · Deney 1 · Şekil-3' });
     const labelled = (await card.count()) === 1;
@@ -2283,11 +2461,9 @@ try {
     await page.goto(URL0, { waitUntil: 'networkidle' });
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
     const dlg = page.getByRole('dialog');
-    // Föye dayanmayan senaryo (LED) ana listede, öbürleri Akdeniz Üniversitesi klasöründe.
-    const mainScenarios = await dlg.getByRole('button', { name: /^Arıza bul: / }).count();
-    await dlg.getByRole('button', { name: /^Akdeniz Üniversitesi · Fizik Bölümü/ }).click(); await page.waitForTimeout(200);
-    const folderScenarios = await dlg.getByRole('button', { name: /^Arıza bul: / }).count();
-    const scenarios = { length: mainScenarios + folderScenarios };
+    // Föye dayanmayan senaryo (LED) genel gruptaki "Arıza bulma"da, öbürleri Akdeniz Üniversitesi'ninkinde.
+    const mainScenarios = await dlg.locator('section[data-section="ariza"]').getByRole('button', { name: /^Arıza bul: / }).count();
+    const scenarios = { length: await dlg.getByRole('button', { name: /^Arıza bul: / }).count() };
     await dlg.getByRole('button', { name: 'Arıza bul: Yükselteçte çıkış yok' }).click(); await page.waitForTimeout(600);
     const card = () => page.locator('[data-notebook="task"]').first();
     const head = ((await card().textContent()) ?? '').replace(/\s+/g, ' ');
@@ -2631,7 +2807,7 @@ try {
     check('masaüstü (v3): Parça ekle satırında yazıp okla seçilen parça Enter’la ekleniyor', pick.startsWith('Zener diyot') && (await doc(page)).parts.some((p) => p.type === 'zener'), pick.slice(0, 30));
     await page.getByRole('button', { name: 'Örnekler', exact: true }).focus();
     await page.keyboard.press('Space'); await page.waitForTimeout(300);
-    const examplesOpen = (await page.getByRole('dialog', { name: 'Örnek devreler' }).count()) === 1;
+    const examplesOpen = (await page.getByRole('dialog', { name: 'Örnekler' }).count()) === 1;
     check('odak bir düğmedeyken Boşluk düğmeyi çalıştırıyor (tuval kaydırmayı yutmuyor)', examplesOpen);
     if (examplesOpen) await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click();
     await page.waitForTimeout(500);
