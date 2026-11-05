@@ -1871,17 +1871,15 @@ export const tr = {
     back: 'Bütün örnekler',
     /** Föyde olmayan ek örneğin etiketi (pencerede ve örnek kartında). */
     extra: 'Föyde yok · ek',
-    questionsTitle: 'Föydeki sorular',
     showAnswer: 'Cevabı göster',
     hideAnswer: 'Cevabı gizle',
-    /** Föy deneylerinin kartı (amaç, teorik bilgi, adımlar, föydeki sorular). */
+    /** Föy deneylerinin kartı (amaç, teorik bilgi, adımlar ve sorular). */
     lab: {
       badge: (n: number, figure: string) => `Deney ${n} · ${figure}`,
       aim: 'Amaç',
       theory: 'Teorik bilgi',
-      steps: 'Adımlar',
+      steps: 'Adımlar ve sorular',
       inSim: 'Simülasyonda:',
-      step: (no: string) => (no === '' ? 'Tek adım' : `${no}. adım`),
       pinout: (part: string, figure: string) => `${part}: bacak bağlantısı (föydeki ${figure})`,
       leg: (n: number) => `${n}. bacak`,
       openExample: (title: string) => `Örneği aç: ${title}`,

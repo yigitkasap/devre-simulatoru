@@ -100,6 +100,9 @@ async function openExample(page, name) {
   await page.getByRole('searchbox', { name: 'Örnek ara' }).fill(name); await page.waitForTimeout(200);
   await page.getByRole('button', { name, exact: true }).tap(); await page.waitForTimeout(600);
 }
+/** Föy kartındaki "Adımlar ve sorular": her adımın numarası, cevabı varsa "+" (düğme adımın içinde), yoksa "-". */
+const labRows = (region) => region.locator('ol > li').evaluateAll((lis) =>
+  lis.map((li) => `${li.querySelector(':scope > span')?.textContent ?? ''}${li.querySelector('button[aria-expanded]') ? '+' : '-'}`).join('|'));
 /** Telefonun üst çubuğundaki durum satırı ("Kur · kaydedildi", "Çalışıyor · 2,58 s"); kablo bağlarken "Kablo bağla". */
 const mode = async (page) => {
   if ((await page.getByRole('button', { name: 'Bitti' }).count()) > 0) return 'Kablo bağla';
@@ -450,36 +453,35 @@ try {
     const theoryClosed = (await theory.getAttribute('aria-expanded')) === 'false' && !text.includes('kT / q');
     await theory.click(); await page.waitForTimeout(200);
     const theoryOpen = (await theory.getAttribute('aria-expanded')) === 'true' && ((await region.textContent()) ?? '').includes('kT / q');
-    const steps = region.getByRole('region', { name: 'Adımlar' });
+    const steps = region.getByRole('region', { name: 'Adımlar ve sorular' });
     const stepText = (await steps.textContent()) ?? '';
-    const qa = region.getByRole('region', { name: 'Föydeki sorular' });
-    const label = (await qa.locator('li > span').first().textContent()) ?? '';
-    const before = await qa.locator('div[id]').count();
-    await qa.getByRole('button', { name: 'Cevabı göster' }).click(); await page.waitForTimeout(200);
-    const answer = (await qa.locator('div[id]').first().textContent()) ?? '';
-    const order = ['Amaç', 'Teorik bilgi', 'Adımlar', 'Föydeki sorular', 'Günlük hayatta'].map((t) => text.indexOf(t));
-    check('föy kartı (masaüstü): zenerin kartı "Örnek · Deney 1 · Şekil-3"; sırayla Amaç, Teorik bilgi, Adımlar, Föydeki sorular, Günlük hayatta; "Ne işe yarar?" yok',
-      labelled && order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])) && !text.includes('Ne işe yarar?'), `${labelled} · ${order.join(',')}`);
+    const rows = await labRows(steps);
+    const before = await steps.locator('div[id]').count();
+    await steps.getByRole('button', { name: 'Cevabı göster' }).click(); await page.waitForTimeout(200);
+    const answer = (await steps.locator('div[id]').first().textContent()) ?? '';
+    const order = ['Amaç', 'Teorik bilgi', 'Adımlar ve sorular', 'Günlük hayatta'].map((t) => text.indexOf(t));
+    check('föy kartı (masaüstü): zenerin kartı "Örnek · Deney 1 · Şekil-3"; sırayla Amaç, Teorik bilgi, Adımlar ve sorular, Günlük hayatta; ayrı "Föydeki sorular" ve "Ne işe yarar?" yok',
+      labelled && order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])) && !text.includes('Föydeki sorular') && !text.includes('Ne işe yarar?'), `${labelled} · ${order.join(',')}`);
     check('föy kartı (masaüstü): Teorik bilgi kapalı başlıyor, tıklayınca açılıyor (formüller)', theoryClosed && theoryOpen, `${theoryClosed} · ${theoryOpen}`);
-    check('föy kartı (masaüstü): adımda föydeki numara (3) ve "Simülasyonda:" satırı; soru "3. adım", cevap kapalı başlıyor ve "Cevabı göster" açıyor (5 V genliğin neden kırmadığı)',
-      stepText.includes('Simülasyonda:') && stepText.includes('zener olayını gözle') && label === '3. adım' && before === 0 && answer.includes('5 V genlik bu zeneri kırmaya yetmez') && answer.includes('4,87 V'),
-      `${label} · ${before} · ${answer.slice(0, 40)}`);
+    check('föy kartı (masaüstü): 3. adımda föydeki metin, altında "Simülasyonda:" ve adımın içinde kapalı "Cevabı göster"; tıklayınca cevap açılıyor (5 V genliğin neden kırmadığı)',
+      rows === '3+' && stepText.includes('Simülasyonda:') && stepText.includes('zener olayını gözleyiniz') && before === 0 && answer.includes('5 V genlik bu zeneri kırmaya yetmez') && answer.includes('4,87 V'),
+      `${rows} · ${before} · ${answer.slice(0, 40)}`);
     // Deney 6'nın 4. sorusunun cevabı ek örneği (kuplajlı JFET yükselteç) açıyor.
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300);
     await (await pickExample(page, (p) => p.getByRole('button', { name: 'BF245A ile ortak kaynaklı yükselteç (kazanç 10)', exact: true }))).click(); await page.waitForTimeout(500);
     const fetCard = notebook(page).getByRole('region', { name: 'Örnek · Deney 6 · Şekil-17' });
     await fetCard.getByRole('button').first().click(); await page.waitForTimeout(300);
-    const fetQa = fetCard.getByRole('region', { name: 'Föydeki sorular' });
-    const fetLabels = await fetQa.locator('li > span').allTextContents();
+    const fetQa = fetCard.getByRole('region', { name: 'Adımlar ve sorular' });
+    const fetRows = await labRows(fetQa);
     await fetQa.getByRole('button', { name: 'Cevabı göster' }).last().click(); await page.waitForTimeout(200);
     const link = fetQa.getByRole('button', { name: /^Örneği aç: / });
     const linkText = (await link.textContent()) ?? '';
     await link.click(); await page.waitForTimeout(700);
     const opened = (await notebook(page).getByRole('region', { name: /^Örnek ·/ }).textContent()) ?? '';
-    check('föy kartı (masaüstü): Deney 6’da sorular 1, 2a, 2b, 3, 4. adım; 4. sorunun cevabındaki "Örneği aç" kuplajlı ek devreyi açıyor (kartı eski düzende, "Föyde yok · ek")',
-      fetLabels.join('|') === '1. adım|2a. adım|2b. adım|3. adım|4. adım' && linkText.includes('kuplajlı') && opened.includes('Föyde yok · ek') && (await page.title()).length > 0 &&
+    check('föy kartı (masaüstü): Deney 6’da adımlar 1, 2, 2a, 2b, 3, 4 (2a ve 2b ayrı satır; 2’nin sorusu yok); 4. adımın cevabındaki "Örneği aç" kuplajlı ek devreyi açıyor (kartı eski düzende, "Föyde yok · ek")',
+      fetRows === '1+|2-|2a+|2b+|3+|4+' && linkText.includes('kuplajlı') && opened.includes('Föyde yok · ek') && (await page.title()).length > 0 &&
         (await notebook(page).getByRole('region', { name: 'Örnek · Deney 6 · FET yükselteci' }).count()) === 1,
-      `${fetLabels.join('|')} · ${linkText.slice(0, 40)} · ${opened.slice(0, 50)}`);
+      `${fetRows} · ${linkText.slice(0, 40)} · ${opened.slice(0, 50)}`);
     await ctx.close();
   }
   {
@@ -502,10 +504,9 @@ try {
     const theoryClosed = (await theory.getAttribute('aria-expanded')) === 'false';
     await theory.tap(); await page.waitForTimeout(200);
     const theoryOpen = (await theory.getAttribute('aria-expanded')) === 'true' && ((await card.textContent()) ?? '').includes('kT / q');
-    const stepNos = await card.getByRole('region', { name: 'Adımlar' }).locator('li > span').allTextContents();
-    const sims = await card.getByRole('region', { name: 'Adımlar' }).getByText('Simülasyonda:').count();
-    const qa = card.getByRole('region', { name: 'Föydeki sorular' });
-    const labels = await qa.locator('li > span').allTextContents();
+    const qa = card.getByRole('region', { name: 'Adımlar ve sorular' });
+    const rows = await labRows(qa);
+    const sims = await qa.getByText('Simülasyonda:').count();
     const button = qa.getByRole('button', { name: 'Cevabı göster' }).first();
     await button.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
     const box = await button.boundingBox();
@@ -513,11 +514,11 @@ try {
     await button.tap(); await page.waitForTimeout(200);
     const answer = (await qa.locator('div[id]').first().textContent()) ?? '';
     const text = (await card.textContent()) ?? '';
-    check('föy kartı (telefon): 1N4001 X-Y kartı "Örnek · Deney 1 · Şekil-3"; Amaç ve Günlük hayatta var; adımlar 2a, 2b, 2c, her birinde "Simülasyonda:"',
-      labelled && text.includes('Amaç') && text.includes('Günlük hayatta') && stepNos.join('|') === '2a|2b|2c' && sims === 3, `${labelled} · ${stepNos.join('|')} · ${sims}`);
+    check('föy kartı (telefon): 1N4001 X-Y kartı "Örnek · Deney 1 · Şekil-3"; Amaç, Adımlar ve sorular, Günlük hayatta var, ayrı "Föydeki sorular" yok; adımlar 2a, 2b, 2c, her birinde "Simülasyonda:" ve cevap düğmesi',
+      labelled && text.includes('Amaç') && text.includes('Adımlar ve sorular') && text.includes('Günlük hayatta') && !text.includes('Föydeki sorular') && rows === '2a+|2b+|2c+' && sims === 3, `${labelled} · ${rows} · ${sims}`);
     check('föy kartı (telefon): Teorik bilgi en az 44 px, kapalı başlıyor ve dokununca açılıyor; "Cevabı göster" en az 44 px, cevap kapalı başlıyor ve açılıyor (≈ 4,23 mA); sayfa kaymıyor',
-      theoryBox !== null && theoryBox.height >= 44 && theoryClosed && theoryOpen && labels.join('|') === '2a. adım|2b. adım|2c. adım' && box !== null && box.height >= 44 && closed === 0 && answer.includes('4,23 mA') && !(await pageScrolls(page)),
-      `${Math.round(theoryBox?.height ?? 0)} px · ${theoryClosed}/${theoryOpen} · ${labels.join('|')} · ${Math.round(box?.height ?? 0)} px · ${answer.slice(0, 30)}`);
+      theoryBox !== null && theoryBox.height >= 44 && theoryClosed && theoryOpen && box !== null && box.height >= 44 && closed === 0 && answer.includes('4,23 mA') && !(await pageScrolls(page)),
+      `${Math.round(theoryBox?.height ?? 0)} px · ${theoryClosed}/${theoryOpen} · ${Math.round(box?.height ?? 0)} px · ${answer.slice(0, 30)}`);
     await page.context().close();
   }
   {
@@ -530,8 +531,8 @@ try {
     await theory.scrollIntoViewIfNeeded(); await theory.tap(); await page.waitForTimeout(200);
     const theoryText = (await card.textContent()) ?? '';
     const legs = await card.locator('ol.grid > li').allTextContents();
-    const qa = card.getByRole('region', { name: 'Föydeki sorular' });
-    const steps = await qa.locator('li > span').allTextContents();
+    const qa = card.getByRole('region', { name: 'Adımlar ve sorular' });
+    const steps = await labRows(qa);
     const button = qa.getByRole('button', { name: 'Cevabı göster' }).first();
     await button.scrollIntoViewIfNeeded(); await page.waitForTimeout(200);
     const box = await button.boundingBox();
@@ -540,9 +541,9 @@ try {
     check('föy kartı (telefon): MOSFET kartı "Örnek · Deney 8 · Şekil-21"; Teorik bilgide föydeki (8)–(10) ve IRF510’un bacak bağlantısı (1 kapı, 2 drain, 3 source)',
       labelled && theoryText.includes('(9)') && theoryText.includes('IRF510: bacak bağlantısı (föydeki Şekil-22)') && legs.join('|') === '1. bacakKapı (G)|2. bacakDrain (D)|3. bacakSource (S)',
       `${labelled} · ${legs.join('|')}`);
-    check('föy kartı (telefon): Deney 8’in soruları 3., 4., 5. adım; "Cevabı göster" en az 44 px; cevapta küçük işaret kazancı ≈ 172 ve kaymanın hassasiyeti; sayfa kaymıyor',
-      steps.join('|') === '3. adım|4. adım|5. adım' && box !== null && box.height >= 44 && answer.includes('≈ 172') && answer.includes('0,19 V') && !(await pageScrolls(page)),
-      `${steps.join('|')} · ${Math.round(box?.height ?? 0)} px · ${answer.slice(0, 40)}`);
+    check('föy kartı (telefon): Deney 8’de adımlar 1–5, soruları olan 3., 4., 5. adımda cevap düğmesi; "Cevabı göster" en az 44 px; 3. adımın cevabında küçük işaret kazancı ≈ 172 ve kaymanın hassasiyeti; sayfa kaymıyor',
+      steps === '1-|2-|3+|4+|5+' && box !== null && box.height >= 44 && answer.includes('≈ 172') && answer.includes('0,19 V') && !(await pageScrolls(page)),
+      `${steps} · ${Math.round(box?.height ?? 0)} px · ${answer.slice(0, 40)}`);
     await page.context().close();
   }
 

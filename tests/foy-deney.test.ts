@@ -10,7 +10,10 @@ import type { CircuitDoc } from '../src/model/types';
 import type { CircuitSimulator } from '../src/sim';
 import { between, idOf, load, nodeOf, run, withProps } from './ornek-yardimci';
 
-/** Föydeki bir şekil: şekil numarası, o şekle ait adımlar ve soruların adımları (föydeki sırayla). */
+/**
+ * Föydeki bir şekil: şekil numarası, o şekle ait adımlar (föydeki sırayla; 2a, 2b gibi alt maddeler
+ * ayrı adım) ve bunlardan sorusu olanlar (kartta cevabı olmalı).
+ */
 interface FoySekil {
   readonly figure: string;
   readonly steps: readonly string[];
@@ -64,9 +67,9 @@ const FOY: Record<LabExperimentNo, { readonly steps: readonly string[]; readonly
     },
   },
   6: {
-    steps: ['1', '2', '3', '4'],
+    steps: ['1', '2', '2a', '2b', '3', '4'],
     figures: {
-      'fet-yukseltec': { figure: 'Şekil-17', steps: ['1', '2', '3', '4'], questions: ['1', '2a', '2b', '3', '4'] },
+      'fet-yukseltec': { figure: 'Şekil-17', steps: ['1', '2', '2a', '2b', '3', '4'], questions: ['1', '2a', '2b', '3', '4'] },
     },
   },
   7: {
@@ -149,9 +152,9 @@ function says(text: string, ...patterns: (string | Measured)[]) {
 }
 
 function answer(id: ExampleId, step: string): string {
-  const q = LAB_FIGURE_TEXTS[id]!.questions.find((x) => x.step === step);
-  expect(q, `${id}: ${step}. adımın sorusu`).toBeDefined();
-  return q!.answer;
+  const s = LAB_FIGURE_TEXTS[id]!.steps.find((x) => x.no === step);
+  expect(s?.answer, `${id}: ${step}. adımın cevabı`).toBeDefined();
+  return s!.answer!;
 }
 
 describe('says: cevaptaki sayılar toleransla', () => {
@@ -200,17 +203,20 @@ describe('Föy kartları: iskelet', () => {
         expect(figure!.figure).toBe(sekil.figure);
         expect(figure!.steps.map((s) => s.no), `${id}: adımlar`).toEqual(sekil.steps);
         for (const s of figure!.steps) {
-          expect(s.text.length, `${id}: ${s.no}. adımın açıklaması`).toBeGreaterThan(20);
+          expect(s.text.length, `${id}: ${s.no}. adımın föydeki metni`).toBeGreaterThan(20);
           expect(s.sim.length, `${id}: ${s.no}. adımın "Simülasyonda:" satırı`).toBeGreaterThan(20);
           covered.add(s.no);
         }
-        expect(figure!.questions.map((q) => q.step), `${id}: sorular`).toEqual(sekil.questions);
-        for (const q of figure!.questions) {
-          expect(q.question.length, `${id}: ${q.step}. adımın sorusu`).toBeGreaterThan(20);
+        // Sorusu olan adımların cevabı var, öbürlerinin yok.
+        expect(figure!.steps.filter((s) => s.answer !== undefined).map((s) => s.no), `${id}: sorular`).toEqual(sekil.questions);
+        for (const s of figure!.steps.filter((x) => x.answer !== undefined)) {
           // Cevap simülasyonda ölçülen sayılara dayanır.
-          expect(q.answer, `${id}: ${q.step}. adımın cevabı`).toMatch(/\d/);
-          expect(q.answer.length).toBeGreaterThan(80);
-          if (q.link) expect(EXAMPLE_GROUPS.some((g) => (g.ids as readonly ExampleId[]).includes(q.link!))).toBe(true);
+          expect(s.answer, `${id}: ${s.no}. adımın cevabı`).toMatch(/\d/);
+          expect(s.answer!.length).toBeGreaterThan(80);
+        }
+        for (const s of figure!.steps.filter((x) => x.link !== undefined)) {
+          expect(s.answer, `${id}: ${s.no}. adımın bağlantısı cevabın altında`).toBeDefined();
+          expect(EXAMPLE_GROUPS.some((g) => (g.ids as readonly ExampleId[]).includes(s.link!))).toBe(true);
         }
       }
       // Deneyin bütün adımları şekillerin kartlarında.
@@ -705,7 +711,7 @@ describe('Deney 6: cevaplardaki sayılar', () => {
     const small = coupled(0.5);
     const big = coupled(2);
     says(text, m`ortalaması ${small.avg} V’tan ${big.avg} V’a`, m`çıkış yine ${big.min}–${big.max} V`);
-    expect(LAB_FIGURE_TEXTS['fet-yukseltec']!.questions.find((q) => q.step === '4')!.link).toBe('fet-yukseltec-kuplajli');
+    expect(LAB_FIGURE_TEXTS['fet-yukseltec']!.steps.find((x) => x.no === '4')!.link).toBe('fet-yukseltec-kuplajli');
   });
 });
 

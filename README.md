@@ -1507,15 +1507,16 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   sonundadır.
 - **Föy kartları (2026-11-05):** Föydeki örneklerin defter kartı ayrı düzendedir: başlıkta
   "Deney N · Şekil-M"; Amaç, Teorik bilgi (katlı; föydeki formüller ve denklem numaraları,
-  transistörün bacak bağlantısı), Adımlar (föydeki numaralarla, her adımın altında
-  "Simülasyonda:" satırı), Föydeki sorular (cevaplar katlı) ve Günlük hayatta. Bir deneyin birden
-  çok şekli varsa her şeklin kartında yalnızca o şekle ait adımlar ve sorular bulunur. Klasörde
+  transistörün bacak bağlantısı), Adımlar ve sorular (tek liste: her adımda föydeki metin adım
+  numarasıyla, 2a/2b gibi alt maddeler ayrı satır; altında "Simülasyonda:" satırı; adımın sorusu
+  varsa altında kapalı "Cevabı göster") ve Günlük hayatta. Bir deneyin birden çok şekli varsa her
+  şeklin kartında yalnızca o şekle ait adımlar bulunur. Klasörde
   her deney grubunun başlığının altında tek cümlelik amaç var. Metinler tipli yapıda
   [`src/i18n/foy.ts`](src/i18n/foy.ts) içindedir; ek örnekler ve föy dışı örnekler eski düzende
   (açıklama, "Ne işe yarar?", "Günlük hayatta") kalır.
-  - **Kaynak:** Elektronik Lab. Deney Föyü (21 sayfa, dokuz deney; depoda değil). Soruların metni
-    föyden kısa alıntıdır; amaç, teorik bilgi, adımlar ve cevaplar föyün anlamı ve sayılarıyla
-    yeniden yazıldı. Föydeki hatalar düzeltildi: Deney 6'da "IDDS" → I_DSS, "Şekil.1" →
+  - **Kaynak:** Elektronik Lab. Deney Föyü (21 sayfa, dokuz deney; depoda değil). Adımların metni
+    föyden alıntıdır (yazım hataları düzeltildi); amaç, teorik bilgi, "Simülasyonda:" satırları ve
+    cevaplar föyün anlamı ve sayılarıyla yeniden yazıldı. Föydeki hatalar düzeltildi: Deney 6'da "IDDS" → I_DSS, "Şekil.1" →
     Şekil-17; Deney 4'te çıkışın anlık değeri υ_ç = υ_g − V_G (föyde υ_T − υ_G, yani tepe değeri);
     Deney 8'de V_T "I_D'yi sıfır yapan" gerilim. Deney 8'in (9) formülünün υ_GS = 0'da kutuplanan
     azaltmalı tip için olduğu, IRF510'da K_υ = 2K(V_GS − V_T)R_d olduğu not edildi.
@@ -1523,9 +1524,12 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
     BC107 (Central: 1 E, 2 B, 3 C) ve IRF510 (Vishay: G D S) föyle aynı; BF245A'da föy 1 kapı,
     3 drain derken Philips kataloğu 1 drain, 3 kapı der (kartta not olarak).
   - **Testler** ([`tests/foy-deney.test.ts`](tests/foy-deney.test.ts)): föyün iskeleti (dokuz
-    deney, şekiller, adım ve soru numaraları) testte ayrıca yazılıdır; bir deneyin amacı, teorik
-    bilgisi, bir adımı ya da bir sorunun cevabı eksikse test düşer. Cevaplardaki her sayı testte
-    simülasyonla ölçülür ve kartlardaki biçimiyle (ondalık virgül, "−") cevap metninde aranır.
+    deney, şekiller, adım numaraları ve hangi adımların sorusu olduğu) testte ayrıca yazılıdır;
+    bir deneyin amacı, teorik bilgisi, bir adımı ya da bir sorunun cevabı eksikse test düşer.
+    Cevaplardaki her sayı testte simülasyonla ölçülür; cevap metnindeki sayı okunup ölçülen
+    değerle, yazıldığı basamağın yarısı kadar toleransla karşılaştırılır (2 basamakta ±0,006).
+    Böylece yuvarlama sınırındaki bir ölçüm (ör. −9,525) platforma göre farklı yuvarlansa da test
+    düşmez.
 - **Föyün belirtmediği ayrıntılarda varsayımlar:**
   - **Zener:** Föy değerini vermiyor. Düzeni en çok benzeyen föyler (Bilecik ve Bandırma: 1N4001,
     LED ve zener, 1 kΩ) 5,6 V (1N4734A) kullanıyor. Föydeki 5 V genlik bu zeneri kırmadığı için

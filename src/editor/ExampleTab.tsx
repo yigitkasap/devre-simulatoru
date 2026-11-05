@@ -1,7 +1,7 @@
 // Defterin örnek kartının içeriği (tasarım: M05a, M05b; v3): devrenin kurulumu, ne işe yaradığı
 // (dayandığı fizik yasasıyla) ve günlük hayatta nerede kullanıldığı; altta önceki/sonraki örnek.
-// Föy deneylerinin kartı ayrı düzendedir: amaç, teorik bilgi (katlı), adımlar ("Simülasyonda:"),
-// föydeki sorular (cevaplar katlı) ve günlük hayatta; metinleri i18n/foy.ts.
+// Föy deneylerinin kartı ayrı düzendedir: amaç, teorik bilgi (katlı), adımlar ve sorular (föydeki
+// metin, "Simülasyonda:" ve katlı cevap) ve günlük hayatta; metinleri i18n/foy.ts.
 
 import { useId, useState, type ReactNode } from 'react';
 import { EXAMPLE_GROUPS, EXAMPLE_IDS, EXTRA_EXAMPLES, type ExampleId } from '../examples';
@@ -37,75 +37,6 @@ function Section({ title, icon, children }: { title: string; icon: ReactNode; ch
         {title}
       </h3>
       <p className="text-sm leading-[1.55]">{children}</p>
-    </section>
-  );
-}
-
-/** Kartta gösterilen bir soru: etiketi (hangi adım), föydeki metni, cevabı ve cevabın açtığı örnek. */
-interface QuestionItem {
-  readonly label: string;
-  readonly question: string;
-  readonly answer: string;
-  readonly link?: ExampleId;
-}
-
-/** Föydeki sorular: her sorunun cevabı "Cevabı göster" ile açılır (öğretmen ne zaman açılacağına karar verir). */
-function Questions({ items, onOpen }: { items: readonly QuestionItem[]; onOpen: (id: ExampleId) => void }) {
-  const touch = useTouchUi();
-  const base = useId();
-  const [shown, setShown] = useState<ReadonlySet<number>>(new Set());
-  const toggle = (i: number) =>
-    setShown((s) => {
-      const next = new Set(s);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
-  return (
-    <section aria-label={tr.examples.questionsTitle} className="flex flex-col gap-3 rounded-lg border border-line bg-panel-2 px-3.5 py-3">
-      <h3 className="flex items-center gap-1.5 text-label font-semibold text-accent-ink">
-        <Icon name="help" className="h-4 w-4" />
-        {tr.examples.questionsTitle}
-      </h3>
-      <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
-        {items.map((q, i) => {
-          const open = shown.has(i);
-          return (
-            <li key={q.label + i} className="flex flex-col gap-1.5">
-              <span className="text-label font-semibold text-muted">{q.label}</span>
-              <p className="text-sm leading-[1.55]">
-                <Rich text={q.question} />
-              </p>
-              <button
-                type="button"
-                aria-expanded={open}
-                aria-controls={`${base}-${i}`}
-                onClick={() => toggle(i)}
-                className={`self-start rounded-md border border-line-2 bg-panel px-2.5 text-small font-medium hover:bg-app ${touch ? 'h-11' : 'h-8'}`}
-              >
-                {open ? tr.examples.hideAnswer : tr.examples.showAnswer}
-              </button>
-              {open && (
-                <div id={`${base}-${i}`} className="flex flex-col gap-2 rounded-[10px] border border-ok-line bg-ok-soft px-3.5 py-2.5 text-sm leading-[1.55]">
-                  <p>
-                    <Rich text={q.answer} />
-                  </p>
-                  {q.link && (
-                    <button
-                      type="button"
-                      onClick={() => onOpen(q.link!)}
-                      className={`flex items-center gap-1.5 self-start text-left text-sm font-semibold text-accent-ink underline-offset-2 hover:underline ${touch ? 'min-h-11' : ''}`}
-                    >
-                      <Icon name="book" className="h-4 w-4 shrink-0" />
-                      {tr.examples.lab.openExample(plainText(tr.examples.texts[q.link].title))}
-                    </button>
-                  )}
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ol>
     </section>
   );
 }
@@ -177,34 +108,81 @@ function Theory({ experiment }: { experiment: LabExperiment }) {
   );
 }
 
-/** Föydeki adımlar, föydeki numarasıyla; her adımın altında simülasyonda nasıl yapılacağı. */
-function Steps({ figure }: { figure: LabFigure }) {
+/**
+ * Adımlar ve sorular tek listede: her adımda föydeki metin (adım numarasıyla; 2a, 2b gibi alt maddeler
+ * ayrı satır), altında "Simülasyonda:" satırı; adımın sorusu varsa altında kapalı "Cevabı göster"
+ * (öğretmen cevabın ne zaman açılacağına karar verir).
+ */
+function StepsAndQuestions({ figure, onOpen }: { figure: LabFigure; onOpen: (id: ExampleId) => void }) {
+  const touch = useTouchUi();
+  const base = useId();
+  const [shown, setShown] = useState<ReadonlySet<number>>(new Set());
+  const toggle = (i: number) =>
+    setShown((s) => {
+      const next = new Set(s);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
   return (
     <section aria-label={tr.examples.lab.steps} className="flex flex-col gap-2 rounded-lg border border-line bg-panel-2 px-3.5 py-3">
       <h3 className="flex items-center gap-1.5 text-label font-semibold text-accent-ink">
         <Icon name="menu" className="h-4 w-4" />
         {tr.examples.lab.steps}
       </h3>
-      <ol className="m-0 flex list-none flex-col gap-3 p-0">
-        {figure.steps.map((step) => (
-          <li key={step.no} className="flex gap-2.5">
-            {step.no !== '' && <span className="w-6 shrink-0 text-sm font-semibold text-accent-ink">{step.no}</span>}
-            <div className="flex min-w-0 flex-col gap-1">
-              <p className="text-sm leading-[1.55]">
-                <Rich text={step.text} />
-              </p>
-              <p className="text-small leading-[1.5] text-ink-2">
-                <b className="font-semibold text-ink">{tr.examples.lab.inSim}</b> <Rich text={step.sim} />
-              </p>
-            </div>
-          </li>
-        ))}
+      <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
+        {figure.steps.map((step, i) => {
+          const open = shown.has(i);
+          return (
+            <li key={step.no} className="flex gap-2.5">
+              {step.no !== '' && <span className="w-6 shrink-0 text-sm font-semibold text-accent-ink">{step.no}</span>}
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <p className="text-sm leading-[1.55]">
+                  <Rich text={step.text} />
+                </p>
+                <p className="text-small leading-[1.5] text-ink-2">
+                  <b className="font-semibold text-ink">{tr.examples.lab.inSim}</b> <Rich text={step.sim} />
+                </p>
+                {step.answer !== undefined && (
+                  <>
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      aria-controls={`${base}-${i}`}
+                      onClick={() => toggle(i)}
+                      className={`self-start rounded-md border border-line-2 bg-panel px-2.5 text-small font-medium hover:bg-app ${touch ? 'h-11' : 'h-8'}`}
+                    >
+                      {open ? tr.examples.hideAnswer : tr.examples.showAnswer}
+                    </button>
+                    {open && (
+                      <div id={`${base}-${i}`} className="flex flex-col gap-2 rounded-[10px] border border-ok-line bg-ok-soft px-3.5 py-2.5 text-sm leading-[1.55]">
+                        <p>
+                          <Rich text={step.answer} />
+                        </p>
+                        {step.link && (
+                          <button
+                            type="button"
+                            onClick={() => onOpen(step.link!)}
+                            className={`flex items-center gap-1.5 self-start text-left text-sm font-semibold text-accent-ink underline-offset-2 hover:underline ${touch ? 'min-h-11' : ''}`}
+                          >
+                            <Icon name="book" className="h-4 w-4 shrink-0" />
+                            {tr.examples.lab.openExample(plainText(tr.examples.texts[step.link].title))}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );
 }
 
-/** Föy deneyinin kartı: amaç, teorik bilgi, adımlar, föydeki sorular, günlük hayatta. */
+/** Föy deneyinin kartı: amaç, teorik bilgi, adımlar ve sorular, günlük hayatta. */
 function LabDetails({ id, figure, onOpen }: { id: ExampleId; figure: LabFigure; onOpen: (id: ExampleId) => void }) {
   const experiment = LAB_EXPERIMENT_TEXTS[figure.experiment];
   return (
@@ -213,12 +191,7 @@ function LabDetails({ id, figure, onOpen }: { id: ExampleId; figure: LabFigure; 
         <Rich text={experiment.aim} />
       </Section>
       <Theory key={figure.experiment} experiment={experiment} />
-      <Steps figure={figure} />
-      <Questions
-        key={id}
-        items={figure.questions.map((q) => ({ label: tr.examples.lab.step(q.step), question: q.question, answer: q.answer, link: q.link }))}
-        onOpen={onOpen}
-      />
+      <StepsAndQuestions key={id} figure={figure} onOpen={onOpen} />
       <Section title={tr.examples.everyday} icon={EVERYDAY_ICON}>
         <Rich text={tr.examples.texts[id].everyday} />
       </Section>
