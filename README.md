@@ -109,9 +109,8 @@ bir bağlantıyla telefonda da açılır, devreni tarayıcın kaydeder.
 <img align="right" width="96" alt="Akdeniz Üniversitesi logosu" src="public/akdeniz-universitesi-96.png">
 
 Simülatör, Akdeniz Üniversitesi Fizik Bölümü'nün Elektronik Laboratuvarı için hazırlandı. Föydeki
-dokuz deneyin devreleri föydeki şekillerin parçaları ve değerleriyle kuruludur; her deneyin amacı,
-teorik bilgisi, adımları ve soruları simülasyonda ölçülen sayılarla cevaplanmış olarak deney
-kartında durur.
+dokuz deneyin devreleri föydeki şekillerle aynıdır. Her deneyin kartında amaç, teorik bilgi, adımlar
+ve sorular var; cevaplar simülasyonda ölçülen sayılara dayanır.
 
 1. Diyot karakteristiklerinin incelenmesi
 2. Doğrultucular

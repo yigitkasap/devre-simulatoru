@@ -111,9 +111,9 @@ Turkish.
 <img align="right" width="96" alt="Akdeniz University logo" src="public/akdeniz-universitesi-96.png">
 
 The simulator was made for the Electronics Laboratory of the Department of Physics at Akdeniz
-University. The circuits of the nine experiments in the lab manual are built with the parts and
-values of the manual's figures; each experiment's aim, theory, steps and questions sit on its
-experiment card, answered with numbers measured in the simulation.
+University. The circuits of the nine experiments in the lab manual are the same as the manual's
+figures. Each experiment's card has the aim, theory, steps and questions; the answers are based on
+numbers measured in the simulation.
 
 1. Diode characteristics
 2. Rectifiers
