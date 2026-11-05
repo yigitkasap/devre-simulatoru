@@ -561,7 +561,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
         step: '3',
         question: 'V_{GS} gerilimini V_{GS} = −0,2 V ve V_{GS} = −0,4 V alarak yukarıdaki deneyi her bir V_{GS} değeri için tekrarlayınız.',
         answer:
-          'V_{GS} = −0,2 V (V_{DS} → I_{D}): 0,2 V → 0,67 mA; 1 V → 2,46 mA; 2 V → 2,85 mA; 8 V → 3,15 mA; 15 V → 3,49 mA. V_{GS} = −0,4 V: 0,2 V → 0,58 mA; 1 V → 1,99 mA; 2 V → 2,16 mA; 8 V → 2,38 mA; 15 V → 2,64 mA. V_{GS} eksildikçe eğriler aşağı iner ve doyum daha küçük V_{DS}’de başlar (V_{GS} − V_{P}: −0,2 V’ta 1,54 V, −0,4 V’ta 1,34 V). Kapıdan akım geçmez (≈ 10 pA), bu yüzden V_{GS} kaynağın gösterdiği değere tam eşittir.',
+          'V_{GS} = −0,2 V (V_{DS} → I_{D}): 0,2 V → 0,67 mA; 1 V → 2,46 mA; 2 V → 2,85 mA; 8 V → 3,15 mA; 15 V → 3,49 mA. V_{GS} = −0,4 V: 0,2 V → 0,58 mA; 1 V → 1,99 mA; 2 V → 2,16 mA; 8 V → 2,38 mA; 15 V → 2,64 mA. V_{GS} eksildikçe eğriler aşağı iner ve doyum daha küçük V_{DS}’de başlar (V_{GS} − V_{P}: −0,2 V’ta 1,54 V, −0,4 V’ta 1,34 V). Kapıdan akım geçmez (≈ 11 pA), bu yüzden V_{GS} kaynağın gösterdiği değere tam eşittir.',
       },
       {
         step: '4',
