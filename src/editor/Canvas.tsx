@@ -3,7 +3,6 @@
 // hangi öğeye tıklandığı geometriyle (isabet testi) bulunur.
 
 import {
-  useCallback,
   useEffect,
   useId,
   useImperativeHandle,
@@ -67,7 +66,7 @@ import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
 import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from './state';
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
-import { circuitHits, circuitShapes, fitAvoiding, type Rect } from './legendFit';
+import { circuitShapes, fitAvoiding, type Rect } from './legendFit';
 import { clampScale, fitView, screenToGrid, snap, zoomAt, type View } from './view';
 
 /** Simülasyon sırasında tıklanınca (ya da basılı tutulunca) kullanılan parçalar: imleç el olur. */
@@ -233,6 +232,12 @@ export interface CanvasProps {
   readonly probes?: ProbeView | null;
   /** Masaüstünde sol alt köşedeki panel (multimetre, px): sığdırırken renk ölçeği kutusunun yerine bundan kaçınılır. */
   readonly cornerPanel?: { readonly w: number; readonly h: number } | null;
+  /** Masaüstü: sol altta yakınlaştırma grubu var (sığdırırken yeri görünür alanın dışında sayılır). */
+  readonly zoomControls?: boolean;
+  /** Dokunmatik (tablet): gerilim çipi 44 px. */
+  readonly touchChip?: boolean;
+  /** Görünümün ölçeği değişince (yakınlaştırma yüzdesi). */
+  readonly onScaleChange?: (scale: number) => void;
   /** Uç koyulurken: tıklanan bacak ya da kablo (parçanın gövdesinde en yakın bacağı). */
   readonly onProbe?: ((probe: Probe) => void) | null;
   /** Arızayı bildirirken yer seçimi: bacak, parçanın kendisi ya da kablo (R2). */
@@ -403,6 +408,9 @@ export function Canvas({
   onPick,
   probes = null,
   cornerPanel = null,
+  zoomControls = false,
+  touchChip = false,
+  onScaleChange,
   onProbe = null,
   onLocate = null,
   placeMarks = null,
@@ -437,29 +445,16 @@ export function Canvas({
   /** Telefon: kalabalık bir noktaya dokununca "Burada N öğe var" seçicisi; büyüteç (basılı tutunca da). */
   const [picker, setPicker] = useState<{ x: number; y: number; options: readonly PickOption[] } | null>(null);
   const [magnifier, setMagnifier] = useState<{ x: number; y: number; g: Point } | null>(null);
+  /** Gerilim göstergesi açık mı (masaüstünde sağ alttaki çip, telefonda sol alttaki düğme; tıklayınca açılır). */
   const [legendOpen, setLegendOpen] = useState(false);
-  /**
-   * Masaüstünde "Kablo gerilimi" kutusunun son ölçülen boyu: Sığdır kutunun yerini görünür alanın
-   * dışında sayar; kutu devreye değerse tek satıra küçülür (analiz düzeltmeleri, 2).
-   */
-  const [legendSize, setLegendSize] = useState({ w: 206, h: 100 });
-  const legendObserver = useRef<ResizeObserver | null>(null);
-  const legendBoxRef = useCallback((el: HTMLDivElement | null) => {
-    legendObserver.current?.disconnect();
-    legendObserver.current = null;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
-      if (w > 0 && h > 0) setLegendSize((s) => (Math.abs(s.w - w) < 0.5 && Math.abs(s.h - h) < 0.5 ? s : { w, h }));
-    });
-    ro.observe(el);
-    legendObserver.current = ro;
-  }, []);
   const shapes = useMemo(() => circuitShapes(doc), [doc]);
-  // Kutu tuvalin sol alt köşesinde (bottom-3 left-3): tuvalin koordinatlarında.
-  const legendRect: Rect | null = phone ? null : { x: 12, y: size.height - 12 - legendSize.h, w: legendSize.w, h: legendSize.h };
-  const avoidRect: Rect | null = cornerPanel && !phone ? { x: 16, y: size.height - 16 - cornerPanel.h, w: cornerPanel.w, h: cornerPanel.h } : legendRect;
+  useEffect(() => {
+    onScaleChange?.(view.scale);
+  }, [view.scale, onScaleChange]);
+  // Sığdır, masaüstünde sol alttaki yakınlaştırma grubunun (ya da arıza bulmada multimetre panelinin) yerini
+  // görünür alanın dışında sayar (tuvalin koordinatlarında).
+  const zoomRect: Rect | null = phone || !zoomControls ? null : { x: 16, y: size.height - 16 - 44, w: 240, h: 44 };
+  const avoidRect: Rect | null = cornerPanel && !phone ? { x: 16, y: size.height - 16 - cornerPanel.h, w: cornerPanel.w, h: cornerPanel.h } : zoomRect;
   const phoneTimers = useRef({ hold: 0, long: 0 });
   const phoneLongFired = useRef(false);
   const lastEmptyTap = useRef(0);
@@ -2177,17 +2172,18 @@ export function Canvas({
       {frame &&
         !phone?.strip &&
         !(cornerPanel && !phone) &&
-        (!phone && legendRect && circuitHits(shapes, view, legendRect) ? (
-          // Kutu devreye değiyor (yakınlaştırılmış ya da kaydırılmış görünüm): tek satır, renk çubuğu ve ±V.
-          <div
-            role="note"
-            aria-label={tr.sim.legendTitle}
-            className="pointer-events-none absolute bottom-3 left-3 flex h-8 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 font-mono text-[11.5px] text-ink-2 tabular shadow-sm"
+        (!phone && !legendOpen ? (
+          // Masaüstü: sağ altta küçük çip ("Gerilim ±5 V"); tıklayınca açıklamalı gösterge.
+          <button
+            type="button"
+            onClick={() => setLegendOpen(true)}
+            aria-label={tr.phone.legendButton}
+            aria-expanded={false}
+            className={`absolute right-4 bottom-4 z-10 flex items-center gap-2 rounded-full border border-line bg-panel px-3 text-label font-medium text-ink-2 shadow-md hover:bg-panel-2 ${touchChip ? 'h-11' : 'h-8'}`}
           >
-            <span>−{formatSI(frame.vmax, 'V', { trim: true })}</span>
-            <i className="block h-2 w-16 rounded-full" style={{ background: voltageGradient(settings.wireScale) }} aria-hidden="true" />
-            <span>+{formatSI(frame.vmax, 'V', { trim: true })}</span>
-          </div>
+            <i className="block h-2 w-8 rounded-full" style={{ background: voltageGradient(settings.wireScale) }} aria-hidden="true" />
+            <span className="font-mono tabular">{tr.sim.legendChip(formatSI(frame.vmax, 'V', { trim: true }))}</span>
+          </button>
         ) : phone && !legendOpen ? (
           <button
             type="button"
@@ -2207,8 +2203,8 @@ export function Canvas({
             rms={doc.parts.some((p) => p.type === 'acsource' || p.type === 'funcgen')}
             ions={doc.parts.some((p) => p.type === 'tank')}
             field={settings.magneticField}
-            onClose={phone ? () => setLegendOpen(false) : undefined}
-            {...(phone ? {} : { boxRef: legendBoxRef })}
+            side={phone ? 'left' : 'right'}
+            onClose={() => setLegendOpen(false)}
           />
         ))}
 
@@ -2803,8 +2799,8 @@ function VoltageLegend({
   rms,
   ions,
   field,
+  side,
   onClose,
-  boxRef,
 }: {
   vmax: number;
   scale: WireScale;
@@ -2815,19 +2811,18 @@ function VoltageLegend({
   ions: boolean;
   /** Manyetik alan gösteriliyor: ⊙ ve ⊗ işaretleri açıklanır. */
   field: boolean;
-  /** Telefon: dokununca küçük düğmeye döner. */
-  onClose?: () => void;
-  /** Masaüstü: kutunun boyu ölçülür (Sığdır onu dışarıda bırakır). */
-  boxRef?: (el: HTMLDivElement | null) => void;
+  /** Hangi alt köşede (telefonda sol, masaüstünde sağ). */
+  side: 'left' | 'right';
+  /** Dokununca (tıklayınca) küçük düğmeye döner. */
+  onClose: () => void;
 }) {
   const label = formatSI(vmax, 'V', { trim: true });
   return (
     <div
-      ref={boxRef}
       role="note"
       aria-label={tr.sim.legendTitle}
       onClick={onClose}
-      className={`absolute bottom-3 left-3 flex flex-col gap-1.5 rounded-[10px] border border-line bg-panel/95 px-3 py-2.5 shadow-sm ${onClose ? '' : 'pointer-events-none'}`}
+      className={`absolute z-10 flex cursor-pointer flex-col gap-1.5 rounded-lg border border-line bg-panel px-3 py-2.5 shadow-md ${side === 'left' ? 'bottom-3 left-3' : 'right-4 bottom-4'}`}
     >
       <span className="text-label font-semibold text-muted">{rms ? tr.sim.legendRms : tr.sim.legend}</span>
       <div className="h-2.5 w-44 rounded-[5px]" style={{ background: voltageGradient(scale) }} />

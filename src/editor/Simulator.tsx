@@ -382,6 +382,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [welcomeOpen, setWelcomeOpen] = useState(() => !embed && !welcomeSeen() && initialIsFresh());
   /** Yardım penceresi açıksa hangi sekmede (? → Klavye kısayolları, F1 → Fare ve dokunma). */
   const [helpTab, setHelpTab] = useState<HelpTab | null>(null);
+  /** Şemanın ölçeği (sol alttaki yakınlaştırma grubunda yüzde). */
+  const [canvasScale, setCanvasScale] = useState(1.5);
   const helpOpen = helpTab !== null;
   /** Karta aktar penceresi (3B kart: delikli plaket ve baskı devre). */
   const [kartaOpen, setKartaOpen] = useState(false);
@@ -1705,6 +1707,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             : null
       }
       cornerPanel={probeView && !phone && meterPanelHeight > 0 ? { w: 300, h: meterPanelHeight } : null}
+      zoomControls={!phone && viewMode === 'schematic' && !boardMode}
+      touchChip={tablet}
+      onScaleChange={setCanvasScale}
       onProbe={meter.placing ? (probe) => setMeter((m) => (m.placing ? { ...m, [m.placing]: probe, placing: null } : m)) : null}
       taskParts={taskParts}
       {...(analysis.open ? { marks: analysis.marks } : {})}
@@ -2056,6 +2061,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               {canvas}
               {viewMode === 'schematic' && !phone && !boardMode && (
                 <CanvasControls
+                  zoom={Math.round(canvasScale * 100)}
                   onZoomOut={() => canvasRef.current?.zoomOut()}
                   onZoomIn={() => canvasRef.current?.zoomIn()}
                   onFit={() => canvasRef.current?.fit()}
@@ -2498,10 +2504,11 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                 />
               ) : (
                 <CanvasControls
+                  zoom={Math.round(canvasScale * 100)}
                   onZoomOut={() => canvasRef.current?.zoomOut()}
                   onZoomIn={() => canvasRef.current?.zoomIn()}
                   onFit={() => canvasRef.current?.fit()}
-                  on3d={() => setViewMode('bench')}
+                  side={probeView && meterPanelHeight > 0 ? 'right' : 'left'}
                   touch={tablet}
                   {...(tablet && sim.status === 'stopped' && doc.parts.length > 0 && !fault ? { onConnect: startConnect } : {})}
                 />
