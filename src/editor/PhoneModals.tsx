@@ -8,7 +8,7 @@ import { tr } from '../i18n/tr';
 import type { SaveState } from './autosave';
 import { Icon, type IconName } from './icons';
 import type { Settings, ThemeChoice } from './settings';
-import { PhoneHelp } from './HelpDialog';
+import { KeysTab, PhoneHelp } from './HelpDialog';
 import { SpeedOptions } from './SimBar';
 import { SettingsFields } from './TopBar';
 import type { SimStatus } from './useSimulation';
@@ -182,92 +182,110 @@ export interface MoreSheetProps {
   readonly settings: Settings;
   readonly onSettings: (patch: Partial<Settings>) => void;
   readonly onClose: () => void;
-  readonly onExamples: () => void;
   /** Analiz alt sayfası (N9). */
   readonly onAnalysis: () => void;
-  readonly onFile: () => void;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  readonly onUndo: () => void;
+  readonly onRedo: () => void;
   readonly onFit: () => void;
-  readonly onShare: () => void;
   readonly onTour: () => void;
   readonly onWelcome: () => void;
-  /** Renk teması (masaüstündeki güneş / ay düğmesinin karşılığı). */
+  /** Renk teması: Sistem / Açık / Koyu. */
   readonly onTheme: (choice: ThemeChoice) => void;
 }
 
 const THEME_CHOICES = ['system', 'light', 'dark'] as const;
 
-export function MoreSheet({ settings, onSettings, onClose, onExamples, onAnalysis, onFile, onFit, onShare, onTour, onWelcome, onTheme }: MoreSheetProps) {
-  const [tab, setTab] = useState<'help' | 'settings'>('help');
-  // v3: devrenin adı durum satırını açar; Dosya ve Örnekler buradan.
-  const quick: Array<{ icon: IconName; label: string; run: () => void; pressed?: boolean }> = [
-    { icon: 'book', label: tr.phone.examples, run: onExamples },
+/**
+ * Daha fazla (arayüz v4): üstte Analiz, Geri al, Yinele, Sığdır; altında masaüstündeki menünün sırası:
+ * Tema (Sistem / Açık / Koyu), Ayarlar, Klavye kısayolları, Yardım, Kısa turu başlat. Ayarlar, kısayollar
+ * ve yardım aynı sayfada açılır (geri düğmesiyle döner).
+ */
+export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, canRedo, onUndo, onRedo, onFit, onTour, onWelcome, onTheme }: MoreSheetProps) {
+  const [view, setView] = useState<'menu' | 'settings' | 'keys' | 'help'>('menu');
+  const t = tr.topbar.more;
+  const quick: Array<{ icon: IconName; label: string; run: () => void; disabled?: boolean }> = [
     { icon: 'chart', label: tr.analysis.button, run: onAnalysis },
-    { icon: 'file', label: tr.phone.file, run: onFile },
-    { icon: 'share', label: tr.phone.share, run: onShare },
+    { icon: 'undo', label: tr.toolbar.undo, run: onUndo, disabled: !canUndo },
+    { icon: 'redo', label: tr.toolbar.redo, run: onRedo, disabled: !canRedo },
     { icon: 'fit', label: tr.bench.fit, run: onFit },
   ];
+  const row = 'flex min-h-[52px] w-full items-center gap-3 rounded-md px-2 text-left text-[15px] font-medium active:bg-panel-2';
+  const title = view === 'settings' ? tr.settings.title : view === 'keys' ? t.shortcuts : view === 'help' ? t.help : null;
   return (
     <ModalSheet label={tr.phone.moreTitle} top={118} onClose={onClose}>
-      <div className="flex shrink-0 flex-col gap-3 px-4">
-        <div className="flex gap-2">
-          {quick.map((q) => (
-            <button
-              key={q.label}
-              type="button"
-              onClick={q.run}
-              aria-pressed={q.pressed}
-              className={`flex h-[72px] min-w-0 flex-1 flex-col items-center justify-center gap-1.5 rounded-xl border px-1 text-[13px] font-medium ${
-                q.pressed ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-panel-2 active:bg-app'
-              }`}
-            >
-              <Icon name={q.icon} className="h-[22px] w-[22px]" />
-              <span className="max-w-full truncate">{q.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-3">
-          <span id="tema-etiketi" className="w-12 shrink-0 text-sm font-semibold">
-            {tr.theme.label}
-          </span>
-          <div role="radiogroup" aria-labelledby="tema-etiketi" className="flex min-w-0 flex-1 gap-0.5 rounded-[10px] bg-app p-0.5">
-            {THEME_CHOICES.map((c) => (
+      {title === null ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
+          <div className="flex shrink-0 gap-2">
+            {quick.map((q) => (
               <button
-                key={c}
+                key={q.label}
                 type="button"
-                role="radio"
-                aria-checked={settings.theme === c}
-                onClick={() => onTheme(c)}
-                className={`h-11 flex-1 rounded-lg text-sm font-semibold ${settings.theme === c ? 'bg-panel text-ink shadow-sm' : 'text-ink-2'}`}
+                onClick={q.run}
+                disabled={q.disabled}
+                className="flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-lg border border-line bg-panel-2 px-1 text-[13px] font-medium active:bg-app disabled:text-stopped"
               >
-                {tr.theme.options[c]}
+                <Icon name={q.icon} className="h-5 w-5" />
+                <span className="max-w-full truncate">{q.label}</span>
               </button>
             ))}
           </div>
-        </div>
-        <div role="tablist" aria-label={tr.phone.moreTitle} className="flex gap-0.5 rounded-[10px] bg-app p-0.5">
-          {(['help', 'settings'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              role="tab"
-              aria-selected={tab === t}
-              onClick={() => setTab(t)}
-              className={`h-11 flex-1 rounded-lg text-sm font-semibold ${tab === t ? 'bg-panel text-ink shadow-sm' : 'text-ink-2'}`}
-            >
-              {t === 'help' ? tr.help.title : tr.settings.title}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
-        {tab === 'help' ? (
-          <PhoneHelp onTour={onTour} />
-        ) : (
-          <div className="pt-3">
-            <SettingsFields settings={settings} onChange={onSettings} touch onWelcome={onWelcome} />
+          <div className="flex shrink-0 items-center gap-3">
+            <span id="tema-etiketi" className="w-12 shrink-0 text-sm font-semibold">
+              {t.theme}
+            </span>
+            <div role="radiogroup" aria-labelledby="tema-etiketi" className="flex min-w-0 flex-1 gap-0.5 rounded-md bg-panel-2 p-0.5">
+              {THEME_CHOICES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  role="radio"
+                  aria-checked={settings.theme === c}
+                  onClick={() => onTheme(c)}
+                  className={`h-11 flex-1 rounded-[6px] text-sm font-semibold ${settings.theme === c ? 'bg-panel text-ink ring-1 ring-line' : 'text-ink-2'}`}
+                >
+                  {tr.theme.options[c]}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
-      </div>
+          <div className="flex shrink-0 flex-col border-t border-line pt-2">
+            <button type="button" onClick={() => setView('settings')} className={row}>
+              <Icon name="settings" className="h-5 w-5 shrink-0" />
+              <span className="flex-1">{tr.settings.title}</span>
+              <Icon name="chevron" className="h-4 w-4 text-muted" />
+            </button>
+            <button type="button" onClick={() => setView('keys')} className={row}>
+              <Icon name="keyboard" className="h-5 w-5 shrink-0" />
+              <span className="flex-1">{t.shortcuts}</span>
+              <Icon name="chevron" className="h-4 w-4 text-muted" />
+            </button>
+            <button type="button" onClick={() => setView('help')} className={row}>
+              <Icon name="help" className="h-5 w-5 shrink-0" />
+              <span className="flex-1">{t.help}</span>
+              <Icon name="chevron" className="h-4 w-4 text-muted" />
+            </button>
+            <button type="button" onClick={onWelcome} className={row}>
+              <Icon name="flag" className="h-5 w-5 shrink-0" />
+              <span className="flex-1">{t.tour}</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center gap-1 border-b border-line px-2 pb-2">
+            <button type="button" onClick={() => setView('menu')} className="flex h-11 items-center gap-1 rounded-md px-2 text-sm font-medium text-accent-ink active:bg-panel-2">
+              <Icon name="chevron" className="h-4 w-4 rotate-180" />
+              {tr.phone.moreTitle}
+            </button>
+            <h3 className="min-w-0 flex-1 truncate pr-2 text-right text-[15px] font-semibold">{title}</h3>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
+            {view === 'settings' ? <SettingsFields settings={settings} onChange={onSettings} touch onWelcome={onWelcome} /> : view === 'keys' ? <KeysTab /> : <PhoneHelp onTour={onTour} />}
+          </div>
+        </div>
+      )}
     </ModalSheet>
   );
 }

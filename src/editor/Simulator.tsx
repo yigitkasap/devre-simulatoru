@@ -90,7 +90,7 @@ import type { MessageAction } from './MessagesTab';
 import { Notebook } from './Notebook';
 import { FileSheet, MoreSheet, StatusSheet, StopToEditDialog } from './PhoneModals';
 import { PartsSheetBody } from './PhoneSheets';
-import { PhoneFabs, PhoneHeader, SchematicButtons, SchematicStrip, statusLine, WiringFooter, WiringHeader } from './PhoneShell';
+import { PhoneBottomBar, PhoneHeader, SchematicButtons, SchematicStrip, statusLine, WiringFooter, WiringHeader } from './PhoneShell';
 import { chainPlacement, firstFreePin } from './phoneTools';
 import { useRecentParts } from './recentParts';
 import { autoSettings } from './scopeView';
@@ -2161,22 +2161,20 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             settings={settings}
             onSettings={updateSettings}
             onClose={() => setModal(null)}
-            onExamples={() => {
-              setModal(null);
-              setExamplesOpen(true);
-            }}
             onAnalysis={() => {
               setModal(null);
               setAddSheet(null);
               analysis.setOpen(true);
             }}
-            onFile={() => setModal('file')}
+            canUndo={sim.status === 'stopped' && state.past.length > 0}
+            canRedo={sim.status === 'stopped' && state.future.length > 0}
+            onUndo={() => dispatch({ type: 'undo' })}
+            onRedo={() => dispatch({ type: 'redo' })}
             onFit={() => {
               setModal(null);
               setSchematicStrip(false);
               canvasRef.current?.fit();
             }}
-            onShare={() => setModal('share')}
             onTour={startTour}
             onWelcome={() => {
               setModal(null);
@@ -2211,14 +2209,17 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             status={sim.status}
             time={sim.frame?.time ?? 0}
             saveState={saveState}
-            canUndo={state.past.length > 0}
-            statusOpen={modal === 'status'}
+            circuitOpen={modal === 'file' || modal === 'share'}
             moreOpen={modal === 'more'}
-            onStatus={() => setModal('status')}
-            onUndo={() => {
-              setPlacing(null);
-              setCabling(null);
-              dispatch({ type: 'undo' });
+            onCircuit={() => setModal('file')}
+            onExamples={() => setExamplesOpen(true)}
+            undo={{
+              can: state.past.length > 0,
+              run: () => {
+                setPlacing(null);
+                setCabling(null);
+                dispatch({ type: 'undo' });
+              },
             }}
             onMore={() => setModal('more')}
           />
@@ -2303,11 +2304,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             status={sim.status}
             time={sim.frame?.time ?? 0}
             saveState={saveState}
-            canUndo={state.past.length > 0}
-            statusOpen={modal === 'status'}
+            circuitOpen={modal === 'file' || modal === 'share'}
             moreOpen={modal === 'more'}
-            onStatus={() => setModal('status')}
-            onUndo={() => dispatch({ type: 'undo' })}
+            onCircuit={() => setModal('file')}
+            onExamples={() => setExamplesOpen(true)}
             onMore={() => setModal('more')}
           />
         )}
@@ -2318,13 +2318,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             <main className={`relative shrink-0 bg-paper ${big ? 'min-h-0 flex-1' : 'border-b border-line'}`} style={big ? undefined : { height: mainHeight }}>
               {canvas}
               {!wiring && (
-                <SchematicButtons
-                  connect={sim.status === 'stopped' && doc.parts.length > 0 && viewMode === 'schematic' && !taskFrozen && !fault}
-                  full={schematicFull}
-                  raised={schematicFull}
-                  onConnect={startConnect}
-                  onFull={() => setSchematicFull((f) => !f)}
-                />
+                <SchematicButtons full={schematicFull} onFull={() => setSchematicFull((f) => !f)} />
               )}
             </main>
           )}
@@ -2357,9 +2351,6 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           )}
           {wiring && (
             <WiringFooter canUndo={state.past.length > 0} hasStart={connect.start !== null} onUndo={() => dispatch({ type: 'undo' })} onClear={() => setConnect({ start: null })} />
-          )}
-          {!wiring && !addSheet && !analysis.open && (
-            <PhoneFabs lift={phoneFaultSheet ? 70 : 0} status={sim.status} canAdd={sim.status === 'stopped' && !taskFrozen && !fault} addOpen={addOpen} onAdd={() => setAddSheet('half')} onPlay={play} onPause={sim.pause} />
           )}
           {addSheet && !wiring && (
             <BottomSheet
@@ -2402,10 +2393,30 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             </BottomSheet>
           )}
         </div>
+        {!wiring && (
+          <PhoneBottomBar
+            status={sim.status}
+            time={sim.frame?.time ?? 0}
+            canEdit={!taskFrozen && !fault}
+            canConnect={doc.parts.length > 0 && viewMode === 'schematic'}
+            addOpen={addOpen}
+            speedOpen={modal === 'status'}
+            onAdd={() => setAddSheet((s) => (s ? null : 'half'))}
+            onConnect={() => {
+              setAddSheet(null);
+              startConnect();
+            }}
+            onPlay={play}
+            onPause={sim.pause}
+            onStop={sim.stop}
+            onSpeed={() => setModal('status')}
+          />
+        )}
         {modals}
         {taskDialogEl}
         {overlays}
-        <Toast toast={toast} offset={addSheet || analysis.open ? sheetHeight + 12 : wiring ? 92 : 96} onDone={hideToast} />
+        {/* Alttaki çubuk 76 px (güvenli alan Toast'ta ayrıca eklenir). */}
+        <Toast toast={toast} offset={wiring ? 92 : addSheet || analysis.open ? sheetHeight + 88 : 88} onDone={hideToast} />
       </div>
     );
   }

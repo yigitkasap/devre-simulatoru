@@ -3375,6 +3375,12 @@ export const tr = {
     play: 'Oynat',
     pause: 'Duraklat',
     resume: 'Devam et',
+    circuitButton: (title: string, line: string) => `${title}, ${line}: devre sayfası`,
+    bottomBar: 'Simülasyon ve düzenleme',
+    addShort: 'Parça',
+    wireShort: 'Kablo',
+    stopToEditButton: 'Düzenlemek için durdur',
+    timeButton: (time: string) => `${time}: hız`,
     done: 'Bitti',
     // Defter düzeni (v3: DP1–DP4)
     statusLine: { stopped: 'Kur', running: 'Çalışıyor', paused: 'Duraklatıldı' } as Record<string, string>,

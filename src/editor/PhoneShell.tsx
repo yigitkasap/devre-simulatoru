@@ -1,7 +1,7 @@
-// Telefonun defter düzeni (tasarım v3: DP1–DP4): 56 px üst çubuk (logo, devrenin adı ve altında durum
-// satırı; dokununca Durdur ve Hız; Geri al, ⋯), şema kutusunun düğmeleri, bir karta odaklanınca şemanın
-// yerini alan 64 px şerit, tam ekran kablo bağlama görünümünün (DP2) üst ve alt çubukları ve iki yüzen
-// düğme (sol altta Parça ekle, sağ altta 64 px Oynat / Duraklat).
+// Telefonun defter düzeni (arayüz v4): 56 px üst çubuk (logo, devrenin adı ve altında durum satırı;
+// dokununca devre sayfası; sağda Örnekler ve Daha fazla), şema kutusunun tam ekran düğmesi, bir karta
+// odaklanınca şemanın yerini alan 64 px şerit, tam ekran kablo bağlama görünümünün (DP2) üst ve alt
+// çubukları ve altta sabit çubuk (Parça, Kablo, Oynat; çalışırken Duraklat, Durdur, süre).
 
 import { useMemo } from 'react';
 import { tr } from '../i18n/tr';
@@ -28,15 +28,17 @@ export interface PhoneHeaderProps {
   readonly status: SimStatus;
   readonly time: number;
   readonly saveState: SaveState;
-  readonly canUndo: boolean;
-  readonly statusOpen: boolean;
+  /** Devre sayfası (yeni, aç, indir, paylaş…) açık mı; adına dokununca açılır. */
+  readonly circuitOpen: boolean;
   readonly moreOpen: boolean;
-  readonly onStatus: () => void;
-  readonly onUndo: () => void;
+  readonly onCircuit: () => void;
+  readonly onExamples: () => void;
   readonly onMore: () => void;
+  /** Tahtada kur: Geri al üst çubukta (yalnızca Kur kipinde). */
+  readonly undo?: { readonly can: boolean; readonly run: () => void };
 }
 
-/** Üst çubuk (DP1): Geri al yalnızca Kur kipinde (çalışırken devrenin yapısı kilitli). */
+/** Üst çubuk (56 px): logo, devrenin adı (tek satır) ve altında durum; sağda Örnekler ve Daha fazla. */
 export function PhoneHeader(props: PhoneHeaderProps) {
   const { status } = props;
   const line = statusLine(status, props.time, props.saveState);
@@ -44,15 +46,15 @@ export function PhoneHeader(props: PhoneHeaderProps) {
   return (
     <header className="shrink-0 border-b border-line bg-panel" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <h1 className="sr-only">{tr.site.name}</h1>
-      <div className="flex h-14 items-center gap-2 pr-2 pl-3">
-        <Logo size={30} />
+      <div className="flex h-14 items-center gap-1.5 pr-1.5 pl-3">
+        <Logo size={28} />
         <button
           type="button"
-          onClick={props.onStatus}
+          onClick={props.onCircuit}
           aria-haspopup="dialog"
-          aria-expanded={props.statusOpen}
-          aria-label={tr.phone.statusButton(props.title, line)}
-          className="flex h-11 min-w-0 flex-1 flex-col justify-center rounded-[10px] px-1 text-left leading-[1.2] active:bg-app"
+          aria-expanded={props.circuitOpen}
+          aria-label={tr.phone.circuitButton(props.title, line)}
+          className="flex h-11 min-w-0 flex-1 flex-col justify-center rounded-md px-1.5 text-left leading-[1.2] active:bg-panel-2"
         >
           <span className="truncate text-[15px] font-semibold">{props.title}</span>
           <span className={`flex min-w-0 items-center gap-1.5 text-label ${tone}`}>
@@ -60,11 +62,14 @@ export function PhoneHeader(props: PhoneHeaderProps) {
             <span className="truncate tabular">{line}</span>
           </span>
         </button>
-        {status === 'stopped' && (
-          <button type="button" onClick={props.onUndo} disabled={!props.canUndo} aria-label={tr.toolbar.undo} className={iconButton}>
+        {props.undo && status === 'stopped' && (
+          <button type="button" onClick={props.undo.run} disabled={!props.undo.can} aria-label={tr.toolbar.undo} className={iconButton}>
             <Icon name="undo" />
           </button>
         )}
+        <button type="button" onClick={props.onExamples} aria-label={tr.examples.button} className={iconButton}>
+          <Icon name="book" />
+        </button>
         <button type="button" onClick={props.onMore} aria-haspopup="dialog" aria-expanded={props.moreOpen} aria-label={tr.phone.more} className={iconButton}>
           <Icon name="more" />
         </button>
@@ -130,27 +135,16 @@ export function SchematicStrip({ doc, errors, warnings, onOpen }: { doc: Circuit
   );
 }
 
-/** Şema kutusunun sağ altı: Kablo bağla (yalnızca Kur kipinde) ve tam ekran / küçült. */
-export function SchematicButtons({ connect, full, raised, onConnect, onFull }: { connect: boolean; full: boolean; raised: boolean; onConnect: () => void; onFull: () => void }) {
+/** Şema kutusunun sağ altı: tam ekran / küçült. */
+export function SchematicButtons({ full, onFull }: { full: boolean; onFull: () => void }) {
   return (
-    <div className="absolute right-2.5 z-10 flex gap-1.5" style={{ bottom: raised ? 'calc(100px + env(safe-area-inset-bottom))' : 10 }}>
-      {connect && (
-        <button
-          type="button"
-          data-tour="canvas"
-          onClick={onConnect}
-          className="flex h-11 items-center gap-2 rounded-xl bg-accent px-3.5 text-sm font-semibold text-white shadow-sm active:brightness-110"
-        >
-          <Icon name="wire" className="h-[18px] w-[18px]" />
-          {tr.phone.connectButton}
-        </button>
-      )}
+    <div className="absolute right-2.5 bottom-2.5 z-10 flex gap-1.5">
       <button
         type="button"
         onClick={onFull}
         aria-label={full ? tr.phone.schematicSmall : tr.phone.schematicFull}
         aria-pressed={full}
-        className="flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-panel text-ink shadow-sm active:bg-app"
+        className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-panel text-ink shadow-md active:bg-panel-2"
       >
         <Icon name={full ? 'fullscreenExit' : 'fullscreen'} />
       </button>
@@ -200,54 +194,95 @@ export function WiringFooter({ canUndo, hasStart, onUndo, onClear }: { canUndo: 
   );
 }
 
-/** Yüzen düğmeler: sol altta Parça ekle (Kur kipinde), sağ altta 64 px Oynat / Duraklat. */
-export function PhoneFabs({
+/**
+ * Altta sabit çubuk (76 px; altında güvenli alan): Kur kipinde [+ Parça] [Kablo] [▶ Oynat] (Oynat daha geniş,
+ * yeşil); çalışırken [Duraklat] [Durdur] [● süre] (süreye dokununca hız); duraklatılmışken Parça ve Kablo
+ * yerine "Düzenlemek için durdur" ve Devam et. Arıza bulmada ve kilitli görevde Parça ve Kablo yok.
+ */
+export function PhoneBottomBar({
   status,
-  canAdd,
+  time,
+  canEdit,
+  canConnect,
   addOpen,
+  speedOpen,
   onAdd,
+  onConnect,
   onPlay,
   onPause,
-  lift = 0,
+  onStop,
+  onSpeed,
 }: {
   status: SimStatus;
-  canAdd: boolean;
+  time: number;
+  /** Parça eklenebilir mi (Kur kipinde, kilitli görev ve arıza bulma dışında). */
+  canEdit: boolean;
+  /** Kablo bağlanabilir mi (devrede parça var, şema görünümünde). */
+  canConnect: boolean;
   addOpen: boolean;
+  speedOpen: boolean;
   onAdd: () => void;
+  onConnect: () => void;
   onPlay: () => void;
   onPause: () => void;
-  /** Alttaki sabit çubuğun (arıza bulma: İpucu, Arızayı bildir) yüksekliği kadar yukarı (px). */
-  lift?: number;
+  onStop: () => void;
+  onSpeed: () => void;
 }) {
-  const running = status === 'running';
+  const base = 'flex h-[52px] min-w-0 items-center justify-center gap-2 rounded-md px-2 text-[15px] font-semibold';
+  const outline = `${base} flex-1 border border-line-2 bg-panel text-ink active:bg-panel-2 disabled:text-stopped`;
+  const green = `${base} flex-[1.6] bg-ok px-3 text-white active:brightness-110`;
   return (
-    <>
-      {canAdd && (
-        <button
-          type="button"
-          data-tour="parts"
-          onClick={onAdd}
-          aria-haspopup="dialog"
-          aria-expanded={addOpen}
-          className="absolute left-4 z-20 flex h-[52px] items-center gap-2 rounded-full border border-line-2 bg-panel pr-[18px] pl-4 text-[15px] font-semibold shadow-[0_4px_12px_rgba(29,39,51,0.1)] active:bg-app"
-          style={{ bottom: 'calc(28px + env(safe-area-inset-bottom))' }}
-        >
-          <Icon name="plus" className="h-[18px] w-[18px]" />
-          {tr.phone.addTitle}
-        </button>
+    <nav
+      aria-label={tr.phone.bottomBar}
+      className="flex shrink-0 items-center gap-2 border-t border-line bg-panel px-3 pt-3"
+      style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
+    >
+      {status === 'running' ? (
+        <>
+          <button type="button" data-tour="play" onClick={onPause} className={`${base} flex-1 bg-ink text-on-ink active:brightness-125`}>
+            <Icon name="pause" className="h-[18px] w-[18px]" />
+            {tr.sim.pause}
+          </button>
+          <button type="button" onClick={onStop} className={outline}>
+            <Icon name="stop" className="h-[18px] w-[18px]" />
+            {tr.sim.stop}
+          </button>
+          <button type="button" onClick={onSpeed} aria-haspopup="dialog" aria-expanded={speedOpen} aria-label={tr.phone.timeButton(formatSI(time, 's', { digits: 3 }))} className={`${outline} font-mono font-medium tabular`}>
+            <i className="block h-2 w-2 shrink-0 rounded-full bg-ok" aria-hidden="true" />
+            {formatSI(time, 's', { digits: 3 })}
+          </button>
+        </>
+      ) : status === 'paused' ? (
+        <>
+          <button type="button" onClick={onStop} className={`${base} flex-[1.4] border border-line-2 bg-panel text-sm text-ink active:bg-panel-2`}>
+            <Icon name="stop" className="h-[18px] w-[18px] shrink-0" />
+            <span className="truncate">{tr.phone.stopToEditButton}</span>
+          </button>
+          <button type="button" data-tour="play" onClick={onPlay} className={green}>
+            <Icon name="play" className="h-[18px] w-[18px]" />
+            {tr.phone.resume}
+          </button>
+        </>
+      ) : (
+        <>
+          {canEdit && (
+            <>
+              <button type="button" data-tour="parts" onClick={onAdd} aria-haspopup="dialog" aria-expanded={addOpen} className={addOpen ? `${base} flex-1 border border-accent bg-accent-soft text-accent-ink` : outline}>
+                <Icon name="plus" className="h-[18px] w-[18px]" />
+                {tr.phone.addShort}
+              </button>
+              <button type="button" data-tour="canvas" onClick={onConnect} disabled={!canConnect} className={outline}>
+                <Icon name="wire" className="h-[18px] w-[18px]" />
+                {tr.phone.wireShort}
+              </button>
+            </>
+          )}
+          <button type="button" data-tour="play" onClick={onPlay} className={green}>
+            <Icon name="play" className="h-[18px] w-[18px]" />
+            {tr.sim.play}
+          </button>
+        </>
       )}
-      <button
-        type="button"
-        data-tour="play"
-        onClick={running ? onPause : onPlay}
-        aria-label={running ? tr.sim.pause : status === 'paused' ? tr.phone.resume : tr.sim.play}
-        className={`absolute right-4 z-20 flex h-16 w-16 items-center justify-center rounded-full active:brightness-110 ${
-          running ? 'bg-ink text-on-ink shadow-[0_6px_16px_rgba(29,39,51,0.3)]' : 'bg-ok text-white shadow-[0_6px_16px_rgba(27,125,68,0.3)]'
-        }`}
-        style={{ bottom: `calc(${20 + lift}px + env(safe-area-inset-bottom))` }}
-      >
-        <Icon name={running ? 'pause' : 'play'} className="h-6 w-6" />
-      </button>
-    </>
+    </nav>
   );
 }

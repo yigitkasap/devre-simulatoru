@@ -52,23 +52,24 @@ export function useViewMode(): [ViewMode, (mode: ViewMode) => void] {
 }
 
 /** Telefonda şema kutusunun sol üstündeki Şema | 3B düğmesi (masaüstünde 3B ve Şema sağ alttaki kutularda). */
+/**
+ * Şemanın sol üstünde küçük Şema / 3B seçimi (arayüz v4): görünüşü 32 px (seçili beyaz); dokunmatikte
+ * düğmelerin kendisi 44 px (görünen hap ortada), parmakla rahat basılır.
+ */
 export function ViewToggle({ mode, onChange, touch }: { mode: ViewMode; onChange: (mode: ViewMode) => void; touch: boolean }) {
-  const size = touch ? 'h-11 min-w-14 px-3.5 text-sm' : 'h-9 min-w-12 px-3 text-small';
   return (
     <div
       role="group"
       aria-label={tr.bench.viewGroup}
-      className="pointer-events-auto absolute top-3 left-3 z-10 flex rounded-lg border border-line-2 bg-panel p-0.5 shadow-sm"
+      className={`pointer-events-auto absolute left-3 z-10 flex items-center px-0.5 before:absolute before:inset-x-0 before:rounded-md before:bg-panel-2 before:shadow-md before:ring-1 before:ring-line before:content-[''] ${
+        touch ? 'top-1.5 h-11 before:top-1.5 before:bottom-1.5' : 'top-3 h-8 before:inset-y-0'
+      }`}
     >
       {(['schematic', 'bench'] as const).map((m) => (
-        <button
-          key={m}
-          type="button"
-          aria-pressed={mode === m}
-          onClick={() => onChange(m)}
-          className={`${size} rounded-md font-semibold ${mode === m ? 'bg-accent text-white' : 'text-ink-2 hover:bg-panel-2'}`}
-        >
-          {m === 'schematic' ? tr.bench.schematic : tr.bench.bench}
+        <button key={m} type="button" aria-pressed={mode === m} onClick={() => onChange(m)} className={`relative flex min-w-12 items-center justify-center ${touch ? 'h-11' : 'h-8'}`}>
+          <span className={`flex h-7 items-center rounded-[6px] px-3 text-small font-semibold ${mode === m ? 'bg-panel text-ink ring-1 ring-line' : 'text-ink-2'}`}>
+            {m === 'schematic' ? tr.bench.schematic : tr.bench.bench}
+          </span>
         </button>
       ))}
     </div>

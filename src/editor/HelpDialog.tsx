@@ -50,7 +50,8 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function KeysTab() {
+/** Klavye kısayolları listesi (yardım penceresi; telefonda Daha fazla → Klavye kısayolları). */
+export function KeysTab() {
   return (
     <div className="grid gap-x-12 md:grid-cols-2">
       {tr.help.keyGroups.map((group) => (

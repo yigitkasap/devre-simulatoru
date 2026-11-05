@@ -292,7 +292,7 @@ export function Notebook(props: NotebookProps) {
       ref={listRef}
       onKeyDown={onNavKeys}
       className={`flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain bg-panel ${touch ? 'p-3' : 'p-4'}`}
-      style={props.phone ? { paddingBottom: 'calc(104px + env(safe-area-inset-bottom))' } : undefined}
+      style={props.phone ? { paddingBottom: 16 } : undefined}
     >
       {props.taskCard}
       {props.example.id && <ExampleCard id={props.example.id} onOpen={props.example.onOpen} onClose={props.example.onClose} />}
