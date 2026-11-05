@@ -186,6 +186,8 @@
 
   /* Düzen: < 900 px telefon, ≥ 900 px masaüstü (desk:), ≥ 1280 px geniş masaüstü (wide:) */
   --breakpoint-desk: 900px;
+  /* Arayüz v4: bu genişliğin altında üst çubukta site adı, Örnekler ve Analiz'in yazısı gizlenir. */
+  --breakpoint-mid: 1100px;
   --breakpoint-wide: 1280px;
 }
 

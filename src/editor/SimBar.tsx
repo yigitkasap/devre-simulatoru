@@ -60,12 +60,15 @@ export function SpeedOptions({
   onSpeed,
   groupRef,
   touch = false,
+  compact = false,
 }: {
   speed: number;
   scopeSpeed: number | null;
   onSpeed: (speed: number) => void;
   groupRef?: RefObject<HTMLDivElement | null>;
   touch?: boolean;
+  /** Menüde (üst çubuk): öğeler 36 px tek satır. */
+  compact?: boolean;
 }) {
   const fineId = useId();
   const presets: Array<{ label: string; value: number | null; note: string }> = [
@@ -103,7 +106,7 @@ export function SpeedOptions({
               tabIndex={checked || (checkedIndex < 0 && i === 0) ? 0 : -1}
               onClick={() => preset.value !== null && onSpeed(preset.value)}
               className={`flex items-center justify-between gap-3 rounded-md px-2.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                touch ? 'min-h-12 text-[15px]' : 'py-2'
+                touch ? 'min-h-12 text-[15px]' : compact ? 'h-9 text-sm' : 'py-2'
               } ${checked ? 'bg-accent-soft font-medium text-accent-ink' : disabled ? 'text-muted' : 'text-ink hover:bg-panel-2'}`}
             >
               <span>{preset.label}</span>

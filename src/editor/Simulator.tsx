@@ -71,7 +71,7 @@ import { Canvas, type CanvasHandle, type ConnectStart, type Highlight, type Phon
 import { CanvasControls, WiringControls } from './CanvasControls';
 import type { DeviceHooks } from './DeviceCards';
 import { ExamplesDialog } from './ExamplesDialog';
-import { HelpDialog } from './HelpDialog';
+import { HelpDialog, type HelpTab } from './HelpDialog';
 import { markWelcomeSeen, Tour, welcomeSeen, WelcomeDialog, type TourStep } from './Welcome';
 import type { PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
@@ -380,7 +380,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [taskDraft, setTaskDraft] = useState<TaskDef | null>(null);
   // İlk açılış (M01): hoş geldin yalnızca ilk ziyarette (kayıtlı devre ya da paylaşım bağlantısı yoksa).
   const [welcomeOpen, setWelcomeOpen] = useState(() => !embed && !welcomeSeen() && initialIsFresh());
-  const [helpOpen, setHelpOpen] = useState(false);
+  /** Yardım penceresi açıksa hangi sekmede (? → Klavye kısayolları, F1 → Fare ve dokunma). */
+  const [helpTab, setHelpTab] = useState<HelpTab | null>(null);
+  const helpOpen = helpTab !== null;
   /** Karta aktar penceresi (3B kart: delikli plaket ve baskı devre). */
   const [kartaOpen, setKartaOpen] = useState(false);
   /** Karta aktar'ın açılacağı sekme (Tahtada kur → Lehim rehberine geç: delikli plaket). */
@@ -1827,6 +1829,23 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   shortcutRef.current = (e: KeyboardEvent) => {
     if (dialogOpen || e.defaultPrevented) return;
+    // Ctrl+O bilgisayardan aç, Ctrl+S bilgisayara indir (tarayıcının kendi açma ve kaydetmesi yerine); F1
+    // yardım, F11 tam ekran (defter gizli). Yazı alanındayken de; gömülü sayfada ve telefonda yok.
+    if (embed === null && !phone && !e.altKey && !e.shiftKey) {
+      const key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && (key === 'o' || key === 's')) {
+        e.preventDefault();
+        if (key === 'o') fileInputRef.current?.click();
+        else downloadDoc(doc, analysis.doc);
+        return;
+      }
+      if (!e.ctrlKey && !e.metaKey && (e.key === 'F1' || e.key === 'F11')) {
+        e.preventDefault();
+        if (e.key === 'F1') setHelpTab('pointer');
+        else focus.toggle();
+        return;
+      }
+    }
     const target = e.target as HTMLElement | null;
     if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
     if (e.key === 'Escape' && analysis.pick) {
@@ -1853,7 +1872,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     if (e.key === '?') {
       e.preventDefault();
       if (phone) setModal('more');
-      else setHelpOpen(true);
+      else setHelpTab('keys');
     } else if (e.shiftKey && e.code === 'Digit1') {
       e.preventDefault();
       canvasRef.current?.fit();
@@ -1911,7 +1930,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   };
   const startTour = () => {
     closeWelcome();
-    setHelpOpen(false);
+    setHelpTab(null);
     setModal(null);
     setTour({ step: 0, parts: doc.parts.length, wires: doc.wires.length });
   };
@@ -1952,7 +1971,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           />
         </Suspense>
       )}
-      {helpOpen && <HelpDialog scale={settings.wireScale} onTour={startTour} onClose={() => setHelpOpen(false)} />}
+      {helpTab !== null && <HelpDialog scale={settings.wireScale} initialTab={helpTab} onTour={startTour} onClose={() => setHelpTab(null)} />}
       {tour && !welcomeOpen && (
         <Tour
           step={tour.step}
@@ -2419,8 +2438,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           onExamples={() => setExamplesOpen(true)}
           analysisOpen={analysis.open}
           onAnalysis={() => analysis.setOpen(!analysis.open)}
-          onHelp={() => setHelpOpen(true)}
+          onShortcuts={() => setHelpTab('keys')}
+          onHelp={() => setHelpTab('pointer')}
           onWelcome={() => setWelcomeOpen(true)}
+          view={boardMode ? null : { mode: viewMode, onChange: setViewMode }}
           touch={tablet}
           theme={settings.theme}
           appliedTheme={theme}

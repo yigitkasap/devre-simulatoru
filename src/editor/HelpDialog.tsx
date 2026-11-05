@@ -10,7 +10,7 @@ import { Kbd } from './HintStrip';
 import { Icon } from './icons';
 import { Rich } from './Rich';
 
-type HelpTab = 'keys' | 'pointer' | 'symbols' | 'lab';
+export type HelpTab = 'keys' | 'pointer' | 'symbols' | 'lab';
 const TABS: readonly HelpTab[] = ['keys', 'pointer', 'symbols', 'lab'];
 
 /** "Ctrl+Z" → tuş kutuları; "tekerlek" gibi sözcükler düz yazı. Seçenekler " ya da " ile ayrılır. */
@@ -186,9 +186,10 @@ function LabTab() {
   );
 }
 
-export function HelpDialog({ scale, onTour, onClose }: { scale: WireScale; onTour: () => void; onClose: () => void }) {
+/** Yardım penceresi; `initialTab`: Klavye kısayolları (?) "keys", Yardım (F1) "pointer". */
+export function HelpDialog({ scale, initialTab = 'keys', onTour, onClose }: { scale: WireScale; initialTab?: HelpTab; onTour: () => void; onClose: () => void }) {
   const titleId = useId();
-  const [tab, setTab] = useState<HelpTab>('keys');
+  const [tab, setTab] = useState<HelpTab>(initialTab);
   const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;

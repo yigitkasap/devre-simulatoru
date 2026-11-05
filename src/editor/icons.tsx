@@ -76,7 +76,9 @@ export type IconName =
   | 'flag'
   | 'bulb'
   | 'multimeter'
-  | 'eye';
+  | 'eye'
+  | 'cloudCheck'
+  | 'keyboard';
 
 const PATHS: Record<IconName, ReactNode> = {
   target: (
@@ -212,6 +214,18 @@ const PATHS: Record<IconName, ReactNode> = {
       <rect x="11" y="3" width="6" height="6" rx="1.5" />
       <rect x="3" y="11" width="6" height="6" rx="1.5" />
       <path d="M14 11v6M11 14h6" />
+    </>
+  ),
+  cloudCheck: (
+    <>
+      <path d="M6 15.5h8.3a3.2 3.2 0 0 0 .4-6.4A4.8 4.8 0 0 0 5.4 8.1 3.7 3.7 0 0 0 6 15.5z" />
+      <path d="M7.9 11.4l1.7 1.7 2.9-3.1" />
+    </>
+  ),
+  keyboard: (
+    <>
+      <rect x="2.5" y="5.5" width="15" height="9" rx="1.5" />
+      <path d="M5.5 8.5h.5M8.5 8.5h.5M11.5 8.5h.5M14.5 8.5h.5M6.5 11.5h7" />
     </>
   ),
   book: <path d="M3 4h5a2 2 0 0 1 2 2v11a2 2 0 0 0-2-2H3zM17 4h-5a2 2 0 0 0-2 2v11a2 2 0 0 1 2-2h5z" />,
