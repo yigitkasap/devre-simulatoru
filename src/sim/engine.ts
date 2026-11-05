@@ -37,6 +37,7 @@ import {
   FuseDevice,
   LampDevice,
   LedDevice,
+  LogicIcDevice,
   MotorDevice,
   RelayDevice,
   TransformerDevice,
@@ -191,6 +192,8 @@ export class CircuitSimulator {
   private lteStates: Array<readonly [number, number]> = [];
   /** Kırılma noktası verebilen bileşenler (zamanla değişen kaynaklar). */
   private breakpointDevices: readonly Device[] = [];
+  /** Son gmin gruplamasında iki düğüm aynı iletken grupta mı (lojik entegrenin boştaki girişi için). */
+  private sameGroup: ((a: number, b: number) => boolean) | null = null;
   /** Son adım denemesinin LTE oranı (|LTE|/tolerans; tahmin yapılamadıysa null). */
   private lteRatioLast: number | null = null;
   /** Son adımda bir bileşenin durumu değişti mi (LED yandı, röle çekti): süreksizlik. */
@@ -473,6 +476,15 @@ export class CircuitSimulator {
           elementIds: [device.id],
           netKeys: [],
           params: { temperature: device.burnTemperature, ratedVoltage: device.params.ratedVoltage },
+        });
+      }
+      if (device instanceof LogicIcDevice && device.burned) {
+        result.push({
+          severity: 'warning',
+          code: 'ic-burned',
+          elementIds: [device.id],
+          netKeys: [],
+          params: { supply: device.burnSupply, limit: device.spec.supplyAbsMax },
         });
       }
       if (device instanceof LedDevice && device.burned) {
@@ -1263,6 +1275,8 @@ export class CircuitSimulator {
       const key = this.topologySignature(transient);
       if (key !== this.topologyKey) {
         this.floating = this.floatingNodes(transient);
+        const same = this.sameGroup;
+        if (same) for (const device of this.circuit.devices) device.drivenPins(same);
         this.zeroPins = this.findZeroPins(transient);
         for (const device of this.circuit.devices) device.zeroCurrentPins(this.zeroPins.get(device.id));
         this.topologyKey = key;
@@ -1307,6 +1321,7 @@ export class CircuitSimulator {
       }
     }
     const ground = uf.find(groundIndex);
+    this.sameGroup = (a, b) => uf.find(index(a)) === uf.find(index(b));
     const tied = new Set<number>();
     const result: number[] = [];
     for (let i = 0; i < n; i++) {

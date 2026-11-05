@@ -1,10 +1,9 @@
-// Breadboard ve breadboard'a özgü parçalar: kart gövdesi (delikler, numaralar, raylar), DIP-8 entegre,
+// Breadboard ve breadboard'a özgü parçalar: kart gövdesi (delikler, numaralar, raylar),
 // yatık jumper teli.
 
-import { BoxGeometry, CatmullRomCurve3, CylinderGeometry, Group, Mesh, MeshStandardMaterial, TubeGeometry, Vector3 } from 'three';
+import { BoxGeometry, CatmullRomCurve3, Group, Mesh, MeshStandardMaterial, TubeGeometry, Vector3 } from 'three';
 import { BB, boardWidth, colX, railHoles, railX, railZ, stripRowZ } from './breadboard';
-import { M, canvasTexture, labelPlate, mat, mesh, rod } from './kit';
-import type { PartModel } from './model';
+import { M, canvasTexture, mat, rod } from './kit';
 
 /** Deliğin breadboard yüzeyinden ne kadar içine girilir (bacak ve tel uçları). */
 export const HOLE_DEPTH = 0.5;
@@ -87,29 +86,6 @@ export function breadboardMesh(cols: number): Mesh {
   board.position.y = BB.height / 2;
   board.userData.ownsMaterial = true;
   return board;
-}
-
-/** DIP-8 entegre: gövde orta kanalın üstünde, bacaklar e ve f satırlarındaki deliklere (yerel). */
-export function dipChipModel(type: 'opamp' | 'timer555', anchors: readonly Vector3[], extra: readonly Vector3[]): PartModel {
-  const root = new Group();
-  const all = [...anchors, ...extra];
-  const xs = all.map((a) => a.x);
-  const length = Math.max(...xs) - Math.min(...xs) + 0.9;
-  const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
-  const body = mesh(new BoxGeometry(length, 1.25, 2.3), mat('#17181b', 0.5), cx, 1.15, 0);
-  root.add(body);
-  const notch = mesh(new CylinderGeometry(0.3, 0.3, 0.05, 14), mat('#2a2c30', 0.6), cx - length / 2 + 0.45, 1.79, 0);
-  root.add(notch);
-  const label = labelPlate(type === 'opamp' ? 'LM741' : 'NE555', length * 0.8, 0.9, { fg: '#c6cad0' });
-  label.position.set(cx + 0.2, 1.78, 0.2);
-  root.add(label);
-  for (const a of all) {
-    const side = Math.sign(a.z) || 1;
-    const shoulder = new Vector3(a.x, 0.95, side * 1.15);
-    const knee = new Vector3(a.x, 0.95, a.z);
-    root.add(rod(shoulder, knee, 0.09, M.tin(), 6), rod(knee, a, 0.09, M.tin(), 6));
-  }
-  return { root, anchors };
 }
 
 /** Breadboard üstünde iki delik arasında yatık jumper teli (uçları soyuk). */

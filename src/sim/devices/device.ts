@@ -105,6 +105,21 @@ export interface DeviceStatus {
   readonly opto?: { readonly led: number; readonly ledVoltage: number; readonly output: number; readonly vce: number; readonly ctr: number; readonly saturated: boolean };
   /** Tristör: iletimde mi; kapı akımı ve kapı–katot gerilimi. */
   readonly scr?: { readonly on: boolean; readonly gate: number; readonly gateVoltage: number };
+  /**
+   * Lojik entegre: aile, model, besleniyor mu, besleme gerilimi; bacakların durumu ve mantık seviyesi;
+   * flip-flopun Q'su, sayacın değeri, kod çözücünün gösterdiği rakam (null: karartılmış).
+   */
+  readonly logic?: {
+    readonly family: string;
+    readonly model: string;
+    readonly powered: boolean;
+    readonly supply: number;
+    readonly pins: readonly LogicPinStatus[];
+    readonly levels: readonly (number | null)[];
+    readonly q?: readonly number[];
+    readonly count?: number;
+    readonly digit?: number | null;
+  };
   /** Basmalı düğme: basılı tutuluyor mu? */
   readonly pressed?: boolean;
   /** Röle: palet çekili mi (NA kontağı kapalı)? */
@@ -174,8 +189,31 @@ export interface DeviceStatus {
 }
 
 /** Gerçek parçanın sınırı aşıldı (Fizik 5): uyarı kodu ve ayrıntıları (gerilim, güç, sınır). */
+/** Lojik entegre bacağının kartta gösterilen durumu: 1, 0, belirsiz (V_IL–V_IH arası), boşta, besleme, sürülmeyen çıkış. */
+export type PinState = 'high' | 'low' | 'undefined' | 'floating' | 'supply' | 'off';
+
+export interface LogicPinStatus {
+  readonly state: PinState;
+  /** GND bacağına göre gerilim (V). */
+  readonly voltage: number;
+  /** Çıkış mı? */
+  readonly output: boolean;
+}
+
 export interface RatingWarning {
-  readonly code: Extract<DiagnosticCode, 'reverse-voltage' | 'resistor-overpower' | 'capacitor-reverse' | 'motor-overload' | 'pin-overcurrent' | 'regulator-dropout'>;
+  readonly code: Extract<
+    DiagnosticCode,
+    | 'reverse-voltage'
+    | 'resistor-overpower'
+    | 'capacitor-reverse'
+    | 'motor-overload'
+    | 'pin-overcurrent'
+    | 'regulator-dropout'
+    | 'logic-unpowered'
+    | 'logic-supply-range'
+    | 'logic-input-floating'
+    | 'logic-input-undefined'
+  >;
   readonly params: Readonly<Record<string, number>>;
 }
 
@@ -323,6 +361,13 @@ export abstract class Device {
    * çıkışın (ör. fonksiyon üretecinin TTL'si) kenarları kırılma noktası sayılmasın diye.
    */
   connectPins(_connected: readonly boolean[]): void {}
+
+  /**
+   * Topoloji değişince: `same(a, b)` iki düğümün bileşenler üzerinden aynı iletken grupta olup
+   * olmadığını söyler (motorun gmin gruplaması). Lojik entegre, hiçbir şeyin sürmediği (beslemeye
+   * yolu olmayan) CMOS girişini bununla bulur.
+   */
+  drivenPins(_same: (a: number, b: number) => boolean): void {}
 
   /**
    * İletken yollar: bu bileşenin içinden akımın akabildiği düğüm grupları (pinler ve iç düğümler;

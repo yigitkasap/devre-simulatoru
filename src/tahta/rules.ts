@@ -10,7 +10,7 @@
 //     sütun yanda).
 //   - Bir delikte tek bacak ya da tek kablo ucu: dolu deliğe takılmaz.
 
-import { DIP4_PINS, DIP_PINS, LEG_ORDER, holeXZ, mountOf, planSpan, type Hole, type Mount } from '../bench3d/breadboard';
+import { LEG_ORDER, dipLegHole, dipPins, dipShape, holeXZ, mountOf, planSpan, type Hole, type Mount } from '../bench3d/breadboard';
 import { allHoles, holeLabel, parseHole } from '../bench3d/holes';
 import { occupiedHoles, type Build, type BuildPart } from '../model/build';
 import { CATALOG } from '../model/catalog';
@@ -93,17 +93,21 @@ export function fixedHoles(type: DeviceType, at: Hole, orientation: Orientation,
       order.forEach((pin, k) => (holes[pin] = strip(at.col + k, at.row)));
       return done(holes);
     }
+    case 'dip4':
     case 'dip8':
-    case 'dip4': {
-      // Orta kanalın üstünde: alt sıra f (5), üst sıra e (4). 1. bacak sol altta (180°'de sağ üstte).
-      const half = mount === 'dip4' ? 2 : 4;
-      const map = (mount === 'dip4' ? DIP4_PINS : DIP_PINS)[type]!;
+    case 'dip14':
+    case 'dip16':
+    case 'seg10': {
+      // Orta kanalın üstünde: DIP'te alt sıra f (5), üst sıra e (4); 7 segment göstergede h ve d.
+      // 1. bacak sol altta (180°'de sağ üstte).
+      const shape = dipShape(mount)!;
+      const map = dipPins(type);
       const legOf = (dip: number): Hole | null => {
-        const normal = dip <= half ? { col: at.col + dip - 1, row: 5 } : { col: at.col + 2 * half - dip, row: 4 };
-        return orientation === 0 ? strip(normal.col, normal.row) : strip(2 * at.col + half - 1 - normal.col, normal.row === 5 ? 4 : 5);
+        const h = dipLegHole(shape, at.col, dip, orientation !== 0);
+        return strip(h.col, h.row);
       };
       const extra: Array<Hole | null> = [];
-      for (let dip = 1; dip <= 2 * half; dip++) if (!map.includes(dip)) extra.push(legOf(dip));
+      for (let dip = 1; dip <= 2 * shape.half; dip++) if (!map.includes(dip)) extra.push(legOf(dip));
       return done(
         map.map((dip) => legOf(dip)),
         extra,
@@ -197,7 +201,7 @@ export function movePlaced(build: Build, type: DeviceType, partId: string, dc: n
   if ([...holes, ...extra].some((h) => h === null)) return { ok: false, reason: 'board' };
   // DIP ve düğme kanala göre sabit satırlarda kalır.
   const mount = mountOf(type);
-  if ((mount === 'dip8' || mount === 'dip4' || mount === 'button') && dr !== 0) return { ok: false, reason: 'board' };
+  if ((dipShape(mount) || mount === 'button') && dr !== 0) return { ok: false, reason: 'board' };
   return placePart(build, type, partId, { holes: holes as Hole[], extra: extra as Hole[] });
 }
 

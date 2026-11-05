@@ -315,6 +315,11 @@ export function useSimulation(
         live.set(part.id, { energized: status.energized ?? false, field: current });
       } else if (part.type === 'timer555') {
         live.set(part.id, { high: status.timer?.high ?? false });
+      } else if (status.logic) {
+        const l = status.logic;
+        live.set(part.id, {
+          levels: l.levels,
+        });
       } else if (part.type === 'arduino') {
         live.set(part.id, { ledL: status.arduino?.ledL ?? false, ledTx: status.arduino?.ledTx ?? false });
       } else if (part.type === 'speaker') {

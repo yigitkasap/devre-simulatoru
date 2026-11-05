@@ -16,6 +16,7 @@
 //     şeridi paylaşır (direnç → LED zinciri jumper'sız olur).
 //   - Bir şeride en çok 3 bacak ya da kablo takılır; 2 delik şeritleri birleştiren jumper'lara kalır.
 
+import { CATALOG } from '../model/catalog';
 import { buildConnectivity, pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import type { DeviceType } from '../sim/netlist';
@@ -59,7 +60,35 @@ export function holeXZ(h: Hole, cols: number): { x: number; z: number } {
     : { x: railX(h.k, cols), z: boardZ(h.board) + railZ(h.rail) };
 }
 
-export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip8' | 'dip4' | 'button' | 'inline';
+export type Mount = 'axial' | 'radial' | 'to92' | 'pot' | 'dip4' | 'dip8' | 'dip14' | 'dip16' | 'seg10' | 'button' | 'inline';
+
+/**
+ * Orta kanalın üstüne oturan DIP kılıflar: bir sıradaki bacak sayısı ve bacakların satırları (üst
+ * sıra, alt sıra; 0 = a … 9 = j). 1. bacak alt sıranın en solunda, numaralar alt sırada soldan sağa,
+ * üst sırada sağdan sola artar. DIP'lerde sıralar e ve f (7,62 mm); 0,56" 7 segment göstergede
+ * sıralar arası 15,24 mm (6 delik): d ve h.
+ */
+const DIP_SHAPES: Partial<Record<Mount, { readonly half: number; readonly top: number; readonly bottom: number }>> = {
+  dip4: { half: 2, top: 4, bottom: 5 },
+  dip8: { half: 4, top: 4, bottom: 5 },
+  dip14: { half: 7, top: 4, bottom: 5 },
+  dip16: { half: 8, top: 4, bottom: 5 },
+  seg10: { half: 5, top: 3, bottom: 7 },
+};
+
+/** DIP kılıfın biçimi (bir sıradaki bacak sayısı, satırlar); DIP olmayan takılışta null. */
+export function dipShape(mount: Mount | undefined): { readonly half: number; readonly top: number; readonly bottom: number } | null {
+  return (mount && DIP_SHAPES[mount]) ?? null;
+}
+
+/**
+ * DIP bacağının deliği: `start` 1. bacağın sütunu; `flipped` 180° döndürülmüş (1. bacak üst sıranın
+ * en sağında).
+ */
+export function dipLegHole(shape: { readonly half: number; readonly top: number; readonly bottom: number }, start: number, leg: number, flipped = false): { col: number; row: number } {
+  const normal = leg <= shape.half ? { col: start + leg - 1, row: shape.bottom } : { col: start + 2 * shape.half - leg, row: shape.top };
+  return flipped ? { col: 2 * start + shape.half - 1 - normal.col, row: normal.row === shape.bottom ? shape.top : shape.bottom } : normal;
+}
 
 export interface BoardPart {
   readonly partId: string;
@@ -143,6 +172,12 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   opamp: { mount: 'dip8' },
   opto: { mount: 'dip4' },
   timer555: { mount: 'dip8' },
+  ic7400: { mount: 'dip14' },
+  ic7402: { mount: 'dip14' },
+  ic7404: { mount: 'dip14' },
+  ic7408: { mount: 'dip14' },
+  ic7432: { mount: 'dip14' },
+  ic7486: { mount: 'dip14' },
 };
 
 /**
@@ -157,16 +192,17 @@ export const LEG_ORDER: Partial<Record<DeviceType, readonly number[]>> = {
   scr: [1, 2, 0], // TO-92 MCR100: K, G, A
 };
 
-/** DIP-8: parça pin sırası → entegre bacak numarası (1–8). */
+/** DIP: parça pin sırası → kılıfın bacak numarası. Yoksa pin sırası bacak sırasıdır (1, 2, …). */
 export const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = {
   opamp: [2, 3, 6, 7, 4], // LM741: −, +, OUT, V+, V− (1, 5, 8 boş)
   timer555: [1, 2, 3, 4, 5, 6, 7, 8],
+  opto: [1, 2, 4, 3], // PC817: 1 A, 2 K, 3 E, 4 C (Sharp iç bağlantı şeması)
 };
 
-/** DIP-4: parça pin sırası → bacak numarası (PC817: 1 A, 2 K, 3 E, 4 C; Sharp iç bağlantı şeması). */
-export const DIP4_PINS: Partial<Record<DeviceType, readonly number[]>> = {
-  opto: [1, 2, 4, 3],
-};
+/** DIP parçanın pinlerinin bacak numaraları (pin sırasıyla). */
+export function dipPins(type: DeviceType): readonly number[] {
+  return DIP_PINS[type] ?? Array.from({ length: CATALOG[type].pins.length }, (_, i) => i + 1);
+}
 
 /** Masadaki parçaların yeri: sol sütun, arka sıra (cihazlar), ön sıra. */
 type Side = 'left' | 'back' | 'front';
@@ -380,9 +416,10 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
   for (const part of ordered) {
     const spec = MOUNTS[part.type];
     if (!spec) continue;
-    if (spec.mount === 'dip8' || spec.mount === 'dip4') {
-      // Orta kanalın üstünde: iki yarının aynı dört (DIP-4'te iki) sütunu.
-      const half = spec.mount === 'dip4' ? 2 : 4;
+    const shape = dipShape(spec.mount);
+    if (shape) {
+      // Orta kanalın üstünde: iki yarının aynı `half` sütunu.
+      const half = shape.half;
       let board = 0;
       let start = 0;
       for (; ; board++) {
@@ -392,9 +429,11 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
         if (start + half - 1 <= cols - 1) break;
       }
       const [top, bottom] = slotsOf(board);
-      const map = (spec.mount === 'dip4' ? DIP4_PINS : DIP_PINS)[part.type]!;
-      const legOf = (dip: number): { half: 0 | 1; col: number; row: number } =>
-        dip <= half ? { half: 1, col: start + dip - 1, row: 5 } : { half: 0, col: start + 2 * half - dip, row: 4 };
+      const map = dipPins(part.type);
+      const legOf = (dip: number): { half: 0 | 1; col: number; row: number } => {
+        const at = dipLegHole(shape, start, dip);
+        return { ...at, half: at.row >= 5 ? 1 : 0 };
+      };
       const holes = map.map((dip, i) => {
         const at = legOf(dip);
         const s = takeStrip(board, at.half, at.col, net(part, i));

@@ -1,0 +1,213 @@
+// Dalga 2: lojik entegreler ve 7 segment gösterge. Doğruluk tabloları (74HC ve 74LS), eşiklerin ve
+// çıkış gerilimlerinin veri sayfasıyla karşılaştırılması (yük altında V_OH / V_OL), boştaki giriş,
+// beslemesiz entegre, yanma, gecikme, flip-flop, sayıcı, kod çözücü ve göstergenin aşırı akımda yanması.
+
+import { describe, expect, it } from 'vitest';
+import { GATE_CHIPS, GATE_CHIP_TYPES, LOGIC_CHIPS, gateModels, gateOutput, type LogicChipType } from '../src/model/logicChips';
+import { CircuitSimulator } from '../src/sim';
+import { circuit } from './helpers';
+
+type Builder = ReturnType<typeof circuit>;
+
+/** Entegrenin düğümleri: verilen bacaklar adlandırılmış düğümlerde, öbürleri kendi (boş) düğümünde. */
+function pins(type: LogicChipType, given: Record<number, string>): string[] {
+  return Array.from({ length: LOGIC_CHIPS[type].names.length }, (_, i) => given[i + 1] ?? `u${i + 1}`);
+}
+
+/** Beslemeli devre: VCC düğümü `vcc`, toprak `gnd`. */
+function powered(vcc = 5): Builder {
+  return circuit().battery('B1', 'vcc', 'gnd', vcc, 0).ground('G1', 'gnd');
+}
+
+function run(c: Builder, time = 2e-6): CircuitSimulator {
+  const sim = new CircuitSimulator(c.build());
+  sim.advance(time);
+  return sim;
+}
+
+const codes = (sim: CircuitSimulator) => sim.runtimeDiagnostics.map((d) => d.code);
+
+describe('Kapı entegreleri: doğruluk tablosu (74HC ve 74LS)', () => {
+  for (const type of GATE_CHIP_TYPES) {
+    for (const model of gateModels(type)) {
+      it(`${model}: her kapı, her giriş birleşimi`, () => {
+        const chip = GATE_CHIPS[type];
+        const n = chip.gates[0]!.inputs.length;
+        for (let combo = 0; combo < 2 ** n; combo++) {
+          const ins = Array.from({ length: n }, (_, k) => (combo >> (n - 1 - k)) & 1);
+          const given: Record<number, string> = { 7: 'gnd', 14: 'vcc' };
+          for (const g of chip.gates) g.inputs.forEach((p, k) => (given[p] = ins[k] ? 'vcc' : 'gnd'));
+          const sim = run(powered().add(type, 'U1', pins(type, given), { model }));
+          const l = sim.status('U1').logic!;
+          for (const g of chip.gates) expect(l.levels[g.output - 1], `${model} ${ins.join('')} → ${g.output}. bacak`).toBe(gateOutput(chip.kind, ins));
+        }
+      });
+    }
+  }
+});
+
+describe('Eşikler ve çıkış gerilimleri (veri sayfası)', () => {
+  /** 7404'ün 1A girişi `vin`'de; 1Y'nin okuduğu seviye ve kartın durumu. */
+  const inverter = (model: string, vcc: number, vin: number) => {
+    const sim = run(powered(vcc).battery('BI', 'in', 'gnd', vin, 0).add('ic7404', 'U1', pins('ic7404', { 1: 'in', 2: 'y', 7: 'gnd', 14: 'vcc' }), { model }).resistor('RL', 'y', 'gnd', 1e6));
+    const l = sim.status('U1').logic!;
+    return { level: l.levels[0], state: l.pins[0]!.state, sim };
+  };
+
+  it('74HC (4,5 V): V_IL 1,35 V → 0, V_IH 3,15 V → 1, arası belirsiz ve uyarılı', () => {
+    expect(inverter('74HC04', 4.5, 1.35)).toMatchObject({ level: 0, state: 'low' });
+    expect(inverter('74HC04', 4.5, 3.15)).toMatchObject({ level: 1, state: 'high' });
+    const mid = inverter('74HC04', 4.5, 2.4);
+    expect(mid.state).toBe('undefined');
+    const w = mid.sim.runtimeDiagnostics.find((d) => d.code === 'logic-input-undefined');
+    expect(w?.params).toMatchObject({ pin: 1, vil: 1.35, vih: 3.15 });
+  });
+
+  it('74HC (2 V ve 6 V): eşikler tablodaki noktalarda (0,5 / 1,5 V ve 1,8 / 4,2 V)', () => {
+    expect(inverter('74HC04', 2, 0.5).state).toBe('low');
+    expect(inverter('74HC04', 2, 1.5).state).toBe('high');
+    expect(inverter('74HC04', 6, 1.8).state).toBe('low');
+    expect(inverter('74HC04', 6, 4.2).state).toBe('high');
+  });
+
+  it('74LS (5 V): V_IL 0,8 V → 0, V_IH 2 V → 1', () => {
+    expect(inverter('74LS04', 5, 0.8)).toMatchObject({ level: 0, state: 'low' });
+    expect(inverter('74LS04', 5, 2)).toMatchObject({ level: 1, state: 'high' });
+    expect(inverter('74LS04', 5, 1.4).state).toBe('undefined');
+  });
+
+  /** 7408'in 1Y'si (1) yük direnciyle toprağa, 2Y'si (0) çekme direnciyle VCC'ye. */
+  const loaded = (model: string, vcc: number, rHigh: number, rLow: number) => {
+    const sim = run(
+      powered(vcc)
+        .add('ic7408', 'U1', pins('ic7408', { 1: 'vcc', 2: 'vcc', 3: 'y', 4: 'gnd', 5: 'gnd', 6: 'z', 7: 'gnd', 14: 'vcc' }), { model })
+        .resistor('RH', 'y', 'gnd', rHigh)
+        .resistor('RZ', 'vcc', 'z', rLow),
+    );
+    const l = sim.status('U1').logic!;
+    return { voh: l.pins[2]!.voltage, vol: l.pins[5]!.voltage, sim };
+  };
+
+  it('74HC08 (4,5 V): I_OH −4 mA’de V_OH 4,3 V, I_OL 4 mA’de V_OL 0,17 V (tipik)', () => {
+    const { voh, vol } = loaded('74HC08', 4.5, 4.3 / 4e-3, (4.5 - 0.17) / 4e-3);
+    expect(voh).toBeCloseTo(4.3, 3);
+    expect(vol).toBeCloseTo(0.17, 3);
+  });
+
+  it('74HC08 (6 V): I_OH −5,2 mA’de 5,8 V, I_OL 5,2 mA’de 0,15 V (tipik)', () => {
+    const { voh, vol } = loaded('74HC08', 6, 5.8 / 5.2e-3, (6 - 0.15) / 5.2e-3);
+    expect(voh).toBeCloseTo(5.8, 3);
+    expect(vol).toBeCloseTo(0.15, 3);
+  });
+
+  it('74LS08 (4,75 V): I_OH −0,4 mA’de 3,4 V, I_OL 4 mA’de 0,25 V (tipik)', () => {
+    const { voh, vol } = loaded('74LS08', 4.75, 3.4 / 0.4e-3, (4.75 - 0.25) / 4e-3);
+    expect(voh).toBeCloseTo(3.4, 3);
+    expect(vol).toBeCloseTo(0.25, 3);
+  });
+
+  it('kısa devre ve aşırı yük: 74HC08’in 1 çıkışı 10 Ω’la toprağa: gerilim düşer, 25 mA aşılınca uyarı', () => {
+    const { voh, sim } = loaded('74HC08', 5, 10, 1e6);
+    expect(voh).toBeLessThan(1);
+    const w = sim.runtimeDiagnostics.find((d) => d.code === 'pin-overcurrent');
+    expect(w?.params?.pin).toBe(3);
+    expect(w?.params?.current).toBeGreaterThan(25e-3);
+    // 74LS: kısa devre akımı I_OS aralığının ortasında (−60 mA, V_CC = 5,25 V).
+    const ls = loaded('74LS08', 5.25, 1e-3, 1e6);
+    expect(ls.voh / 1e-3).toBeCloseTo(60e-3, 3);
+  });
+
+});
+
+describe('Boştaki giriş ve besleme', () => {
+  it('74HC: bağlı olmayan ya da sürülmeyen (açık anahtar) giriş: "CMOS giriş boşta" uyarısı; 0 V sayılır', () => {
+    const open = run(
+      powered()
+        .add('switch', 'S1', ['vcc', 'a'], { closed: false })
+        .add('ic7408', 'U1', pins('ic7408', { 1: 'a', 2: 'vcc', 3: 'y', 4: 'gnd', 5: 'gnd', 7: 'gnd', 9: 'gnd', 10: 'gnd', 12: 'gnd', 13: 'gnd', 14: 'vcc' }), { model: '74HC08' })
+        .resistor('RL', 'y', 'gnd', 1e5),
+    );
+    const l = open.status('U1').logic!;
+    expect(l.pins[0]!.state).toBe('floating');
+    expect(l.levels[2]).toBe(0);
+    expect(open.runtimeDiagnostics.filter((d) => d.code === 'logic-input-floating').map((d) => d.params?.pin)).toEqual([1]);
+    // 10 kΩ aşağı çekme direnciyle uyarı kalkar.
+    const pulled = run(
+      powered()
+        .add('switch', 'S1', ['vcc', 'a'], { closed: false })
+        .resistor('RP', 'a', 'gnd', 10e3)
+        .add('ic7408', 'U1', pins('ic7408', { 1: 'a', 2: 'vcc', 3: 'y', 4: 'gnd', 5: 'gnd', 7: 'gnd', 9: 'gnd', 10: 'gnd', 12: 'gnd', 13: 'gnd', 14: 'vcc' }), { model: '74HC08' })
+        .resistor('RL', 'y', 'gnd', 1e5),
+    );
+    expect(codes(pulled)).not.toContain('logic-input-floating');
+    expect(pulled.status('U1').logic!.pins[0]!.state).toBe('low');
+  });
+
+  it('74LS: boştaki giriş ≈ 2,59 V’ta kalır ve 1 okunur (uyarı yok); I_IL −0,4 mA', () => {
+    const sim = run(powered().add('ic7408', 'U1', pins('ic7408', { 2: 'vcc', 3: 'y', 4: 'gnd', 5: 'gnd', 7: 'gnd', 9: 'gnd', 10: 'gnd', 12: 'gnd', 13: 'gnd', 14: 'vcc' }), { model: '74LS08' }).resistor('RL', 'y', 'gnd', 1e5));
+    const l = sim.status('U1').logic!;
+    expect(l.pins[0]!.voltage).toBeCloseTo(2.59, 2);
+    expect(l.levels[0]).toBe(1);
+    expect(l.levels[2]).toBe(1);
+    expect(codes(sim)).not.toContain('logic-input-floating');
+    // 0,4 V'taki girişin verdiği akım: −0,4 mA.
+    const low = run(powered().battery('BI', 'i', 'gnd', 0.4, 0).add('ic7408', 'U1', pins('ic7408', { 1: 'i', 2: 'vcc', 7: 'gnd', 14: 'vcc' }), { model: '74LS08' }));
+    expect(low.measure('BI')!.current).toBeCloseTo(0.4e-3, 6);
+  });
+
+  it('beslemesiz entegre: çıkışlar sürülmez, "entegre beslenmiyor" uyarısı', () => {
+    const sim = run(powered().add('ic7408', 'U1', pins('ic7408', { 1: 'vcc', 2: 'vcc', 3: 'y', 7: 'gnd' }), { model: '74HC08' }).resistor('RL', 'y', 'gnd', 1e4));
+    const l = sim.status('U1').logic!;
+    expect(l.powered).toBe(false);
+    expect(l.pins[2]!.state).toBe('off');
+    expect(l.pins[2]!.voltage).toBeCloseTo(0, 6);
+    expect(codes(sim)).toContain('logic-unpowered');
+  });
+
+  it('besleme aralığı: 74LS 5,5 V’ta uyarı; 74HC 7 V’u (mutlak en büyük) aşınca yanar', () => {
+    expect(codes(run(powered(5.5).add('ic7408', 'U1', pins('ic7408', { 7: 'gnd', 14: 'vcc' }), { model: '74LS08' })))).toContain('logic-supply-range');
+    const burned = run(powered(8).add('ic7408', 'U1', pins('ic7408', { 1: 'vcc', 2: 'vcc', 3: 'y', 7: 'gnd', 14: 'vcc' }), { model: '74HC08' }).resistor('RL', 'y', 'gnd', 1e4));
+    expect(burned.status('U1').burned).toBe(true);
+    expect(burned.status('U1').logic!.powered).toBe(false);
+    const d = burned.runtimeDiagnostics.find((x) => x.code === 'ic-burned');
+    expect(d?.params).toMatchObject({ supply: 8, limit: 7 });
+  });
+});
+
+describe('Yayılma gecikmesi', () => {
+  /** 7404'ün girişine 1 MHz kare dalga; girişin eşiği geçmesiyle çıkışın değişmesi arasındaki süre. */
+  const delay = (model: string, vcc: number) => {
+    const sim = new CircuitSimulator(
+      powered(vcc)
+        .add('acsource', 'S1', ['in', 'gnd'], { waveform: 'square', frequency: 1e6, amplitude: vcc / 2, offset: vcc / 2, internalResistance: 0 })
+        .add('ic7404', 'U1', pins('ic7404', { 1: 'in', 2: 'y', 7: 'gnd', 14: 'vcc' }), { model })
+        .resistor('RL', 'y', 'gnd', 1e6)
+        .build(),
+    );
+    const edges: Array<{ t: number; input: number | null; output: number | null }> = [];
+    let prev: { input: number | null; output: number | null } | null = null;
+    for (let k = 0; k < 3000; k++) {
+      sim.advance(1e-9);
+      const l = sim.status('U1').logic!;
+      const now = { input: l.levels[0]!, output: l.levels[1]! };
+      if (prev && (now.input !== prev.input || now.output !== prev.output)) edges.push({ t: sim.time, ...now });
+      prev = now;
+    }
+    // İlk düşen giriş kenarından sonra çıkışın yükselmesi (t_PLH) ve ilk yükselen kenardan sonra düşmesi (t_PHL).
+    const fall = edges.find((e) => e.input === 0)!;
+    const rise = edges.find((e) => e.t > fall.t && e.output === 1)!;
+    const up = edges.find((e) => e.t > rise.t && e.input === 1)!;
+    const down = edges.find((e) => e.t > up.t && e.output === 0)!;
+    return { lh: rise.t - fall.t, hl: down.t - up.t };
+  };
+
+  it('74HC04 (4,5 V): t_pd 9 ns; 74LS04: t_PLH 9 ns, t_PHL 10 ns (1 ns çözünürlükle)', () => {
+    const hc = delay('74HC04', 4.5);
+    expect(hc.lh).toBeCloseTo(9e-9, 8.7);
+    expect(hc.hl).toBeCloseTo(9e-9, 8.7);
+    const ls = delay('74LS04', 5);
+    expect(ls.lh).toBeCloseTo(9e-9, 8.7);
+    expect(ls.hl).toBeCloseTo(10e-9, 8.7);
+  });
+});
+

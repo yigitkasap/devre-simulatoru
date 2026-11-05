@@ -27,6 +27,8 @@ import { formatEditable, formatSI } from '../sim/units';
 import { useThrottledText } from './a11y';
 import { ArduinoCardBody } from './ArduinoPanel';
 import { MultimeterCardBody } from './MultimeterCard';
+import { LogicDetails } from './LogicCard';
+import { isLogicChip } from '../model/logicChips';
 import { spdtThrow } from '../sim/devices/spdt';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
 import { ExampleDetails, ExtraTag, groupOf, labBadge } from './ExampleTab';
@@ -147,13 +149,6 @@ export function cardReading(part: Part, frame: SimFrame | null): { main: string;
   if (part.type === 'pushbutton') return null;
   // Regülatör: çıkış gerilimi (satırlar giriş, çıkış, akım…).
   if ((part.type === 'reg7805' || part.type === 'lm317') && rows[1]) return { main: rows[1].value };
-  if (part.type === 'dcsupply') {
-    // Güç kaynağı: akım veren çıkışlar (ikisi de boştaysa 1. çıkış); satırlar çıkış sırasında.
-    const outputs = frame.statuses.get(part.id)?.outputs ?? [];
-    const used = outputs.flatMap((o, k) => (Math.abs(o.current) > 1e-9 && rows[k] ? [k] : []));
-    const [first = 0, second] = used;
-    return { main: rows[first]!.value, ...(second !== undefined ? { second: rows[second]!.value } : {}) };
-  }
   if (SOURCES.has(part.type) && rows[1]) return { main: rows[1].value };
   return { main: rows[0]!.value };
 }
@@ -819,6 +814,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
             )}
             <PrimaryControl {...props} values={values} locked={locked} />
             {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
+            {isLogicChip(part.type) && <LogicDetails part={part} frame={frame} />}
             <LiveTiles
               part={part}
               frame={frame}

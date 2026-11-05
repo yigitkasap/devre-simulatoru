@@ -12,9 +12,42 @@ import { SITE_NAME } from '../config';
 import type { Diagnostic } from '../sim/diagnostics';
 import type { ExampleFolderId, ExampleGroupId, ExampleId } from '../examples';
 import type { FaultScenarioId } from '../examples/faultScenarios';
+import { LOGIC_CHIPS, chipPinLabel, type LogicChipType } from '../model/logicChips';
 import type { DeviceType } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
 import { ek, toDative } from './ek';
+
+/** 74HC kapılarının veri sayfası ve 4,5 V'taki tipik t_pd'si; 74LS'lerin veri sayfası ve t_PLH / t_PHL'si. */
+const HC_DOCS: Record<string, readonly [string, string]> = {
+  '00': ['SCLS181H', '9'],
+  '02': ['SCLS076G', '9'],
+  '04': ['SCLS078H', '9'],
+  '08': ['SCLS081J', '10'],
+  '32': ['SCLS200F', '10'],
+  '86': ['SCLS100F', '12'],
+};
+const LS_DOCS: Record<string, readonly [string, string, string]> = {
+  '00': ['SN74LS00', 'SDLS025D', '9 / 10'],
+  '02': ['SN74LS02', 'SDLS027', '10 / 10'],
+  '04': ['SN74LS04', 'SDLS029C', '9 / 10'],
+  '08': ['SN74LS08', 'SDLS033', '8 / 10'],
+  '32': ['SN74LS32', 'SDLS100', '14 / 14'],
+  '86A': ['SN74LS86A', 'SDLS124', '12 / 10 (öbür giriş 1 iken 20 / 13)'],
+};
+const HC_COMMON =
+  'CMOS, 2–6 V (mutlak en çok 7 V). Eşikler beslemeyle değişir: 4,5 V’ta 1 için en az 3,15 V, 0 için en çok 1,35 V. Çıkış 4,5 V’ta 4 mA’de tipik 4,3 V / 0,17 V; ' +
+  'çıkış başına en çok 25 mA. Girişler akım çekmez: boşta bırakılan giriş belirsizdir.';
+const LS_COMMON =
+  'TTL, 4,75–5,25 V (mutlak en çok 7 V). Girişte 1 için en az 2 V, 0 için en çok 0,8 V. 0’a çekilen giriş 0,4 mA verir: boştaki giriş ≈ 2,6 V’ta kalır ve 1 okunur. ' +
+  'Çıkış 1’de 0,4 mA’de tipik 3,4 V, 0’da 4 mA’de 0,25 V; kısa devre akımı 20–100 mA.';
+const LOGIC_MODEL_NOTES: Record<string, string> = {
+  ...Object.fromEntries(
+    Object.entries(HC_DOCS).map(([n, [doc, tpd]]) => [`74HC${n}`, `74HC${n} (TI SN74HC${n}, ${doc}): ${HC_COMMON} Yayılma gecikmesi 4,5 V’ta tipik ${tpd} ns.`]),
+  ),
+  ...Object.fromEntries(
+    Object.entries(LS_DOCS).map(([n, [name, doc, tpd]]) => [`74LS${n}`, `74LS${n} (TI ${name}, ${doc}): ${LS_COMMON} Gecikme t_{PLH} / t_{PHL} tipik ${tpd} ns.`]),
+  ),
+};
 
 export interface DiagnosticContext {
   /** Bileşenin tuvaldeki adı (R1, B2...). */
@@ -69,6 +102,12 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   lm317: 'Ayarlı regülatör',
   opto: 'Optokuplör',
   scr: 'Tristör',
+  ic7400: '4 × NAND kapısı',
+  ic7402: '4 × NOR kapısı',
+  ic7404: '6 × DEĞİL kapısı',
+  ic7408: '4 × VE kapısı',
+  ic7432: '4 × VEYA kapısı',
+  ic7486: '4 × ÖZEL VEYA kapısı',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -118,6 +157,12 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   lm317: 'ayarlı regülatörünün',
   opto: 'optokuplörünün',
   scr: 'tristörünün',
+  ic7400: 'NAND entegresinin',
+  ic7402: 'NOR entegresinin',
+  ic7404: 'DEĞİL entegresinin',
+  ic7408: 'VE entegresinin',
+  ic7432: 'VEYA entegresinin',
+  ic7486: 'ÖZEL VEYA entegresinin',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -166,6 +211,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   lm317: ['giriş ucu (IN)', 'ayar ucu (ADJ)', 'çıkış ucu (OUT)'],
   opto: ['LED anodu (A)', 'LED katodu (K)', 'kollektör ucu (C)', 'emiter ucu (E)'],
   scr: ['anot (A)', 'katot (K)', 'kapı (G)'],
+  ...logicPinNames(),
 };
 
 /** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
@@ -215,6 +261,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   lm317: ['IN', 'ADJ', 'OUT'],
   opto: ['A', 'K', 'C', 'E'],
   scr: ['A', 'K', 'G'],
+  ...logicPinTags(),
 };
 
 /** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
@@ -264,7 +311,34 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   lm317: ['IN', 'ADJ', 'OUT'],
   opto: ['A', 'K', 'C', 'E'],
   scr: ['A', 'K', 'G'],
+  ...logicPinTags(),
 };
+
+/** Lojik entegrenin bacak adları: "1A girişi (1. bacak)", "1Y çıkışı (3. bacak)", "VCC besleme ucu (14. bacak)". */
+function logicPinNames(): Record<LogicChipType, readonly string[]> {
+  return Object.fromEntries(
+    (Object.keys(LOGIC_CHIPS) as LogicChipType[]).map((type) => {
+      const c = LOGIC_CHIPS[type];
+      return [
+        type,
+        c.names.map((_, i) => {
+          const pin = i + 1;
+          const name = chipPinLabel(type, pin);
+          if (pin === c.vcc || pin === c.gnd) return `${name} besleme ucu (${pin}. bacak)`;
+          return `${name} ${c.outputs.includes(pin) ? 'çıkışı' : 'girişi'} (${pin}. bacak)`;
+        }),
+      ];
+    }),
+  ) as unknown as Record<LogicChipType, readonly string[]>;
+}
+
+/** Lojik entegrenin bacaklarının kısa adları (veri sayfasındaki ad, etkin düşükse üstü çizgili). */
+function logicPinTags(): Record<LogicChipType, readonly string[]> {
+  return Object.fromEntries((Object.keys(LOGIC_CHIPS) as LogicChipType[]).map((type) => [type, LOGIC_CHIPS[type].names.map((_, i) => chipPinLabel(type, i + 1))])) as unknown as Record<
+    LogicChipType,
+    readonly string[]
+  >;
+}
 
 function list(labels: readonly string[]): string {
   if (labels.length <= 1) return labels[0] ?? '';
@@ -453,6 +527,15 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
       };
     case 'pin-overcurrent': {
       const pin = p.pin ?? 13;
+      const type = first !== undefined ? ctx.type(first) : undefined;
+      if (type && type in LOGIC_CHIPS) {
+        return {
+          title: 'Entegre çıkışı aşırı yükleniyor',
+          detail:
+            `${firstLabel}: ${PIN_NAMES[type][pin - 1] ?? `${pin}. bacak`} ${formatSI(p.current ?? 0, 'A')} veriyor; veri sayfasına göre bir çıkış en çok ` +
+            `${formatSI(p.limit ?? 0.025, 'A', { trim: true })} verebilir. Çıkış gerilimi düşer ve entegre ısınır. LED’e seri ön direnç koy; büyük yükleri bir transistörle sür.`,
+        };
+      }
       return {
         title: 'Arduino pini aşırı yükleniyor',
         detail:
@@ -461,6 +544,55 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           'koy (5 V ve 20 mA için ≈ 220 Ω); motor, röle ya da lamba gibi büyük yükleri bir transistörle sür.',
       };
     }
+    case 'logic-unpowered': {
+      const type = first !== undefined ? ctx.type(first) : undefined;
+      const chip = type && type in LOGIC_CHIPS ? LOGIC_CHIPS[type as LogicChipType] : null;
+      const pins = chip ? ` (${chip.vcc}. bacak ${chip.names[chip.vcc - 1]}, ${chip.gnd}. bacak ${chip.names[chip.gnd - 1]})` : '';
+      return {
+        title: 'Entegre beslenmiyor',
+        detail:
+          `${firstLabel}: besleme bacakları${pins} bağlı değil ya da besleme ${formatSI(p.supply ?? 0, 'V', { digits: 3 })} (en az ` +
+          `${formatSI(p.min ?? 0, 'V', { trim: true })} gerekir). Kapılar da beslemeyle çalışır: beslenmeyen entegrenin çıkışları sürülmez. ` +
+          'VCC’yi artıya, GND’yi eksiye (toprağa) bağla.',
+      };
+    }
+    case 'logic-supply-range':
+      return {
+        title: 'Besleme veri sayfasının aralığı dışında',
+        detail:
+          `${firstLabel} ${formatSI(p.supply ?? 0, 'V', { digits: 3 })} ile besleniyor; veri sayfasının önerdiği aralık ` +
+          `${formatSI(p.min ?? 0, 'V', { trim: true })}–${formatSI(p.max ?? 0, 'V', { trim: true })}. Bu aralığın dışında eşikler ve gecikmeler garanti edilmez; ` +
+          'mutlak en büyük değer aşılırsa entegre bozulur.',
+      };
+    case 'logic-input-floating': {
+      const type = first !== undefined ? ctx.type(first) : undefined;
+      const pin = type ? (PIN_NAMES[type][(p.pin ?? 1) - 1] ?? `${p.pin}. bacak`) : `${p.pin}. bacak`;
+      return {
+        title: 'CMOS giriş boşta: durumu belirsiz',
+        detail:
+          `${firstLabel}: ${pin} hiçbir yere bağlı değil ya da onu süren bir şey yok (ör. açık bir anahtar). CMOS girişi neredeyse hiç akım çekmez: ` +
+          'boştaki giriş gürültüyle 0 ile 1 arasında gidip gelebilir. Girişi bir dirençle (ör. 10 kΩ) GND’ye (aşağı çekme) ya da VCC’ye (yukarı çekme) bağla. ' +
+          'Simülasyon boştaki girişi 0 V sayar. (74LS girişi boşta 1 okunur.)',
+      };
+    }
+    case 'logic-input-undefined': {
+      const type = first !== undefined ? ctx.type(first) : undefined;
+      const pin = type ? (PIN_NAMES[type][(p.pin ?? 1) - 1] ?? `${p.pin}. bacak`) : `${p.pin}. bacak`;
+      return {
+        title: 'Giriş gerilimi belirsiz bölgede',
+        detail:
+          `${firstLabel}: ${pin} ${formatSI(p.voltage ?? 0, 'V', { digits: 3 })}. Veri sayfasına göre bu beslemede 0 için en çok V_{IL} = ` +
+          `${formatSI(p.vil ?? 0, 'V', { digits: 3 })}, 1 için en az V_{IH} = ${formatSI(p.vih ?? 0, 'V', { digits: 3 })} gerekir; arası belirsizdir ` +
+          '(gerçek entegre ikisinden birini okur, hangisi olduğu garanti edilmez). Girişi sürenin gerilimini ya da bölücüyü değiştir.',
+      };
+    }
+    case 'ic-burned':
+      return {
+        title: 'Entegre yandı',
+        detail:
+          `${firstLabel}: besleme ${formatSI(p.supply ?? 0, 'V', { digits: 3 })} oldu; veri sayfasına göre mutlak en büyük besleme ` +
+          `${formatSI(p.limit ?? 7, 'V', { trim: true })}. Entegrenin içi bozuldu, çıkışları sürülmüyor. Beslemeyi düşür ve “Onar” ile yenisini tak.`,
+      };
     case 'inductor-spike':
       if (first !== undefined && ctx.type(first) === 'motor') {
         return {
@@ -602,6 +734,18 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'Bir LED ile bir fototransistör aynı kılıfta: LED’den akım geçince yanar, ışığı fototransistörü iletime sokar. İki taraf arasında elektriksel bağ yoktur (yalıtım); çıkış akımı yaklaşık CTR · IF, CTR akım aktarım oranıdır.',
   scr:
     'Kapıdan küçük bir akımla tetiklenen diyot (SCR): tetiklenince anottan katoda iletir ve kapı akımı kesilse de iletimde kalır; anot akımı tutma akımının altına inince keser. Mandal gibi davranır.',
+  ic7400:
+    'Dört iki girişli NAND (VE DEĞİL) kapısı tek kılıfta (DIP-14): çıkış yalnızca iki giriş de 1 iken 0’dır. NAND “evrensel” kapıdır: DEĞİL, VE, VEYA hepsi NAND’larla kurulabilir. 14. bacak VCC, 7. bacak GND: entegre beslenmeden çalışmaz. Model: 74HC (CMOS, 2–6 V) ya da 74LS (TTL, 5 V).',
+  ic7402:
+    'Dört iki girişli NOR (VEYA DEĞİL) kapısı (DIP-14): çıkış yalnızca iki giriş de 0 iken 1’dir. Bacak sırası öbür kapılardan farklıdır: her kapıda önce çıkış (1Y), sonra girişler. 14. bacak VCC, 7. bacak GND.',
+  ic7404:
+    'Altı DEĞİL kapısı (evirici, DIP-14): çıkış girişin tersidir. 14. bacak VCC, 7. bacak GND.',
+  ic7408:
+    'Dört iki girişli VE kapısı (DIP-14): çıkış yalnızca iki giriş de 1 iken 1’dir. 14. bacak VCC, 7. bacak GND.',
+  ic7432:
+    'Dört iki girişli VEYA kapısı (DIP-14): girişlerden en az biri 1 iken çıkış 1’dir. 14. bacak VCC, 7. bacak GND.',
+  ic7486:
+    'Dört iki girişli ÖZEL VEYA (XOR) kapısı (DIP-14): girişler farklıyken çıkış 1’dir. İkili toplamada toplam basamağını verir. 14. bacak VCC, 7. bacak GND.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -1454,6 +1598,7 @@ export const tr = {
       semiconductors: 'Yarı iletkenler',
       transistors: 'Transistörler',
       ics: 'Entegreler',
+      logic: 'Lojik entegreler',
       instruments: 'Laboratuvar cihazları',
       switches: 'Anahtarlar ve koruma',
       outputs: 'Çıkış elemanları',
@@ -1723,6 +1868,9 @@ export const tr = {
       saturated
         ? `Çıkış doymada: dış devre CTR · I_{F}’den (${ctr}) az akım çekiyor, V_{CE} ≈ 0,1 V. LED ile çıkış arasında elektriksel bağ yok; bağı ışık kurar.`
         : `I_{C} = CTR · I_{F} = ${ctr} (${ic}). LED ile çıkış arasında elektriksel bağ yok; bağı ışık kurar.`,
+    logicSupply: 'Besleme (VCC − GND)',
+    logicSupplyCurrent: 'Besleme akımı',
+    logicUnpowered: 'Entegre beslenmiyor: çıkışlar sürülmüyor.',
     regInput: 'Giriş',
     regOutput: 'Çıkış',
     inputMinusOutput: 'Giriş − çıkış',
@@ -2902,6 +3050,12 @@ export const tr = {
       lm317: 'Ayarlı regülatörler',
       opto: 'Optokuplörler',
       scr: 'Tristörler',
+      ic7400: 'NAND entegreleri',
+      ic7402: 'NOR entegreleri',
+      ic7404: 'DEĞİL entegreleri',
+      ic7408: 'VE entegreleri',
+      ic7432: 'VEYA entegreleri',
+      ic7486: 'ÖZEL VEYA entegreleri',
     } satisfies Record<DeviceType, string>,
   },
   // Arayüz v4: masaüstü üst çubuğu ve menüleri (devre menüsü, Daha fazla).
@@ -3300,6 +3454,7 @@ export const tr = {
     } as Partial<Record<DeviceType, string>>,
     /** Parça modelinin notu (genel modellerde türün notu kullanılır). */
     modelNotes: {
+      ...LOGIC_MODEL_NOTES,
       'MCR100-6':
         'MCR100-6 (onsemi): 400 V, 0,8 A, TO-92 tristör. Kapı akımı I_{GT} ≈ 40 µA’i (V_{GT} ≈ 0,62 V) aşınca iletime geçer; kapı akımı kesilince anot akımı kilitleme akımı I_{L} ≈ 0,6 mA’in üstündeyse iletimde kalır, sonra anot akımı tutma akımı I_{H} ≈ 0,5 mA’in altına inince keser (tablodaki tipik değerler). İletim gerilimi veri sayfasının eğrisinden: 0,1 A’de ≈ 0,9 V.',
       PC817:
@@ -3509,6 +3664,20 @@ export const tr = {
     pickPin: 'Buradan kablo başlat',
     pickWire: (ends: string) => (ends ? `${ends} · kabloyu seç` : 'kabloyu seç'),
     pickerClose: 'Seçiciyi kapat',
+  },
+  /** Lojik entegrenin defter kartı (editor/LogicCard.tsx). */
+  logic: {
+    unpowered: 'Entegre beslenmiyor: çıkışlar sürülmüyor. VCC’yi artıya, GND’yi eksiye bağla.',
+    truthTable: 'Doğruluk tablosu',
+    gatePicker: 'Doğruluk tablosu gösterilen kapı',
+    gate: (n: number) => `${n}. kapı`,
+    noRow: 'Kapının girişleri okunamıyor.',
+    pinsTitle: 'Bacaklar',
+    columns: { pin: 'Bacak', name: 'Ad', state: 'Durum', voltage: 'Gerilim' },
+    roles: { input: 'giriş', output: 'çıkış', supply: 'besleme' },
+    states: { high: '1', low: '0', undefined: 'belirsiz', floating: 'boşta', supply: 'besleme', off: 'sürülmüyor' },
+    /** 74LS'nin boştaki girişi. */
+    floatingHigh: 'boşta · 1 okunur',
   },
   help: {
     title: 'Yardım',

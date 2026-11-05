@@ -16,7 +16,8 @@ import { tr } from '../i18n/tr';
 import { pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import { strProp, type DeviceType } from '../sim/netlist';
-import { holeXZ, planBreadboard, type BreadboardPlan, type Hole } from './breadboard';
+import { dipPins, dipShape, holeXZ, planBreadboard, type BreadboardPlan, type Hole } from './breadboard';
+import { LOGIC_CHIPS, isLogicChip } from '../model/logicChips';
 import { RULES, routePcb, type Routing } from './router';
 import { makeZip } from './zip';
 
@@ -115,22 +116,31 @@ function geometry(part: Part): Geometry {
     case 'opamp':
     case 'timer555':
       return { name: 'DIP-8_W7.62mm', equivalent: 'Package_DIP:DIP-8_W7.62mm_Socket', drill: 0.8, size: 1.6, square: 0, body: 'dip' };
+    case 'opto':
+      return { name: 'DIP-4_W7.62mm', equivalent: 'Package_DIP:DIP-4_W7.62mm', drill: 0.8, size: 1.6, square: 0, body: 'dip' };
+    case 'ic7400':
+    case 'ic7402':
+    case 'ic7404':
+    case 'ic7408':
+    case 'ic7432':
+    case 'ic7486':
+      return { name: 'DIP-14_W7.62mm', equivalent: 'Package_DIP:DIP-14_W7.62mm_Socket', drill: 0.8, size: 1.6, square: 0, body: 'dip' };
+      return { name: 'DIP-16_W7.62mm', equivalent: 'Package_DIP:DIP-16_W7.62mm_Socket', drill: 0.8, size: 1.6, square: 0, body: 'dip' };
     default:
       // Transistörler (TO-92, geniş adım: elle lehimlemeye uygun).
       return { name: 'TO-92_Inline_Wide', equivalent: 'Package_TO_SOT_THT:TO-92_Inline_Wide', drill: 0.75, size: 1.5, body: 'to92' };
   }
 }
 
-/** DIP-8: parça pin sırası → entegrenin bacak numarası (breadboard.ts ile aynı). */
-const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = { opamp: [2, 3, 6, 7, 4], timer555: [1, 2, 3, 4, 5, 6, 7, 8] };
+/** DIP kılıflı parçalar (bacak numaraları breadboard.ts'teki dipPins). */
+const DIP_TYPES: ReadonlySet<DeviceType> = new Set(['opamp', 'timer555', 'opto', ...Object.keys(LOGIC_CHIPS)] as DeviceType[]);
 
 /**
  * Parça pininin ped numarası, eşdeğer standart KiCad kılıfıyla aynı: kılıf standart kitaplıktakiyle
  * değiştirilirse ağlar yerinde kalır. Diyot ve LED'de 1 = katot, entegrede bacak numarası.
  */
 export function padNumber(type: DeviceType, pin: number): string {
-  const dip = DIP_PINS[type];
-  if (dip) return String(dip[pin]);
+  if (DIP_TYPES.has(type)) return String(dipPins(type)[pin]);
   if (type === 'diode' || type === 'schottky' || type === 'zener' || type === 'led') return pin === 0 ? '2' : '1';
   return String(pin + 1);
 }
@@ -224,18 +234,19 @@ export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard
     const netOfPin = (pin: number) => plan.netOf.get(pinKey(id, pin));
     let pads: PcbPad[];
     if (g.body === 'dip') {
-      const map = DIP_PINS[part.type]!;
+      const map = dipPins(part.type);
+      const half = dipShape(placed.mount)?.half ?? map.length / 2;
       const all: PcbPad[] = [];
       const extras = [...(placed.extraHoles ?? [])].map(at);
       // Bacak numaraları: parçanın pinleri DIP_PINS'ten, boşlar sırayla kalan numaralar.
-      const free = [1, 2, 3, 4, 5, 6, 7, 8].filter((n) => !map.includes(n));
+      const free = Array.from({ length: 2 * half }, (_, i) => i + 1).filter((n) => !map.includes(n));
       pins.forEach((p, i) => all.push({ number: String(map[i]), x: p.x, y: p.y, net: name(netOfPin(i), `Net-(${part.label}-Pad${map[i]})`), shape: map[i] === 1 ? 'rect' : 'oval', size: g.size, drill: g.drill }));
-      // Boş bacakların numarası konumdan: alt sıra (f) soldan 1–4, üst sıra (e) sağdan 5–8.
+      // Boş bacakların numarası konumdan: alt sıra soldan 1…n/2, üst sıra sağdan n/2+1…n.
       for (const p of extras) {
         const bottom = p.y > Math.min(...pins.map((q) => q.y), ...extras.map((q) => q.y)) + PITCH;
         const xs = [...pins, ...extras].map((q) => q.x);
         const k = Math.round((p.x - Math.min(...xs)) / PITCH);
-        const number = bottom ? k + 1 : 8 - k;
+        const number = bottom ? k + 1 : 2 * half - k;
         if (free.includes(number)) all.push({ number: String(number), x: p.x, y: p.y, net: null, shape: number === 1 ? 'rect' : 'oval', size: g.size, drill: g.drill });
       }
       pads = all.sort((a, b) => Number(a.number) - Number(b.number));
@@ -331,11 +342,13 @@ export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard
   let nextC = 1;
   for (const f of [...footprints]) {
     const part = f.partId ? byId.get(f.partId) : undefined;
-    if (!part || (part.type !== 'opamp' && part.type !== 'timer555')) continue;
+    if (!part || (part.type !== 'opamp' && part.type !== 'timer555' && !isLogicChip(part.type))) continue;
     const padOf = (n: number) => f.pads.find((p) => p.number === String(n));
     const ground = [...netName.entries()].find(([, n]) => n === 'GND')?.[1];
     const pairs: Array<[PcbPad, string | null]> =
-      part.type === 'timer555'
+      isLogicChip(part.type)
+        ? [[padOf(LOGIC_CHIPS[part.type].vcc)!, padOf(LOGIC_CHIPS[part.type].gnd)!.net]]
+        : part.type === 'timer555'
         ? [[padOf(8)!, padOf(1)!.net]]
         : [
             [padOf(7)!, ground ?? padOf(4)!.net],

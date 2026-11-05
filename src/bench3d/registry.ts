@@ -2,7 +2,9 @@
 
 import type { Vector3 } from 'three';
 import type { Part } from '../model/types';
-import { dipChipModel } from './breadboardModel';
+import { dipChipModel, logicModuleModel } from './logicModels';
+import { isLogicChip } from '../model/logicChips';
+import { partProp } from '../model/catalog';
 import { withAnchors } from './kit';
 import { arduinoModel } from './arduinoModel';
 import { dcsupplyModel, funcgenModel, meterModel, multimeterModel, oscilloscopeModel, tankModel } from './instruments';
@@ -45,9 +47,15 @@ import {
  * boş bacakları. Verilmezse parça masada, bacakları şema pinleri × SPREAD'de.
  */
 export function buildPartModel(part: Part, holes: readonly Vector3[] | null = null, extra: readonly Vector3[] = []): PartModel {
-  if (holes && (part.type === 'opamp' || part.type === 'timer555')) return dipChipModel(part.type, holes, extra);
+  if (holes && (part.type === 'opamp' || part.type === 'timer555')) return dipChipModel(part.type === 'opamp' ? 'LM741' : 'NE555', holes, extra);
+  if (holes && isLogicChip(part.type)) return dipChipModel(chipModel(part), holes, extra, holes[0]);
   if (holes && part.type === 'pushbutton') return withAnchors(holes, () => pushButtonModel(extra));
   return withAnchors(holes, () => build(part));
+}
+
+/** Lojik entegrenin model adı (74HC08, CD4017B…). */
+function chipModel(part: Part): string {
+  return String(partProp(part.type, part.props, 'model'));
 }
 
 function build(part: Part): PartModel {
@@ -101,6 +109,13 @@ function build(part: Part): PartModel {
       return to220Model('reg7805', 'L7805CV', '5 V · 1,5 A', [0, 1, 2]);
     case 'opto':
       return optoModel(p);
+    case 'ic7400':
+    case 'ic7402':
+    case 'ic7404':
+    case 'ic7408':
+    case 'ic7432':
+    case 'ic7486':
+      return logicModuleModel(part.type, chipModel(part));
     case 'scr':
       return scrModel(p);
     case 'lm317':

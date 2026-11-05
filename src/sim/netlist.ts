@@ -50,7 +50,14 @@ export type DeviceType =
   | 'reg7805'
   | 'lm317'
   | 'opto'
-  | 'scr';
+  | 'scr'
+  // Lojik entegreler (Dalga 2): kapı entegreleri (74HC / 74LS).
+  | 'ic7400'
+  | 'ic7402'
+  | 'ic7404'
+  | 'ic7408'
+  | 'ic7432'
+  | 'ic7486'
 
 export type PropValue = number | string | boolean;
 export type Props = Readonly<Record<string, PropValue>>;

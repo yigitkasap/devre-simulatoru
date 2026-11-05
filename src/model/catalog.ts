@@ -72,13 +72,15 @@ import {
   TANK_MODES,
   VOLTMETER_DEFAULTS,
   WAVEFORMS,
+  logicModels,
 } from '../sim/devices';
+import { LOGIC_CHIPS, LOGIC_CHIP_TYPES, type LogicChipType } from './logicChips';
 import { RESISTOR_POWER_RATINGS } from '../sim/ratings';
 import type { DeviceType, PropValue } from '../sim/netlist';
 import type { UnitSymbol } from '../sim/units';
 import type { Point } from './types';
 
-export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'ics' | 'switches' | 'outputs' | 'sensors' | 'meters' | 'instruments';
+export type Category = 'sources' | 'passive' | 'semiconductors' | 'transistors' | 'ics' | 'logic' | 'switches' | 'outputs' | 'sensors' | 'meters' | 'instruments';
 
 export interface NumberPropDef {
   readonly kind: 'number';
@@ -183,7 +185,38 @@ function transistor(
 /** Ölçü aletlerinin DC / AC kipi. */
 const METER_MODE_PROP: PropDef = { kind: 'select', key: 'mode', options: METER_MODES };
 
+/**
+ * Lojik entegrenin (DIP-14 / DIP-16) şemadaki uçları: veri sayfasının bacak sırasıyla bir DIP kutusu;
+ * sol yanda yukarıdan aşağı 1…n/2, sağ yanda aşağıdan yukarı n/2+1…n (çentik üstte). Bacaklar iki
+ * birim arayla, uçlar x = ±9'da (sembol: editor/logicSymbols.tsx).
+ */
+export function dipPins(count: number): Point[] {
+  const half = count / 2;
+  return Array.from({ length: count }, (_, i) => {
+    const pin = i + 1;
+    return pin <= half ? { x: -9, y: -(half - 1) + 2 * (pin - 1) } : { x: 9, y: -(half - 1) + 2 * (count - pin) };
+  });
+}
+
+function logicDef(type: LogicChipType): PartDef {
+  const count = LOGIC_CHIPS[type].names.length;
+  const models = logicModels(type);
+  const half = count / 2;
+  return {
+    type,
+    category: 'logic',
+    labelPrefix: 'U',
+    pins: dipPins(count),
+    bounds: { x: -9, y: -half - 0.4, w: 18, h: 2 * half + 0.8 },
+    defaultProps: { model: models[0]! },
+    propDefs: [{ kind: 'select', key: 'model', options: models }],
+    showLabel: true,
+    polarized: false,
+  };
+}
+
 export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
+  ...(Object.fromEntries(LOGIC_CHIP_TYPES.map((t) => [t, logicDef(t)])) as Record<LogicChipType, PartDef>),
   battery: {
     type: 'battery',
     category: 'sources',
@@ -870,6 +903,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'semiconductors', types: ['diode', 'zener', 'led', 'bridge', 'schottky', 'scr'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'ics', types: ['opamp', 'timer555', 'arduino', 'reg7805', 'lm317', 'opto'] },
+  { id: 'logic', types: ['ic7400', 'ic7402', 'ic7404', 'ic7408', 'ic7432', 'ic7486'] },
   { id: 'switches', types: ['switch', 'pushbutton', 'spdt', 'relay', 'fuse'] },
   { id: 'outputs', types: ['lamp', 'motor', 'speaker', 'buzzer'] },
   { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },

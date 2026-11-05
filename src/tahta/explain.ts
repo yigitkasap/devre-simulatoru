@@ -1,7 +1,7 @@
 // Tahtada kur, Denetle: sorun kartının başlığı (kademeye göre) ve açıklaması (3. kademe). Metinler T3'teki
 // gibi: "R1 · iki bacağı aynı şeritte", "R1’in bacakları 6b ve 6e’de. …".
 
-import { mountOf } from '../bench3d/breadboard';
+import { dipShape, mountOf } from '../bench3d/breadboard';
 import { ek } from '../i18n/ek';
 import { tr } from '../i18n/tr';
 import type { CircuitDoc, Part } from '../model/types';
@@ -38,7 +38,7 @@ const pinName = (part: Part, pin: number) => tr.devices.pins[part.type][pin] ?? 
 function reversedSort(part: Part): 'reversed' | 'order' | 'swappedLeads' {
   const mount = mountOf(part.type);
   if (mount === undefined) return 'swappedLeads';
-  if (mount === 'dip8' || mount === 'dip4' || part.type === 'potentiometer' || part.type === 'spdt' || tr.devices.pins[part.type].length === 2) return 'reversed';
+  if (dipShape(mount) || part.type === 'potentiometer' || part.type === 'spdt' || tr.devices.pins[part.type].length === 2) return 'reversed';
   return 'order';
 }
 
@@ -109,7 +109,7 @@ export function problemText(doc: CircuitDoc, problem: Problem): string {
     const schematic = joined.length > 0 ? ` ${k.schematicJoined(joined.join(', '))}` : '';
     const mount = mountOf(part.type);
     if (mount === undefined) return `${k.leadsSwapped(ek(L, 'in'), placed)}${schematic}`;
-    if (mount === 'dip8' || mount === 'dip4') return k.dipReversed(L);
+    if (dipShape(mount)) return k.dipReversed(L);
     const tip = k.polarityTips[part.type === 'capacitor' ? 'capacitor' : part.type] ?? '';
     const title = reversedTitle(part) === k.kinds.order ? k.orderWrong(ek(L, 'in'), placed) : k.reversedAt(L, placed);
     return `${title}${schematic}${tip ? ` ${tip}` : ''}`;

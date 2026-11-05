@@ -7,7 +7,7 @@
 import { tr } from '../i18n/tr';
 import { strProp, type DeviceType } from '../sim/netlist';
 import type { CircuitDoc, Part } from '../model/types';
-import { railX, type BreadboardPlan, type Hole } from './breadboard';
+import { dipShape, railX, type BreadboardPlan, type Hole } from './breadboard';
 import type { GuideStep, SolderGuide } from './guide';
 import type { PcbDesign, PcbFootprint, PcbPad } from './kicad';
 import type { Routing } from './router';
@@ -85,10 +85,11 @@ export function holeLabels(target: StepTarget, plan: BreadboardPlan): { readonly
   if (target.kind === 'jumper') return target.holes.map((hole) => ({ hole, text: name(hole) }));
   if (target.kind === 'lead') return [{ hole: target.holes[0]!, text: `${target.part.label} ${tr.devices.pinShort[target.part.type][plan.leads[target.index]!.pin] ?? ''} → ${name(target.holes[0]!)}`.replace('  ', ' ') }];
   const part = target.part;
-  if (part.type === 'timer555' || part.type === 'opamp') {
-    const at = plan.onBoard.get(part.id);
+  const at = plan.onBoard.get(part.id);
+  const shape = dipShape(at?.mount);
+  if (shape && part.type !== 'opto') {
     const all = [...(at?.holes ?? []), ...(at?.extraHoles ?? [])];
-    const bottom = all.filter((h): h is Extract<Hole, { kind: 'strip' }> => h.kind === 'strip' && h.row === 5);
+    const bottom = all.filter((h): h is Extract<Hole, { kind: 'strip' }> => h.kind === 'strip' && h.row === shape.bottom);
     const first = bottom.reduce<Extract<Hole, { kind: 'strip' }> | null>((a, b) => (a === null || b.col < a.col ? b : a), null);
     return first ? [{ hole: first, text: `${tr.karta.plaket.pinOne} ${name(first)}` }] : [];
   }

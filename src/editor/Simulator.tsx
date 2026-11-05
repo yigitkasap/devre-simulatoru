@@ -1115,7 +1115,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   /** Mesajın düzeltme düğmeleri: yanan LED için Onar ve (tek seri direnç varsa) önerilen ön direnç. */
   const messageActions = (item: MessageItem): MessageAction[] => {
     const d = item.diagnostic;
-    if (d?.code === 'lamp-burned' || d?.code === 'fuse-blown') return [{ label: tr.messages.repair, primary: true, run: () => sim.repair(d.elementIds[0]!) }];
+    if (d?.code === 'lamp-burned' || d?.code === 'fuse-blown' || d?.code === 'ic-burned') return [{ label: tr.messages.repair, primary: true, run: () => sim.repair(d.elementIds[0]!) }];
     if (d?.code !== 'led-burned') return [];
     const ledId = d.elementIds[0]!;
     const actions: MessageAction[] = [{ label: tr.messages.repair, primary: true, run: () => sim.repair(ledId) }];

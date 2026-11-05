@@ -8,7 +8,8 @@ import type { CircuitDoc, Part } from '../model/types';
 import { boolProp, numProp, strProp } from '../sim/netlist';
 import { LED_COLORS } from '../sim/devices/led';
 import { resistorColorCode } from './bands';
-import { holeXZ, type BreadboardPlan, type Hole } from './breadboard';
+import { dipShape, holeXZ, type BreadboardPlan, type Hole } from './breadboard';
+import { LOGIC_CHIPS } from '../model/logicChips';
 import { holeLabel } from './holes';
 
 
@@ -91,6 +92,15 @@ function describe(part: Part): { name: string; detail: string } {
       return { name: `Optokuplör ${typeof p.model === 'string' ? p.model : 'PC817'}`, detail: 'DIP-4; 1. bacak (nokta) anot' };
     case 'timer555':
       return { name: '555 zamanlayıcı NE555', detail: 'DIP-8; 8 bacaklı soketle' };
+    case 'ic7400':
+    case 'ic7402':
+    case 'ic7404':
+    case 'ic7408':
+    case 'ic7432':
+    case 'ic7486': {
+      const n = LOGIC_CHIPS[part.type].names.length;
+      return { name: `${tr.devices.names[part.type]} ${partValueText(part)}`, detail: `DIP-${n}; ${n} bacaklı soketle` };
+    }
     case 'potentiometer':
       return { name: `Potansiyometre ${formatOhm(numProp(p, 'resistance', 10e3))}`, detail: 'dikey trimpot, 3 bacak' };
     case 'switch':
@@ -183,14 +193,21 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
         });
         break;
       case 'opamp':
-      case 'timer555': {
+      case 'timer555':
+      case 'ic7400':
+      case 'ic7402':
+      case 'ic7404':
+      case 'ic7408':
+      case 'ic7432':
+      case 'ic7486': {
         // 1. bacak: alt sıranın (f) en solundaki delik.
         const bottom = [...at.holes, ...(at.extraHoles ?? [])].filter((h) => h.kind === 'strip' && h.row === 5);
         const first = bottom.reduce((a, b) => (a.kind === 'strip' && b.kind === 'strip' && b.col < a.col ? b : a));
-        addMaterial('DIP-8 soket', 'entegre sokete takılır', part.label);
+        const n = 2 * (dipShape(at.mount)?.half ?? 4);
+        addMaterial(`DIP-${n} soket`, 'entegre sokete takılır', part.label);
         steps.push({
           group: 'ic',
-          title: `${part.label} · DIP-8 soket (entegre en son takılır)`,
+          title: `${part.label} · DIP-${n} soket (entegre en son takılır)`,
           holes: `orta kanalın üstünde, ${at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ')}`,
           note: `Çentik sola: 1. bacak ${name(first)} deliğinde (sol alt).`,
         });

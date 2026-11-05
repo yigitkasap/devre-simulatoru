@@ -3,7 +3,7 @@
 // bitince denetle listesi. Ekranda görünmez; yazdırırken yalnızca bu bölüm basılır (global.css →
 // #lehim-rehberi); koyu tema belirteçleri yalnızca ekranda geçerli olduğundan kâğıda açık temada.
 
-import { BB, boardWidth, boardZ, colX, holeXZ, netColors, railHoles, railX, railZ, stripRowZ, type BreadboardPlan, type Hole } from '../bench3d/breadboard';
+import { BB, boardWidth, boardZ, colX, dipShape, holeXZ, netColors, railHoles, railX, railZ, stripRowZ, type BreadboardPlan, type Hole } from '../bench3d/breadboard';
 import type { SolderGuide } from '../bench3d/guide';
 import { tr } from '../i18n/tr';
 import type { CircuitDoc } from '../model/types';
@@ -67,7 +67,7 @@ function BoardDiagram({ doc, plan }: { doc: CircuitDoc; plan: BreadboardPlan }) 
         const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
         const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
         const name = label(p.partId);
-        if (p.mount === 'dip8' || p.mount === 'dip4') {
+        if (dipShape(p.mount)) {
           return (
             <g key={p.partId}>
               <rect x={Math.min(...xs) - 0.5} y={cy - 1.2} width={Math.max(...xs) - Math.min(...xs) + 1} height={2.4} rx={0.2} fill="#24262a" />

@@ -43,8 +43,18 @@ export type DiagnosticCode =
   | 'lamp-burned'
   /** Motor zorlanıyor: sargının ortalama bakır kaybı sürekli çalışma sınırını aşıyor (uyarı). */
   | 'motor-overload'
-  /** Arduino pininden mutlak en büyük akımdan (40 mA) fazlası çekiliyor (uyarı). */
+  /** Arduino pininden ya da lojik entegrenin çıkışından mutlak en büyük akımdan fazlası çekiliyor (uyarı). */
   | 'pin-overcurrent'
+  /** Lojik entegre beslenmiyor (VCC ya da GND bağlı değil, besleme önerilen en küçük değerin altında): çıkışlar sürmez. */
+  | 'logic-unpowered'
+  /** Lojik entegrenin beslemesi veri sayfasının önerilen aralığının dışında. */
+  | 'logic-supply-range'
+  /** CMOS girişi (74HC, CD4000) boşta: hiçbir şey sürmüyor, durumu belirsiz. */
+  | 'logic-input-floating'
+  /** Lojik girişin gerilimi V_IL ile V_IH arasında: 0 mı 1 mi okunacağı belirsiz. */
+  | 'logic-input-undefined'
+  /** Lojik entegrenin beslemesi mutlak en büyük değeri aştı ve entegre yandı. */
+  | 'ic-burned'
   /** Bobinin akımı aniden kesildi: uçlarında kaynaklardan çok büyük bir gerilim sıçraması (Lenz). */
   | 'inductor-spike'
   /** Newton-Raphson en küçük zaman adımında da yakınsamadı. */

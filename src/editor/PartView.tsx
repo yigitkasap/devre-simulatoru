@@ -65,6 +65,13 @@ export function partValueText(part: Part): string {
     case 'timer555':
       // Sembolün içinde "741" / "555" yazar.
       return '';
+    case 'ic7400':
+    case 'ic7402':
+    case 'ic7404':
+    case 'ic7408':
+    case 'ic7432':
+    case 'ic7486':
+      return String(p.model ?? CATALOG[part.type].defaultProps.model ?? '');
     case 'arduino':
       return tr.properties.optionLabel('program', String(p.program ?? ''));
     case 'speaker':

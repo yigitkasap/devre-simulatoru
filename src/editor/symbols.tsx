@@ -13,6 +13,7 @@ import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { ANION_COLOR, CATION_COLOR, ionsOnLine, jiggle, seeded, type IonView, type PlacedIon } from './ions';
+import { GateIc } from './logicSymbols';
 import type { ResistorStyle } from './settings';
 
 /** Simülasyon sırasında sembolün görünümünü değiştiren değerler (Aşama 3-4). */
@@ -39,6 +40,8 @@ export interface LiveVisual {
   readonly energized?: boolean;
   /** 555: çıkış yüksek mi? */
   readonly high?: boolean;
+  /** Lojik entegre: bacakların mantık seviyesi (1 olanların ucunda turuncu nokta). */
+  readonly levels?: readonly (number | null)[];
   /** Arduino: kart üstü L (D13) ve TX (seri gönderim) LED'leri yanıyor mu? */
   readonly ledL?: boolean;
   readonly ledTx?: boolean;
@@ -1318,6 +1321,13 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <Regulator text="LM317" rotation={rotation} dropout={live?.dropout ?? false} />;
     case 'opto':
       return <Optocoupler />;
+    case 'ic7400':
+    case 'ic7402':
+    case 'ic7404':
+    case 'ic7408':
+    case 'ic7432':
+    case 'ic7486':
+      return <GateIc type={type} model={String(partProp(type, props, 'model'))} rotation={rotation} levels={live?.levels} />;
     case 'scr':
       return <Scr on={live?.on ?? false} />;
   }

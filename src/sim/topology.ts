@@ -3,6 +3,7 @@
 // bağlı olmayan adalara derlemede sıfır noktası verilir (compile.ts, autoReferences).
 
 import type { AutoReference } from './compile';
+import { LOGIC_CHIPS, type LogicChipType } from '../model/logicChips';
 import type { Diagnostic } from './diagnostics';
 import type { Device } from './devices';
 import { GROUND } from './mna';
@@ -69,6 +70,9 @@ export function checkTopology(input: TopologyInput): Diagnostic[] {
       if (el.type === 'relay' && index >= 3) return;
       if (el.type === 'funcgen' && index < 2) return;
       if (el.type === 'dcsupply' && floating(index) && floating(index ^ 1)) return;
+      // Lojik entegrenin kullanılmayan çıkışları normaldir; boştaki girişi entegrenin kendi uyarısı
+      // söyler (CMOS'ta "giriş boşta", 74LS'de 1 okunur). Besleme bacakları bağlanmalıdır.
+      if (el.type in LOGIC_CHIPS && index + 1 !== LOGIC_CHIPS[el.type as LogicChipType].vcc && index + 1 !== LOGIC_CHIPS[el.type as LogicChipType].gnd) return;
       // Arduino'nun kullanılmayan pinleri normaldir; iki GND'den biri bağlanmalıdır.
       if (el.type === 'arduino' && (index !== 2 && index !== 21 ? true : !floating(index === 2 ? 21 : 2))) return;
       const root = wiring.findKey(pin);
