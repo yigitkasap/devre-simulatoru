@@ -1478,10 +1478,20 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
 
 ### Örnekler
 
-- **Örnekler penceresi (kullanıcı isteği):** Örnekler sol panelden kaldırıldı; üst çubuktaki
-  "Örnekler" düğmesi gruplanmış bir pencere açar (telefonda tam ekran, aramalı ve açılır gruplu
-  liste). Açılan örneğin açıklaması, "Ne işe yarar?" ve "Günlük hayatta" bölümleri İnceleme
-  panelinin Örnek sekmesinde (telefonda alt sayfada). Gruplar ve sıraları
+- **Örnekler penceresi (2026-11-05'te sadeleşti):** Üst çubuktaki "Örnekler" düğmesi açar.
+  Masaüstünde ≈ 1160 px'lik pencere: başlık satırında arama ("/" tuşu odaklar) ve toplam devre
+  sayısı; solda 264 px yan liste (Akdeniz Üniversitesi logosu, klasörün grupları numarasıyla:
+  Deney 1–9, P baraj projesi, ! arıza bulma; çizgi, "Genel" ve genel gruplar). Sağda bütün gruplar
+  tek kayan listede: grubun üst yazısı (DENEY N, PROJE, ARIZA BULMA), föydeki adı ve amaç cümlesi;
+  kartlarda devrenin küçük şeması (simülasyonsuz `CircuitView`; kart görünür olunca çizilir,
+  önbellekte kalır), şekil çipi ya da "Föyde yok · ek", başlık, tek satırlık cümle
+  (`tr.examples.cues`) ve "Tahtada kur". Yan listeye tıklayınca içerik o gruba kayar, kaydırınca
+  görünen grup vurgulanır; açık örnek "Açık" çipiyle işaretlidir, pencere ona kayarak açılır.
+  Telefonda iki adım: ana ekranda arama, açık örneğin satırı, Akdeniz kutusu ve genel gruplar;
+  gruba dokununca o grubun kartları. Arama başlıkta, cümlede, açıklamada, grup adında ve devredeki
+  parçaların adlarında (ör. "zener", "555") Türkçe karakterlere duyarsız arar
+  ([`src/editor/examplesIndex.ts`](src/editor/examplesIndex.ts)). Uzun açıklama, "Ne işe yarar?"
+  ve "Günlük hayatta" listede değil, açılan örneğin defter kartındadır. Gruplar ve sıraları
   [`src/examples/index.ts`](src/examples/index.ts) içindedir; iOS kuralı gereği pencere açıkken
   tuvalin `touch-action` değeri kaldırılır (pencere parmakla kaydırılabilsin).
 - **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC",
@@ -1510,7 +1520,7 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   transistörün bacak bağlantısı), Adımlar ve sorular (tek liste: her adımda föydeki metin adım
   numarasıyla, 2a/2b gibi alt maddeler ayrı satır; altında "Simülasyonda:" satırı; adımın sorusu
   varsa altında kapalı "Cevabı göster") ve Günlük hayatta. Bir deneyin birden çok şekli varsa her
-  şeklin kartında yalnızca o şekle ait adımlar bulunur. Klasörde
+  şeklin kartında yalnızca o şekle ait adımlar bulunur. Örnekler penceresinde
   her deney grubunun başlığının altında tek cümlelik amaç var. Metinler tipli yapıda
   [`src/i18n/foy.ts`](src/i18n/foy.ts) içindedir; ek örnekler ve föy dışı örnekler eski düzende
   (açıklama, "Ne işe yarar?", "Günlük hayatta") kalır.

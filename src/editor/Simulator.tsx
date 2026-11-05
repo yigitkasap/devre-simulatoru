@@ -1967,6 +1967,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const examplesDialog = examplesOpen && (
     <ExamplesDialog
       phone={phone}
+      settings={settings}
       activeExample={activeExample}
       onClose={() => setExamplesOpen(false)}
       onLoad={(id) => {
