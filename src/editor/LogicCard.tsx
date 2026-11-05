@@ -58,6 +58,7 @@ export function LogicDetails({ part, frame }: { part: Part; frame: SimFrame | nu
         </p>
       )}
       {type === 'cd4017' && logic?.powered && logic.count !== undefined && <p className="m-0 text-[15px]">{t().count(logic.count)}</p>}
+      {type === 'cd4511' && logic?.powered && <p className="m-0 text-[15px]">{t().digit(logic.digit ?? null, logic.levels)}</p>}
       <section aria-label={t().pinsTitle} className="flex flex-col gap-1.5">
         <span className="text-label font-semibold text-muted">{t().pinsTitle}</span>
         <table className={`w-full border-collapse ${touch ? 'text-[14px]' : 'text-[13px]'}`}>

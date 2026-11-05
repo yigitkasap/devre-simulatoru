@@ -3,7 +3,7 @@
 // beslemesiz entegre, yanma, gecikme, flip-flop, sayıcı, kod çözücü ve göstergenin aşırı akımda yanması.
 
 import { describe, expect, it } from 'vitest';
-import { GATE_CHIPS, GATE_CHIP_TYPES, LOGIC_CHIPS, gateModels, gateOutput, type LogicChipType } from '../src/model/logicChips';
+import { GATE_CHIPS, GATE_CHIP_TYPES, LOGIC_CHIPS, SEVEN_SEGMENT_CODES, gateModels, gateOutput, type LogicChipType } from '../src/model/logicChips';
 import { CircuitSimulator } from '../src/sim';
 import { circuit } from './helpers';
 
@@ -126,6 +126,16 @@ describe('Eşikler ve çıkış gerilimleri (veri sayfası)', () => {
     expect(ls.voh / 1e-3).toBeCloseTo(60e-3, 3);
   });
 
+  it('CD4511B: segment çıkışı 5 V’ta 10 mA’de 4,10 V, 20 mA’de 3,75 V (tipik)', () => {
+    for (const [i, v] of [[10e-3, 4.1], [20e-3, 3.75]] as const) {
+      const sim = run(
+        powered(5)
+          .add('cd4511', 'U1', pins('cd4511', { 1: 'gnd', 2: 'gnd', 3: 'vcc', 4: 'vcc', 5: 'gnd', 6: 'gnd', 7: 'gnd', 8: 'gnd', 16: 'vcc', 13: 'a' }))
+          .resistor('RA', 'a', 'gnd', v / i),
+      );
+      expect(sim.status('U1').logic!.pins[12]!.voltage).toBeCloseTo(v, 3);
+    }
+  });
 });
 
 describe('Boştaki giriş ve besleme', () => {
@@ -299,6 +309,46 @@ describe('CD4017B: onluk sayıcı', () => {
     expect(run(counter('vcc', 'gnd'), 5.5e-3).status('U1').logic!.count).toBe(0);
     expect(run(counter('gnd', 'vcc'), 5.5e-3).status('U1').logic!.count).toBe(0);
     expect(run(counter('gnd', 'gnd'), 5.5e-3).status('U1').logic!.count).toBe(5);
+  });
+});
+
+describe('CD4511B: BCD → 7 segment', () => {
+  /** A…D kodu, LT̄, BL̄, LE; a…g çıkışları 10 kΩ'la toprağa. */
+  const decoder = (code: number, lt = 1, bl = 1, le = 0): Builder => {
+    const bit = (k: number) => ((code >> k) & 1 ? 'vcc' : 'gnd');
+    let c = powered().add(
+      'cd4511',
+      'U1',
+      pins('cd4511', { 7: bit(0), 1: bit(1), 2: bit(2), 6: bit(3), 3: lt ? 'vcc' : 'gnd', 4: bl ? 'vcc' : 'gnd', 5: le ? 'vcc' : 'gnd', 8: 'gnd', 16: 'vcc', 13: 'sa', 12: 'sb', 11: 'sc', 10: 'sd', 9: 'se', 15: 'sf', 14: 'sg' }),
+    );
+    for (const s of ['a', 'b', 'c', 'd', 'e', 'f', 'g']) c = c.resistor(`R${s}`, `s${s}`, 'gnd', 1e4);
+    return c;
+  };
+  const segments = (sim: CircuitSimulator) => {
+    const l = sim.status('U1').logic!;
+    return LOGIC_CHIPS.cd4511.outputs.map((p) => l.levels[p - 1]);
+  };
+
+  it('0–9 kodları veri sayfasının tablosundaki segmentler (6 ve 9 kuyruksuz); gösterilen rakam', () => {
+    for (let d = 0; d <= 9; d++) {
+      const sim = run(decoder(d));
+      expect(segments(sim), `${d}`).toEqual([...SEVEN_SEGMENT_CODES[d]!]);
+      expect(sim.status('U1').logic!.digit).toBe(d);
+    }
+    expect(SEVEN_SEGMENT_CODES[6]![0]).toBe(0);
+    expect(SEVEN_SEGMENT_CODES[9]![3]).toBe(0);
+  });
+
+  it('9’dan büyük kod ve BL̄ = 0 karartır; LT̄ = 0 bütün segmentleri yakar (BL̄’den önce)', () => {
+    for (let d = 10; d <= 15; d++) expect(segments(run(decoder(d)))).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(segments(run(decoder(5, 1, 0)))).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(run(decoder(5, 1, 0)).status('U1').logic!.digit).toBeNull();
+    expect(segments(run(decoder(5, 0, 0)))).toEqual([1, 1, 1, 1, 1, 1, 1]);
+  });
+
+  it('LE = 1 iken mandal son kodu tutar', () => {
+    // LE açılışta 1: mandal açılıştaki 0 kodunda kalır, girişteki 7 görünmez.
+    expect(run(decoder(7, 1, 1, 1)).status('U1').logic!.digit).toBe(0);
   });
 });
 

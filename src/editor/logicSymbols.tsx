@@ -4,7 +4,7 @@
 // şekilleriyle, bağlı oldukları bacaklara kısa çizgilerle; 7474, CD4017 ve CD4511'de kutunun içinde blok.
 // Simülasyonda 1 olan bacakların ucunda turuncu nokta.
 
-import { GATE_CHIPS, LOGIC_CHIPS, chipPinNames, type GateChipType, type GateKind, type LogicChipType } from '../model/logicChips';
+import { GATE_CHIPS, LOGIC_CHIPS, SEVEN_SEGMENT_CODES, chipPinNames, type GateChipType, type GateKind, type LogicChipType } from '../model/logicChips';
 import type { Rotation } from '../model/types';
 
 /** Kutunun kenarı ve bacak ucu (piksel, GRID = 10). */
@@ -197,6 +197,23 @@ export function CounterIc({ rotation, levels, count }: { rotation: Rotation; lev
   );
 }
 
+/** CD4511: kutunun içinde "BCD → 7" bloğu ve küçük bir gösterge; simülasyonda gösterilen rakam. */
+export function DecoderIc({ rotation, levels, digit }: { rotation: Rotation; levels?: readonly (number | null)[]; digit?: number | null | undefined }) {
+  const segments = digit === undefined || digit === null ? null : (SEVEN_SEGMENT_CODES[digit] ?? null);
+  return (
+    <g>
+      <DipBox type="cd4511" model="CD4511B" rotation={rotation} levels={levels} />
+      <rect x={-34} y={-34} width={68} height={68} rx={3} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <Text x={0} y={-24} rotation={rotation} size={8} weight={700}>
+        BCD → 7
+      </Text>
+      <g transform="translate(0 6) scale(0.42)">
+        <Digit segments={segments ? [...segments, 0] : null} />
+      </g>
+    </g>
+  );
+}
+
 /**
  * DIP kutusu: bacak çizgileri, çentik, bacak numaraları (içte) ve adları (dışta, etkin düşükler üstü
  * çizgili); 1 olan bacakta turuncu nokta.
@@ -235,6 +252,42 @@ export function DipBox({ type, model, rotation, levels }: { type: LogicChipType;
           </g>
         );
       })}
+    </g>
+  );
+}
+
+/**
+ * 7 segmentin şekilleri (yerel; hanenin ortası (0, 0), 36 × 64 piksel, 8° eğik). Sıra a b c d e f g;
+ * DP ayrı daire.
+ */
+const SEGMENT_PATHS: readonly string[] = (() => {
+  const w = 36;
+  const h = 64;
+  const t = 6;
+  const hx = (y: number) => `M${-w / 2 + t},${y}l${t / 2},${-t / 2}h${w - 3 * t}l${t / 2},${t / 2}l${-t / 2},${t / 2}h${-(w - 3 * t)}Z`;
+  const vy = (x: number, y0: number) => `M${x},${y0 + t / 2}l${t / 2},${t / 2}v${h / 2 - 2 * t}l${-t / 2},${t / 2}l${-t / 2},${-t / 2}v${-(h / 2 - 2 * t)}Z`;
+  return [hx(-h / 2), vy(w / 2 - t / 2, -h / 2), vy(w / 2 - t / 2, 0), hx(h / 2), vy(-w / 2 + t / 2, 0), vy(-w / 2 + t / 2, -h / 2), hx(0)];
+})();
+
+/** Bir hane: `segments` a…g ve DP için 0..1 parlaklık (null: hepsi sönük); `burned`: yanmış segmentler. */
+function Digit({ segments, burned }: { segments: readonly number[] | null; burned?: readonly boolean[] | undefined }) {
+  const lit = (k: number) => (segments?.[k] ?? 0) > 0.02;
+  const fill = (k: number) => (lit(k) ? 'var(--color-lamp-cc)' : 'var(--color-line)');
+  const opacity = (k: number) => (lit(k) ? 0.25 + 0.75 * (segments?.[k] ?? 0) : 1);
+  return (
+    <g transform="skewX(-8)">
+      {SEGMENT_PATHS.map((d, k) => (
+        <path
+          key={k}
+          d={d}
+          fill={burned?.[k] ? 'none' : fill(k)}
+          fillOpacity={opacity(k)}
+          stroke={burned?.[k] ? 'currentColor' : 'none'}
+          strokeWidth={1}
+          strokeDasharray={burned?.[k] ? '2 2' : undefined}
+        />
+      ))}
+      <circle cx={26} cy={30} r={3.5} fill={burned?.[7] ? 'none' : fill(7)} fillOpacity={opacity(7)} stroke={burned?.[7] ? 'currentColor' : 'none'} strokeDasharray="2 2" />
     </g>
   );
 }

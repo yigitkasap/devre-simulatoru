@@ -117,6 +117,7 @@ function build(part: Part): PartModel {
     case 'ic7486':
     case 'ic7474':
     case 'cd4017':
+    case 'cd4511':
       return logicModuleModel(part.type, chipModel(part));
     case 'scr':
       return scrModel(p);

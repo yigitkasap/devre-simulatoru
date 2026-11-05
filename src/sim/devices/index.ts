@@ -231,8 +231,10 @@ export { BRIDGE_DEFAULTS, BRIDGE_MODELS, BridgeDevice } from './bridge';
 export { SCR_DEFAULTS, SCR_IGT, SCR_IH, SCR_IL, SCR_MODELS, ScrDevice } from './scr';
 export {
   CD4017_MODELS,
+  CD4511_MODELS,
   Counter4017Device,
   curveAt,
+  Decoder4511Device,
   FlipFlop7474Device,
   GateIcDevice,
   LOGIC_FAMILIES,

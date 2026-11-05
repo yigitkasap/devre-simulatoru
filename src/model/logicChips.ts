@@ -119,7 +119,7 @@ function gateDef(type: GateChipType): LogicChipDef {
   };
 }
 
-export const LOGIC_CHIPS: Readonly<Record<GateChipType | 'ic7474' | 'cd4017', LogicChipDef>> = {
+export const LOGIC_CHIPS: Readonly<Record<GateChipType | 'ic7474' | 'cd4017' | 'cd4511', LogicChipDef>> = {
   ...(Object.fromEntries(GATE_CHIP_TYPES.map((t) => [t, gateDef(t)])) as Record<GateChipType, LogicChipDef>),
   // SN74HC74 / SN74LS74A: 1CLR̄ 1D 1CLK 1PRĒ 1Q 1Q̄ GND 2Q̄ 2Q 2PRĒ 2CLK 2D 2CLR̄ VCC.
   ic7474: {
@@ -139,9 +139,18 @@ export const LOGIC_CHIPS: Readonly<Record<GateChipType | 'ic7474' | 'cd4017', Lo
     outputs: [3, 2, 4, 7, 10, 1, 5, 6, 9, 11, 12],
     bars: [],
   },
+  // CD4511B: B C LT̄ BL̄ LE D A VSS e d c b a g f VDD.
+  cd4511: {
+    names: ['B', 'C', 'LT', 'BL', 'LE', 'D', 'A', 'VSS', 'e', 'd', 'c', 'b', 'a', 'g', 'f', 'VDD'],
+    vcc: 16,
+    gnd: 8,
+    inputs: [7, 1, 2, 6, 3, 4, 5],
+    outputs: [13, 12, 11, 10, 9, 15, 14],
+    bars: [3, 4],
+  },
 };
 
-export type LogicChipType = GateChipType | 'ic7474' | 'cd4017';
+export type LogicChipType = GateChipType | 'ic7474' | 'cd4017' | 'cd4511';
 
 export const LOGIC_CHIP_TYPES = Object.keys(LOGIC_CHIPS) as LogicChipType[];
 
@@ -154,6 +163,27 @@ export function chipPinNames(type: LogicChipType, model: string): readonly strin
   const names = LOGIC_CHIPS[type].names;
   if (model !== '74LS00') return names;
   return names.map((n, i) => (i === 8 ? '3B' : i === 9 ? '3A' : i === 11 ? '4B' : i === 12 ? '4A' : n));
+}
+
+/** CD4511B doğruluk tablosu (SCHS072B, s. 4): rakam → a…g; 6 ve 9 kuyruksuz (6'da a, 9'da d sönük). */
+export const SEVEN_SEGMENT_CODES: readonly (readonly number[])[] = [
+  [1, 1, 1, 1, 1, 1, 0],
+  [0, 1, 1, 0, 0, 0, 0],
+  [1, 1, 0, 1, 1, 0, 1],
+  [1, 1, 1, 1, 0, 0, 1],
+  [0, 1, 1, 0, 0, 1, 1],
+  [1, 0, 1, 1, 0, 1, 1],
+  [0, 0, 1, 1, 1, 1, 1],
+  [1, 1, 1, 0, 0, 0, 0],
+  [1, 1, 1, 1, 1, 1, 1],
+  [1, 1, 1, 0, 0, 1, 1],
+];
+
+/** Segmentlerin gösterdiği rakam: hiçbiri yanmıyorsa 'blank', rakama uymuyorsa null. */
+export function digitOf(segments: readonly number[]): number | 'blank' | null {
+  if (segments.every((s) => s === 0)) return 'blank';
+  const i = SEVEN_SEGMENT_CODES.findIndex((code) => code.every((s, k) => s === segments[k]));
+  return i >= 0 ? i : null;
 }
 
 /** Üstü çizgili (etkin düşük) ad: her harfe U+0305 birleşik üst çizgi; baştaki rakam çizilmez ("1CLR" → "1C̅L̅R̅"). */

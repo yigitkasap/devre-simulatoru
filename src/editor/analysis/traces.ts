@@ -63,12 +63,12 @@ export function netIndex(doc: CircuitDoc, conn: Connectivity): NetIndex {
 }
 
 /** Düğüme ad verecek parçanın önceliği: yarı iletken ve entegre uçları, sonra öbürleri, en son ölçü aletleri ve kaynaklar. */
-const RANK: Partial<Record<Part['type'], number>> = { npn: 0, pnp: 0, njfet: 0, pjfet: 0, nmos: 0, pmos: 0, opamp: 0, timer555: 0, ic7400: 0, ic7402: 0, ic7404: 0, ic7408: 0, ic7432: 0, ic7486: 0, ic7474: 0, cd4017: 0, oscilloscope: 2, voltmeter: 2, ammeter: 2, funcgen: 2, dcsupply: 2, acsource: 2, battery: 2 };
+const RANK: Partial<Record<Part['type'], number>> = { npn: 0, pnp: 0, njfet: 0, pjfet: 0, nmos: 0, pmos: 0, opamp: 0, timer555: 0, ic7400: 0, ic7402: 0, ic7404: 0, ic7408: 0, ic7432: 0, ic7486: 0, ic7474: 0, cd4017: 0, cd4511: 0, oscilloscope: 2, voltmeter: 2, ammeter: 2, funcgen: 2, dcsupply: 2, acsource: 2, battery: 2 };
 const byLabel = (a: { part: Part }, b: { part: Part }) => (RANK[a.part.type] ?? 1) - (RANK[b.part.type] ?? 1) || a.part.label.localeCompare(b.part.label, 'tr', { numeric: true });
 
 /** Ad verirken önce gelen kaynaklar ve yarı iletkenler (entegreler dahil). */
 const SOURCES: ReadonlySet<string> = new Set(['battery', 'dcsupply', 'acsource', 'funcgen']);
-const ACTIVE: ReadonlySet<string> = new Set(['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos', 'opamp', 'timer555', 'ic7400', 'ic7402', 'ic7404', 'ic7408', 'ic7432', 'ic7486', 'ic7474', 'cd4017']);
+const ACTIVE: ReadonlySet<string> = new Set(['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos', 'opamp', 'timer555', 'ic7400', 'ic7402', 'ic7404', 'ic7408', 'ic7432', 'ic7486', 'ic7474', 'cd4017', 'cd4511']);
 
 function pinName(p: { part: Part; pin: number }, idx: NetIndex): string {
   let short = tr.devices.pinShort[p.part.type]?.[p.pin];

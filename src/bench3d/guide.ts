@@ -99,7 +99,8 @@ function describe(part: Part): { name: string; detail: string } {
     case 'ic7432':
     case 'ic7486':
     case 'ic7474':
-    case 'cd4017': {
+    case 'cd4017':
+    case 'cd4511': {
       const n = LOGIC_CHIPS[part.type].names.length;
       return { name: `${tr.devices.names[part.type]} ${partValueText(part)}`, detail: `DIP-${n}; ${n} bacaklı soketle` };
     }
@@ -203,7 +204,8 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
       case 'ic7432':
       case 'ic7486':
       case 'ic7474':
-      case 'cd4017': {
+      case 'cd4017':
+      case 'cd4511': {
         // 1. bacak: alt sıranın (f) en solundaki delik.
         const bottom = [...at.holes, ...(at.extraHoles ?? [])].filter((h) => h.kind === 'strip' && h.row === 5);
         const first = bottom.reduce((a, b) => (a.kind === 'strip' && b.kind === 'strip' && b.col < a.col ? b : a));

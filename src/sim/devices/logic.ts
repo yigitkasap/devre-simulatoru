@@ -1,4 +1,4 @@
-import { GATE_CHIPS, LOGIC_CHIPS, gateModels, gateOutput, type GateChipType, type LogicChipType } from '../../model/logicChips';
+import { GATE_CHIPS, LOGIC_CHIPS, SEVEN_SEGMENT_CODES, gateModels, gateOutput, type GateChipType, type LogicChipType } from '../../model/logicChips';
 import { GMIN } from '../constants';
 import type { MnaSystem } from '../mna';
 import { strProp } from '../netlist';
@@ -229,6 +229,20 @@ const CD: LogicFamilySpec = {
   },
   outputCurrentMax: null,
 };
+
+/**
+ * CD4511B'nin npn çıkışı (SCHS072B, "Output Drive Voltage", 25 °C tipik V_OH; I_OH = 0, 5, 10, 15,
+ * 20, 25 mA): 5 V'ta 4,55 / 4,25 / 4,10 / 3,95 / 3,75 / 3,55 V; 10 V'ta 9,55 / 9,25 / 9,15 / 9,05 /
+ * 8,90 / 8,75 V; 15 V'ta 14,55 / 14,30 / 14,20 / 14,10 / 13,95 / 13,80 V. Çıkış 25 mA'e kadar akım
+ * verebilir ("up to 25 mA").
+ */
+const CD4511_HIGH: CurveTable = (
+  [
+    [5, [4.55, 4.25, 4.1, 3.95, 3.75, 3.55]],
+    [10, [9.55, 9.25, 9.15, 9.05, 8.9, 8.75]],
+    [15, [14.55, 14.3, 14.2, 14.1, 13.95, 13.8]],
+  ] as const
+).map(([vcc, voh]) => ({ vcc, curve: voh.map((v, k) => [k * 5e-3, vcc - v] as const) }));
 
 export const LOGIC_FAMILIES: Readonly<Record<LogicFamily, LogicFamilySpec>> = { HC, LS, CD };
 
@@ -989,11 +1003,75 @@ export class Counter4017Device extends LogicIcDevice {
   }
 }
 
+// --- CD4511B: BCD'den 7 segmente kod çözücü ---------------------------------------------------------------
+
+/**
+ * CD4511B (SCHS072B doğruluk tablosu): LT̄ = 0 bütün segmentleri yakar; değilse BL̄ = 0 karartır;
+ * değilse LE = 0 iken mandal girişi izler, LE = 1 iken son kodu tutar; 9'dan büyük kodda bütün
+ * segmentler söner. Gecikme (tipik, 5 / 10 / 15 V): veri → çıkış t_PHL 520 / 210 / 150, t_PLH 660 /
+ * 260 / 180 ns; BL̄ t_PHL 350 / 175 / 125, t_PLH 400 / 175 / 150 ns; LT̄ t_PHL 250 / 125 / 85, t_PLH
+ * 150 / 75 / 50 ns. LE → çıkış gecikmesi veri sayfasında yok: verinin gecikmesi kullanılır. Girişlerin
+ * sırası A, B, C, D, LT̄, BL̄, LE; çıkışlar a…g.
+ */
+const CD4511_TPD = {
+  data: { hl: [[5, 520e-9], [10, 210e-9], [15, 150e-9]], lh: [[5, 660e-9], [10, 260e-9], [15, 180e-9]] },
+  blank: { hl: [[5, 350e-9], [10, 175e-9], [15, 125e-9]], lh: [[5, 400e-9], [10, 175e-9], [15, 150e-9]] },
+  test: { hl: [[5, 250e-9], [10, 125e-9], [15, 85e-9]], lh: [[5, 150e-9], [10, 75e-9], [15, 50e-9]] },
+} as const;
+
+export class Decoder4511Device extends LogicIcDevice {
+  readonly type = 'cd4511' as const;
+  /** Mandaldaki BCD kodu. */
+  latched = 0;
+  private shown: number | null = 0;
+
+  constructor(init: DeviceInit) {
+    super(init, 'cd4511', modelOf(init, CD4511_MODELS), { output: { high: CD4511_HIGH }, outputCurrentMax: 25e-3 });
+  }
+
+  protected override resetState(): void {
+    this.latched = 0;
+  }
+
+  protected evaluate(levels: readonly number[]): number[] {
+    const [a, b, c, d, lt, bl, le] = levels as [number, number, number, number, number, number, number];
+    if (le === 0) this.latched = a + 2 * b + 4 * c + 8 * d;
+    if (lt === 0) {
+      this.shown = 8;
+      return [1, 1, 1, 1, 1, 1, 1];
+    }
+    if (bl === 0 || this.latched > 9) {
+      this.shown = null;
+      return [0, 0, 0, 0, 0, 0, 0];
+    }
+    this.shown = this.latched;
+    return [...SEVEN_SEGMENT_CODES[this.latched]!];
+  }
+
+  protected delay(vcc: number, _out: number, level: number, changed: readonly boolean[]): number {
+    const t = changed[4] ? CD4511_TPD.test : changed[5] ? CD4511_TPD.blank : CD4511_TPD.data;
+    return lerp(vcc, level === 1 ? t.lh : t.hl);
+  }
+
+  protected override details() {
+    return { digit: this.powered ? this.shown : null };
+  }
+
+  protected override adoptLogic(prev: LogicIcDevice): void {
+    if (prev instanceof Decoder4511Device) {
+      this.latched = prev.latched;
+      this.shown = prev.shown;
+    }
+  }
+}
+
 export const CD4017_MODELS = ['CD4017B'] as const;
+export const CD4511_MODELS = ['CD4511B'] as const;
 
 /** Entegrenin model seçenekleri (katalog). */
 export function logicModels(type: LogicChipType): readonly string[] {
   if (type === 'cd4017') return CD4017_MODELS;
+  if (type === 'cd4511') return CD4511_MODELS;
   return gateModels(type);
 }
 
@@ -1010,4 +1088,5 @@ export const LOGIC_IC_MODELS: Readonly<Record<LogicChipType, DeviceModel>> = {
   ic7486: model('ic7486', (init) => new GateIcDevice(init, 'ic7486')),
   ic7474: model('ic7474', (init) => new FlipFlop7474Device(init)),
   cd4017: model('cd4017', (init) => new Counter4017Device(init)),
+  cd4511: model('cd4511', (init) => new Decoder4511Device(init)),
 };

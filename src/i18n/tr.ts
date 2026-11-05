@@ -54,6 +54,9 @@ const LOGIC_MODEL_NOTES: Record<string, string> = {
   CD4017B:
     'CD4017B (TI, SCHS027C): CMOS, 3–18 V (mutlak en çok 20 V). 5 V’ta 1 için en az 3,5 V, 0 için en çok 1,5 V. Çıkış 5 V’ta 1 mA verirken tipik 4,6 V, 3,2 mA’de 2,5 V: ' +
     'zayıf bir çıkıştır, bir LED’e ancak birkaç mA verir. CLK → Q gecikmesi 5 V’ta tipik 325 ns; en çok 2,5 MHz (5 V).',
+  CD4511B:
+    'CD4511B (TI, SCHS072B): CMOS, 3–18 V (mutlak en çok 20 V). Segment çıkışları npn: 5 V’ta 0 mA’de 4,55 V, 10 mA’de 4,10 V, 20 mA’de 3,75 V (tipik); en çok 25 mA. ' +
+    'Her segmente ön direnç koy. Veri → segment gecikmesi 5 V’ta tipik 520–660 ns.',
 };
 
 export interface DiagnosticContext {
@@ -117,6 +120,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ic7486: '4 × ÖZEL VEYA kapısı',
   ic7474: '2 × D flip-flop',
   cd4017: 'Onluk sayıcı',
+  cd4511: 'BCD → 7 segment kod çözücü',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -174,6 +178,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ic7486: 'ÖZEL VEYA entegresinin',
   ic7474: 'flip-flop entegresinin',
   cd4017: 'sayıcının',
+  cd4511: 'kod çözücünün',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -761,6 +766,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'İki D flip-flop (DIP-14): saatin (CLK) yükselen kenarında D’deki seviyeyi Q’ya alır ve bir sonraki kenara kadar saklar; Q̅ her zaman Q’nun tersidir. P̅R̅E̅ (ön kurma) Q’yu 1, C̅L̅R̅ (silme) 0 yapar: ikisi de etkin düşük ve saatten bağımsızdır, kullanılmıyorsa 1’e bağlanır.',
   cd4017:
     'CMOS onluk sayıcı (DIP-16, 3–18 V): CLK’ın her yükselen kenarında Q0…Q9 çıkışlarından sıradakini 1 yapar (bir anda yalnızca biri 1). RST 1 iken sayaç 0’da durur; INH (13. bacak, CLOCK INHIBIT; bazı veri sayfalarında etkin düşük CLOCK ENABLE) 1 iken sayma durur. CO (elde) 0–4’te 1, 5–9’da 0: sonraki sayıcıyı sürer.',
+  cd4511:
+    'CMOS BCD → 7 segment kod çözücü (DIP-16, 3–18 V): A (en düşük basamak) … D girişlerindeki ikili kodu (0–9) ortak katotlu göstergenin a…g segmentlerine çevirir; çıkışlar segmentlere akım verir (her biri ön dirençle). L̅T̅ = 0 bütün segmentleri yakar (lamba testi), B̅L̅ = 0 karartır, LE = 1 son kodu tutar (mandal). 9’dan büyük kodda gösterge söner.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -1887,6 +1894,7 @@ export const tr = {
     logicSupplyCurrent: 'Besleme akımı',
     logicQ: '1Q · 2Q',
     logicCount: 'Sayaç',
+    logicDigit: 'Rakam',
     logicUnpowered: 'Entegre beslenmiyor: çıkışlar sürülmüyor.',
     regInput: 'Giriş',
     regOutput: 'Çıkış',
@@ -3075,6 +3083,7 @@ export const tr = {
       ic7486: 'ÖZEL VEYA entegreleri',
       ic7474: 'D flip-flop entegreleri',
       cd4017: 'Onluk sayıcılar',
+      cd4511: 'Kod çözücüler',
     } satisfies Record<DeviceType, string>,
   },
   // Arayüz v4: masaüstü üst çubuğu ve menüleri (devre menüsü, Daha fazla).
@@ -3698,6 +3707,14 @@ export const tr = {
     /** 74LS'nin boştaki girişi. */
     floatingHigh: 'boşta · 1 okunur',
     count: (n: number) => `Sayaç: ${n} (Q${n} = 1)`,
+    digit: (d: number | null, levels: readonly (number | null)[]) =>
+      levels[2] === 0
+        ? 'Lamba testi (L̅T̅ = 0): bütün segmentler yanıyor (8).'
+        : d !== null
+          ? `Gösterilen rakam: ${d}`
+          : levels[3] === 0
+            ? 'Karartılmış (B̅L̅ = 0): bütün segmentler sönük.'
+            : 'Sönük: mandaldaki kod 9’dan büyük.',
   },
   help: {
     title: 'Yardım',
