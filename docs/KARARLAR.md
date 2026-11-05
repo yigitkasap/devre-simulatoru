@@ -2338,3 +2338,108 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
   - Görevde hazır gelen parça ve kablolar kilitlidir (taşınmaz, döndürülmez, silinmez; Tahtayı boşalt
     yalnızca öğrencininkileri kaldırır). "Güç rayları bağlı": güç kaynaklarının raylara giden
     kabloları ve raylar arası kablolar takılı gelir.
+
+### Lojik entegreler (Dalga 2, 2026-11-05)
+
+Yeni parçalar ("Parça ekle → Lojik entegreler"): 7400 (4 × NAND), 7402 (4 × NOR), 7404 (6 × DEĞİL),
+7408 (4 × VE), 7432 (4 × VEYA), 7486 (4 × ÖZEL VEYA), 7474 (2 × D flip-flop), her birinde model
+seçimi 74HC ya da 74LS; CD4017B (onluk sayıcı), CD4511B (BCD → 7 segment kod çözücü) ve ortak katotlu
+7 segment gösterge (Kingbright SC56-11EWA). Bacak tabloları `src/model/logicChips.ts`, çözücü
+`src/sim/devices/logic.ts` ve `display7.ts`, sembol `src/editor/logicSymbols.tsx`, defter kartı
+`src/editor/LogicCard.tsx`, 3B `src/bench3d/logicModels.ts`.
+
+- **Şema:** entegre tek parça, veri sayfasının bacak sırasıyla bir DIP kutusu (çentik üstte; sol yanda
+  yukarıdan aşağı 1…n/2, sağ yanda aşağıdan yukarı); bacak numaraları kutunun içinde, adları dışında
+  (etkin düşükler üstü çizgili), VCC ve GND açık bacak. Kapılar kutunun içinde ANSI şekilleriyle ve
+  bacaklarına giden kısa çizgilerle; 7474'te iki flip-flop bloğu (D, saat üçgeni, Q, Q̅, PR̅E̅ ve C̅L̅R̅'de
+  değil dairesi), CD4017'de "÷10" bloğu ve sayaç, CD4511'de "BCD → 7" bloğu ve küçük bir hane.
+  Simülasyonda 1 olan bacağın ucunda turuncu nokta. Göstergede segmentler akımla yanar (yanmış segment
+  kesikli).
+- **Defter kartı:** bacak tablosu (her bacağın durumu 1 / 0 / belirsiz / boşta / sürülmüyor ve GND'ye
+  göre gerilimi); kapı entegrelerinde seçilen kapının doğruluk tablosu, o anki satır vurgulu; 7474'te
+  1Q ve 2Q, CD4017'de sayaç, CD4511'de gösterilen rakam (ya da lamba testi / karartma / 9'dan büyük
+  kod); göstergede segment başına akım ve durum.
+- **Tahtada kur, 3B, PCB:** DIP-14/16 orta kanalın üstüne oturur (1. bacak f satırının solunda);
+  3B'de çentik, 1. bacak noktası ve üstte model yazısı (ör. 74HC08). Gösterge d ve h satırlarında
+  (sıralar arası 15,24 mm). PCB'de DIP-14/16 ayak izi (KiCad eşdeğeri `Package_DIP:DIP-14_W7.62mm_Socket`)
+  ve 100 nF dekuplaj; gösterge için 10 pedli iz (eşdeğeri `Display_7Segment:7SegmentLED_LTS6760_LTS6780`,
+  aynı yerleşim). Optokuplör de artık DIP-4 izinde (önce yanlışlıkla TO-92'ydi).
+- **Kullanılmayan bacaklar:** entegrenin kullanılmayan çıkışları "uç boşta" sayılmaz; boştaki girişi
+  entegrenin kendi uyarısı söyler. Göstergenin kullanılmayan segmentleri (DP) normaldir.
+
+**Çözücü modeli** (555'teki olay tabanlı yapı):
+
+- Girişler veri sayfasındaki V_IL / V_IH'e göre 0 ya da 1 (beslemeye göre tablodaki noktalar arasında
+  doğrusal ara değer). Arası "belirsiz": sayısal durum kararlı kalsın diye ortadaki eşik %5'lik
+  histerezisle kullanılır, kart belirsiz gösterir ve uyarır ("Giriş gerilimi belirsiz bölgede").
+- 74HC ve CD4000B girişi akım çekmez. Girişin düğümünün entegrenin beslemesine iletken yolu yoksa (bağlı
+  değil ya da açık anahtarın arkasında) "CMOS giriş boşta: durumu belirsiz" uyarısı; motorun gmin'i
+  girişi 0 V'a çeker. (Motor, gmin gruplamasını `drivenPins` ile bileşenlere bildirir.)
+- 74LS girişi veri sayfasının giriş akımlarıyla: I_IL = −0,4 mA (0,4 V) ve I_IH = 20 µA (2,7 V)
+  noktalarından geçen doğru (2,59 V arkasında 5,48 kΩ), 2,7 V'un üstünde 7 V'taki I_I = 0,1 mA'e giden
+  doğru. Boştaki giriş 2,59 V'ta kalır ve 1 okunur. 74LS86A'nın girişleri ve 74LS74A'nın PR̅E̅ ve C̅L̅R̅'si
+  iki birim yük (I_IL −0,8 mA, I_IH 40 µA).
+- Çıkış: 1'de V_CC'den, 0'da GND'den, veri sayfasındaki V_OH / V_OL – akım noktalarından geçen parça parça
+  doğrusal eğriyle (noktalar arasında doğru, son noktanın ötesinde son doğrunun uzantısı; beslemeye
+  göre tablolar arasında ara değer). Kısa devrede ve aşırı yükte çıkış gerilimi bu eğriye göre düşer;
+  74HC'de 25 mA, CD4511B'de 25 mA aşılınca uyarı. 0 A'de sıfırdan farklı başlayan eğrilerde (74LS, CD4511B'nin
+  npn çıkışı) çıkış ters yönde akım vermez (o bölgede motorun gmin'i kadar iletkenlik).
+- Besleme: VCC ya da GND bağlı değilse ya da besleme önerilen en küçük değerin altındaysa çıkışlar
+  sürmez ("Entegre beslenmiyor"); önerilen aralığın dışı uyarı; mutlak en büyük değerin üstünde entegre
+  yanar (Onar ile düzelir).
+- Yayılma gecikmesi: giriş eşiği geçtikten (olay, 10 ns çözünürlükle) t_pd sonra çıkış değişir
+  (kırılma noktası); t_pd'den kısa darbe çıkışa geçmez (eylemsiz gecikme). Aynı anda vadesi gelen
+  değişimlerden önce en küçük indeksli uygulanır, öbürleri 2 ps ertelenip yeni çözümde yeniden
+  denetlenir: NAND mandalı gibi iki kapının birbirini aynı anda değiştirmek istediği durumda devre
+  sonsuza dek salınmaz, kararlı durumlardan birine düşer. Doğru akım çözümünde (gecikmesiz) çıkışlar
+  art arda ikiden çok değişirse her seferinde yalnızca ilk farklı çıkış değişir (aynı amaç).
+- Kenar tetiklemeli: 7474 Q'yu saatin yükselen kenarında D'nin kenardan önceki seviyesiyle alır;
+  PR̅E̅ ve C̅L̅R̅ saatten bağımsız, ikisi 0 iken Q ve Q̅ ikisi de 1. CD4017 CLK · INH̅'in yükselen kenarında
+  sayar (CLK'ın yükselen kenarı ya da CLK 1 iken INH'in düşen kenarı), RESET 1 iken 0'da kalır; CO 0–4'te 1.
+  CD4511: L̅T̅ = 0 → bütün segmentler; değilse B̅L̅ = 0 → karartma; LE = 0 iken mandal girişi izler, 1
+  iken tutar; 9'dan büyük kodda karartma. Açılışta 7474'ün Q'su, sayaç ve mandal 0 (veri sayfaları
+  açılış durumunu vermez).
+
+**Veri sayfası değerleri** (TA = 25 °C; tipik değer varsa tipik):
+
+| Aile / parça | Kaynak | Değerler |
+|---|---|---|
+| 74HC00/02/04/08/32/86/74 | TI SCLS181H, SCLS076G, SCLS078H, SCLS081J, SCLS200F, SCLS100F, SCLS094F | V_CC 2–6 V, mutlak en çok 7 V; V_IH 1,5 / 3,15 / 4,2 V, V_IL 0,5 / 1,35 / 1,8 V (2 / 4,5 / 6 V); V_OH 1,998 V (2 V, −20 µA), 4,3 V (4,5 V, −4 mA), 5,8 V (6 V, −5,2 mA); V_OL 0,002 V (2 V, 20 µA), 0,17 V (4,5 V, 4 mA), 0,15 V (6 V, 5,2 mA); I_O en çok ±25 mA |
+| 74HC t_pd | aynı | 2 / 4,5 / 6 V: HC00, HC02, HC04 45 / 9 / 8 ns; HC08, HC32 50 / 10 / 8 ns; HC86 40 / 12 / 10 ns; HC74 CLK, PR̅E̅, C̅L̅R̅ → Q 70 / 20 / 15 ns |
+| 74LS00/02/04/08/32/86A/74A | TI SDLS025D, SDLS027, SDLS029C, SDLS033, SDLS100, SDLS124, SDLS119 | V_CC 4,75–5,25 V, mutlak en çok 7 V; V_IH 2 V, V_IL 0,8 V; V_OH 3,4 V (V_CC 4,75 V, −0,4 mA); I_OS −20 … −100 mA; V_OL 0,25 V (4 mA), 0,35 V (8 mA); LS04: 0,25 V (8 mA); I_IL −0,4 mA (0,4 V), I_IH 20 µA (2,7 V), I_I 0,1 mA (7 V) |
+| 74LS t_PLH / t_PHL | aynı (R_L 2 kΩ, C_L 15 pF) | LS00 9 / 10, LS02 10 / 10, LS04 9 / 10, LS08 8 / 10, LS32 14 / 14 ns; LS86A öbür giriş 0 iken 12 / 10, 1 iken 20 / 13 ns; LS74A 13 / 25 ns |
+| 74LS besleme akımı | aynı (5,25 V) | I_CCH / I_CCL: LS00 0,8 / 2,4, LS02 1,6 / 2,8, LS04 1,2 / 3,6, LS08 2,4 / 4,4, LS32 3,1 / 4,9 mA; LS86A 6,1 mA; LS74A 4 mA |
+| CD4017B | TI SCHS027C | V_DD 3–18 V, mutlak en çok 20 V; V_IL 1,5 / 3 / 4 V, V_IH 3,5 / 7 / 11 V (5 / 10 / 15 V); I_OH −1 mA (4,6 V) ve −3,2 mA (2,5 V) (5 V), −2,6 mA (9,5 V, 10 V), −6,8 mA (13,5 V, 15 V); I_OL 1 mA (0,4 V, 5 V), 2,6 mA (0,5 V, 10 V), 6,8 mA (1,5 V, 15 V); CLOCK → Q 325 / 135 / 85 ns, → CO 300 / 125 / 80 ns, RESET → çıkış 265 / 115 / 85 ns; CO dağılımı Şekil 2'den |
+| CD4511B | TI SCHS072B | V_DD 3–18 V, mutlak en çok 20 V; eşikler CD4017B ile aynı; segment çıkışı V_OH (0 / 5 / 10 / 15 / 20 / 25 mA): 5 V'ta 4,55 / 4,25 / 4,10 / 3,95 / 3,75 / 3,55 V, 10 V'ta 9,55 / 9,25 / 9,15 / 9,05 / 8,90 / 8,75 V, 15 V'ta 14,55 / 14,30 / 14,20 / 14,10 / 13,95 / 13,80 V; en çok 25 mA; I_OL CD4017B ile aynı; veri → çıkış t_PHL 520 / 210 / 150, t_PLH 660 / 260 / 180 ns; B̅L̅ 350 / 175 / 125, 400 / 175 / 150 ns; L̅T̅ 250 / 125 / 85, 150 / 75 / 50 ns; doğruluk tablosu (6 ve 9 kuyruksuz) |
+| SC56-11EWA | Kingbright DSAP6671 V.1A | V_F 10 mA'de tipik 1,9 V (en çok 2,3 V); I_F en çok 30 mA; V_R 5 V; bacaklar a 7, b 6, c 4, d 2, e 1, f 9, g 10, DP 5, ortak katot 3 ve 8; eğrinin (s. 3) 15 noktasından N 2,76, R_s 8,8 Ω |
+| DIP (N) | TI 4040049/E | bacak aralığı 2,54 mm, sıralar arası 7,62 mm (14 ve 16 bacak) |
+
+**Yaklaştırmalar ve modellenmeyenler:**
+
+- 74HC'nin 2 V'taki çıkış direnci yalnızca −20 µA noktasından (1,998 V, 1 mV'luk basılı değer).
+- 74LS'nin 1 çıkışı: V_OH tipiği V_CC = 4,75 V'ta, kısa devre akımı V_CC = 5,25 V'ta verilir ve
+  tipiği yoktur: aralığın ortası (−60 mA) alındı.
+- 74LS'nin 0 çıkışında 0 A'deki gerilim (0,15 V) iki tipik noktadan uzatma; 74LS04'te yalnız 8 mA
+  noktası olduğu için eğim kardeşlerininki (25 Ω).
+- CD4017B'nin 10 V ve 15 V'taki kaynak eğrisi tek noktadan (tek doğru); ara beslemelerde tablolar
+  arasında ara değer.
+- CD4511B'nin LE → çıkış gecikmesi veri sayfasında yok: verinin gecikmesi kullanılır.
+- Çıkışın yükselme ve düşme süresi, kurulum ve tutma süreleri (ör. 74HC74 4,5 V'ta t_su 20 ns),
+  en büyük saat frekansı, giriş kapasitesi, giriş kenetleme diyotları, CMOS'un durgun akımı (µA),
+  sıcaklık etkisi modellenmez. 74LS besleme akımı V_CC–GND arasında bir iletkenlik (5,25 V'taki
+  değerden).
+- Gösterge: tepe akımı (160 mA, 1/10 görev) modellenmez; 30 mA'i aşan segment yanar (LED gibi).
+  Parlaklık 10 mA'e göre normalleştirilir.
+
+**Örnekler** ("Lojik devreler"): VE kapısının doğruluk tablosu (74HC08; 74LS08'e geçince 10 kΩ'luk
+aşağı çekmenin girişi ancak 1,67 V'a indirebildiği, boştaki LS girişinin 1 okunduğu), NAND ile DEĞİL
+ve VE, yarım toplayıcı (74HC86 + 74HC08), NAND ile SR mandal, D flip-flopla frekans bölücü (555 →
+74HC74, osiloskopta f ve f/2), yürüyen ışık (555 + CD4017 + 10 LED), BCD'den 7 segmente (çift yollu
+anahtarlar → CD4511 → gösterge; aşağı çekme dirençleri olmadan devre tek tahtaya sığar). Metinlerdeki
+sayılar `tests/examples-lojik.test.ts`'te simülasyonda ölçülür.
+
+**Testler:** `tests/lojik.test.ts` (her kapı entegresinin doğruluk tablosu HC ve LS'de, eşikler,
+yük altında V_OH / V_OL, kısa devre, boştaki giriş ve uyarısı, beslemesiz ve yanan entegre, yayılma
+gecikmesi, 7474'ün kenarı ve PR̅E̅ / C̅L̅R̅'si, frekans bölücü, CD4017'nin sayması, RESET ve INH'i,
+CD4511'in 0–15 kodları ve karartması, göstergenin ileri gerilimi ve aşırı akımda yanması); ios-kontrol
+"Lojik entegreler" maddeleri (şema, kart, LS'de belirsiz giriş, Tahtada kur, gösterge, telefon).

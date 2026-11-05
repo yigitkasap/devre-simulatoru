@@ -7,7 +7,7 @@ import { Device, type DeviceInit, type DeviceModel, type DeviceStatus, type Logi
 /**
  * Lojik entegreler (Dalga 2): 7400, 7402, 7404, 7408, 7432, 7486, 7474 (74HC ve 74LS), CD4017B,
  * CD4511B. Bütün sayılar üreticinin veri sayfasından (TA = 25 °C, tipik değer varsa tipik); kaynaklar
- * aşağıdaki sabitlerin yorumlarında ve README'de ("Lojik entegreler").
+ * aşağıdaki sabitlerin yorumlarında ve docs/KARARLAR.md'de ("Lojik entegreler").
  *
  * Model:
  *   - Girişler veri sayfasındaki V_IL / V_IH eşiklerine göre 0 ya da 1 okunur (besleme gerilimine göre

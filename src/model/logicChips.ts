@@ -1,6 +1,6 @@
 // Lojik entegrelerin bacak tanımları: çözücü (sim/devices/logic.ts), şema sembolü, defter kartı, 3B
 // ve PCB aynı tanımı kullanır. Bacak adları ve sırası TI veri sayfalarındaki DIP (N / E kılıf) bacak
-// şemalarından (README, "Lojik entegreler").
+// şemalarından (docs/KARARLAR.md, "Lojik entegreler").
 
 import type { DeviceType } from '../sim/netlist';
 

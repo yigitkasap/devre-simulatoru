@@ -3268,13 +3268,13 @@ try {
   dp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
   await dp.goto(URL0, { waitUntil: 'networkidle' });
   const canvas = await dp.locator('svg.schematic').boundingBox();
-  // v3: sol kütüphane yok; "Bütün parçalar (45)" (v4: eskiden "Bütün parçalara göz at") kategorili ızgarayı açar, tıklanan parça eklenir.
-  await notebook(dp).getByRole('button', { name: 'Bütün parçalar (45)', exact: true }).click(); await dp.waitForTimeout(200);
+  // v3: sol kütüphane yok; "Bütün parçalar (55)" (v4: eskiden "Bütün parçalara göz at") kategorili ızgarayı açar, tıklanan parça eklenir.
+  await notebook(dp).getByRole('button', { name: 'Bütün parçalar (55)', exact: true }).click(); await dp.waitForTimeout(200);
   const grid = dp.getByRole('dialog', { name: 'Bütün parçalar' });
   const tiles = await grid.locator('button[data-part]').count();
   await grid.getByRole('button', { name: 'Kondansatör', exact: true }).click(); await dp.waitForTimeout(300);
-  check('masaüstü (v3): kütüphane yok; "Bütün parçalar" 45 parçayı gösteriyor, tıklanan parça ekleniyor, pencere kapanıyor',
-    (await dp.getByPlaceholder(/Parça ara/).count()) === 0 && tiles === 45 && (await doc(dp)).parts.some((p) => p.type === 'capacitor') && (await grid.count()) === 0, `${tiles} parça`);
+  check('masaüstü (v3): kütüphane yok; "Bütün parçalar" 55 parçayı gösteriyor, tıklanan parça ekleniyor, pencere kapanıyor',
+    (await dp.getByPlaceholder(/Parça ara/).count()) === 0 && tiles === 55 && (await doc(dp)).parts.some((p) => p.type === 'capacitor') && (await grid.count()) === 0, `${tiles} parça`);
   await dp.getByRole('button', { name: 'Geri al', exact: true }).click(); await dp.waitForTimeout(150);
   // v3: alt simülasyon çubuğu ve ipucu şeridi yok; tuval alta kadar. v4: yakınlaştırma grubu tuvalin sol altında
   // (−, %yüzde, +, Sığdır); Şema / 3B seçimi üst çubukta.
@@ -3628,6 +3628,115 @@ try {
     await shot(page, 'ios-dalga1.png');
     check('telefon (Parça Dalga 1): Ölç’te düğmeye parmakla basılı tutunca tristör tetikleniyor; kartta "Basılı tut" en az 44 px, sayfa kaymıyor',
       text.includes('iletimde') && holdBox !== null && holdBox.height >= 44 && !(await pageScrolls(page)), `${holdBox ? Math.round(holdBox.height) : 'yok'} px; ${text.replace(/\s+/g, ' ').slice(0, 60)}`);
+    await page.context().close();
+  }
+
+  // --- Lojik entegreler (Dalga 2): DIP sembolü, defter kartı (bacaklar, doğruluk tablosu), LS girişi, Tahtada kur, gösterge, telefon --
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'VE kapısının doğruluk tablosu (74HC08)', exact: true }))).click(); await page.waitForTimeout(500);
+    const texts = await page.locator('svg.schematic text').allTextContents();
+    const numbers = Array.from({ length: 14 }, (_, i) => String(i + 1)).every((n) => texts.includes(n));
+    check('lojik (masaüstü): 74HC08 şemada veri sayfasının bacak sırasıyla DIP kutusu: 1–14 numaralar, 1A 1B 1Y … adları, VCC ve GND açık bacak; altında model',
+      numbers && ['1A', '1B', '1Y', '4Y', 'VCC', 'GND'].every((n) => texts.includes(n)) && texts.includes('74HC08'), texts.filter((t) => /^(VCC|GND|1A|74HC08)$/.test(t)).join(' '));
+    await page.getByRole('button', { name: 'Oynat', exact: true }).last().click(); await page.waitForTimeout(1200);
+    const highDots = await page.locator('svg.schematic circle[fill="var(--color-paused)"]').count();
+    await notebook(page).getByRole('button', { name: /^U1 ·/ }).click(); await page.waitForTimeout(400);
+    const card = notebook(page).getByRole('region', { name: /^U1 ·/ });
+    const cardText = (await card.textContent()) ?? '';
+    const current = await card.locator('tr[aria-current="true"]').textContent().catch(() => '');
+    const gates = await card.getByRole('group', { name: 'Doğruluk tablosu gösterilen kapı' }).getByRole('button').count();
+    const pinRow = (n) => card.getByRole('region', { name: 'Bacaklar' }).locator('tbody tr').nth(n - 1).textContent();
+    check('lojik (masaüstü): Oynat’ta 1 olan bacaklarda turuncu nokta; kartta doğruluk tablosu (1. kapı, o anki satır 1 1 1 vurgulu), 4 kapı seçilebilir; bacak tablosunda 1Y 1 · 4,60 V, besleme 5,000 V',
+      highDots >= 3 && cardText.includes('Doğruluk tablosu') && (current ?? '').replace(/\s+/g, '') === '111' && gates === 4 && /1Y.*1.*4,60 V/.test((await pinRow(3)) ?? '') && cardText.includes('5,000 V'),
+      `${highDots} nokta · satır ${current} · ${gates} kapı · ${(await pinRow(3))?.replace(/\s+/g, ' ')}`);
+    // 4. kapıya geç: tablo değişir, satır 0 0 0 (girişleri toprakta).
+    await card.getByRole('button', { name: '4. kapı' }).click(); await page.waitForTimeout(200);
+    const fourth = await card.locator('tr[aria-current="true"]').textContent().catch(() => '');
+    check('lojik (masaüstü): 4. kapının tablosunda o anki satır 0 0 0 (kullanılmayan girişler toprakta)', (fourth ?? '').replace(/\s+/g, '') === '000', fourth ?? '');
+    // 74LS08'e geç ve S2'yi aç: 10 kΩ LS girişini ancak 1,67 V'a çeker (belirsiz, 1 okunur), uyarı.
+    await card.getByRole('radio', { name: '74LS08', exact: true }).click(); await page.waitForTimeout(900);
+    const s2 = await part(page, 'S2');
+    const at = await screen(page, s2.x, s2.y);
+    await page.mouse.click(at.x, at.y); await page.waitForTimeout(1200);
+    const lsCard = notebook(page).getByRole('region', { name: /^U1 ·/ });
+    const lsRow = ((await lsCard.getByRole('region', { name: 'Bacaklar' }).locator('tbody tr').nth(1).textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    const messages = (await notebook(page).textContent()) ?? '';
+    check('lojik (masaüstü): 74LS08’de S2 açıkken 1B 1,67 V’ta “belirsiz”; “Giriş gerilimi belirsiz bölgede” uyarısı; LED yanık kalıyor (1 okunur)',
+      lsRow.includes('belirsiz') && lsRow.includes('1,67 V') && messages.includes('Giriş gerilimi belirsiz bölgede'), lsRow);
+    await ctx.close();
+  }
+  {
+    // Tahtada kur: 74HC08 kanalın üstüne oturuyor (alt sıra f, üst sıra e; 14 bacak).
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const bp = await ctx.newPage();
+    bp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await bp.goto(URL0, { waitUntil: 'networkidle' });
+    await bp.getByRole('button', { name: 'Örnekler', exact: true }).click(); await bp.waitForTimeout(200);
+    await (await pickExample(bp, (p) => p.getByRole('button', { name: 'VE kapısının doğruluk tablosu (74HC08): tahtada kur' }))).click(); await bp.waitForTimeout(1500);
+    await bp.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await bp.waitForTimeout(600);
+    const panel = bp.getByRole('region', { name: 'Tahtada kur paneli' });
+    const holeXY = (name) => bp.evaluate((n) => {
+      const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
+      const m = /^(\d+)([a-j])$/.exec(n); const col = +m[1]; const row = 'abcdefghij'.indexOf(m[2]);
+      const x = col - 15.5; const z = row < 5 ? -5.5 + row : 1.5 + (row - 5);
+      return { x: rect.left + x * t.scale + t.ox, y: rect.top + z * t.scale + t.oy };
+    }, name);
+    await panel.getByRole('button', { name: 'U1: tahtaya tak' }).click();
+    const target = await holeXY('10f'); await bp.mouse.click(target.x, target.y); await bp.waitForTimeout(500);
+    const d = await doc(bp);
+    const id = d.parts.find((q) => q.label === 'U1').id;
+    const holes = d.build?.parts[id]?.holes ?? [];
+    const expected = [...Array.from({ length: 7 }, (_, i) => `${10 + i}f`), ...Array.from({ length: 7 }, (_, i) => `${16 - i}e`)];
+    const placed = await bp.evaluate((pid) => window.__tezgah?.parts.has(pid) ?? false, id);
+    await shot(bp, 'ios-lojik-tahta.png');
+    check('lojik (Tahtada kur): 74HC08 kanalın üstüne oturuyor: 1. bacak 10f, 1–7 f satırında soldan sağa, 8–14 e satırında sağdan sola; 3B’de entegre var',
+      holes.join(' ') === expected.join(' ') && placed, holes.join(' '));
+    await ctx.close();
+  }
+  {
+    // 7 segment gösterge: BCD örneğinde 5; segmentler yanıyor; kod çözücünün kartında rakam.
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'BCD’den 7 segmente (CD4511 + gösterge)', exact: true }))).click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).last().click(); await page.waitForTimeout(1200);
+    const lit = await page.locator('svg.schematic path[fill="var(--color-lamp-cc)"]').count();
+    await notebook(page).getByRole('button', { name: /^U1 ·/ }).click(); await page.waitForTimeout(400);
+    const decoder = (await notebook(page).getByRole('region', { name: /^U1 ·/ }).textContent()) ?? '';
+    await notebook(page).getByRole('button', { name: /^DS1 ·/ }).click(); await page.waitForTimeout(400);
+    const display = notebook(page).getByRole('region', { name: /^DS1 ·/ });
+    const litRows = await display.locator('tbody tr', { hasText: 'yanıyor' }).count();
+    const aRow = ((await display.locator('tbody tr').first().textContent()) ?? '').replace(/\s+/g, ' ');
+    await shot(page, 'ios-lojik-gosterge.png');
+    // Yanık segmentler: göstergede 5 ve kod çözücünün kutusundaki küçük hanede 5.
+    check('lojik (masaüstü): gösterge 5’i gösteriyor (a, c, d, f, g yanık; CD4511’in kutusunda da 5); CD4511 kartında “Gösterilen rakam: 5”; göstergenin kartında 5 segment yanıyor, a 10,0 mA',
+      lit === 10 && decoder.includes('Gösterilen rakam: 5') && litRows === 5 && aRow.includes('10,0 mA'), `${lit} · ${litRows} · ${aRow}`);
+    await ctx.close();
+  }
+  {
+    // Telefon: kart (bacak tablosu, doğruluk tablosu), kapı düğmeleri 44 px, sayfa kaymıyor.
+    const { page } = await phone();
+    await openExample(page, 'VE kapısının doğruluk tablosu (74HC08)');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(1000);
+    await phoneNotebook(page).getByRole('button', { name: /^U1 ·/ }).tap(); await page.waitForTimeout(500);
+    const card = phoneNotebook(page).getByRole('region', { name: /^U1 ·/ });
+    const gateButtons = await card.getByRole('group', { name: 'Doğruluk tablosu gösterilen kapı' }).getByRole('button').evaluateAll((bs) => bs.map((b) => Math.round(b.getBoundingClientRect().height)));
+    const current = await card.locator('tr[aria-current="true"]').textContent().catch(() => '');
+    const rows = await card.locator('tbody tr').count();
+    await shot(page, 'ios-lojik-telefon.png');
+    check('lojik (telefon): kartta doğruluk tablosu (satır 1 1 1 vurgulu) ve 14 bacaklık tablo; kapı düğmeleri en az 44 px; sayfa kaymıyor',
+      (current ?? '').replace(/\s+/g, '') === '111' && rows === 4 + 14 && gateButtons.length === 4 && gateButtons.every((h) => h >= 44) && !(await pageScrolls(page)),
+      `${current} · ${rows} satır · ${gateButtons.join('/')} px`);
     await page.context().close();
   }
 
