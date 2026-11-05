@@ -27,7 +27,7 @@ import { formatEditable, formatSI } from '../sim/units';
 import { useThrottledText } from './a11y';
 import { ArduinoCardBody } from './ArduinoPanel';
 import { MultimeterCardBody } from './MultimeterCard';
-import { LogicDetails } from './LogicCard';
+import { LogicDetails, SegmentDetails } from './LogicCard';
 import { isLogicChip } from '../model/logicChips';
 import { spdtThrow } from '../sim/devices/spdt';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
@@ -824,6 +824,7 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
             <PrimaryControl {...props} values={values} locked={locked} />
             {sliderRows.length > 0 && <div className="flex flex-col gap-2">{sliderRows}</div>}
             {isLogicChip(part.type) && <LogicDetails part={part} frame={frame} />}
+            {part.type === 'seg7' && <SegmentDetails part={part} frame={frame} />}
             <LiveTiles
               part={part}
               frame={frame}

@@ -74,6 +74,7 @@ export function partValueText(part: Part): string {
     case 'ic7474':
     case 'cd4017':
     case 'cd4511':
+    case 'seg7':
       return String(p.model ?? CATALOG[part.type].defaultProps.model ?? '');
     case 'arduino':
       return tr.properties.optionLabel('program', String(p.program ?? ''));

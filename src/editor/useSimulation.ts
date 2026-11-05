@@ -322,6 +322,8 @@ export function useSimulation(
           ...(l.count !== undefined && l.powered ? { count: l.count } : {}),
           ...(l.digit !== undefined ? { digit: l.digit } : {}),
         });
+      } else if (status.display) {
+        live.set(part.id, { segments: status.display.brightness, segmentsBurned: status.display.burned });
       } else if (part.type === 'arduino') {
         live.set(part.id, { ledL: status.arduino?.ledL ?? false, ledTx: status.arduino?.ledTx ?? false });
       } else if (part.type === 'speaker') {

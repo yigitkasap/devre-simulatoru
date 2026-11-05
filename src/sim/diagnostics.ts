@@ -55,6 +55,8 @@ export type DiagnosticCode =
   | 'logic-input-undefined'
   /** Lojik entegrenin beslemesi mutlak en büyük değeri aştı ve entegre yandı. */
   | 'ic-burned'
+  /** 7 segment göstergenin bir segmentinden mutlak en büyük akımdan fazlası geçti ve segment yandı. */
+  | 'segment-burned'
   /** Bobinin akımı aniden kesildi: uçlarında kaynaklardan çok büyük bir gerilim sıçraması (Lenz). */
   | 'inductor-spike'
   /** Newton-Raphson en küçük zaman adımında da yakınsamadı. */

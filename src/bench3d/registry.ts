@@ -2,7 +2,7 @@
 
 import type { Vector3 } from 'three';
 import type { Part } from '../model/types';
-import { dipChipModel, logicModuleModel } from './logicModels';
+import { dipChipModel, logicModuleModel, sevenSegmentBoardModel, sevenSegmentModuleModel } from './logicModels';
 import { isLogicChip } from '../model/logicChips';
 import { partProp } from '../model/catalog';
 import { withAnchors } from './kit';
@@ -49,6 +49,7 @@ import {
 export function buildPartModel(part: Part, holes: readonly Vector3[] | null = null, extra: readonly Vector3[] = []): PartModel {
   if (holes && (part.type === 'opamp' || part.type === 'timer555')) return dipChipModel(part.type === 'opamp' ? 'LM741' : 'NE555', holes, extra);
   if (holes && isLogicChip(part.type)) return dipChipModel(chipModel(part), holes, extra, holes[0]);
+  if (holes && part.type === 'seg7') return sevenSegmentBoardModel(holes, extra);
   if (holes && part.type === 'pushbutton') return withAnchors(holes, () => pushButtonModel(extra));
   return withAnchors(holes, () => build(part));
 }
@@ -119,6 +120,8 @@ function build(part: Part): PartModel {
     case 'cd4017':
     case 'cd4511':
       return logicModuleModel(part.type, chipModel(part));
+    case 'seg7':
+      return sevenSegmentModuleModel();
     case 'scr':
       return scrModel(p);
     case 'lm317':

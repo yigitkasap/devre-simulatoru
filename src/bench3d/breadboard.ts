@@ -17,6 +17,7 @@
 //   - Bir şeride en çok 3 bacak ya da kablo takılır; 2 delik şeritleri birleştiren jumper'lara kalır.
 
 import { CATALOG } from '../model/catalog';
+import { SEG7_LEGS } from '../model/logicChips';
 import { buildConnectivity, pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import type { DeviceType } from '../sim/netlist';
@@ -181,6 +182,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   ic7474: { mount: 'dip14' },
   cd4017: { mount: 'dip16' },
   cd4511: { mount: 'dip16' },
+  seg7: { mount: 'seg10' },
 };
 
 /**
@@ -200,6 +202,7 @@ export const DIP_PINS: Partial<Record<DeviceType, readonly number[]>> = {
   opamp: [2, 3, 6, 7, 4], // LM741: −, +, OUT, V+, V− (1, 5, 8 boş)
   timer555: [1, 2, 3, 4, 5, 6, 7, 8],
   opto: [1, 2, 4, 3], // PC817: 1 A, 2 K, 3 E, 4 C (Sharp iç bağlantı şeması)
+  seg7: SEG7_LEGS, // SC56-11EWA: a 7, b 6, c 4, d 2, e 1, f 9, g 10, DP 5, ortak katot 3 (8 boş: içeriden 3'e bağlı)
 };
 
 /** DIP parçanın pinlerinin bacak numaraları (pin sırasıyla). */

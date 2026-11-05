@@ -1,9 +1,9 @@
-// Lojik entegrelerin 3B modelleri: masada (şema pinleri × SPREAD'deki pin
+// Lojik entegrelerin ve 7 segment göstergenin 3B modelleri: masada (şema pinleri × SPREAD'deki pin
 // başlıklı küçük bir kart üstünde) ve breadboard'da (DIP orta kanalın üstünde; gösterge d ve h
 // satırlarında). Gösterge segmentleri simülasyonla yanar.
 
 import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three';
-import { LOGIC_CHIPS, chipPinNames, type LogicChipType } from '../model/logicChips';
+import { LOGIC_CHIPS, SEG7_PINS, chipPinNames, type LogicChipType } from '../model/logicChips';
 import { M, canvasTexture, labelPlate, mat, mesh, pinAnchors, rod } from './kit';
 import type { PartModel } from './model';
 
@@ -115,3 +115,97 @@ export function logicModuleModel(type: LogicChipType, model: string): PartModel 
   return { root, anchors: pins.map((p) => new Vector3(p.x, HEADER_TOP, p.z)) };
 }
 
+// --- 7 segment gösterge (SC56-11EWA) ----------------------------------------------------------------------
+
+/**
+ * Göstergenin gövdesi (merkez (0, 0, 0), alt yüz y = 0): 12,7 × 19,05 mm, 8 mm yüksek (5 × 7,5 × 3,15
+ * birim); hanenin üstü −z'de. Segmentler (a…g, DP) ayrı malzemeyle, akımla yanar.
+ */
+function displayBody(): { group: Group; update: (brightness: readonly number[] | undefined, burned: readonly boolean[] | undefined, active: boolean) => void } {
+  const group = new Group();
+  const h = 3.15;
+  group.add(mesh(new BoxGeometry(5, h, 7.5), mat('#141414', 0.6), 0, h / 2 + 0.2, 0));
+  group.add(mesh(new BoxGeometry(4.6, 0.04, 7.1), mat('#232323', 0.35), 0, h + 0.22, 0));
+  const lit = '#ff3b30';
+  const mats = SEG7_PINS.slice(0, 8).map(() => new MeshStandardMaterial({ color: '#3b1714', roughness: 0.4, emissive: lit, emissiveIntensity: 0 }));
+  const y = h + 0.26;
+  const W = 3.0;
+  const H = 5.6;
+  const t = 0.55;
+  const skew = Math.tan((8 * Math.PI) / 180);
+  /** Yatay ve dikey segment (eğik hane: x, z'ye göre kaydırılır). */
+  const horizontal = (z: number, m: MeshStandardMaterial) => mesh(new BoxGeometry(W - t, 0.05, t), m, -z * skew, y, z);
+  const vertical = (x: number, z: number, m: MeshStandardMaterial) => {
+    const seg = mesh(new BoxGeometry(t, 0.05, H / 2 - t), m, x - z * skew, y, z);
+    seg.rotation.y = -Math.atan(skew);
+    return seg;
+  };
+  const [a, b, c, d, e, f, g, dp] = mats as [MeshStandardMaterial, MeshStandardMaterial, MeshStandardMaterial, MeshStandardMaterial, MeshStandardMaterial, MeshStandardMaterial, MeshStandardMaterial, MeshStandardMaterial];
+  group.add(
+    horizontal(-H / 2, a),
+    vertical(W / 2, -H / 4, b),
+    vertical(W / 2, H / 4, c),
+    horizontal(H / 2, d),
+    vertical(-W / 2, H / 4, e),
+    vertical(-W / 2, -H / 4, f),
+    horizontal(0, g),
+    mesh(new CylinderGeometry(0.32, 0.32, 0.05, 14), dp, W / 2 + 0.75 - (H / 2) * skew, y, H / 2),
+  );
+  return {
+    group,
+    update(brightness, burned, active) {
+      mats.forEach((m, k) => {
+        const off = burned?.[k] ?? false;
+        const v = active && !off ? (brightness?.[k] ?? 0) : 0;
+        m.emissiveIntensity = 2.6 * v;
+        m.color.set(off ? '#1c1c1c' : v > 0.05 ? '#ff6b5e' : '#3b1714');
+      });
+    },
+  };
+}
+
+/** Breadboard'da gösterge: bacaklar d ve h satırlarında, gövde aralarında. */
+export function sevenSegmentBoardModel(anchors: readonly Vector3[], extra: readonly Vector3[]): PartModel {
+  const root = new Group();
+  const all = [...anchors, ...extra];
+  const xs = all.map((p) => p.x);
+  const zs = all.map((p) => p.z);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
+  const cz = (Math.max(...zs) + Math.min(...zs)) / 2;
+  const body = displayBody();
+  body.group.position.set(cx, 0.6, cz);
+  root.add(body.group);
+  for (const p of all) root.add(rod(new Vector3(p.x, 0.9, p.z), p, 0.08, M.tin(), 6));
+  return {
+    root,
+    anchors,
+    update(ctx) {
+      body.update(ctx.live?.segments, ctx.live?.segmentsBurned, ctx.active);
+      return false;
+    },
+  };
+}
+
+/** Masada gösterge: şema pinlerinin yerindeki pin başlıklı kartın ortasında. */
+export function sevenSegmentModuleModel(): PartModel {
+  const root = new Group();
+  const pins = pinAnchors('seg7');
+  const body = displayBody();
+  const xs = pins.map((p) => p.x);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2 + 1;
+  // Bacakların gövde altındaki uçları (yollar buraya gider): a…DP ve ortak katot.
+  const legs = pins.map((_, i) => (i < 8 ? new Vector3(cx - 2.2, 0, -3 + (6 * i) / 7) : new Vector3(cx, 0, 3.4)));
+  const board = carrierBoard(pins, legs, [...SEG7_PINS.slice(0, 8), 'K']);
+  root.add(board.mesh);
+  body.group.position.set(cx, 0.5, 0);
+  root.add(body.group);
+  for (const p of pins) root.add(headerPin(p));
+  return {
+    root,
+    anchors: pins.map((p) => new Vector3(p.x, HEADER_TOP, p.z)),
+    update(ctx) {
+      body.update(ctx.live?.segments, ctx.live?.segmentsBurned, ctx.active);
+      return false;
+    },
+  };
+}

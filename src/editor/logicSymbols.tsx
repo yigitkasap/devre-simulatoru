@@ -2,7 +2,7 @@
 // üstte, çentik üstte; sol yanda yukarıdan aşağı 1…n/2, sağ yanda aşağıdan yukarı n/2+1…n). Bacak
 // numaraları kutunun içinde, adları dışında; VCC ve GND açık bacak. Kapılar kutunun içinde ANSI
 // şekilleriyle, bağlı oldukları bacaklara kısa çizgilerle; 7474, CD4017 ve CD4511'de kutunun içinde blok.
-// Simülasyonda 1 olan bacakların ucunda turuncu nokta.
+// Simülasyonda 1 olan bacakların ucunda turuncu nokta. 7 segment göstergede segmentler akımla yanar.
 
 import { GATE_CHIPS, LOGIC_CHIPS, SEVEN_SEGMENT_CODES, chipPinNames, type GateChipType, type GateKind, type LogicChipType } from '../model/logicChips';
 import type { Rotation } from '../model/types';
@@ -292,3 +292,33 @@ function Digit({ segments, burned }: { segments: readonly number[] | null; burne
   );
 }
 
+/**
+ * Ortak katotlu 7 segment gösterge: solda a…g ve DP anotları (yukarıdan aşağı), altta ortak katot.
+ * Segmentler akımla yanar (parlaklık akımla); yanmış segment kesikli çizgiyle.
+ */
+export function SevenSegment({ rotation, brightness, burned }: { rotation: Rotation; brightness?: readonly number[] | undefined; burned?: readonly boolean[] | undefined }) {
+  const names = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'DP'];
+  return (
+    <g>
+      <path
+        d={`${names.map((_, k) => `M-60,${-70 + 20 * k}H-45`).join('')}M10,100V85`}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <rect x={-45} y={-85} width={90} height={170} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
+      {names.map((n, k) => (
+        <Text key={n} x={-40} y={-70 + 20 * k} rotation={rotation} size={6.5} anchor="start" color="var(--color-muted)">
+          {n}
+        </Text>
+      ))}
+      <Text x={10} y={77} rotation={rotation} size={6.5} color="var(--color-muted)">
+        K
+      </Text>
+      <g transform="translate(12 -8)">
+        <Digit segments={brightness ?? null} burned={burned} />
+      </g>
+    </g>
+  );
+}

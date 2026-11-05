@@ -31,6 +31,7 @@ import { schottkyModel } from './schottky';
 import { lm317Model, reg7805Model } from './regulator';
 import { optocouplerModel } from './optocoupler';
 import { LOGIC_IC_MODELS } from './logic';
+import { display7Model } from './display7';
 import { scrModel } from './scr';
 import { multimeterModel } from './multimeter';
 import { lampModel, ldrModel, ntcModel, potentiometerModel } from './sensors';
@@ -89,6 +90,7 @@ export const DEVICE_MODELS: Readonly<Record<DeviceType, DeviceModel>> = {
   opto: optocouplerModel,
   scr: scrModel,
   ...LOGIC_IC_MODELS,
+  seg7: display7Model,
 };
 
 export * from './device';
@@ -243,6 +245,7 @@ export {
   logicModels,
   type LogicFamily,
 } from './logic';
+export { Display7Device, SEG7, SEG7_DEFAULTS, SEG7_MODELS, segmentBrightness } from './display7';
 export { OPTO_CTR, OPTO_DEFAULTS, OPTO_MODELS, OPTO_RANKS, OptocouplerDevice, optoCtr, type OptoRank } from './optocoupler';
 export { dropoutVoltage, LM317, LM317_DEFAULTS, LM317_MODELS, REG7805, RegulatorDevice } from './regulator';
 export { SCHOTTKY_DEFAULTS, SCHOTTKY_MODELS, SchottkyDevice } from './schottky';

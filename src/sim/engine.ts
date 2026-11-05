@@ -33,6 +33,7 @@ import {
   BatteryDevice,
   CapacitorDevice,
   DEVICE_MODELS,
+  Display7Device,
   InductorDevice,
   FuseDevice,
   LampDevice,
@@ -485,6 +486,19 @@ export class CircuitSimulator {
           elementIds: [device.id],
           netKeys: [],
           params: { supply: device.burnSupply, limit: device.spec.supplyAbsMax },
+        });
+      }
+      if (device instanceof Display7Device) {
+        device.burned.forEach((burned, segment) => {
+          if (burned) {
+            result.push({
+              severity: 'warning',
+              code: 'segment-burned',
+              elementIds: [device.id],
+              netKeys: [],
+              params: { segment, current: device.burnCurrents[segment]!, maxCurrent: 30e-3 },
+            });
+          }
         });
       }
       if (device instanceof LedDevice && device.burned) {

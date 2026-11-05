@@ -120,6 +120,8 @@ export interface DeviceStatus {
     readonly count?: number;
     readonly digit?: number | null;
   };
+  /** 7 segment gösterge: segmentlerin (a…g, DP) akımı, parlaklığı (0..1) ve yanmış olanlar. */
+  readonly display?: { readonly currents: readonly number[]; readonly brightness: readonly number[]; readonly burned: readonly boolean[] };
   /** Basmalı düğme: basılı tutuluyor mu? */
   readonly pressed?: boolean;
   /** Röle: palet çekili mi (NA kontağı kapalı)? */

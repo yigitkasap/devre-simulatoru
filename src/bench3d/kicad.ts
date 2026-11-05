@@ -79,7 +79,7 @@ interface Geometry {
   readonly size: number;
   /** Kare pedin pin sırası (kutuplu parçada 1. ped: katot ya da + uç). */
   readonly square?: number;
-  readonly body: 'axial' | 'radial' | 'to92' | 'dip' | 'rect';
+  readonly body: 'axial' | 'radial' | 'to92' | 'dip' | 'rect' | 'display';
   /** Radyal gövdenin yarıçapı (mm). */
   readonly radius?: number;
 }
@@ -129,6 +129,9 @@ function geometry(part: Part): Geometry {
     case 'cd4017':
     case 'cd4511':
       return { name: 'DIP-16_W7.62mm', equivalent: 'Package_DIP:DIP-16_W7.62mm_Socket', drill: 0.8, size: 1.6, square: 0, body: 'dip' };
+    case 'seg7':
+      // SC56-11EWA: iki sıra 15,24 mm arayla, ped numaraları bacak numaraları (KiCad'in 0,56" LTS67x0 izi aynı yerleşimde).
+      return { name: 'SC56-11_P2.54mm_W15.24mm', equivalent: 'Display_7Segment:7SegmentLED_LTS6760_LTS6780', drill: 0.8, size: 1.6, square: 0, body: 'display' };
     default:
       // Transistörler (TO-92, geniş adım: elle lehimlemeye uygun).
       return { name: 'TO-92_Inline_Wide', equivalent: 'Package_TO_SOT_THT:TO-92_Inline_Wide', drill: 0.75, size: 1.5, body: 'to92' };
@@ -136,7 +139,7 @@ function geometry(part: Part): Geometry {
 }
 
 /** DIP kılıflı parçalar (bacak numaraları breadboard.ts'teki dipPins). */
-const DIP_TYPES: ReadonlySet<DeviceType> = new Set(['opamp', 'timer555', 'opto', ...Object.keys(LOGIC_CHIPS)] as DeviceType[]);
+const DIP_TYPES: ReadonlySet<DeviceType> = new Set(['opamp', 'timer555', 'opto', 'seg7', ...Object.keys(LOGIC_CHIPS)] as DeviceType[]);
 
 /**
  * Parça pininin ped numarası, eşdeğer standart KiCad kılıfıyla aynı: kılıf standart kitaplıktakiyle
@@ -236,7 +239,7 @@ export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard
     const pins = placed.holes.map(at);
     const netOfPin = (pin: number) => plan.netOf.get(pinKey(id, pin));
     let pads: PcbPad[];
-    if (g.body === 'dip') {
+    if (g.body === 'dip' || g.body === 'display') {
       const map = dipPins(part.type);
       const half = dipShape(placed.mount)?.half ?? map.length / 2;
       const all: PcbPad[] = [];
@@ -298,6 +301,10 @@ export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard
       const x1 = Math.max(...xs) + 1.3;
       silk.push(...rectSilk(x0, cy - 2.6, x1, cy + 2.6));
       circles.push([x0 + 0.9, cy, 0.5]);
+    } else if (g.body === 'display') {
+      // 12,7 × 19,05 mm gövde; sağ altta ondalık noktası.
+      silk.push(...rectSilk(cx - 6.35, cy - 9.525, cx + 6.35, cy + 9.525));
+      circles.push([cx + 4.6, cy + 6.2, 0.5]);
     } else {
       silk.push(...rectSilk(Math.min(...xs) - 2.2, Math.min(...ys) - 2.2, Math.max(...xs) + 2.2, Math.max(...ys) + 2.2));
     }

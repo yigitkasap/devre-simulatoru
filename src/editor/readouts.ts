@@ -2,6 +2,7 @@
 // (gerilim, akım, güç ve türe özel ek bilgiler). Saf fonksiyon; arayüzden bağımsız test edilir.
 
 import { tr } from '../i18n/tr';
+import { digitOf } from '../model/logicChips';
 import type { Part } from '../model/types';
 import { METER_MODES } from '../sim/averager';
 import {
@@ -240,6 +241,20 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
       if (l.powered && l.count !== undefined) rows.push({ label: t.logicCount, value: String(l.count) });
       if (l.powered && part.type === 'cd4511') rows.push({ label: t.logicDigit, value: l.digit === null || l.digit === undefined ? '—' : String(l.digit) });
       return { title, rows, ...(l.powered ? {} : { note: t.logicUnpowered }) };
+    }
+    case 'seg7': {
+      const d = status.display;
+      if (!d) return { title, rows: [] };
+      const lit = d.brightness.slice(0, 7).map((b) => (b > 0.05 ? 1 : 0));
+      const digit = digitOf(lit);
+      return {
+        title,
+        rows: [
+          { label: t.segDigit, value: digit === 'blank' ? t.segBlank : digit === null ? t.segUnknown : String(digit) },
+          { label: t.segTotal, value: a(I) },
+          { label: t.segMax, value: a(Math.max(0, ...d.currents)) },
+        ],
+      };
     }
     case 'timer555': {
       const tm = status.timer ?? { high: false, output: 0, threshold: 0, trigger: 0, upper: 0, lower: 0 };

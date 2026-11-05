@@ -186,6 +186,13 @@ export function digitOf(segments: readonly number[]): number | 'blank' | null {
   return i >= 0 ? i : null;
 }
 
+/**
+ * 7 segment gösterge (Kingbright SC56-11EWA, DSAP6671): şemadaki uçlar a b c d e f g DP ve ortak
+ * katot; karşılık gelen bacaklar 7 6 4 2 1 9 10 5 ve 3 (8. bacak içeriden 3'e bağlı ortak katot).
+ */
+export const SEG7_PINS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'DP', 'CC'] as const;
+export const SEG7_LEGS: readonly number[] = [7, 6, 4, 2, 1, 9, 10, 5, 3];
+
 /** Üstü çizgili (etkin düşük) ad: her harfe U+0305 birleşik üst çizgi; baştaki rakam çizilmez ("1CLR" → "1C̅L̅R̅"). */
 export function barName(name: string): string {
   const m = /^(\d*)(.*)$/.exec(name)!;

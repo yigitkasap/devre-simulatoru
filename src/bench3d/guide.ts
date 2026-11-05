@@ -104,6 +104,8 @@ function describe(part: Part): { name: string; detail: string } {
       const n = LOGIC_CHIPS[part.type].names.length;
       return { name: `${tr.devices.names[part.type]} ${partValueText(part)}`, detail: `DIP-${n}; ${n} bacaklı soketle` };
     }
+    case 'seg7':
+      return { name: `7 segment gösterge ${typeof p.model === 'string' ? p.model : 'SC56-11EWA'}`, detail: '0,56″, ortak katot; 10 bacak, sıralar arası 15,24 mm' };
     case 'potentiometer':
       return { name: `Potansiyometre ${formatOhm(numProp(p, 'resistance', 10e3))}`, detail: 'dikey trimpot, 3 bacak' };
     case 'switch':
@@ -195,6 +197,18 @@ export function buildSolderGuide(doc: CircuitDoc, plan: BreadboardPlan): SolderG
           note: `Noktalı köşe (1. bacak, A) ${name(at.holes[0]!)} deliğinde; LED tarafı (A, K) alt yarıda, çıkış (C, E) üst yarıda.`,
         });
         break;
+      case 'seg7': {
+        // 1. bacak (e): alt sıranın (h) en solundaki delik.
+        const bottom = [...at.holes, ...(at.extraHoles ?? [])].filter((h) => h.kind === 'strip' && h.row === 7);
+        const first = bottom.reduce((a, b) => (a.kind === 'strip' && b.kind === 'strip' && b.col < a.col ? b : a));
+        steps.push({
+          group: 'ic',
+          title: `${part.label} · ${material}`,
+          holes: `orta kanalın üstünde, ${at.holes.map((h, i) => `${pinNames[i]} ${name(h)}`).join(', ')}`,
+          note: `Ondalık noktası sağ altta: 1. bacak (e) ${name(first)} deliğinde (sol alt). 8. bacak da ortak katottur (içeriden 3'e bağlı).`,
+        });
+        break;
+      }
       case 'opamp':
       case 'timer555':
       case 'ic7400':

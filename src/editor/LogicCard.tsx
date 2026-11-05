@@ -1,9 +1,9 @@
-// Lojik entegrenin defter kartındaki ayrıntıları: bacakların anlık durumu
+// Lojik entegrenin ve 7 segment göstergenin defter kartındaki ayrıntıları: bacakların anlık durumu
 // (1 / 0 / belirsiz / boşta) ve gerilimi; kapı entegrelerinde seçilen kapının doğruluk tablosu (o anki
-// satır vurgulu); 7474'te Q, CD4017'de sayaç, CD4511'de gösterilen rakam.
+// satır vurgulu); 7474'te Q, CD4017'de sayaç, CD4511'de gösterilen rakam; göstergede segment akımları.
 
 import { useId, useState } from 'react';
-import { GATE_CHIPS, LOGIC_CHIPS, chipPinNames, gateOutput, isGateChip, type LogicChipType } from '../model/logicChips';
+import { GATE_CHIPS, LOGIC_CHIPS, SEG7_PINS, chipPinNames, gateOutput, isGateChip, type LogicChipType } from '../model/logicChips';
 import { partProp } from '../model/catalog';
 import type { Part } from '../model/types';
 import type { PinState } from '../sim/devices/device';
@@ -158,3 +158,40 @@ function TruthTable({ part, levels }: { part: Part; levels: readonly (number | n
   );
 }
 
+/** 7 segment göstergenin segmentleri: akım ve durum (yanıyor / sönük / yandı). */
+export function SegmentDetails({ part, frame }: { part: Part; frame: SimFrame | null }) {
+  const display = frame?.statuses.get(part.id)?.display;
+  return (
+    <section aria-label={t().segmentsTitle} className="flex flex-col gap-1.5">
+      <span className="text-label font-semibold text-muted">{t().segmentsTitle}</span>
+      <table className="w-full border-collapse text-[13px]">
+        <thead>
+          <tr className="text-left text-[11px] text-muted">
+            <th className="py-1 pr-2 font-medium">{t().columns.segment}</th>
+            <th className="py-1 pr-2 font-medium">{t().columns.state}</th>
+            <th className="py-1 text-right font-medium">{t().columns.current}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {SEG7_PINS.slice(0, 8).map((name, k) => {
+            const current = display?.currents[k] ?? null;
+            const burned = display?.burned[k] ?? false;
+            const lit = !burned && (display?.brightness[k] ?? 0) > 0.05;
+            return (
+              <tr key={name} className="border-t border-line">
+                <td className="py-1 pr-2 font-mono">{name}</td>
+                <td className={`py-1 pr-2 ${burned ? 'font-semibold text-danger' : lit ? 'font-semibold text-ink' : 'text-ink-2'}`}>
+                  <span className="inline-flex items-center gap-1.5">
+                    {lit && <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-lamp-cc" />}
+                    {display ? (burned ? t().segmentBurned : lit ? t().segmentLit : t().segmentOff) : '—'}
+                  </span>
+                </td>
+                <td className="py-1 text-right font-mono tabular">{current !== null ? formatSI(current, 'A', { digits: 3 }) : '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
+}

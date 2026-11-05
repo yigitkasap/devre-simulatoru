@@ -13,7 +13,7 @@ import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { ANION_COLOR, CATION_COLOR, ionsOnLine, jiggle, seeded, type IonView, type PlacedIon } from './ions';
-import { CounterIc, DecoderIc, FlipFlopIc, GateIc } from './logicSymbols';
+import { CounterIc, DecoderIc, FlipFlopIc, GateIc, SevenSegment } from './logicSymbols';
 import type { ResistorStyle } from './settings';
 
 /** Simülasyon sırasında sembolün görünümünü değiştiren değerler (Aşama 3-4). */
@@ -44,6 +44,9 @@ export interface LiveVisual {
   readonly levels?: readonly (number | null)[];
   readonly count?: number;
   readonly digit?: number | null;
+  /** 7 segment gösterge: segmentlerin (a…g, DP) parlaklığı (0..1) ve yanmış olanlar. */
+  readonly segments?: readonly number[];
+  readonly segmentsBurned?: readonly boolean[];
   /** Arduino: kart üstü L (D13) ve TX (seri gönderim) LED'leri yanıyor mu? */
   readonly ledL?: boolean;
   readonly ledTx?: boolean;
@@ -1336,6 +1339,8 @@ export function PartSymbol({ type, props, resistorStyle, rotation = 0, live }: S
       return <CounterIc rotation={rotation} levels={live?.levels} count={live?.count} />;
     case 'cd4511':
       return <DecoderIc rotation={rotation} levels={live?.levels} digit={live?.digit} />;
+    case 'seg7':
+      return <SevenSegment rotation={rotation} brightness={live?.segments} burned={live?.segmentsBurned} />;
     case 'scr':
       return <Scr on={live?.on ?? false} />;
   }

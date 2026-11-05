@@ -61,6 +61,7 @@ export type DeviceType =
   | 'ic7474'
   | 'cd4017'
   | 'cd4511'
+  | 'seg7';
 
 export type PropValue = number | string | boolean;
 export type Props = Readonly<Record<string, PropValue>>;

@@ -12,7 +12,7 @@ import { SITE_NAME } from '../config';
 import type { Diagnostic } from '../sim/diagnostics';
 import type { ExampleFolderId, ExampleGroupId, ExampleId } from '../examples';
 import type { FaultScenarioId } from '../examples/faultScenarios';
-import { LOGIC_CHIPS, chipPinLabel, type LogicChipType } from '../model/logicChips';
+import { LOGIC_CHIPS, SEG7_PINS, chipPinLabel, type LogicChipType } from '../model/logicChips';
 import type { DeviceType } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
 import { ek, toDative } from './ek';
@@ -57,6 +57,9 @@ const LOGIC_MODEL_NOTES: Record<string, string> = {
   CD4511B:
     'CD4511B (TI, SCHS072B): CMOS, 3–18 V (mutlak en çok 20 V). Segment çıkışları npn: 5 V’ta 0 mA’de 4,55 V, 10 mA’de 4,10 V, 20 mA’de 3,75 V (tipik); en çok 25 mA. ' +
     'Her segmente ön direnç koy. Veri → segment gecikmesi 5 V’ta tipik 520–660 ns.',
+  'SC56-11EWA':
+    'Kingbright SC56-11EWA: 14,2 mm (0,56″) ortak katotlu, yüksek verimli kırmızı. Segment başına 10 mA’de tipik 1,9 V (en çok 2,3 V); sürekli akım en çok 30 mA, ters gerilim en çok 5 V. ' +
+    'Bacaklar: a 7, b 6, c 4, d 2, e 1, f 9, g 10, DP 5, ortak katot 3 ve 8.',
 };
 
 export interface DiagnosticContext {
@@ -121,6 +124,7 @@ const DEVICE_NAMES: Record<DeviceType, string> = {
   ic7474: '2 × D flip-flop',
   cd4017: 'Onluk sayıcı',
   cd4511: 'BCD → 7 segment kod çözücü',
+  seg7: '7 segment gösterge',
 };
 
 /** "R1 direnci", "B1 pili" gibi tamlamalar için tür adının küçük harfli, belirtme durumlu hali. */
@@ -179,6 +183,7 @@ const DEVICE_GENITIVE: Record<DeviceType, string> = {
   ic7474: 'flip-flop entegresinin',
   cd4017: 'sayıcının',
   cd4511: 'kod çözücünün',
+  seg7: 'göstergenin',
 };
 
 const PIN_NAMES: Record<DeviceType, readonly string[]> = {
@@ -228,6 +233,7 @@ const PIN_NAMES: Record<DeviceType, readonly string[]> = {
   opto: ['LED anodu (A)', 'LED katodu (K)', 'kollektör ucu (C)', 'emiter ucu (E)'],
   scr: ['anot (A)', 'katot (K)', 'kapı (G)'],
   ...logicPinNames(),
+  seg7: [...SEG7_PINS.slice(0, 7).map((s) => `${s} segmentinin anodu`), 'nokta (DP) anodu', 'ortak katodu (3. ve 8. bacak)'],
 };
 
 /** Bağla kipinde uç hedeflerinin üstündeki kısa etiketler (tasarım: P03). */
@@ -278,6 +284,7 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
   opto: ['A', 'K', 'C', 'E'],
   scr: ['A', 'K', 'G'],
   ...logicPinTags(),
+  seg7: [...SEG7_PINS.slice(0, 8), 'K'],
 };
 
 /** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
@@ -328,6 +335,7 @@ const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   opto: ['A', 'K', 'C', 'E'],
   scr: ['A', 'K', 'G'],
   ...logicPinTags(),
+  seg7: [...SEG7_PINS.slice(0, 8), 'K'],
 };
 
 /** Lojik entegrenin bacak adları: "1A girişi (1. bacak)", "1Y çıkışı (3. bacak)", "VCC besleme ucu (14. bacak)". */
@@ -609,6 +617,16 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           `${firstLabel}: besleme ${formatSI(p.supply ?? 0, 'V', { digits: 3 })} oldu; veri sayfasına göre mutlak en büyük besleme ` +
           `${formatSI(p.limit ?? 7, 'V', { trim: true })}. Entegrenin içi bozuldu, çıkışları sürülmüyor. Beslemeyi düşür ve “Onar” ile yenisini tak.`,
       };
+    case 'segment-burned': {
+      const name = SEG7_PINS[p.segment ?? 0] ?? 'a';
+      return {
+        title: 'Gösterge segmenti yandı',
+        detail:
+          `${firstLabel}: ${name} segmentinden ${formatSI(p.current ?? 0, 'A')} geçti; SC56-11EWA’nın bir segmenti en çok ` +
+          `${formatSI(p.maxCurrent ?? 0.03, 'A', { trim: true })} sürekli akıma dayanır. Segmente seri ön direnç koy: R = (V − 1,9 V) / I ` +
+          '(5 V ve 10 mA için ≈ 330 Ω). Arızayı giderip “Onar” ile yenile.',
+      };
+    }
     case 'inductor-spike':
       if (first !== undefined && ctx.type(first) === 'motor') {
         return {
@@ -768,6 +786,8 @@ const DEVICE_DESCRIPTIONS: Record<DeviceType, string> = {
     'CMOS onluk sayıcı (DIP-16, 3–18 V): CLK’ın her yükselen kenarında Q0…Q9 çıkışlarından sıradakini 1 yapar (bir anda yalnızca biri 1). RST 1 iken sayaç 0’da durur; INH (13. bacak, CLOCK INHIBIT; bazı veri sayfalarında etkin düşük CLOCK ENABLE) 1 iken sayma durur. CO (elde) 0–4’te 1, 5–9’da 0: sonraki sayıcıyı sürer.',
   cd4511:
     'CMOS BCD → 7 segment kod çözücü (DIP-16, 3–18 V): A (en düşük basamak) … D girişlerindeki ikili kodu (0–9) ortak katotlu göstergenin a…g segmentlerine çevirir; çıkışlar segmentlere akım verir (her biri ön dirençle). L̅T̅ = 0 bütün segmentleri yakar (lamba testi), B̅L̅ = 0 karartır, LE = 1 son kodu tutar (mandal). 9’dan büyük kodda gösterge söner.',
+  seg7:
+    'Ortak katotlu 7 segment gösterge: her segment (a…g ve nokta DP) ayrı bir LED, katotları ortak. Segmenti yakmak için anoduna ön dirençle akım ver (10 mA’de ≈ 1,9 V); bir segmentten 30 mA’den fazla geçerse yanar.',
 };
 
 /** Özellik penceresindeki alan adları (tür + özellik anahtarı). */
@@ -1896,6 +1916,11 @@ export const tr = {
     logicCount: 'Sayaç',
     logicDigit: 'Rakam',
     logicUnpowered: 'Entegre beslenmiyor: çıkışlar sürülmüyor.',
+    segDigit: 'Gösterilen',
+    segTotal: 'Toplam akım',
+    segMax: 'En büyük segment akımı',
+    segBlank: 'sönük',
+    segUnknown: 'rakam değil',
     regInput: 'Giriş',
     regOutput: 'Çıkış',
     inputMinusOutput: 'Giriş − çıkış',
@@ -3084,6 +3109,7 @@ export const tr = {
       ic7474: 'D flip-flop entegreleri',
       cd4017: 'Onluk sayıcılar',
       cd4511: 'Kod çözücüler',
+      seg7: '7 segment göstergeler',
     } satisfies Record<DeviceType, string>,
   },
   // Arayüz v4: masaüstü üst çubuğu ve menüleri (devre menüsü, Daha fazla).
@@ -3693,7 +3719,7 @@ export const tr = {
     pickWire: (ends: string) => (ends ? `${ends} · kabloyu seç` : 'kabloyu seç'),
     pickerClose: 'Seçiciyi kapat',
   },
-  /** Lojik entegrenin defter kartı (editor/LogicCard.tsx). */
+  /** Lojik entegrenin ve 7 segment göstergenin defter kartı (editor/LogicCard.tsx). */
   logic: {
     unpowered: 'Entegre beslenmiyor: çıkışlar sürülmüyor. VCC’yi artıya, GND’yi eksiye bağla.',
     truthTable: 'Doğruluk tablosu',
@@ -3701,7 +3727,7 @@ export const tr = {
     gate: (n: number) => `${n}. kapı`,
     noRow: 'Kapının girişleri okunamıyor.',
     pinsTitle: 'Bacaklar',
-    columns: { pin: 'Bacak', name: 'Ad', state: 'Durum', voltage: 'Gerilim' },
+    columns: { pin: 'Bacak', name: 'Ad', state: 'Durum', voltage: 'Gerilim', segment: 'Segment', current: 'Akım' },
     roles: { input: 'giriş', output: 'çıkış', supply: 'besleme' },
     states: { high: '1', low: '0', undefined: 'belirsiz', floating: 'boşta', supply: 'besleme', off: 'sürülmüyor' },
     /** 74LS'nin boştaki girişi. */
@@ -3715,6 +3741,10 @@ export const tr = {
           : levels[3] === 0
             ? 'Karartılmış (B̅L̅ = 0): bütün segmentler sönük.'
             : 'Sönük: mandaldaki kod 9’dan büyük.',
+    segmentsTitle: 'Segmentler',
+    segmentLit: 'yanıyor',
+    segmentOff: 'sönük',
+    segmentBurned: 'yandı',
   },
   help: {
     title: 'Yardım',

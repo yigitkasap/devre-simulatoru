@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { GATE_CHIPS, GATE_CHIP_TYPES, LOGIC_CHIPS, SEVEN_SEGMENT_CODES, gateModels, gateOutput, type LogicChipType } from '../src/model/logicChips';
 import { CircuitSimulator } from '../src/sim';
+import { SEG7 } from '../src/sim/devices/display7';
 import { circuit } from './helpers';
 
 type Builder = ReturnType<typeof circuit>;
@@ -352,3 +353,26 @@ describe('CD4511B: BCD → 7 segment', () => {
   });
 });
 
+describe('7 segment gösterge (SC56-11EWA)', () => {
+  /** a segmenti R üzerinden 5 V'a; ortak katot toprakta. */
+  const display = (r: number) => run(powered().resistor('R1', 'vcc', 'a', r).add('seg7', 'DS1', ['a', 'u1', 'u2', 'u3', 'u4', 'u5', 'u6', 'u7', 'gnd']), 1e-6);
+
+  it('10 mA’de ileri gerilim 1,9 V (veri sayfası, tipik)', () => {
+    const r = (5 - SEG7.forwardVoltage) / SEG7.testCurrent;
+    const d = display(r).status('DS1').display!;
+    expect(d.currents[0]).toBeCloseTo(10e-3, 5);
+    expect(d.brightness[0]).toBeCloseTo(1, 6);
+    expect(d.brightness[1]).toBe(0);
+  });
+
+  it('30 mA’in üstünde segment yanar (açık devre), uyarı; ön dirençle yanmaz', () => {
+    const sim = display(47);
+    const d = sim.status('DS1').display!;
+    expect(d.burned[0]).toBe(true);
+    expect(d.currents[0]).toBe(0);
+    const w = sim.runtimeDiagnostics.find((x) => x.code === 'segment-burned');
+    expect(w?.params?.segment).toBe(0);
+    expect(w?.params?.current).toBeGreaterThan(30e-3);
+    expect(display(330).status('DS1').display!.burned[0]).toBe(false);
+  });
+});

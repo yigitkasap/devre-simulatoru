@@ -72,6 +72,8 @@ import {
   TANK_MODES,
   VOLTMETER_DEFAULTS,
   WAVEFORMS,
+  SEG7_DEFAULTS,
+  SEG7_MODELS,
   logicModels,
 } from '../sim/devices';
 import { LOGIC_CHIPS, LOGIC_CHIP_TYPES, type LogicChipType } from './logicChips';
@@ -217,6 +219,18 @@ function logicDef(type: LogicChipType): PartDef {
 
 export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
   ...(Object.fromEntries(LOGIC_CHIP_TYPES.map((t) => [t, logicDef(t)])) as Record<LogicChipType, PartDef>),
+  // 7 segment gösterge: solda a…g ve DP (yukarıdan aşağı), altta ortak katot.
+  seg7: {
+    type: 'seg7',
+    category: 'logic',
+    labelPrefix: 'DS',
+    pins: [...Array.from({ length: 8 }, (_, k) => ({ x: -6, y: -7 + 2 * k })), { x: 1, y: 10 }],
+    bounds: { x: -6, y: -9, w: 11, h: 19 },
+    defaultProps: { ...SEG7_DEFAULTS },
+    propDefs: [{ kind: 'select', key: 'model', options: SEG7_MODELS }],
+    showLabel: true,
+    polarized: false,
+  },
   battery: {
     type: 'battery',
     category: 'sources',
@@ -903,7 +917,7 @@ export const CATEGORIES: ReadonlyArray<{ readonly id: Category; readonly types: 
   { id: 'semiconductors', types: ['diode', 'zener', 'led', 'bridge', 'schottky', 'scr'] },
   { id: 'transistors', types: ['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos'] },
   { id: 'ics', types: ['opamp', 'timer555', 'arduino', 'reg7805', 'lm317', 'opto'] },
-  { id: 'logic', types: ['ic7400', 'ic7402', 'ic7404', 'ic7408', 'ic7432', 'ic7486', 'ic7474', 'cd4017', 'cd4511'] },
+  { id: 'logic', types: ['ic7400', 'ic7402', 'ic7404', 'ic7408', 'ic7432', 'ic7486', 'ic7474', 'cd4017', 'cd4511', 'seg7'] },
   { id: 'switches', types: ['switch', 'pushbutton', 'spdt', 'relay', 'fuse'] },
   { id: 'outputs', types: ['lamp', 'motor', 'speaker', 'buzzer'] },
   { id: 'sensors', types: ['ldr', 'ntc', 'tank'] },
