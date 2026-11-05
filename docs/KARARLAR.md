@@ -1,5 +1,7 @@
 # Devre Simülatörü
 
+> Bu belge, deponun 5 Kasım 2026'ya kadarki README'sidir: geliştirme kararları, parça modelleri, testler ve yayın adımları burada olduğu gibi duruyor. Projenin kısa tanıtımı: [README.md](../README.md).
+
 Fizik bölümü öğrencileri için tarayıcıda çalışan, şematik görünümlü, Türkçe bir devre kurma ve
 simülasyon aracı. Arayüz ve çalışma mantığı derslerde kullanılan şematik simülatörlerden ilham
 alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı yoktur: `npm run build`
@@ -7,7 +9,7 @@ alır; görseller, adlar ve kod bu projeye özgüdür. Sunucu ya da veritabanı 
 
 **Yayındaki adres:** <https://yigitkasap.github.io/devre-simulatoru/>
 
-> Sitenin adı tek bir yerde tanımlıdır: [`src/config.ts`](src/config.ts).
+> Sitenin adı tek bir yerde tanımlıdır: [`src/config.ts`](../src/config.ts).
 
 ## Özellikler
 
@@ -108,7 +110,7 @@ test:spice` her karşılaştırmayı dosyaya yazar.
 
 ### GitHub Pages (şu anki yayın)
 
-Site, `main` dalına her push'ta [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) ile
+Site, `main` dalına her push'ta [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) ile
 derlenip yayımlanır. İş akışı Astro'nun resmî GitHub Pages rehberindekidir: `withastro/action`
 bağımlılıkları `package-lock.json`'dan kurar (`npm ci`), `npm run build` çalıştırır (tür denetimi
 dahil) ve `dist/`'i GitHub Pages'e yükler. Depo ayarlarında **Settings → Pages → Source: GitHub
@@ -241,7 +243,7 @@ tests/               Vitest testleri
 **Veri akışı:** Editör belgeyi (`model/types.ts`) değiştirir → `connectivity.ts` belgeden netlist
 üretir → `sim/` netlist'i derler ve çözer → `useSimulation.ts` her animasyon karesinde motoru
 ilerletip gerilimleri, akımları ve durumları tuvale aktarır. Arayüz motoru yalnızca
-[`src/sim/index.ts`](src/sim/index.ts) üzerinden kullanır. Çözücü metin üretmez; hata ve uyarıları
+[`src/sim/index.ts`](../src/sim/index.ts) üzerinden kullanır. Çözücü metin üretmez; hata ve uyarıları
 kod + sayısal parametre olarak döndürür, Türkçe metinler `tr.ts`'tedir.
 
 **Yeni bileşen eklemek** (ör. transistör, op-amp, AC kaynak):
@@ -538,7 +540,7 @@ Sınır aşılınca yalnızca uyarı verilir (Mesajlar sekmesi, parça vurgusu v
 zaman ve nasıl olacağına dair veri sayfalarında dayanak olmadığı için yanma ya da bozulma
 modellenmez. AC devrede ters gerilimin bir periyotluk tepesine, direnç gücünün bir periyotluk
 ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta yanıp sönmez). Değerler
-[`src/sim/ratings.ts`](src/sim/ratings.ts) içinde, kaynaklarıyla:
+[`src/sim/ratings.ts`](../src/sim/ratings.ts) içinde, kaynaklarıyla:
 
 | Sınır | Değer | Kaynak |
 |---|---|---|
@@ -622,7 +624,7 @@ ortalamasına bakılır (ısınma ortalama güçle olur; uyarı yarım periyotta
   radyal bobin, 10 mH ±%10, DC direnci en fazla 12 Ω, I_dc 100 mA, öz rezonans frekansı (SRF)
   0,53 MHz (üretici veri sayfası değerleri; Farnell ve RS listeleri). 10 V / 100 Ω'luk RL devresinin
   100 mA'i bu bobinin akım sınırıdır.
-- *Model* ([`inductor.ts`](src/sim/devices/inductor.ts)): uç 0 ── R_dc ── L ── uç 1, MNA'da akım
+- *Model* ([`inductor.ts`](../src/sim/devices/inductor.ts)): uç 0 ── R_dc ── L ── uç 1, MNA'da akım
   bilinmeyeniyle (dal satırı v_L − R_eş·i = sağ taraf). Yamukta R_eş = 2L/h, sağ taraf
   −R_eş·i(n) − v(n); geri Euler'de R_eş = L/h; doğru akımda kısa devre. Aşama 4'ün integrasyonu
   ve LTE denetimi (bobin akımı bir durum değişkenidir, akım toleransıyla). Sembol dört sarım
@@ -673,7 +675,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   Özellikler: sarım oranı N₁ / N₂, birincil endüktansı L₁, kuplaj k (en fazla 0,999: k = 1'de
   endüktans matrisi tekil), birincil ve ikincil sargı dirençleri. Sembol: iki sargı (dört sarım),
   ortada demir çekirdek (iki çizgi), polarite noktaları.
-- *Model* ([`transformer.ts`](src/sim/devices/transformer.ts)): iki sargı, her biri "sargı direnci
+- *Model* ([`transformer.ts`](../src/sim/devices/transformer.ts)): iki sargı, her biri "sargı direnci
   + endüktans", MNA'da iki akım bilinmeyeniyle; v_L₁ = L₁·di₁/dt + M·di₂/dt, v_L₂ = M·di₁/dt +
   L₂·di₂/dt, M = k·√(L₁L₂), L₂ = L₁ / n². Yamuk kuralı ve LTE denetimi bobindeki gibi (dal
   satırlarına −cs·[[L₁, M], [M, L₂]]). Doğru akımda sargılar kısa devredir, ikincilde gerilim
@@ -716,7 +718,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   IEC röle sargısı (dikdörtgen, palet çekiliyken hafifçe dolu), kesikli çizgiyle bağlı değiştirme
   kontağı; dil bırakılmışken NK'ya, çekiliyken NA'ya değer. Kullanılmayan NA ya da NK boşta
   kalabilir (uyarı yok).
-- *Model* ([`relay.ts`](src/sim/devices/relay.ts)): sargı bobindeki gibi (R + L, sargı kapasitesi
+- *Model* ([`relay.ts`](../src/sim/devices/relay.ts)): sargı bobindeki gibi (R + L, sargı kapasitesi
   100 pF), kontak C ile kapalı uç arasında 30 mΩ. Sargının akımı |i| çekme akımına (V_ç / R)
   ulaşınca palet çekilir, bırakma akımının (V_b / R) altına inince bırakılır (kuvvet akımın
   karesiyle orantılı: yön önemsiz). Palet çekilince hava aralığı kapanır, endüktans 1,15 H'den
@@ -762,7 +764,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   (IEC); dairedeki nokta milin dönüşünü gerçek hızın 1/100'üyle gösterir (simülasyon zamanıyla
   ilerler, ters dönüşte ters döner). Bilgi kutusu: hız (dev/dk), zıt EMK, akım, motor torku,
   yüke verilen güç; notu duruma göre (dönüyor, durmuş, jeneratör/frenleme).
-- *Model* ([`motor.ts`](src/sim/devices/motor.ts)): elektriksel eşdeğer devre, ayrı bir mekanik
+- *Model* ([`motor.ts`](../src/sim/devices/motor.ts)): elektriksel eşdeğer devre, ayrı bir mekanik
   çözücü yok. Mil denklemi J·dω/dt = k·i − T zıt EMK e = k·ω ile yazılınca (J/k²)·de/dt = i − T/k
   olur: sargının (R + L) akımı bir C_m = J/k² kapasitesini doldurur (kinetik enerji ½Jω² =
   ½C_m·e²). Sürtünme ve yük torku dönmeye karşı koyan doğrusal olmayan bir akım:
@@ -796,7 +798,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
 
 - *Ayar:* Ayarlar → Akım → "Manyetik alanı göster" (varsayılan kapalı; tarayıcıda saklanır).
   Simülasyon çalışırken açılır; gösterimde (sol alt) ⊙ ve ⊗ açıklanır.
-- *Kablolar* ([`MagneticField.tsx`](src/editor/MagneticField.tsx)): akım taşıyan her kablo
+- *Kablolar* ([`MagneticField.tsx`](../src/editor/MagneticField.tsx)): akım taşıyan her kablo
   parçasının iki yanında (9 px) ⊙ (alan sayfadan dışarı) ve ⊗ (sayfaya doğru) işaretleri;
   B = I·dl × r̂ (sağ el kuralı): akıma bakınca solda ⊙, sağda ⊗. Saat yönünde dönen bir akım
   halkasının içi hep ⊗ olur. Büyüklük akımın logaritmasıyla (1 µA'de görünmez, 1 mA'de yarı, 1 A'de
@@ -814,7 +816,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
 
 ### Yeni parçalar 5: potansiyometre, LDR, NTC, akkor lamba (2026-10-17)
 
-- *Kaydırıcı:* sayısal özelliğin altında kaydırıcı (`NumberPropDef.slider`; [`PropSlider.tsx`](src/editor/PropSlider.tsx)):
+- *Kaydırıcı:* sayısal özelliğin altında kaydırıcı (`NumberPropDef.slider`; [`PropSlider.tsx`](../src/editor/PropSlider.tsx)):
   potansiyometrenin konumu (%0–100), LDR'nin aydınlığı (0,1–100 000 lüks, logaritmik), NTC'nin
   sıcaklığı (−40…125 °C). Masaüstünde sürüklerken değer canlı uygulanır ve geçmişe yazılmaz
   (düzenleyicinin `preview` eylemi); bırakınca sürüklemeden önceki belge geçmişe eklenir (tek geri
@@ -832,7 +834,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   Isıl düğüm ortamın üstündeki ısınmadır: ortam sıcaklığı değişince termistör hemen uyar (gerçekte
   havada ≈ 15 s; simülasyonda beklememek için).
 - *Akkor lamba* (çıkış elemanları, LP): 12 V 0,1 A minyatür lamba. Filaman sıcaklığı MNA'da bir iç
-  düğüm (ısıl devre benzetmesi; [`thermal.ts`](src/sim/devices/thermal.ts)): C·dT/dt + P_kayıp(T) =
+  düğüm (ısıl devre benzetmesi; [`thermal.ts`](../src/sim/devices/thermal.ts)): C·dT/dt + P_kayıp(T) =
   V²/R(T), elektrikle birlikte Newton-Raphson ile; NTC aynı çözümü kullanır. Veri sayfaları soğuk
   direnci ve ısıl zaman sabitini vermediği için tungstenden türetildi: ρ ∝ T^1,215 (Desai ve diğ.
   1984), anma sıcaklığı 2500 K (uzun ömürlü vakumlu lamba) → soğukken 8,9 Ω, sıcakken 120 Ω (13,5
@@ -853,7 +855,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
 
 ### Yeni parçalar 6: hoparlör, buzzer, sigorta (2026-10-17)
 
-- *Ses* ([`audio.ts`](src/editor/audio.ts), npm bağımlılığı yok): WebAudio ile. Her karede
+- *Ses* ([`audio.ts`](../src/editor/audio.ts), npm bağımlılığı yok): WebAudio ile. Her karede
   simülasyonun ilerlediği aralığın sesi hazırlanıp ≈ 90 ms gecikmeyle çalma sırasına eklenir
   (AudioBufferSource parçaları). Hoparlörün sesi adım adım kaydedilen zar ivmesidir (ses kartının
   hızına doğrusal aradeğerle); aktif buzzerin osilatörü simülasyonda olmadığından ses 2400 Hz'lik
@@ -897,7 +899,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   yayımladığı yeni µA741 veri sayfası başka bir yongayı anlatıyor: 540 GΩ giriş, ±14,95 V salınım;
   okullardaki klasik bipolar 741 için LM741 alındı.) Giriş kayma gerilimi (1 mV) ve kutuplama akımı
   (80 nA) modellenmez.
-- *Model* ([`opamp.ts`](src/sim/devices/opamp.ts), davranışsal, tek kutuplu): kazanç düğümü y (iç
+- *Model* ([`opamp.ts`](../src/sim/devices/opamp.ts), davranışsal, tek kutuplu): kazanç düğümü y (iç
   düğüm) τ·dy/dt = A·v_d − y, τ = A/(2π·GBW) ≈ 27 ms (baskın kutup ≈ 5,8 Hz); dy/dt yumuşak olarak
   eğim hızıyla sınırlı (S·tanh(u/(S·τ))): giriş katı v_d ≈ 70 mV'ta doyar, 1 mV'luk farkla çıkış
   eğim hızıyla değil 2π·GBW·v_d ≈ 7 V/ms ile değişir (gerçek 741 gibi). y raylardan 1 V'tan fazla
@@ -923,7 +925,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   RESET, CONT, THRES, DISCH, VCC); sembolde solda DISCH, THRES, TRIG (zamanlama kolu sırasıyla),
   sağda OUT, üstte VCC ve RESET, altta GND ve CV; kutuda uç adları ve "555"; çıkış yüksekken OUT'un
   yanında sarı nokta.
-- *Model* ([`timer555.ts`](src/sim/devices/timer555.ts)), **TI NE555** veri sayfası (SLFS022K):
+- *Model* ([`timer555.ts`](../src/sim/devices/timer555.ts)), **TI NE555** veri sayfası (SLFS022K):
   VCC–CONT–iç düğüm–GND arasında üç 5 kΩ (eşikler 2/3 ve 1/3 V_CC), RESET 0,7 V; flip-flop: TRIG <
   1/3·V_CC → yüksek (öncelikli), THRES > CONT → düşük, RESET → düşük. Çıkış yüksekte V_CC − 0,9 V
   arkasında 8 Ω (100 mA'de V_CC − 1,7 V, 200 mA'de − 2,5 V), düşükte 0,025 V arkasında 7,5 Ω (10 mA'de
@@ -1071,7 +1073,7 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   yanmış LED'de Onar).
 - **Formüllerde alt simge (kullanıcı isteği):** Metinlerde alt simge `_{...}` ile işaretlenir
   (`R_{iç}`, `V_{f}`) ve ekranda gerçek alt simge (`<sub>`) olarak çizilir
-  ([`editor/Rich.tsx`](src/editor/Rich.tsx)).
+  ([`editor/Rich.tsx`](../src/editor/Rich.tsx)).
 
 ### AC kaynak, osiloskop ve DC/AC kipi
 
@@ -1167,7 +1169,7 @@ doğrulanır.
   ≈ −0,8 V'ta iletir; adımı eklem gibi (pnjlim) sınırlanır.
 - **Newton-Raphson:** Üç uçlu bileşenler uçlarına giren akımları iki kontrol geriliminin
   (V_BE, V_BC ya da V_GS, V_DS) fonksiyonu olarak verir ve bunların Jacobian'ıyla doğrusallaştırılır
-  ([`sim/devices/threeTerminal.ts`](src/sim/devices/threeTerminal.ts)). FET'lerde V_GS adımı 1 V,
+  ([`sim/devices/threeTerminal.ts`](../src/sim/devices/threeTerminal.ts)). FET'lerde V_GS adımı 1 V,
   V_DS adımı 5 V ile sınırlanır. Kablo akımları için her bileşen uçlarına giren akımları verir.
 
 ### Su haznesi ve sarı LED (baraj projesi, A aşaması)
@@ -1188,12 +1190,12 @@ doğrulanır.
   Seviye zamanla değişirken devre adım adım çözülür; iletkenlik seviyeye bağlı olduğu için hazne
   Newton-Raphson iterasyonunda yeniden eklenir (`stampNonlinear`).
 - **Denetimler:** Cihaz rafında ve telefonun Cihazlar sayfasında aynı bileşen
-  ([`TankControls.tsx`](src/editor/TankControls.tsx)): seviye göstergesi, ıslak prob lambaları,
+  ([`TankControls.tsx`](../src/editor/TankControls.tsx)): seviye göstergesi, ıslak prob lambaları,
   kaydırıcı, su akışı, dolma süresi, su direnci, jaklar. Sembolde su canlı yükselir.
 - **Suda akımı iyonlar taşır (kullanıcı isteği, 2026-10-17):** Prob kuruyken devre açıktır; su
   gelince devreyi su tamamlar, çünkü içinde çözünmüş iyonlar (Ca²⁺, Mg²⁺, Na⁺, Cl⁻, HCO₃⁻…) vardır.
   Simülasyon çalışırken hazne sembolünde ve baraj sahnesinde iyonlar çizilir
-  ([`ions.ts`](src/editor/ions.ts)): prob akımları anot → katot kanallarına ayrılır (her anodun
+  ([`ions.ts`](../src/editor/ions.ts)): prob akımları anot → katot kanallarına ayrılır (her anodun
   akımı katotlara, katot akımlarıyla orantılı; toplamlar korunur), her kanalda üç alan çizgisi
   boyunca katyonlar (turuncu, +) akım yönünde, anyonlar (mor, −) ters yönde sürüklenir; arada
   başka bir prob varsa çizgi onun ucunun solundan kavis yapar. Hız, kablolardaki akım
@@ -1428,7 +1430,7 @@ parametreler sonra yine değiştirilebilir (öğrencinin ölçtüğü β ya da I
   (V > V_J/2'de doğrusal uzatma) ve difüzyon yükü Q = τ·I. Zaman adımında yamuk kuralıyla
   i = 2(Q(v) − Q_önceki)/h − i_önceki, iletkenliği 2C(v)/h (ilk adımda ve süreksizliklerden sonra
   geri Euler: i = (Q(v) − Q_önceki)/h; Fizik 4); bu katkı `stampNonlinear(sys, ctx)` içinde
-  Newton-Raphson'a girer ([`junction.ts`](src/sim/devices/junction.ts) → `ChargeState`).
+  Newton-Raphson'a girer ([`junction.ts`](../src/sim/devices/junction.ts) → `ChargeState`).
   Doğru akım çözümünde (h = 0) yük akımı yoktur: kondansatörsüz devreler eskisi gibi tek
   çözümle kalır. Ölçülen akımlar son adımın yük akımlarını da içerir.
 - **Sonuçları (testler: `tests/models.test.ts`):** 1N4001'de ±5 V kare dalga ters dönünce
@@ -1490,9 +1492,9 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   Telefonda iki adım: ana ekranda arama, açık örneğin satırı, Akdeniz kutusu ve genel gruplar;
   gruba dokununca o grubun kartları. Arama başlıkta, cümlede, açıklamada, grup adında ve devredeki
   parçaların adlarında (ör. "zener", "555") Türkçe karakterlere duyarsız arar
-  ([`src/editor/examplesIndex.ts`](src/editor/examplesIndex.ts)). Uzun açıklama, "Ne işe yarar?"
+  ([`src/editor/examplesIndex.ts`](../src/editor/examplesIndex.ts)). Uzun açıklama, "Ne işe yarar?"
   ve "Günlük hayatta" listede değil, açılan örneğin defter kartındadır. Gruplar ve sıraları
-  [`src/examples/index.ts`](src/examples/index.ts) içindedir; iOS kuralı gereği pencere açıkken
+  [`src/examples/index.ts`](../src/examples/index.ts) içindedir; iOS kuralı gereği pencere açıkken
   tuvalin `touch-action` değeri kaldırılır (pencere parmakla kaydırılabilsin).
 - **Gruplar:** Temel devreler (görevdeki beş örnek, "Ampermetrenin etkisi", "Kare dalga ile RC",
   "RL devresi", "Bobin ve serbest geçiş diyotu"),
@@ -1522,7 +1524,7 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   varsa altında kapalı "Cevabı göster") ve Günlük hayatta. Bir deneyin birden çok şekli varsa her
   şeklin kartında yalnızca o şekle ait adımlar bulunur. Örnekler penceresinde
   her deney grubunun başlığının altında tek cümlelik amaç var. Metinler tipli yapıda
-  [`src/i18n/foy.ts`](src/i18n/foy.ts) içindedir; ek örnekler ve föy dışı örnekler eski düzende
+  [`src/i18n/foy.ts`](../src/i18n/foy.ts) içindedir; ek örnekler ve föy dışı örnekler eski düzende
   (açıklama, "Ne işe yarar?", "Günlük hayatta") kalır.
   - **Kaynak:** Elektronik Lab. Deney Föyü (21 sayfa, dokuz deney; depoda değil). Adımların metni
     föyden alıntıdır (yazım hataları düzeltildi); amaç, teorik bilgi, "Simülasyonda:" satırları ve
@@ -1533,7 +1535,7 @@ Arayüz `docs/tasarim/` altındaki tasarıma göre 9 aşamada yeniden yazıldı;
   - **Bacak bağlantıları** föydeki şekillerle (Şekil-16, 19, 22) ve kataloglarla karşılaştırıldı:
     BC107 (Central: 1 E, 2 B, 3 C) ve IRF510 (Vishay: G D S) föyle aynı; BF245A'da föy 1 kapı,
     3 drain derken Philips kataloğu 1 drain, 3 kapı der (kartta not olarak).
-  - **Testler** ([`tests/foy-deney.test.ts`](tests/foy-deney.test.ts)): föyün iskeleti (dokuz
+  - **Testler** ([`tests/foy-deney.test.ts`](../tests/foy-deney.test.ts)): föyün iskeleti (dokuz
     deney, şekiller, adım numaraları ve hangi adımların sorusu olduğu) testte ayrıca yazılıdır;
     bir deneyin amacı, teorik bilgisi, bir adımı ya da bir sorunun cevabı eksikse test düşer.
     Cevaplardaki her sayı testte simülasyonla ölçülür; cevap metnindeki sayı okunup ölçülen
