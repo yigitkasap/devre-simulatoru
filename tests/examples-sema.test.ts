@@ -1,9 +1,10 @@
 // Örneklerin şema kalitesi: kablolar dik ve parçaların gövdesinden geçmez, parçalar üst üste
-// binmez, devre başına tek toprak sembolü vardır ve dönüş akımı kablodan döner (toprak hattı
-// yalnızca toprak tuzağında çizilir). Kablo kesişmesi yalnızca topolojik olarak kaçınılmaz olan
-// örneklerde, sayısı sınırlı olarak bulunur (docs/KARARLAR.md, "Örnek şemaları").
+// binmez, yazıları birbirine ve gövdelere binmez, devre başına tek toprak sembolü vardır ve dönüş
+// akımı kablodan döner (toprak hattı yalnızca toprak tuzağında çizilir). Kablo kesişmesi yalnızca
+// topolojik olarak kaçınılmaz olan örneklerde, sayısı sınırlı olarak bulunur (docs/KARARLAR.md, "Örnek şemaları").
 
 import { describe, expect, it } from 'vitest';
+import { meterFlipped, partTextBoxes } from '../src/editor/PartView';
 import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../src/examples';
 import type { Box } from '../src/model/catalog';
 import { buildFlowGraph } from '../src/model/flow';
@@ -141,6 +142,28 @@ describe('Örnek şemaları', () => {
       for (const scope of doc.parts.filter((p) => p.type === 'oscilloscope')) {
         const com = pinPositions(scope)[2]!;
         expect(ends.has(`${com.x},${com.y}`), `${id}: ${scope.label} COM`).toBe(true);
+      }
+    }
+  });
+
+  // Eski örnek: P1'in değer yazısı ("10 kΩ · %50") Arduino'nun 3V3 bacağının ucuna değiyor.
+  const TEXT_OVERLAP_ALLOWED: ReadonlySet<ExampleId> = new Set(['ard-potansiyometre']);
+
+  it('parçaların yazıları (ad, değer) birbirine ve başka parçaların gövdesine binmiyor', () => {
+    for (const id of EXAMPLE_IDS) {
+      if (TEXT_OVERLAP_ALLOWED.has(id)) continue;
+      const doc = exampleDoc(id)!;
+      const texts = doc.parts.flatMap((part) => {
+        const others = doc.parts.filter((o) => o !== part).map(partBounds);
+        return partTextBoxes(part, meterFlipped(part, others)).map((box) => ({ part, box }));
+      });
+      for (const [i, a] of texts.entries()) {
+        for (const b of texts.slice(i + 1)) {
+          if (a.part !== b.part) expect(overlaps(a.box, b.box), `${id}: ${a.part.label} ile ${b.part.label} yazıları`).toBe(false);
+        }
+        for (const part of doc.parts) {
+          if (part !== a.part) expect(overlaps(a.box, partBounds(part)), `${id}: ${a.part.label} yazısı ${part.label} gövdesinde`).toBe(false);
+        }
       }
     }
   });
