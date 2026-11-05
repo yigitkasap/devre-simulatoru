@@ -319,6 +319,7 @@ export function useSimulation(
         const l = status.logic;
         live.set(part.id, {
           levels: l.levels,
+          ...(l.count !== undefined && l.powered ? { count: l.count } : {}),
         });
       } else if (part.type === 'arduino') {
         live.set(part.id, { ledL: status.arduino?.ledL ?? false, ledTx: status.arduino?.ledTx ?? false });

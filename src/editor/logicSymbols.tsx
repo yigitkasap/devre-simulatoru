@@ -181,6 +181,22 @@ export function FlipFlopIc({ model, rotation, levels }: { model: string; rotatio
   );
 }
 
+/** CD4017: kutunun içinde "÷10" bloğu; simülasyonda sayacın değeri. */
+export function CounterIc({ rotation, levels, count }: { rotation: Rotation; levels?: readonly (number | null)[]; count?: number | undefined }) {
+  return (
+    <g>
+      <DipBox type="cd4017" model="CD4017B" rotation={rotation} levels={levels} />
+      <rect x={-30} y={-30} width={60} height={60} rx={3} style={PAPER} stroke="currentColor" strokeWidth={1.6} />
+      <Text x={0} y={-16} rotation={rotation} size={9} weight={700}>
+        ÷10
+      </Text>
+      <Text x={0} y={6} rotation={rotation} size={16} weight={700} color={count !== undefined ? HIGH : 'var(--color-muted)'}>
+        {count !== undefined ? String(count) : '0–9'}
+      </Text>
+    </g>
+  );
+}
+
 /**
  * DIP kutusu: bacak çizgileri, çentik, bacak numaraları (içte) ve adları (dışta, etkin düşükler üstü
  * çizgili); 1 olan bacakta turuncu nokta.

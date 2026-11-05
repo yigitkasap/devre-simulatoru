@@ -119,7 +119,7 @@ function gateDef(type: GateChipType): LogicChipDef {
   };
 }
 
-export const LOGIC_CHIPS: Readonly<Record<GateChipType | 'ic7474', LogicChipDef>> = {
+export const LOGIC_CHIPS: Readonly<Record<GateChipType | 'ic7474' | 'cd4017', LogicChipDef>> = {
   ...(Object.fromEntries(GATE_CHIP_TYPES.map((t) => [t, gateDef(t)])) as Record<GateChipType, LogicChipDef>),
   // SN74HC74 / SN74LS74A: 1CLR̄ 1D 1CLK 1PRĒ 1Q 1Q̄ GND 2Q̄ 2Q 2PRĒ 2CLK 2D 2CLR̄ VCC.
   ic7474: {
@@ -130,9 +130,18 @@ export const LOGIC_CHIPS: Readonly<Record<GateChipType | 'ic7474', LogicChipDef>
     outputs: [5, 6, 9, 8],
     bars: [1, 4, 6, 8, 10, 13],
   },
+  // CD4017B: Q5 Q1 Q0 Q2 Q6 Q7 Q3 VSS Q8 Q4 Q9 CO INH CLK RST VDD (13: CLOCK INHIBIT).
+  cd4017: {
+    names: ['Q5', 'Q1', 'Q0', 'Q2', 'Q6', 'Q7', 'Q3', 'VSS', 'Q8', 'Q4', 'Q9', 'CO', 'INH', 'CLK', 'RST', 'VDD'],
+    vcc: 16,
+    gnd: 8,
+    inputs: [14, 13, 15],
+    outputs: [3, 2, 4, 7, 10, 1, 5, 6, 9, 11, 12],
+    bars: [],
+  },
 };
 
-export type LogicChipType = GateChipType | 'ic7474';
+export type LogicChipType = GateChipType | 'ic7474' | 'cd4017';
 
 export const LOGIC_CHIP_TYPES = Object.keys(LOGIC_CHIPS) as LogicChipType[];
 

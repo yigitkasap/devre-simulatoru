@@ -76,6 +76,15 @@ describe('Eşikler ve çıkış gerilimleri (veri sayfası)', () => {
     expect(inverter('74LS04', 5, 1.4).state).toBe('undefined');
   });
 
+  it('CD4017B (5 / 10 V): V_IL 1,5 / 3 V, V_IH 3,5 / 7 V (RESET girişi)', () => {
+    for (const [vdd, vil, vih] of [[5, 1.5, 3.5], [10, 3, 7]] as const) {
+      const state = (v: number) =>
+        run(powered(vdd).battery('BR', 'r', 'gnd', v, 0).add('cd4017', 'U1', pins('cd4017', { 8: 'gnd', 16: 'vcc', 13: 'gnd', 14: 'gnd', 15: 'r' }))).status('U1').logic!.pins[14]!.state;
+      expect(state(vil)).toBe('low');
+      expect(state(vih)).toBe('high');
+    }
+  });
+
   /** 7408'in 1Y'si (1) yük direnciyle toprağa, 2Y'si (0) çekme direnciyle VCC'ye. */
   const loaded = (model: string, vcc: number, rHigh: number, rLow: number) => {
     const sim = run(
@@ -261,6 +270,35 @@ describe('7474: D flip-flop', () => {
     }
     // Her yükselen kenarda (1, 2, 3 … ms) Q döner; kenarların arasında (1,5; 2,5 … ms) okunur: 1, 0, 1, 0 …
     expect(q).toEqual([1, 0, 1, 0, 1, 0, 1, 0]);
+  });
+});
+
+describe('CD4017B: onluk sayıcı', () => {
+  /** Saat 1 kHz kare dalga (ilk yükselen kenar 1 ms'de); RESET ve INH sabit. */
+  const counter = (rst: string, inh: string): Builder =>
+    powered()
+      .add('acsource', 'S1', ['clk', 'gnd'], { waveform: 'square', frequency: 1e3, amplitude: 2.5, offset: 2.5, internalResistance: 0 })
+      .add('cd4017', 'U1', pins('cd4017', { 8: 'gnd', 16: 'vcc', 14: 'clk', 13: inh, 15: rst, 12: 'co' }))
+      .resistor('RC', 'co', 'gnd', 1e6);
+  const outputs = LOGIC_CHIPS.cd4017.outputs;
+
+  it('her yükselen kenarda bir sayar; yalnız sayımın çıkışı 1; CO 0–4’te 1, 5–9’da 0; 10’da başa döner', () => {
+    const sim = new CircuitSimulator(counter('gnd', 'gnd').build());
+    sim.advance(0.5e-3);
+    for (let n = 0; n <= 12; n++) {
+      const l = sim.status('U1').logic!;
+      const count = n % 10;
+      expect(l.count, `${n}. kenardan sonra`).toBe(count);
+      expect(outputs.slice(0, 10).map((p) => l.levels[p - 1])).toEqual(Array.from({ length: 10 }, (_, k) => (k === count ? 1 : 0)));
+      expect(l.levels[11]).toBe(count < 5 ? 1 : 0);
+      sim.advance(1e-3);
+    }
+  });
+
+  it('RESET 1 iken 0’da kalır; CLOCK INHIBIT 1 iken saymaz', () => {
+    expect(run(counter('vcc', 'gnd'), 5.5e-3).status('U1').logic!.count).toBe(0);
+    expect(run(counter('gnd', 'vcc'), 5.5e-3).status('U1').logic!.count).toBe(0);
+    expect(run(counter('gnd', 'gnd'), 5.5e-3).status('U1').logic!.count).toBe(5);
   });
 });
 

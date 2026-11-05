@@ -150,7 +150,7 @@ export function cardReading(part: Part, frame: SimFrame | null): { main: string;
   // Regülatör: çıkış gerilimi (satırlar giriş, çıkış, akım…).
   if ((part.type === 'reg7805' || part.type === 'lm317') && rows[1]) return { main: rows[1].value };
   // Flip-flop, sayıcı, kod çözücü: iç durum (Q, sayaç, rakam); kapılarda besleme.
-  if ((part.type === 'ic7474') && rows[2]) return { main: rows[2].value };
+  if ((part.type === 'ic7474' || part.type === 'cd4017') && rows[2]) return { main: rows[2].value };
   if (part.type === 'dcsupply') {
     // Güç kaynağı: akım veren çıkışlar (ikisi de boştaysa 1. çıkış); satırlar çıkış sırasında.
     const outputs = frame.statuses.get(part.id)?.outputs ?? [];

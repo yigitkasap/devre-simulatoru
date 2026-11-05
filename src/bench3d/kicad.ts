@@ -126,6 +126,7 @@ function geometry(part: Part): Geometry {
     case 'ic7486':
     case 'ic7474':
       return { name: 'DIP-14_W7.62mm', equivalent: 'Package_DIP:DIP-14_W7.62mm_Socket', drill: 0.8, size: 1.6, square: 0, body: 'dip' };
+    case 'cd4017':
       return { name: 'DIP-16_W7.62mm', equivalent: 'Package_DIP:DIP-16_W7.62mm_Socket', drill: 0.8, size: 1.6, square: 0, body: 'dip' };
     default:
       // Transistörler (TO-92, geniş adım: elle lehimlemeye uygun).

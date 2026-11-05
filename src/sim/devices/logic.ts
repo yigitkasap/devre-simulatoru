@@ -928,9 +928,72 @@ export class FlipFlop7474Device extends LogicIcDevice {
   }
 }
 
+// --- CD4017B: on çıkışlı sayıcı ------------------------------------------------------------------------
+
+/**
+ * CD4017B (SCHS027C): CLOCK'un yükselen kenarında, CLOCK INHIBIT 0 iken bir sayar; CLOCK 1 iken
+ * CLOCK INHIBIT'in düşen kenarı da sayar (sayma işareti CLOCK · INHIBIT̄'in yükselen kenarı). RESET 1
+ * iken sayaç 0'da kalır. Q0–Q9'dan yalnızca sayımın çıkışı 1; CARRY OUT 0–4'te 1, 5–9'da 0 (Şekil 2).
+ * Açılışta 0 (veri sayfası açılış durumunu vermez). Gecikme (tipik, 5 / 10 / 15 V): CLOCK → Q 325 /
+ * 135 / 85 ns, CLOCK → CARRY OUT 300 / 125 / 80 ns, RESET → çıkışlar 265 / 115 / 85 ns. Girişlerin
+ * sırası CLK, INH, RST; çıkışlar Q0…Q9, CO.
+ */
+const CD4017_TPD = {
+  decode: [
+    [5, 325e-9],
+    [10, 135e-9],
+    [15, 85e-9],
+  ],
+  carry: [
+    [5, 300e-9],
+    [10, 125e-9],
+    [15, 80e-9],
+  ],
+  reset: [
+    [5, 265e-9],
+    [10, 115e-9],
+    [15, 85e-9],
+  ],
+} as const satisfies Record<string, ReadonlyArray<readonly [number, number]>>;
+
+export class Counter4017Device extends LogicIcDevice {
+  readonly type = 'cd4017' as const;
+  count = 0;
+
+  constructor(init: DeviceInit) {
+    super(init, 'cd4017', modelOf(init, CD4017_MODELS));
+  }
+
+  protected override resetState(): void {
+    this.count = 0;
+  }
+
+  protected evaluate(levels: readonly number[], previous: readonly number[]): number[] {
+    const [clk, inh, rst] = levels as [number, number, number];
+    const was = previous[0] === 1 && previous[1] === 0;
+    if (rst === 1) this.count = 0;
+    else if (!was && clk === 1 && inh === 0) this.count = (this.count + 1) % 10;
+    return [...Array.from({ length: 10 }, (_, k) => (k === this.count ? 1 : 0)), this.count < 5 ? 1 : 0];
+  }
+
+  protected delay(vcc: number, out: number, _level: number, changed: readonly boolean[]): number {
+    return lerp(vcc, changed[2] ? CD4017_TPD.reset : out === 10 ? CD4017_TPD.carry : CD4017_TPD.decode);
+  }
+
+  protected override details() {
+    return { count: this.count };
+  }
+
+  protected override adoptLogic(prev: LogicIcDevice): void {
+    if (prev instanceof Counter4017Device) this.count = prev.count;
+  }
+}
+
+export const CD4017_MODELS = ['CD4017B'] as const;
 
 /** Entegrenin model seçenekleri (katalog). */
 export function logicModels(type: LogicChipType): readonly string[] {
+  if (type === 'cd4017') return CD4017_MODELS;
   return gateModels(type);
 }
 
@@ -946,4 +1009,5 @@ export const LOGIC_IC_MODELS: Readonly<Record<LogicChipType, DeviceModel>> = {
   ic7432: model('ic7432', (init) => new GateIcDevice(init, 'ic7432')),
   ic7486: model('ic7486', (init) => new GateIcDevice(init, 'ic7486')),
   ic7474: model('ic7474', (init) => new FlipFlop7474Device(init)),
+  cd4017: model('cd4017', (init) => new Counter4017Device(init)),
 };

@@ -179,6 +179,7 @@ const MOUNTS: Partial<Record<DeviceType, { mount: Mount; span?: number }>> = {
   ic7432: { mount: 'dip14' },
   ic7486: { mount: 'dip14' },
   ic7474: { mount: 'dip14' },
+  cd4017: { mount: 'dip16' },
 };
 
 /**
