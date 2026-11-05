@@ -1838,8 +1838,7 @@ export const tr = {
   examples: {
     section: 'Örnekler',
     button: 'Örnekler',
-    dialogTitle: 'Örnek devreler',
-    dialogHint: 'Bir örneğe tıkla: devre açılır; ne işe yaradığı ve günlük hayatta nerede kullanıldığı Örnek kartında çıkar.',
+    dialogTitle: 'Örnekler',
     /** Örnekler penceresi: yan liste, gruplar, kartlar ve arama. */
     browser: {
       searchPlaceholder: 'Devre, parça ya da deney ara',
@@ -1905,13 +1904,9 @@ export const tr = {
     } as Record<ExampleGroupId, string>,
     folders: {
       akdeniz: {
-        title: 'Akdeniz Üniversitesi · Fizik Bölümü',
-        summary: (n: number) => `Temel Elektronik Laboratuvarı: 9 deney, baraj projesi, arıza bulma · ${n} devre`,
         logoAlt: 'Akdeniz Üniversitesi logosu',
       },
-    } as Record<ExampleFolderId, { title: string; summary: (n: number) => string; logoAlt: string }>,
-    /** Klasör görünümünden ana listeye dönüş. */
-    back: 'Bütün örnekler',
+    } as Record<ExampleFolderId, { logoAlt: string }>,
     /** Föyde olmayan ek örneğin etiketi (pencerede ve örnek kartında). */
     extra: 'Föyde yok · ek',
     showAnswer: 'Cevabı göster',
@@ -2755,7 +2750,6 @@ export const tr = {
       pickHintTouch: 'Arızanın yerini şemada seç: bacağa, parçaya ya da kabloya dokun',
     },
     scenarios: FAULT_SCENARIO_TEXTS,
-    group: 'Arıza bul',
     groupNote: 'Devre şemadaki gibi kurulmuş ama bir yerde gizli arıza var: multimetreyle ölçerek bul.',
     loaded: (title: string) => `Arıza bul: ${title}`,
     phone: {
@@ -3167,7 +3161,6 @@ export const tr = {
       lamps: (names: readonly string[]) =>
         names.length === 0 ? 'Hiçbir lamba yanmıyor.' : `${names.join(' ve ').replace(/^./, (c) => c.toLocaleUpperCase('tr'))} yanıyor.`,
     },
-    examplesLink: 'Baraj sayfasını aç',
     examplesLinkNote: 'Büyük baraj çizimi, ışık kulesi ve kontroller ayrı sayfada',
     exampleTabLink: 'Baraj sayfasında izle',
   },
@@ -3473,12 +3466,6 @@ export const tr = {
     pickPin: 'Buradan kablo başlat',
     pickWire: (ends: string) => (ends ? `${ends} · kabloyu seç` : 'kabloyu seç'),
     pickerClose: 'Seçiciyi kapat',
-    // Örnekler (P12)
-    examplesSearch: 'Örnek ara…',
-    examplesSearchLabel: 'Örnek ara',
-    examplesHint: 'Bir örneğe dokun: devre açılır; ne işe yaradığı defterin üstündeki örnek kartında.',
-    exampleOpen: 'Açık',
-    examplesNone: 'Bu aramayla eşleşen örnek yok.',
   },
   help: {
     title: 'Yardım',

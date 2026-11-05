@@ -81,9 +81,9 @@ import bjtYukseltecKuplajli from './bjt-yukseltec-kuplajli.json';
 import fetYukseltecKuplajli from './fet-yukseltec-kuplajli.json';
 
 /**
- * Örnekler penceresindeki klasörler: içindeki gruplar ana listede değil, klasörün kendi görünümünde.
- * Akdeniz Üniversitesi Fizik Bölümü'nün Temel Elektronik Laboratuvarı (site bu ders için yapıldı):
- * föyün dokuz deneyi, baraj projesi ve föye dayanan arıza bulma görevleri. Adı tr.ts → examples.folders.
+ * Örnekler penceresindeki klasörler: grupları genel gruplardan önce gelir (yan listede logonun altında,
+ * telefonda logolu ayrı bir kutuda). Akdeniz Üniversitesi Fizik Bölümü'nün Temel Elektronik Laboratuvarı (site bu ders için yapıldı):
+ * föyün dokuz deneyi, baraj projesi ve föye dayanan arıza bulma görevleri. Adı tr.ts → examples.browser.folderName.
  */
 export const EXAMPLE_FOLDERS = [{ id: 'akdeniz', logo: 'akdeniz-universitesi-96.png' }] as const;
 
