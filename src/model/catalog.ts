@@ -135,7 +135,7 @@ export interface PartDef {
   readonly showLabel: boolean;
   /** Yönlü parça mı? (Ters çevir komutu yalnızca bunlarda çalışır.) */
   readonly polarized: boolean;
-  /** Ad ve değer yazısı parçanın sağında (üç uçlu transistörlerde üst ve alt uçlar kablolu olur). */
+  /** Ad ve değer yazısı parçanın sağında (üç uçlu transistörlerde üst ve alt uçlar, göstergede alt uç kablolu olur). */
   readonly labelRight?: boolean;
   /**
    * Belgede bulunmayan özelliklerin eski anlamı: bu özellik eklenmeden önce kaydedilmiş devreler
@@ -226,6 +226,8 @@ export const CATALOG: Readonly<Record<DeviceType, PartDef>> = {
     labelPrefix: 'DS',
     pins: [...Array.from({ length: 8 }, (_, k) => ({ x: -6, y: -7 + 2 * k })), { x: 1, y: 10 }],
     bounds: { x: -6, y: -9, w: 11, h: 19 },
+    // Ad ve model yazısı sağda: ortak katot ucu altta, alttaki yazının üstünden kablosu geçerdi.
+    labelRight: true,
     defaultProps: { ...SEG7_DEFAULTS },
     propDefs: [{ kind: 'select', key: 'model', options: SEG7_MODELS }],
     showLabel: true,

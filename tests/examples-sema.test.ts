@@ -1,7 +1,8 @@
 // Örneklerin şema kalitesi: kablolar dik ve parçaların gövdesinden geçmez, parçalar üst üste
 // binmez, yazıları birbirine ve gövdelere binmez, devre başına tek toprak sembolü vardır ve dönüş
 // akımı kablodan döner (toprak hattı yalnızca toprak tuzağında çizilir). Kablo kesişmesi yalnızca
-// topolojik olarak kaçınılmaz olan örneklerde, sayısı sınırlı olarak bulunur (docs/KARARLAR.md, "Örnek şemaları").
+// topolojik olarak kaçınılmaz olan örneklerde, sayısı sınırlı olarak bulunur (docs/KARARLAR.md,
+// "Örnek şemaları"). Parçaların yazılarının (ad, not, değer) üstünden kablo geçmez.
 
 import { describe, expect, it } from 'vitest';
 import { meterFlipped, partTextBoxes } from '../src/editor/PartView';
@@ -51,7 +52,11 @@ const CROSSINGS: Partial<Record<ExampleId, number>> = {
   'frekans-bolucu': 4,
   // LED'ler sayım sırasıyla (Q0 … Q9), CD4017'nin bacakları Q5 Q1 Q0 Q2 Q6 Q7 Q3 / Q9 Q4 Q8 sırasıyla.
   'yuruyen-isik': 16,
-  // CD4511'in çıkış sırası f g a b c d e; göstergenin a … g; L̅T̅, B̅L̅ ve LE girişlerin arasında.
+  // Anahtarlar yukarıdan aşağı D C B A, CD4511'in girişleri B C L̅T̅ B̅L̅ LE D A: D'nin kablosu C'ninkini ve
+  // B'ninkini, C'ninki B'ninkini keser (3); L̅T̅ ve B̅L̅'nin besleme kablosu B ile C'yi, LE'nin toprak
+  // kablosu D ile A'yı keser (4); anahtarların toprak uçları besleme hattını keser (3, en alttaki hariç).
+  // CD4511'in çıkış sırası f g a b c d e, göstergenin a … g: f ve g göstergenin çevresinden dolaşırken
+  // ortak katodun toprak kablosunu keser (2).
   'bcd-7-segment': 12,
 };
 
@@ -146,13 +151,17 @@ describe('Örnek şemaları', () => {
     }
   });
 
-  it('parçaların yazıları (ad, değer) birbirine ve başka parçaların gövdesine binmiyor', () => {
+  /** Parçaların yazılarının (ad, not, değer) kutuları. */
+  const textBoxes = (doc: CircuitDoc) =>
+    doc.parts.flatMap((part) => {
+      const others = doc.parts.filter((o) => o !== part).map(partBounds);
+      return partTextBoxes(part, meterFlipped(part, others)).map((box) => ({ part, box }));
+    });
+
+  it('parçaların yazıları (ad, not, değer) birbirine ve başka parçaların gövdesine binmiyor', () => {
     for (const id of EXAMPLE_IDS) {
       const doc = exampleDoc(id)!;
-      const texts = doc.parts.flatMap((part) => {
-        const others = doc.parts.filter((o) => o !== part).map(partBounds);
-        return partTextBoxes(part, meterFlipped(part, others)).map((box) => ({ part, box }));
-      });
+      const texts = textBoxes(doc);
       for (const [i, a] of texts.entries()) {
         for (const b of texts.slice(i + 1)) {
           if (a.part !== b.part) expect(overlaps(a.box, b.box), `${id}: ${a.part.label} ile ${b.part.label} yazıları`).toBe(false);
@@ -160,6 +169,25 @@ describe('Örnek şemaları', () => {
         for (const part of doc.parts) {
           if (part !== a.part) expect(overlaps(a.box, partBounds(part)), `${id}: ${a.part.label} yazısı ${part.label} gövdesinde`).toBe(false);
         }
+      }
+    }
+  });
+
+  /**
+   * Kablo yazının üstünden geçmez: yazı kutusunun içinden geçen ya da içinde kalan kablo parçası (kutunun
+   * kenarına değen sayılmaz). Kaçınılmaz olan istisna şimdilik yok.
+   */
+  it('kablolar parçaların yazılarının (ad, not, değer) üstünden geçmiyor', () => {
+    const across = (b: Box, [a, c]: Segment) => {
+      const box = segmentBox([a, c]);
+      if (box.w === 0) return b.x < box.x && box.x < b.x + b.w && box.y < b.y + b.h && b.y < box.y + box.h;
+      return b.y < box.y && box.y < b.y + b.h && box.x < b.x + b.w && b.x < box.x + box.w;
+    };
+    for (const id of EXAMPLE_IDS) {
+      const doc = exampleDoc(id)!;
+      const segs = segments(doc);
+      for (const { part, box } of textBoxes(doc)) {
+        for (const s of segs) expect(across(box, s), `${id}: ${s[0].x},${s[0].y}–${s[1].x},${s[1].y} kablosu ${part.label} yazısının üstünden`).toBe(false);
       }
     }
   });

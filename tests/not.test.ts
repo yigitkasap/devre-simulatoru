@@ -1,11 +1,13 @@
 // Parçanın isteğe bağlı notu: kayıt biçimi (eski devreler aynen açılır), güncelleme, şemadaki yeri,
-// etiketle birlikte gösterim.
+// etiketle birlikte gösterim; KiCad referansına ve ağ adlarına girmez.
 
 import { describe, expect, it } from 'vitest';
+import { designPcb, kicadPcb } from '../src/bench3d/kicad';
 import { labelLayout, partTextBoxes } from '../src/editor/PartView';
+import { exampleDoc } from '../src/examples';
 import { NOTE_MAX, nextLabel, partTitle, updatePart } from '../src/model/docOps';
 import { parseDoc, serializeDoc } from '../src/model/serialize';
-import type { Part } from '../src/model/types';
+import type { CircuitDoc, Part } from '../src/model/types';
 
 const raw = (parts: unknown[]) => ({ version: 1, parts, wires: [] });
 const resistor = (extra: Record<string, unknown> = {}) => ({ id: 'p1', type: 'resistor', label: 'R1', x: 0, y: 0, rotation: 0, props: { resistance: 1000 }, ...extra });
@@ -53,5 +55,22 @@ describe('Parça notu', () => {
     // Yazı kutuları: ad, değer ve not (çakışma ve kablo kuralları notu da kapsar).
     expect(partTextBoxes({ ...base, note: 'Toplam' }, false)).toHaveLength(3);
     expect(partTextBoxes(base, false)).toHaveLength(2);
+  });
+
+  it('KiCad ve PCB: referans ve ağ adları etiketle, not girmez (BCD örneği, S4 · D (8))', () => {
+    const doc = exampleDoc('bcd-7-segment') as CircuitDoc;
+    expect(doc.parts.find((p) => p.label === 'S4')!.note).toBe('D (8)');
+    const result = designPcb(doc);
+    if (!result.ok) throw new Error(result.reason);
+    const text = kicadPcb(result.design, 'BCD');
+    expect(text).toContain('"S4"');
+    expect(text).not.toContain('D (8)');
+  });
+
+  it('örnek notları: BCD anahtarları, yarım toplayıcının ve yürüyen ışığın LED’leri', () => {
+    const notes = (id: Parameters<typeof exampleDoc>[0]) => Object.fromEntries(exampleDoc(id)!.parts.filter((p) => p.note).map((p) => [p.label, p.note]));
+    expect(notes('bcd-7-segment')).toEqual({ S4: 'D (8)', S3: 'C (4)', S2: 'B (2)', S1: 'A (1)' });
+    expect(notes('yarim-toplayici')).toEqual({ LED1: 'Toplam', LED2: 'Elde' });
+    expect(notes('yuruyen-isik')).toEqual(Object.fromEntries(Array.from({ length: 10 }, (_, k) => [`LED${k}`, `Q${k}`])));
   });
 });

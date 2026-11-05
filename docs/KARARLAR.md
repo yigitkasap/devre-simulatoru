@@ -2443,3 +2443,21 @@ yük altında V_OH / V_OL, kısa devre, boştaki giriş ve uyarısı, beslemesiz
 gecikmesi, 7474'ün kenarı ve PR̅E̅ / C̅L̅R̅'si, frekans bölücü, CD4017'nin sayması, RESET ve INH'i,
 CD4511'in 0–15 kodları ve karartması, göstergenin ileri gerilimi ve aşırı akımda yanması); ios-kontrol
 "Lojik entegreler" maddeleri (şema, kart, LS'de belirsiz giriş, Tahtada kur, gösterge, telefon).
+
+**Ek (2026-11-06):**
+
+- **Parça notu:** her parçanın isteğe bağlı kısa notu (en çok 24 karakter; `Part.note`, devre dosyasında
+  `"note"`, notsuz eski devreler aynen açılır). Şemada adın altında küçük ve soluk; kartta, 3B'de ve
+  Tahtada kur'da etiketin yanında ("S4 · D (8)"); kartta Diğer ayarlar → Not. KiCad referansı, PCB
+  yazısı ve ağ adları yalnızca etiketi kullanır. Örneklerde: BCD anahtarları D (8), C (4), B (2), A (1);
+  yarım toplayıcıda Toplam ve Elde; yürüyen ışıkta Q0 … Q9.
+- **Örnek şemaları:** parçaların yazıları (ad, not, değer) birbirine ve başka parçaların gövdesine
+  binmez, kablolar yazıların üstünden geçmez (`tests/examples-sema.test.ts`, istisna yok). Bunun için
+  yürüyen ışık, frekans bölücü, VE / NAND / yarım toplayıcı / SR mandal, beş Arduino örneği ve
+  transistör anahtar düzenlendi (bağlantılar aynı). 7 segment göstergenin adı ve model yazısı sağda:
+  ortak katot ucu altta olduğu için alttaki yazının üstünden kablosu geçerdi.
+- **BCD → 7 segment şeması:** anahtarlar solda tek sütunda yukarıdan aşağı D, C, B, A (B uçları x = 8'deki
+  besleme hattına, A uçları x = 6'daki toprak hattına); segment dirençleri CD4511 ile gösterge arasında
+  6 birim arayla tek dikey sırada, değer yazıları altta. Kesişmeler (12) testte gerekçesiyle izinli:
+  CD4511'in giriş sırası (B C L̅T̅ B̅L̅ LE D A) anahtarların sırasından farklı, f ve g göstergenin
+  çevresinden dolaşır. Tahtada kur yine tek tahtada.

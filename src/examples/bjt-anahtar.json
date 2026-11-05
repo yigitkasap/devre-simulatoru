@@ -6,16 +6,16 @@
     {"id": "p6", "type": "resistor", "label": "R1", "x": 31, "y": 12, "rotation": 0, "props": {"resistance": 10000}},
     {"id": "p4", "type": "npn", "label": "Q1", "x": 42, "y": 12, "rotation": 0, "props": {"model": "BC107", "beta": 200}},
     {"id": "p2", "type": "resistor", "label": "R2", "x": 44, "y": -6, "rotation": 90, "props": {"resistance": 1000}},
-    {"id": "p3", "type": "led", "label": "LED1", "x": 54, "y": 8, "rotation": 90, "props": {"color": "red"}},
+    {"id": "p3", "type": "led", "label": "LED1", "x": 57, "y": 8, "rotation": 90, "props": {"color": "red"}},
     {"id": "p8", "type": "ground", "label": "GND1", "x": 7, "y": 20, "rotation": 0, "props": {}}
   ],
   "wires": [
     {"id": "w1", "points": [[5, -11], [9, -11], [9, -14], [44, -14], [44, -10]]},
     {"id": "w2", "points": [[44, -2], [44, 8]]},
-    {"id": "w3", "points": [[44, -2], [54, -2], [54, 4]]},
+    {"id": "w3", "points": [[44, -2], [57, -2], [57, 4]]},
     {"id": "w4", "points": [[44, 16], [44, 20]]},
-    {"id": "w5", "points": [[54, 12], [54, 20]]},
-    {"id": "w6", "points": [[5, -9], [7, -9], [7, 20], [54, 20]]},
+    {"id": "w5", "points": [[57, 12], [57, 20]]},
+    {"id": "w6", "points": [[5, -9], [7, -9], [7, 20], [57, 20]]},
     {"id": "w7", "points": [[21, 12], [27, 12]]},
     {"id": "w8", "points": [[35, 12], [38, 12]]},
     {"id": "w9", "points": [[21, 14], [23, 14], [23, 20]]}

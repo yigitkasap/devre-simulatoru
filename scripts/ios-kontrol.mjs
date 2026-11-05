@@ -3672,6 +3672,35 @@ try {
     await ctx.close();
   }
   {
+    // Parça notu: yarım toplayıcının LED'lerinde "Toplam" ve "Elde"; kartta etiketin yanında, Diğer ayarlar → Not.
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Yarım toplayıcı (74HC86 + 74HC08)', exact: true }))).click(); await page.waitForTimeout(500);
+    const notes = await page.locator('svg.schematic text[data-note]').allTextContents();
+    const group = notebook(page).getByRole('button', { name: /^LED’ler/ });
+    if (await group.count()) { await group.click(); await page.waitForTimeout(200); }
+    const row = notebook(page).getByRole('button', { name: /^LED1 · Toplam · LED: kartı aç/ });
+    const rowOk = (await row.count()) === 1;
+    await row.click(); await page.waitForTimeout(300);
+    const card = notebook(page).getByRole('region', { name: /^LED1 · Toplam/ });
+    await card.getByRole('button', { name: 'Diğer ayarlar' }).click(); await page.waitForTimeout(200);
+    const input = card.getByRole('textbox', { name: /^Not/ });
+    const before = await input.inputValue();
+    await input.fill('Toplam (S)'); await input.press('Enter'); await page.waitForTimeout(300);
+    const after = await page.locator('svg.schematic text[data-note]').allTextContents();
+    await page.keyboard.press('Escape');
+    await page.locator('header').getByRole('button', { name: 'Geri al', exact: true }).click(); await page.waitForTimeout(300);
+    const undone = await page.locator('svg.schematic text[data-note]').allTextContents();
+    check('not (masaüstü): şemada LED’lerin adının altında “Toplam” ve “Elde”; kartta etiketin yanında; Diğer ayarlar → Not değişince şema güncelleniyor, Geri al eskisine döndürüyor',
+      notes.includes('Toplam') && notes.includes('Elde') && rowOk && before === 'Toplam' && after.includes('Toplam (S)') && undone.includes('Toplam') && !undone.includes('Toplam (S)'),
+      `${notes.join('/')} · satır ${rowOk} · ${before} → ${after.join('/')} → ${undone.join('/')}`);
+    await ctx.close();
+  }
+  {
     // Tahtada kur: 74HC08 kanalın üstüne oturuyor (alt sıra f, üst sıra e; 14 bacak).
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
