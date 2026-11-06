@@ -8,13 +8,13 @@ import { tr } from '../i18n/tr';
 import type { SaveState } from './autosave';
 import { Icon, type IconName } from './icons';
 import type { Settings, ThemeChoice } from './settings';
-import { KeysTab, PhoneHelp } from './HelpDialog';
+import { PhoneHelp } from './HelpDialog';
 import { SpeedOptions } from './SimBar';
 import { SettingsFields } from './TopBar';
 import type { SimStatus } from './useSimulation';
 
-/** Alttan açılan karartmalı sayfa; `top` yoksa içeriği kadar yüksek. */
-function ModalSheet({ label, top, onClose, children }: { label: string; top?: number; onClose: () => void; children: ReactNode }) {
+/** Alttan açılan karartmalı sayfa: yüksekliği içeriğe göre, en çok ekranın % 90'ı (uzun içerik içeride kayar). */
+function ModalSheet({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
@@ -40,7 +40,7 @@ function ModalSheet({ label, top, onClose, children }: { label: string; top?: nu
         aria-modal="true"
         aria-label={label}
         className="sheet-in absolute inset-x-0 bottom-0 flex flex-col rounded-t-xl bg-panel shadow-[0_-4px_18px_rgba(29,39,51,0.2)]"
-        style={top !== undefined ? { top: `calc(${top}px + env(safe-area-inset-top))` } : { maxHeight: 'calc(100% - 72px - env(safe-area-inset-top))' }}
+        style={{ maxHeight: 'min(90%, calc(100% - 8px - env(safe-area-inset-top)))' }}
       >
         <button type="button" onClick={onClose} aria-label={tr.phone.close} className="flex h-11 w-full shrink-0 items-center justify-center rounded-t-xl" tabIndex={-1}>
           <i className="block h-[5px] w-9 rounded-[3px] bg-line-2" aria-hidden="true" />
@@ -114,7 +114,7 @@ export function FileSheet(props: FileSheetProps) {
   };
 
   return (
-    <ModalSheet label={tr.phone.fileTitle} top={150} onClose={props.onClose}>
+    <ModalSheet label={tr.phone.fileTitle} onClose={props.onClose}>
       <div className="flex shrink-0 items-center justify-between pr-2 pb-1 pl-4">
         <div className="flex min-w-0 flex-col">
           <b className="truncate text-[18px] font-semibold">{props.title}</b>
@@ -199,11 +199,11 @@ const THEME_CHOICES = ['system', 'light', 'dark'] as const;
 
 /**
  * Daha fazla (arayüz v4): üstte Analiz, Geri al, Yinele, Sığdır; altında masaüstündeki menünün sırası:
- * Tema (Sistem / Açık / Koyu), Ayarlar, Klavye kısayolları, Yardım, Kısa turu başlat. Ayarlar, kısayollar
- * ve yardım aynı sayfada açılır (geri düğmesiyle döner).
+ * Tema (Sistem / Açık / Koyu), Ayarlar, Yardım, Kısa turu başlat. Ayarlar ve yardım aynı sayfada açılır
+ * (geri düğmesiyle döner). Klavye kısayolları telefonda yok (tablette masaüstünün Daha fazla menüsünde).
  */
 export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, canRedo, onUndo, onRedo, onFit, onTour, onWelcome, onTheme }: MoreSheetProps) {
-  const [view, setView] = useState<'menu' | 'settings' | 'keys' | 'help'>('menu');
+  const [view, setView] = useState<'menu' | 'settings' | 'help'>('menu');
   const t = tr.topbar.more;
   const quick: Array<{ icon: IconName; label: string; run: () => void; disabled?: boolean }> = [
     { icon: 'chart', label: tr.analysis.button, run: onAnalysis },
@@ -212,9 +212,9 @@ export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, 
     { icon: 'fit', label: tr.bench.fit, run: onFit },
   ];
   const row = 'flex min-h-[52px] w-full items-center gap-3 rounded-md px-2 text-left text-[15px] font-medium active:bg-panel-2';
-  const title = view === 'settings' ? tr.settings.title : view === 'keys' ? t.shortcuts : view === 'help' ? t.help : null;
+  const title = view === 'settings' ? tr.settings.title : view === 'help' ? t.help : null;
   return (
-    <ModalSheet label={tr.phone.moreTitle} top={118} onClose={onClose}>
+    <ModalSheet label={tr.phone.moreTitle} onClose={onClose}>
       {title === null ? (
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-4" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
           <div className="flex shrink-0 gap-2">
@@ -256,11 +256,6 @@ export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, 
               <span className="flex-1">{tr.settings.title}</span>
               <Icon name="chevron" className="h-4 w-4 text-muted" />
             </button>
-            <button type="button" onClick={() => setView('keys')} className={row}>
-              <Icon name="keyboard" className="h-5 w-5 shrink-0" />
-              <span className="flex-1">{t.shortcuts}</span>
-              <Icon name="chevron" className="h-4 w-4 text-muted" />
-            </button>
             <button type="button" onClick={() => setView('help')} className={row}>
               <Icon name="help" className="h-5 w-5 shrink-0" />
               <span className="flex-1">{t.help}</span>
@@ -282,7 +277,7 @@ export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, 
             <h3 className="min-w-0 flex-1 truncate pr-2 text-right text-[15px] font-semibold">{title}</h3>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
-            {view === 'settings' ? <SettingsFields settings={settings} onChange={onSettings} touch onWelcome={onWelcome} /> : view === 'keys' ? <KeysTab /> : <PhoneHelp onTour={onTour} />}
+            {view === 'settings' ? <SettingsFields settings={settings} onChange={onSettings} touch onWelcome={onWelcome} /> : <PhoneHelp onTour={onTour} />}
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
-// "Kablo gerilimi" açıklama kutusu (tuvalin sol alt köşesi) devrenin üstüne binmesin: Sığdır bu kutuyu
-// görünür alanın dışında sayar (devre kutuya değecekse alttan ya da soldan pay bırakılır), kutu yine de
-// devreye değiyorsa (kullanıcı yakınlaştırdı, kaydırdı) tek satıra küçülür. Saf işlevler (testler çağırır).
+// Tuvalin alt köşesindeki kutular (masaüstünde sol alttaki yakınlaştırma grubu, telefonda sağ alttaki gerilim
+// çipi ve tam ekran düğmesi) devrenin üstüne binmesin: Sığdır kutuyu görünür alanın dışında sayar (devre kutuya
+// değecekse alttan ya da yandan pay bırakılır). Saf işlevler (testler çağırır).
 
 import type { Box } from '../model/catalog';
 import { partBounds } from '../model/geometry';
@@ -64,17 +64,29 @@ export function circuitHits(shapes: CircuitShapes, view: View, rect: Rect, pad =
 }
 
 /**
- * Kutuyu (ızgara biriminde) ekrana sığdıran görünüm; devre sol alt köşedeki açıklama kutusuna değecekse
- * ya alttan (kutunun üst kenarına kadar) ya da soldan (sağ kenarına kadar) pay bırakılır: ikisinden
- * devrenin daha büyük göründüğü seçilir.
+ * Kutuyu (ızgara biriminde) ekrana sığdıran görünüm; devre alt köşedeki kutuya değecekse ya alttan (kutunun
+ * üst kenarına kadar) ya da yandan (sol alttaki kutuda sağ kenarına, sağ alttakinde sol kenarına kadar) pay
+ * bırakılır: ikisinden devrenin daha büyük göründüğü seçilir.
  */
 export function fitAvoiding(shapes: CircuitShapes, box: Box, width: number, height: number, padding: number, legend: Rect | null): View {
   const plain = fitView(box, width, height, padding);
   if (!legend || !circuitHits(shapes, plain, legend)) return plain;
   const gap = 8;
+  const right = legend.x + legend.w / 2 > width / 2;
   const bottom = Math.max(0, height - legend.y + gap - padding);
-  const left = Math.max(0, legend.x + legend.w + gap - padding);
+  const side = Math.max(0, right ? width - legend.x + gap - padding : legend.x + legend.w + gap - padding);
   const above = fitView(box, width, Math.max(1, height - bottom), padding);
-  const beside = fitView(box, Math.max(1, width - left), height, padding);
-  return above.scale >= beside.scale ? above : { ...beside, x: beside.x + left };
+  const beside = fitView(box, Math.max(1, width - side), height, padding);
+  if (above.scale >= beside.scale) return above;
+  return right ? beside : { ...beside, x: beside.x + side };
+}
+
+/** Telefon: sağ alttaki tam ekran düğmesi (44 px, kenardan 10 px) ve solundaki gerilim çipi (en çok 120 px). */
+export const PHONE_CORNER = { margin: 10, button: 44, gap: 8, chip: 120 } as const;
+
+/** Telefonda Sığdır'ın dışarıda bıraktığı sağ alt köşe (tuvalin koordinatlarında). */
+export function phoneCornerRect(width: number, height: number): Rect {
+  const { margin, button, gap, chip } = PHONE_CORNER;
+  const w = chip + gap + button;
+  return { x: width - margin - w, y: height - margin - button, w, h: button };
 }

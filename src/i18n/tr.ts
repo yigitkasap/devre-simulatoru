@@ -3350,7 +3350,7 @@ export const tr = {
     defaultName: 'Devrem',
     emptyName: 'Yeni devre',
     fileButton: (title: string) => `Dosya ve örnekler: ${title}`,
-    more: 'Daha fazla: görünüm, ayarlar, yardım, paylaş',
+    more: 'Daha fazla: analiz, tema, ayarlar, yardım',
     nodeVoltages: 'Düğüm gerilimleri',
     modes: { kur: 'Kur', bagla: 'Bağla', olc: 'Ölç', pause: 'Duraklatıldı', bench: '3B' },
     modeLabel: (mode: string) => `Kip: ${mode}`,

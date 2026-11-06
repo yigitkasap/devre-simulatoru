@@ -2883,8 +2883,8 @@ try {
     const hadBack = (await backButton.count()) === 1;
     if (hadBack) { await backButton.tap(); await page.waitForTimeout(300); }
     const backHome = (await moreSheet.getByRole('button', { name: 'Ayarlar', exact: true }).count()) === 1;
-    check('telefonda ⋯ (v4): kutular Analiz, Geri al, Yinele, Sığdır; satırlar Ayarlar, Klavye kısayolları, Yardım, Kısa turu başlat (Örnekler ve Dosya yok); Yardım sayfasında dokunma hareketleri, "Daha fazla" ile geri (P14)',
-      tiles.join('|') === 'Analiz|Geri al|Yinele|Sığdır' && rows.join('|') === 'Ayarlar|Klavye kısayolları|Yardım|Kısa turu başlat' && more.includes('Uca dokun') && hadBack && backHome &&
+    check('telefonda ⋯ (v4): kutular Analiz, Geri al, Yinele, Sığdır; satırlar Ayarlar, Yardım, Kısa turu başlat (Örnekler, Dosya ve Klavye kısayolları yok); Yardım sayfasında dokunma hareketleri, "Daha fazla" ile geri (P14)',
+      tiles.join('|') === 'Analiz|Geri al|Yinele|Sığdır' && rows.join('|') === 'Ayarlar|Yardım|Kısa turu başlat' && more.includes('Uca dokun') && hadBack && backHome &&
         (await moreSheet.getByRole('button', { name: 'Örnekler', exact: true }).count()) === 0 && (await moreSheet.getByRole('button', { name: 'Dosya', exact: true }).count()) === 0,
       `${tiles.join('|')} · ${rows.join('|')} · ${more.slice(0, 40)}`);
     await ctx.close();
@@ -3164,6 +3164,102 @@ try {
       wiring === 'Kablo bağla' && barHidden && (await mode(page)).startsWith('Kur') && (await phoneBar(page).count()) === 1, `${wiring} · çubuk gizli ${barHidden}`);
     void cdp;
     await page.context().close();
+  }
+
+  // --- Arayüz v4 düzeltmeleri (telefon): gerilim çipi, Daha fazla'nın adı, alt sayfaların boyu, bildirim, kısayollar ---
+  {
+    const { page } = await phone();
+    // 4. "Örnek yüklendi. · Geri al" 390 px'te tek satır (genişlik içeriğe göre; eskiden ekranın yarısında kırılıyordu).
+    // Satırlar yazının parçalarının üst kenarından sayılır (yazı birkaç düğümde olabilir: "±" ve değer).
+    await openExample(page, 'RC dolma');
+    const toast = page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' });
+    const toastBox = await toast.boundingBox();
+    const toastLines = await toast.locator('span').first().evaluate((s) => { const r = document.createRange(); r.selectNodeContents(s); return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size; }).catch(() => -1);
+    const undoBox = await toast.getByRole('button', { name: 'Geri al' }).boundingBox();
+    check('arayüz v4 düzeltmeleri (telefon 390): "Örnek yüklendi. · Geri al" bildirimi tek satır (yazı tek satır, bildirim ≤ 48 px, Geri al aynı satırda)',
+      toastBox !== null && undoBox !== null && toastLines === 1 && toastBox.height <= 48.5 && undoBox.y >= toastBox.y && undoBox.y + undoBox.height <= toastBox.y + toastBox.height + 0.5,
+      `${Math.round(toastBox?.width ?? 0)}×${Math.round(toastBox?.height ?? 0)} px · ${toastLines} satır`);
+    await toast.waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+
+    // 1. Gerilim çipi: sağ altta, tam ekran düğmesinin solunda, düğmeyle aynı boyda tek satır; Sığdır o köşeyi
+    // dışarıda bıraktığı için çip (ve düğme) çizime (parçalar, etiketleri, kablolar) binmiyor.
+    const chipRows = [];
+    for (const name of ['RC dolma', 'Gerilim bölücü', 'LED ve ön direnç', 'Yarım dalga doğrultmaç', 'Transistör anahtar: LED kollektörde']) {
+      if (name !== 'RC dolma') await openExample(page, name);
+      await phoneBar(page).getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(700);
+      const chip = page.getByRole('button', { name: 'Gösterim: kablo gerilimi ölçeği' });
+      const cb = await chip.boundingBox();
+      const fb = await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).boundingBox();
+      const lines = await chip.locator('span').evaluate((s) => { const r = document.createRange(); r.selectNodeContents(s); return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size; }).catch(() => -1);
+      const hits = cb === null || fb === null ? ['?'] : await page.evaluate((rects) => {
+        const svg = document.querySelector('svg.schematic');
+        const items = [
+          ...[...svg.querySelectorAll('g[transform^="translate("][style*="color"]')].map((g) => ({ n: g.querySelector('text')?.textContent ?? 'parça', r: g.getBoundingClientRect() })),
+          ...[...svg.querySelectorAll('polyline')].filter((p) => !['none', 'transparent'].includes(p.getAttribute('stroke') ?? 'none')).map((p) => ({ n: 'kablo', r: p.getBoundingClientRect() })),
+        ];
+        const out = [];
+        for (const { n, r } of items) for (const c of rects) if (r.left < c.x + c.width && r.right > c.x && r.top < c.y + c.height && r.bottom > c.y) out.push(n);
+        return out;
+      }, [cb, fb]);
+      chipRows.push({ name, ok: cb !== null && fb !== null && lines === 1 && Math.abs(cb.height - fb.height) < 0.5 && Math.abs(cb.y - fb.y) < 0.5 && fb.x - (cb.x + cb.width) >= 4 && fb.x - (cb.x + cb.width) <= 12 && hits.length === 0,
+        text: `${name}: çip ${Math.round(cb?.width ?? 0)}×${Math.round(cb?.height ?? 0)}, düğmeyle arası ${Math.round((fb?.x ?? 0) - ((cb?.x ?? 0) + (cb?.width ?? 0)))} px${hits.length ? `, değiyor: ${hits.join(', ')}` : ''}` });
+      await phoneBar(page).getByRole('button', { name: 'Durdur', exact: true }).tap(); await page.waitForTimeout(300);
+    }
+    check('arayüz v4 düzeltmeleri (telefon 390): gerilim çipi sağ altta, tam ekran düğmesinin solunda, düğmeyle aynı boyda (44 px) tek satır; beş örnekte de Sığdır sonrası çip ve düğme çizime binmiyor',
+      chipRows.every((x) => x.ok), chipRows.filter((x) => !x.ok).map((x) => x.text).join(' · ') || chipRows[0].text);
+
+    // 2. Daha fazla düğmesinin adı içerikle aynı (Paylaş devre sayfasında; burada yok). 5. Klavye kısayolları telefonda yok.
+    const moreButton = page.locator('header').getByRole('button', { name: /^Daha fazla/ });
+    const moreName = await moreButton.getAttribute('aria-label');
+    await moreButton.tap(); await page.waitForTimeout(400);
+    const sheet = page.getByRole('dialog', { name: 'Daha fazla' });
+    const sheetText = (await sheet.textContent()) ?? '';
+    check('arayüz v4 düzeltmeleri (telefon): Daha fazla düğmesinin adı "Daha fazla: analiz, tema, ayarlar, yardım"; sayfada Analiz, Tema, Ayarlar, Yardım var, Paylaş yok',
+      moreName === 'Daha fazla: analiz, tema, ayarlar, yardım' && (await sheet.getByRole('button', { name: 'Analiz', exact: true }).count()) === 1 && (await sheet.getByRole('radiogroup', { name: 'Tema' }).count()) === 1 &&
+        (await sheet.getByRole('button', { name: 'Ayarlar', exact: true }).count()) === 1 && (await sheet.getByRole('button', { name: 'Yardım', exact: true }).count()) === 1 && !sheetText.includes('Paylaş'),
+      moreName ?? '');
+    const noKeys = (await sheet.getByText('Klavye kısayolları').count()) === 0;
+
+    // 3. Alt sayfaların boyu içeriğe göre (altında boşluk yok), en çok ekranın % 90'ı; uzun içerik içeride kayıyor.
+    const sizeOf = async (dlg, lastName) => {
+      const box = await dlg.boundingBox();
+      const last = await dlg.getByRole('button', { name: lastName, exact: true }).boundingBox();
+      return { h: box ? box.height : 0, top: box ? box.y : 0, gap: box && last ? box.y + box.height - (last.y + last.height) : -1 };
+    };
+    const moreSize = await sizeOf(sheet, 'Kısa turu başlat');
+    await sheet.getByRole('button', { name: 'Yardım', exact: true }).tap(); await page.waitForTimeout(300);
+    const helpBox = await sheet.boundingBox();
+    const helpScroll = await sheet.evaluate((d) => [...d.querySelectorAll('div')].some((e) => e.scrollHeight > e.clientHeight + 4 && getComputedStyle(e).overflowY === 'auto'));
+    await sheet.getByRole('button', { name: 'Daha fazla', exact: true }).tap(); await page.waitForTimeout(300);
+    await sheet.getByRole('button', { name: 'Kapat', exact: true }).first().tap(); await page.waitForTimeout(300);
+    await phoneFileSheet(page);
+    const fileSheet = page.getByRole('dialog', { name: 'Dosya' });
+    const fileSize = await sizeOf(fileSheet, 'Sayfaya göm');
+    await fileSheet.getByRole('button', { name: 'Kapat', exact: true }).first().tap(); await page.waitForTimeout(300);
+    const max = 844 * 0.9;
+    check('arayüz v4 düzeltmeleri (telefon 390 × 844): Daha fazla ve devre sayfası içeriğe göre (son satırın altında ≤ 20 px, ekranın % 90’ından kısa); Yardım gibi uzun içerikte sayfa en çok % 90 (760 px), içerik kayıyor',
+      moreSize.h < max && moreSize.gap >= 0 && moreSize.gap <= 20 && fileSize.h < max && fileSize.gap >= 0 && fileSize.gap <= 20 && helpBox !== null && helpBox.height <= max + 1 && helpBox.height >= max - 2 && helpScroll,
+      `Daha fazla ${Math.round(moreSize.h)} px (alt boşluk ${Math.round(moreSize.gap)}) · devre sayfası ${Math.round(fileSize.h)} px (alt boşluk ${Math.round(fileSize.gap)}) · Yardım ${Math.round(helpBox?.height ?? 0)} px`);
+    await page.context().close();
+
+    // Yatay telefon (844 × 390): Daha fazla sayfası en çok ekranın % 90'ı.
+    const { page: land } = await phone(844, 390);
+    await land.locator('header').getByRole('button', { name: /^Daha fazla/ }).tap(); await land.waitForTimeout(400);
+    const landBox = await land.getByRole('dialog', { name: 'Daha fazla' }).boundingBox();
+    check('arayüz v4 düzeltmeleri (yatay telefon 844 × 390): Daha fazla sayfası en çok ekranın % 90’ı (351 px), üstü ekranın içinde',
+      landBox !== null && landBox.height <= 390 * 0.9 + 1 && landBox.y >= 390 * 0.1 - 1, `${Math.round(landBox?.height ?? 0)} px`);
+    await land.context().close();
+
+    // 5. Tablette (1180 × 820, dokunmatik) masaüstünün Daha fazla menüsünde Klavye kısayolları duruyor.
+    const tctx = await browser.newContext({ viewport: { width: 1180, height: 820 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    const tp = await tctx.newPage();
+    tp.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await tp.goto(URL0, { waitUntil: 'networkidle' });
+    await tp.locator('header').getByRole('button', { name: 'Daha fazla', exact: true }).tap(); await tp.waitForTimeout(250);
+    const tabletKeys = await tp.getByRole('menu', { name: 'Daha fazla' }).getByRole('menuitem', { name: /^Klavye kısayolları/ }).count();
+    check('arayüz v4 düzeltmeleri: "Klavye kısayolları" telefonun Daha fazla sayfasında yok, tablette (1180 px, dokunmatik) Daha fazla menüsünde var',
+      noKeys && tabletKeys === 1, `telefonda yok ${noKeys} · tablette ${tabletKeys}`);
+    await tctx.close();
   }
 
   // --- Masaüstü kabuğu: kütüphane bilgi alanı, ipucu şeridi, hız penceresi ---------------

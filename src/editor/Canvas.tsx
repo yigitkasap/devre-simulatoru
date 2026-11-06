@@ -66,7 +66,7 @@ import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
 import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from './state';
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
-import { circuitShapes, fitAvoiding, type Rect } from './legendFit';
+import { circuitShapes, fitAvoiding, phoneCornerRect, type Rect } from './legendFit';
 import { clampScale, fitView, screenToGrid, snap, zoomAt, type View } from './view';
 
 /** Simülasyon sırasında tıklanınca (ya da basılı tutulunca) kullanılan parçalar: imleç el olur. */
@@ -445,7 +445,7 @@ export function Canvas({
   /** Telefon: kalabalık bir noktaya dokununca "Burada N öğe var" seçicisi; büyüteç (basılı tutunca da). */
   const [picker, setPicker] = useState<{ x: number; y: number; options: readonly PickOption[] } | null>(null);
   const [magnifier, setMagnifier] = useState<{ x: number; y: number; g: Point } | null>(null);
-  /** Gerilim göstergesi açık mı (masaüstünde sağ alttaki çip, telefonda sol alttaki düğme; tıklayınca açılır). */
+  /** Gerilim göstergesi açık mı (sağ alttaki çip; telefonda tam ekran düğmesinin solunda; tıklayınca açılır). */
   const [legendOpen, setLegendOpen] = useState(false);
   const shapes = useMemo(() => circuitShapes(doc), [doc]);
   useEffect(() => {
@@ -564,9 +564,11 @@ export function Canvas({
       phone && ((phone.mode === 'bagla' && !phone.connectHeader) || (phone.mode === 'olc' && phone.lockChip))
         ? Math.min(phone.mode === 'bagla' ? 84 : 48, size.height / 4)
         : 0;
-    // Masaüstünde sol alttaki "Kablo gerilimi" kutusu da görünür alanın dışında sayılır.
+    // Masaüstünde sol alttaki yakınlaştırma grubu, telefonda sağ alttaki gerilim çipi ve tam ekran düğmesi
+    // görünür alanın dışında sayılır.
+    const height = Math.max(1, size.height - top);
     const fitted = phone
-      ? fitView(bounds, Math.max(1, size.width), Math.max(1, size.height - top), 20)
+      ? fitAvoiding(shapes, bounds, Math.max(1, size.width), height, 20, phoneCornerRect(Math.max(1, size.width), height))
       : fitAvoiding(shapes, bounds, Math.max(1, size.width), Math.max(1, size.height), 48, avoidRect);
     setView({ ...fitted, y: fitted.y + top });
   };
@@ -2185,15 +2187,17 @@ export function Canvas({
             <span className="font-mono tabular">{tr.sim.legendChip(formatSI(frame.vmax, 'V', { trim: true }))}</span>
           </button>
         ) : phone && !legendOpen ? (
+          // Telefon: sağ altta, tam ekran düğmesinin solunda tek satırlık küçük çip (düğmeyle aynı boyda; Sığdır bu
+          // köşeyi dışarıda bırakır: legendFit.phoneCornerRect).
           <button
             type="button"
             onClick={() => setLegendOpen(true)}
             aria-label={tr.phone.legendButton}
             aria-expanded={false}
-            className="absolute bottom-3 left-3 flex h-11 items-center gap-2 rounded-full border border-line bg-panel/95 px-3 text-[13px] font-medium shadow-sm"
+            className="absolute right-[62px] bottom-2.5 z-10 flex h-11 max-w-[120px] items-center gap-1.5 rounded-full border border-line bg-panel/95 px-2.5 whitespace-nowrap shadow-sm"
           >
-            <i className="block h-2 w-14 rounded-full" style={{ background: voltageGradient(settings.wireScale) }} aria-hidden="true" />
-            <span className="font-mono text-label">±{formatSI(frame.vmax, 'V', { trim: true })}</span>
+            <i className="block h-2 w-7 shrink-0 rounded-full" style={{ background: voltageGradient(settings.wireScale) }} aria-hidden="true" />
+            <span className="font-mono text-label tabular">±{formatSI(frame.vmax, 'V', { trim: true })}</span>
           </button>
         ) : (
           <VoltageLegend
@@ -2203,7 +2207,7 @@ export function Canvas({
             rms={doc.parts.some((p) => p.type === 'acsource' || p.type === 'funcgen')}
             ions={doc.parts.some((p) => p.type === 'tank')}
             field={settings.magneticField}
-            side={phone ? 'left' : 'right'}
+            phone={phone !== null}
             onClose={() => setLegendOpen(false)}
           />
         ))}
@@ -2799,7 +2803,7 @@ function VoltageLegend({
   rms,
   ions,
   field,
-  side,
+  phone,
   onClose,
 }: {
   vmax: number;
@@ -2811,8 +2815,8 @@ function VoltageLegend({
   ions: boolean;
   /** Manyetik alan gösteriliyor: ⊙ ve ⊗ işaretleri açıklanır. */
   field: boolean;
-  /** Hangi alt köşede (telefonda sol, masaüstünde sağ). */
-  side: 'left' | 'right';
+  /** Telefon: çipin yerinde (tam ekran düğmesinin solunda); masaüstünde sağ alt köşede. */
+  phone: boolean;
   /** Dokununca (tıklayınca) küçük düğmeye döner. */
   onClose: () => void;
 }) {
@@ -2822,7 +2826,7 @@ function VoltageLegend({
       role="note"
       aria-label={tr.sim.legendTitle}
       onClick={onClose}
-      className={`absolute z-10 flex cursor-pointer flex-col gap-1.5 rounded-lg border border-line bg-panel px-3 py-2.5 shadow-md ${side === 'left' ? 'bottom-3 left-3' : 'right-4 bottom-4'}`}
+      className={`absolute z-10 flex cursor-pointer flex-col gap-1.5 rounded-lg border border-line bg-panel px-3 py-2.5 shadow-md ${phone ? 'right-[62px] bottom-2.5' : 'right-4 bottom-4'}`}
     >
       <span className="text-label font-semibold text-muted">{rms ? tr.sim.legendRms : tr.sim.legend}</span>
       <div className="h-2.5 w-44 rounded-[5px]" style={{ background: voltageGradient(scale) }} />
