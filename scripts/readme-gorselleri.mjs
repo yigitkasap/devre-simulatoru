@@ -14,7 +14,7 @@
 // Ölçüler: banner 1280 × 360 (2×: 2560 × 720), sosyal önizleme 1280 × 640 (1×), ana ekran 1440 × 900
 // (2×), özellik görselleri 2400 × 1500 px (1200 × 750, 2×). Özellik görsellerinde README'nin iki sütunlu
 // tablosunda da okunsun diye arayüzün ilgili bölgesi kırpılıp bu ölçüye getirilir.
-// Banner'daki işaret "düğüm dalgası" logosudur (yalnızca README görsellerinde); sağdaki soluk şema, baraj
+// Banner'daki işaret "düğüm dalgası" logosudur (uygulamanın logosu); sağdaki soluk şema, baraj
 // örneğinin (Örnekler penceresindeki) CircuitView çizimidir.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -77,10 +77,9 @@ async function openExample(page, title) {
   await page.waitForTimeout(800);
 }
 
-/** Telefonda ⋯ → Örnekler → arama ile bir örneği açar. */
+/** Telefonda üst çubuktaki Örnekler → arama ile bir örneği açar. */
 async function openExamplePhone(page, title) {
-  await page.getByRole('button', { name: /^Daha fazla/ }).tap();
-  await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Örnekler', exact: true }).tap();
+  await page.locator('header').getByRole('button', { name: 'Örnekler', exact: true }).tap();
   await page.getByRole('searchbox', { name: 'Örnek ara' }).fill(title);
   await page.getByRole('button', { name: title, exact: true }).tap();
   await page.waitForTimeout(800);
@@ -88,6 +87,8 @@ async function openExamplePhone(page, title) {
 
 const play = (page) => page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click();
 const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
+/** Üst çubuktaki Şema / 3B seçiminin 3B düğmesi. */
+const bench = (page) => page.locator('header').getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: /^3B/ });
 
 /** "Örnek yüklendi · Geri al" bildirimi kapanana kadar bekler (görüntüye girmesin). */
 async function noToast(page) {
@@ -95,23 +96,28 @@ async function noToast(page) {
 }
 
 /**
- * Masaüstünde şemayla defteri birlikte içine alan 16:10 kırpma. Şema sol alttaki kablo gerilimi
- * göstergesinin hizasına taşıyorsa görünüm uzaklaştırılır; kırpma göstergenin sağından başlar.
+ * Masaüstünde şemayla defteri birlikte içine alan 16:10 kırpma: üst çubuğun altından şemanın alt
+ * köşelerindeki yakınlaştırma grubunun ve gerilim çipinin üstüne kadar, sağ kenarı defterin kenarı.
+ * Şema kırpmanın dışına taşıyorsa görünüm uzaklaştırılır.
  */
 async function schematicClip(page) {
-  const legendRight = await page.evaluate(() => {
-    const boxes = [...document.querySelectorAll('div')].filter((el) => el.innerText?.startsWith('Kablo gerilimi')).map((el) => el.getBoundingClientRect());
-    return boxes.length ? Math.min(...boxes.map((r) => r.right)) : 0;
-  });
-  const contentLeft = () =>
-    page.evaluate(() => Math.min(...[...document.querySelectorAll('svg.schematic :is(polyline, path, text, circle)')].map((el) => el.getBoundingClientRect()).filter((r) => r.width || r.height).map((r) => r.left)));
-  for (let i = 0; i < 4 && (await contentLeft()) < legendRight + 32; i++) {
+  const y = Math.ceil(await page.locator('header').first().evaluate((h) => h.getBoundingClientRect().bottom));
+  const zoom = await page.locator('main').getByRole('group', { name: 'Yakınlaştırma' }).boundingBox();
+  const height = Math.floor(zoom.y - 8 - y);
+  const width = height * 1.6;
+  const x = page.viewportSize().width - width;
+  const content = () =>
+    page.evaluate(() => {
+      const rects = [...document.querySelectorAll('svg.schematic :is(polyline, path, text, circle)')].map((el) => el.getBoundingClientRect()).filter((r) => r.width || r.height);
+      return { left: Math.min(...rects.map((r) => r.left)), bottom: Math.max(...rects.map((r) => r.bottom)) };
+    });
+  for (let i = 0; i < 4; i++) {
+    const c = await content();
+    if (c.left >= x + 32 && c.bottom <= y + height - 16) break;
     await page.getByRole('button', { name: 'Uzaklaştır', exact: true }).click();
     await page.waitForTimeout(300);
   }
-  const x = Math.ceil(legendRight) + 4;
-  const width = page.viewportSize().width - x;
-  return { x, y: 60, width, height: width / 1.6 };
+  return { x, y, width, height };
 }
 
 /**
@@ -323,7 +329,7 @@ try {
     await openExample(page, 'Transistör anahtar: LED kollektörde');
     await play(page);
     await page.waitForTimeout(800);
-    await page.getByRole('button', { name: '3B', exact: true }).first().click();
+    await bench(page).click();
     await page.waitForTimeout(6000);
     await page.getByRole('button', { name: /^Etiketler/ }).click();
     await noToast(page);
@@ -333,8 +339,9 @@ try {
   }
 
   // Tahtada kur: LED devresi tahtada; LED ters takılı, artı raydan dirence giden kablo eksik; Denetle sonrası.
+  // Kırpma tahtanın tamamını ve sağdaki Denetle panelini içine alır; soldaki Tahtada kur / Tepeden / 3B grubu dışarıda.
   if (want('ozellik-tahtada-kur')) {
-    const { ctx, page } = await openApp({ width: 1440, height: 900, dpr: 2400 / 1130 });
+    const { ctx, page } = await openApp({ width: 1440, height: 900, dpr: 2400 / 1128 });
     await openExample(page, 'LED ve ön direnç: tahtada kur');
     await page.waitForTimeout(800);
     const field = page.getByRole('textbox', { name: /Delik adı yaz/ });
@@ -369,19 +376,22 @@ try {
     }
     await noToast(page);
     await page.waitForTimeout(500);
-    await save('ozellik-tahtada-kur', await page.screenshot({ clip: { x: 310, y: 60, width: 1130, height: 706.25 } }), 400, FEATURE);
+    await save('ozellik-tahtada-kur', await page.screenshot({ clip: { x: 312, y: 66, width: 1128, height: 705 } }), 400, FEATURE);
     await ctx.close();
   }
 
-  // Analiz: BC107 yükseltecinde eğri izleyici (çıkış ailesi, yük doğrusu ve Q noktası).
+  // Analiz: BC107 yükseltecinde eğri izleyici (çıkış ailesi, yük doğrusu ve Q noktası). Analiz çekmecesi
+  // defterin solunda: pencere 1312 px genişlikte açılınca çekmece 912 × 560 olur; kırpma çekmecenin üstündeki
+  // tutamaçtan başlar (16:10).
   if (want('ozellik-analiz')) {
-    const { ctx, page } = await openApp({ width: 1440, height: 900, dpr: 2400 / 912 });
+    const { ctx, page } = await openApp({ width: 1312, height: 900, dpr: 2400 / 912 });
     await openExample(page, 'BC107 ile ortak emetörlü yükselteç');
     await page.getByRole('button', { name: 'Analiz', exact: true }).click();
     await page.getByRole('tab', { name: /Eğri izleyici/ }).click();
     await noToast(page);
     await page.waitForTimeout(3000);
-    await save('ozellik-analiz', await page.screenshot({ clip: { x: 8, y: 330, width: 912, height: 570 } }), 400, FEATURE);
+    const drawer = await page.getByRole('region', { name: 'Analiz' }).boundingBox();
+    await save('ozellik-analiz', await page.screenshot({ clip: { x: drawer.x, y: drawer.y - 10, width: drawer.width, height: drawer.width / 1.6 } }), 400, FEATURE);
     await ctx.close();
   }
 
@@ -409,7 +419,7 @@ try {
   if (want('ozellik-pcb')) {
     const { ctx, page } = await openApp({ width: 1200, height: 750, dpr: 2 });
     await openExample(page, 'Transistör anahtar: LED kollektörde');
-    await page.getByRole('button', { name: '3B', exact: true }).first().click();
+    await bench(page).click();
     await page.waitForTimeout(4000);
     await page.getByRole('button', { name: /^Karta aktar/ }).click();
     await page.getByRole('tab', { name: /Baskı devre/ }).click();
