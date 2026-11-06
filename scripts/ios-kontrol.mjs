@@ -3701,6 +3701,25 @@ try {
     await ctx.close();
   }
   {
+    // 555 zamanlaması (motor-555): uygulamanın osiloskobu (büyük adımlarla ilerleyen motor) metindeki frekansı
+    // (küçük adımla ölçülen) %0,5 içinde gösteriyor: saat 968 Hz, Q 484 Hz.
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'D flip-flopla frekans bölücü (555 + 74HC74)', exact: true }))).click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).last().click(); await page.waitForTimeout(3000);
+    await notebook(page).getByRole('button', { name: /^OSC1 ·/ }).click(); await page.waitForTimeout(1200);
+    const scopeText = ((await notebook(page).getByRole('region', { name: /^OSC1 ·/ }).textContent()) ?? '').replace(/\s+/g, ' ');
+    const freqs = [...scopeText.matchAll(/f ([\d.,]+) (k?)Hz/g)].map((m) => Number(m[1].replace(/\./g, '').replace(',', '.')) * (m[2] ? 1000 : 1));
+    const [fa, fb] = freqs;
+    check('555 zamanlaması: frekans bölücüde uygulamanın osiloskobu saati 968 Hz, Q’yu 484 Hz gösteriyor (metindeki, küçük adımla ölçülen değerler; %0,5 içinde)',
+      fa !== undefined && fb !== undefined && Math.abs(fb / 968 - 1) < 0.005 && Math.abs(fa / 484 - 1) < 0.005, `A ${fa} Hz · B ${fb} Hz`);
+    await ctx.close();
+  }
+  {
     // Tahtada kur: 74HC08 kanalın üstüne oturuyor (alt sıra f, üst sıra e; 14 bacak).
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });

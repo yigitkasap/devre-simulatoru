@@ -126,7 +126,7 @@ describe('Lojik devreler örnekleri: metinlerdeki sayılar', { timeout: 120_000 
     expect(text('sr-mandal')).toContain('8,59 mA');
   });
 
-  it('Frekans bölücü: saat 970 Hz (1,03 ms), Q 485 Hz', () => {
+  it('Frekans bölücü: saat 968 Hz (1,03 ms), Q 484 Hz', () => {
     const doc = load('frekans-bolucu');
     const sim = run(doc, 5e-3);
     const id = idOf(doc, 'U2');
@@ -143,10 +143,10 @@ describe('Lojik devreler örnekleri: metinlerdeki sayılar', { timeout: 120_000 
       lastQ = l.q![0];
     }
     const period = (t: number[]) => (t[t.length - 1]! - t[0]!) / (t.length - 1);
-    expect(1 / period(clock)).toBeCloseTo(970, -1);
+    expect(1 / period(clock)).toBeCloseTo(968, 0);
     expect(period(clock) * 1e3).toBeCloseTo(1.03, 2);
-    expect(1 / (2 * period(flips))).toBeCloseTo(485, -1);
-    for (const s of ['970 Hz', '1,03 ms', '485 Hz', '≈ 986 Hz', '≈ 18 ns']) expect(text('frekans-bolucu')).toContain(s);
+    expect(1 / (2 * period(flips))).toBeCloseTo(484, 0);
+    for (const s of ['968 Hz', '1,03 ms', '484 Hz', '≈ 986 Hz', '≈ 18 ns']) expect(text('frekans-bolucu')).toContain(s);
   });
 
   it('Yürüyen ışık: adım 213 ms (4,69 Hz), yanan LED 3,29 mA, sırayla LED0 … LED9', () => {

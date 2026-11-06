@@ -1615,7 +1615,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     description:
       'Solda 555 astabil (RA 1 kΩ, RB 6,8 kΩ, C1 100 nF, 5 V) ≈ 1 kHz kare dalga üretir ve U2’nin (74HC74) 1CLK girişini sürer. 1Q̅ 1D’ye bağlı: her yükselen kenarda flip-flop kendi tersini alır. 1P̅R̅E̅ ve 1C̅L̅R̅ 5 V’ta (etkisiz); kullanılmayan 2. flip-flopun girişleri de 5 V’ta. Osiloskobun A kanalı 1Q’yu, B kanalı saati gösterir (1 ms/bölme).',
     purpose:
-      'Saatin her yükselen kenarında Q değişir: Q’nun bir periyodu saatin iki periyodu kadardır, frekans yarıya iner. Simülasyonda saat 970 Hz (periyot 1,03 ms; formül 1,44 / ((RA + 2RB) · C) ≈ 986 Hz), Q 485 Hz. Q’yu ikinci flip-flopun saatine verirsen frekans dörde, dört flip-flopla on altıya bölünür (ikili sayıcı). Q’nun kenarı saatin kenarından 74HC74’ün yayılma gecikmesi kadar (5 V’ta ≈ 18 ns) sonra gelir.',
+      'Saatin her yükselen kenarında Q değişir: Q’nun bir periyodu saatin iki periyodu kadardır, frekans yarıya iner. Simülasyonda saat 968 Hz (periyot 1,03 ms; formül 1,44 / ((RA + 2RB) · C) ≈ 986 Hz), Q 484 Hz. Q’yu ikinci flip-flopun saatine verirsen frekans dörde, dört flip-flopla on altıya bölünür (ikili sayıcı). Q’nun kenarı saatin kenarından 74HC74’ün yayılma gecikmesi kadar (5 V’ta ≈ 18 ns) sonra gelir.',
     everyday:
       'Saatlerdeki kuvars kristali 32 768 Hz’te titreşir; on beş flip-flop bunu 2¹⁵’e bölerek tam 1 Hz’lik saniye vuruşunu üretir. Bilgisayarlarda da işlemcinin ve belleğin saatleri tek bir kristalin frekansının bölünüp çarpılmasıyla elde edilir.',
   },
