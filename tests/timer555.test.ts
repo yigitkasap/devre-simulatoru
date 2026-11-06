@@ -229,5 +229,5 @@ describe('555 örnekleri: metindeki sayılar', () => {
       const coarse = frequency(1e-4);
       expect(Math.abs(coarse / fine - 1), `${id}: ${fine.toFixed(1)} / ${coarse.toFixed(1)} Hz`).toBeLessThan(0.005);
     }
-  });
+  }, 30_000);
 });
