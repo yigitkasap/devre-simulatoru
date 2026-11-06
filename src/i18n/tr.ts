@@ -4243,6 +4243,7 @@ export const tr = {
       inGraph: 'grafikte',
       xAxis: 'Yatay eksen',
       xTime: 'Zaman',
+      settings: 'Ayarlar',
     },
     trace: {
       current: (part: string) => `${part} akımı`,

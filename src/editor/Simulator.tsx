@@ -501,7 +501,6 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   /** Kullanıcı tutamakla boy verdiyse o boy kalır; vermediyse Eğri ve Bode sekmesinde çekmece en az 560 px. */
   const [drawerSized, setDrawerSized] = useState(false);
   const [drawerExpanded, setDrawerExpanded] = useState(false);
-  const [analysisSheet, setAnalysisSheet] = useState<SheetSize>('half');
   const [windowHeight, setWindowHeight] = useState(() => window.innerHeight);
   useEffect(() => {
     const onResize = () => setWindowHeight(window.innerHeight);
@@ -2381,19 +2380,15 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               />
             </BottomSheet>
           )}
+          {/* Analiz telefonda tam ekran sayfa (analiz v2): ekranı kaplar, içerik içeride kayar. */}
           {analysis.open && !addSheet && !wiring && (
-            <BottomSheet
-              size={analysisSheet}
-              sizes={['half', 'full']}
-              halfRatio={0.72}
-              label={tr.analysis.title}
-              areaHeight={phoneAreaHeight}
-              onHeight={setSheetHeight}
-              onSize={setAnalysisSheet}
-              onClose={() => analysis.setOpen(false)}
+            <section
+              aria-label={tr.analysis.title}
+              className="fixed inset-0 z-40 flex flex-col bg-panel"
+              style={{ paddingTop: 'max(8px, env(safe-area-inset-top))', paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}
             >
               <AnalysisSheetBody api={analysis} recorder={sim.traceRecorder} status={sim.status} frame={sim.frame} notify={notify} title={circuitTitle} onClose={() => analysis.setOpen(false)} onPlay={play} onPause={sim.pause} />
-            </BottomSheet>
+            </section>
           )}
         </div>
         {bottomBar && (
@@ -2420,7 +2415,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         {taskDialogEl}
         {overlays}
         {/* Alttaki çubuk 76 px (güvenli alan Toast'ta ayrıca eklenir). */}
-        <Toast toast={toast} offset={wiring ? 92 : addSheet || analysis.open ? sheetHeight + 12 : layout.landscape ? 68 : 88} onDone={hideToast} />
+        <Toast toast={toast} offset={wiring ? 92 : analysis.open ? 92 : addSheet ? sheetHeight + 12 : layout.landscape ? 68 : 88} onDone={hideToast} />
       </div>
     );
   }

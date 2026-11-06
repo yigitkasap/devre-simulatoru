@@ -14,6 +14,7 @@ import { axisUnit, datedName, saveFile, toCsv, type CsvSeparator } from './forma
 import { QuantityPicker } from './QuantityPicker';
 import { quantityKey } from './quantities';
 import { foyGraph } from '../../i18n/foyGraphs';
+import { Fold } from './Fold';
 import { traceLabel } from './traces';
 import type { AnalysisApi } from './useAnalysis';
 import { XYChart, type XYSeries } from './XYChart';
@@ -365,8 +366,9 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
 
   return compact ? (
     <div className="flex flex-col gap-3">
-      <div className="flex h-[260px] shrink-0">{chart}</div>
-      {settings}
+      {/* Sütun yönlü: yüksekliği verilen XYChart flex: none olur, satır yönlü kapta genişliği 0 kalırdı. */}
+      <div className="flex shrink-0 flex-col">{chart}</div>
+      <Fold title={tr.analysis.picker.settings}>{settings}</Fold>
     </div>
   ) : (
     <div className="flex min-h-0 flex-1 gap-5 px-4 pb-3">

@@ -24,6 +24,7 @@ import { StartScreen } from './StartScreen';
 import { saveSweep, sweepAxes, SweepPane, sweepToTable } from './SweepPane';
 import { TablePane } from './TablePane';
 import { TimeXY } from './TimeXY';
+import { Fold } from './Fold';
 import { traceColor } from './traces';
 import type { AnalysisApi } from './useAnalysis';
 
@@ -689,7 +690,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
   return (
     <TouchUi.Provider value>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div data-sheet-grab="" className="flex shrink-0 touch-none items-center gap-2 pr-2 pl-4">
+        <div className="flex shrink-0 items-center gap-2 pr-2 pl-4">
           <h2 className="m-0 min-w-0 flex-1 truncate text-[18px] font-semibold">{tr.analysis.title}</h2>
           {/* Alt sayfa açıkken Oynat düğmesi (sağ alt) gizli: kayıt buradan başlatılır. */}
           <button
@@ -744,15 +745,8 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                       </span>
                     );
                   })}
-                  {!api.pick && !api.traceGate && (
-                    <button type="button" onClick={() => setAdding(true)} aria-label={t.add} className="flex h-11 items-center gap-1 rounded-full border border-line px-3.5 text-small font-semibold text-accent-ink">
-                      <Icon name="plus" className="h-4 w-4" />
-                      {t.addShort}
-                    </button>
-                  )}
                 </div>
                 <PickControls api={api} touch />
-                <XAxisSelect api={api} touch />
                 {api.active?.kind === 'time' && api.active.x !== null ? (
                   <TimeXY api={api} recorder={recorder} version={g.version} compact />
                 ) : (
@@ -775,6 +769,17 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                   </div>
                 )}
                 {recorder.perFrame && api.graphTraces.length > 0 && <p className="m-0 text-label text-warn">{t.perFrame}</p>}
+                {/* Ayarlar grafiğin altında katlı: büyüklük ekle, yatay eksen. */}
+                <Fold title={tr.analysis.picker.settings}>
+                  {!api.pick && !api.traceGate && (
+                    <button type="button" onClick={() => setAdding(true)} className="flex h-11 items-center justify-center gap-1.5 rounded-lg border border-dashed border-accent-line text-small font-semibold text-accent-ink">
+                      <Icon name="plus" className="h-4 w-4" />
+                      {t.add}
+                    </button>
+                  )}
+                  {api.traceGate && <p className="m-0 text-small text-ink-2">{api.traceGate}</p>}
+                  <XAxisSelect api={api} touch />
+                </Fold>
               </>
             )
           ) : api.view === 'sweep' ? (
