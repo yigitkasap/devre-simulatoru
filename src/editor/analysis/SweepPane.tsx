@@ -13,6 +13,7 @@ import { MAX_SWEEP_POINTS, sweepValues, type DcSweepCurve } from './dcsweep';
 import { axisUnit, datedName, saveFile, toCsv, type CsvSeparator } from './format';
 import { QuantityPicker } from './QuantityPicker';
 import { quantityKey } from './quantities';
+import { foyGraph } from '../../i18n/foyGraphs';
 import { traceLabel } from './traces';
 import type { AnalysisApi } from './useAnalysis';
 import { XYChart, type XYSeries } from './XYChart';
@@ -72,6 +73,31 @@ export function sweepToTable(api: AnalysisApi, spec: SweepSpec, curves: readonly
   return valid.length;
 }
 
+/**
+ * Föy grafiğinin işaretleri (Deney 5 transfer): V_P, akımın sıfırlandığı V_GS (sıfırdan önceki son iki
+ * noktadan √I_D doğrusal uzatılarak; doyumda I_D ∝ (V_GS − V_P)²), I_DSS, V_GS = 0'daki akım.
+ */
+export function foyMarks(ref: { example: string; key: string }, curves: readonly DcSweepCurve[]): { vp?: number; idss?: number } | null {
+  const def = foyGraph(ref);
+  if (!def || def.plan.kind !== 'sweep' || !def.plan.marks) return null;
+  const pts = curves[0]?.points ?? [];
+  const out: { vp?: number; idss?: number } = {};
+  if (def.plan.marks.includes('idss')) {
+    // V_GS'si sıfıra en yakın nokta (kapı akımı yüzünden tam sıfır olmayabilir).
+    const zero = pts.reduce<readonly number[] | null>((best, p) => (best === null || Math.abs(p[1]!) < Math.abs(best[1]!) ? p : best), null);
+    if (zero && Math.abs(zero[1]!) < 1e-3 && Number.isFinite(zero[2]!)) out.idss = zero[2]!;
+  }
+  if (def.plan.marks.includes('vp')) {
+    const i = pts.findIndex((p) => Math.abs(p[2]!) <= 1e-9);
+    if (i >= 2) {
+      const [x1, y1] = [pts[i - 2]![1]!, Math.sqrt(Math.abs(pts[i - 2]![2]!))];
+      const [x2, y2] = [pts[i - 1]![1]!, Math.sqrt(Math.abs(pts[i - 1]![2]!))];
+      if (y1 !== y2) out.vp = x2 + ((x2 - x1) * y2) / (y1 - y2);
+    }
+  }
+  return out;
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -115,6 +141,7 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
   }, [curves, spec, axes]);
 
   if (!graph || !spec || !axes) return null;
+  const marks = graph.foy ? foyMarks(graph.foy, curves) : null;
   if (api.sweepParams.length === 0) return <p className="m-0 px-4 py-6 text-small text-muted">{t.none}</p>;
 
   const set = (patch: Partial<SweepSpec>) => api.setSweep(patch);
@@ -311,6 +338,8 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
         cursorText={(x) => `${axes.x.name} = ${formatNumber(x, 3).replace(/,?0+$/, '').replace(/,$/, '')} ${xUnit}`}
         ariaLabel={yLabel}
         compact={compact}
+        {...(marks?.vp !== undefined ? { vLines: [{ x: marks.vp * xScale, label: `VP ≈ ${formatSI(marks.vp, 'V', { digits: 3 })}` }] } : {})}
+        {...(marks?.idss !== undefined ? { hLines: [{ y: marks.idss * yScale, label: `IDSS ≈ ${formatSI(marks.idss, 'A', { digits: 3 })}` }] } : {})}
         {...(compact ? { height: 260 } : {})}
         footer={
           cur !== null ? (

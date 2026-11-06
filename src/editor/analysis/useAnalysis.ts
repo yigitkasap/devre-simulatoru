@@ -2,14 +2,18 @@
 // (izler, tablo, grafikler), çekmecenin açıklığı, açık grafik (çip) ya da başlangıç ekranı, ölçüm tablosu
 // paneli, "İz ekle" seçimi, şemadaki iz etiketleri.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CsvSeparator } from './format';
 import { tr } from '../../i18n/tr';
 import { nextTraceColor, pruneTraces, type AnalysisDoc, type FoyGraphRef, type GraphDef, type GraphKind, type Quantity, type SweepSpec, type TableRow, type TraceDef } from '../../model/analysis';
 import type { Connectivity } from '../../model/connectivity';
 import type { CircuitDoc, Point } from '../../model/types';
 import type { CanvasMark, PickTarget } from '../Canvas';
-import { foyGraph } from '../../i18n/foyGraphs';
+import { foyGraph, type FoyGraphDef } from '../../i18n/foyGraphs';
+import { labFigure } from '../../i18n/foy';
+import type { ExampleId } from '../../examples';
+import { foyCards, resolveFoyPlan } from './foyPlan';
+import type { FoySection } from './StartScreen';
 import { sweepParams, type SweepParamOption } from './dcsweep';
 import { useDcSweep, type DcSweepApi } from './useDcSweep';
 import { quantityOptions, type QuantityOption } from './quantities';
@@ -41,6 +45,8 @@ export interface AnalysisApi {
   readonly openGraph: (graph: DistributiveOmit<GraphDef, 'id'>) => void;
   /** Seçilen büyüklüklerle zamana göre grafik açar (x verilirse X-Y). */
   readonly openTimeGraph: (quantities: readonly Quantity[], options?: { readonly x?: Quantity; readonly foy?: FoyGraphRef }) => void;
+  /** Açık zaman grafiğinin yatay ekseni: null zaman, bir büyüklük X-Y. */
+  readonly setTimeX: (quantity: Quantity | null) => void;
   /** Açık zaman grafiğine bir büyüklük ekler (zaten varsa eklemez). */
   readonly addQuantity: (quantity: Quantity) => void;
   /** Bir değeri tarayarak (DC tarama): açık tarama grafiğinin sonucu, ilerleme, iptal. */
@@ -52,6 +58,10 @@ export interface AnalysisApi {
   /** Tarama grafiğinin imleci (x ekseninin SI değeri). */
   readonly sweepCursor: number | null;
   readonly setSweepCursor: (x: number | null) => void;
+  /** Açık örnek föydeyse başlangıç ekranının föy grafikleri; değilse null. */
+  readonly foy: FoySection | null;
+  /** Föy grafiğini açar (açıksa ona geçer). */
+  readonly openFoy: (def: FoyGraphDef) => void;
   /** Föy grafiğinin başlığı (çipte); bilinmiyorsa null. */
   readonly foyTitle: (ref: FoyGraphRef) => string | null;
   /** Devre (öneriler ve büyüklük seçici için). */
@@ -112,8 +122,11 @@ export function useAnalysis(
   selected: string | null = null,
   gate: string | null = null,
   traceGate: string | null = null,
+  example: ExampleId | null = null,
 ): AnalysisApi {
   const [analysis, setDoc] = useState(initial);
+  const analysisRef = useRef(analysis);
+  analysisRef.current = analysis;
   const [open, setOpen] = useState(false);
   const [tableOpen, setTableOpen] = useState(false);
   const [pick, setPick] = useState<PickState | null>(null);
@@ -182,11 +195,60 @@ export function useAnalysis(
     });
   }, []);
   const addQuantity = useCallback((q: Quantity) => addTrace(q as DistributiveOmit<TraceDef, 'id' | 'color'>), [addTrace]);
+  const setTimeX = useCallback(
+    (q: Quantity | null) =>
+      setDoc((a) => {
+        const g = a.graphs.find((x) => x.id === a.active);
+        if (g?.kind !== 'time') return a;
+        if (!q) return pruneTraces({ ...a, graphs: a.graphs.map((x) => (x === g ? { ...g, x: null } : x)) });
+        const t = { ...q, id: newId('t'), color: nextTraceColor(a.traces) } as TraceDef;
+        return pruneTraces({ ...a, traces: [...a.traces, t], graphs: a.graphs.map((x) => (x === g ? { ...g, x: t.id } : x)) });
+      }),
+    [],
+  );
   const quantities = useMemo(() => quantityOptions(doc, idx), [doc, idx]);
   const params = useMemo(() => sweepParams(doc), [doc]);
   const sweep = useDcSweep(connectivity.netlist, active?.kind === 'sweep' ? active : null);
   const [sweepCursor, setSweepCursor] = useState<number | null>(null);
   useEffect(() => setSweepCursor(null), [activeId]);
+  const latestDoc = useRef(doc);
+  latestDoc.current = doc;
+  const openFoy = useCallback(
+    (def: FoyGraphDef) => {
+      if (!example) return;
+      const ref = { example, key: def.key };
+      const open = analysisRef.current.graphs.find((g) => g.foy?.example === ref.example && g.foy.key === ref.key);
+      if (open) {
+        setDoc((a) => ({ ...a, active: open.id }));
+        return;
+      }
+      const plan = resolveFoyPlan(def, latestDoc.current);
+      if (!plan) {
+        notify(tr.analysis.start.foyMissing);
+        return;
+      }
+      if (plan.kind === 'time') openTimeGraph(plan.y, { ...(plan.x ? { x: plan.x } : {}), foy: ref });
+      else if (plan.kind === 'sweep') setDoc((a) => { const g: GraphDef = { id: newId('g'), kind: 'sweep', sweep: plan.sweep, foy: ref }; return { ...a, graphs: [...a.graphs, g], active: g.id }; });
+      else setDoc((a) => { const g: GraphDef = { id: newId('g'), kind: 'bode', foy: ref }; return { ...a, graphs: [...a.graphs, g], active: g.id }; });
+    },
+    [example, notify, openTimeGraph],
+  );
+  const foy = useMemo<FoySection | null>(() => {
+    const figure = example ? labFigure(example) : null;
+    const cards = foyCards(example);
+    if (!figure || cards.length === 0) return null;
+    return {
+      heading: tr.analysis.start.foy(figure.experiment, figure.figure),
+      cards: cards.map((c) => ({
+        key: c.key,
+        eyebrow: c.eyebrow,
+        title: c.title,
+        detail: c.detail,
+        icon: c.plan.kind === 'bode' ? 'bode' : c.plan.kind === 'sweep' ? 'measure' : c.plan.kind === 'time' && c.plan.x ? 'curve' : 'chart',
+        open: () => openFoy(c),
+      })),
+    };
+  }, [example, openFoy]);
   const setSweep = useCallback(
     (patch: Partial<SweepSpec>) => setDoc((a) => ({ ...a, graphs: a.graphs.map((g) => (g.id === a.active && g.kind === 'sweep' ? { ...g, sweep: { ...g.sweep, ...patch } } : g)) })),
     [],
@@ -305,11 +367,14 @@ export function useAnalysis(
     openGraph,
     openTimeGraph,
     addQuantity,
+    setTimeX,
     sweep,
     sweepParams: params,
     setSweep,
     sweepCursor,
     setSweepCursor,
+    foy,
+    openFoy,
     foyTitle: (ref) => foyGraph(ref)?.title ?? null,
     circuit: doc,
     quantities,

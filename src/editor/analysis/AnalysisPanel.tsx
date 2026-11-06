@@ -20,9 +20,10 @@ import { BodePane, bodeToTable, saveBode } from './BodePane';
 import { CurvePane, curveSummary, saveCurves } from './CurvePane';
 import { QuantityPicker } from './QuantityPicker';
 import { quantityKey } from './quantities';
-import { StartScreen, type FoySection } from './StartScreen';
+import { StartScreen } from './StartScreen';
 import { saveSweep, sweepAxes, SweepPane, sweepToTable } from './SweepPane';
 import { TablePane } from './TablePane';
+import { TimeXY } from './TimeXY';
 import { traceColor } from './traces';
 import type { AnalysisApi } from './useAnalysis';
 
@@ -36,8 +37,6 @@ export interface AnalysisPanelProps {
   readonly notify: (message: string) => void;
   /** Devrenin adı (tablonun başlığı). */
   readonly title: string;
-  /** Açık örnek föydeyse başlangıç ekranının föy grafikleri. */
-  readonly foy?: FoySection | null;
 }
 
 const KIND_ICONS: Record<GraphDef['kind'], IconName> = { time: 'chart', sweep: 'measure', curve: 'curve', bode: 'bode' };
@@ -353,9 +352,35 @@ function AddQuantity({ api, touch, onClose }: { api: AnalysisApi; touch: boolean
   );
 }
 
+/** Zaman grafiğinin yatay ekseni: Zaman ya da bir büyüklük (X-Y). */
+function XAxisSelect({ api, touch }: { api: AnalysisApi; touch: boolean }) {
+  const t = tr.analysis.picker;
+  const graph = api.active?.kind === 'time' ? api.active : null;
+  const x = graph?.x ? api.traces.find((tr0) => tr0.id === graph.x) : undefined;
+  const value = x ? (x.kind === 'voltage' && x.ref === null ? `n:${api.idx.netOf(x.node)}` : quantityKey(x)) : '';
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-label font-semibold text-muted">{t.xAxis}</span>
+      <select
+        value={value}
+        onChange={(e) => api.setTimeX(api.quantities.find((o) => o.key === e.target.value)?.quantity ?? null)}
+        className={`w-full rounded-lg border border-line-2 bg-panel px-2 text-small ${touch ? 'h-11 text-[16px]' : 'h-8'}`}
+      >
+        <option value="">{t.xTime}</option>
+        {api.quantities.map((o) => (
+          <option key={o.key} value={o.key}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function GraphDesk({ api, recorder, g, touch }: AnalysisPanelProps & { g: Graph; touch: boolean }) {
   const t = tr.analysis.graph;
   const [adding, setAdding] = useState(false);
+  const xy = api.active?.kind === 'time' && api.active.x !== null;
   return (
     <div className="flex min-h-0 flex-1 gap-5 px-4 pb-3">
       <div className="flex w-[232px] shrink-0 flex-col gap-2 overflow-y-auto overscroll-contain">
@@ -363,6 +388,7 @@ function GraphDesk({ api, recorder, g, touch }: AnalysisPanelProps & { g: Graph;
           <AddQuantity api={api} touch={touch} onClose={() => setAdding(false)} />
         ) : (
           <>
+            <XAxisSelect api={api} touch={touch} />
             <h3 className="m-0 text-small font-semibold tracking-[0.02em] text-muted">{t.traces}</h3>
             {api.graphTraces.map((tr0) => {
               const label = api.labels.get(tr0.id);
@@ -400,7 +426,13 @@ function GraphDesk({ api, recorder, g, touch }: AnalysisPanelProps & { g: Graph;
           </>
         )}
       </div>
-      <ChartMemo recorder={recorder} traces={g.chartTraces} version={g.version} cursor={g.cursor} onCursor={g.setCursor} onToTable={g.toTable} svgRef={g.svg} />
+      {xy ? (
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <TimeXY api={api} recorder={recorder} version={g.version} />
+        </div>
+      ) : (
+        <ChartMemo recorder={recorder} traces={g.chartTraces} version={g.version} cursor={g.cursor} onCursor={g.setCursor} onToTable={g.toTable} svgRef={g.svg} />
+      )}
     </div>
   );
 }
@@ -448,7 +480,7 @@ export function AnalysisDrawer(
           <span aria-hidden="true" className={`h-2 w-2 rounded-full ${g.recording ? 'bg-ok' : 'bg-stopped'}`} />
           {g.statusText}
         </span>
-        {pngButton(() => void g.png(), !g.span)}
+        {pngButton(() => void (api.active?.kind === 'time' && api.active.x !== null ? panePng(pane, tr.analysis.graph.fileName) : g.png()), !g.span)}
         <button type="button" onClick={() => g.csv(false)} disabled={!g.span} className={solid}>
           <Icon name="download" className="h-4 w-4" />
           {tr.analysis.graph.csv}
@@ -557,7 +589,7 @@ export function AnalysisDrawer(
         <div ref={pane} className="flex min-h-0 min-w-0 flex-1 flex-col">
           {api.view === 'start' ? (
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-1 pb-4">
-              <StartScreen api={api} foy={props.foy ?? null} touch={touch} />
+              <StartScreen api={api} foy={api.foy} touch={touch} />
             </div>
           ) : api.view === 'time' ? (
             <GraphDesk {...props} g={g} touch={touch} />
@@ -693,7 +725,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
               <TablePane api={api} recorder={recorder} version={g.version} title={props.title} compact />
             </>
           ) : api.view === 'start' ? (
-            <StartScreen api={api} foy={props.foy ?? null} touch phone />
+            <StartScreen api={api} foy={api.foy} touch phone />
           ) : api.view === 'time' ? (
             adding ? (
               <AddQuantity api={api} touch onClose={() => setAdding(false)} />
@@ -720,9 +752,14 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                   )}
                 </div>
                 <PickControls api={api} touch />
-                <div className="flex h-[210px] shrink-0">
-                  <ChartMemo recorder={recorder} traces={g.chartTraces} version={g.version} cursor={g.cursor} onCursor={g.setCursor} compact svgRef={g.svg} />
-                </div>
+                <XAxisSelect api={api} touch />
+                {api.active?.kind === 'time' && api.active.x !== null ? (
+                  <TimeXY api={api} recorder={recorder} version={g.version} compact />
+                ) : (
+                  <div className="flex h-[210px] shrink-0">
+                    <ChartMemo recorder={recorder} traces={g.chartTraces} version={g.version} cursor={g.cursor} onCursor={g.setCursor} compact svgRef={g.svg} />
+                  </div>
+                )}
                 {g.cursor !== null && <p className="m-0 font-mono text-label text-muted">{t.cursorPhone(g.timeText(g.cursor))}</p>}
                 {g.cursor !== null && (
                   <div className="grid grid-cols-2 gap-2">

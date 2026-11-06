@@ -492,6 +492,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     selection.parts.length === 1 && selection.wires.length === 0 ? selection.parts[0]! : null,
     fault ? tr.fault.analysisGate : gate,
     fault ? tr.fault.traceGate : null,
+    activeExample,
   );
   // Gömülü görünüm kaydetmez: aynı sitedeki asıl devreye (otomatik kayıt) dokunmasın.
   const saveState = useAutosave(doc, analysis.doc, embed === null);

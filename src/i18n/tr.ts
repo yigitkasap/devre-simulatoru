@@ -4194,6 +4194,7 @@ export const tr = {
       back: 'Geri',
       curveTitle: 'Hangi parçanın karakteristiği?',
       curveNone: 'Devrede diyot, zener, LED ya da transistör yok.',
+      foyMissing: 'Föy grafiği kurulamadı: devrede föydeki parçalardan biri yok ya da adı değişmiş.',
     },
     sweep: {
       /** Taranabilen özelliklerin adı ("PS1 · 1. çıkış"). */
@@ -4240,6 +4241,8 @@ export const tr = {
       nodeDetail: (name: string) => `${name} düğümünün gerilimi (toprağa göre)`,
       title: 'Büyüklük ekle',
       inGraph: 'grafikte',
+      xAxis: 'Yatay eksen',
+      xTime: 'Zaman',
     },
     trace: {
       current: (part: string) => `${part} akımı`,
