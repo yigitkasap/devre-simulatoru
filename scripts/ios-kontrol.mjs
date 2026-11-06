@@ -147,6 +147,26 @@ const phoneNotebook = (page) => page.getByRole('region', { name: /^Defter/ });
 const selectedCount = (page) => page.locator('svg.schematic rect[data-selected]').count();
 /** Masaüstünde sağdaki defter (v3). */
 const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
+/**
+ * Analiz v2: grafiği başlangıç ekranından açar (eski sekmeler yerine). kind 'curve' (Parçanın karakteristiği;
+ * birden çok aday varsa `part` adlı parça) ya da 'bode' (Frekansa göre).
+ */
+async function openAnalysisGraph(region, kind, { touch = false, part } = {}) {
+  const act = (l) => (touch ? l.tap() : l.click());
+  const start = region.getByRole('button', { name: 'Yeni grafik' });
+  if ((await start.getAttribute('aria-pressed')) !== 'true') await act(start);
+  await region.page().waitForTimeout(150);
+  if (kind === 'bode') await act(region.getByRole('button', { name: /^Frekansa göre/ }));
+  else {
+    await act(region.getByRole('button', { name: /^Parçanın karakteristiği/ }));
+    await region.page().waitForTimeout(150);
+    if (part) {
+      const choice = region.getByRole('button', { name: new RegExp(`^${part} ·`) });
+      if (await choice.count()) await act(choice.first());
+    }
+  }
+  await region.page().waitForTimeout(200);
+}
 /** Sayfa (belge) kayıyor mu (dikey ya da yatay). */
 /**
  * Arıza bulma görevi bağlantısı (B2): BC107 yükselteç, verilen gizli arızalarla. Örnek devre
@@ -1586,21 +1606,28 @@ try {
     const dBox = await drawer.boundingBox();
     const mainBox = await page.locator('main').boundingBox();
     const nbBox = await notebook(page).boundingBox();
-    const tabs = await drawer.getByRole('tab').allTextContents();
-    check('analiz (masaüstü, N1): üst çubukta Örnekler’in yanında "Analiz" (basılı); tezgâhın altında 380 px çekmece, defter yerinde; sekmeler Grafik | Tablo | Eğri izleyici | Bode',
+    // Analiz v2: grafik yokken başlangıç ekranı ("Ne çizmek istiyorsun?"); boş grafik hiç gösterilmez.
+    const startTitle = await drawer.getByRole('heading', { name: 'Ne çizmek istiyorsun?' }).count();
+    const startChips = await drawer.getByRole('tablist', { name: 'Grafikler' }).count();
+    const startCards = await drawer.getByRole('button', { name: /^(Zamana göre|Bir değeri tarayarak|Frekansa göre|Parçanın karakteristiği)/ }).count();
+    // RC dolmada diyot ya da transistör yok: Parçanın karakteristiği kartı da yok (Zamana göre, Bir değeri tarayarak, Frekansa göre).
+    check('analiz (masaüstü, N1; v2): üst çubukta Örnekler’in yanında "Analiz" (basılı); tezgâhın altında 380 px çekmece, defter yerinde; grafik yokken başlangıç ekranı ("Ne çizmek istiyorsun?", Kendin kur kartları), çip yok, "+ Yeni grafik" basılı',
       buttonBox !== null && examplesBox !== null && buttonBox.x > examplesBox.x && buttonBox.x - (examplesBox.x + examplesBox.width) < 24 && (await button.getAttribute('aria-pressed')) === 'true' &&
-      dBox !== null && Math.abs(dBox.height - 380) < 2 && mainBox !== null && dBox.y >= mainBox.y + mainBox.height - 1 && nbBox !== null && nbBox.x >= dBox.x + dBox.width - 1 && tabs.join('|') === 'Grafik|Tablo|Eğri izleyici|Bode',
-      `${Math.round(dBox?.height ?? 0)} px · ${tabs.join('|')}`);
-    // İz ekle: kabloya tıkla (düğüm, toprağa göre), parçaya tıkla (akım).
-    await drawer.getByRole('button', { name: 'İz ekle' }).click(); await page.waitForTimeout(150);
+      dBox !== null && Math.abs(dBox.height - 380) < 2 && mainBox !== null && dBox.y >= mainBox.y + mainBox.height - 1 && nbBox !== null && nbBox.x >= dBox.x + dBox.width - 1 &&
+      startTitle === 1 && startChips === 0 && startCards === 3 && (await drawer.getByRole('button', { name: 'Yeni grafik' }).getAttribute('aria-pressed')) === 'true',
+      `${Math.round(dBox?.height ?? 0)} px · başlık ${startTitle} · kart ${startCards} · çip ${startChips}`);
+    // Zamana göre → Şemadan seç: kabloya tıkla (düğüm, toprağa göre); grafik açılınca İz ekle → Şemadan seç → parçaya tıkla (akım).
+    await drawer.getByRole('button', { name: /^Zamana göre/ }).click(); await page.waitForTimeout(150);
+    await drawer.getByRole('button', { name: 'Şemadan seç' }).click(); await page.waitForTimeout(150);
     let at = await screen(page, 28, -8); await page.mouse.click(at.x, at.y); await page.waitForTimeout(150);
-    const pickText = (await drawer.getByRole('status').textContent().catch(() => '')) ?? '';
+    const pickText = (await drawer.getByRole('status').filter({ hasText: 'seçildi' }).textContent().catch(() => '')) ?? '';
     await drawer.getByRole('button', { name: 'Toprağa göre ekle' }).click(); await page.waitForTimeout(150);
     await drawer.getByRole('button', { name: 'İz ekle' }).click(); await page.waitForTimeout(150);
+    await drawer.getByRole('button', { name: 'Şemadan seç' }).click(); await page.waitForTimeout(150);
     at = await screen(page, 20, -8); await page.mouse.click(at.x, at.y); await page.waitForTimeout(200);
     const names = await drawer.locator('b.font-mono').allTextContents();
     const marks = await page.locator('svg.schematic text').allTextContents();
-    check('analiz: "İz ekle" → düğüme tıklayınca V(C1) (fark için ikinci düğüm sorulur), parçaya tıklayınca I(R1); şemada izin renginde etiketler',
+    check('analiz (v2): Zamana göre → Şemadan seç → düğüme tıklayınca V(C1) (fark için ikinci düğüm sorulur; grafik açılır), İz ekle → Şemadan seç → parçaya tıklayınca I(R1); şemada izin renginde etiketler',
       pickText.startsWith('C1 seçildi') && names.slice(0, 2).join(',') === 'V(C1),I(R1)' && marks.includes('V(C1)') && marks.includes('I(R1) →'), `${names.slice(0, 2).join(',')} · ${pickText.slice(0, 30)}`);
     // Kayıt: S1 çalışırken kapanır, kondansatör dolar.
     const sim = page.getByRole('region', { name: 'Simülasyon' });
@@ -1672,14 +1699,18 @@ try {
     check('analiz: "Tabloya ekle" imleçteki değerleri tabloya geçiriyor; CSV (noktalı virgül, ondalık virgül) ve PNG indiriliyor',
       /^grafik-verisi-.*\.csv$/.test(csv.suggestedFilename()) && csvText.startsWith('﻿t (s);V(C1) (V);I(R1) (A)') && /\r\n0,00\d+;/.test(csvText) && /^grafik-.*\.png$/.test(png.suggestedFilename()),
       `${csv.suggestedFilename()} · ${png.suggestedFilename()}`);
-    await drawer.getByRole('tab', { name: 'Tablo' }).click(); await page.waitForTimeout(150);
-    const tableText = (await drawer.getByRole('tabpanel').textContent()) ?? '';
+    await drawer.getByRole('button', { name: 'Ölçüm tablosu' }).click(); await page.waitForTimeout(150);
+    const tablePanel = drawer.getByRole('complementary', { name: 'Ölçüm tablosu' });
+    const tableText = (await tablePanel.textContent()) ?? '';
+    const tableBox = await tablePanel.boundingBox();
     const sep = drawer.getByRole('separator', { name: 'Analiz çekmecesinin yüksekliği' });
     await sep.focus(); await page.keyboard.press('ArrowUp'); await page.keyboard.press('ArrowUp'); await page.waitForTimeout(150);
     const taller = (await drawer.boundingBox())?.height ?? 0;
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).analysis ?? null);
-    check('analiz: Tablo sekmesinde eklenen satırlar; tutamak (↑) çekmeceyi büyütüyor; izler ve tablo devreyle kaydediliyor',
-      tableText.includes('V(C1)') && tableText.includes('imleç') && Math.abs(taller - 420) < 2 && saved?.traces?.length === 2 && saved?.rows?.length === 2, `${Math.round(taller)} px · ${saved?.traces?.length}/${saved?.rows?.length}`);
+    check('analiz (v2): "Ölçüm tablosu" sağdan açılan panelde eklenen satırlar; tutamak (↑) çekmeceyi büyütüyor; izler, grafik ve tablo devreyle kaydediliyor',
+      tableText.includes('V(C1)') && tableText.includes('imleç') && tableBox !== null && dBox !== null && tableBox.x + tableBox.width >= dBox.x + dBox.width - 2 && Math.abs(taller - 420) < 2 &&
+        saved?.traces?.length === 2 && saved?.rows?.length === 2 && saved?.graphs?.length === 1 && saved?.graphs?.[0]?.kind === 'time',
+      `${Math.round(taller)} px · ${saved?.traces?.length}/${saved?.rows?.length}/${saved?.graphs?.length}`);
     // Tablo (A2, N2): sütunlar, % hata, laboratuvar sütunu, satır ekle ve kaynak seçimi, doğru uydurma, CSV menüsü.
     const heads = await drawer.locator('thead th').allTextContents();
     await drawer.getByRole('textbox', { name: 'V(C1): teorik değer' }).fill('10 V'); await page.waitForTimeout(100);
@@ -1732,18 +1763,21 @@ try {
     await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(500);
     const sheet = page.getByRole('region', { name: 'Analiz' });
-    await sheet.getByRole('button', { name: 'İz ekle' }).tap(); await page.waitForTimeout(200);
-    const at = await screen(page, 28, -8);
-    await page.touchscreen.tap(at.x, at.y); await page.waitForTimeout(250);
-    await sheet.getByRole('button', { name: 'Toprağa göre ekle' }).tap(); await page.waitForTimeout(250);
+    const sheetBox = await sheet.boundingBox();
+    // Zamana göre → seçici: aranıp düğüm (C1) seçilir, "Grafiği çiz" (telefonda şemadan seçilmez; sayfa ekranı kaplar).
+    await sheet.getByRole('button', { name: /^Zamana göre/ }).tap(); await page.waitForTimeout(200);
+    const fromSchematic = await sheet.getByRole('button', { name: 'Şemadan seç' }).count();
+    await sheet.getByRole('searchbox', { name: 'Büyüklük ara' }).fill('C1'); await page.waitForTimeout(150);
+    await sheet.getByRole('group', { name: 'Düğümler' }).getByRole('button').first().tap(); await page.waitForTimeout(150);
+    await sheet.getByRole('button', { name: /^Grafiği çiz/ }).tap(); await page.waitForTimeout(300);
     const chips = await sheet.locator('span.font-mono').allTextContents();
-    const tabSizes = await sheet.getByRole('tab').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+    const chipTabs = await sheet.getByRole('tablist', { name: 'Grafikler' }).getByRole('tab').count();
     const small = await sheet.evaluate((root) => [...root.querySelectorAll('button, [role=tab]')].map((el) => { const r = el.getBoundingClientRect(); return { n: (el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 16), w: r.width, h: r.height }; }).filter((r) => r.w > 0 && (r.h < 43.5 || r.w < 35)).map((r) => `${r.n} ${Math.round(r.w)}×${Math.round(r.h)}`));
     const bottom = await sheet.getByRole('button', { name: 'CSV paylaş' }).boundingBox();
-    check('analiz (telefon, N9): ⋯ → Analiz alt sayfası; dört sekme, + İz ile şemadan V(C1); hedefler ≥ 44 px; altta "Tabloya ekle" ve "CSV paylaş"; sayfa kaymıyor',
-      chips.includes('V(C1)') && tabSizes.length === 4 && tabSizes.every((h) => h >= 44) && small.length === 0 && bottom !== null && bottom.y + bottom.height <= 844 && !(await pageScrolls(page)),
-      small.join(', ') || chips.join(','));
-    await sheet.getByRole('tab', { name: 'Tablo' }).tap(); await page.waitForTimeout(200);
+    check('analiz (telefon, N9; v2): ⋯ → Analiz tam ekran sayfa; Zamana göre → seçicide arayıp V(C1) → bir grafik çipi; telefonda "Şemadan seç" yok; hedefler ≥ 44 px; altta "Tabloya ekle" ve "CSV paylaş"; sayfa kaymıyor',
+      sheetBox !== null && sheetBox.y <= 1 && sheetBox.height >= 843 && fromSchematic === 0 && chips.includes('V(C1)') && chipTabs === 1 && small.length === 0 && bottom !== null && bottom.y + bottom.height <= 844 && !(await pageScrolls(page)),
+      small.join(', ') || `${chips.join(',')} · sayfa ${Math.round(sheetBox?.y ?? -1)}+${Math.round(sheetBox?.height ?? 0)}`);
+    await sheet.getByRole('button', { name: 'Ölçüm tablosu' }).tap(); await page.waitForTimeout(200);
     await sheet.getByRole('button', { name: 'Satır ekle' }).tap(); await page.waitForTimeout(200);
     const theoryInput = sheet.getByRole('textbox', { name: 'Yeni büyüklük: teorik değer' });
     const inputBox = await theoryInput.boundingBox();
@@ -1752,6 +1786,94 @@ try {
     check('analiz (telefon, Tablo): satırlar kart; girdiler ≥ 44 px ve 16 px yazı (iOS yakınlaştırmaz); altta Kopyala ve CSV paylaş; doğru uydurma altında',
       inputBox !== null && inputBox.height >= 43.5 && inputFont >= 16 && tableButtons.every((b) => b !== null && b.height >= 44) && (await sheet.getByRole('region', { name: 'Doğru uydur' }).count()) === 1,
       `${Math.round(inputBox?.height ?? 0)} px · ${inputFont} px`);
+    await page.context().close();
+  }
+  // --- Analiz v2: başlangıç ekranı, föy kartları, eğri ailesi, büyüklük seçici, tarama iptali, çipler, telefon ---
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'BF245A: çıkış ve transfer karakteristiği', exact: true }))).click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(300);
+    const drawer = page.getByRole('region', { name: 'Analiz' });
+    const curves = () => drawer.locator('svg[role=img] path[stroke^="var(--color-tr"]').count();
+    const foyHeading = await drawer.getByRole('heading', { name: 'Föydeki grafikler · Deney 5 · Şekil-15' }).count();
+    const foyCards = await drawer.getByRole('button', { name: /^ADIM / }).allTextContents();
+    const offers = await drawer.getByRole('heading', { name: 'Bu devre için' }).count();
+    check('analiz v2: Deney 5 açıkken başlangıç ekranında "Föydeki grafikler · Deney 5 · Şekil-15" ve iki kart (ADIM 2–3 çıkış ailesi, ADIM 4–5 transfer); "Bu devre için" ve "Kendin kur" bölümleri',
+      foyHeading === 1 && foyCards.length === 2 && /ADIM 2–3 · ÇIKIŞ KARAKTERİSTİĞİ.*ID – VDS ailesi/.test(foyCards[0] ?? '') && /ADIM 4–5 · TRANSFER/.test(foyCards[1] ?? '') && offers === 1 &&
+        (await drawer.getByRole('heading', { name: 'Kendin kur' }).count()) === 1,
+      foyCards.map((c) => c.slice(0, 40)).join(' | '));
+    // Föy kartından tek tıkla aile: üç eğri (VGG 0; 0,2; 0,4 V), çipte FÖY.
+    await drawer.getByRole('button', { name: /ID – VDS ailesi/ }).click();
+    await drawer.getByText(/^Tarama bitti · \d+ nokta$/).waitFor({ timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    const familyCurves = await curves();
+    const chip1 = ((await drawer.getByRole('tablist', { name: 'Grafikler' }).getByRole('tab', { selected: true }).textContent()) ?? '').replace(/\s+/g, ' ');
+    const done = ((await drawer.getByText(/^Tarama bitti/).textContent().catch(() => '')) ?? '');
+    check('analiz v2: föy kartına tek tıkla ID – VDS ailesi çiziliyor (3 eğri, 144 nokta); çip "FÖY ID – VDS ailesi" seçili',
+      familyCurves === 3 && done === 'Tarama bitti · 144 nokta' && chip1.startsWith('FÖY') && chip1.includes('ID – VDS ailesi'), `${familyCurves} eğri · ${done} · ${chip1}`);
+    // Büyüklük seçici: Yeni grafik → Zamana göre → arama süzüyor, seçilen büyüklükle grafik çiziliyor (ikinci çip).
+    await drawer.getByRole('button', { name: 'Yeni grafik' }).click(); await page.waitForTimeout(150);
+    await drawer.getByRole('button', { name: /^Zamana göre/ }).click(); await page.waitForTimeout(150);
+    const search = drawer.getByRole('searchbox', { name: 'Büyüklük ara' });
+    const groupsBefore = await drawer.getByRole('group').evaluateAll((els) => els.map((e) => e.querySelector('h4')?.textContent ?? '').filter(Boolean));
+    await search.fill('j1 vds'); await page.waitForTimeout(150);
+    const found = await drawer.getByRole('button', { pressed: false }).filter({ hasText: /^J1 · / }).allTextContents();
+    await drawer.getByRole('button', { name: /^J1 · VDS/ }).click(); await page.waitForTimeout(100);
+    await drawer.getByRole('button', { name: /^Grafiği çiz/ }).click(); await page.waitForTimeout(300);
+    const chipCount = await drawer.getByRole('tablist', { name: 'Grafikler' }).getByRole('tab').count();
+    const traceNames = await drawer.locator('b.font-mono').allTextContents();
+    check('analiz v2 (büyüklük seçici): Ölçü aletleri | Parçalar | Düğümler grupları; "j1 vds" araması yalnız J1 · VDS’yi bırakıyor; seçilip "Grafiği çiz" ile ikinci çip ve J1 · VDS izi',
+      groupsBefore.join('|') === 'Ölçü aletleri|Parçalar|Düğümler' && found.length === 1 && chipCount === 2 && traceNames.includes('J1 · VDS'), `${groupsBefore.join('|')} · ${found.length} · ${chipCount} çip`);
+    // Tarama iptali: Bir değeri tarayarak, adım küçültülünce uzun tarama; İptal ilerlemeyi durduruyor.
+    await drawer.getByRole('button', { name: 'Yeni grafik' }).click(); await page.waitForTimeout(150);
+    await drawer.getByRole('button', { name: /^Bir değeri tarayarak/ }).click(); await page.waitForTimeout(200);
+    const stepField = drawer.getByRole('textbox', { name: 'Adım 1' });
+    await stepField.fill('0,004'); await stepField.press('Enter');
+    const cancel = drawer.getByRole('button', { name: 'İptal' });
+    await cancel.waitFor({ timeout: 5000 }).catch(() => {});
+    const running = ((await drawer.getByText(/^Taranıyor · \d+ \/ \d+$/).first().textContent().catch(() => '')) ?? '');
+    await cancel.click().catch(() => {}); await page.waitForTimeout(300);
+    const stopped = (await cancel.count()) === 0 && (await drawer.getByRole('button', { name: 'Yeniden tara' }).count()) === 1;
+    check('analiz v2 (tarama): "Bir değeri tarayarak" uzun taramada ilerleme ("Taranıyor · n / N") ve İptal; İptal’den sonra Yeniden tara',
+      /^Taranıyor · \d+ \/ \d+$/.test(running) && stopped, `${running} · durdu ${stopped}`);
+    // Çipler: kapatılan çipin yanındaki açılıyor; hepsi kapanınca başlangıç ekranı.
+    const tabs = drawer.getByRole('tablist', { name: 'Grafikler' });
+    const beforeClose = await tabs.getByRole('tab').count();
+    await drawer.getByRole('button', { name: /grafiğini kapat$/ }).last().click(); await page.waitForTimeout(150);
+    const afterOne = await tabs.getByRole('tab').count();
+    const activeAfter = ((await tabs.getByRole('tab', { selected: true }).textContent().catch(() => '')) ?? '');
+    while ((await drawer.getByRole('button', { name: /grafiğini kapat$/ }).count()) > 0) { await drawer.getByRole('button', { name: /grafiğini kapat$/ }).first().click(); await page.waitForTimeout(100); }
+    const backToStart = await drawer.getByRole('heading', { name: 'Ne çizmek istiyorsun?' }).count();
+    check('analiz v2 (çipler): üç grafik üç çip; kapatılan çipin yanındaki seçiliyor; hepsi kapanınca başlangıç ekranı (boş grafik yok)',
+      beforeClose === 3 && afterOne === 2 && activeAfter.length > 0 && backToStart === 1, `${beforeClose} → ${afterOne} · ${activeAfter.slice(0, 30)}`);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'BF245A: çıkış ve transfer karakteristiği');
+    await page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(500);
+    const sheet = page.getByRole('region', { name: 'Analiz' });
+    const box = await sheet.boundingBox();
+    const foyCards = await sheet.getByRole('button', { name: /^ADIM / }).count();
+    const customCols = await sheet.getByRole('button', { name: /^(Zamana göre|Bir değeri tarayarak|Frekansa göre|Parçanın karakteristiği)/ }).evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().x))).size);
+    await sheet.getByRole('button', { name: /ID – VDS ailesi/ }).tap();
+    await sheet.locator('svg[role=img] path[stroke^="var(--color-tr"]').nth(2).waitFor({ timeout: 30000 }).catch(() => {});
+    const phoneCurves = await sheet.locator('svg[role=img] path[stroke^="var(--color-tr"]').count();
+    const fold = sheet.getByRole('button', { name: 'Ayarlar' });
+    const foldClosed = (await fold.getAttribute('aria-expanded')) === 'false';
+    const chart = await sheet.getByRole('img').first().boundingBox();
+    const foldBox = await fold.boundingBox();
+    check('analiz v2 (telefon): Analiz tam ekran sayfa; föy kartları (2), Kendin kur 2 sütun; föy kartına dokununca aile (3 eğri) ve ayarlar grafiğin altında katlı; sayfa kaymıyor',
+      box !== null && box.y <= 1 && box.height >= 843 && foyCards === 2 && customCols === 2 && phoneCurves === 3 && foldClosed && chart !== null && foldBox !== null && foldBox.y > chart.y + chart.height - 1 && !(await pageScrolls(page)),
+      `${foyCards} kart · ${customCols} sütun · ${phoneCurves} eğri · katlı ${foldClosed}`);
     await page.context().close();
   }
   // --- Analiz → Eğri izleyici (A3, N3): Worker'da DC tarama, basamaklar, transfer, yük doğrusu, iptal ----
@@ -1767,7 +1889,7 @@ try {
     await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BF245A: çıkış ve transfer/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(200);
     const drawer = page.getByRole('region', { name: 'Analiz' });
-    await drawer.getByRole('tab', { name: 'Eğri izleyici' }).click();
+    await openAnalysisGraph(drawer, 'curve', { part: 'J1' });
     const summary = drawer.getByText(/noktalık DC tarama$/);
     await summary.waitFor({ timeout: 30000 }).catch(() => {});
     const pill = ((await drawer.locator('p.rounded-full').textContent()) ?? '').replace(/\s+/g, ' ');
@@ -1793,6 +1915,8 @@ try {
       five === '5 × 31 noktalık DC tarama' && /^1 × \d+ noktalık DC tarama$/.test(transfer ?? '') && (await drawer.getByRole('button', { name: 'Yeniden tara' }).isVisible()), `${five} · ${transfer} · iptal ${cancelVisible}`);
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
     await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 yükselteç: kuplajlı/ }).first())).click(); await page.waitForTimeout(500);
+    // v2: grafikler devreyle kaydedilir; yeni devre başlangıç ekranıyla açılır, eğri izleyici yeniden açılır.
+    await openAnalysisGraph(drawer, 'curve', { part: 'Q1' });
     await drawer.getByText(/noktalık DC tarama$/).waitFor({ timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(300);
     const bjtSwitch = drawer.getByRole('switch', { name: /Yük doğrusu ve Q noktası/ });
@@ -1820,6 +1944,7 @@ try {
     // kullanıcı bir basamağı silince onun seçtiği basamaklar kalır.
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
     await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /IRF510 yükselteç: R_S/ }).first())).click(); await page.waitForTimeout(500);
+    await openAnalysisGraph(drawer, 'curve', { part: 'M1' });
     // M1'in taraması bitene kadar (önceki parçanın sonucu ekranda kalabilir).
     await drawer.getByRole('button', { name: '3,83 V basamağını kaldır' }).waitFor({ timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(200);
@@ -1840,7 +1965,7 @@ try {
     await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(400);
     const sheet = page.getByRole('region', { name: 'Analiz' });
-    await sheet.getByRole('tab', { name: 'Eğri' }).tap();
+    await openAnalysisGraph(sheet, 'curve', { touch: true, part: 'J1' });
     await sheet.locator('p.rounded-full').waitFor({ timeout: 30000 }).catch(() => {});
     const pill = ((await sheet.locator('p.rounded-full').textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
     const curveEdit = sheet.getByRole('button', { name: /^Ayarları düzenle: / });
@@ -1867,7 +1992,7 @@ try {
     await (await pickExample(page, (p) => p.getByRole('button').filter({ hasText: /BC107 yükselteç: kuplajlı/ }).first())).click(); await page.waitForTimeout(500);
     await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(200);
     const drawer = page.getByRole('region', { name: 'Analiz' });
-    await drawer.getByRole('tab', { name: 'Bode' }).click();
+    await openAnalysisGraph(drawer, 'bode');
     await drawer.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
     const selects = await drawer.locator('select').evaluateAll((els) => els.map((e) => e.selectedOptions[0]?.textContent ?? ''));
     const progress = await drawer.getByRole('progressbar', { name: 'Bode ölçümünün ilerlemesi' }).getAttribute('aria-valuenow');
@@ -1945,7 +2070,7 @@ try {
     await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
     await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(400);
     const sheet = page.getByRole('region', { name: 'Analiz' });
-    await sheet.getByRole('tab', { name: 'Bode' }).tap();
+    await openAnalysisGraph(sheet, 'bode', { touch: true });
     // Ölçüm bitince ayarlar tek satırlık özete kapanır, grafik öne çıkar (analiz düzeltmeleri, 7).
     const edit = sheet.getByRole('button', { name: /^Ayarları düzenle: / });
     await edit.waitFor({ timeout: 60000 }).catch(() => {});
@@ -2152,8 +2277,8 @@ try {
     const blockedPlay = (await st.getByText('Önce görev kartında tahminlerini yaz ve kaydet.').count()) >= 1 && (await st.getByRole('button', { name: 'Duraklat' }).count()) === 0;
     await st.getByRole('button', { name: 'Analiz', exact: true }).click(); await st.waitForTimeout(200);
     const drawer = st.getByRole('region', { name: 'Analiz' });
-    await drawer.getByRole('tab', { name: 'Bode' }).click(); await st.waitForTimeout(300);
-    const blockedBode = (await drawer.getByText('Önce görev kartında tahminlerini yaz ve kaydet.').count()) === 1 && (await drawer.getByRole('button', { name: 'Yeniden ölç' }).count()) === 0;
+    // v2: başlangıç ekranında Frekansa göre (Bode), eğri izleyici ve tarama kartları yok; nedeni yazıyor.
+    const blockedBode = (await drawer.getByText('Önce görev kartında tahminlerini yaz ve kaydet.').count()) === 1 && (await drawer.getByRole('button', { name: /^Frekansa göre/ }).count()) === 0 && (await drawer.getByRole('button', { name: 'Yeniden ölç' }).count()) === 0;
     check('tahmin (öğrenci, B1): kart "Önce tahmin et", her hedefe tahmin alanı, ölçülen gizli; kaydetmeden Oynat ve Analiz → Bode kapalı (nedeni yazıyor); "Tahminleri kaydet" hepsi yazılınca etkin',
       before.startsWith('Önce tahmin et') && (await inputs.count()) === 2 && !/5,9\d V/.test(before) && blockedPlay && blockedBode && !(await lock.isEnabled()),
       before.slice(0, 60));
@@ -2189,6 +2314,8 @@ try {
     const enabled = await lock.isEnabled();
     await lock.click(); await st.waitForTimeout(300);
     const savedLine = await card.getByText('Tahminler kaydedildi. Şimdi Oynat’a bas ve ölç.').count();
+    // v2: tahminler kaydedilince başlangıç ekranında Frekansa göre (Bode) açılıyor; kazanç hedefi Bode'dan ölçülür.
+    await openAnalysisGraph(drawer, 'bode');
     await st.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await st.waitForTimeout(300);
     const measuringLine = await card.getByText('Ölçülüyor…').count();
     await st.waitForTimeout(1200);
@@ -2299,8 +2426,7 @@ try {
     await page.getByRole('button', { name: 'Analiz', exact: true }).first().click(); await page.waitForTimeout(300);
     const drawer = page.getByRole('region', { name: 'Analiz' });
     const graphGate = ((await drawer.textContent()) ?? '').includes('Arıza bulmada serbest iz eklenmez') && (await drawer.getByRole('button', { name: /İz ekle/ }).count()) === 0;
-    await drawer.getByRole('tab', { name: 'Bode' }).click(); await page.waitForTimeout(300);
-    const bodeGate = ((await drawer.textContent()) ?? '').includes('Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul.');
+    const bodeGate = ((await drawer.textContent()) ?? '').includes('Arıza kipinde Bode ve Eğri izleyici kapalı; ölçüm aletleriyle bul.') && (await drawer.getByRole('button', { name: /^(Frekansa göre|Parçanın karakteristiği|Bir değeri tarayarak|Zamana göre)/ }).count()) === 0;
     check('arıza (B2, 2. aşama): açık kartta canlı değer yok ("ölçü aletiyle ölç"); Analiz’de serbest iz eklenmiyor, Eğri izleyici ve Bode kapalı',
       q1.includes('Arıza bulmada canlı değerler gizli') && !/V_?BE|VBE|I_?C\b/.test(q1) && graphGate && bodeGate, q1.slice(0, 80));
     // 5. aşama (R2, R3): ipucu, yanlış bildirim, doğru bildirim → Arıza bulundu, rapor, Onar ve çalıştır.

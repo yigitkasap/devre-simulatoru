@@ -25,6 +25,7 @@ import { saveSweep, sweepAxes, SweepPane, sweepToTable } from './SweepPane';
 import { TablePane } from './TablePane';
 import { TimeXY } from './TimeXY';
 import { Fold } from './Fold';
+import { PickControls } from './PickControls';
 import { traceColor } from './traces';
 import type { AnalysisApi } from './useAnalysis';
 
@@ -292,30 +293,8 @@ function GraphChips({ api, touch }: { api: AnalysisApi; touch: boolean }) {
 
 // --- Zaman grafiği --------------------------------------------------------------------------------------
 
-/** İz listesindeki seçim yönergesi (şemadan seçerken). */
-function PickControls({ api, touch }: { api: AnalysisApi; touch: boolean }) {
-  const t = tr.analysis.graph;
-  const small = `rounded-lg px-3 text-small font-semibold ${touch ? 'h-11' : 'h-9'}`;
-  if (!api.pick) return null;
-  return (
-    <div role="status" className="flex flex-col gap-2 rounded-lg border border-accent-line bg-accent-soft p-2.5 text-small text-accent-ink">
-      <span>{api.pick.stage === 'second' ? t.pickSecond(api.pick.name) : t.picking}</span>
-      <span className="flex flex-wrap gap-1.5">
-        {api.pick.stage === 'second' && (
-          <button type="button" onClick={api.addPendingNode} className={`${small} bg-accent text-white`}>
-            {t.groundAdd}
-          </button>
-        )}
-        <button type="button" onClick={api.cancelPick} className={`${small} border border-accent-line bg-panel text-ink`}>
-          {t.cancel}
-        </button>
-      </span>
-    </div>
-  );
-}
-
 /** "İz ekle": büyüklük seçici (açık grafikte olanlar işaretli; tıklanan eklenir, işaretliye tıklanınca kalkar). */
-function AddQuantity({ api, touch, onClose }: { api: AnalysisApi; touch: boolean; onClose: () => void }) {
+function AddQuantity({ api, touch, phone = false, onClose }: { api: AnalysisApi; touch: boolean; phone?: boolean; onClose: () => void }) {
   const inGraph = useMemo(() => {
     const keys = new Map<string, string>();
     for (const t of api.graphTraces) {
@@ -341,10 +320,14 @@ function AddQuantity({ api, touch, onClose }: { api: AnalysisApi; touch: boolean
           if (existing) api.removeTrace(existing);
           else api.addQuantity(o.quantity);
         }}
-        onFromSchematic={() => {
-          onClose();
-          api.startPick();
-        }}
+        {...(phone
+          ? {}
+          : {
+              onFromSchematic: () => {
+                onClose();
+                api.startPick();
+              },
+            })}
         touch={touch}
         autoFocus={!touch}
         maxHeight={touch ? 320 : undefined}
@@ -605,7 +588,7 @@ export function AnalysisDrawer(
           )}
         </div>
         {api.tableOpen && (
-          <aside aria-label={tr.analysis.tableButton} className="flex w-[460px] shrink-0 flex-col border-l border-line">
+          <aside aria-label={tr.analysis.tableButton} className="flex w-[560px] max-w-[60%] shrink-0 flex-col border-l border-line">
             <div className="flex shrink-0 items-center justify-end gap-2 px-3 pb-2">
               <button type="button" onClick={() => void g.copyTable()} className={ghost}>
                 <Icon name="copy" className="h-4 w-4" />
@@ -616,7 +599,7 @@ export function AnalysisDrawer(
                 <Icon name="close" className="h-4 w-4" />
               </button>
             </div>
-            <TablePane api={api} recorder={props.recorder} version={g.version} title={props.title} compact />
+            <TablePane api={api} recorder={props.recorder} version={g.version} title={props.title} stacked />
           </aside>
         )}
       </div>
@@ -729,7 +712,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
             <StartScreen api={api} foy={api.foy} touch phone />
           ) : api.view === 'time' ? (
             adding ? (
-              <AddQuantity api={api} touch onClose={() => setAdding(false)} />
+              <AddQuantity api={api} touch phone onClose={() => setAdding(false)} />
             ) : (
               <>
                 <div className="flex flex-wrap gap-1.5">

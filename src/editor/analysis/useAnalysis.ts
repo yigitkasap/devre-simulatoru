@@ -245,6 +245,7 @@ export function useAnalysis(
         title: c.title,
         detail: c.detail,
         icon: c.plan.kind === 'bode' ? 'bode' : c.plan.kind === 'sweep' ? 'measure' : c.plan.kind === 'time' && c.plan.x ? 'curve' : 'chart',
+        kind: c.plan.kind,
         open: () => openFoy(c),
       })),
     };

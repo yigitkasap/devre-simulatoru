@@ -22,9 +22,11 @@ export interface TablePaneProps {
   readonly version: number;
   readonly title: string;
   readonly compact?: boolean;
+  /** Masaüstünde sağdaki dar panel (analiz v2): tablo ve doğru uydurma alt alta, ikisi birlikte kayar. */
+  readonly stacked?: boolean;
 }
 
-export function TablePane({ api, recorder, version, title, compact = false }: TablePaneProps) {
+export function TablePane({ api, recorder, version, title, compact = false, stacked = false }: TablePaneProps) {
   const touch = useTouchUi();
   const t = tr.analysis.table;
   const rows = api.doc.rows;
@@ -188,6 +190,14 @@ export function TablePane({ api, recorder, version, title, compact = false }: Ta
     </section>
   );
 
+  if (stacked) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain px-3 pb-3">
+        {table}
+        <FitPanel api={api} fit={fit} touch={touch} cursor={cursor} />
+      </div>
+    );
+  }
   return compact ? (
     <div className="flex flex-col gap-4">
       {table}

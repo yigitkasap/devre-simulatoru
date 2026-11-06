@@ -6,6 +6,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { tr } from '../../i18n/tr';
 import { Icon, type IconName } from '../icons';
+import { PickControls } from './PickControls';
 import { QuantityPicker } from './QuantityPicker';
 import type { QuantityOption } from './quantities';
 import { suggestions, type Suggestion } from './suggest';
@@ -33,6 +34,8 @@ export interface FoyCard {
   /** Alt satır: taranan ve basamak değerleri. */
   readonly detail: string;
   readonly icon: IconName;
+  /** Grafiğin türü: görevin ve arıza bulmanın kısıtları buna göre (tarama ve Bode gate'e, zaman grafiği traceGate'e bağlı). */
+  readonly kind: 'time' | 'sweep' | 'bode';
   readonly open: () => void;
 }
 
@@ -113,10 +116,14 @@ export function StartScreen({ api, foy, touch, phone = false }: { api: AnalysisA
           options={api.quantities}
           selected={keys}
           onToggle={(o) => setChosen((c) => (c.some((x) => x.key === o.key) ? c.filter((x) => x.key !== o.key) : [...c, o]))}
-          onFromSchematic={() => {
-            setMode('home');
-            api.startPick();
-          }}
+          {...(phone
+            ? {}
+            : {
+                onFromSchematic: () => {
+                  setMode('home');
+                  api.startPick();
+                },
+              })}
           touch={touch}
           autoFocus={!touch}
         />
@@ -146,7 +153,7 @@ export function StartScreen({ api, foy, touch, phone = false }: { api: AnalysisA
     );
   }
 
-  const shownOffers = offers.filter(allowed);
+
   const custom: { key: string; icon: IconName; title: string; text: string; badge?: string; open: () => void; hidden: boolean }[] = [
     { key: 'time', icon: 'chart', ...t.cards.time, open: () => setMode('time'), hidden: Boolean(api.traceGate) },
     {
@@ -169,13 +176,18 @@ export function StartScreen({ api, foy, touch, phone = false }: { api: AnalysisA
     },
   ];
   const cols = phone ? 'grid-cols-1' : 'grid-cols-[repeat(auto-fill,minmax(220px,1fr))]';
+  const foyCards = (foy?.cards ?? []).filter((c) => (c.kind === 'time' ? !api.traceGate : !api.gate));
+  const gates = [...new Set([api.gate, api.traceGate].filter((g): g is string => Boolean(g)))];
+  // Föyde aynı grafik varsa (ör. "Giriş ve çıkış dalgası") öneri tekrarlanmaz.
+  const shownOffers = offers.filter(allowed).filter((o) => !foyCards.some((c) => c.title === o.title));
   return (
     <div className="flex flex-col gap-4">
       <h2 className={`m-0 font-semibold ${phone ? 'text-[17px]' : 'text-[16px]'}`}>{t.title}</h2>
-      {foy && foy.cards.length > 0 && (
+      <PickControls api={api} touch={touch} />
+      {foy && foyCards.length > 0 && (
         <Section title={foy.heading}>
           <div className={`grid gap-2 ${cols}`}>
-            {foy.cards.map((c) => (
+            {foyCards.map((c) => (
               <Card key={c.key} foy icon={c.icon} eyebrow={c.eyebrow} title={c.title} detail={c.detail} onClick={c.open} touch={touch} />
             ))}
           </div>
@@ -199,7 +211,11 @@ export function StartScreen({ api, foy, touch, phone = false }: { api: AnalysisA
             ))}
         </div>
       </Section>
-      {(api.gate || api.traceGate) && <p className="m-0 text-small leading-snug text-ink-2">{api.gate ?? api.traceGate}</p>}
+      {gates.map((g) => (
+        <p key={g} className="m-0 text-small leading-snug text-ink-2">
+          {g}
+        </p>
+      ))}
     </div>
   );
 }
