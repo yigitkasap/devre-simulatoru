@@ -21,6 +21,7 @@ import { CurvePane, curveSummary, saveCurves } from './CurvePane';
 import { QuantityPicker } from './QuantityPicker';
 import { quantityKey } from './quantities';
 import { StartScreen, type FoySection } from './StartScreen';
+import { saveSweep, sweepAxes, SweepPane, sweepToTable } from './SweepPane';
 import { TablePane } from './TablePane';
 import { traceColor } from './traces';
 import type { AnalysisApi } from './useAnalysis';
@@ -39,13 +40,17 @@ export interface AnalysisPanelProps {
   readonly foy?: FoySection | null;
 }
 
-const KIND_ICONS: Record<GraphDef['kind'], IconName> = { time: 'chart', curve: 'curve', bode: 'bode' };
+const KIND_ICONS: Record<GraphDef['kind'], IconName> = { time: 'chart', sweep: 'measure', curve: 'curve', bode: 'bode' };
 
 /** Çipin adı: zaman grafiğinde izlerin adları (X-Y'de "y – x"), Bode, "D1 karakteristiği"; föy grafiğinde föydeki başlık. */
 export function graphTitle(graph: GraphDef, api: AnalysisApi): string {
   const t = tr.analysis.graphName;
   if (graph.foy) return api.foyTitle(graph.foy) ?? t.time;
   if (graph.kind === 'bode') return t.bode;
+  if (graph.kind === 'sweep') {
+    const a = sweepAxes(api, graph.sweep);
+    return t.sweep(a.ys.map((y) => y.name).join(', ') || '?', a.x.name);
+  }
   if (graph.kind === 'curve') {
     const part = api.circuit.parts.find((p) => p.id === graph.part);
     return part ? t.curve(part.label) : t.curveEmpty;
@@ -449,6 +454,8 @@ export function AnalysisDrawer(
           {tr.analysis.graph.csv}
         </button>
       </>
+    ) : api.view === 'sweep' && api.active?.kind === 'sweep' ? (
+      <SweepActions api={api} notify={props.notify} pane={pane} ghost={ghost} solid={solid} pngButton={pngButton} />
     ) : gated ? null : api.view === 'curve' ? (
       <>
         <span className="mr-auto min-w-0 truncate text-label text-muted" aria-live="polite">{curveSummary(api.tracer)}</span>
@@ -554,6 +561,8 @@ export function AnalysisDrawer(
             </div>
           ) : api.view === 'time' ? (
             <GraphDesk {...props} g={g} touch={touch} />
+          ) : api.view === 'sweep' ? (
+            <SweepPane api={api} cursor={api.sweepCursor} onCursor={api.setSweepCursor} />
           ) : gated ? (
             <GateNote text={api.gate!} />
           ) : api.view === 'curve' ? (
@@ -582,6 +591,50 @@ export function AnalysisDrawer(
   );
 }
 
+/** Tarama grafiğinin eylemleri: ilerleme ve İptal ya da Yeniden tara, Tabloya ekle, PNG, CSV. */
+function SweepActions({ api, notify, pane, ghost, solid, pngButton }: { api: AnalysisApi; notify: (m: string) => void; pane: RefObject<HTMLDivElement | null>; ghost: string; solid: string; pngButton: (onClick: () => void, disabled: boolean) => ReactNode }) {
+  const t = tr.analysis.sweep;
+  const spec = api.active?.kind === 'sweep' ? api.active.sweep : null;
+  const result = api.sweep.result;
+  const points = result?.curves.reduce((n, c) => n + c.points.length, 0) ?? 0;
+  if (!spec) return null;
+  return (
+    <>
+      <span className="mr-auto min-w-0 truncate text-label text-muted" aria-live="polite">
+        {api.sweep.progress ? t.progress(api.sweep.progress.done, api.sweep.progress.total) : result && api.sweep.fresh ? t.done(points) : ''}
+      </span>
+      {api.sweep.progress ? (
+        <button type="button" onClick={api.sweep.cancel} className={ghost}>
+          <Icon name="stop" className="h-4 w-4" />
+          {t.cancel}
+        </button>
+      ) : (
+        <button type="button" onClick={api.sweep.run} disabled={spec.y.length === 0} className={ghost}>
+          <Icon name="undo" className="h-4 w-4" />
+          {t.rerun}
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          const n = api.sweepCursor !== null && result ? sweepToTable(api, spec, result.curves, api.sweepCursor) : 0;
+          if (n > 0) notify(t.added(n));
+        }}
+        disabled={api.sweepCursor === null || !result}
+        className={ghost}
+      >
+        <Icon name="plus" className="h-4 w-4" />
+        {t.toTable}
+      </button>
+      {pngButton(() => void panePng(pane, t.fileName), !result)}
+      <button type="button" onClick={() => result && saveSweep(api, spec, result.curves, false)} disabled={!result} className={solid}>
+        <Icon name="download" className="h-4 w-4" />
+        {t.csv}
+      </button>
+    </>
+  );
+}
+
 export const MIN_DRAWER = 220;
 export const DEFAULT_DRAWER = 380;
 /** Eğri izleyici ve Bode'da çekmecenin en az boyu (kullanıcı tutamakla boy vermediyse). */
@@ -596,6 +649,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
   const t = tr.analysis.graph;
   const [adding, setAdding] = useState(false);
   const gated = api.gate && (api.view === 'curve' || api.view === 'bode');
+  const sweepSpec = api.active?.kind === 'sweep' ? api.active.sweep : null;
   const bar = 'flex shrink-0 gap-2 border-t border-line px-4 pt-3';
   const barStyle = { paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' };
   const ghost = 'flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50';
@@ -686,6 +740,8 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                 {recorder.perFrame && api.graphTraces.length > 0 && <p className="m-0 text-label text-warn">{t.perFrame}</p>}
               </>
             )
+          ) : api.view === 'sweep' ? (
+            <SweepPane api={api} cursor={api.sweepCursor} onCursor={api.setSweepCursor} compact />
           ) : gated ? (
             <GateNote text={api.gate!} />
           ) : api.view === 'curve' ? (
@@ -701,6 +757,32 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
               {tr.analysis.table.copy}
             </button>
             <button type="button" onClick={() => g.tableFile(true)} disabled={api.doc.rows.length === 0} className={solid}>
+              <Icon name="share" className="h-4 w-4" />
+              {t.csvShare}
+            </button>
+          </div>
+        ) : sweepSpec ? (
+          <div className={bar} style={barStyle}>
+            {api.sweep.progress ? (
+              <button type="button" onClick={api.sweep.cancel} className={ghost}>
+                <Icon name="stop" className="h-4 w-4" />
+                {`${tr.analysis.sweep.cancel} · ${api.sweep.progress.done} / ${api.sweep.progress.total}`}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  const n = api.sweepCursor !== null && api.sweep.result ? sweepToTable(api, sweepSpec, api.sweep.result.curves, api.sweepCursor) : 0;
+                  if (n > 0) props.notify(tr.analysis.sweep.added(n));
+                }}
+                disabled={api.sweepCursor === null || !api.sweep.result}
+                className={ghost}
+              >
+                <Icon name="plus" className="h-4 w-4" />
+                {tr.analysis.sweep.toTable}
+              </button>
+            )}
+            <button type="button" onClick={() => api.sweep.result && saveSweep(api, sweepSpec, api.sweep.result.curves, true)} disabled={!api.sweep.result} className={solid}>
               <Icon name="share" className="h-4 w-4" />
               {t.csvShare}
             </button>

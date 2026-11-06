@@ -5,11 +5,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CsvSeparator } from './format';
 import { tr } from '../../i18n/tr';
-import { nextTraceColor, pruneTraces, type AnalysisDoc, type FoyGraphRef, type GraphDef, type GraphKind, type Quantity, type TableRow, type TraceDef } from '../../model/analysis';
+import { nextTraceColor, pruneTraces, type AnalysisDoc, type FoyGraphRef, type GraphDef, type GraphKind, type Quantity, type SweepSpec, type TableRow, type TraceDef } from '../../model/analysis';
 import type { Connectivity } from '../../model/connectivity';
 import type { CircuitDoc, Point } from '../../model/types';
 import type { CanvasMark, PickTarget } from '../Canvas';
 import { foyGraph } from '../../i18n/foyGraphs';
+import { sweepParams, type SweepParamOption } from './dcsweep';
+import { useDcSweep, type DcSweepApi } from './useDcSweep';
 import { quantityOptions, type QuantityOption } from './quantities';
 import { liveTraces, netIndex, nodeName, traceColor, traceLabel, type NetIndex, type TraceLabel } from './traces';
 import { useBode, type BodeApi } from './useBode';
@@ -41,6 +43,15 @@ export interface AnalysisApi {
   readonly openTimeGraph: (quantities: readonly Quantity[], options?: { readonly x?: Quantity; readonly foy?: FoyGraphRef }) => void;
   /** Açık zaman grafiğine bir büyüklük ekler (zaten varsa eklemez). */
   readonly addQuantity: (quantity: Quantity) => void;
+  /** Bir değeri tarayarak (DC tarama): açık tarama grafiğinin sonucu, ilerleme, iptal. */
+  readonly sweep: DcSweepApi;
+  /** Devrede taranabilen değerler. */
+  readonly sweepParams: readonly SweepParamOption[];
+  /** Açık tarama grafiğinin ayarlarını değiştirir. */
+  readonly setSweep: (patch: Partial<SweepSpec>) => void;
+  /** Tarama grafiğinin imleci (x ekseninin SI değeri). */
+  readonly sweepCursor: number | null;
+  readonly setSweepCursor: (x: number | null) => void;
   /** Föy grafiğinin başlığı (çipte); bilinmiyorsa null. */
   readonly foyTitle: (ref: FoyGraphRef) => string | null;
   /** Devre (öneriler ve büyüklük seçici için). */
@@ -172,6 +183,14 @@ export function useAnalysis(
   }, []);
   const addQuantity = useCallback((q: Quantity) => addTrace(q as DistributiveOmit<TraceDef, 'id' | 'color'>), [addTrace]);
   const quantities = useMemo(() => quantityOptions(doc, idx), [doc, idx]);
+  const params = useMemo(() => sweepParams(doc), [doc]);
+  const sweep = useDcSweep(connectivity.netlist, active?.kind === 'sweep' ? active : null);
+  const [sweepCursor, setSweepCursor] = useState<number | null>(null);
+  useEffect(() => setSweepCursor(null), [activeId]);
+  const setSweep = useCallback(
+    (patch: Partial<SweepSpec>) => setDoc((a) => ({ ...a, graphs: a.graphs.map((g) => (g.id === a.active && g.kind === 'sweep' ? { ...g, sweep: { ...g.sweep, ...patch } } : g)) })),
+    [],
+  );
   const openGraph = useCallback((def: DistributiveOmit<GraphDef, 'id'>) => {
     setDoc((a) => {
       const same = a.graphs.find((g) => (def.kind === 'bode' && g.kind === 'bode') || (def.kind === 'curve' && g.kind === 'curve' && g.part === def.part));
@@ -286,6 +305,11 @@ export function useAnalysis(
     openGraph,
     openTimeGraph,
     addQuantity,
+    sweep,
+    sweepParams: params,
+    setSweep,
+    sweepCursor,
+    setSweepCursor,
     foyTitle: (ref) => foyGraph(ref)?.title ?? null,
     circuit: doc,
     quantities,

@@ -1,8 +1,9 @@
-// Analizin uzun taramaları (eğri izleyici, Bode) ayrı iş parçacığında: arayüz donmaz; iptal, iş
-// parçacığı sonlandırılarak yapılır (tarama yarıda kalır, sonuç gönderilmez).
+// Analizin uzun taramaları (eğri izleyici, Bode, devrede DC tarama) ayrı iş parçacığında: arayüz
+// donmaz; iptal, iş parçacığı sonlandırılarak yapılır (tarama yarıda kalır, sonuç gönderilmez).
 
 import type { Netlist } from '../../sim';
 import { logFrequencies, measureBode, sourceLimits, type BodePoint, type BodeRequest } from './bode';
+import { runDcSweep, type DcSweepCurve, type DcSweepRequest } from './dcsweep';
 import { theoryAt, type TheoryResult } from './bodeTheory';
 import { loadLine, qSteps, runSweep, supplyTo, type SweepRequest } from './sweep';
 
@@ -19,7 +20,8 @@ export type WorkerRequest =
       /** Basamaklar varsayılan (kullanıcı değiştirmedi): MOSFET'te Q'nun çevresinde seçilir. */
       readonly stepsAuto: boolean;
     }
-  | { readonly kind: 'bode'; readonly request: BodeRequest };
+  | { readonly kind: 'bode'; readonly request: BodeRequest }
+  | { readonly kind: 'dcsweep'; readonly request: DcSweepRequest };
 
 export type WorkerReply =
   | { readonly type: 'progress'; readonly done: number; readonly total: number }
@@ -27,6 +29,7 @@ export type WorkerReply =
   | { readonly type: 'theory'; readonly result: TheoryResult }
   | { readonly type: 'bodePoint'; readonly point: BodePoint; readonly done: number; readonly total: number }
   | { readonly type: 'bodeDone'; readonly points: readonly BodePoint[] }
+  | { readonly type: 'dcsweep'; readonly curves: readonly DcSweepCurve[] }
   | { readonly type: 'error'; readonly message: string };
 
 /**
@@ -69,6 +72,16 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
         }
       });
       post({ type: 'curves', curves, load, to: request.to, steps: request.steps });
+    } else if (msg.kind === 'dcsweep') {
+      let last = 0;
+      const curves = runDcSweep(msg.request, (done, total) => {
+        const now = Date.now();
+        if (now - last > 50 || done === total) {
+          last = now;
+          post({ type: 'progress', done, total });
+        }
+      });
+      post({ type: 'dcsweep', curves });
     } else if (msg.kind === 'bode') {
       // Teori (küçük sinyal, A5): ölçüm DC'de oturur oturmaz aynı simülatörden; ölçülen noktalar üstüne gelir.
       const request = msg.request;

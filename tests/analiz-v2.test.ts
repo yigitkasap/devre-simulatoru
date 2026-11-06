@@ -3,7 +3,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { exampleDoc } from '../src/examples';
+import { dcNetlist, runDcSweep, sweepValues } from '../src/editor/analysis/dcsweep';
 import { traceValue } from '../src/editor/analysis/recorder';
+import { sweepAt } from '../src/editor/analysis/SweepPane';
 import { filterOptions, quantityOptions } from '../src/editor/analysis/quantities';
 import { suggestions } from '../src/editor/analysis/suggest';
 import { netIndex } from '../src/editor/analysis/traces';
@@ -133,5 +135,40 @@ describe('Analiz v2: büyüklük seçici ve öneriler', () => {
     expect(keys('diyot-karakteristigi')).toEqual(['wave', 'iv']);
     expect(suggestions(exampleDoc('diyot-karakteristigi')!).find((s) => s.key === 'iv')?.title).toBe('D1’in I–V eğrisi');
     for (const id of ['fet-yukseltec', 'bjt-yukseltec', 'rc-dolma', 'led-on-direnc'] as const) expect(suggestions(exampleDoc(id)!).length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('Analiz v2: bir değeri tarayarak (DC tarama)', () => {
+  it('aralıklar birleşir: 0 → 1 V (0,1) ve 1 → 5 V (1) = 15 nokta, ortak uç bir kez', () => {
+    const xs = sweepValues([{ from: 0, to: 1, step: 0.1 }, { from: 1, to: 5, step: 1 }]);
+    expect(xs.length).toBe(15);
+    expect(xs.slice(-5)).toEqual([1, 2, 3, 4, 5]);
+    expect(sweepValues([{ from: 5, to: 0, step: 1 }])).toEqual([5, 4, 3, 2, 1, 0]);
+  });
+
+  it('JFET deneyi (Deney 5, adım 2–3): V1 – A1 ailesi föy kartındaki sayılarla (V_DS = 8 V’ta 4,02 / 3,15 / 2,38 mA)', () => {
+    const doc = exampleDoc('jfet-karakteristik')!;
+    const id = (label: string) => doc.parts.find((p) => p.label === label)!.id;
+    const curves = runDcSweep({
+      netlist: buildConnectivity(doc).netlist,
+      param: { part: id('PS1'), prop: 'voltage1' },
+      ranges: [{ from: 0, to: 8, step: 0.2 }, { from: 8, to: 15, step: 1 }],
+      family: { param: { part: id('PS1'), prop: 'voltage2' }, values: [0, 0.2, 0.4] },
+      x: { kind: 'meter', part: id('V1') },
+      y: [{ kind: 'meter', part: id('A1') }],
+    });
+    expect(curves.map((c) => c.step)).toEqual([0, 0.2, 0.4]);
+    expect(curves.every((c) => c.points.length === 48)).toBe(true);
+    const at8 = curves.map((c) => sweepAt(c.points, 2, 8));
+    expect(at8[0]! * 1e3).toBeCloseTo(4.02, 1);
+    expect(at8[1]! * 1e3).toBeCloseTo(3.15, 1);
+    expect(at8[2]! * 1e3).toBeCloseTo(2.38, 1);
+  });
+
+  it('DC devresi: kondansatör açık, bobin kısa devre, AC kaynağın ve üretecin genliği sıfır', () => {
+    const netlist = buildConnectivity(exampleDoc('fet-yukseltec-kuplajli')!).netlist;
+    const dc = dcNetlist(netlist);
+    expect(dc.elements.some((e) => e.type === 'capacitor')).toBe(false);
+    expect(dc.elements.filter((e) => e.type === 'funcgen').every((e) => e.props.amplitude === 0)).toBe(true);
   });
 });

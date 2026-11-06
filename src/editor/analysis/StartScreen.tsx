@@ -10,6 +10,19 @@ import { QuantityPicker } from './QuantityPicker';
 import type { QuantityOption } from './quantities';
 import { suggestions, type Suggestion } from './suggest';
 import type { AnalysisApi } from './useAnalysis';
+import type { SweepSpec } from '../../model/analysis';
+
+/** "Bir değeri tarayarak"ın varsayılanı: ilk gerilim kaynağı (yoksa ilk taranabilen değer) 0'dan şu anki değerine, 20 adım; düşey eksen ilk ampermetre (yoksa ilk ölçü aleti ya da ilk akım). */
+export function defaultSweep(api: AnalysisApi): SweepSpec | null {
+  const p = api.sweepParams.find((o) => o.param.prop.startsWith('voltage')) ?? api.sweepParams[0];
+  if (!p) return null;
+  const to = p.value > 0 ? p.value : p.param.prop === 'position' ? 100 : 10;
+  const y =
+    api.quantities.find((o) => o.quantity.kind === 'meter' && o.unit === 'A') ??
+    api.quantities.find((o) => o.group === 'meters') ??
+    api.quantities.find((o) => o.quantity.kind === 'current');
+  return { param: p.param, ranges: [{ from: 0, to, step: to / 20 }], family: null, x: null, y: y ? [y.quantity] : [] };
+}
 
 /** Föy grafiğinin başlangıç ekranındaki kartı (i18n/foyGraphs). */
 export interface FoyCard {
@@ -136,6 +149,16 @@ export function StartScreen({ api, foy, touch, phone = false }: { api: AnalysisA
   const shownOffers = offers.filter(allowed);
   const custom: { key: string; icon: IconName; title: string; text: string; badge?: string; open: () => void; hidden: boolean }[] = [
     { key: 'time', icon: 'chart', ...t.cards.time, open: () => setMode('time'), hidden: Boolean(api.traceGate) },
+    {
+      key: 'sweep',
+      icon: 'measure',
+      ...t.cards.sweep,
+      open: () => {
+        const sweep = defaultSweep(api);
+        if (sweep) api.openGraph({ kind: 'sweep', sweep });
+      },
+      hidden: Boolean(api.gate) || api.sweepParams.length === 0,
+    },
     { key: 'bode', icon: 'bode', ...t.cards.bode, open: () => api.openGraph({ kind: 'bode' }), hidden: Boolean(api.gate) },
     {
       key: 'curve',

@@ -78,13 +78,38 @@ export interface FoyGraphRef {
   readonly key: string;
 }
 
+/** Taranan değer (analiz v2, "Bir değeri tarayarak"): parçanın sayısal bir özelliği. */
+export interface SweepParam {
+  readonly part: string;
+  readonly prop: string;
+}
+
+/** Tarama aralığı: from → to, adım step (ör. 0 → 8 V adım 0,2; 8 → 15 V adım 1). */
+export interface SweepRange {
+  readonly from: number;
+  readonly to: number;
+  readonly step: number;
+}
+
+/** DC taramanın ayarları: taranan değer ve aralıkları, isteğe bağlı eğri ailesi, eksenler. */
+export interface SweepSpec {
+  readonly param: SweepParam;
+  readonly ranges: readonly SweepRange[];
+  /** Her eğri için ikinci değer ve değerleri; null: tek eğri. */
+  readonly family: { readonly param: SweepParam; readonly values: readonly number[] } | null;
+  /** Yatay eksen: null ise taranan değer; bir büyüklükse o (ör. V1 · VDS). */
+  readonly x: Quantity | null;
+  readonly y: readonly Quantity[];
+}
+
 /**
  * Bir grafik (analiz v2; üstte çip): zamana göre (kayıt; izler belgenin izlerinden kimlikle seçilir,
- * x null ise zaman, bir iz kimliğiyse X-Y), frekansa göre (ölçülen Bode) ya da parçanın karakteristiği
- * (eğri izleyici; taranan parça).
+ * x null ise zaman, bir iz kimliğiyse X-Y), bir değeri tarayarak (DC tarama), frekansa göre (ölçülen
+ * Bode) ya da parçanın karakteristiği (eğri izleyici; taranan parça).
  */
 export type GraphDef =
   | { readonly id: string; readonly kind: 'time'; readonly traces: readonly string[]; readonly x: string | null; readonly foy?: FoyGraphRef }
+  | { readonly id: string; readonly kind: 'sweep'; readonly sweep: SweepSpec; readonly foy?: FoyGraphRef }
   | { readonly id: string; readonly kind: 'bode'; readonly foy?: FoyGraphRef }
   | { readonly id: string; readonly kind: 'curve'; readonly part: string | null; readonly foy?: FoyGraphRef };
 
@@ -119,21 +144,60 @@ function point(v: unknown): Point | null {
   return { x: v[0] as number, y: v[1] as number };
 }
 
-function parseTrace(raw: unknown): TraceDef | null {
-  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
-  const color = typeof raw.color === 'number' && Number.isInteger(raw.color) ? Math.abs(raw.color) % TRACE_COLORS : 0;
-  if (raw.kind === 'current' && typeof raw.part === 'string') return { id: raw.id, color, kind: 'current', part: raw.part };
+/** Kimliksiz, renksiz büyüklük (tarama eksenlerinde). */
+function parseQuantity(raw: unknown): Quantity | null {
+  if (!isRecord(raw)) return null;
+  if (raw.kind === 'current' && typeof raw.part === 'string') return { kind: 'current', part: raw.part };
   if (raw.kind === 'voltage' && typeof raw.node === 'string') {
     const at = point(raw.at);
     if (!at) return null;
     const ref = typeof raw.ref === 'string' ? raw.ref : null;
-    return { id: raw.id, color, kind: 'voltage', node: raw.node, at, ref, refAt: ref ? point(raw.refAt) : null };
+    return { kind: 'voltage', node: raw.node, at, ref, refAt: ref ? point(raw.refAt) : null };
   }
   if (typeof raw.part !== 'string') return null;
-  if (raw.kind === 'meter' || raw.kind === 'power' || raw.kind === 'across') return { id: raw.id, color, kind: raw.kind, part: raw.part };
-  if (raw.kind === 'scope' && (raw.channel === 0 || raw.channel === 1)) return { id: raw.id, color, kind: 'scope', part: raw.part, channel: raw.channel };
-  if (raw.kind === 'terminal' && TERMINAL_QUANTITIES.includes(raw.quantity as TerminalQuantity)) return { id: raw.id, color, kind: 'terminal', part: raw.part, quantity: raw.quantity as TerminalQuantity };
+  if (raw.kind === 'meter' || raw.kind === 'power' || raw.kind === 'across') return { kind: raw.kind, part: raw.part };
+  if (raw.kind === 'scope' && (raw.channel === 0 || raw.channel === 1)) return { kind: 'scope', part: raw.part, channel: raw.channel };
+  if (raw.kind === 'terminal' && TERMINAL_QUANTITIES.includes(raw.quantity as TerminalQuantity)) return { kind: 'terminal', part: raw.part, quantity: raw.quantity as TerminalQuantity };
   return null;
+}
+
+function parseTrace(raw: unknown): TraceDef | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  const q = parseQuantity(raw);
+  if (!q) return null;
+  const color = typeof raw.color === 'number' && Number.isInteger(raw.color) ? Math.abs(raw.color) % TRACE_COLORS : 0;
+  return { ...q, id: raw.id, color } as TraceDef;
+}
+
+/** Yazılırken gerilimin noktaları [x, y]. */
+function quantityJson(q: Quantity | TraceDef): Record<string, unknown> {
+  return q.kind === 'voltage' ? { ...q, at: [q.at.x, q.at.y], refAt: q.refAt ? [q.refAt.x, q.refAt.y] : null } : { ...q };
+}
+
+const MAX_SWEEP_RANGES = 8;
+const MAX_FAMILY = 12;
+const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+
+function parseParam(raw: unknown): SweepParam | null {
+  return isRecord(raw) && typeof raw.part === 'string' && typeof raw.prop === 'string' ? { part: raw.part, prop: raw.prop.slice(0, 40) } : null;
+}
+
+function parseSweep(raw: unknown): SweepSpec | null {
+  if (!isRecord(raw)) return null;
+  const param = parseParam(raw.param);
+  if (!param) return null;
+  const ranges = Array.isArray(raw.ranges)
+    ? raw.ranges.slice(0, MAX_SWEEP_RANGES).filter((r): r is SweepRange => isRecord(r) && finite(r.from) && finite(r.to) && finite(r.step) && r.step !== 0).map((r) => ({ from: r.from, to: r.to, step: r.step }))
+    : [];
+  if (ranges.length === 0) return null;
+  let family: SweepSpec['family'] = null;
+  if (isRecord(raw.family)) {
+    const fp = parseParam(raw.family.param);
+    const values = Array.isArray(raw.family.values) ? raw.family.values.filter(finite).slice(0, MAX_FAMILY) : [];
+    if (fp && values.length > 0) family = { param: fp, values };
+  }
+  const y = Array.isArray(raw.y) ? raw.y.slice(0, MAX_TRACES).map(parseQuantity).filter((q): q is Quantity => q !== null) : [];
+  return { param, ranges, family, x: raw.x === null ? null : parseQuantity(raw.x), y };
 }
 
 function parseRow(raw: unknown): TableRow | null {
@@ -164,6 +228,10 @@ function parseGraph(raw: unknown, traceIds: ReadonlySet<string>): GraphDef | nul
     const x = typeof raw.x === 'string' && traceIds.has(raw.x) ? raw.x : null;
     return { ...base, kind: 'time', traces, x };
   }
+  if (raw.kind === 'sweep') {
+    const sweep = parseSweep(raw.sweep);
+    return sweep ? { ...base, kind: 'sweep', sweep } : null;
+  }
   if (raw.kind === 'bode') return { ...base, kind: 'bode' };
   if (raw.kind === 'curve') return { ...base, kind: 'curve', part: typeof raw.part === 'string' ? raw.part : null };
   return null;
@@ -192,11 +260,11 @@ export function parseAnalysis(value: unknown): AnalysisDoc {
 export function serializeAnalysis(a: AnalysisDoc): Record<string, unknown> | undefined {
   if (a.traces.length === 0 && a.rows.length === 0 && !a.labColumn && a.fit === null && a.graphs.length === 0) return undefined;
   return {
-    traces: a.traces.map((t) => (t.kind === 'voltage' ? { ...t, at: [t.at.x, t.at.y], refAt: t.refAt ? [t.refAt.x, t.refAt.y] : null } : { ...t })),
+    traces: a.traces.map(quantityJson),
     rows: a.rows.map((r) => ({ ...r })),
     labColumn: a.labColumn,
     fit: a.fit,
-    graphs: a.graphs.map((g) => ({ ...g })),
+    graphs: a.graphs.map((g) => (g.kind === 'sweep' ? { ...g, sweep: { ...g.sweep, x: g.sweep.x ? quantityJson(g.sweep.x) : null, y: g.sweep.y.map(quantityJson) } } : { ...g })),
     active: a.active,
   };
 }
