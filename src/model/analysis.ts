@@ -54,18 +54,44 @@ export interface FitSpec {
   readonly to?: number | null;
 }
 
+/**
+ * Föydeki bir grafiğin kimliği (analiz v2): örnek ve föy kartındaki grafik anahtarı (i18n/foyGraphs).
+ * Çipte "FÖY" ön eki ve başlığı buradan gelir.
+ */
+export interface FoyGraphRef {
+  readonly example: string;
+  readonly key: string;
+}
+
+/**
+ * Bir grafik (analiz v2; üstte çip): zamana göre (kayıt; izler belgenin izlerinden kimlikle seçilir,
+ * x null ise zaman, bir iz kimliğiyse X-Y), frekansa göre (ölçülen Bode) ya da parçanın karakteristiği
+ * (eğri izleyici; taranan parça).
+ */
+export type GraphDef =
+  | { readonly id: string; readonly kind: 'time'; readonly traces: readonly string[]; readonly x: string | null; readonly foy?: FoyGraphRef }
+  | { readonly id: string; readonly kind: 'bode'; readonly foy?: FoyGraphRef }
+  | { readonly id: string; readonly kind: 'curve'; readonly part: string | null; readonly foy?: FoyGraphRef };
+
+export type GraphKind = GraphDef['kind'];
+
 export interface AnalysisDoc {
   readonly traces: readonly TraceDef[];
   readonly rows: readonly TableRow[];
   readonly labColumn: boolean;
   readonly fit: FitSpec | null;
+  /** Grafikler (çipler, soldan sağa). Boşsa Analiz başlangıç ekranıyla açılır. */
+  readonly graphs: readonly GraphDef[];
+  /** Açık grafiğin kimliği; null: başlangıç ekranı ("Ne çizmek istiyorsun?"). */
+  readonly active: string | null;
 }
 
-export const EMPTY_ANALYSIS: AnalysisDoc = { traces: [], rows: [], labColumn: false, fit: null };
+export const EMPTY_ANALYSIS: AnalysisDoc = { traces: [], rows: [], labColumn: false, fit: null, graphs: [], active: null };
 
 const MAX_TRACES = 12;
 const MAX_ROWS = 200;
 const MAX_TEXT = 120;
+const MAX_GRAPHS = 12;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -106,6 +132,24 @@ function parseRow(raw: unknown): TableRow | null {
   };
 }
 
+function parseFoyRef(raw: unknown): FoyGraphRef | undefined {
+  return isRecord(raw) && typeof raw.example === 'string' && typeof raw.key === 'string' ? { example: raw.example.slice(0, 40), key: raw.key.slice(0, 40) } : undefined;
+}
+
+function parseGraph(raw: unknown, traceIds: ReadonlySet<string>): GraphDef | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || raw.id === '') return null;
+  const foy = parseFoyRef(raw.foy);
+  const base = { id: raw.id.slice(0, 40), ...(foy ? { foy } : {}) };
+  if (raw.kind === 'time') {
+    const traces = Array.isArray(raw.traces) ? raw.traces.filter((t): t is string => typeof t === 'string' && traceIds.has(t)) : [];
+    const x = typeof raw.x === 'string' && traceIds.has(raw.x) ? raw.x : null;
+    return { ...base, kind: 'time', traces, x };
+  }
+  if (raw.kind === 'bode') return { ...base, kind: 'bode' };
+  if (raw.kind === 'curve') return { ...base, kind: 'curve', part: typeof raw.part === 'string' ? raw.part : null };
+  return null;
+}
+
 /** Kayıttan okunan analiz bölümü; bozuksa boş analiz. */
 export function parseAnalysis(value: unknown): AnalysisDoc {
   if (!isRecord(value)) return EMPTY_ANALYSIS;
@@ -117,12 +161,17 @@ export function parseAnalysis(value: unknown): AnalysisDoc {
     // Başlangıcı yazılmamış uydurma kendiliğinden başlangıcı korur (undefined), null ise sınır yok.
     fit = { x: value.fit.x, y: value.fit.y, lnOffset: num(value.fit.lnOffset), ...('from' in value.fit ? { from: num(value.fit.from) } : {}), to: num(value.fit.to) };
   }
-  return { traces, rows, labColumn: value.labColumn === true, fit };
+  const ids = new Set(traces.map((t) => t.id));
+  let graphs = Array.isArray(value.graphs) ? value.graphs.slice(0, MAX_GRAPHS).map((g) => parseGraph(g, ids)).filter((g): g is GraphDef => g !== null) : [];
+  // Analiz v2'den önceki kayıt: izler tek bir zaman grafiğinde.
+  if (!Array.isArray(value.graphs) && traces.length > 0) graphs = [{ id: 'g0', kind: 'time', traces: traces.map((t) => t.id), x: null }];
+  const active = typeof value.active === 'string' && graphs.some((g) => g.id === value.active) ? value.active : (graphs[0]?.id ?? null);
+  return { traces, rows, labColumn: value.labColumn === true, fit, graphs, active };
 }
 
 /** JSON'a yazılacak biçim (noktalar [x, y]); boş analiz yazılmaz (undefined). */
 export function serializeAnalysis(a: AnalysisDoc): Record<string, unknown> | undefined {
-  if (a.traces.length === 0 && a.rows.length === 0 && !a.labColumn && a.fit === null) return undefined;
+  if (a.traces.length === 0 && a.rows.length === 0 && !a.labColumn && a.fit === null && a.graphs.length === 0) return undefined;
   return {
     traces: a.traces.map((t) =>
       t.kind === 'current'
@@ -132,7 +181,16 @@ export function serializeAnalysis(a: AnalysisDoc): Record<string, unknown> | und
     rows: a.rows.map((r) => ({ ...r })),
     labColumn: a.labColumn,
     fit: a.fit,
+    graphs: a.graphs.map((g) => ({ ...g })),
+    active: a.active,
   };
+}
+
+/** Hiçbir zaman grafiğinde kullanılmayan izler atılır (grafik ya da iz kapatılınca). */
+export function pruneTraces(a: AnalysisDoc): AnalysisDoc {
+  const used = new Set(a.graphs.flatMap((g) => (g.kind === 'time' ? [...g.traces, ...(g.x ? [g.x] : [])] : [])));
+  const traces = a.traces.filter((t) => used.has(t.id));
+  return traces.length === a.traces.length ? a : { ...a, traces };
 }
 
 /** Kullanılmayan ilk iz rengi. */

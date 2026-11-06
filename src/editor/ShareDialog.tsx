@@ -8,6 +8,7 @@ import { exampleDoc, type ExampleId } from '../examples';
 import { tr } from '../i18n/tr';
 import { DEFAULT_EMBED, DEFAULT_EMBED_HEIGHT, EMBED_HEIGHT_LIMITS, embedSrc, iframeCode, type EmbedOptions } from '../model/embed';
 import { serializeDoc } from '../model/serialize';
+import type { AnalysisDoc } from '../model/analysis';
 import { shareUrl } from '../model/share';
 import type { CircuitDoc } from '../model/types';
 import { Icon } from './icons';
@@ -49,12 +50,15 @@ async function copyText(text: string, field: HTMLInputElement | HTMLTextAreaElem
 
 export function ShareDialog({
   doc,
+  analysis,
   example,
   title,
   initialTab = 'link',
   onClose,
 }: {
   doc: CircuitDoc;
+  /** Analizin grafikleri (analiz v2): paylaşım bağlantısında devreyle birlikte. */
+  analysis?: AnalysisDoc;
   /** Açık örnek; devre değişmemişse gömme adresi örneğin adıyla kurulur. */
   example: ExampleId | null;
   title: string;
@@ -65,7 +69,7 @@ export function ShareDialog({
   const titleId = useId();
   const touch = useTouchUi();
   const [tab, setTab] = useState<ShareTab>(initialTab);
-  const link = useMemo(() => shareUrl(doc, window.location.href), [doc]);
+  const link = useMemo(() => shareUrl(doc, window.location.href, analysis), [doc, analysis]);
   const tabs: readonly ShareTab[] = ['link', 'embed'];
 
   return (

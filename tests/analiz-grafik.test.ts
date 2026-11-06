@@ -7,7 +7,7 @@ import { advanceRecorded, intervalForSpeed, niceInterval, TraceRecorder } from '
 import { axisUnit, niceTicks, tickText, toCsv } from '../src/editor/analysis/format';
 import { occupancy, overlapCost, placeValueBox } from '../src/editor/analysis/Chart';
 import { netIndex, nodeName, traceLabel } from '../src/editor/analysis/traces';
-import { parseAnalysis, serializeAnalysis, type TraceDef } from '../src/model/analysis';
+import { EMPTY_ANALYSIS, parseAnalysis, serializeAnalysis, type AnalysisDoc, type TraceDef } from '../src/model/analysis';
 import { buildConnectivity, pinKey } from '../src/model/connectivity';
 import type { CircuitDoc } from '../src/model/types';
 import { exampleDoc } from '../src/examples';
@@ -108,10 +108,10 @@ describe('Analiz: grafik kaydı', () => {
   });
 
   it('analiz bölümü kaydedilip okunur; bozuk veri boş analize döner', () => {
-    const a = { traces: [vTrace, iTrace], rows: [], labColumn: true, fit: null };
+    const a: AnalysisDoc = { traces: [vTrace, iTrace], rows: [], labColumn: true, fit: null, graphs: [{ id: 'g1', kind: 'time', traces: [vTrace.id, iTrace.id], x: null }], active: 'g1' };
     expect(parseAnalysis(JSON.parse(JSON.stringify(serializeAnalysis(a))))).toEqual(a);
-    expect(parseAnalysis('x')).toEqual({ traces: [], rows: [], labColumn: false, fit: null });
-    expect(serializeAnalysis({ traces: [], rows: [], labColumn: false, fit: null })).toBeUndefined();
+    expect(parseAnalysis('x')).toEqual(EMPTY_ANALYSIS);
+    expect(serializeAnalysis(EMPTY_ANALYSIS)).toBeUndefined();
   });
 });
 

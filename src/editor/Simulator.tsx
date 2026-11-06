@@ -42,7 +42,7 @@ import { addEntry, entryName, METER_LIMIT, NEW_SESSION, parseSession, type Fault
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
 import { buildFlowGraph } from '../model/flow';
 import { partBounds, pinPositions } from '../model/geometry';
-import { docFromHash, shareUrl } from '../model/share';
+import { docFromHash, sharedFromHash, shareUrl } from '../model/share';
 import { emptyDoc, type CircuitDoc } from '../model/types';
 import { compileNetlist, scopeSettings, type CompiledCircuit, type Diagnostic } from '../sim';
 import { loadArduinoRuntime } from '../sim/arduino/runtime';
@@ -173,9 +173,9 @@ function initialDoc(embed: (EmbedOptions & { readonly example: string | null }) 
   const fromTask = taskFromHash(window.location.hash);
   if (fromTask !== undefined) clearHash();
   if (fromTask) return { doc: fromTask.doc, analysis: EMPTY_ANALYSIS, task: fromTask.task, example: null, shared: 'task' };
-  const shared = fromTask === null ? undefined : docFromHash(window.location.hash);
+  const shared = fromTask === null ? undefined : sharedFromHash(window.location.hash);
   if (shared !== undefined) clearHash();
-  if (shared) return { doc: shared, analysis: EMPTY_ANALYSIS, task: null, example: null, shared: 'loaded' };
+  if (shared) return { doc: shared.doc, analysis: shared.analysis, task: null, example: null, shared: 'loaded' };
   const saved = loadSavedDoc();
   return {
     doc: saved ?? emptyDoc(),
@@ -935,10 +935,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   loadDocRef.current = loadDoc;
   useEffect(() => {
     const onHash = () => {
-      const shared = docFromHash(window.location.hash);
+      const shared = sharedFromHash(window.location.hash);
       if (shared === undefined) return;
       clearHash();
-      if (shared) loadDocRef.current(shared, tr.file.sharedLoaded);
+      if (shared) loadDocRef.current(shared.doc, tr.file.sharedLoaded, null, shared.analysis);
       else showToast(tr.file.sharedError, 'error');
     };
     window.addEventListener('hashchange', onHash);
@@ -2035,7 +2035,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
 
   const shareDialogEl = share && (
     <TouchUi.Provider value={phone || tablet}>
-      <ShareDialog doc={doc} example={activeExample} title={circuitTitle} initialTab={share} onClose={() => setShare(null)} />
+      <ShareDialog doc={doc} analysis={analysis.doc} example={activeExample} title={circuitTitle} initialTab={share} onClose={() => setShare(null)} />
     </TouchUi.Provider>
   );
 
@@ -2126,7 +2126,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             title={circuitTitle}
             saveState={saveState}
             shareOpen={modal === 'share'}
-            shareLink={() => shareUrl(doc, window.location.href)}
+            shareLink={() => shareUrl(doc, window.location.href, analysis.doc)}
             onClose={() => setModal(null)}
             onExamples={() => {
               setModal(null);
