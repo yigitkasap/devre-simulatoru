@@ -787,16 +787,24 @@ function PartCard(props: NotebookProps & { part: Part; open: boolean }) {
       <OpenCardHeader
         {...props}
         fixed={locked ? 'locked' : props.taskParts?.plugged?.has(part.id) ? 'plugged' : null}
-        badges={
-          <>
-            {part.type === 'oscilloscope' && <ScopeStatus part={part} view={props.devices.scopeView(part.id)} />}
-            {badges}
-          </>
-        }
+        badges={badges}
+        subtitle={part.type === 'oscilloscope' ? <ScopeStatus part={part} view={props.devices.scopeView(part.id)} /> : null}
         onClose={onClearSelection}
         bodyId={bodyId}
       />
       <div id={bodyId} className="flex flex-col gap-3">
+        {/* Masaüstünde "3B’de yaklaş" başlıkta değil gövdenin başında: başlıkta metinli düğme adı
+            ("FG1 · Fonksiyon üreteci") sığdırmıyordu. Dokunmatikte başlıkta simge düğme. */}
+        {props.onFocus3d && !touch && (
+          <button
+            type="button"
+            onClick={() => props.onFocus3d?.(part.id)}
+            className="flex h-8 shrink-0 items-center gap-1.5 self-start rounded-md border border-line px-2.5 text-label font-medium text-ink hover:bg-panel-2"
+          >
+            <Icon name="search" className="h-3.5 w-3.5" />
+            {tr.bench.focus}
+          </button>
+        )}
         {device ? (
           <ControlsLocked.Provider value={locked && CATALOG[part.type].propDefs.every((p) => !operable(part.type, p.key))}>
             <DeviceControls part={part} devices={props.devices} />
@@ -853,7 +861,16 @@ function OpenCardHeader({
   onClose,
   onFocus3d,
   fixed,
-}: NotebookProps & { part: Part; badges: ReactNode; onClose: () => void; bodyId: string; fixed: 'locked' | 'plugged' | null }) {
+  subtitle,
+}: NotebookProps & {
+  part: Part;
+  badges: ReactNode;
+  /** Başlığın altındaki küçük satır (osiloskobun tetik durumu): yanına konunca adı sığdırmıyordu. */
+  subtitle: ReactNode;
+  onClose: () => void;
+  bodyId: string;
+  fixed: 'locked' | 'plugged' | null;
+}) {
   const touch = useTouchUi();
   const burned = frame?.statuses.get(part.id)?.burned === true;
   const size = touch ? 'h-11 w-11' : 'h-9 w-9';
@@ -872,24 +889,16 @@ function OpenCardHeader({
   return (
     <div className="flex items-center gap-2">
       <SymbolIcon type={part.type} resistorStyle={settings.resistorStyle} className="max-h-[18px] w-[34px] shrink-0 text-accent-ink" />
-      <h3 className="min-w-0 flex-1 truncate text-[15px] font-semibold">
-        {part.label}
-        {part.note && <span className="font-medium text-ink-2"> {part.note}</span>} <span className="font-normal text-muted">· {tr.devices.names[part.type]}</span>
-      </h3>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <h3 className="truncate text-[15px] font-semibold">
+          {part.label}
+          {part.note && <span className="font-medium text-ink-2"> {part.note}</span>} <span className="font-normal text-muted">· {tr.devices.names[part.type]}</span>
+        </h3>
+        {subtitle}
+      </div>
       {badges}
-      {onFocus3d &&
-        (touch ? (
-          action('search', tr.bench.focus, () => onFocus3d(part.id))
-        ) : (
-          <button
-            type="button"
-            onClick={() => onFocus3d(part.id)}
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-line px-2.5 text-label font-medium text-ink hover:bg-panel-2"
-          >
-            <Icon name="search" className="h-3.5 w-3.5" />
-            {tr.bench.focus}
-          </button>
-        ))}
+      {/* Masaüstünde "3B’de yaklaş" kartın gövdesinde (PartCard). */}
+      {onFocus3d && touch && action('search', tr.bench.focus, () => onFocus3d(part.id))}
       {burned && status !== 'stopped' && action('saved', tr.inspector.repair, () => onRepair(part.id))}
       {/* Dokunmatikte çalışırken devrenin yapısı kilitli (Ölç kipi; DP3): döndür ve sil yok. Görevde
           kilitli parçada ikisi de yok; takılı ampermetre döndürülmez, kaldırılır (Sil). */}

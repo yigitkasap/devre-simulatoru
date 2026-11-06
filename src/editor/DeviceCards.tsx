@@ -220,7 +220,9 @@ function ScopeControls({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2.5">
+        // Masaüstünde 2 × 2 (A, B; zaman, kip): defter 400 px, üç sütunda değerler ("200 mV/b") ve kip
+        // düğmeleri ("A ve B") sığmıyordu.
+        <div className="grid grid-cols-2 gap-2.5">
           {CHANNELS.map((name, index) => (
             <div key={name} className="flex min-w-0 flex-col gap-1.5">
               <span className={head}>
@@ -239,6 +241,9 @@ function ScopeControls({
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className={head}>{tr.scope.timePerDiv}</span>
             {timeStepper}
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className={head}>{tr.scope.mode}</span>
             <Segmented<ScopeMode> label={tr.scope.mode} options={modes} value={s.mode} onChange={(mode) => onChange({ mode })} />
           </div>
         </div>
@@ -248,9 +253,9 @@ function ScopeControls({
         onClick={() => setAdvanced((a) => !a)}
         aria-expanded={advanced}
         aria-controls={advancedId}
-        className={`flex items-center gap-1.5 self-start text-small font-medium text-accent-ink ${touch ? 'h-11' : 'h-8'}`}
+        className={`flex items-center gap-1.5 self-start text-left text-small font-medium text-accent-ink ${touch ? 'h-11' : 'min-h-8 py-1'}`}
       >
-        <Icon name={advanced ? 'chevronDown' : 'chevron'} className="h-4 w-4" />
+        <Icon name={advanced ? 'chevronDown' : 'chevron'} className="h-4 w-4 shrink-0" />
         {touch ? tr.notebook.scopeAdvancedShort : tr.notebook.scopeAdvanced}
       </button>
       {advanced && (

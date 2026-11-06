@@ -4179,6 +4179,83 @@ try {
   check('1100 px (v4): defter 400 px; Parça ekle düğmesiyle açılan kutudan eklenen parça şemaya geliyor', nbBox !== null && Math.round(nbBox.width) === 400 && placed, nbBox ? `${Math.round(nbBox.width)} px` : 'yok');
   await compact.close();
 
+  // --- Cihaz kartları (masaüstü 1280, 1440, 1920 px): yazı taşması yok --------------------------
+  // Defter her genişlikte 400 px. Kartta kendi genişliğinden (ya da sabit yüksekliğinden) büyük yazısı olan
+  // öğe aranır: kesilen değer ("200 mV/b"), bitişen seçenek ("A ve B" ile "A + B"), "…" ile kısalan başlık
+  // ("OSC1 · Osiloskop"). Şema görünümünde BF245A yükseltecinin osiloskobu (açılır bölümler açık; A ve B,
+  // A + B, X-Y kipleri), fonksiyon üreteci ve güç kaynağı, baraj örneğinin su haznesi; 3B görünümünde aynı
+  // üç cihaz ("3B’de yaklaş" masaüstünde kartın gövdesinde, başlıkta değil).
+  {
+    const overflowing = (root) => {
+      const out = [];
+      for (const el of root.querySelectorAll('*')) {
+        if (el.closest('svg') || el.closest('.sr-only') || el.tagName === 'CANVAS') continue;
+        const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.display === 'inline' || cs.visibility === 'hidden') continue;
+        const hasText = [...el.childNodes].some((n) => (n.nodeType === 3 || (n.nodeType === 1 && getComputedStyle(n).display === 'inline')) && n.textContent.trim());
+        if (!hasText) continue;
+        const name = `"${el.textContent.trim().slice(0, 32)}"`;
+        if (el.scrollWidth > el.clientWidth + 1) out.push(`${name} ${el.scrollWidth}>${el.clientWidth}`);
+        else if (el.scrollHeight > el.clientHeight + 1 && !['auto', 'scroll'].includes(cs.overflowY)) out.push(`${name} yükseklik ${el.scrollHeight}>${el.clientHeight}`);
+      }
+      return out;
+    };
+    for (const [width, height] of [[1280, 800], [1440, 900], [1920, 1080]]) {
+      const ctx = await browser.newContext({ viewport: { width, height }, locale: 'tr-TR' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      const nb = notebook(page);
+      const card = (id) => nb.getByRole('region', { name: new RegExp(`^${id} ·`) });
+      const openCard = async (id) => {
+        if (!(await card(id).count())) await nb.getByRole('button', { name: new RegExp(`^${id} ·`) }).first().click();
+        await page.waitForTimeout(400);
+      };
+      const found = [];
+      const measure = async (label, region) => { for (const o of await region.evaluate(overflowing)) found.push(`${label}: ${o}`); };
+      await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+      await (await pickExample(page, (p) => p.getByRole('button', { name: 'BF245A ile ortak kaynaklı yükselteç (kazanç 10)', exact: true }))).click(); await page.waitForTimeout(500);
+      await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(1000);
+      let scopeTitle = '';
+      for (const id of ['OSC1', 'FG1', 'PS1']) {
+        await openCard(id);
+        await measure(id, card(id));
+        if (id === 'OSC1') scopeTitle = ((await card(id).locator('h3').textContent()) ?? '').trim();
+        const more = card(id).getByRole('button', { name: /^(Gelişmiş|Diğer ayarlar)/ });
+        for (let i = 0; i < (await more.count()); i++) await more.nth(i).click();
+        await page.waitForTimeout(200);
+        await measure(`${id} açık`, card(id));
+        if (id === 'OSC1') {
+          for (const mode of ['A + B', 'X-Y', 'A ve B']) {
+            await card(id).getByRole('radiogroup', { name: 'Kip' }).getByRole('radio', { name: mode, exact: true }).click(); await page.waitForTimeout(200);
+            await measure(`OSC1 ${mode}`, card(id));
+          }
+        }
+      }
+      const sema = found.splice(0);
+      await benchButton(page).click();
+      await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
+      let focusInHeader = 0;
+      for (const id of ['OSC1', 'FG1', 'PS1']) {
+        await openCard(id);
+        await measure(`${id} 3B`, card(id));
+        focusInHeader += await card(id).locator('h3').locator('xpath=../..').getByRole('button', { name: '3B’de yaklaş' }).count();
+      }
+      const bench = found.splice(0);
+      await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+      await (await pickExample(page, (p) => p.getByRole('button', { name: 'Baraj uyarısı: tek ışık', exact: true }))).click(); await page.waitForTimeout(500);
+      await nb.getByRole('button', { name: /^H1 · Su haznesi/ }).first().click(); await page.waitForTimeout(400);
+      await measure('H1', nb.getByRole('region', { name: /^H1 · Su haznesi/ }));
+      sema.push(...found.splice(0));
+      check(`cihaz kartları (${width} px, şema): osiloskop, fonksiyon üreteci, güç kaynağı ve su haznesinde yazı taşmıyor ("${scopeTitle}" tam, "200 mV/b" kesilmiyor, "A ve B" ile "A + B" ayrı; açılır bölümler ve üç kip)`,
+        sema.length === 0 && scopeTitle === 'OSC1 · Osiloskop', sema.slice(0, 4).join(' | ') || 'taşma yok');
+      check(`cihaz kartları (${width} px, 3B): başlıklar tam ("3B’de yaklaş" gövdede), yazı taşmıyor`,
+        bench.length === 0 && focusInHeader === 0, bench.slice(0, 4).join(' | ') || `taşma yok · başlıkta yaklaş düğmesi ${focusInHeader}`);
+      await ctx.close();
+    }
+  }
+
   // --- Tam ekran (masaüstü, tablet): tarayıcı tam ekranı, yalnızca devre şeması -------------
   {
     const fsCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
