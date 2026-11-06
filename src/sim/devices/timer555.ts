@@ -43,6 +43,10 @@ export class Timer555Device extends Device {
   override get switching(): boolean {
     return true;
   }
+  /** Flip-flop: eşik geçilince yeni durum geçiş anından itibaren geçerli (Device.latchesAtEvent). */
+  override get latchesAtEvent(): boolean {
+    return true;
+  }
   /** Kondansatörsüz bir 555 devresi de zamanla çözülsün (geçişler zaman içinde olur). */
   override get reactive(): boolean {
     return true;

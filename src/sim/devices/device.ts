@@ -351,6 +351,16 @@ export abstract class Device {
   }
 
   /**
+   * Eşik geçişinde durumu mandallanan bileşen (555'in flip-flopu): geçiş bir adımın sonunda bulununca adım
+   * eski durumla kabul edilir, yeni durum ancak sonraki adımlarda geçerlidir. Öbür bileşenlerde (durumu o
+   * anki gerilimin sonucu olanlar: LED, röle…) adım yeni durumla yeniden çözülür. Yeniden çözmek mandalda
+   * yeni durumu adımın başına, yani geçişten önceki aralığa da uygulardı (adım ne kadar uzunsa o kadar).
+   */
+  get latchesAtEvent(): boolean {
+    return false;
+  }
+
+  /**
    * `after` anından (kesin olarak) sonraki ilk süreksizlik: kare dalganın kenarı, üçgenin köşesi.
    * Zaman adımı tam bu ana denk getirilir, ardından geri Euler adımı atılır. Yoksa sonsuz.
    */

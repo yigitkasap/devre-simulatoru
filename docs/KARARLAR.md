@@ -2461,3 +2461,55 @@ CD4511'in 0–15 kodları ve karartması, göstergenin ileri gerilimi ve aşır�
   6 birim arayla tek dikey sırada, değer yazıları altta. Kesişmeler (12) testte gerekçesiyle izinli:
   CD4511'in giriş sırası (B C L̅T̅ B̅L̅ LE D A) anahtarların sırasından farklı, f ve g göstergenin
   çevresinden dolaşır. Tahtada kur yine tek tahtada.
+
+### 555 zamanlaması (motor-555, 2026-11-06)
+
+**Bulgu:** 555'in frekansı motorun adım boyuna bağlıydı. 1 kHz'lik astabilde (frekans bölücünün 555'i)
+`advance` parçası 2 µs iken 969,9 Hz, 100 µs iken 996,6 Hz; 555-ses'te 991,0 ve 1029,8 Hz. Uygulama motoru
+büyük parçalarla ilerlettiği için frekans bölücüde osiloskop 989 Hz gösteriyordu, metin (küçük adımla
+ölçülen) 970 Hz diyordu.
+
+**Önerilen iki yol denendi:** zamanlama kondansatörünün (THR / TRIG düğümüne bağlı durum değişkenleri) LTE
+toleransı 50 kata kadar daraltıldı: adım sayısı ve frekans değişmedi. Hata integrasyondan gelmiyordu: 50 µs'lik
+en büyük adımda RC eğrisinin integrasyon hatası mikrovolt düzeyinde. Adımı RC'ye göre sınırlamak hatayı adımla
+orantılı olarak küçültürdü ama kaynağını gidermezdi (ve %0,5 için adımı çok küçültmek gerekirdi).
+
+**Kök neden:** bir eşik adımın sonunda (olay çözünürlüğü, 10 ns içinde) geçilince motor `switchState`'i çağırıp
+adımı yeni durumla aynı başlangıçtan yeniden çözüyordu. LED ya da röle gibi durumu o anki gerilimin sonucu olan
+bileşenlerde doğru; ama 555'in flip-flopunda yeni durum (deşarj transistörü, çıkış) böylece geçişten önceki
+aralığa da, yani adımın tamamına (en çok 50 µs) uygulanıyordu. Her geçiş yeni yarım periyodu adım kadar erken
+başlatıyordu.
+
+**Düzeltme:** `Device.latchesAtEvent` (yalnızca 555): eşik adımın sonunda geçildiyse adım eski durumla kabul
+edilir, durum adımdan sonra değişir. Ardından bir kez 2 ns'lik bir oturma adımı atılır (`LATCH_SETTLE_STEP`):
+çıkışın ani değişimi orada olur ve ona bağlı eşikler (ör. 7474'ün saat girişi) adımı defalarca bölmeden geçilir;
+sonra olağan adım boyuna dönülür. Öbür bileşenlerin (LED, röle, tristör, lojik entegreler) davranışı aynı.
+
+| Ölçüm | Önce | Sonra |
+|---|---|---|
+| Frekans bölücü, 2 µs / 100 µs parça | 969,9 / 996,6 Hz | 967,9 / 968,2 Hz |
+| 555-ses, 2 µs / 100 µs parça | 991,0 / 1029,8 Hz | 989,5 / 989,8 Hz |
+| Uygulamadaki osiloskop, frekans bölücü (saat / Q) | 989 / 495 Hz | 968 / 484 Hz |
+
+Metinlerdeki sayılar yeniden ölçüldü: frekans bölücüde saat 970 → 968 Hz, Q 485 → 484 Hz (periyot yine
+1,03 ms). 555-astabil (ilk yüksek 0,76 s, sonra 0,48 / 0,49 s), 555-monostabil (5,16 s), 555-ses (≈ 990 Hz) ve
+yürüyen ışık (213 ms, 4,69 Hz) gösterilen hassasiyette değişmedi.
+
+**Performans** (`npm run tarama:performans:motor`, simülasyon saniyesi başına; adım sayısı güvenilir ölçü,
+süreler makinenin yüküyle dalgalanır: aynı taramada 555'siz örneklerde adım sayısı aynıyken süre iki katına kadar
+oynadı):
+
+| Örnek | Adım | Süre (ms / sim. s) |
+|---|---|---|
+| frekans-bolucu | 42 609 → 43 374 | 541 → 486 |
+| 555-ses | 38 782 → 51 808 | 229 → 238 |
+| 555-astabil | 20 017 → 20 019 | 56 → 51 |
+| 555-monostabil | 20 015 → 20 015 | 49 → 44 |
+| yuruyen-isik | 20 095 → 20 110 | 305 → 291 |
+
+555-ses'teki ek adımlar, çıkış değişince hoparlörden geçen akımın hızlı değişiminden: eskiden bu değişim hata
+denetimi atlanan (yeni durumla yeniden çözülen) adımın içinde kayboluyordu; şimdi hata denetimiyle çözülüyor.
+
+**Testler:** `tests/timer555.test.ts`: 555-ses ve frekans bölücüde 100 µs'lik parçalarla (uygulamadaki gibi)
+ve 2 µs'lik adımla ölçülen frekans %0,5 içinde; `tests/examples-lojik.test.ts`: 968 / 484 Hz; ios-kontrol:
+frekans bölücüde uygulamanın osiloskobu 968 / 484 Hz'i %0,5 içinde gösteriyor.

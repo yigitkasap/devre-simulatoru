@@ -55,6 +55,11 @@ export const NR_ABSTOL = 1e-12;
  * eşik aşılıyorsa adım, geçişin en fazla bu kadar sonrasına denk gelecek biçimde kısaltılır.
  */
 export const EVENT_RESOLUTION = 1e-8;
+/**
+ * Mandallı bir bileşen (555) durum değiştirdikten sonraki ilk adımın boyu (s): çıkışın ani değişimi bu adımda
+ * olur; olay çözünürlüğünden kısa olduğu için ona bağlı eşikler adımı bölmeden geçilir.
+ */
+export const LATCH_SETTLE_STEP = 2e-9;
 
 /** Kapalı anahtarın direnci: 1 mΩ. */
 export const SWITCH_ON_RESISTANCE = 1e-3;

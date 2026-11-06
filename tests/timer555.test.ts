@@ -206,4 +206,28 @@ describe('555 örnekleri: metindeki sayılar', () => {
     expect(f2).toBeLessThan(500);
     expect(e.sim.runtimeDiagnostics).toEqual([]);
   });
+
+  // Motor (555 zamanlaması): mandal (flip-flop) eşiğin geçildiği andan itibaren değişir; eskiden yeni durum
+  // bütün adıma uygulanıyordu ve adım büyüdükçe frekans yükseliyordu (100 µs'de %3–4). Uygulama motoru büyük
+  // parçalarla (advance) ilerletir: ölçüm ikisinde de aynı olmalı.
+  it('555 zamanlaması: uygulamadaki gibi büyük parçalarla (100 µs) ve küçük adımla (2 µs) aynı frekans, %0,5 içinde', () => {
+    for (const id of ['555-ses', 'frekans-bolucu'] as const) {
+      const frequency = (chunk: number) => {
+        const e = example(id);
+        e.sim.runUntil(5e-3);
+        const rising: number[] = [];
+        let last = (e.sim.device(e.idOf('U1')) as Timer555Device).high;
+        while (e.sim.time < 0.205) {
+          expect(e.sim.advance(chunk).ok).toBe(true);
+          const now = (e.sim.device(e.idOf('U1')) as Timer555Device).high;
+          if (now && !last) rising.push(e.sim.time);
+          last = now;
+        }
+        return (rising.length - 1) / (rising[rising.length - 1]! - rising[0]!);
+      };
+      const fine = frequency(2e-6);
+      const coarse = frequency(1e-4);
+      expect(Math.abs(coarse / fine - 1), `${id}: ${fine.toFixed(1)} / ${coarse.toFixed(1)} Hz`).toBeLessThan(0.005);
+    }
+  });
 });

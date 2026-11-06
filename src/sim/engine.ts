@@ -13,6 +13,7 @@ import { compileNetlist, devicesTouching, netKeysOfNode, type CompiledCircuit } 
 import {
   DEFAULT_TIME_STEP,
   EVENT_RESOLUTION,
+  LATCH_SETTLE_STEP,
   GMIN,
   LTE_ABSTOL_CURRENT,
   LTE_RELTOL,
@@ -189,6 +190,11 @@ export class CircuitSimulator {
   private historyCount = 0;
   /** Bir sonraki adım geri Euler ile mi (başlangıç, süreksizlik, yakınsama sorunu)? */
   private eulerNext = true;
+  /**
+   * Bir mandal (555) az önce değişti: sonraki adım LATCH_SETTLE_STEP kadar kısa. Çıkıştaki ani değişim bu
+   * adımda olur ve ona bağlı eşikler (ör. 7474'ün saat girişi) adımı bölmeden bu adımda geçilir.
+   */
+  private settleNext = false;
   /** LTE ile denetlenen durum değişkenleri: bileşenlerin lteStates()'i. */
   private lteStates: Array<readonly [number, number]> = [];
   /** Kırılma noktası verebilen bileşenler (zamanla değişen kaynaklar). */
@@ -840,6 +846,7 @@ export class CircuitSimulator {
       // en az bir adım atar, osiloskobun izi sıçramaz.
       let limit = exact ? Number.POSITIVE_INFINITY : Math.max(minStep, dt);
       for (const device of this.stepLimitDevices) limit = Math.min(limit, device.stepLimit);
+      if (this.settleNext) limit = Math.min(limit, LATCH_SETTLE_STEP);
       /** Adım bir bileşenin (ekran yakalayan osiloskobun) sınırıyla kısaltıldı mı? */
       const limited = limit < Math.min(this.h, this.maxStep);
       const proposed = limited ? Math.max(minStep, limit) : Math.min(this.h, this.maxStep);
@@ -1165,6 +1172,8 @@ export class CircuitSimulator {
         }
       }
       for (const device of this.switchingDevices) {
+        // Mandallı bileşen (555) zaman adımında burada değişmez: adım kabul edildikten sonra (aşağıda).
+        if (ctx.h > 0 && device.latchesAtEvent) continue;
         if (device.switchState(this.xNew)) changed = true;
       }
       if (!changed) break;
@@ -1183,6 +1192,20 @@ export class CircuitSimulator {
     }
     for (const device of this.circuit.devices) device.accept(this.xNew, ctx);
     this.x.set(this.xNew);
+    // Mandallı bileşenler (Device.latchesAtEvent): eşik bu adımın sonunda geçildiyse (olay çözünürlüğü
+    // içinde) adım eski durumla kabul edildi; yeni durum bundan sonraki adımlarda geçerli. Süreksizlik:
+    // sonraki adım geri Euler.
+    if (ctx.h > 0) {
+      let latched = false;
+      for (const device of this.switchingDevices) if (device.latchesAtEvent && device.switchState(this.x)) latched = true;
+      if (latched) {
+        this.limitEvent = true;
+        this.invalidate();
+        this.settleNext = true;
+      } else {
+        this.settleNext = false;
+      }
+    }
     return 'ok';
   }
 
