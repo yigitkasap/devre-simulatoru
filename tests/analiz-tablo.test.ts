@@ -13,7 +13,7 @@ function recorded(): TraceRecorder {
   const rec = new TraceRecorder();
   rec.setTraces([{ id: 'v', color: 0, kind: 'voltage', node: 'x', at: { x: 0, y: 0 }, ref: null, refAt: null }]);
   rec.reset(0, 1, false);
-  for (const [t, v] of rc as number[][]) rec.sample({ time: t!, voltageAt: () => v!, measure: () => null });
+  for (const [t, v] of rc as number[][]) rec.sample({ time: t!, voltageAt: () => v!, measure: () => null, device: () => undefined, pinCurrents: () => null });
   return rec;
 }
 
@@ -65,8 +65,8 @@ describe('Analiz: tablo', () => {
     const rec = new TraceRecorder();
     rec.setTraces([{ id: 'v', color: 0, kind: 'voltage', node: 'x', at: { x: 0, y: 0 }, ref: null, refAt: null }]);
     rec.reset(0, 1, false);
-    for (let i = 0; i < 60; i++) rec.sample({ time: i * 0.005, voltageAt: () => 0, measure: () => null });
-    for (const [t, v] of rc as number[][]) if (t! > 0) rec.sample({ time: 0.3 + t!, voltageAt: () => v!, measure: () => null });
+    for (let i = 0; i < 60; i++) rec.sample({ time: i * 0.005, voltageAt: () => 0, measure: () => null, device: () => undefined, pinCurrents: () => null });
+    for (const [t, v] of rc as number[][]) if (t! > 0) rec.sample({ time: 0.3 + t!, voltageAt: () => v!, measure: () => null, device: () => undefined, pinCurrents: () => null });
     const start = changeStart(rec, 'v')!;
     expect(start).toBeCloseTo(0.295, 6);
     // Bu aralıkta ln dönüşümüyle τ yine 100 ms; dönüşümsüz doğru R² < 0,9 (uyarı).
@@ -82,7 +82,7 @@ describe('Analiz: tablo', () => {
     const flat = new TraceRecorder();
     flat.setTraces([{ id: 'v', color: 0, kind: 'voltage', node: 'x', at: { x: 0, y: 0 }, ref: null, refAt: null }]);
     flat.reset(0, 1, false);
-    for (let i = 0; i < 10; i++) flat.sample({ time: i * 0.005, voltageAt: () => 5, measure: () => null });
+    for (let i = 0; i < 10; i++) flat.sample({ time: i * 0.005, voltageAt: () => 5, measure: () => null, device: () => undefined, pinCurrents: () => null });
     expect(changeStart(flat, 'v')).toBeNull();
   });
 

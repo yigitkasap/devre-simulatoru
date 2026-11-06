@@ -3,8 +3,14 @@
 
 import { describe, expect, it } from 'vitest';
 import { exampleDoc } from '../src/examples';
-import { EMPTY_ANALYSIS, parseAnalysis, pruneTraces, serializeAnalysis, type AnalysisDoc, type TraceDef } from '../src/model/analysis';
+import { traceValue } from '../src/editor/analysis/recorder';
+import { filterOptions, quantityOptions } from '../src/editor/analysis/quantities';
+import { suggestions } from '../src/editor/analysis/suggest';
+import { netIndex } from '../src/editor/analysis/traces';
+import { EMPTY_ANALYSIS, parseAnalysis, pruneTraces, serializeAnalysis, type AnalysisDoc, type Quantity, type TraceDef } from '../src/model/analysis';
+import { buildConnectivity } from '../src/model/connectivity';
 import { decodeShared, encodeDoc, sharedFromHash, shareUrl } from '../src/model/share';
+import { CircuitSimulator } from '../src/sim';
 
 const v: TraceDef = { id: 't1', color: 0, kind: 'voltage', node: 'p1#0', at: { x: 1, y: 2 }, ref: null, refAt: null };
 const i: TraceDef = { id: 't2', color: 1, kind: 'current', part: 'p2' };
@@ -77,5 +83,55 @@ describe('Analiz v2: paylaşım bağlantısı', () => {
     expect(decodeShared(encodeDoc(doc))?.analysis).toEqual(EMPTY_ANALYSIS);
     expect(sharedFromHash('#d=bozuk')).toBeNull();
     expect(sharedFromHash('#baska')).toBeUndefined();
+  });
+});
+
+describe('Analiz v2: büyüklük seçici ve öneriler', () => {
+  const setup = (id: Parameters<typeof exampleDoc>[0]) => {
+    const doc = exampleDoc(id)!;
+    const conn = buildConnectivity(doc);
+    return { doc, conn, idx: netIndex(doc, conn), idOf: (label: string) => doc.parts.find((p) => p.label === label)!.id };
+  };
+
+  it('JFET deneyi: ölçü aletleri, transistörün büyüklükleri, parçaların V, I, P’si ve adlandırılmış düğümler', () => {
+    const { doc, idx } = setup('jfet-karakteristik');
+    const options = quantityOptions(doc, idx);
+    const names = (group: string) => options.filter((o) => o.group === group).map((o) => o.name);
+    expect(names('meters')).toEqual(['A1', 'V1']);
+    expect(names('parts')).toEqual(expect.arrayContaining(['J1 · VGS', 'J1 · VDS', 'J1 · ID', 'RD · V', 'RD · I', 'RD · P']));
+    expect(names('parts')).not.toContain('J1 · V');
+    // Düğümler bağlı bacaklarla, toprak yok; her ad bir kez.
+    expect(names('nodes').length).toBeGreaterThan(2);
+    expect(names('nodes')).not.toContain('0');
+    expect(new Set(options.map((o) => o.key)).size).toBe(options.length);
+    expect(filterOptions(options, 'j1 drain').every((o) => `${o.name} ${o.detail}`.toLocaleLowerCase('tr-TR').includes('drain'))).toBe(true);
+    expect(filterOptions(options, 'yok-böyle-bir-şey')).toEqual([]);
+  });
+
+  it('transistörün büyüklükleri ölçü aletleriyle tutarlı: J1 · ID = A1, J1 · VDS = V1, J1 · VGS = 0 (V_GG = 0)', () => {
+    const { conn, idOf } = setup('jfet-karakteristik');
+    const sim = new CircuitSimulator(conn.netlist);
+    expect(sim.runUntil(0.05).ok).toBe(true);
+    const value = (q: Quantity) => traceValue(sim, q);
+    const id = value({ kind: 'terminal', part: idOf('J1'), quantity: 'id' });
+    const vds = value({ kind: 'terminal', part: idOf('J1'), quantity: 'vds' });
+    expect(id).toBeGreaterThan(1e-3);
+    expect(vds).toBeGreaterThan(5);
+    expect(value({ kind: 'terminal', part: idOf('J1'), quantity: 'vgs' })).toBeCloseTo(0, 6);
+    expect(Math.abs(value({ kind: 'meter', part: idOf('A1') }))).toBeCloseTo(id, 6);
+    expect(Math.abs(value({ kind: 'meter', part: idOf('V1') }))).toBeCloseTo(vds, 3);
+    // Direncin gücü = uçları arası gerilim × akım.
+    const rd = idOf('RD');
+    expect(value({ kind: 'power', part: rd })).toBeCloseTo(value({ kind: 'across', part: rd }) * value({ kind: 'current', part: rd }), 9);
+  });
+
+  it('öneriler devredeki parçalara göre, en çok üç', () => {
+    const keys = (id: Parameters<typeof exampleDoc>[0]) => suggestions(exampleDoc(id)!).map((s) => s.key);
+    expect(keys('fet-yukseltec')).toEqual(['wave', 'gain', 'family']);
+    expect(keys('jfet-karakteristik')).toEqual(['family', 'meters']);
+    expect(suggestions(exampleDoc('jfet-karakteristik')!).find((s) => s.key === 'meters')?.title).toBe('A1 ve V1 zamanla');
+    expect(keys('diyot-karakteristigi')).toEqual(['wave', 'iv']);
+    expect(suggestions(exampleDoc('diyot-karakteristigi')!).find((s) => s.key === 'iv')?.title).toBe('D1’in I–V eğrisi');
+    for (const id of ['fet-yukseltec', 'bjt-yukseltec', 'rc-dolma', 'led-on-direnc'] as const) expect(suggestions(exampleDoc(id)!).length).toBeLessThanOrEqual(3);
   });
 });

@@ -12,7 +12,7 @@ import { traceColor } from './traces';
 export interface ChartTrace {
   readonly id: string;
   readonly name: string;
-  readonly unit: 'V' | 'A';
+  readonly unit: 'V' | 'A' | 'W';
   readonly color: number;
 }
 

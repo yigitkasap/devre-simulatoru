@@ -97,13 +97,16 @@ export async function saveFile(name: string, blob: Blob, share = false): Promise
  * yazılır (resim dosyası CSS bilmez), zemin panel rengi.
  */
 export async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob | null> {
-  const root = getComputedStyle(document.documentElement);
+  return svgsToPng([svg], scale);
+}
+
+/** SVG'yi tema belirteçleri yerine konmuş bir resme çevirir. */
+async function svgImage(svg: SVGSVGElement, root: CSSStyleDeclaration): Promise<{ img: HTMLImageElement; width: number; height: number } | null> {
   const clone = svg.cloneNode(true) as SVGSVGElement;
   const { width, height } = svg.getBoundingClientRect();
   clone.setAttribute('width', String(width));
   clone.setAttribute('height', String(height));
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  const bg = root.getPropertyValue('--color-panel').trim() || '#ffffff';
   const markup = new XMLSerializer()
     .serializeToString(clone)
     // Yazı tipi adları çift tırnaklı: öznitelik içinde tek tırnağa çevrilir (yoksa XML bozulur).
@@ -115,14 +118,29 @@ export async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob | nu
   } catch {
     return null;
   }
+  return { img, width, height };
+}
+
+/** Birden çok grafik (Bode'da kazanç ve faz) alt alta tek PNG'de; zemin panel rengi. */
+export async function svgsToPng(svgs: readonly SVGSVGElement[], scale = 2): Promise<Blob | null> {
+  const root = getComputedStyle(document.documentElement);
+  const images = await Promise.all(svgs.map((s) => svgImage(s, root)));
+  if (images.length === 0 || images.some((i) => i === null)) return null;
+  const parts = images as { img: HTMLImageElement; width: number; height: number }[];
+  const width = Math.max(...parts.map((p) => p.width));
+  const height = parts.reduce((h, p) => h + p.height, 0);
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(width * scale);
   canvas.height = Math.round(height * scale);
   const g = canvas.getContext('2d');
   if (!g) return null;
-  g.fillStyle = bg;
+  g.fillStyle = root.getPropertyValue('--color-panel').trim() || '#ffffff';
   g.fillRect(0, 0, canvas.width, canvas.height);
-  g.drawImage(img, 0, 0, canvas.width, canvas.height);
+  let y = 0;
+  for (const p of parts) {
+    g.drawImage(p.img, 0, Math.round(y * scale), Math.round(p.width * scale), Math.round(p.height * scale));
+    y += p.height;
+  }
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 

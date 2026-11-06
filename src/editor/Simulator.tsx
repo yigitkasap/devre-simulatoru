@@ -849,7 +849,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       }}
       onBode={() => {
         analysis.setOpen(true);
-        analysis.setTab('bode');
+        analysis.openGraph({ kind: 'bode' });
       }}
       onPlay={play}
       onSubmit={submitTask}
@@ -2536,7 +2536,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               frame={sim.frame}
               notify={notify}
               title={circuitTitle}
-              height={drawerExpanded ? drawerMax : Math.min(!drawerSized && (analysis.tab === 'curve' || analysis.tab === 'bode') ? Math.max(TALL_DRAWER, drawerHeight) : drawerHeight, drawerMax)}
+              height={drawerExpanded ? drawerMax : Math.min(!drawerSized && (analysis.view === 'curve' || analysis.view === 'bode') ? Math.max(TALL_DRAWER, drawerHeight) : drawerHeight, drawerMax)}
               maxHeight={drawerMax}
               onHeight={(h) => {
                 setDrawerExpanded(false);

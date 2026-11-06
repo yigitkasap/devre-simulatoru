@@ -4,16 +4,46 @@
 // ortalamalarını (kablo renkleri, LED parlaklığı) son parçaya indirirdi: orada karede bir örnek alınır.
 
 import { mergeStats, type AdvanceResult, type CircuitSimulator, type KeyStats } from '../../sim';
-import type { TraceDef } from '../../model/analysis';
+import type { Quantity, TraceDef } from '../../model/analysis';
+import { pinKey } from '../../model/connectivity';
 
-/** Bir izin şu anki değeri (V ya da A); hesaplanamıyorsa NaN. */
-export function traceValue(sim: Pick<CircuitSimulator, 'measure' | 'voltageAt'>, trace: TraceDef): number {
-  if (trace.kind === 'current') return sim.measure(trace.part)?.current ?? Number.NaN;
-  const a = sim.voltageAt(trace.node);
-  if (a === null) return Number.NaN;
-  if (trace.ref === null) return a;
-  const b = sim.voltageAt(trace.ref);
-  return b === null ? Number.NaN : a - b;
+/** İki düğüm arasındaki gerilim; biri yoksa NaN. */
+function between(sim: Pick<CircuitSimulator, 'voltageAt'>, a: string, b: string | null): number {
+  const va = sim.voltageAt(a);
+  if (va === null) return Number.NaN;
+  if (b === null) return va;
+  const vb = sim.voltageAt(b);
+  return vb === null ? Number.NaN : va - vb;
+}
+
+/** Bir izin (büyüklüğün) şu anki değeri (V, A ya da W); hesaplanamıyorsa NaN. */
+export function traceValue(sim: Pick<CircuitSimulator, 'measure' | 'voltageAt' | 'device' | 'pinCurrents'>, trace: Quantity): number {
+  switch (trace.kind) {
+    case 'current':
+      return sim.measure(trace.part)?.current ?? Number.NaN;
+    case 'voltage':
+      return between(sim, trace.node, trace.ref);
+    case 'meter': {
+      const m = sim.measure(trace.part);
+      if (!m) return Number.NaN;
+      return sim.device(trace.part)?.type === 'ammeter' ? m.current : m.voltage;
+    }
+    case 'across':
+      return sim.measure(trace.part)?.voltage ?? Number.NaN;
+    case 'power':
+      return sim.measure(trace.part)?.power ?? Number.NaN;
+    case 'scope':
+      return between(sim, pinKey(trace.part, trace.channel), pinKey(trace.part, 2));
+    case 'terminal': {
+      // Uç sırası: BJT kollektör, baz, emetör; FET drain, gate, source (akımlar uca giren).
+      const pin = (n: number) => pinKey(trace.part, n);
+      if (trace.quantity === 'vbe' || trace.quantity === 'vgs') return between(sim, pin(1), pin(2));
+      if (trace.quantity === 'vce' || trace.quantity === 'vds') return between(sim, pin(0), pin(2));
+      const currents = sim.pinCurrents(trace.part);
+      if (!currents) return Number.NaN;
+      return (trace.quantity === 'ib' ? currents[1] : currents[0]) ?? Number.NaN;
+    }
+  }
 }
 
 /** 1-2-5 dizisinde x'e en yakın (altındaki) değer. */
@@ -102,7 +132,7 @@ export class TraceRecorder {
   }
 
   /** Şu anki değerleri kaydeder. */
-  sample(sim: Pick<CircuitSimulator, 'measure' | 'voltageAt' | 'time'>): void {
+  sample(sim: Pick<CircuitSimulator, 'measure' | 'voltageAt' | 'device' | 'pinCurrents' | 'time'>): void {
     if (this.count >= MAX_SAMPLES) this.decimate();
     if (this.count >= this.times.length) this.grow();
     const i = this.count++;

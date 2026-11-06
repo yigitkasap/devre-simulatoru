@@ -3,7 +3,7 @@
 // uçlu parça varsa onun adı, yoksa ilk parçanın adı ve ucu.
 
 import { tr } from '../../i18n/tr';
-import type { TraceDef } from '../../model/analysis';
+import type { Quantity, TerminalQuantity, TraceDef } from '../../model/analysis';
 import type { Connectivity } from '../../model/connectivity';
 import type { CircuitDoc, Part } from '../../model/types';
 
@@ -64,13 +64,13 @@ export function netIndex(doc: CircuitDoc, conn: Connectivity): NetIndex {
 
 /** Düğüme ad verecek parçanın önceliği: yarı iletken ve entegre uçları, sonra öbürleri, en son ölçü aletleri ve kaynaklar. */
 const RANK: Partial<Record<Part['type'], number>> = { npn: 0, pnp: 0, njfet: 0, pjfet: 0, nmos: 0, pmos: 0, opamp: 0, timer555: 0, ic7400: 0, ic7402: 0, ic7404: 0, ic7408: 0, ic7432: 0, ic7486: 0, ic7474: 0, cd4017: 0, cd4511: 0, oscilloscope: 2, voltmeter: 2, ammeter: 2, funcgen: 2, dcsupply: 2, acsource: 2, battery: 2 };
-const byLabel = (a: { part: Part }, b: { part: Part }) => (RANK[a.part.type] ?? 1) - (RANK[b.part.type] ?? 1) || a.part.label.localeCompare(b.part.label, 'tr', { numeric: true });
+export const byLabel = (a: { part: Part }, b: { part: Part }) => (RANK[a.part.type] ?? 1) - (RANK[b.part.type] ?? 1) || a.part.label.localeCompare(b.part.label, 'tr', { numeric: true });
 
 /** Ad verirken önce gelen kaynaklar ve yarı iletkenler (entegreler dahil). */
 const SOURCES: ReadonlySet<string> = new Set(['battery', 'dcsupply', 'acsource', 'funcgen']);
 const ACTIVE: ReadonlySet<string> = new Set(['npn', 'pnp', 'njfet', 'pjfet', 'nmos', 'pmos', 'opamp', 'timer555', 'ic7400', 'ic7402', 'ic7404', 'ic7408', 'ic7432', 'ic7486', 'ic7474', 'cd4017', 'cd4511']);
 
-function pinName(p: { part: Part; pin: number }, idx: NetIndex): string {
+export function pinName(p: { part: Part; pin: number }, idx: NetIndex): string {
   let short = tr.devices.pinShort[p.part.type]?.[p.pin];
   // İki çıkışlı güç kaynağının yalnız 1. çıkışı kullanılıyorsa "PS1 +" ("PS1 1+" değil).
   if (p.part.type === 'dcsupply' && p.pin < 2 && short && !outputUsed(p.part, 2, idx)) short = short.slice(1);
@@ -119,19 +119,47 @@ function pinCount(part: Part, idx: NetIndex): number {
 }
 
 export interface TraceLabel {
-  /** Kısa ad: V(C1), I(R1), V(C1, R1 1). */
+  /** Kısa ad: V(C1), I(R1), V(C1, R1 1); analiz v2'de "R1 · P", "J1 · VGS", "OSC1 · A", "V1". */
   readonly name: string;
   /** Açıklama: "C1 gerilimi", "R1 akımı". */
   readonly detail: string;
-  readonly unit: 'V' | 'A';
+  readonly unit: 'V' | 'A' | 'W';
 }
 
-export function traceLabel(trace: TraceDef, doc: CircuitDoc, idx: NetIndex): TraceLabel {
+/** Transistör büyüklüğünün adı (kısa) ve birimi. */
+export const TERMINAL_NAMES: Record<TerminalQuantity, { readonly name: string; readonly unit: 'V' | 'A' }> = {
+  vbe: { name: 'VBE', unit: 'V' },
+  vce: { name: 'VCE', unit: 'V' },
+  ic: { name: 'IC', unit: 'A' },
+  ib: { name: 'IB', unit: 'A' },
+  vgs: { name: 'VGS', unit: 'V' },
+  vds: { name: 'VDS', unit: 'V' },
+  id: { name: 'ID', unit: 'A' },
+};
+
+export function traceLabel(trace: Quantity | TraceDef, doc: CircuitDoc, idx: NetIndex): TraceLabel {
   const t = tr.analysis.trace;
-  if (trace.kind === 'current') {
+  if (trace.kind !== 'voltage') {
     const part = doc.parts.find((p) => p.id === trace.part);
     const label = part?.label ?? '?';
-    return { name: `I(${label})`, detail: t.current(label), unit: 'A' };
+    switch (trace.kind) {
+      case 'current':
+        return { name: `I(${label})`, detail: t.current(label), unit: 'A' };
+      case 'meter':
+        return part?.type === 'ammeter' ? { name: label, detail: t.ammeter(label), unit: 'A' } : { name: label, detail: t.voltmeter(label), unit: 'V' };
+      case 'across':
+        return { name: `${label} · V`, detail: t.across(label), unit: 'V' };
+      case 'power':
+        return { name: `${label} · P`, detail: t.power(label), unit: 'W' };
+      case 'scope': {
+        const ch = trace.channel === 0 ? 'A' : 'B';
+        return { name: `${label} · ${ch}`, detail: t.scope(label, ch), unit: 'V' };
+      }
+      case 'terminal': {
+        const q = TERMINAL_NAMES[trace.quantity];
+        return { name: `${label} · ${q.name}`, detail: t.terminal(label, q.name), unit: q.unit };
+      }
+    }
   }
   const a = nodeName(trace.node, idx);
   if (trace.ref === null) return { name: `V(${a})`, detail: t.voltage(a), unit: 'V' };
@@ -141,7 +169,7 @@ export function traceLabel(trace: TraceDef, doc: CircuitDoc, idx: NetIndex): Tra
 
 /** Belgede artık olmayan parça ya da düğüme bağlı izler atılır. */
 export function liveTraces(traces: readonly TraceDef[], doc: CircuitDoc, idx: NetIndex): TraceDef[] {
-  return traces.filter((t) => (t.kind === 'current' ? doc.parts.some((p) => p.id === t.part) : idx.netOf(t.node) !== undefined && (t.ref === null || idx.netOf(t.ref) !== undefined)));
+  return traces.filter((t) => (t.kind !== 'voltage' ? doc.parts.some((p) => p.id === t.part) : idx.netOf(t.node) !== undefined && (t.ref === null || idx.netOf(t.ref) !== undefined)));
 }
 
 /** İzin şemadaki rengi (tema belirteci). */

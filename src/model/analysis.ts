@@ -7,10 +7,17 @@ import type { Point } from './types';
 /** İz rengi: tema belirteçleri --color-tr-1 … --color-tr-6. */
 export const TRACE_COLORS = 6;
 
+/** Transistörün büyüklükleri (analiz v2, büyüklük seçici): BJT'de V_BE, V_CE, I_C, I_B; FET'te V_GS, V_DS, I_D. */
+export const TERMINAL_QUANTITIES = ['vbe', 'vce', 'ic', 'ib', 'vgs', 'vds', 'id'] as const;
+export type TerminalQuantity = (typeof TERMINAL_QUANTITIES)[number];
+
 /**
  * Grafikte kaydedilen bir büyüklük: parçanın akımı (pin 0'dan pin 1'e) ya da bir düğümün gerilimi
  * (toprağa göre; ref verilmişse iki düğüm arasındaki fark). Düğüm anahtarları bağlantı modelinin
- * anahtarlarıdır (pinKey, wireKey); `at` şemadaki etiketin yeri (ızgara noktası).
+ * anahtarlarıdır (pinKey, wireKey); `at` şemadaki etiketin yeri (ızgara noktası). Analiz v2'de ayrıca:
+ * ölçü aletinin okuması (voltmetrede uçları arası gerilim, ampermetrede akım), osiloskop kanalı (kanal
+ * ucu ile COM arası), parçanın uçları arası gerilimi (pin 0 − pin 1) ve gücü (uçları arası gerilim ×
+ * akım), transistörün büyüklükleri.
  */
 export type TraceDef =
   | { readonly id: string; readonly color: number; readonly kind: 'current'; readonly part: string }
@@ -22,7 +29,15 @@ export type TraceDef =
       readonly at: Point;
       readonly ref: string | null;
       readonly refAt: Point | null;
-    };
+    }
+  | { readonly id: string; readonly color: number; readonly kind: 'meter'; readonly part: string }
+  | { readonly id: string; readonly color: number; readonly kind: 'across'; readonly part: string }
+  | { readonly id: string; readonly color: number; readonly kind: 'scope'; readonly part: string; readonly channel: 0 | 1 }
+  | { readonly id: string; readonly color: number; readonly kind: 'power'; readonly part: string }
+  | { readonly id: string; readonly color: number; readonly kind: 'terminal'; readonly part: string; readonly quantity: TerminalQuantity };
+
+/** Rengi ve kimliği olmayan büyüklük (seçicide, tarama eksenlerinde). */
+export type Quantity = TraceDef extends infer T ? (T extends unknown ? Omit<T, 'id' | 'color'> : never) : never;
 
 /** Ölçüm tablosunun bir satırı (N2). Teorik ve laboratuvar değerleri öğrencinin yazdığı metin. */
 export interface TableRow {
@@ -114,6 +129,10 @@ function parseTrace(raw: unknown): TraceDef | null {
     const ref = typeof raw.ref === 'string' ? raw.ref : null;
     return { id: raw.id, color, kind: 'voltage', node: raw.node, at, ref, refAt: ref ? point(raw.refAt) : null };
   }
+  if (typeof raw.part !== 'string') return null;
+  if (raw.kind === 'meter' || raw.kind === 'power' || raw.kind === 'across') return { id: raw.id, color, kind: raw.kind, part: raw.part };
+  if (raw.kind === 'scope' && (raw.channel === 0 || raw.channel === 1)) return { id: raw.id, color, kind: 'scope', part: raw.part, channel: raw.channel };
+  if (raw.kind === 'terminal' && TERMINAL_QUANTITIES.includes(raw.quantity as TerminalQuantity)) return { id: raw.id, color, kind: 'terminal', part: raw.part, quantity: raw.quantity as TerminalQuantity };
   return null;
 }
 
@@ -173,11 +192,7 @@ export function parseAnalysis(value: unknown): AnalysisDoc {
 export function serializeAnalysis(a: AnalysisDoc): Record<string, unknown> | undefined {
   if (a.traces.length === 0 && a.rows.length === 0 && !a.labColumn && a.fit === null && a.graphs.length === 0) return undefined;
   return {
-    traces: a.traces.map((t) =>
-      t.kind === 'current'
-        ? { ...t }
-        : { ...t, at: [t.at.x, t.at.y], refAt: t.refAt ? [t.refAt.x, t.refAt.y] : null },
-    ),
+    traces: a.traces.map((t) => (t.kind === 'voltage' ? { ...t, at: [t.at.x, t.at.y], refAt: t.refAt ? [t.refAt.x, t.refAt.y] : null } : { ...t })),
     rows: a.rows.map((r) => ({ ...r })),
     labColumn: a.labColumn,
     fit: a.fit,

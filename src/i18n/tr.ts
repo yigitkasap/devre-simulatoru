@@ -288,6 +288,17 @@ const PIN_TAGS: Record<DeviceType, readonly string[]> = {
 };
 
 /** Uçların yalın adları ("Başlangıç: R1 · 2. uç"). */
+/** Transistör büyüklüklerinin açıklaması (analiz v2, büyüklük seçici). */
+const TERMINAL_DETAIL: Readonly<Record<string, string>> = {
+  VBE: 'baz–emetör gerilimi',
+  VCE: 'kollektör–emetör gerilimi',
+  IC: 'kollektör akımı',
+  IB: 'baz akımı',
+  VGS: 'kapı–source gerilimi',
+  VDS: 'drain–source gerilimi',
+  ID: 'drain akımı',
+};
+
 const PIN_SHORT: Record<DeviceType, readonly string[]> = {
   battery: ['+ uç', '− uç'],
   acsource: ['+ uç', '− uç'],
@@ -4141,10 +4152,67 @@ export const tr = {
     close: 'Analizi kapat',
     play: 'Oynat (kaydı başlat)',
     pause: 'Duraklat',
+    // Analiz v2: grafik çipleri, başlangıç ekranı, ölçüm tablosu paneli, büyüklük seçici.
+    newGraph: 'Yeni grafik',
+    chipsLabel: 'Grafikler',
+    chipClose: (name: string) => `${name} grafiğini kapat`,
+    foyPrefix: 'FÖY',
+    tableButton: 'Ölçüm tablosu',
+    tableClose: 'Ölçüm tablosunu kapat',
+    graphName: {
+      time: 'Zaman grafiği',
+      bode: 'Bode',
+      curve: (part: string) => `${part} karakteristiği`,
+      curveEmpty: 'Eğri izleyici',
+    },
+    start: {
+      title: 'Ne çizmek istiyorsun?',
+      foy: (experiment: number, figure: string) => `Föydeki grafikler · Deney ${experiment} · ${figure}`,
+      suggest: 'Bu devre için',
+      custom: 'Kendin kur',
+      cards: {
+        time: { title: 'Zamana göre', text: 'Dalga, dolma-boşalma; X-Y de olur' },
+        sweep: { title: 'Bir değeri tarayarak', text: 'Bir kaynağı ya da direnci adım adım değiştir', badge: 'Yeni' },
+        bode: { title: 'Frekansa göre (Bode)', text: 'Kazancın ve fazın frekansla değişimi' },
+        curve: { title: 'Parçanın karakteristiği', text: 'Eğri izleyici: I–V, çıkış ailesi' },
+      },
+      suggestions: {
+        wave: 'Giriş ve çıkış dalgası',
+        waveDetail: (scope: string) => `${scope} · A ve ${scope} · B zamana göre`,
+        gain: 'Kazancın frekansla değişimi',
+        gainDetail: (generator: string) => `Bode: ${generator} girişten çıkışa`,
+        /** Ad ekiyle gelir: "D1’in I–V eğrisi". */
+        iv: (part: string) => `${part} I–V eğrisi`,
+        family: (part: string) => `${part} çıkış ailesi`,
+        curveDetail: 'Eğri izleyici: parça devreden ayrı taranır',
+        meters: (labels: readonly string[]) => `${labels.join(' ve ')} zamanla`,
+        metersDetail: 'Ölçü aletlerinin okuması zamana göre',
+      },
+      timeTitle: 'Zamana göre: çizilecek büyüklükleri seç',
+      draw: (n: number) => (n === 0 ? 'Grafiği çiz' : `Grafiği çiz (${n})`),
+      back: 'Geri',
+      curveTitle: 'Hangi parçanın karakteristiği?',
+      curveNone: 'Devrede diyot, zener, LED ya da transistör yok.',
+    },
+    picker: {
+      search: 'Büyüklük ara',
+      groups: { meters: 'Ölçü aletleri', parts: 'Parçalar', nodes: 'Düğümler' },
+      none: 'Aramaya uyan büyüklük yok.',
+      fromSchematic: 'Şemadan seç',
+      nodeDetail: (name: string) => `${name} düğümünün gerilimi (toprağa göre)`,
+      title: 'Büyüklük ekle',
+      inGraph: 'grafikte',
+    },
     trace: {
       current: (part: string) => `${part} akımı`,
       voltage: (node: string) => `${node} gerilimi`,
       difference: (a: string, b: string) => `${a} ile ${b} arası gerilim`,
+      voltmeter: (part: string) => `${part} voltmetresinin okuduğu gerilim`,
+      ammeter: (part: string) => `${part} ampermetresinin okuduğu akım`,
+      across: (part: string) => `${part} uçları arası gerilim`,
+      power: (part: string) => `${part} gücü`,
+      scope: (part: string, ch: string) => `${part} ${ch} kanalı (COM’a göre)`,
+      terminal: (part: string, q: string) => `${part} ${TERMINAL_DETAIL[q] ?? q}`,
     },
     graph: {
       traces: 'İZLER',
