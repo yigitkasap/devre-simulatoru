@@ -2,7 +2,7 @@
 // markanın panelini kopyalamaz. Türkçe ad önde; laboratuvarda görülecek panel yazısı yanında küçük
 // mono (VOLTS/DIV). Döner düğme çizilmez: kademeli ayar (− değer +), tekerlek ve ↑/↓ tuşları.
 
-import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { tr } from '../i18n/tr';
 
 /** Kilitli parçanın kartı (görev): içindeki kademeli ayarlar (− değer +) devre dışı. */
@@ -311,16 +311,15 @@ export function Jack({
   earthed?: boolean;
   onClick: () => void;
 }) {
-  const id = useId();
+  // Ad yalnızca `label` ("FG1 COM ucunu tuvalde göster"): görünen uç adı ("COM") onun içinde, eklenince iki kez okunurdu.
   return (
-    <button type="button" onClick={onClick} aria-labelledby={id} title={label} className="flex flex-col items-center gap-0.5 rounded-md p-0.5 hover:bg-panel/50">
+    <button type="button" onClick={onClick} aria-label={earthed ? `${label} (${tr.rack.jackEarthed})` : label} title={label} className="flex flex-col items-center gap-0.5 rounded-md p-0.5 hover:bg-panel/50">
       <svg width="30" height="30" viewBox="0 0 44 44" aria-hidden="true">
         <circle cx="22" cy="22" r="18" fill={color} stroke={ring ? 'var(--color-earth)' : 'none'} strokeWidth={ring ? 2.5 : 0} />
         <circle cx="22" cy="22" r="8" fill="#0f1713" />
         <circle cx="22" cy="22" r="4" fill="#9aa3ad" />
       </svg>
-      <span id={id} className={`font-mono text-[10px] font-semibold ${earthed ? 'text-earth' : 'text-ink'}`}>
-        <span className="sr-only">{label}: </span>
+      <span aria-hidden="true" className={`font-mono text-[10px] font-semibold ${earthed ? 'text-earth' : 'text-ink'}`}>
         {name}
         {earthed && ' ⏚'}
       </span>

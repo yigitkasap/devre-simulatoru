@@ -4256,6 +4256,34 @@ try {
     }
   }
 
+  // --- Cihaz kartları: yazılarda tekrar yok ------------------------------------------------------
+  // Fonksiyon üretecinin Genlik satırı "AMPL · tepe-tepe, açık devre" ("tepe-tepe" iki kez değil); uç
+  // düğmelerinin adı "FG1 COM ucunu tuvalde göster" (görünen uç adı ada ikinci kez eklenmez).
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const nb = notebook(page);
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'BF245A ile ortak kaynaklı yükselteç (kazanç 10)', exact: true }))).click(); await page.waitForTimeout(500);
+    const jackNames = [];
+    let amplitude = '';
+    for (const id of ['FG1', 'OSC1', 'PS1']) {
+      await nb.getByRole('button', { name: new RegExp(`^${id} ·`) }).first().click(); await page.waitForTimeout(300);
+      const card = nb.getByRole('region', { name: new RegExp(`^${id} ·`) });
+      if (id === 'OSC1') await card.getByRole('button', { name: /^Gelişmiş/ }).click();
+      if (id === 'FG1') amplitude = await card.locator('span', { has: page.locator('small', { hasText: 'AMPL' }) }).last().evaluate((el) => [...el.childNodes].map((n) => n.textContent.trim()).filter(Boolean).join(' '));
+      jackNames.push(...(await card.getByRole('button', { name: /ucunu tuvalde göster/ }).evaluateAll((els) => els.map((e) => (e.getAttribute('aria-label') ?? document.getElementById(e.getAttribute('aria-labelledby') ?? '')?.textContent ?? '').trim()))));
+    }
+    // Uç adı ("COM") adın sonunda ikinci kez: "FG1 COM ucunu tuvalde göster: COM ⏚".
+    const repeated = jackNames.filter((n) => { const m = n.match(/^\S+ (.+?) ucunu tuvalde göster: (.+?)( ⏚)?$/); return m !== null && m[1] === m[2]; });
+    check('cihaz kartları: Genlik satırı "Genlik AMPL · tepe-tepe, açık devre"; uç düğmelerinin adında uç adı bir kez (FG1, OSC1, PS1)',
+      amplitude === 'Genlik AMPL · tepe-tepe, açık devre' && jackNames.length === 10 && repeated.length === 0, `"${amplitude}" · ${jackNames.length} uç · ${repeated.join(' | ') || 'tekrar yok'}`);
+    await ctx.close();
+  }
+
   // --- Tam ekran (masaüstü, tablet): tarayıcı tam ekranı, yalnızca devre şeması -------------
   {
     const fsCtx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
