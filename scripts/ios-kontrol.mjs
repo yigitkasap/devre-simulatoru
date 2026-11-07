@@ -2213,6 +2213,37 @@ try {
       await ctx.close();
     }
     {
+      // Şebeke toprağı işareti (FG1, OSC1): sade çizimde siyah; o anki değerlerle (ve ekranda) yeşil.
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+      await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+      await (await pickExample(page, (p) => p.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }))).click(); await page.waitForTimeout(500);
+      await page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+      const screenGreen = await page.locator('svg.schematic g[stroke="var(--color-earth)"]').count();
+      await page.keyboard.press('Control+p');
+      const dlg = dialogOf(page);
+      await ready(dlg);
+      const plain = readFileSync((await download(page, () => dlg.getByRole('button', { name: 'SVG indir' }).click())).path, 'utf8');
+      await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+      await page.locator('header').getByRole('button', { name: 'Oynat', exact: true }).click();
+      await page.waitForTimeout(1200);
+      await page.keyboard.press('Control+p');
+      const dlg2 = dialogOf(page);
+      await ready(dlg2);
+      await dlg2.getByRole('checkbox', { name: /O anki değerlerle/ }).click();
+      await page.waitForTimeout(300); await ready(dlg2);
+      const live = readFileSync((await download(page, () => dlg2.getByRole('button', { name: 'SVG indir' }).click())).path, 'utf8');
+      const green = (svg) => (svg.match(/<g stroke="#1b7d44"/g) ?? []).length;
+      check('şemayı indir (şebeke toprağı işareti): ekranda yeşil; sade çizimde siyah (FG1 ve OSC1’de yeşil yok), o anki değerlerle yeşil kalıyor',
+        screenGreen === 2 && green(plain) === 0 && green(live) === 2, `ekran ${screenGreen} · sade ${green(plain)} · o anki ${green(live)}`);
+      await page.keyboard.press('Escape');
+      await ctx.close();
+    }
+    {
       // Koyu tema: ekran koyu kalır; şemanın ve Analiz grafiğinin PNG'si açık renkli, beyaz zeminli.
       const { ctx, page } = await desktop('dark');
       const screenDark = await page.evaluate(() => document.documentElement.dataset.theme);
