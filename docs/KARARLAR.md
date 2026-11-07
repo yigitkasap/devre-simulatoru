@@ -951,6 +951,20 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   pinler ve kablo uçları küçük halkayla gösterilir.
 - **Kablo çekme:** Pinden pine tıklanır; araya yatay/dikey (L biçimli) yol otomatik çizilir.
   Kablo aracında (W) boş bir noktadan ya da bir kablonun üzerinden de başlanabilir.
+- **Kablo yolu (masaüstü, 2026-11-07):** Yol engellerden kaçar (`src/model/route.ts`): parça gövdesinden,
+  yazısından ve ölçü aletinin ekranından geçmez; başka kablonun üstünden boyuna geçmez; bir ucun ya da
+  kablo köşesinin üstünden geçmez; köşesi bir uca, kablo köşesine ya da kablonun üstüne düşmez (dik
+  kesişme serbest). Adaylar: düz, iki L, Z ve U (en çok 10 birim dışarıdan); temiz aday yoksa ızgarada
+  köşe cezalı en kısa yol (A*). Kullanıcı testinde L yolunun köşesi kablolara ve uçlara düşüp devreyi
+  fark ettirmeden değiştiriyordu (multimetre LED yerine pilin − ucunu ölçtü, fonksiyon üretecinin OUT'u
+  COM'a kısa devre oldu). Telefondaki iki seçenekli yol (routeAround) değişmedi.
+- **Beklenmeyen bağlantı:** Kablo bitince, bırakılan iki uçtaki ağlar dışında kabloyla birleşen bir ağ
+  varsa (`src/model/wireCheck.ts`) kırmızı bildirim ("Kablo, bıraktığın iki uçtan başka şuna da bağlandı:
+  R2 2. uç") ve Geri al; o uç ve kablo 5 s yanıp söner (telefonda ve tablette de). Bir uca bırakılan
+  kablonun o ucun üstünden geçen kabloyla kurduğu T bağlantısı da beklenmeyendir.
+- **Tıklayarak yol çiz:** Çekme bir uçta bitmeyince (ya da uca tıklanıp sürüklenmeyince) sol altta
+  vurgulu şerit: "Tıklayarak yol çiz · her tıklama bir köşe koyar…"; konan köşeler noktayla gösterilir.
+  Kablo çekerken bütün parça uçları kabloların ve önizlemenin üstünde halkayla görünür.
 - **Yerleştirme:** Kütüphaneden seçilen parça bir kez yerleştirilir ve seçme aracına
   dönülür; Shift + tıklama ile art arda yerleştirilir.
 - **Taşıma:** Parçaya bağlı kablolar esner; esneyen kablo parçasına T ile bağlı kablolar da

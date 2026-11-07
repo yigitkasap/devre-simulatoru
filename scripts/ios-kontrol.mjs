@@ -5284,6 +5284,224 @@ try {
     check('baraj (masaüstü): ⋯ → "Simülatörde aç" devreyi o anki seviyeyle simülatörde açıyor', tankPart !== undefined && Math.abs(tankPart.props.level - 50) < 1 && opened.parts.filter((q) => q.type === 'led').length === 3, `${opened?.parts.length ?? 0} parça, %${tankPart?.props.level}`);
     await bCtx.close();
   }
+
+  // --- Kablo yolu (masaüstü): sıfırdan kurulan devrelerde beklenmeyen bağlantı yok -----------------------
+  // Kullanıcı testinde L biçimli yolun köşesi başka bir kablonun köşesine ya da bir uca düşmüş, kablo başka
+  // bir kablonun ucunun üstünden geçmişti: multimetre LED yerine pilin − ucunu ölçtü, fonksiyon üretecinin
+  // OUT'u COM'a kısa devre oldu. Parçalar Parça ekle kutusundan eklenip fareyle yerine taşınır (gerekirse
+  // R ile döndürülür), kablolar uçtan uca sürüklenir; sonunda ağlar beklenenle aynı olmalı ve "beklenmeyen
+  // bağlantı" bildirimi çıkmamalı. Eski yol (routeL) bu yerleşimlerde iki devrede de kısa devre kuruyordu.
+  {
+    // Parça uçlarının yerleri (katalogdaki gibi, ızgara birimi) ve döndürme (saat yönünde: (x, y) ↦ (−y, x)).
+    const PINS = {
+      battery: [[-4, 0], [4, 0]], resistor: [[-4, 0], [4, 0]], led: [[-4, 0], [4, 0]], multimeter: [[-4, 0], [4, 0]],
+      diode: [[-4, 0], [4, 0]], ground: [[0, 0]], funcgen: [[5, -2], [5, 0], [5, 2]], oscilloscope: [[-5, -2], [-5, 0], [-5, 2]],
+    };
+    const rot = ([x, y], r) => (r === 90 ? [-y, x] : r === 180 ? [-x, -y] : r === 270 ? [y, -x] : [x, y]);
+    const pinsOf = (p) => PINS[p.type].map((o) => { const [dx, dy] = rot(o, p.rotation); return { x: p.x + dx, y: p.y + dy }; });
+    /** Belgedeki kablo noktası ([x, y]) → { x, y }. */
+    const pt = (q) => (Array.isArray(q) ? { x: q[0], y: q[1] } : q);
+    /** Belgenin ağları (connectivity.ts'in kuralları): "ETİKET:uç" gruplarının sıralı yazısı. */
+    function nets(doc) {
+      const wires = doc.wires.map((w) => ({ id: w.id, points: w.points.map(pt) }));
+      const parent = new Map();
+      const find = (k) => { if (!parent.has(k)) parent.set(k, k); let r = k; while (parent.get(r) !== r) r = parent.get(r); parent.set(k, r); return r; };
+      const union = (a, b) => parent.set(find(a), find(b));
+      const at = new Map();
+      const put = (p, k) => { const key = `${p.x},${p.y}`; if (!at.has(key)) at.set(key, []); at.get(key).push(k); };
+      for (const p of doc.parts) pinsOf(p).forEach((q, i) => { find(`${p.label}:${i}`); put(q, `${p.label}:${i}`); });
+      for (const w of wires) w.points.forEach((q) => put(q, `w:${w.id}`));
+      for (const keys of at.values()) for (const k of keys.slice(1)) union(keys[0], k);
+      const inside = (p, a, b) => (a.x === b.x ? p.x === a.x && p.y > Math.min(a.y, b.y) && p.y < Math.max(a.y, b.y) : a.y === b.y && p.y === a.y && p.x > Math.min(a.x, b.x) && p.x < Math.max(a.x, b.x));
+      for (const w of wires) for (const end of [w.points[0], w.points.at(-1)]) for (const o of wires) {
+        if (o.id !== w.id && o.points.some((q, i) => i > 0 && inside(end, o.points[i - 1], q))) union(`w:${w.id}`, `w:${o.id}`);
+      }
+      const groups = new Map();
+      for (const p of doc.parts) PINS[p.type].forEach((_, i) => { const k = `${p.label}:${i}`; const r = find(k); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(k); });
+      return [...groups.values()].map((g) => g.sort().join(' ')).sort().join(' | ');
+    }
+    const canonical = (groups) => groups.map((g) => g.slice().sort().join(' ')).sort().join(' | ');
+
+    const saved = async (page) => { await page.waitForTimeout(400); return page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre'))); };
+    const screen = (page, gx, gy) => page.evaluate(([x, y]) => {
+      const svg = document.querySelector('svg.schematic'); const g = svg.querySelector('g[transform]');
+      const m = g.getAttribute('transform').match(/translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)/); const r = svg.getBoundingClientRect();
+      return { x: r.left + Number(m[1]) + x * 10 * Number(m[3]), y: r.top + Number(m[2]) + y * 10 * Number(m[3]) };
+    }, [gx, gy]);
+    /** Tuvalin ortasındaki ızgara noktası (yerleşim buna göre). */
+    const centerGrid = (page) => page.evaluate(() => {
+      const svg = document.querySelector('svg.schematic'); const g = svg.querySelector('g[transform]');
+      const m = g.getAttribute('transform').match(/translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)/); const r = svg.getBoundingClientRect();
+      const s = Number(m[3]) * 10;
+      return { x: Math.round((r.width / 2 - Number(m[1])) / s), y: Math.round((r.height / 2 - Number(m[2])) / s) };
+    });
+    const notebook = (page) => page.getByRole('complementary', { name: /^Defter/ });
+    async function deskAdd(page) {
+      const box = notebook(page).getByRole('combobox', { name: /Parça ekle/ });
+      if ((await box.count()) === 0) { await notebook(page).getByRole('button', { name: 'Parça ekle', exact: true }).click(); await page.waitForTimeout(150); }
+      return box;
+    }
+    /** Parçayı Parça ekle kutusundan ekler, R ile döndürür ve gövdesinden sürükleyip (x, y)'ye taşır. */
+    async function addPart(page, query, option, label, x, y, rotation = 0, grab = [0, 0]) {
+      const box = await deskAdd(page);
+      await box.fill(query); await page.waitForTimeout(200);
+      await page.getByRole('option', { name: option }).first().click(); await page.waitForTimeout(300);
+      let p = (await saved(page)).parts.find((q) => q.label === label);
+      // Tuvale tıklayıp (parça seçili kalır) R ile döndür.
+      for (let k = 0; k < rotation / 90; k++) {
+        const s = await screen(page, p.x + grab[0], p.y + grab[1]);
+        await page.mouse.click(s.x, s.y); await page.waitForTimeout(100);
+        await page.keyboard.press('r'); await page.waitForTimeout(150);
+        p = (await saved(page)).parts.find((q) => q.label === label);
+      }
+      const [gx, gy] = rot(grab, p.rotation);
+      for (let attempt = 0; attempt < 3 && (p.x !== x || p.y !== y); attempt++) {
+        const a = await screen(page, p.x + gx, p.y + gy);
+        const b = await screen(page, x + gx, y + gy);
+        await page.mouse.move(a.x, a.y); await page.mouse.down();
+        await page.mouse.move(b.x, b.y, { steps: 10 }); await page.mouse.up(); await page.waitForTimeout(200);
+        p = (await saved(page)).parts.find((q) => q.label === label);
+      }
+      await page.keyboard.press('Escape');
+      return p;
+    }
+    /** Bir uçtan öbür uca fareyle sürükleyerek kablo; bildirim çıktıysa metni. */
+    async function wire(page, from, to) {
+      const a = await screen(page, from.x, from.y);
+      const b = await screen(page, to.x, to.y);
+      await page.mouse.move(a.x, a.y); await page.mouse.down();
+      await page.mouse.move(b.x, b.y, { steps: 12 }); await page.mouse.up(); await page.waitForTimeout(250);
+      const alert = page.getByRole('alert').filter({ hasText: 'bıraktığın' });
+      return (await alert.count()) > 0 ? await alert.first().textContent() : null;
+    }
+    const pin = (doc, label, i) => pinsOf(doc.parts.find((p) => p.label === label))[i];
+
+    /** Masaüstü sayfası; devre `seed` (varsayılan boş) ile açılır. */
+    async function desk(seed = { version: 1, parts: [], wires: [] }) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+      await ctx.addInitScript((d) => {
+        try {
+          localStorage.setItem('devre-simulatoru:hosgeldin', '1');
+          if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); }
+        } catch {}
+      }, JSON.stringify(seed));
+      const page = await ctx.newPage();
+      const errors = [];
+      page.on('pageerror', (e) => { errors.push(e.message); problems.push('pageerror: ' + e.message); });
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      return { ctx, page, errors };
+    }
+
+    // --- 1. LED devresi ve multimetre (kullanıcı testi) ---------------------------------------------------
+    {
+      const { ctx, page, errors } = await desk();
+      const c = await centerGrid(page);
+      const o = { x: c.x - 10, y: c.y - 4 };
+      await addPart(page, 'pil', /^Pil/, 'B1', o.x, o.y, 90);
+      await addPart(page, 'direnç', /^Direnç/, 'R1', o.x + 8, o.y - 8);
+      await addPart(page, 'led', /^LED/, 'LED1', o.x + 20, o.y, 90);
+      await addPart(page, 'toprak', /^Toprak/, 'GND1', o.x, o.y + 8, 0, [0, 1]);
+      await addPart(page, 'multimetre', /Multimetre/, 'MM1', o.x + 4, o.y + 14);
+      let d = await saved(page);
+      const placed = d.parts.map((p) => `${p.label}(${p.x - o.x},${p.y - o.y},${p.rotation})`).join(' ');
+      const steps = [
+        ['B1', 0, 'R1', 0], ['R1', 1, 'LED1', 0], ['LED1', 1, 'B1', 1], ['B1', 1, 'GND1', 0],
+        ['MM1', 0, 'LED1', 0],
+      ];
+      const alerts = [];
+      for (const [la, ia, lb, ib] of steps) {
+        d = await saved(page);
+        const t = await wire(page, pin(d, la, ia), pin(d, lb, ib));
+        if (t) alerts.push(`${la}:${ia}→${lb}:${ib}: ${t}`);
+      }
+      // Son kablo: MM1 COM'dan boşluğa sürükleyip bırak → "Tıklayarak yol çiz" kipi açıkça görünüyor, bütün
+      // parça uçları kabloların üstünde; LED1'in katoduna tıklayınca kablo biter.
+      d = await saved(page);
+      const com = pin(d, 'MM1', 1);
+      const a = await screen(page, com.x, com.y);
+      const free = await screen(page, com.x + 6, com.y + 3);
+      await page.mouse.move(a.x, a.y); await page.mouse.down();
+      await page.mouse.move(free.x, free.y, { steps: 8 });
+      const dragging = { hint: await page.getByText('Uca bırak: bağla').count(), pins: await page.locator('[data-wiring-pins] > circle').count() };
+      await page.mouse.up(); await page.waitForTimeout(200);
+      const pill = page.locator('[data-click-route]');
+      const clickMode = { pill: await pill.count(), text: ((await pill.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' '), pins: await page.locator('[data-wiring-pins] > circle').count() };
+      const totalPins = d.parts.reduce((n, p) => n + PINS[p.type].length, 0);
+      const k = pin(d, 'LED1', 1);
+      const kp = await screen(page, k.x, k.y);
+      await page.mouse.click(kp.x, kp.y); await page.waitForTimeout(300);
+      const t = page.getByRole('alert').filter({ hasText: 'bıraktığın' });
+      if (await t.count()) alerts.push(`MM1:1→LED1:1 (tıklayarak): ${await t.first().textContent()}`);
+      const pillAfter = await pill.count();
+      check('masaüstü kablo: pinden çekerken "Uca bırak: bağla" ve bütün parça uçları görünüyor; boşlukta bırakınca "Tıklayarak yol çiz" kipi (vurgulu şerit) açılıyor, uca tıklayınca kablo bitiyor ve şerit kapanıyor',
+        dragging.hint === 1 && dragging.pins === totalPins && clickMode.pill === 1 && /Tıklayarak yol çiz/.test(clickMode.text) && clickMode.pins === totalPins && pillAfter === 0,
+        `${JSON.stringify(dragging)} · ${JSON.stringify(clickMode)} · ${totalPins} uç · sonra ${pillAfter}`);
+      d = await saved(page);
+      const want = canonical([['B1:0', 'R1:0'], ['R1:1', 'LED1:0', 'MM1:0'], ['LED1:1', 'B1:1', 'GND1:0', 'MM1:1']]);
+      if (OUT) await page.screenshot({ path: `${OUT}/1-led-multimetre.png` });
+      check('sıfırdan LED devresi ve multimetre (masaüstü, fareyle): 6 kablo; ağlar beklenen gibi (multimetre LED’in uçlarında), beklenmeyen bağlantı bildirimi yok',
+        d.wires.length === 6 && nets(d) === want && alerts.length === 0, `${placed} · ${d.wires.length} kablo · ${nets(d) === want ? 'ağlar doğru' : nets(d)}${alerts.length ? ' · ' + alerts.join(' / ') : ''}${errors.length ? ' · ' + errors.join(' | ') : ''}`);
+      await ctx.close();
+    }
+
+    // --- 2. Osiloskoplu yarım dalga doğrultucu (fonksiyon üretecinin OUT–COM kısa devresi) -----------------
+    {
+      const { ctx, page, errors } = await desk();
+      const c = await centerGrid(page);
+      const o = { x: c.x - 20, y: c.y + 2 };
+      await addPart(page, 'fonksiyon', /Fonksiyon üreteci/, 'FG1', o.x, o.y);
+      await addPart(page, 'diyot', /^Diyot/, 'D1', o.x + 14, o.y - 14);
+      await addPart(page, 'direnç', /^Direnç/, 'R1', o.x + 24, o.y - 8, 90);
+      await addPart(page, 'toprak', /^Toprak/, 'GND1', o.x + 8, o.y + 8, 0, [0, 1]);
+      await addPart(page, 'osiloskop', /Osiloskop/, 'OSC1', o.x + 40, o.y - 6);
+      let d = await saved(page);
+      const placed = d.parts.map((p) => `${p.label}(${p.x - o.x},${p.y - o.y},${p.rotation})`).join(' ');
+      const steps = [
+        ['FG1', 0, 'D1', 0], ['D1', 1, 'R1', 0], ['R1', 1, 'FG1', 2], ['FG1', 2, 'GND1', 0],
+        ['OSC1', 0, 'FG1', 0], ['OSC1', 1, 'R1', 0], ['OSC1', 2, 'R1', 1],
+      ];
+      const alerts = [];
+      for (const [la, ia, lb, ib] of steps) {
+        d = await saved(page);
+        const t = await wire(page, pin(d, la, ia), pin(d, lb, ib));
+        if (t) alerts.push(`${la}:${ia}→${lb}:${ib}: ${t}`);
+      }
+      d = await saved(page);
+      const want = canonical([['FG1:0', 'D1:0', 'OSC1:0'], ['D1:1', 'R1:0', 'OSC1:1'], ['R1:1', 'FG1:2', 'GND1:0', 'OSC1:2'], ['FG1:1']]);
+      if (OUT) await page.screenshot({ path: `${OUT}/2-yarim-dalga.png` });
+      check('sıfırdan osiloskoplu yarım dalga doğrultucu (masaüstü, fareyle): 7 kablo; ağlar beklenen gibi (FG1 OUT ile COM ayrı), beklenmeyen bağlantı bildirimi yok',
+        d.wires.length === 7 && nets(d) === want && alerts.length === 0, `${placed} · ${d.wires.length} kablo · ${nets(d) === want ? 'ağlar doğru' : nets(d)}${alerts.length ? ' · ' + alerts.join(' / ') : ''}${errors.length ? ' · ' + errors.join(' | ') : ''}`);
+      await ctx.close();
+    }
+
+    // --- 3. Beklenmeyen bağlantı: uca bırakılan kablo, o ucun üstünden geçen kabloya da bağlanıyor ---------
+    {
+      // R1'in 2. ucunun üstünden geçen (ona bağlı olmayan) bir kablo: R2'nin 2. ucundan yukarı.
+      const { ctx, page, errors } = await desk({
+        version: 1,
+        parts: [
+          { id: 'p1', type: 'resistor', label: 'R1', x: 0, y: 0, rotation: 0, props: { resistance: 1000 } },
+          { id: 'p2', type: 'resistor', label: 'R2', x: 0, y: 12, rotation: 0, props: { resistance: 1000 } },
+          { id: 'p3', type: 'resistor', label: 'R3', x: 16, y: 0, rotation: 0, props: { resistance: 1000 } },
+        ],
+        wires: [{ id: 'w1', points: [[4, 12], [4, -6]] }],
+      });
+      await page.waitForTimeout(400);
+      let d = await saved(page);
+      const before = nets(d);
+      const text = await wire(page, pin(d, 'R3', 0), pin(d, 'R1', 1));
+      d = await saved(page);
+      const joined = nets(d);
+      const flashing = await page.locator('svg.schematic circle.alarm-blink').count();
+      await page.getByRole('alert').getByRole('button', { name: 'Geri al' }).click().catch(() => {});
+      await page.waitForTimeout(300);
+      d = await saved(page);
+      check('masaüstü kablo: uca bırakılan kablo, o ucun üstünden geçen kabloya da bağlanınca bildirim ("… şuna da bağlandı: R2 2. uç"), uç yanıp sönüyor; Geri al kabloyu kaldırıyor',
+        /bıraktığın iki uçtan başka şuna da bağlandı: R2 2\. uç/.test(text ?? '') && joined.includes('R1:1 R2:1 R3:0') && flashing >= 1 && d.wires.length === 1 && nets(d) === before,
+        `${text} · ${flashing} yanıp sönen · ${d.wires.length} kablo${errors.length ? ' · ' + errors.join(' | ') : ''}`);
+      await ctx.close();
+    }
+  }
 } finally {
   await browser.close();
 }
