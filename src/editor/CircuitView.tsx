@@ -8,7 +8,7 @@ import type { Connectivity } from '../model/connectivity';
 import { partBounds } from '../model/geometry';
 import { GRID, type CircuitDoc } from '../model/types';
 import { UNKNOWN_WIRE_COLOR, UNKNOWN_WIRE_DASH, voltageColor } from './colors';
-import { PartView } from './PartView';
+import { METER_DISPLAY, meterFlipped, PartView } from './PartView';
 import type { Settings } from './settings';
 import type { SimFrame } from './useSimulation';
 
@@ -96,7 +96,19 @@ export const CircuitView = memo(function CircuitView({ doc, connectivity, frame,
         ))}
         {doc.parts.map((part) => {
           const live = frame?.live.get(part.id);
-          return <PartView key={part.id} part={part} tone={selected?.includes(part.id) ? 'selected' : 'normal'} resistorStyle={settings.resistorStyle} {...(live ? { live } : {})} />;
+          // Ölçü aletinin ekranı tuvaldeki gibi: okuması (o anki değerlerle) ve başka parçaya biniyorsa öbür yanda.
+          const flip = METER_DISPLAY.has(part.type) && meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)));
+          return (
+            <PartView
+              key={part.id}
+              part={part}
+              tone={selected?.includes(part.id) ? 'selected' : 'normal'}
+              resistorStyle={settings.resistorStyle}
+              meterText={frame?.meterTexts.get(part.id) ?? null}
+              displayFlip={flip}
+              {...(live ? { live } : {})}
+            />
+          );
         })}
         {overlay}
       </svg>

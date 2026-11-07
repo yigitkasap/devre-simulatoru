@@ -96,6 +96,7 @@ import { useRecentParts } from './recentParts';
 import { autoSettings } from './scopeView';
 import { useSettings } from './settings';
 import { ShareDialog, type ShareTab } from './ShareDialog';
+import { SchematicExportDialog } from './SchematicExportDialog';
 import { EmbedBar } from './embed/EmbedBar';
 import { speedLabel } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState, type Selection } from './state';
@@ -387,6 +388,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const helpOpen = helpTab !== null;
   /** Karta aktar penceresi (3B kart: delikli plaket ve baskı devre). */
   const [kartaOpen, setKartaOpen] = useState(false);
+  /** Şemayı indir / yazdır penceresi. */
+  const [schematicOpen, setSchematicOpen] = useState(false);
   /** Karta aktar'ın açılacağı sekme (Tahtada kur → Lehim rehberine geç: delikli plaket). */
   const [kartaTab, setKartaTab] = useState<'perf' | undefined>(undefined);
   const [tour, setTour] = useState<{ step: TourStep; parts: number; wires: number } | null>(null);
@@ -1606,7 +1609,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     return () => window.clearTimeout(id);
   }, [logKey, logText, logName, meter.mode]);
 
-  const overlayOpen = share !== null || examplesOpen || modal !== null || stopAsk || kartaOpen;
+  const overlayOpen = share !== null || examplesOpen || modal !== null || stopAsk || kartaOpen || schematicOpen;
   const schematic = (
     <Canvas
       ref={canvasRef}
@@ -1618,7 +1621,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       dispatch={dispatch}
       libraryDragType={libraryDragType}
       onOpenProperties={openProperties}
-      keyboardEnabled={share === null && !examplesOpen && modal === null && !helpOpen && !welcomeOpen}
+      keyboardEnabled={share === null && !examplesOpen && modal === null && !helpOpen && !welcomeOpen && !schematicOpen}
       flowGraph={flowGraph}
       simActive={sim.status !== 'stopped'}
       frame={sim.frame}
@@ -1830,17 +1833,19 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // Klavye kısayolları (onaylı liste, M12): + / − yakınlaştır, Shift+1 sığdır, P oynat/duraklat,
   // Alt+1…3 panel sekmeleri, ? yardım. Yazı alanlarında ve açık pencerelerde çalışmaz. Tuşlar e.key ve
   // e.code ile okunur; Türkçe Q klavyede de aynı.
-  const dialogOpen = share !== null || examplesOpen || modal !== null || stopAsk || helpOpen || welcomeOpen;
+  const dialogOpen = share !== null || examplesOpen || modal !== null || stopAsk || helpOpen || welcomeOpen || schematicOpen;
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   shortcutRef.current = (e: KeyboardEvent) => {
     if (dialogOpen || e.defaultPrevented) return;
-    // Ctrl+O bilgisayardan aç, Ctrl+S bilgisayara indir (tarayıcının kendi açma ve kaydetmesi yerine); F1
-    // yardım, F11 tam ekran (defter gizli). Yazı alanındayken de; gömülü sayfada ve telefonda yok.
+    // Ctrl+O bilgisayardan aç, Ctrl+S bilgisayara indir, Ctrl+P şemayı indir / yazdır (tarayıcının kendi
+    // açma, kaydetme ve yazdırması yerine: sayfanın kendisi yazdırılınca boş çıkar); F1 yardım, F11 tam
+    // ekran (defter gizli). Yazı alanındayken de; gömülü sayfada ve telefonda yok.
     if (embed === null && !phone && !e.altKey && !e.shiftKey) {
       const key = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && (key === 'o' || key === 's')) {
+      if ((e.ctrlKey || e.metaKey) && (key === 'o' || key === 's' || key === 'p')) {
         e.preventDefault();
         if (key === 'o') fileInputRef.current?.click();
+        else if (key === 'p') setSchematicOpen(true);
         else downloadDoc(doc, analysis.doc);
         return;
       }
@@ -1960,6 +1965,19 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           }}
           onClose={closeWelcome}
         />
+      )}
+      {schematicOpen && (
+        <TouchUi.Provider value={phone || tablet || coarsePointer}>
+          <SchematicExportDialog
+            doc={doc}
+            connectivity={connectivity}
+            frame={sim.status === 'stopped' ? null : shownFrame}
+            settings={shownSettings}
+            title={circuitTitle}
+            example={activeExample}
+            onClose={() => setSchematicOpen(false)}
+          />
+        </TouchUi.Provider>
       )}
       {kartaOpen && (
         <Suspense fallback={null}>
@@ -2155,6 +2173,10 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             onKarta={() => {
               setModal(null);
               setKartaOpen(true);
+            }}
+            onSchematic={() => {
+              setModal(null);
+              setSchematicOpen(true);
             }}
           />
         )}
@@ -2450,6 +2472,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           onImport={() => fileInputRef.current?.click()}
           onShare={() => setShare('link')}
           onKarta={() => setKartaOpen(true)}
+          onSchematic={() => setSchematicOpen(true)}
           onTask={() => setTaskDialog(true)}
           onExamples={() => setExamplesOpen(true)}
           analysisOpen={analysis.open}

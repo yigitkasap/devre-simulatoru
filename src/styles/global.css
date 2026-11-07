@@ -468,14 +468,28 @@ button {
   }
 }
 
-/* Lehim rehberi yazdırılırken yalnızca rehber görünür (sayfanın geri kalanı gizli). */
+/* Lehim rehberi ya da şema (Şemayı indir / yazdır → Yazdır) yazdırılırken yalnızca o görünür (sayfanın
+   geri kalanı gizli). Şemanın sayfa yönü (A4 dikey ya da yatay) SchematicDialog'da @page ile. */
 @media print {
   body * {
     visibility: hidden;
   }
   #lehim-rehberi,
-  #lehim-rehberi * {
+  #lehim-rehberi *,
+  #sema-yazdir,
+  #sema-yazdir * {
     visibility: visible;
+  }
+  #sema-yazdir {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+  }
+  #sema-yazdir > svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 100vh;
   }
   #lehim-rehberi {
     position: absolute;

@@ -105,6 +105,7 @@ function CircuitMenu(props: {
   onShare: () => void;
   onTask: () => void;
   onKarta: () => void;
+  onSchematic: () => void;
 }) {
   const menu = useMenu();
   const t = tr.topbar.circuit;
@@ -135,6 +136,7 @@ function CircuitMenu(props: {
           <MenuItem icon="fileNew" label={t.newCircuit} title={tr.file.newCircuitNote} touch={props.touch} onSelect={pick(props.onNew)} />
           <MenuItem icon="upload" label={t.open} shortcut="Ctrl+O" title={t.openNote} touch={props.touch} onSelect={pick(props.onOpen)} />
           <MenuItem icon="download" label={t.download} shortcut="Ctrl+S" title={t.downloadNote} touch={props.touch} onSelect={pick(props.onDownload)} />
+          <MenuItem icon="printer" label={tr.schematicExport.menu} shortcut="Ctrl+P" title={tr.schematicExport.menuNote} touch={props.touch} onSelect={pick(props.onSchematic)} />
           <MenuSeparator />
           <MenuItem icon="share" label={t.share} title={tr.file.shareNote} touch={props.touch} onSelect={pick(props.onShare)} />
           <MenuItem icon="target" label={t.task} title={tr.task.menuNote} touch={props.touch} onSelect={pick(props.onTask)} />
@@ -484,6 +486,8 @@ export interface DeskTopBarProps {
   readonly onImport: () => void;
   readonly onShare: () => void;
   readonly onKarta: () => void;
+  /** Şemayı indir / yazdır (PNG, SVG, yazdırma). */
+  readonly onSchematic: () => void;
   /** Görev oluştur (C1, N6). */
   readonly onTask: () => void;
   readonly onExamples: () => void;
@@ -627,6 +631,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
           onShare={props.onShare}
           onTask={props.onTask}
           onKarta={props.onKarta}
+          onSchematic={props.onSchematic}
         />
         {props.saveState !== 'off' && <SaveMark state={props.saveState} />}
       </div>

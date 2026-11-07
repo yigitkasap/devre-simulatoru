@@ -82,6 +82,8 @@ export interface FileSheetProps {
   readonly onExport: () => void;
   readonly onImport: () => void;
   readonly onKarta: () => void;
+  /** Şemayı indir / yazdır (PNG paylaş, SVG, yazdırma). */
+  readonly onSchematic: () => void;
   /** Görev oluştur (C1, N6). */
   readonly onTask: () => void;
   /** Paylaş → Sayfaya göm (N7). */
@@ -168,6 +170,7 @@ export function FileSheet(props: FileSheetProps) {
         </div>
         <MenuItem icon="download" label={tr.topbar.circuit.download} onClick={props.onExport} />
         <MenuItem icon="upload" label={tr.topbar.circuit.open} onClick={props.onImport} />
+        <MenuItem icon="printer" label={tr.schematicExport.menu} onClick={props.onSchematic} />
         <MenuItem icon="board" label={tr.karta.open} onClick={props.onKarta} />
         <MenuItem icon="target" label={tr.task.menu} onClick={props.onTask} />
         <MenuItem icon="code" label={tr.embed.menu} onClick={props.onEmbed} />
