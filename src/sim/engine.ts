@@ -778,6 +778,7 @@ export class CircuitSimulator {
    * devre değiştiyse yeniden çözer.
    * @param maxSteps Bu çağrıda en fazla kaç adım atılacağı (yavaş bilgisayarda donmayı önler);
    *                 aşılırsa kalan süre atlanır.
+   * @param deadline Süre sınırı (performance.now() cinsinden): geçilince kalan süre atlanır (truncated).
    */
   advance(dt: number, maxSteps = Number.POSITIVE_INFINITY, deadline = Number.POSITIVE_INFINITY): AdvanceResult {
     this.deadline = deadline;
@@ -875,12 +876,12 @@ export class CircuitSimulator {
       } else if (this.pending < (end - this.time) * (1 - 1e-9)) {
         break;
       }
-      // Bütçe: adım sayısı. Süre sınırı verildiyse (arayüz) sayı bütçesi dolduktan sonra da süre
-      // kaldıkça sürer (en çok 4 katına kadar): küçük adım isteyen devre bilgisayar yetiştirdikçe kesilmez,
-      // bütçe içindeki bir anlık yavaşlama (GC) da uyarı doğurmaz.
-      const overCount = steps >= maxSteps;
-      const outOfTime = this.deadline === Number.POSITIVE_INFINITY || steps >= 4 * maxSteps || performance.now() > this.deadline;
-      if ((overCount && outOfTime) || attempts >= 16 * maxSteps + 64) {
+      // Bütçe: süre sınırı (arayüz) kesindir; adım sayısı sınırına gelinmese de süre bitince kare kesilir
+      // (yavaş işlemcide kare uzayıp donmasın). Adım sayısı bütçesi, süre sınırı verildiyse süre kaldıkça
+      // aşılabilir (en çok 4 katına kadar): küçük adım isteyen devre bilgisayar yetiştirdikçe kesilmez.
+      const outOfTime = performance.now() > this.deadline;
+      const overCount = steps >= (this.deadline === Number.POSITIVE_INFINITY ? maxSteps : 4 * maxSteps);
+      if (outOfTime || overCount || attempts >= 16 * maxSteps + 64) {
         this.pending = 0;
         this.truncated = true;
         break;

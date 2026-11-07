@@ -141,11 +141,19 @@ export function dotSpeed(current: number): number {
 /** Bir karede atılabilecek zaman adımı bütçesi (yavaş bilgisayarda donmayı önler). */
 const MAX_STEPS_PER_FRAME = 6000;
 /**
- * Kare başına hesap süresi (ms): adım bütçesi dolduktan sonra da bu süre kaldıkça adım atılır
- * (en çok 4 katı). Küçük adım isteyen devre (yüksek frekanslı LC) bilgisayar yetiştirebildiği
- * sürece "yetişemiyor" uyarısı almaz; 60 Hz'lik karenin geri kalanı çizime kalır.
+ * Kare başına hesap süresi (ms). Süre sınırı kesindir: süre bitince kare kesilir, adım bütçesi dolmamış
+ * olsa da (simülasyon gerçek zamanın gerisinde kalır, "yetişemiyor" göstergesi çıkar). Sınırın değeri:
+ *   - Gerçek zamana yetişmek için gereken süre (ölçülen hesap hızıyla, %50 paylı): en az FRAME_COMPUTE_MS,
+ *     en çok MAX_COMPUTE_MS. Bilgisayar yetiştirebildiği sürece kare kesilmez (masaüstü eskisi gibi).
+ *   - Kare aralığı (yumuşatılmış) TARGET_FRAME_MS'yi aşarsa (yavaş işlemci, çizimin kendisi uzun) sınır
+ *     farkla orantılı kısalır (en az MIN_COMPUTE_MS): kare hızı 30/s'nin altına düşmez, kare uzayıp donmaz.
+ * Adım bütçesi dolduktan sonra da süre kaldıkça adım atılır (en çok 4 katı): küçük adım isteyen devre
+ * (yüksek frekanslı LC) bilgisayar yetiştirebildiği sürece uyarı almaz.
  */
 const FRAME_COMPUTE_MS = 10;
+const MAX_COMPUTE_MS = 25;
+const TARGET_FRAME_MS = 28;
+const MIN_COMPUTE_MS = 2;
 /** Gerçek zamanlı kare süresinin üst sınırı: sekme arka planda kalınca büyük sıçramaları önler. */
 const MAX_FRAME_SECONDS = 0.1;
 /**
@@ -511,19 +519,33 @@ export function useSimulation(
     let last = performance.now();
     /** Son karelerde adım sınırına takılma oranı (yumuşatılmış; uyarı titremesin). */
     let lagSamples = 0;
+    /** Kare aralığı (ms, yumuşatılmış) ve ona göre kısalan hesap süresi sınırı. */
+    let frameMs = 1000 / 60;
+    let fpsLimitMs = FRAME_COMPUTE_MS;
+    /** Hesap hızı: 1 ms'lik simülasyonun kaç ms hesap sürdüğü (yumuşatılmış). */
+    let costPerMs = 0;
     const tick = (now: number) => {
       const sim = simRef.current;
       if (!sim || statusRef.current !== 'running') return;
-      const dtReal = Math.min(MAX_FRAME_SECONDS, Math.max(0, (now - last) / 1000));
+      const interval = Math.max(0, now - last);
+      const dtReal = Math.min(MAX_FRAME_SECONDS, interval / 1000);
       last = now;
+      frameMs += (Math.min(interval, 200) - frameMs) * 0.1;
+      fpsLimitMs = Math.min(MAX_COMPUTE_MS, Math.max(MIN_COMPUTE_MS, fpsLimitMs + (TARGET_FRAME_MS - frameMs) * 0.05));
       const simDt = dtReal * speedRef.current;
       sim.watch(watchedRef.current);
       // Süre sınırı çağrı anından (rAF zaman damgası karenin başı: önceki karenin çizimi o süreyi yemiş olabilir).
       const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.maxTimeStep) * 8 + 64);
       // İz varsa kayıt: AC kaynaksız devrede kare örnek anlarında bölünür (istatistikler birleştirilir).
       if (recorder.active && recorder.count === 0 && recorder.due < sim.time) recorder.reset(sim.time, speedRef.current, sim.hasAcSources);
-      const recorded = recorder.active ? advanceRecorded(sim, simDt, maxSteps, performance.now() + FRAME_COMPUTE_MS, recorder, watchedRef.current) : null;
-      const result = recorded ? recorded.result : sim.advance(simDt, maxSteps, performance.now() + FRAME_COMPUTE_MS);
+      const needMs = Math.min(MAX_COMPUTE_MS, Math.max(FRAME_COMPUTE_MS, 1.5 * costPerMs * simDt * 1000));
+      const computeMs = Math.min(fpsLimitMs, needMs);
+      const simBefore = sim.time;
+      const t0 = performance.now();
+      const recorded = recorder.active ? advanceRecorded(sim, simDt, maxSteps, t0 + computeMs, recorder, watchedRef.current) : null;
+      const result = recorded ? recorded.result : sim.advance(simDt, maxSteps, t0 + computeMs);
+      const advanced = (sim.time - simBefore) * 1000;
+      if (advanced > 0) costPerMs += ((performance.now() - t0) / advanced - costPerMs) * 0.1;
       // Bütçe bittiyse istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
       lagSamples = (lagSamples * 0.9) + (result.truncated ? 0.1 : 0);
       if (!result.ok) {
