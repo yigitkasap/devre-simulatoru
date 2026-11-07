@@ -2037,6 +2037,72 @@ try {
       await page.context().close();
     }
   }
+  // --- Örnekler penceresi: devre çalışırken kaydırma donmuyor; sekmenin simgesi yeni logo -------------------
+  {
+    // Uzun görevler (≥ 50 ms) sayfa yüklenince izlenir; ölçülen aralıkta toplamları.
+    const watchLong = (page) => page.evaluate(() => {
+      window.__long = 0;
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long += e.duration; }).observe({ type: 'longtask' });
+    });
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    // Sekmenin simgesi: sürüm ekli adres (tarayıcının önbelleğindeki eski simge kalmasın), yeni logo.
+    const icon = await page.evaluate(async () => {
+      const href = document.querySelector('link[rel=icon]')?.getAttribute('href') ?? '';
+      const svg = await (await fetch(href)).text();
+      const manifest = await (await fetch(document.querySelector('link[rel=manifest]').getAttribute('href'))).json();
+      return { href, wave: svg.includes('M8 16C10.5 8.5 13.5 8.5 16 16S21.5 23.5 24 16'), old: svg.includes('M4 16h5l2-6'), icons: manifest.icons.map((i) => i.src) };
+    });
+    check('sekmenin simgesi (favicon): yeni logo ("düğüm dalgası"), adreste sürüm eki (favicon.svg?v=4; manifest simgeleri de), eski kırmızı zikzak yok',
+      /\/favicon\.svg\?v=\d+$/.test(icon.href) && icon.wave && !icon.old && icon.icons.every((src) => /\.png\?v=\d+$/.test(src)), `${icon.href} · ${icon.icons.join(', ')}`);
+    await watchLong(page);
+    await page.locator('header').getByRole('button', { name: 'Oynat', exact: true }).click();
+    await page.waitForTimeout(1000);
+    await page.locator('header').getByRole('button', { name: 'Örnekler', exact: true }).click();
+    await page.waitForTimeout(1000);
+    const dialog = page.getByRole('dialog', { name: 'Örnekler' });
+    const box = await dialog.locator('.overflow-y-auto').nth(1).boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.evaluate(() => { window.__long = 0; });
+    const t0 = Date.now();
+    for (let i = 0; i < 24; i++) { await page.mouse.wheel(0, 120); await page.waitForTimeout(100); }
+    const elapsed = Date.now() - t0;
+    const busy = await page.evaluate(() => window.__long);
+    const running = await page.locator('header').getByRole('button', { name: 'Duraklat' }).count();
+    check('Örnekler (masaüstü, devre çalışırken): kaydırırken pencere her karede yeniden çizilmiyor — uzun görevlerin toplamı sürenin %20’sinden az (eskiden neredeyse tamamı)',
+      running === 1 && busy < elapsed * 0.2, `${Math.round(busy)} ms / ${elapsed} ms`);
+    await ctx.close();
+  }
+  {
+    // Telefon işlemcisi gibi 4 kat yavaş (hızlı makinede 11 kartın her karede yeniden çizimi 50 ms'yi aşmıyordu).
+    const { page, cdp } = await phone();
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.evaluate(() => {
+      window.__long = 0;
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__long += e.duration; }).observe({ type: 'longtask' });
+    });
+    await phoneBar(page).getByRole('button', { name: 'Oynat' }).tap();
+    await page.waitForTimeout(1000);
+    await phoneExamples(page);
+    await page.locator('[data-group="arduino"]').tap(); await page.waitForTimeout(800);
+    const list = page.locator('[role=dialog] .overflow-y-auto').last();
+    const box = await list.boundingBox();
+    await page.evaluate(() => { window.__long = 0; });
+    const t0 = Date.now();
+    for (let i = 0; i < 12; i++) {
+      await page.evaluate((y) => document.querySelectorAll('[role=dialog] .overflow-y-auto')[document.querySelectorAll('[role=dialog] .overflow-y-auto').length - 1].scrollBy(0, y), 160);
+      await page.waitForTimeout(150);
+    }
+    const elapsed = Date.now() - t0;
+    const busy = await page.evaluate(() => window.__long);
+    check('Örnekler (telefon, işlemci 4 kat yavaş, Arduino grubu, devre çalışırken): kaydırırken uzun görevlerin toplamı sürenin %20’sinden az',
+      box !== null && busy < elapsed * 0.2, `${Math.round(busy)} ms / ${elapsed} ms`);
+    await page.context().close();
+  }
   // --- Analiz → Eğri izleyici (A3, N3): Worker'da DC tarama, basamaklar, transfer, yük doğrusu, iptal ----
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
