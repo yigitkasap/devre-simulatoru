@@ -27,6 +27,8 @@ export interface PhoneHeaderProps {
   readonly title: string;
   readonly status: SimStatus;
   readonly time: number;
+  /** Simülasyon gerçek zamana yetişemiyor (masaüstündeki gibi uyarı simgesi; açıklaması Durum sayfasında). */
+  readonly lagging?: boolean;
   readonly saveState: SaveState;
   /** Devre sayfası (yeni, aç, indir, paylaş…) açık mı; adına dokununca açılır. */
   readonly circuitOpen: boolean;
@@ -60,6 +62,11 @@ export function PhoneHeader(props: PhoneHeaderProps) {
           <span className={`flex min-w-0 items-center gap-1.5 text-label ${tone}`}>
             {status === 'running' && <i className="block h-1.5 w-1.5 shrink-0 rounded-full bg-ok" aria-hidden="true" />}
             <span className="truncate tabular">{line}</span>
+            {props.lagging && status === 'running' && (
+              <span data-lagging="" className="flex shrink-0 text-warn">
+                <Icon name="info" className="h-3.5 w-3.5" />
+              </span>
+            )}
           </span>
         </button>
         {props.undo && status === 'stopped' && (

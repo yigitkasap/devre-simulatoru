@@ -2150,6 +2150,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             line={line}
             speed={sim.speed}
             scopeSpeed={scopeSpeed}
+            lagging={sim.frame?.lagging ?? false}
             onSpeed={sim.setSpeed}
             onStop={() => {
               setModal(null);
@@ -2251,6 +2252,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             title={circuitTitle}
             status={sim.status}
             time={sim.frame?.time ?? 0}
+            lagging={sim.frame?.lagging ?? false}
             saveState={saveState}
             circuitOpen={modal === 'file' || modal === 'share'}
             moreOpen={modal === 'more'}
@@ -2346,6 +2348,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             title={circuitTitle}
             status={sim.status}
             time={sim.frame?.time ?? 0}
+            lagging={sim.frame?.lagging ?? false}
             saveState={saveState}
             circuitOpen={modal === 'file' || modal === 'share'}
             moreOpen={modal === 'more'}

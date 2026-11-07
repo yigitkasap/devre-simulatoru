@@ -585,7 +585,11 @@ function RunControls(props: DeskTopBarProps & { touch: boolean }) {
             <StatusMark status={status} />
             <span className="sr-only">{tr.sim.status[status]}</span>
             <span className="truncate font-mono tabular">{formatSI(props.time, 's', { digits: 3 })}</span>
-            {props.lagging && <Icon name="info" className="h-4 w-4 shrink-0 text-warn" />}
+            {props.lagging && (
+              <span data-lagging="" className="flex shrink-0 text-warn">
+                <Icon name="info" className="h-4 w-4" />
+              </span>
+            )}
           </span>
           <SpeedMenu speed={props.speed} scopeSpeed={props.scopeSpeed} onSpeed={props.onSpeed} touch={touch} />
         </div>
