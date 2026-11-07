@@ -47,8 +47,8 @@ describe('Analiz v2: föy grafiklerinde föyün adları', () => {
           const q = resolveFoyQuantity(f, doc(example));
           expect(q, `${example}/${d.key} ${f.name}`).not.toBeNull();
           expect(names!.quantities.get(quantityKey(q!))).toBe(f.name);
-          // Kartta föydeki ad, ardından parantez içinde devredeki ad.
-          expect(d.detail, `${example}/${d.key}`).toMatch(new RegExp(`${f.name.replace(/[{}()[\]\\]/g, '\\$&')} \\(`));
+          // Kartta föydeki ad, ardından parantez içinde ya da "=" ile devredeki ad.
+          expect(d.detail, `${example}/${d.key}`).toMatch(new RegExp(`${f.name.replace(/[{}()[\]\\]/g, '\\$&')} [(=]`));
         }
         if (plan.kind === 'sweep') {
           expect(d.detail).toMatch(/· x: .+ \(.+\), y: .+ \(.+\)$/);
@@ -122,6 +122,7 @@ describe('Analiz v2: föy grafiklerinde föyün adları', () => {
     expect(names('bjt-yukseltec', 'giris-cikis')).toEqual(['V_{s}', 'V_{CE}']);
     expect(names('bjt-anahtar', 'anahtar')).toEqual(['V_{S}', 'I_{LED}']);
     expect(names('diyot-karakteristigi', 'iv-xy')).toEqual(['V_{o}', 'V_{i}']);
+    expect(names('gerilim-katlayici', 'katlayici')).toEqual(['V_{p} (C1)', 'V_{p} (C2)', 'V_{ç}']);
   });
 });
 

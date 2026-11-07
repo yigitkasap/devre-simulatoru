@@ -21,7 +21,7 @@ export type FoyQuantity = (
   | { readonly kind: 'across'; readonly part: string }
   | { readonly kind: 'current'; readonly part: string }
   | { readonly kind: 'terminal'; readonly part: string; readonly quantity: TerminalQuantity }
-  /** İki ucun arası (b yoksa toprağa göre): üretecin TTL'i COM'a göre, katlayıcıda A − B. */
+  /** İki ucun arası (b yoksa toprağa göre): üretecin TTL'i COM'a göre, katlayıcıda A − B ve COM − B (B ters). */
   | { readonly kind: 'pins'; readonly a: { readonly part: string; readonly pin: number }; readonly b?: { readonly part: string; readonly pin: number } }
 ) & { readonly name: string };
 
@@ -166,15 +166,23 @@ export const FOY_GRAPHS: Readonly<Record<string, readonly FoyGraphDef[]>> = {
   ],
   'negatif-kenetleyici': [inOut('1', 'V_{g}', 'V_{ç}')],
   'pozitif-kenetleyici': [inOut('1', 'V_{g}', 'V_{ç}')],
-  // Föyde iki kondansatörün gerilimi de V_{p}: üstteki V_{p1} (A), alttaki B'de eksi görünür (−V_{p2}).
+  // Föyde iki kondansatörün gerilimi de pozitif V_{p} (Şekil-10, V_{ç} = 2V_{p}). Osiloskobun COM'u ortada:
+  // C1'inki A'da, C2'ninki B'de eksi görünür; B ters çevrilir (COM − B), ikisi de pozitif.
   'gerilim-katlayici': [
     {
       key: 'katlayici',
       steps: '2',
       topic: 'GERİLİM KATLAYICI',
-      title: 'V_{ç}, V_{p1} ve V_{p2}',
-      detail: 'V_{p1} (OSC1 A), −V_{p2} (OSC1 B) ve V_{ç} (A − B) zamana göre',
-      plan: { kind: 'time', y: [A('V_{p1}'), B('−V_{p2}'), { kind: 'pins', a: { part: 'OSC1', pin: 0 }, b: { part: 'OSC1', pin: 1 }, name: 'V_{ç}' }] },
+      title: 'V_{ç}, V_{p} (C1) ve V_{p} (C2)',
+      detail: 'V_{p} (C1) = OSC1 A, V_{p} (C2) = OSC1 B ters çevrilmiş, V_{ç} = A − B zamana göre',
+      plan: {
+        kind: 'time',
+        y: [
+          A('V_{p} (C1)'),
+          { kind: 'pins', a: { part: 'OSC1', pin: 2 }, b: { part: 'OSC1', pin: 1 }, name: 'V_{p} (C2)' },
+          { kind: 'pins', a: { part: 'OSC1', pin: 0 }, b: { part: 'OSC1', pin: 1 }, name: 'V_{ç}' },
+        ],
+      },
     },
   ],
   'seri-kirpici': [inOut('', 'V_{g}', 'V_{ç}')],

@@ -91,7 +91,8 @@ describe('Analiz v2: föydeki grafikler', { timeout: 120_000 }, () => {
       kopru: record('kopru-dogrultmac', 'giris-cikis', 0.02, 0.021, 1e-5).hi[1],
       negatif: record('negatif-kenetleyici', 'giris-cikis', 0.2, 0.201, 1e-5).hi[1],
       pozitif: record('pozitif-kenetleyici', 'giris-cikis', 0.2, 0.201, 1e-5).lo[1],
-      katlayici: record('gerilim-katlayici', 'katlayici', 0.4, 0.401, 1e-5).hi[2],
+      // Föydeki gibi iki V_{p} de pozitif (B ters çevrilmiş: COM − B); V_{ç} = A − B ikisinin toplamı.
+      katlayici: record('gerilim-katlayici', 'katlayici', 0.4, 0.401, 1e-5),
       seriLo: record('seri-kirpici', 'giris-cikis', 0.02, 0.021, 1e-5).lo[1],
       // Pozitif yarıda çıkış kırpılmış (≈ 0 V): girişin tepesinde. (En büyük değer değil: diyot kesime
       // geçerken 1N4001'in ters toparlanma akımı kısa bir ≈ 0,2 V sıçrama yapar.)
@@ -103,7 +104,11 @@ describe('Analiz v2: föydeki grafikler', { timeout: 120_000 }, () => {
     expect.soft(v.kopru).toBeCloseTo(4.36, 1);
     expect.soft(v.negatif).toBeCloseTo(0.6, 0);
     expect.soft(v.pozitif).toBeCloseTo(-0.6, 0);
-    expect.soft(v.katlayici).toBeCloseTo(9.2, 0);
+    expect.soft(v.katlayici.hi[2]).toBeCloseTo(9.2, 0);
+    expect.soft(v.katlayici.lo[0]).toBeGreaterThan(4.4);
+    expect.soft(v.katlayici.lo[1]).toBeGreaterThan(4.4);
+    expect.soft(v.katlayici.hi[0]).toBeCloseTo(4.6, 0);
+    expect.soft(v.katlayici.hi[1]).toBeCloseTo(4.6, 0);
     expect.soft(v.seriLo).toBeCloseTo(-9.47, 1);
     expect.soft(v.seriAtPeak.input).toBeGreaterThan(9.9);
     expect.soft(v.seriAtPeak.output).toBeCloseTo(0, 1);
