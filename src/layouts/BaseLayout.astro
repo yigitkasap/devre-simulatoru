@@ -17,6 +17,10 @@ const { title, description = SITE_DESCRIPTION } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE_NAME}` : SITE_NAME;
 // Site bir alt klasörde yayımlanırsa (astro.config.mjs → base) yollar ona göre kurulur.
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+// Simgelerin sürümü: tarayıcılar favicon'u kendi önbelleğinde uzun süre tutar ve adres aynı kaldıkça
+// yenisini çekmez (arayüz v4'ün logosu gelmişken sekmede eski simge kalıyordu). Logo değişince artır;
+// site.webmanifest'teki simge adreslerinde de aynı ek var.
+const icons = 'v=4';
 ---
 
 <!doctype html>
@@ -41,9 +45,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         if (dark) document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0e1318');
       })();
     </script>
-    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg`} />
-    <link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png`} />
-    <link rel="manifest" href={`${base}/site.webmanifest`} />
+    <link rel="icon" type="image/svg+xml" href={`${base}/favicon.svg?${icons}`} />
+    <link rel="apple-touch-icon" href={`${base}/apple-touch-icon.png?${icons}`} />
+    <link rel="manifest" href={`${base}/site.webmanifest?${icons}`} />
     <link rel="preload" href={plexSans} as="font" type="font/woff2" crossorigin />
     <title>{fullTitle}</title>
   </head>
