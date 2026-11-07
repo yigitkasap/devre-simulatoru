@@ -853,8 +853,15 @@ function useScreen() {
     : { box: { fill: '#1e2a25' }, ink: '#a6f4bd', wave: '#e8c547' };
 }
 
+/** Şebeke toprağı işaretinin rengi: bağlıysa yeşil; sade çizimde (dışa aktarım, föy gibi) her zaman siyah. */
+function useEarthColor(earthed: boolean): string {
+  const plain = useDrawStyle().plain;
+  return earthed && !plain ? 'var(--color-earth)' : 'currentColor';
+}
+
 function Oscilloscope({ rotation, earthed }: { rotation: Rotation; earthed: boolean }) {
   const screen = useScreen();
+  const earth = useEarthColor(earthed);
   const upright = (x: number, y: number) => (rotation ? `rotate(${-rotation} ${x} ${y})` : undefined);
   const pinLabel = (text: string, y: number) => (
     <text
@@ -883,8 +890,8 @@ function Oscilloscope({ rotation, earthed }: { rotation: Rotation; earthed: bool
       </g>
       {pinLabel('A', -20)}
       {pinLabel('B', 0)}
-      {/* Ortak uç: küçük toprak işareti (şebeke toprağına bağlıysa yeşil) */}
-      <g stroke={earthed ? 'var(--color-earth)' : 'currentColor'} strokeWidth={1.4} strokeLinecap="round" transform={upright(-23, 20)}>
+      {/* Ortak uç: küçük toprak işareti (şebeke toprağına bağlıysa yeşil; sade çizimde siyah) */}
+      <g stroke={earth} strokeWidth={1.4} strokeLinecap="round" transform={upright(-23, 20)}>
         <line x1={-23} y1={15} x2={-23} y2={19} />
         <line x1={-28} y1={19} x2={-18} y2={19} />
         <line x1={-26} y1={22} x2={-20} y2={22} />
@@ -1028,9 +1035,10 @@ function DeviceText({
 
 /** Şebeke toprağı işareti (topraklı cihazın COM ucunda yeşil). */
 function EarthGlyph({ x, y, rotation, earthed }: { x: number; y: number; rotation: Rotation; earthed: boolean }) {
+  const earth = useEarthColor(earthed);
   return (
     <g
-      stroke={earthed ? 'var(--color-earth)' : 'currentColor'}
+      stroke={earth}
       strokeWidth={1.4}
       strokeLinecap="round"
       transform={rotation ? `rotate(${-rotation} ${x} ${y})` : undefined}
