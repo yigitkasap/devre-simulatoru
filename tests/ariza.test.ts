@@ -64,7 +64,8 @@ describe('Arıza bulma: arıza netlist kurulurken uygulanır', () => {
     const sim = run(doc, [], pinKey(Q1, 1));
     expect(reading(sim, 'olcum')).toBeCloseTo(0.64, 2);
     expect(sim.status(Q1).region).toBe('active');
-  });
+    // İki tam benzetim: bütün testler birlikte koşarken 5 s'yi aşabiliyordu.
+  }, 30_000);
 
   it('RC kollektör bacağı kopuk: VC ≈ 0,01 V, VB ≈ 0,55 V, Q1 doyumda; kopuk uçta 10 MΩ ile 11,99 V, yanındaki düğümde 0,01 V', () => {
     const sim = run(doc, [open]);
