@@ -1805,6 +1805,13 @@ export const tr = {
     cancelWire: 'İptal',
     dropHint: 'Uca bırak: bağla',
     escCancel: 'vazgeç',
+    /** Kablo bir uçta bitmeden bırakıldı (ya da bir uca tıklanıp sürüklenmedi): tıklayarak yol çizme. */
+    clickRoute: 'Tıklayarak yol çiz',
+    clickRouteHint: 'Her tıklama bir köşe koyar; bir uca ya da kabloya tıklayınca kablo biter',
+    clickRouteFinish: 'çift tık: burada bitir',
+    /** Kablo bırakılan iki uç dışında da bağlandı (köşesi bir uca ya da kabloya denk geldi). */
+    unexpectedLink: (names: readonly string[]) =>
+      `Kablo, bıraktığın iki uçtan başka ${names.length > 1 ? 'şunlara' : 'şuna'} da bağlandı: ${names.join(', ')}.`,
   },
   sim: {
     play: 'Oynat',

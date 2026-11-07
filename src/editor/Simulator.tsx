@@ -101,6 +101,7 @@ import { EmbedBar } from './embed/EmbedBar';
 import { speedLabel } from './SimBar';
 import { EMPTY_SELECTION, editorReducer, initialEditorState, type Selection } from './state';
 import { Toast, useToast } from './Toast';
+import type { UnexpectedLink } from './wireRoute';
 import { DeskTopBar } from './TopBar';
 import { useTheme } from './theme';
 import { TouchUi } from './touchUi';
@@ -1293,6 +1294,23 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     canvasRef.current?.reveal([partId], [...wires]);
     flashTimer.current = window.setTimeout(() => setFlash(null), 1800);
   };
+  /**
+   * Çizilen kablo bıraktığın iki uç dışında da bağlandı: bildirim (Geri al kabloyu kaldırır); kablo ve
+   * beklenmeyen uçlar bildirim boyunca yanıp söner.
+   */
+  const warnUnexpectedLink = (link: UnexpectedLink & { readonly wireId: string }) => {
+    window.clearTimeout(flashTimer.current);
+    setFlash({ parts: new Set(link.parts), wires: new Set([link.wireId]), severity: 'warning', pins: link.pins });
+    flashTimer.current = window.setTimeout(() => setFlash(null), 5000);
+    showToast(tr.canvas.unexpectedLink(link.names), 'error', {
+      label: tr.toast.undo,
+      run: () => {
+        window.clearTimeout(flashTimer.current);
+        setFlash(null);
+        dispatch({ type: 'undo' });
+      },
+    });
+  };
 
   // --- Telefon ve tablet -----------------------------------------------------------------------
   // Tuvalin kipi: Bağla (kablo bağlarken), Ölç (çalışıyor ya da duraklatılmış; yapı kilitli) ya da Kur.
@@ -1660,6 +1678,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       overlayOpen={overlayOpen}
       desk={!phone && !tablet}
       onPartPlaced={rememberPart}
+      onUnexpectedLink={warnUnexpectedLink}
       onExamples={() => setExamplesOpen(true)}
       issues={issues}
       issuePins={issuePins}

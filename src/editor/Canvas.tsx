@@ -34,8 +34,10 @@ import {
   snapToSegment,
   unionBox,
 } from '../model/geometry';
-import { GRID, type CircuitDoc, type Point, type Rotation } from '../model/types';
-import { moveSegment, routeL } from '../model/wires';
+import { GRID, type CircuitDoc, type Part, type Point, type Rotation } from '../model/types';
+import { routeWire, type RouteObstacles } from '../model/route';
+import { unexpectedLinks } from '../model/wireCheck';
+import { moveSegment } from '../model/wires';
 import { boolProp, type DeviceType } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import {
@@ -61,6 +63,7 @@ import type { Probe } from './fault/meter';
 import { PlaceMarks, ProbeLayer, type PlaceMark, type ProbeView } from './fault/ProbeLayer';
 import type { Place } from './fault/session';
 import { routeAround } from './phoneTools';
+import { describeUnexpected, wireObstacles, type UnexpectedLink } from './wireRoute';
 import { HintText } from './HintStrip';
 import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
@@ -210,6 +213,11 @@ export interface CanvasProps {
   readonly onStatusChange?: (status: CanvasStatus) => void;
   /** Bir parça yerleştirildi (kütüphanenin "Son" listesi için). */
   readonly onPartPlaced?: (type: DeviceType) => void;
+  /**
+   * Çizilen kablo, kullanıcının bıraktığı iki uç dışında da bağlandı (köşesi bir uca ya da kablo köşesine
+   * denk geldi, başka bir kablonun ucu üstünde kaldı): bildirim ve Geri al.
+   */
+  readonly onUnexpectedLink?: (link: UnexpectedLink & { readonly wireId: string }) => void;
   /** Boş tuvaldeki "Örneklerden başla" düğmesi. */
   readonly onExamples?: () => void;
   /** Hata ya da uyarısı olan parçalar: çerçeve ve köşede rozet (M07a, M07b). */
@@ -399,6 +407,7 @@ export function Canvas({
   overlayOpen,
   onStatusChange,
   onPartPlaced,
+  onUnexpectedLink,
   onExamples,
   issues,
   issuePins,
@@ -458,6 +467,8 @@ export function Canvas({
   const phoneTimers = useRef({ hold: 0, long: 0 });
   const phoneLongFired = useRef(false);
   const lastEmptyTap = useRef(0);
+  /** Kablo yolunun engelleri: belge ya da çizilen kablonun köşeleri değişince yeniden kurulur. */
+  const obstacleCache = useRef<{ doc: CircuitDoc; drawn: readonly Point[]; value: RouteObstacles } | null>(null);
   const clearPhoneTimers = () => {
     window.clearTimeout(phoneTimers.current.hold);
     window.clearTimeout(phoneTimers.current.long);
@@ -761,10 +772,35 @@ export function Canvas({
   const commit = (next: CircuitDoc, nextSelection?: Selection) =>
     dispatch({ type: 'commit', doc: next, ...(nextSelection ? { selection: nextSelection } : {}) });
 
+  /** Kablo eklenir; kullanıcının bıraktığı iki uç dışında bağlantı kurduysa bildirilir. */
+  const addCheckedWire = (points: readonly Point[]) => {
+    const result = addWire(doc, points);
+    if (!result.id) return;
+    commit(result.doc, EMPTY_SELECTION);
+    const groups = unexpectedLinks(doc, result.doc, result.id);
+    const added = result.doc.wires.find((w) => w.id === result.id);
+    if (groups.length > 0 && added) onUnexpectedLink?.({ ...describeUnexpected(result.doc, added.points, groups), wireId: result.id });
+  };
+
   const finishWire = (points: readonly Point[]) => {
     setInteraction({ kind: 'idle' });
-    const result = addWire(doc, points);
-    if (result.id) commit(result.doc, EMPTY_SELECTION);
+    addCheckedWire(points);
+  };
+
+  /** Yol bulucunun engelleri (önbellekli; Canvas'ın ölçü aleti ekranı yönüyle). */
+  const routeObstacles = (drawn: readonly Point[]): RouteObstacles => {
+    const cached = obstacleCache.current;
+    if (cached && cached.doc === doc && cached.drawn === drawn) return cached.value;
+    const flipped = (part: Part) => meterFlips?.get(part.id) ?? meterFlipped(part, doc.parts.filter((p) => p.id !== part.id).map((p) => partBounds(p)));
+    const value = wireObstacles(doc, flipped, drawn);
+    obstacleCache.current = { doc, drawn, value };
+    return value;
+  };
+
+  /** Çizilen kablonun son köşesinden hedefe engellerden kaçan yol (masaüstü; telefon routeAround). */
+  const routeTo = (points: readonly Point[], to: Point): Point[] => {
+    const last = points[points.length - 1]!;
+    return routeWire(last, to, routeObstacles(points), horizontalFirst(points, to));
   };
 
   const wiringClick = (state: Extract<Interaction, { kind: 'wiring' }>, g: Point) => {
@@ -774,7 +810,7 @@ export function Canvas({
       if (target.finishes && state.points.length >= 2) finishWire(state.points);
       return;
     }
-    const points = [...state.points, ...routeL(last, target.point, horizontalFirst(state.points, target.point))];
+    const points = [...state.points, ...routeTo(state.points, target.point)];
     if (target.finishes) finishWire(points);
     else setInteraction({ ...state, points, dragPointerId: null });
   };
@@ -873,8 +909,7 @@ export function Canvas({
       phone.onConnectStart(null);
       return;
     }
-    const result = addWire(doc, [start.point, ...routeAround(doc, start.point, target.point)]);
-    if (result.id) commit(result.doc, EMPTY_SELECTION);
+    addCheckedWire([start.point, ...routeAround(doc, start.point, target.point)]);
     phone.onConnectStart(null);
   };
 
@@ -1652,7 +1687,7 @@ export function Canvas({
   if (interaction.kind === 'wiring') {
     const last = interaction.points[interaction.points.length - 1]!;
     const target = cursor ? wireTarget(cursor).point : last;
-    wiringPreview = [...interaction.points, ...routeL(last, target, horizontalFirst(interaction.points, target))];
+    wiringPreview = samePoint(target, last) ? [...interaction.points] : [...interaction.points, ...routeTo(interaction.points, target)];
     const hit = desk && cursor ? hitTest(cursor, { parts: false }) : null;
     if (hit?.kind === 'pin') {
       const part = doc.parts.find((p) => p.id === hit.partId);
@@ -2074,6 +2109,24 @@ export function Canvas({
               strokeLinejoin="round"
             />
           )}
+          {/* Kablo çekerken bütün parça uçları kabloların ve önizlemenin üstünde görünür (altında kalan uç da). */}
+          {interaction.kind === 'wiring' && (
+            <g pointerEvents="none" data-wiring-pins="">
+              {doc.parts.flatMap((part) =>
+                pinPositions(part).map((pos, i) => (
+                  <circle key={`wp${part.id}-${i}`} cx={pos.x * GRID} cy={pos.y * GRID} r={2.6} fill="var(--color-paper)" stroke="var(--color-pin)" strokeWidth={1.4} />
+                )),
+              )}
+            </g>
+          )}
+          {/* Tıklayarak yol çizerken konan köşeler. */}
+          {interaction.kind === 'wiring' && interaction.dragPointerId === null && (
+            <g pointerEvents="none" data-wiring-corners="">
+              {interaction.points.slice(1).map((p, i) => (
+                <circle key={`wc${i}`} cx={p.x * GRID} cy={p.y * GRID} r={3} fill="var(--color-select)" />
+              ))}
+            </g>
+          )}
 
           {ghostType && ghostAt && (
             <g opacity={0.5} pointerEvents="none">
@@ -2262,13 +2315,29 @@ export function Canvas({
           {dropPin.name}
         </span>
       )}
-      {interaction.kind === 'wiring' && desk && (
+      {interaction.kind === 'wiring' && desk && interaction.dragPointerId !== null && (
         <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-small text-ink-2">
           {tr.canvas.dropHint}
           <span className="text-line-2" aria-hidden="true">
             ·
           </span>
           <Kbd size="sm">Esc</Kbd> {tr.canvas.escCancel}
+        </div>
+      )}
+      {/* Çekme bir uçta bitmedi (ya da uca tıklandı): tıklayarak yol çizme kipi açıkça görünür. */}
+      {interaction.kind === 'wiring' && desk && interaction.dragPointerId === null && (
+        <div
+          role="status"
+          data-click-route=""
+          className="absolute bottom-4 left-4 z-20 flex max-w-[calc(100%-2rem)] items-center gap-2 rounded-lg border-2 border-accent bg-accent-soft px-3 py-2 text-small text-accent-ink shadow-md"
+        >
+          <Icon name="wire" className="h-4 w-4 shrink-0" />
+          <b className="shrink-0 font-semibold">{tr.canvas.clickRoute}</b>
+          <span className="min-w-0">
+            {tr.canvas.clickRouteHint} · {tr.canvas.clickRouteFinish} ·
+          </span>
+          <Kbd size="sm">Esc</Kbd>
+          <span className="shrink-0">{tr.canvas.escCancel}</span>
         </div>
       )}
       {interaction.kind === 'wiring' && !desk && (
