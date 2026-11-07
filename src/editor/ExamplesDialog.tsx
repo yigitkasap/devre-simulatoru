@@ -4,7 +4,7 @@
 // (Akdeniz Üniversitesi bölümü ve genel gruplar), gruba dokununca o grubun kartları. Arama başlıkta,
 // cümlede, açıklamada, grup adında ve devredeki parçaların adlarında arar.
 
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { memo, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { EXAMPLE_FOLDERS, type ExampleFolderId, type ExampleId } from '../examples';
 import type { FaultScenarioId } from '../examples/faultScenarios';
 import { tr } from '../i18n/tr';
@@ -43,9 +43,44 @@ export interface ExamplesDialogProps {
 
 const t = () => tr.examples.browser;
 
+/**
+ * Pencere, Simulator her çizildiğinde yeniden çizilmez: devre çalışırken Simulator her karede çizilir ve
+ * geri çağırmaları her seferinde yenidir; pencere de her karede 90'a yakın kartı baştan çizip kaydırmayı
+ * donduruyordu. Geri çağırmalar sabit sarmalayıcılarla (en son verilene gider), gövde yalnızca verisi
+ * (açık örnek, ayarlar, düzen) değişince çizilir.
+ */
 export function ExamplesDialog(props: ExamplesDialogProps) {
-  return props.phone ? <PhoneExamples {...props} /> : <DesktopExamples {...props} />;
+  const latest = useRef(props);
+  latest.current = props;
+  const actions = useMemo(
+    () => ({
+      onLoad: (id: ExampleId) => latest.current.onLoad(id),
+      onBoard: (id: ExampleId) => latest.current.onBoard?.(id),
+      onFault: (id: FaultScenarioId) => latest.current.onFault(id),
+      onClose: () => latest.current.onClose(),
+    }),
+    [],
+  );
+  const hasBoard = props.onBoard !== undefined;
+  const stable = useMemo<ExamplesDialogProps>(
+    () => ({
+      phone: props.phone,
+      activeExample: props.activeExample,
+      activeFault: props.activeFault,
+      settings: props.settings,
+      onLoad: actions.onLoad,
+      onFault: actions.onFault,
+      onClose: actions.onClose,
+      ...(hasBoard ? { onBoard: actions.onBoard } : {}),
+    }),
+    [props.phone, props.activeExample, props.activeFault, props.settings, hasBoard, actions],
+  );
+  return <DialogBody {...stable} />;
 }
+
+const DialogBody = memo(function DialogBody(props: ExamplesDialogProps) {
+  return props.phone ? <PhoneExamples {...props} /> : <DesktopExamples {...props} />;
+});
 
 const BASE = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 
@@ -356,24 +391,36 @@ function DesktopExamples(props: ExamplesDialogProps) {
                 </button>
               </div>
             )}
-            {shown.map((s) =>
-              s.entries.length === 0 ? null : (
-                <section key={s.key} data-section={s.key} aria-labelledby={`${titleId}-${s.key}`} className="mb-9 flex flex-col gap-4 last:mb-0">
-                  <SectionHeader section={s} count={s.entries.length} headingId={`${titleId}-${s.key}`} />
-                  <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
-                    {s.entries.map((e) => (
-                      <EntryCard key={entryKey(e)} entry={e} props={props} query={q} touch={false} />
-                    ))}
-                  </ul>
-                </section>
-              ),
-            )}
+            <SectionList shown={shown} query={q} titleId={titleId} props={props} />
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+/**
+ * Masaüstünün kart listesi (grupların başlıkları ve kartları). Kaydırınca yan listede vurgulanan grup
+ * değişir; liste ona bağlı değildir (memo): grup değiştikçe bütün kartlar yeniden çizilip kaydırma takılmasın.
+ */
+const SectionList = memo(function SectionList({ shown, query, titleId, props }: { shown: readonly ExampleSection[]; query: string; titleId: string; props: ExamplesDialogProps }) {
+  return (
+    <>
+      {shown.map((s) =>
+        s.entries.length === 0 ? null : (
+          <section key={s.key} data-section={s.key} aria-labelledby={`${titleId}-${s.key}`} className="mb-9 flex flex-col gap-4 last:mb-0">
+            <SectionHeader section={s} count={s.entries.length} headingId={`${titleId}-${s.key}`} />
+            <ul className="m-0 grid list-none grid-cols-1 gap-4 p-0 md:grid-cols-2 xl:grid-cols-3">
+              {s.entries.map((e) => (
+                <EntryCard key={entryKey(e)} entry={e} props={props} query={query} touch={false} />
+              ))}
+            </ul>
+          </section>
+        ),
+      )}
+    </>
+  );
+});
 
 // --- Telefon -----------------------------------------------------------------------------------------------
 
