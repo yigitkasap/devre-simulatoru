@@ -4232,6 +4232,9 @@ export const tr = {
       csv: 'CSV indir',
       fileName: 'tarama',
       curveLabel: (name: string, value: string) => `${name} = ${value}`,
+      /** Föy grafiğinin işaretleri (Deney 5 transfer): V_{P} ve V_{GS} = 0'daki akım (I_{DSS} değil; o kartta). */
+      vpMark: (v: string) => `V_{P} ≈ ${v}`,
+      zeroMark: (y: string, x: string, at: string | null, value: string) => `${y} (${x} = 0${at ? `, ${at}` : ''}) = ${value}`,
     },
     picker: {
       search: 'Büyüklük ara',
@@ -4281,6 +4284,8 @@ export const tr = {
       png: 'PNG',
       csv: 'CSV indir',
       csvShare: 'CSV paylaş',
+      /** Telefonda (Web Share API destekleniyorsa) grafiğin resmi. */
+      pngShare: 'PNG paylaş',
       noData: 'Henüz örnek yok',
       chartLabel: (names: string, span: string) => `Grafik: ${names}, ${span}`,
       timeAxis: (unit: string) => `t (${unit})`,
@@ -4384,6 +4389,8 @@ export const tr = {
       added: (n: number) => `${n} değer tabloya aktarıldı`,
       csv: 'CSV indir',
       gain: 'Kazanç (dB)',
+      /** Föy grafiğinde kazancın föydeki adıyla: "Kazanç K_{υ} (dB)". */
+      gainNamed: (name: string) => `Kazanç ${name} (dB)`,
       phase: 'Faz (°)',
       freqAxis: 'f (Hz)',
       mid: (f: string) => `Orta bant (${f})`,

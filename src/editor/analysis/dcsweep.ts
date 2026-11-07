@@ -114,6 +114,16 @@ function settle(sim: CircuitSimulator, read: () => number[]): boolean {
   return true;
 }
 
+/**
+ * Taramanın tek bir noktasında bir büyüklük (föy işaretinin yanındaki V_{DS}): nokta, taramadaki gibi
+ * aynı değerlerle yeniden çözülür. Çözüm yoksa NaN.
+ */
+export function dcPointValue(netlist: Netlist, spec: Pick<DcSweepRequest, 'param' | 'family'>, value: number, step: number | null, q: Quantity): number {
+  const family = spec.family && step !== null ? { param: spec.family.param, values: [step] } : null;
+  const curves = runDcSweep({ netlist, param: spec.param, ranges: [{ from: value, to: value, step: 1 }], family, x: null, y: [q] });
+  return curves[0]?.points[0]?.[2] ?? Number.NaN;
+}
+
 /** Taramayı yapar (eğri eğri). onProgress her noktada; cancelled true dönerse durur. Çözüm bulunamayan noktada eğri biter. */
 export function runDcSweep(req: DcSweepRequest, onProgress?: (done: number, total: number) => void, cancelled?: () => boolean): DcSweepCurve[] {
   const xs = sweepValues(req.ranges);

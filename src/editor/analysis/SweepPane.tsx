@@ -3,21 +3,24 @@
 // değerlerini gösterir; "Tabloya ekle" eylem satırında.
 
 import { useMemo, useState, type ReactNode } from 'react';
+import { foyGraph } from '../../i18n/foyGraphs';
 import { tr } from '../../i18n/tr';
-import type { Quantity, SweepRange, SweepSpec } from '../../model/analysis';
+import type { FoyGraphRef, Quantity, SweepRange, SweepSpec } from '../../model/analysis';
+import type { CircuitDoc } from '../../model/types';
 import { formatNumber, formatSI, parseValue } from '../../sim/units';
 import { Icon } from '../icons';
+import { plainText, Rich } from '../Rich';
 import { useTouchUi } from '../touchUi';
-import { svgSub } from './CurvePane';
-import { MAX_SWEEP_POINTS, sweepValues, type DcSweepCurve } from './dcsweep';
+import { stepValueText } from './CurvePane';
+import { dcPointValue, MAX_SWEEP_POINTS, sweepValues, type DcSweepCurve } from './dcsweep';
+import { Fold } from './Fold';
 import { axisUnit, datedName, saveFile, toCsv, type CsvSeparator } from './format';
+import { foyNames, resolveFoyQuantity, sameParam } from './foyPlan';
 import { QuantityPicker } from './QuantityPicker';
 import { quantityKey } from './quantities';
-import { foyGraph } from '../../i18n/foyGraphs';
-import { Fold } from './Fold';
 import { traceLabel } from './traces';
 import type { AnalysisApi } from './useAnalysis';
-import { XYChart, type XYSeries } from './XYChart';
+import { svgSub, XYChart, type XYSeries } from './XYChart';
 
 const editable = (v: number) => formatNumber(v, 6).replace(/,?0+$/, '').replace(/,$/, '');
 
@@ -31,36 +34,69 @@ export function sweepAt(points: readonly (readonly number[])[], col: number, x: 
   return points.length === 1 && points[0]![1] === x ? points[0]![col]! : Number.NaN;
 }
 
-/** Eksen ve sütun adları; birimler. */
-export function sweepAxes(api: AnalysisApi, spec: SweepSpec) {
-  const param = api.sweepParams.find((p) => p.param.part === spec.param.part && p.param.prop === spec.param.prop);
-  const label = (q: Quantity) => traceLabel(q, api.circuit, api.idx);
-  const x = spec.x ? { name: label(spec.x).name, unit: label(spec.x).unit as string } : { name: param?.name ?? '?', unit: param?.unit ?? '' };
-  const ys = spec.y.map((q) => ({ name: label(q).name, unit: label(q).unit as string }));
+/**
+ * Eksen ve sütun adları; birimler. Föy grafiğinde föy planındaki büyüklükler ve değerler föydeki adlarıyla
+ * (I_{D}, V_{DS}, V_{GS} = −V_{GG}: işaret −1); kullanıcının değiştirdikleri devredeki adlarıyla.
+ */
+export function sweepAxes(api: NamesApi, spec: SweepSpec, foy?: FoyGraphRef) {
+  const names = foyNames(foy, api.circuit);
+  const found = api.sweepParams.find((p) => p.param.part === spec.param.part && p.param.prop === spec.param.prop);
+  const param = found ? { ...found, name: sameParam(spec.param, names?.param ?? null) ? names!.param!.name : found.name } : undefined;
+  const label = (q: Quantity) => {
+    const l = traceLabel(q, api.circuit, api.idx);
+    return { name: names?.quantities.get(quantityKey(q)) ?? l.name, unit: l.unit as string };
+  };
+  const x = spec.x ? label(spec.x) : { name: param?.name ?? '?', unit: param?.unit ?? '' };
+  const ys = spec.y.map(label);
   const familyParam = spec.family ? api.sweepParams.find((p) => p.param.part === spec.family!.param.part && p.param.prop === spec.family!.param.prop) : null;
-  return { param, x, ys, family: familyParam ? { name: familyParam.name, unit: familyParam.unit } : null };
+  const foyFamily = spec.family && sameParam(spec.family.param, names?.family ?? null) ? names!.family! : null;
+  const family = familyParam ? { name: foyFamily?.name ?? familyParam.name, unit: familyParam.unit, sign: foyFamily?.sign ?? 1, foy: foyFamily !== null } : null;
+  return { param, x, ys, family };
+}
+
+export type SweepAxes = ReturnType<typeof sweepAxes>;
+
+/** Adlar için gereken: taranabilen değerler, devre ve düğüm dizini. */
+type NamesApi = Pick<AnalysisApi, 'sweepParams' | 'circuit' | 'idx'>;
+
+/** Eğrinin ikinci değeri ("V_{GS} = −0,2 V" için −0,2 V): föyde volt cinsinden, işaretiyle; yoksa önekli. */
+export function familyText(family: NonNullable<SweepAxes['family']>, step: number): string {
+  const v = family.sign * step;
+  return family.foy && family.unit === 'V' ? stepValueText(v, 'V') : formatSI(v, family.unit, { trim: true });
+}
+
+/** Eğrinin adı: föyde "V_{GS} = −0,2 V", devrede "PS1 2. çıkış = 200 mV". */
+function curveName(family: NonNullable<SweepAxes['family']>, step: number): string {
+  return tr.analysis.sweep.curveLabel(family.foy ? family.name : family.name.replace(' · ', ' '), familyText(family, step));
+}
+
+/** V_{GS} = 0 işaretinin yazısı: "I_{D} (V_{GS} = 0, V_{DS} ≈ 9,6 V) = 4,12 mA". */
+export function zeroMark(axes: SweepAxes, zero: NonNullable<FoyMarks['zero']>): string {
+  const at = Number.isFinite(zero.at) ? `${zero.atName} ≈ ${formatSI(zero.at, 'V', { digits: 2 })}` : null;
+  return tr.analysis.sweep.zeroMark(axes.ys[0]?.name ?? '?', axes.x.name, at, formatSI(zero.value, axes.ys[0]?.unit ?? 'A', { digits: 3 }));
 }
 
 /** Taramanın CSV'si: her eğri ve her düşey büyüklük bir sütun çifti değil, satır başına [eğri, taranan, x, y…]. */
-export function sweepCsv(api: AnalysisApi, spec: SweepSpec, curves: readonly DcSweepCurve[], sep: CsvSeparator): Blob {
-  const a = sweepAxes(api, spec);
-  const head = [...(a.family ? [`${a.family.name} (${a.family.unit})`] : []), `${a.param?.name ?? '?'} (${a.param?.unit ?? ''})`, ...(spec.x ? [`${a.x.name} (${a.x.unit})`] : []), ...a.ys.map((y) => `${y.name} (${y.unit})`)];
+export function sweepCsv(api: NamesApi, spec: SweepSpec, curves: readonly DcSweepCurve[], sep: CsvSeparator, foy?: FoyGraphRef): Blob {
+  const a = sweepAxes(api, spec, foy);
+  const col = (name: string, unit: string) => `${plainText(name)} (${unit})`;
+  const head = [...(a.family ? [col(a.family.name, a.family.unit)] : []), col(a.param?.name ?? '?', a.param?.unit ?? ''), ...(spec.x ? [col(a.x.name, a.x.unit)] : []), ...a.ys.map((y) => col(y.name, y.unit))];
   const rows: (number | string)[][] = [];
-  for (const c of curves) for (const p of c.points) rows.push([...(a.family ? [c.step ?? ''] : []), p[0]!, ...(spec.x ? [p[1]!] : []), ...p.slice(2)]);
+  for (const c of curves) for (const p of c.points) rows.push([...(a.family ? [c.step === null ? '' : a.family.sign * c.step] : []), p[0]!, ...(spec.x ? [p[1]!] : []), ...p.slice(2)]);
   return new Blob([toCsv(head, rows, sep)], { type: 'text/csv;charset=utf-8' });
 }
 
-export function saveSweep(api: AnalysisApi, spec: SweepSpec, curves: readonly DcSweepCurve[], share: boolean): void {
-  void saveFile(datedName(tr.analysis.sweep.fileName, 'csv'), sweepCsv(api, spec, curves, api.separator), share);
+export function saveSweep(api: AnalysisApi, spec: SweepSpec, curves: readonly DcSweepCurve[], share: boolean, foy?: FoyGraphRef): void {
+  void saveFile(datedName(tr.analysis.sweep.fileName, 'csv'), sweepCsv(api, spec, curves, api.separator, foy), share);
 }
 
 /** İmleçteki değerler tabloya (her eğri ve büyüklük bir satır). */
-export function sweepToTable(api: AnalysisApi, spec: SweepSpec, curves: readonly DcSweepCurve[], x: number): number {
-  const a = sweepAxes(api, spec);
-  const xText = `${a.x.name} = ${formatSI(x, a.x.unit, { digits: 4, trim: true })}`;
+export function sweepToTable(api: AnalysisApi, spec: SweepSpec, curves: readonly DcSweepCurve[], x: number, foy?: FoyGraphRef): number {
+  const a = sweepAxes(api, spec, foy);
+  const xText = `${plainText(a.x.name)} = ${formatSI(x, a.x.unit, { digits: 4, trim: true })}`;
   const rows = curves.flatMap((c) =>
     spec.y.map((_, k) => ({
-      name: `${a.ys[k]!.name}${c.step !== null && a.family ? ` (${a.family.name} = ${formatSI(c.step, a.family.unit, { trim: true })})` : ''}`,
+      name: `${a.ys[k]!.name}${c.step !== null && a.family ? ` (${a.family.name} = ${familyText(a.family, c.step)})` : ''}`,
       formula: '',
       theory: '',
       measured: sweepAt(c.points, k + 2, x),
@@ -74,21 +110,34 @@ export function sweepToTable(api: AnalysisApi, spec: SweepSpec, curves: readonly
   return valid.length;
 }
 
+export interface FoyMarks {
+  readonly vp?: number;
+  /** V_{GS} = 0'daki akım (I_{DSS} değil) ve o noktada ölçülen gerilim (V_{DS}; ölçülemediyse NaN). */
+  readonly zero?: { readonly value: number; readonly at: number; readonly atName: string };
+}
+
 /**
  * Föy grafiğinin işaretleri (Deney 5 transfer): V_P, akımın sıfırlandığı V_GS (sıfırdan önceki son iki
- * noktadan √I_D doğrusal uzatılarak; doyumda I_D ∝ (V_GS − V_P)²), I_DSS, V_GS = 0'daki akım.
+ * noktadan √I_D doğrusal uzatılarak; doyumda I_D ∝ (V_GS − V_P)²) ve V_GS = 0'daki akım, yanında o
+ * noktadaki V_DS (measure: tek noktanın çözümü). Bu akım I_DSS değildir: kanal boyu modülasyonu yüzünden
+ * V_DS ile artar; föy kartındaki I_DSS doyum doğrusunun V_DS = 0'a uzatılmasıyla bulunur.
  */
-export function foyMarks(ref: { example: string; key: string }, curves: readonly DcSweepCurve[]): { vp?: number; idss?: number } | null {
+export function foyMarks(ref: FoyGraphRef, curves: readonly DcSweepCurve[], doc?: CircuitDoc, measure?: (q: Quantity, value: number, step: number | null) => number): FoyMarks | null {
   const def = foyGraph(ref);
   if (!def || def.plan.kind !== 'sweep' || !def.plan.marks) return null;
-  const pts = curves[0]?.points ?? [];
-  const out: { vp?: number; idss?: number } = {};
-  if (def.plan.marks.includes('idss')) {
+  const marks = def.plan.marks;
+  const curve = curves[0];
+  const pts = curve?.points ?? [];
+  const out: { vp?: number; zero?: FoyMarks['zero'] } = {};
+  if (marks.zero) {
     // V_GS'si sıfıra en yakın nokta (kapı akımı yüzünden tam sıfır olmayabilir).
     const zero = pts.reduce<readonly number[] | null>((best, p) => (best === null || Math.abs(p[1]!) < Math.abs(best[1]!) ? p : best), null);
-    if (zero && Math.abs(zero[1]!) < 1e-3 && Number.isFinite(zero[2]!)) out.idss = zero[2]!;
+    if (zero && Math.abs(zero[1]!) < 1e-3 && Number.isFinite(zero[2]!)) {
+      const q = doc ? resolveFoyQuantity(marks.zero, doc) : null;
+      out.zero = { value: zero[2]!, at: q && measure ? measure(q, zero[0]!, curve?.step ?? null) : Number.NaN, atName: marks.zero.name };
+    }
   }
-  if (def.plan.marks.includes('vp')) {
+  if (marks.vp) {
     const i = pts.findIndex((p) => Math.abs(p[2]!) <= 1e-9);
     if (i >= 2) {
       const [x1, y1] = [pts[i - 2]![1]!, Math.sqrt(Math.abs(pts[i - 2]![2]!))];
@@ -115,9 +164,14 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
   const [familyDraft, setFamilyDraft] = useState('');
   const touch = useTouchUi();
   const spec = graph?.sweep ?? null;
-  const axes = spec ? sweepAxes(api, spec) : null;
+  const axes = spec ? sweepAxes(api, spec, graph?.foy) : null;
   const result = api.sweep.result;
   const curves = result?.curves ?? [];
+  // İşaretler (föyde): V_{GS} = 0 noktasındaki V_{DS} o noktanın çözümüyle (tarama sonucu değişince bir kez).
+  const marks = useMemo(
+    () => (graph?.foy && spec ? foyMarks(graph.foy, curves, api.circuit, (q, v, step) => dcPointValue(api.netlist, spec, v, step, q)) : null),
+    [curves, graph?.foy?.example, graph?.foy?.key],
+  );
   const points = spec ? sweepValues(spec.ranges).length * (spec.family?.values.length ?? 1) : 0;
 
   const { series, xScale, xUnit, yScale, yUnit } = useMemo(() => {
@@ -133,8 +187,8 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
     const out: XYSeries[] = [];
     curves.forEach((c, ci) =>
       spec.y.forEach((_, k) => {
-        const familyText = c.step !== null && axes.family ? formatSI(c.step, axes.family.unit, { trim: true }) : null;
-        const label = spec.y.length > 1 ? (familyText ? `${axes.ys[k]!.name} · ${familyText}` : axes.ys[k]!.name) : familyText ? t.curveLabel(axes.family!.name.replace(' · ', ' '), familyText) : undefined;
+        const step = c.step !== null && axes.family ? familyText(axes.family, c.step) : null;
+        const label = spec.y.length > 1 ? (step ? `${axes.ys[k]!.name} · ${step}` : axes.ys[k]!.name) : step && c.step !== null ? curveName(axes.family!, c.step) : undefined;
         out.push({ id: `${ci}-${k}`, color: (spec.y.length > 1 ? k : ci) % 6, points: c.points.filter((p) => Number.isFinite(p[k + 2]!)).map((p) => [p[1]! * xu.scale, p[k + 2]!] as const), ...(label ? { label } : {}) });
       }),
     );
@@ -142,7 +196,6 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
   }, [curves, spec, axes]);
 
   if (!graph || !spec || !axes) return null;
-  const marks = graph.foy ? foyMarks(graph.foy, curves) : null;
   if (api.sweepParams.length === 0) return <p className="m-0 px-4 py-6 text-small text-muted">{t.none}</p>;
 
   const set = (patch: Partial<SweepSpec>) => api.setSweep(patch);
@@ -284,7 +337,7 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
           }}
           className={select}
         >
-          <option value="">{t.xParam(axes.param?.name ?? '?')}</option>
+          <option value="">{t.xParam(plainText(axes.param?.name ?? '?'))}</option>
           {api.quantities.map((o) => (
             <option key={o.key} value={quantityKey(o.quantity)}>
               {o.name}
@@ -295,8 +348,10 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
       <Field label={t.yAxis}>
         {spec.y.map((q, k) => (
           <div key={quantityKey(q)} className="flex items-center gap-1 rounded-lg bg-panel-2 py-1 pr-1 pl-3" style={{ boxShadow: `inset 3px 0 0 var(--color-tr-${(k % 6) + 1})` }}>
-            <b className="min-w-0 flex-1 truncate font-mono text-small font-semibold">{axes.ys[k]!.name}</b>
-            <button type="button" onClick={() => set({ y: spec.y.filter((_, i) => i !== k) })} aria-label={t.yRemove(axes.ys[k]!.name)} className={small}>
+            <b className="min-w-0 flex-1 truncate font-mono text-small font-semibold">
+              <Rich text={axes.ys[k]!.name} />
+            </b>
+            <button type="button" onClick={() => set({ y: spec.y.filter((_, i) => i !== k) })} aria-label={t.yRemove(plainText(axes.ys[k]!.name))} className={small}>
               <Icon name="close" className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -336,11 +391,11 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
         yScale={yScale}
         cursor={cur !== null ? cur * xScale : null}
         onCursor={(x) => onCursor(x / xScale)}
-        cursorText={(x) => `${axes.x.name} = ${formatNumber(x, 3).replace(/,?0+$/, '').replace(/,$/, '')} ${xUnit}`}
-        ariaLabel={yLabel}
+        cursorText={(x) => `${plainText(axes.x.name)} = ${formatNumber(x, 3).replace(/,?0+$/, '').replace(/,$/, '')} ${xUnit}`}
+        ariaLabel={plainText(yLabel)}
         compact={compact}
-        {...(marks?.vp !== undefined ? { vLines: [{ x: marks.vp * xScale, label: `VP ≈ ${formatSI(marks.vp, 'V', { digits: 3 })}` }] } : {})}
-        {...(marks?.idss !== undefined ? { hLines: [{ y: marks.idss * yScale, label: `IDSS ≈ ${formatSI(marks.idss, 'A', { digits: 3 })}` }] } : {})}
+        {...(marks?.vp !== undefined ? { vLines: [{ x: marks.vp * xScale, label: t.vpMark(formatSI(marks.vp, 'V', { digits: 3 })) }] } : {})}
+        {...(marks?.zero ? { hLines: [{ y: marks.zero.value * yScale, label: zeroMark(axes, marks.zero) }] } : {})}
         {...(compact ? { height: 260 } : {})}
         footer={
           cur !== null ? (
@@ -366,8 +421,9 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
 
   return compact ? (
     <div className="flex flex-col gap-3">
-      {/* Sütun yönlü: yüksekliği verilen XYChart flex: none olur, satır yönlü kapta genişliği 0 kalırdı. */}
-      <div className="flex shrink-0 flex-col">{chart}</div>
+      {/* Sütun yönlü: yüksekliği verilen XYChart flex: none olur, satır yönlü kapta genişliği 0 kalırdı.
+          Telefonda grafik ekranın tam genişliğinde (sayfanın kenar boşluğu dışında), adlar altında. */}
+      <div className="-mx-4 flex shrink-0 flex-col">{chart}</div>
       <Fold title={tr.analysis.picker.settings}>{settings}</Fold>
     </div>
   ) : (

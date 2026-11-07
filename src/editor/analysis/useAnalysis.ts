@@ -7,16 +7,18 @@ import type { CsvSeparator } from './format';
 import { tr } from '../../i18n/tr';
 import { nextTraceColor, pruneTraces, type AnalysisDoc, type FoyGraphRef, type GraphDef, type GraphKind, type Quantity, type SweepSpec, type TableRow, type TraceDef } from '../../model/analysis';
 import type { Connectivity } from '../../model/connectivity';
+import type { Netlist } from '../../sim';
 import type { CircuitDoc, Point } from '../../model/types';
 import type { CanvasMark, PickTarget } from '../Canvas';
 import { foyGraph, type FoyGraphDef } from '../../i18n/foyGraphs';
 import { labFigure } from '../../i18n/foy';
+import { plainText } from '../Rich';
 import type { ExampleId } from '../../examples';
-import { foyCards, resolveFoyPlan } from './foyPlan';
+import { foyCards, foyNames, resolveFoyPlan } from './foyPlan';
 import type { FoySection } from './StartScreen';
 import { sweepParams, type SweepParamOption } from './dcsweep';
 import { useDcSweep, type DcSweepApi } from './useDcSweep';
-import { quantityOptions, type QuantityOption } from './quantities';
+import { quantityKey, quantityOptions, type QuantityOption } from './quantities';
 import { liveTraces, netIndex, nodeName, traceColor, traceLabel, type NetIndex, type TraceLabel } from './traces';
 import { useBode, type BodeApi } from './useBode';
 import { useTracer, type TracerApi } from './useTracer';
@@ -98,6 +100,8 @@ export interface AnalysisApi {
   readonly bode: BodeApi;
   /** Devrenin düğüm dizini (görev hedeflerinin adları ve ölçümü). */
   readonly idx: NetIndex;
+  /** Devrenin ağı (föy grafiğinin işaretindeki tek nokta ölçümü için). */
+  readonly netlist: Netlist;
   /** Görevde tahmin kaydedilmeden (B1) ölçüm yapılmaz: Eğri izleyici ve Bode yerine bu yazı. */
   readonly gate: string | null;
   /** Arıza bulmada (B2) serbest iz eklenmez: Grafik'te "İz ekle" yerine bu yazı. */
@@ -160,7 +164,21 @@ export function useAnalysis(
   // Kimlikler değişmedikçe aynı dizi (kayıt her belge değişikliğinde yeniden kurulmasın).
   const liveKey = live.map((t) => t.id).join(',');
   const traces = useMemo(() => live, [liveKey]);
-  const labels = useMemo(() => new Map(traces.map((t) => [t.id, traceLabel(t, doc, idx)])), [traces, doc, idx]);
+  // Föy grafiğinin izleri föydeki adlarıyla (V_{i}, V_{ç}…); öbürleri devredeki adlarıyla ("OSC1 · A").
+  const labels = useMemo(() => {
+    const out = new Map(traces.map((t) => [t.id, traceLabel(t, doc, idx)]));
+    for (const g of analysis.graphs) {
+      const names = g.kind === 'time' ? foyNames(g.foy, doc) : null;
+      if (!names || g.kind !== 'time') continue;
+      for (const id of [...g.traces, ...(g.x ? [g.x] : [])]) {
+        const t = traces.find((x) => x.id === id);
+        const name = t ? names.quantities.get(quantityKey(t)) : undefined;
+        const label = out.get(id);
+        if (name && label) out.set(id, { ...label, name });
+      }
+    }
+    return out;
+  }, [traces, doc, idx, analysis.graphs]);
   const bode = useBode(doc, connectivity, idx, traces, labels);
 
   const graphTraces = useMemo(
@@ -325,13 +343,15 @@ export function useAnalysis(
       const label = labels.get(t.id);
       if (!label) continue;
       const color = traceColor(t.color);
+      // Şemadaki etiket düz yazı (föydeki adın alt simgesi düz: "Vç").
+      const name = plainText(label.name);
       if (t.kind !== 'voltage') {
         // Parçanın büyüklüğü (akım, okuma, kanal, güç, transistör): etiket parçanın üstünde.
         const part = doc.parts.find((p) => p.id === t.part);
-        if (part) out.push({ at: { x: part.x, y: part.y }, text: t.kind === 'current' ? `${label.name} →` : label.name, color, kind: 'pill' });
+        if (part) out.push({ at: { x: part.x, y: part.y }, text: t.kind === 'current' ? `${name} →` : name, color, kind: 'pill' });
       } else {
-        out.push({ at: t.at, text: label.name, color, kind: 'pill' });
-        if (t.refAt) out.push({ at: t.refAt, text: `${label.name}−`, color, kind: 'ring' });
+        out.push({ at: t.at, text: name, color, kind: 'pill' });
+        if (t.refAt) out.push({ at: t.refAt, text: `${name}−`, color, kind: 'ring' });
       }
     }
     if (pick?.stage === 'second') out.push({ at: pick.at, text: `pick-${pick.key}`, color: 'var(--color-accent)', kind: 'ring' });
@@ -400,6 +420,7 @@ export function useAnalysis(
     tracer,
     bode,
     idx,
+    netlist: connectivity.netlist,
     gate,
     traceGate,
   };

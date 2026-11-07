@@ -3,7 +3,7 @@
 // devrede yük direnci varsa; yoksa soluk ve nedeni yazılı). Sağda eğriler (adları sağ uçta) ve imleç
 // değerleri altta tek satırda. Parametre değişince kendiliğinden yeniden taranır.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { tr } from '../../i18n/tr';
 import { formatNumber, formatSI } from '../../sim/units';
 import { Icon } from '../icons';
@@ -13,7 +13,7 @@ import { axisUnit, datedName, saveFile, toCsv, type CsvSeparator } from './forma
 import { FAMILY, isP, sweepValues, type Curve } from './sweep';
 import { traceColor } from './traces';
 import type { TracerApi } from './useTracer';
-import { valueAt, XYChart } from './XYChart';
+import { svgSub, valueAt, XYChart } from './XYChart';
 import { SettingsSummary, useSettingsEditing } from './SettingsSummary';
 
 /** Eksen ve basamak adları (alt simgeli: "V_{DS}"); P tipinde başında eksi. */
@@ -27,20 +27,8 @@ export function quantities(tracer: TracerApi): { x: string; y: string; step: str
   return { x: `${neg}V_{DS}`, y: `${neg}I_{D}`, step: `${neg}V_{GS}`, stepUnit: 'V', load: 'R_{D}' };
 }
 
-/** SVG içinde alt simge: "V_{DS}" → V ve küçük, aşağıda DS. */
-export function svgSub(text: string): ReactNode {
-  const parts = text.split(/_\{([^}]*)\}/);
-  return parts.map((p, i) =>
-    i % 2 === 1 ? (
-      <tspan key={i} fontSize="0.75em" dy="0.3em">
-        {p}
-        <tspan dy="-0.3em"> </tspan>
-      </tspan>
-    ) : (
-      p
-    ),
-  );
-}
+/** SVG içinde alt simge (XYChart'ta): "V_{DS}" → V ve küçük, aşağıda DS. */
+export { svgSub };
 
 const plain = (text: string) => text.replace(/_\{([^}]*)\}/g, '$1');
 
@@ -303,7 +291,8 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
   return compact ? (
     <div className="flex flex-col gap-3">
       {collapsed ? <SettingsSummary text={summary} onEdit={() => setEditing(true)} /> : controls}
-      {chart}
+      {/* Telefonda grafik ekranın tam genişliğinde, eğri adları altında. */}
+      <div className="-mx-4 flex flex-col">{chart}</div>
     </div>
   ) : (
     <div className="flex min-h-0 flex-1 gap-5 px-4 pb-3">

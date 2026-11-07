@@ -6,6 +6,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { tr } from '../../i18n/tr';
 import { Icon, type IconName } from '../icons';
+import { Rich } from '../Rich';
 import { PickControls } from './PickControls';
 import { QuantityPicker } from './QuantityPicker';
 import type { QuantityOption } from './quantities';
@@ -68,10 +69,14 @@ function Card({ icon, eyebrow, title, detail, badge, foy = false, onClick, touch
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         {eyebrow && <span className="font-mono text-[10.5px] font-semibold tracking-[0.06em] text-accent-ink uppercase">{eyebrow}</span>}
         <span className="flex items-center gap-1.5">
-          <b className="min-w-0 text-small font-semibold text-ink">{title}</b>
+          <b className="min-w-0 text-small font-semibold text-ink">
+            <Rich text={title} />
+          </b>
           {badge && <span className="shrink-0 rounded-full bg-accent px-1.5 text-[10.5px] font-semibold text-white">{badge}</span>}
         </span>
-        <span className="text-label leading-snug text-muted">{detail}</span>
+        <span className="text-label leading-snug text-muted">
+          <Rich text={detail} />
+        </span>
       </span>
     </button>
   );

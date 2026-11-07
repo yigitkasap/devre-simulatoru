@@ -127,9 +127,10 @@ describe('Analiz v2: föydeki grafikler', { timeout: 120_000 }, () => {
     expect(sweepAt(zero!.points, 2, 8) * 1e3).toBeCloseTo(4.02, 1);
     const tf = plan('jfet-karakteristik', 'id-vgs');
     if (tf.kind !== 'sweep') throw new Error('tarama değil');
+    // İşaret V_{GS} = 0'daki akım (4,12 mA, V_{DS} ≈ 9,6 V); föy kartındaki I_{DSS} (3,52 mA) yukarıdaki uzatmayla.
     const marks = foyMarks({ example: 'jfet-karakteristik', key: 'id-vgs' }, runDcSweep({ netlist, ...tf.sweep }))!;
     expect(marks.vp!).toBeCloseTo(-1.74, 1);
-    expect(marks.idss! * 1e3).toBeCloseTo(4.12, 1);
+    expect(marks.zero!.value * 1e3).toBeCloseTo(4.12, 1);
   });
 
   it('Deney 6–8: giriş ve çıkış; kazanç FET ≈ 10, BJT ≈ 16; MOSFET’te çıkış ≈ 2,3 V ile 14,0 V arasında; Bode grafiği kuruluyor', () => {

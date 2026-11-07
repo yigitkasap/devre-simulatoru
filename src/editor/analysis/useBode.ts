@@ -4,6 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { tr } from '../../i18n/tr';
+import { plainText } from '../Rich';
 import type { TraceDef } from '../../model/analysis';
 import { pinKey, type Connectivity } from '../../model/connectivity';
 import { pinPositions } from '../../model/geometry';
@@ -83,7 +84,8 @@ export function useBode(doc: CircuitDoc, connectivity: Connectivity, idx: NetInd
     }
     for (const tr0 of traces) {
       if (tr0.kind !== 'voltage') continue;
-      out.push({ key: `trace:${tr0.id}`, label: labels.get(tr0.id)?.name ?? '?', short: labels.get(tr0.id)?.name ?? '?', probe: { a: tr0.node, b: tr0.ref }, at: tr0.at });
+      const name = plainText(labels.get(tr0.id)?.name ?? '?');
+      out.push({ key: `trace:${tr0.id}`, label: name, short: name, probe: { a: tr0.node, b: tr0.ref }, at: tr0.at });
     }
     return out;
   }, [doc.parts, idx, connectivity, traces, labels, t]);

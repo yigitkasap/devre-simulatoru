@@ -13,7 +13,8 @@ import { Icon, type IconName } from '../icons';
 import { TouchUi, useTouchUi } from '../touchUi';
 import type { SimFrame, SimStatus } from '../useSimulation';
 import { Chart, cursorTime, recordSpan, timeUnit, type ChartTrace } from './Chart';
-import { datedName, saveFile, svgsToPng, svgToPng, tickText, toCsv } from './format';
+import { canSharePng, datedName, saveFile, svgsToPng, svgToPng, tickText, toCsv } from './format';
+import { plainText, Rich } from '../Rich';
 import type { TraceRecorder } from './recorder';
 import { tableCsv, tableTsv } from './table';
 import { BodePane, bodeToTable, saveBode } from './BodePane';
@@ -94,7 +95,7 @@ function useGraph({ api, recorder: rec, status, frame, notify }: AnalysisPanelPr
   const svg = useRef<SVGSVGElement>(null);
 
   const csvBlob = () => {
-    const header = ['t (s)', ...chartTraces.map((t) => `${t.name} (${t.unit})`)];
+    const header = ['t (s)', ...chartTraces.map((t) => `${plainText(t.name)} (${t.unit})`)];
     const rows: (number | string)[][] = [];
     for (let i = 0; i < rec.count; i++) rows.push([rec.times[i]!, ...chartTraces.map((t) => rec.values.get(t.id)?.[i] ?? Number.NaN)]);
     return new Blob([toCsv(header, rows, api.separator)], { type: 'text/csv;charset=utf-8' });
@@ -140,12 +141,12 @@ function useGraph({ api, recorder: rec, status, frame, notify }: AnalysisPanelPr
 
 type Graph = ReturnType<typeof useGraph>;
 
-/** Eğri izleyicinin ve Bode'un grafikleri (bölmedeki çizimler) alt alta tek PNG'de. */
-async function panePng(pane: RefObject<HTMLDivElement | null>, name: string) {
+/** Bölmedeki grafikler (Bode'da kazanç ve faz) alt alta tek PNG'de; telefonda (share) paylaşım sayfasıyla. */
+async function panePng(pane: RefObject<HTMLDivElement | null>, name: string, share = false) {
   const svgs = [...(pane.current?.querySelectorAll<SVGSVGElement>('svg[role=img]') ?? [])];
   if (svgs.length === 0) return;
   const blob = await svgsToPng(svgs);
-  if (blob) await saveFile(datedName(name, 'png'), blob);
+  if (blob) await saveFile(datedName(name, 'png'), blob, share);
 }
 
 /** CSV menüsü (N2): ayırıcı (noktalı virgül varsayılan, virgül) ve iki dosya. */
@@ -262,13 +263,15 @@ function GraphChips({ api, touch }: { api: AnalysisApi; touch: boolean }) {
                 >
                   {graph.foy && <span className={`rounded-[4px] px-1 font-mono text-[10px] font-bold tracking-[0.06em] ${on ? 'bg-on-ink/15' : 'bg-accent-soft text-accent-ink'}`}>{t.foyPrefix}</span>}
                   {!graph.foy && <Icon name={KIND_ICONS[graph.kind]} className="h-3.5 w-3.5 shrink-0" />}
-                  <span className="truncate">{name}</span>
+                  <span className="truncate">
+                    <Rich text={name} />
+                  </span>
                 </button>
                 <button
                   type="button"
                   onClick={() => api.closeGraph(graph.id)}
-                  aria-label={t.chipClose(name)}
-                  title={t.chipClose(name)}
+                  aria-label={t.chipClose(plainText(name))}
+                  title={t.chipClose(plainText(name))}
                   className={`flex shrink-0 items-center justify-center rounded-r-lg ${touch ? 'w-11' : 'w-7'} ${h} ${on ? 'hover:bg-on-ink/10' : 'hover:bg-panel-2'}`}
                 >
                   <Icon name="close" className="h-3.5 w-3.5" />
@@ -379,10 +382,12 @@ function GraphDesk({ api, recorder, g, touch }: AnalysisPanelProps & { g: Graph;
               return (
                 <div key={tr0.id} className="flex items-center gap-1 rounded-lg bg-panel-2 py-1.5 pr-1 pl-3" style={{ boxShadow: `inset 3px 0 0 ${traceColor(tr0.color)}` }}>
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <b className="truncate font-mono text-small font-semibold">{label?.name}</b>
+                    <b className="truncate font-mono text-small font-semibold">
+                      <Rich text={label?.name ?? ''} />
+                    </b>
                     <span className="truncate text-label text-muted">{label?.detail}</span>
                   </span>
-                  <button type="button" onClick={() => api.removeTrace(tr0.id)} aria-label={t.remove(label?.name ?? '')} title={t.remove(label?.name ?? '')} className={`flex shrink-0 items-center justify-center rounded-md text-muted hover:bg-app ${touch ? 'h-11 w-11' : 'h-8 w-8'}`}>
+                  <button type="button" onClick={() => api.removeTrace(tr0.id)} aria-label={t.remove(plainText(label?.name ?? ''))} title={t.remove(plainText(label?.name ?? ''))} className={`flex shrink-0 items-center justify-center rounded-md text-muted hover:bg-app ${touch ? 'h-11 w-11' : 'h-8 w-8'}`}>
                     <Icon name="close" className="h-4 w-4" />
                   </button>
                 </div>
@@ -633,7 +638,7 @@ function SweepActions({ api, notify, pane, ghost, solid, pngButton }: { api: Ana
       <button
         type="button"
         onClick={() => {
-          const n = api.sweepCursor !== null && result ? sweepToTable(api, spec, result.curves, api.sweepCursor) : 0;
+          const n = api.sweepCursor !== null && result ? sweepToTable(api, spec, result.curves, api.sweepCursor, api.active?.foy) : 0;
           if (n > 0) notify(t.added(n));
         }}
         disabled={api.sweepCursor === null || !result}
@@ -643,7 +648,7 @@ function SweepActions({ api, notify, pane, ghost, solid, pngButton }: { api: Ana
         {t.toTable}
       </button>
       {pngButton(() => void panePng(pane, t.fileName), !result)}
-      <button type="button" onClick={() => result && saveSweep(api, spec, result.curves, false)} disabled={!result} className={solid}>
+      <button type="button" onClick={() => result && saveSweep(api, spec, result.curves, false, api.active?.foy)} disabled={!result} className={solid}>
         <Icon name="download" className="h-4 w-4" />
         {t.csv}
       </button>
@@ -670,6 +675,21 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
   const barStyle = { paddingBottom: 'calc(14px + env(safe-area-inset-bottom))' };
   const ghost = 'flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel text-[15px] font-semibold disabled:opacity-50';
   const solid = 'flex h-[52px] min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent text-[15px] font-semibold text-white disabled:opacity-50';
+  // PNG yalnızca dosya paylaşımı destekleniyorsa (Web Share API); yoksa telefonda yalnızca CSV.
+  const pngShare = useMemo(canSharePng, []);
+  const pngButton = (disabled: boolean, name: string = tr.analysis.graph.fileName) =>
+    pngShare ? (
+      <button
+        type="button"
+        onClick={() => void panePng(pane, name, true)}
+        disabled={disabled}
+        aria-label={t.pngShare}
+        className="flex h-[52px] shrink-0 items-center justify-center gap-1.5 rounded-lg border border-line-2 bg-panel px-3.5 text-[15px] font-semibold disabled:opacity-50"
+      >
+        <Icon name="camera" className="h-4 w-4" />
+        {t.png}
+      </button>
+    ) : null;
   return (
     <TouchUi.Provider value>
       <div className="flex min-h-0 flex-1 flex-col">
@@ -721,8 +741,10 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                     return (
                       <span key={tr0.id} className="flex h-11 items-center gap-1 rounded-full bg-accent-soft pl-3 font-mono text-small font-semibold">
                         <span aria-hidden="true" className="h-2.5 w-2.5 rounded-[3px]" style={{ background: traceColor(tr0.color) }} />
-                        {name}
-                        <button type="button" onClick={() => api.removeTrace(tr0.id)} aria-label={t.remove(name)} className="flex h-11 w-11 items-center justify-center rounded-full text-muted active:bg-app">
+                        <span>
+                          <Rich text={name} />
+                        </span>
+                        <button type="button" onClick={() => api.removeTrace(tr0.id)} aria-label={t.remove(plainText(name))} className="flex h-11 w-11 items-center justify-center rounded-full text-muted active:bg-app">
                           <Icon name="close" className="h-3.5 w-3.5" />
                         </button>
                       </span>
@@ -730,10 +752,13 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                   })}
                 </div>
                 <PickControls api={api} touch />
+                {/* Grafik ekranın tam genişliğinde (sayfanın kenar boşluğu dışında). */}
                 {api.active?.kind === 'time' && api.active.x !== null ? (
-                  <TimeXY api={api} recorder={recorder} version={g.version} compact />
+                  <div className="-mx-4 flex shrink-0 flex-col">
+                    <TimeXY api={api} recorder={recorder} version={g.version} compact />
+                  </div>
                 ) : (
-                  <div className="flex h-[210px] shrink-0">
+                  <div className="-mx-4 flex h-[210px] shrink-0">
                     <ChartMemo recorder={recorder} traces={g.chartTraces} version={g.version} cursor={g.cursor} onCursor={g.setCursor} compact svgRef={g.svg} />
                   </div>
                 )}
@@ -744,7 +769,9 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                       const v = recorder.valueAt(ct.id, g.cursor!);
                       return (
                         <div key={ct.id} className="flex flex-col rounded-lg bg-panel-2 px-3 py-2" style={{ boxShadow: `inset 3px 0 0 ${traceColor(ct.color)}` }}>
-                          <span className="font-mono text-label text-muted">{ct.name}</span>
+                          <span className="font-mono text-label text-muted">
+                            <Rich text={ct.name} />
+                          </span>
                           <b className="font-mono text-[17px] font-semibold tabular">{Number.isFinite(v) ? formatSI(v, ct.unit, { digits: 4 }) : '—'}</b>
                         </div>
                       );
@@ -797,7 +824,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
               <button
                 type="button"
                 onClick={() => {
-                  const n = api.sweepCursor !== null && api.sweep.result ? sweepToTable(api, sweepSpec, api.sweep.result.curves, api.sweepCursor) : 0;
+                  const n = api.sweepCursor !== null && api.sweep.result ? sweepToTable(api, sweepSpec, api.sweep.result.curves, api.sweepCursor, api.active?.foy) : 0;
                   if (n > 0) props.notify(tr.analysis.sweep.added(n));
                 }}
                 disabled={api.sweepCursor === null || !api.sweep.result}
@@ -807,7 +834,8 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                 {tr.analysis.sweep.toTable}
               </button>
             )}
-            <button type="button" onClick={() => api.sweep.result && saveSweep(api, sweepSpec, api.sweep.result.curves, true)} disabled={!api.sweep.result} className={solid}>
+            {pngButton(!api.sweep.result, tr.analysis.sweep.fileName)}
+            <button type="button" onClick={() => api.sweep.result && saveSweep(api, sweepSpec, api.sweep.result.curves, true, api.active?.foy)} disabled={!api.sweep.result} className={solid}>
               <Icon name="share" className="h-4 w-4" />
               {t.csvShare}
             </button>
@@ -825,6 +853,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                 {tr.analysis.bode.rerun}
               </button>
             )}
+            {pngButton(api.bode.points.length === 0)}
             <button type="button" onClick={() => saveBode(api.bode, api.separator, true)} disabled={api.bode.points.length === 0} className={solid}>
               <Icon name="share" className="h-4 w-4" />
               {t.csvShare}
@@ -843,6 +872,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                 {tr.analysis.curve.rerun}
               </button>
             )}
+            {pngButton(!api.tracer.result)}
             <button type="button" onClick={() => saveCurves(api.tracer, api.separator, true)} disabled={!api.tracer.result} className={solid}>
               <Icon name="share" className="h-4 w-4" />
               {t.csvShare}
@@ -854,6 +884,7 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
               <Icon name="plus" className="h-4 w-4" />
               {t.toTable}
             </button>
+            {pngButton(!g.span)}
             <button type="button" onClick={() => g.csv(true)} disabled={!g.span} className={solid}>
               <Icon name="share" className="h-4 w-4" />
               {t.csvShare}

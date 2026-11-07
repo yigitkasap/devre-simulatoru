@@ -3,11 +3,11 @@
 
 import { useMemo } from 'react';
 import { formatSI } from '../../sim/units';
-import { svgSub } from './CurvePane';
+import { plainText } from '../Rich';
 import { axisUnit } from './format';
 import type { TraceRecorder } from './recorder';
 import type { AnalysisApi } from './useAnalysis';
-import { XYChart, type XYSeries } from './XYChart';
+import { svgSub, XYChart, type XYSeries } from './XYChart';
 
 const MAX_POINTS = 4000;
 
@@ -45,7 +45,7 @@ export function TimeXY({ api, recorder: rec, version, compact = false }: { api: 
       yScale={view.yu.scale}
       cursor={null}
       cursorText={(x) => formatSI(x / view.xu.scale, xLabel?.unit ?? 'V', { digits: 3 })}
-      ariaLabel={`${yText} – ${xText}`}
+      ariaLabel={plainText(`${yText} – ${xText}`)}
       compact={compact}
       {...(compact ? { height: 260 } : {})}
     />

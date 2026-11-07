@@ -1,17 +1,35 @@
-// x–y grafiği (eğri izleyici N3, Bode N4): doğrusal ya da logaritmik x ekseni, eğri adları sağ uçta,
-// sürüklenebilir dikey imleç (klavyeyle de), isteğe bağlı noktalar, yatay ve dikey işaret çizgileri,
-// ek katman (yük doğrusu, Q noktası). SVG piksel boyunda çizilir.
+// x–y grafiği (eğri izleyici N3, Bode N4, tarama): doğrusal ya da logaritmik x ekseni, eğri adları sağ uçta
+// (sığmıyorsa ya da telefonda grafiğin altında açıklama satırlarında), sürüklenebilir dikey imleç
+// (klavyeyle de), isteğe bağlı noktalar, yatay ve dikey işaret çizgileri (yazıları çizgilerle, eğrilerle ve
+// birbirleriyle çakışmayan yerde), ek katman (yük doğrusu, Q noktası). SVG piksel boyunda çizilir; PNG'ye
+// açıklama satırları da girer. Yazılarda alt simge `_{...}` (svgSub).
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { formatNumber } from '../../sim/units';
+import { legendLayout, pickSpot, textWidth, type Box, type Segment } from './chartText';
 import { niceTicks, tickText } from './format';
 import { traceColor } from './traces';
+
+/** SVG yazısında alt simgeler: "I_{C}" → I ve aşağıda küçük C. */
+export function svgSub(text: string): ReactNode {
+  const parts = text.split(/_\{([^}]*)\}/);
+  return parts.map((p, i) =>
+    i % 2 === 1 ? (
+      <tspan key={i} fontSize="0.75em" dy="0.3em">
+        {p}
+        <tspan dy="-0.3em"> </tspan>
+      </tspan>
+    ) : (
+      p
+    ),
+  );
+}
 
 export interface XYSeries {
   readonly id: string;
   readonly color: number;
   readonly points: readonly (readonly [number, number])[];
-  /** Sağ uçta yazan ad ("0 V", "10 µA"). */
+  /** Sağ uçta (ya da altta açıklamada) yazan ad ("0 V", "10 µA", "V_{GS} = −0,2 V"). */
   readonly label?: string;
   /** Ölçüm noktaları ayrıca nokta olarak (Bode). */
   readonly dots?: boolean;
@@ -47,10 +65,22 @@ export interface XYChartProps {
   readonly compact?: boolean;
   /** Sabit y aralığı (çizim biriminde); verilmezse verilerden. */
   readonly yRange?: readonly [number, number];
+  /** Çizim alanının yüksekliği; açıklama satırları buna eklenir. */
   readonly height?: number;
+  /**
+   * Eğri adlarının yeri: 'auto' sağ uçta (genişliğin üçte birine sığmıyorsa altta), 'below' her zaman
+   * altta (telefon: grafik tam genişlik). Verilmezse compact'ta altta.
+   */
+  readonly legend?: 'auto' | 'below';
 }
 
-export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, cursor, onCursor, cursorText, ariaLabel, hLines = [], vLines = [], overlay, footer, compact = false, yRange, height }: XYChartProps) {
+/** İşaret yazılarının boyu (px) ve kutusunun yüksekliği. */
+const MARK_FONT = 10.5;
+const MARK_BOX = 13;
+const LABEL_FONT = 11;
+const LEGEND_ROW = 18;
+
+export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, cursor, onCursor, cursorText, ariaLabel, hLines = [], vLines = [], overlay, footer, compact = false, yRange, height, legend }: XYChartProps) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -61,10 +91,15 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
     return () => ro.disconnect();
   }, []);
   const clipId = `xy-${useId().replace(/:/g, '')}`;
-  const labelled = series.some((s) => s.label);
-  // Sağdaki adlar sığsın ("Q · 5,17 µA"): 11 px eş aralıklı yazıda harf başına ≈ 6,7 px.
-  const labelWidth = Math.max(0, ...series.map((s) => s.label?.length ?? 0)) * 6.7 + 10;
-  const m = compact ? { l: 36, r: labelled ? Math.max(48, labelWidth) : 12, t: 18, b: 32 } : { l: 48, r: labelled ? Math.max(64, labelWidth) : 16, t: 22, b: 40 };
+  // Eğri adları ölçülen genişlikleriyle: sağda yer genişliğin üçte birine sığıyorsa sağ uçta, yoksa altta.
+  const named = series.filter((s) => s.label);
+  const widths = named.map((s) => textWidth(s.label!, LABEL_FONT));
+  const base = compact ? { l: 36, r: 16, t: 18, b: 32 } : { l: 48, r: 16, t: 22, b: 40 };
+  const rightWidth = Math.max(0, ...widths) + 12;
+  const right = named.length > 0 && (legend ?? (compact ? 'below' : 'auto')) === 'auto' && rightWidth <= size.w / 3;
+  const rows = named.length > 0 && !right ? legendLayout(widths, Math.max(40, size.w - base.l - base.r)) : null;
+  const legendHeight = rows ? rows.rows * LEGEND_ROW + 4 : 0;
+  const m = { ...base, r: right ? Math.max(compact ? 48 : 64, rightWidth) : base.r, b: base.b + legendHeight };
   const pw = Math.max(10, size.w - m.l - m.r);
   const ph = Math.max(10, size.h - m.t - m.b);
 
@@ -125,15 +160,58 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
     onCursor(Math.min(hi, Math.max(lo, next)));
   };
   const cx = cursor !== null && !empty ? X(cursor) : null;
-  // Sağ uçtaki adlar üst üste binmesin: en az 14 px aralık.
-  const ends = series
-    .filter((s) => s.label && s.points.length > 0)
-    .map((s) => ({ s, y: Y(s.points[s.points.length - 1]![1] * yScale) }))
-    .sort((a, b) => a.y - b.y);
+  // Sağ uçtaki adlar üst üste binmesin (en az 14 px aralık) ve grafiğin boyunu aşmasın (alttaki x
+  // bölmesinin yazısına da değmesin).
+  const ends = right
+    ? named
+        .filter((s) => s.points.length > 0)
+        .map((s) => ({ s, y: Math.min(m.t + ph - 4, Math.max(m.t + 4, Y(s.points[s.points.length - 1]![1] * yScale))) }))
+        .sort((a, b) => a.y - b.y)
+    : [];
   for (let i = 1; i < ends.length; i++) if (ends[i]!.y - ends[i - 1]!.y < 14) ends[i]!.y = ends[i - 1]!.y + 14;
+  for (let i = ends.length - 1; i >= 0; i--) {
+    const limit = i === ends.length - 1 ? m.t + ph - 4 : ends[i + 1]!.y - 14;
+    if (ends[i]!.y > limit) ends[i]!.y = limit;
+  }
+
+  // İşaret yazıları: önce yatay çizgilerinki (uzun), sonra dikeylerinki; her biri adaylardan çizgilerle,
+  // eğrilerle ve öncekilerle en az çakışana.
+  const marks: { key: string; text: string; box: Box }[] = [];
+  if (!empty && size.w > 0 && [...hLines, ...vLines].some((l) => l.label)) {
+    const plot: Box = { x: m.l, y: m.t, w: pw, h: ph };
+    const lines: Segment[] = [...hLines.map((h): Segment => [m.l, Y(h.y), m.l + pw, Y(h.y)]), ...vLines.map((v): Segment => [X(v.x), m.t, X(v.x), m.t + ph])];
+    const curves: Segment[] = [];
+    for (const s of series) {
+      for (let i = 1; i < s.points.length; i++) {
+        const [xa, ya] = s.points[i - 1]!;
+        const [xb, yb] = s.points[i]!;
+        if ([xa, ya, xb, yb].every(Number.isFinite)) curves.push([X(xa), Y(ya * yScale), X(xb), Y(yb * yScale)]);
+      }
+    }
+    const boxes: Box[] = [];
+    const box = (x: number, baseline: number, w: number): Box => ({ x, y: baseline - 10, w, h: MARK_BOX });
+    for (const h of hLines) {
+      if (!h.label) continue;
+      const w = textWidth(h.label, MARK_FONT);
+      const y = Y(h.y);
+      const xs = [m.l + 6, ...vLines.map((v) => X(v.x) + 6), m.l + pw - 6 - w, ...vLines.map((v) => X(v.x) - 6 - w)];
+      const spot = pickSpot(xs.flatMap((x) => [box(x, y + 13, w), box(x, y - 4, w)]), { lines, curves, boxes }, plot);
+      boxes.push(spot);
+      marks.push({ key: `h${h.y}`, text: h.label, box: spot });
+    }
+    for (const v of vLines) {
+      if (!v.label) continue;
+      const w = textWidth(v.label, MARK_FONT);
+      const x = X(v.x);
+      const ys = [m.t + 12, m.t + ph - 4, ...hLines.flatMap((h) => [Y(h.y) + 13, Y(h.y) - 4])];
+      const spot = pickSpot(ys.flatMap((y) => [box(x + 4, y, w), box(x - 4 - w, y, w)]), { lines, curves, boxes }, plot);
+      boxes.push(spot);
+      marks.push({ key: `v${v.x}`, text: v.label, box: spot });
+    }
+  }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={height ? { height, flex: 'none' } : undefined}>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={height ? { height: height + legendHeight, flex: 'none' } : undefined}>
       <div ref={box} className="relative min-h-0 flex-1" style={{ minHeight: MIN_CHART }}>
         {size.w > 0 && (
           <svg width={size.w} height={size.h} role="img" aria-label={ariaLabel} className="absolute inset-0 block select-none" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -161,25 +239,10 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
               {xLabel}
             </text>
             {hLines.map((h) => (
-              <g key={`h${h.y}`}>
-                <line x1={m.l} x2={m.l + pw} y1={Y(h.y)} y2={Y(h.y)} stroke="var(--color-warn)" strokeDasharray="6 4" />
-                {h.label && (
-                  // Çizginin altında: Bode'da (tek kullanım, −3 dB) eğri çizginin üstünde kalır.
-                  <text x={m.l + 6} y={Y(h.y) + 13} fontSize={10.5} fill="var(--color-warn)">
-                    {h.label}
-                  </text>
-                )}
-              </g>
+              <line key={`h${h.y}`} x1={m.l} x2={m.l + pw} y1={Y(h.y)} y2={Y(h.y)} stroke="var(--color-warn)" strokeDasharray="6 4" />
             ))}
             {vLines.map((v) => (
-              <g key={`v${v.x}`}>
-                <line x1={X(v.x)} x2={X(v.x)} y1={m.t} y2={m.t + ph} stroke="var(--color-warn)" strokeDasharray="3 3" />
-                {v.label && (
-                  <text x={X(v.x) + 4} y={m.t + 12} fontSize={10.5} fill="var(--color-warn)">
-                    {v.label}
-                  </text>
-                )}
-              </g>
+              <line key={`v${v.x}`} x1={X(v.x)} x2={X(v.x)} y1={m.t} y2={m.t + ph} stroke="var(--color-warn)" strokeDasharray="3 3" />
             ))}
             <defs>
               <clipPath id={clipId}>
@@ -206,11 +269,32 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
                 </g>
               ))}
             {overlay?.(X, Y)}
-            {ends.map(({ s, y }) => (
-              <text key={`e${s.id}`} x={m.l + pw + 6} y={y + 3.5} fontSize={11} fontWeight={s.strong ? 700 : undefined} fill={s.stroke ?? traceColor(s.color)}>
-                {s.label}
+            {marks.map((k) => (
+              // Zeminli: çizgiye yakın düşse de okunur.
+              <text key={k.key} x={k.box.x} y={k.box.y + 10} fontSize={MARK_FONT} fill="var(--color-warn)" stroke="var(--color-panel)" strokeWidth={3} paintOrder="stroke" data-mark="">
+                {svgSub(k.text)}
               </text>
             ))}
+            {ends.map(({ s, y }) => (
+              <text key={`e${s.id}`} x={m.l + pw + 6} y={y + 3.5} fontSize={LABEL_FONT} fontWeight={s.strong ? 700 : undefined} fill={s.stroke ?? traceColor(s.color)} data-label="">
+                {svgSub(s.label!)}
+              </text>
+            ))}
+            {rows &&
+              named.map((s, i) => {
+                const item = rows.items[i]!;
+                const x = m.l + item.x;
+                const y = m.t + ph + base.b + 4 + item.row * LEGEND_ROW + 9;
+                const color = s.stroke ?? traceColor(s.color);
+                return (
+                  <g key={`l${s.id}`} data-legend="">
+                    <line x1={x} x2={x + 12} y1={y - 3.5} y2={y - 3.5} stroke={color} strokeWidth={s.strong ? 3.5 : 2.5} strokeLinecap="round" {...(s.dashed ? { strokeDasharray: '4 3' } : {})} />
+                    <text x={x + 18} y={y} fontSize={LABEL_FONT} fontWeight={s.strong ? 700 : undefined} fill={color} data-label="">
+                      {svgSub(s.label!)}
+                    </text>
+                  </g>
+                );
+              })}
             {cx !== null && cursor !== null && (
               <g pointerEvents="none">
                 <line x1={cx} x2={cx} y1={m.t} y2={m.t + ph} stroke="var(--color-ink)" strokeDasharray="4 3" />

@@ -93,6 +93,19 @@ export async function saveFile(name: string, blob: Blob, share = false): Promise
 }
 
 /**
+ * Telefonda PNG paylaşılabilir mi (Web Share API ile dosya paylaşımı: navigator.canShare bir PNG dosyasını
+ * kabul ediyor mu). Desteklenmiyorsa telefonda yalnızca CSV paylaşılır.
+ */
+export function canSharePng(): boolean {
+  try {
+    if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') return false;
+    return navigator.canShare({ files: [new File([new Uint8Array([0])], 'grafik.png', { type: 'image/png' })] });
+  } catch {
+    return false;
+  }
+}
+
+/**
  * SVG grafiğini PNG'ye çevirir: tema belirteçleri (var(--…)) ve yazı tipleri o anki değerleriyle
  * yazılır (resim dosyası CSS bilmez), zemin panel rengi.
  */

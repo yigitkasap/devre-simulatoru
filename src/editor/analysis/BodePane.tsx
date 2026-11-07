@@ -8,7 +8,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { tr } from '../../i18n/tr';
 import { formatNumber, formatSI } from '../../sim/units';
-import { Rich } from '../Rich';
+import { plainText, Rich } from '../Rich';
 import { useTouchUi } from '../touchUi';
 import { bodeSummary, toDb, type BodePoint } from './bode';
 import type { TheoryPoint, TheoryResult } from './bodeTheory';
@@ -17,7 +17,8 @@ import type { BodeApi } from './useBode';
 import { SettingsSummary, useSettingsEditing } from './SettingsSummary';
 import type { AnalysisApi } from './useAnalysis';
 import { InfoTip } from './InfoTip';
-import { MIN_CHART, valueAt, XYChart } from './XYChart';
+import { foyNames } from './foyPlan';
+import { MIN_CHART, svgSub, valueAt, XYChart } from './XYChart';
 
 /** Teori eğrisinin rengi: ölçülenden ayrılsın diye gri (kesikli). */
 const THEORY_STROKE = 'var(--color-ink-2)';
@@ -65,6 +66,9 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
   const t = tr.analysis.bode;
   const bode = api.bode;
   const touch = useTouchUi();
+  // Föy grafiğinde giriş, çıkış ve kazanç föydeki adlarıyla (V_{s}, V_{DS}, K_{υ}).
+  const foy = api.active?.kind === 'bode' ? (foyNames(api.active.foy, api.circuit)?.bode ?? null) : null;
+  const optionLabel = (o: { key: string; label: string }, key: string | null | undefined, name: string | undefined) => (foy && name && o.key === key ? `${plainText(name)} · ${o.label}` : o.label);
   // Kendiliğinden ölçüm: sekme açılınca ve ayarlar değişince (aynı ayarlarla bir kez).
   // Bağımlılıklar yalnız değerler: simülasyon çalışırken sayfa her karede yeniden çizilir, nesneye
   // bağlı efekt bekleme süresini her karede sıfırlardı (ölçüm hiç başlamazdı).
@@ -181,7 +185,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
         <select value={bode.input.key} onChange={(e) => bode.setInput(e.target.value)} className={`${select} text-ink`}>
           {bode.inputs.map((o) => (
             <option key={o.key} value={o.key}>
-              {o.label}
+              {optionLabel(o, foy?.inputKey, foy?.input)}
             </option>
           ))}
         </select>
@@ -192,7 +196,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
           <select value={bode.output.key} onChange={(e) => bode.setOutput(e.target.value)} className={`${select} text-ink`}>
             {bode.outputs.map((o) => (
               <option key={o.key} value={o.key}>
-                {o.label}
+                {optionLabel(o, foy?.outputKey, foy?.output)}
               </option>
             ))}
           </select>
@@ -332,7 +336,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
     <XYChart
       series={gainSeries}
       xLabel={phaseVisible ? '' : t.freqAxis}
-      yLabel={t.gain}
+      yLabel={foy ? svgSub(t.gainNamed(foy.gain)) : t.gain}
       logX
       cursor={cur}
       onCursor={setCursor}
@@ -377,7 +381,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
           controls
         )}
         {strip}
-        <div ref={chartsBox} className="flex flex-col gap-1">
+        <div ref={chartsBox} className="-mx-4 flex flex-col gap-1">
           {gainChart(200)}
           {phaseChart(220)}
         </div>

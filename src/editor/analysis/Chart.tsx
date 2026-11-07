@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type Ref } from 'react';
 import { tr } from '../../i18n/tr';
+import { plainText, Rich } from '../Rich';
 import { formatSI } from '../../sim/units';
 import { axisUnit, niceTicks, tickText } from './format';
 import type { TraceRecorder } from './recorder';
@@ -248,7 +249,7 @@ export function Chart({ recorder: rec, traces, version, cursor, onCursor, compac
 
   const cx = cursor !== null && span ? X(cursor) : null;
   const timeText = (t: number) => formatSI(t, 's', { digits: 4 });
-  const label = tr.analysis.graph.chartLabel(traces.map((t) => t.name).join(', ') || '—', span ? `${timeText(span.t0)} – ${timeText(span.t1)}` : tr.analysis.graph.noData);
+  const label = tr.analysis.graph.chartLabel(traces.map((t) => plainText(t.name)).join(', ') || '—', span ? `${timeText(span.t0)} – ${timeText(span.t1)}` : tr.analysis.graph.noData);
   const boxLeft = cx !== null && cx + 230 > size.w ? cx - 222 : (cx ?? 0) + 14;
   // Değer kutusu eğrilerle en az çakışan yere (analiz düzeltmeleri, 8). Yükseklik satır sayısından.
   const showBox = !compact && span !== null && cursor !== null && cx !== null && traces.length > 0;
@@ -388,7 +389,9 @@ export function Chart({ recorder: rec, traces, version, cursor, onCursor, compac
             return (
               <span key={t.id} className="flex items-center gap-2 text-small">
                 <span aria-hidden="true" className="h-[3px] w-3 shrink-0 rounded-full" style={{ background: traceColor(t.color) }} />
-                <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  <Rich text={t.name} />
+                </span>
                 <b className="font-mono font-semibold tabular">{Number.isFinite(v) ? formatSI(v, t.unit, { digits: 4 }) : '—'}</b>
               </span>
             );

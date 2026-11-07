@@ -45,7 +45,7 @@ export function TablePane({ api, recorder, version, title, compact = false, stac
       for (const trace of api.traces) {
         const v = recorder.valueAt(trace.id, cursor);
         const label = api.labels.get(trace.id);
-        if (Number.isFinite(v) && label) out.push({ key: `c${trace.id}`, text: t.cursorOption(label.name, at), measured: v, unit: label.unit, source: tr.analysis.graph.cursorSource(at) });
+        if (Number.isFinite(v) && label) out.push({ key: `c${trace.id}`, text: t.cursorOption(plainText(label.name), at), measured: v, unit: label.unit, source: tr.analysis.graph.cursorSource(at) });
       }
     }
     if (fit.result) {
@@ -254,7 +254,7 @@ function FitPanel({ api, fit, touch, cursor, compact = false }: { api: AnalysisA
   const spec = fit.spec;
   const field = `min-w-0 rounded-lg border border-line-2 bg-panel px-2 text-small ${touch ? 'h-11 text-[16px]' : 'h-8'}`;
   const setSpec = (patch: Partial<FitSpec>) => spec && api.setDoc((a) => ({ ...a, fit: { ...spec, ...patch } }));
-  const nameOf = (id: string) => (id === 't' ? 't' : (api.labels.get(id)?.name ?? '?'));
+  const nameOf = (id: string) => (id === 't' ? 't' : plainText(api.labels.get(id)?.name ?? '?'));
   const yName = spec ? (spec.lnOffset !== null ? `ln(${formatNumber(spec.lnOffset, 3).replace(/,?0+$/, '')} − ${nameOf(spec.y)})` : nameOf(spec.y)) : '';
   const r = fit.result;
   const row = (label: ReactNode, value: string) => (
