@@ -1876,6 +1876,113 @@ try {
       `${foyCards} kart · ${customCols} sütun · ${phoneCurves} eğri · katlı ${foldClosed}`);
     await page.context().close();
   }
+  // --- Analiz v2: föy grafiklerinde föyün adları, işaret yazıları, telefonda açıklama satırları ve PNG ---
+  {
+    // Grafiğin yazıları (boşluklar tek: alt simgeden sonraki boşluk), kutuları; çizim alanı, kesikli çizgiler.
+    const svgInfo = (loc) => loc.evaluate((svg) => {
+      const r = svg.getBoundingClientRect();
+      const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom }; };
+      const plot = svg.querySelector('rect');
+      return {
+        svg: { l: r.left, r: r.right, t: r.top, b: r.bottom, w: r.width },
+        plot: plot ? box(plot) : null,
+        texts: [...svg.querySelectorAll('text')].map((t) => ({ text: t.textContent.replace(/\s+/g, ' ').trim(), ...box(t), mark: t.hasAttribute('data-mark'), label: t.hasAttribute('data-label'), legend: t.closest('[data-legend]') !== null })),
+        dashed: [...svg.querySelectorAll('line[stroke-dasharray]')].filter((l) => l.getAttribute('stroke') === 'var(--color-warn)').map(box),
+      };
+    });
+    const inside = (t, s) => t.l >= s.l - 0.5 && t.r <= s.r + 0.5 && t.t >= s.t - 0.5 && t.b <= s.b + 0.5;
+    const hits = (t, l) => l.l <= t.r && l.r >= t.l && l.t <= t.b && l.b >= t.t;
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'BF245A: çıkış ve transfer karakteristiği', exact: true }))).click(); await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(300);
+    const drawer = page.getByRole('region', { name: 'Analiz' });
+    const cards = (await drawer.getByRole('button', { name: /^ADIM / }).allTextContents()).map((c) => c.replace(/\s+/g, ' '));
+    check('föy adları (Deney 5): kartlarda föydeki ad ve parantez içinde devredeki ad ("x: VDS (V1), y: ID (A1)", "x: VGS (J1), y: ID (A1)"), eğriler VGS 0; −0,2; −0,4 V',
+      cards.length === 2 && cards[0].includes('VGS 0; −0,2; −0,4 V · x: VDS (V1), y: ID (A1)') && cards[1].includes('x: VGS (J1), y: ID (A1)'), cards.map((c) => c.slice(-40)).join(' | '));
+    await drawer.getByRole('button', { name: /ID – VDS ailesi/ }).click();
+    await drawer.getByText(/^Tarama bitti/).waitFor({ timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    const fam = await svgInfo(drawer.locator('svg[role=img]').first());
+    const famTexts = fam.texts.map((t) => t.text);
+    const famLabels = fam.texts.filter((t) => t.label);
+    check('föy adları (Deney 5 çıkış ailesi, 1440 px): eksenler "ID (mA)" ve "VDS (V)", eğri adları "VGS = 0 V", "VGS = −0,2 V", "VGS = −0,4 V" (devre adı yok); adlar grafiğin içinde (taşmıyor)',
+      famTexts.includes('ID (mA)') && famTexts.includes('VDS (V)') && ['VGS = 0 V', 'VGS = −0,2 V', 'VGS = −0,4 V'].every((n) => famLabels.some((t) => t.text === n)) && !famTexts.some((t) => /PS1|A1|V1/.test(t)) && famLabels.length === 3 && famLabels.every((t) => inside(t, fam.svg)),
+      `${famLabels.map((t) => t.text).join(' | ')} · ${famTexts.filter((t) => /\(/.test(t)).join(' | ')}`);
+    await drawer.getByRole('button', { name: 'Yeni grafik' }).click(); await page.waitForTimeout(150);
+    await drawer.getByRole('button', { name: /ID – VGS ve VP/ }).click();
+    await drawer.getByText(/^Tarama bitti/).waitFor({ timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(400);
+    const tf = await svgInfo(drawer.locator('svg[role=img]').first());
+    const marks = tf.texts.filter((t) => t.mark);
+    const crossing = marks.filter((t) => tf.dashed.some((l) => hits(t, l)));
+    const tfLabel = tf.texts.find((t) => t.label);
+    check('föy işareti (Deney 5 transfer): "ID (VGS = 0, VDS ≈ 9,6 V) = 4,12 mA" (IDSS değil) ve "VP ≈ −1,74 V"; işaret yazılarının üstünden kesikli çizgi geçmiyor, yazılar grafik alanında; eğri adı "VDD = 10 V" grafiğin içinde',
+      marks.map((t) => t.text).sort().join(' | ') === 'ID (VGS = 0, VDS ≈ 9,6 V) = 4,12 mA | VP ≈ −1,74 V' && !tf.texts.some((t) => /IDSS/.test(t.text)) && tf.dashed.length === 2 && crossing.length === 0 &&
+        marks.every((t) => tf.plot && inside(t, tf.plot)) && tfLabel?.text === 'VDD = 10 V' && inside(tfLabel, tf.svg),
+      `${marks.map((t) => t.text).join(' | ')} · çakışan ${crossing.length} · ${tfLabel?.text}`);
+    await ctx.close();
+  }
+  {
+    // Telefon: grafik ekranın tam genişliğinde, eğri adları grafiğin altında; PNG paylaşımı (Web Share API
+    // dosya paylaşımı taklit edilir: paylaşılan dosya kaydedilir).
+    const { page } = await phone();
+    await openExample(page, 'BF245A: çıkış ve transfer karakteristiği');
+    await page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: (d) => Array.isArray(d?.files) });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: async (d) => { window.__shared = (d.files ?? []).map((f) => ({ name: f.name, type: f.type, size: f.size })); } });
+    });
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(500);
+    const sheet = page.getByRole('region', { name: 'Analiz' });
+    await sheet.getByRole('button', { name: /ID – VDS ailesi/ }).tap();
+    await sheet.locator('svg[role=img] [data-legend]').nth(2).waitFor({ timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    const info = await sheet.locator('svg[role=img]').first().evaluate((svg) => {
+      const r = svg.getBoundingClientRect();
+      const plot = svg.querySelector('rect').getBoundingClientRect();
+      const legend = [...svg.querySelectorAll('[data-legend] text')].map((t) => { const b = t.getBoundingClientRect(); return { text: t.textContent.replace(/\s+/g, ' ').trim(), l: b.left, r: b.right, t: b.top, b: b.bottom }; });
+      const right = [...svg.querySelectorAll('text[data-label]')].filter((t) => !t.closest('[data-legend]')).length;
+      return { l: r.left, w: r.width, plotRight: plot.right, plotBottom: plot.bottom, svgBottom: r.bottom, legend, right };
+    });
+    const vw = page.viewportSize().width;
+    const png = sheet.getByRole('button', { name: 'PNG paylaş' });
+    const pngVisible = (await png.count()) === 1 && (await png.isEnabled());
+    const pngBox = await png.boundingBox();
+    await png.tap().catch(() => {});
+    await page.waitForFunction(() => window.__shared !== undefined, null, { timeout: 8000 }).catch(() => {});
+    const shared = await page.evaluate(() => window.__shared ?? null);
+    check('telefon (föy grafiği): grafik ekranın tam genişliğinde, eğri adları grafiğin altında (sağda ad yok), adlar ekranın içinde; PNG paylaş düğmesi (≥ 44 px) PNG dosyası paylaşıyor',
+      Math.abs(info.l) <= 1 && Math.abs(info.w - vw) <= 1 && info.plotRight >= vw - 20 && info.right === 0 && info.legend.length === 3 && info.legend.every((t) => t.t > info.plotBottom && t.b <= info.svgBottom + 0.5 && t.l >= 0 && t.r <= vw) &&
+        info.legend.map((t) => t.text).join('|') === 'VGS = 0 V|VGS = −0,2 V|VGS = −0,4 V' && pngVisible && pngBox !== null && pngBox.height >= 44 &&
+        shared !== null && shared.length === 1 && shared[0].type === 'image/png' && /^tarama-\d{4}-\d{2}-\d{2}\.png$/.test(shared[0].name) && shared[0].size > 2000 && !(await pageScrolls(page)),
+      `svg ${Math.round(info.l)}+${Math.round(info.w)}/${vw} · açıklama ${info.legend.map((t) => t.text).join(', ')} · paylaşılan ${JSON.stringify(shared)}`);
+    await page.context().close();
+  }
+  {
+    // Dosya paylaşımı olmayan tarayıcıda PNG düğmesi yok, CSV paylaş kalıyor.
+    const { page } = await phone();
+    await openExample(page, 'BF245A: çıkış ve transfer karakteristiği');
+    await page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined });
+      Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    });
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(500);
+    const sheet = page.getByRole('region', { name: 'Analiz' });
+    await sheet.getByRole('button', { name: /ID – VDS ailesi/ }).tap();
+    await sheet.getByRole('button', { name: 'CSV paylaş' }).waitFor({ timeout: 8000 }).catch(() => {});
+    check('telefon: Web Share API ile dosya paylaşılamıyorsa PNG düğmesi yok, yalnızca CSV paylaş',
+      (await sheet.getByRole('button', { name: 'PNG paylaş' }).count()) === 0 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1);
+    await page.context().close();
+  }
   // --- Analiz → Eğri izleyici (A3, N3): Worker'da DC tarama, basamaklar, transfer, yük doğrusu, iptal ----
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
