@@ -295,6 +295,7 @@ export function StatusSheet({
   line,
   speed,
   scopeSpeed,
+  lagging = false,
   onSpeed,
   onStop,
   onClose,
@@ -302,6 +303,8 @@ export function StatusSheet({
   status: SimStatus;
   /** "Çalışıyor · 2,58 s" */
   line: string;
+  /** Simülasyon gerçek zamana yetişemiyor: açıklaması hızların üstünde. */
+  lagging?: boolean;
   speed: number;
   scopeSpeed: number | null;
   onSpeed: (speed: number) => void;
@@ -324,6 +327,14 @@ export function StatusSheet({
           <MenuItem icon="stop" label={tr.sim.stop} note={tr.phone.stopNote} onClick={onStop} />
         ) : (
           <p className="border-b border-app py-3 text-[13.5px] leading-normal text-muted">{tr.phone.stoppedNote}</p>
+        )}
+        {lagging && status === 'running' && (
+          <p data-lagging="" className="flex gap-2 border-b border-app py-3 text-[13.5px] leading-normal text-ink-2">
+            <span className="mt-0.5 flex shrink-0 text-warn">
+              <Icon name="info" className="h-4 w-4" />
+            </span>
+            {tr.sim.lagging}
+          </p>
         )}
         <h3 className="pt-3.5 pb-1 text-label font-semibold text-muted">{tr.sim.speedDialog}</h3>
         <SpeedOptions speed={speed} scopeSpeed={scopeSpeed} onSpeed={onSpeed} touch />
