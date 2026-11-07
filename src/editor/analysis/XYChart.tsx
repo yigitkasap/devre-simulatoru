@@ -68,6 +68,11 @@ export interface XYChartProps {
   /** Çizim alanının yüksekliği; açıklama satırları buna eklenir. */
   readonly height?: number;
   /**
+   * Telefonda: height en az yükseklik; sayfada boş yer varsa grafik onu doldurur (Ayarlar kapalıyken
+   * grafik uzar, açılınca bu yüksekliğe döner ve sayfa kayar).
+   */
+  readonly grow?: boolean;
+  /**
    * Eğri adlarının yeri: 'auto' sağ uçta (genişliğin üçte birine sığmıyorsa altta), 'below' her zaman
    * altta (telefon: grafik tam genişlik). Verilmezse compact'ta altta.
    */
@@ -80,7 +85,7 @@ const MARK_BOX = 13;
 const LABEL_FONT = 11;
 const LEGEND_ROW = 18;
 
-export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, cursor, onCursor, cursorText, ariaLabel, hLines = [], vLines = [], overlay, footer, compact = false, yRange, height, legend }: XYChartProps) {
+export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, cursor, onCursor, cursorText, ariaLabel, hLines = [], vLines = [], overlay, footer, compact = false, yRange, height, grow = false, legend }: XYChartProps) {
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   useEffect(() => {
@@ -211,7 +216,10 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={height ? { height: height + legendHeight, flex: 'none' } : undefined}>
+    <div
+      className="flex min-h-0 min-w-0 flex-1 flex-col"
+      style={height ? (grow ? { minHeight: height + legendHeight, flex: '1 0 auto' } : { height: height + legendHeight, flex: 'none' }) : undefined}
+    >
       <div ref={box} className="relative min-h-0 flex-1" style={{ minHeight: MIN_CHART }}>
         {size.w > 0 && (
           <svg width={size.w} height={size.h} role="img" aria-label={ariaLabel} className="absolute inset-0 block select-none" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -341,7 +349,8 @@ export function XYChart({ series, xLabel, yLabel, yScale = 1, logX = false, curs
           />
         )}
       </div>
-      {footer}
+      {/* Telefonda grafik tam genişlikte; altındaki satır sayfanın kenar boşluğu içinde kalır. */}
+      {footer && (compact ? <div className="px-4">{footer}</div> : footer)}
     </div>
   );
 }

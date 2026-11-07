@@ -752,13 +752,14 @@ export function AnalysisSheetBody(props: AnalysisPanelProps & { readonly onClose
                   })}
                 </div>
                 <PickControls api={api} touch />
-                {/* Grafik ekranın tam genişliğinde (sayfanın kenar boşluğu dışında). */}
+                {/* Grafik ekranın tam genişliğinde (sayfanın kenar boşluğu dışında); Ayarlar kapalıyken
+                    altındaki boş yeri doldurur, açılınca en az boyuna döner. */}
                 {api.active?.kind === 'time' && api.active.x !== null ? (
-                  <div className="-mx-4 flex shrink-0 flex-col">
+                  <div className="-mx-4 flex flex-1 flex-col">
                     <TimeXY api={api} recorder={recorder} version={g.version} compact />
                   </div>
                 ) : (
-                  <div className="-mx-4 flex h-[210px] shrink-0">
+                  <div className="-mx-4 flex min-h-[210px] flex-1">
                     <ChartMemo recorder={recorder} traces={g.chartTraces} version={g.version} cursor={g.cursor} onCursor={g.setCursor} compact svgRef={g.svg} />
                   </div>
                 )}

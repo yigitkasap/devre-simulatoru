@@ -47,7 +47,7 @@ export function TimeXY({ api, recorder: rec, version, compact = false }: { api: 
       cursorText={(x) => formatSI(x / view.xu.scale, xLabel?.unit ?? 'V', { digits: 3 })}
       ariaLabel={plainText(`${yText} – ${xText}`)}
       compact={compact}
-      {...(compact ? { height: 260 } : {})}
+      {...(compact ? { height: 260, grow: true } : {})}
     />
   );
 }

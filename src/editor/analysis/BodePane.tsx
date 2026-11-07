@@ -347,7 +347,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
       vLines={vLines}
       compact={compact}
       {...(phaseVisible ? {} : { footer })}
-      {...(height ? { height } : {})}
+      {...(height ? { height, grow: compact } : {})}
     />
   );
   const phaseChart = (height?: number) => (
@@ -363,7 +363,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
       vLines={vLines}
       compact={compact}
       footer={footer}
-      {...(height ? { height } : {})}
+      {...(height ? { height, grow: compact } : {})}
     />
   );
 
@@ -371,7 +371,7 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
     // Ölçüm bitince ayarlar tek satırlık özete kapanır, grafik öne çıkar (analiz düzeltmeleri, 7).
     const collapsed = !editing && !busy && fresh && points.length > 0 && bode.output !== null;
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-1 flex-col gap-3">
         {collapsed ? (
           <SettingsSummary
             text={t.settingsSummary(bode.input.short, bode.output!.short, hz(bode.range.from), hz(bode.range.to), bode.range.points)}
@@ -381,7 +381,8 @@ export function BodePane({ api, compact = false }: { api: AnalysisApi; compact?:
           controls
         )}
         {strip}
-        <div ref={chartsBox} className="-mx-4 flex flex-col gap-1">
+        {/* İki grafik boş yeri paylaşır. */}
+        <div ref={chartsBox} className="-mx-4 flex flex-1 flex-col gap-1">
           {gainChart(200)}
           {phaseChart(220)}
         </div>

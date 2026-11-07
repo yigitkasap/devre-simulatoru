@@ -396,7 +396,7 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
         compact={compact}
         {...(marks?.vp !== undefined ? { vLines: [{ x: marks.vp * xScale, label: t.vpMark(formatSI(marks.vp, 'V', { digits: 3 })) }] } : {})}
         {...(marks?.zero ? { hLines: [{ y: marks.zero.value * yScale, label: zeroMark(axes, marks.zero) }] } : {})}
-        {...(compact ? { height: 260 } : {})}
+        {...(compact ? { height: 260, grow: true } : {})}
         footer={
           cur !== null ? (
             <p className="m-0 mx-auto mt-1 flex max-w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-full border border-line bg-panel px-3 py-1 font-mono text-label">
@@ -420,10 +420,10 @@ export function SweepPane({ api, cursor, onCursor, compact = false }: { api: Ana
     );
 
   return compact ? (
-    <div className="flex flex-col gap-3">
-      {/* Sütun yönlü: yüksekliği verilen XYChart flex: none olur, satır yönlü kapta genişliği 0 kalırdı.
-          Telefonda grafik ekranın tam genişliğinde (sayfanın kenar boşluğu dışında), adlar altında. */}
-      <div className="-mx-4 flex shrink-0 flex-col">{chart}</div>
+    <div className="flex flex-1 flex-col gap-3">
+      {/* Sütun yönlü: satır yönlü kapta XYChart'ın genişliği 0 kalırdı. Telefonda grafik ekranın tam
+          genişliğinde (sayfanın kenar boşluğu dışında), adlar altında; boş yeri doldurur. */}
+      <div className="-mx-4 flex flex-1 flex-col">{chart}</div>
       <Fold title={tr.analysis.picker.settings}>{settings}</Fold>
     </div>
   ) : (

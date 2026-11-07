@@ -263,7 +263,7 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
       ariaLabel={t.chartLabel(part.label, curves.length)}
       compact={compact}
       footer={footer}
-      {...(compact ? { height: 260 } : {})}
+      {...(compact ? { height: 260, grow: true } : {})}
       overlay={(X, Y) =>
         load && showLoad && loadAllowed ? (
           <g pointerEvents="none">
@@ -289,10 +289,10 @@ export function CurvePane({ tracer, compact = false }: { tracer: TracerApi; comp
     family === 'diode' ? 0 : curves.length,
   );
   return compact ? (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-1 flex-col gap-3">
       {collapsed ? <SettingsSummary text={summary} onEdit={() => setEditing(true)} /> : controls}
-      {/* Telefonda grafik ekranın tam genişliğinde, eğri adları altında. */}
-      <div className="-mx-4 flex flex-col">{chart}</div>
+      {/* Telefonda grafik ekranın tam genişliğinde, eğri adları altında; boş yeri doldurur. */}
+      <div className="-mx-4 flex flex-1 flex-col">{chart}</div>
     </div>
   ) : (
     <div className="flex min-h-0 flex-1 gap-5 px-4 pb-3">
