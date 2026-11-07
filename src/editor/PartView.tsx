@@ -7,6 +7,7 @@ import { GRID, type Part } from '../model/types';
 import { tr } from '../i18n/tr';
 import { funcgenSettings } from '../sim/devices/funcgen';
 import { LED_COLORS } from '../sim/devices/led';
+import { useDrawStyle } from './drawStyle';
 import { numProp, strProp, type DeviceType } from '../sim/netlist';
 import { formatNumber, formatSI } from '../sim/units';
 import { meterRole } from './readouts';
@@ -173,7 +174,9 @@ export const PartView = memo(function PartView({
 
   // Ölçü aletinde ekran üstte (dikeyde sağda), ad karşı tarafta; displayFlip ile yer değiştirir.
   const role = meterRole(part);
-  const display = isMeter ? meterDisplay(role === 'ohm' ? 'Ω' : role === 'ammeter' ? 'A' : 'V', meterText ?? null) : null;
+  // Sade çizimde (dışa aktarım, o anki değerler kapalı) boş gösterge ("– – – A") çizilmez.
+  const plain = useDrawStyle().plain;
+  const display = isMeter && !(plain && !meterText) ? meterDisplay(role === 'ohm' ? 'Ω' : role === 'ammeter' ? 'A' : 'V', meterText ?? null) : null;
   const displayRect = meterDisplayRect(part, displayFlip);
   const displayX = displayRect.x * GRID - part.x * GRID;
   const displayY = displayRect.y * GRID - part.y * GRID;

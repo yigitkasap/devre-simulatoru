@@ -13,6 +13,7 @@ import type { Rotation } from '../model/types';
 import { boolProp, numProp, strProp, type DeviceType, type Props } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import { ANION_COLOR, CATION_COLOR, ionsOnLine, jiggle, seeded, type IonView, type PlacedIon } from './ions';
+import { useDrawStyle } from './drawStyle';
 import { CounterIc, DecoderIc, FlipFlopIc, GateIc, SevenSegment } from './logicSymbols';
 import type { ResistorStyle } from './settings';
 
@@ -841,7 +842,19 @@ function AcSource({ waveform, rotation }: { waveform: Waveform; rotation: Rotati
 }
 
 /** Osiloskop: küçük ekranlı bir kutu; girişler sol kenarda (A, B ve ortak uç). */
+/**
+ * Cihaz ekranının renkleri: ekranda koyu zemin ve yeşil yazı; sade çizimde (dışa aktarım) beyaz zemin, ince
+ * çerçeve, koyu yazı.
+ */
+function useScreen() {
+  const plain = useDrawStyle().plain;
+  return plain
+    ? { box: { fill: 'var(--color-panel)', stroke: 'currentColor', strokeWidth: 0.8 }, ink: 'currentColor', wave: 'currentColor' }
+    : { box: { fill: '#1e2a25' }, ink: '#a6f4bd', wave: '#e8c547' };
+}
+
 function Oscilloscope({ rotation, earthed }: { rotation: Rotation; earthed: boolean }) {
+  const screen = useScreen();
   const upright = (x: number, y: number) => (rotation ? `rotate(${-rotation} ${x} ${y})` : undefined);
   const pinLabel = (text: string, y: number) => (
     <text
@@ -865,8 +878,8 @@ function Oscilloscope({ rotation, earthed }: { rotation: Rotation; earthed: bool
       <line x1={-50} y1={20} x2={-30} y2={20} {...line} />
       <rect x={-30} y={-28} width={68} height={56} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
       <g transform={upright(10, -3)}>
-        <rect x={-12} y={-20} width={44} height={34} rx={2} fill="#1e2a25" />
-        <path d={wavePath('sine', 17, 9, 10, -3)} fill="none" stroke="#e8c547" strokeWidth={1.6} strokeLinecap="round" />
+        <rect x={-12} y={-20} width={44} height={34} rx={2} {...screen.box} />
+        <path d={wavePath('sine', 17, 9, 10, -3)} fill="none" stroke={screen.wave} strokeWidth={1.6} strokeLinecap="round" />
       </g>
       {pinLabel('A', -20)}
       {pinLabel('B', 0)}
@@ -1035,6 +1048,7 @@ function FunctionGenerator({ props, rotation }: { props: Props; rotation: Rotati
   const waveform = strProp(props, 'waveform', WAVEFORMS, 'sine');
   const earthed = boolProp(props, 'earthed', true);
   const frequency = formatSI(Math.max(0, Number(props.frequency ?? 1000)), 'Hz', { trim: true, digits: 4 });
+  const screen = useScreen();
   return (
     <g>
       <line x1={30} y1={-20} x2={50} y2={-20} {...line} />
@@ -1042,9 +1056,9 @@ function FunctionGenerator({ props, rotation }: { props: Props; rotation: Rotati
       <line x1={30} y1={20} x2={50} y2={20} {...line} />
       <rect x={-40} y={-28} width={70} height={56} rx={4} style={PAPER} stroke="currentColor" strokeWidth={2} />
       <g transform={rotation ? `rotate(${-rotation} -14 -8)` : undefined}>
-        <rect x={-34} y={-20} width={40} height={24} rx={2} fill="#1e2a25" />
-        <path d={wavePath(waveform, 6.5, 5, -26.5, -8)} fill="none" stroke="#a6f4bd" strokeWidth={1.4} strokeLinecap="round" />
-        <text x={2} y={-8.5} textAnchor="end" dominantBaseline="central" fontSize={6.5} fill="#a6f4bd" style={{ fontFamily: 'var(--font-mono)' }}>
+        <rect x={-34} y={-20} width={40} height={24} rx={2} {...screen.box} />
+        <path d={wavePath(waveform, 6.5, 5, -26.5, -8)} fill="none" stroke={screen.ink} strokeWidth={1.4} strokeLinecap="round" />
+        <text x={2} y={-8.5} textAnchor="end" dominantBaseline="central" fontSize={6.5} fill={screen.ink} style={{ fontFamily: 'var(--font-mono)' }}>
           {frequency}
         </text>
       </g>
@@ -1068,6 +1082,7 @@ function DcSupply({ props, rotation, live }: { props: Props; rotation: Rotation;
     { y: -20, text: volts('voltage1'), cc: live?.currentLimited?.[0] ?? false },
     { y: 20, text: volts('voltage2'), cc: live?.currentLimited?.[1] ?? false },
   ];
+  const screen = useScreen();
   return (
     <g>
       {[-30, -10, 10, 30].map((y) => (
@@ -1078,14 +1093,14 @@ function DcSupply({ props, rotation, live }: { props: Props; rotation: Rotation;
       {outputs.map(({ y, text, cc }) => (
         <g key={y}>
           <g transform={rotation ? `rotate(${-rotation} -12 ${y - 6})` : undefined}>
-            <rect x={-34} y={y - 15} width={44} height={17} rx={2} fill="#1e2a25" />
+            <rect x={-34} y={y - 15} width={44} height={17} rx={2} {...screen.box} />
             <text
               x={6}
               y={y - 6}
               textAnchor="end"
               dominantBaseline="central"
               fontSize={8}
-              fill="#a6f4bd"
+              fill={screen.ink}
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               {text}

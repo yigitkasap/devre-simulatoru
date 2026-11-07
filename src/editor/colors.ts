@@ -31,10 +31,10 @@ export function voltageHue(ratio: number): number {
   return t >= 0 ? HUE_ZERO + (HUE_POSITIVE - HUE_ZERO) * t : HUE_ZERO + (HUE_NEGATIVE - HUE_ZERO) * -t;
 }
 
-function classicColor(ratio: number): string {
+function classicColor(ratio: number, isDark: boolean): string {
   const hue = voltageHue(ratio);
   const band = hue > 45 && hue <= 200;
-  if (dark) return `hsl(${hue.toFixed(0)} 60% ${band ? 56 : 62}%)`;
+  if (isDark) return `hsl(${hue.toFixed(0)} 60% ${band ? 56 : 62}%)`;
   return `hsl(${hue.toFixed(0)} 75% ${band ? 32 : 40}%)`;
 }
 
@@ -59,9 +59,9 @@ function hexChannels(hex: string): [number, number, number] {
   return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
 }
 
-function colorblindColor(ratio: number): string {
+function colorblindColor(ratio: number, isDark: boolean): string {
   const t = clampRatio(ratio);
-  const stops = dark ? COLORBLIND_STOPS_DARK : COLORBLIND_STOPS;
+  const stops = isDark ? COLORBLIND_STOPS_DARK : COLORBLIND_STOPS;
   let i = 0;
   while (i < stops.length - 2 && t > stops[i + 1]![0]) i++;
   const [r0, c0] = stops[i]!;
@@ -73,17 +73,24 @@ function colorblindColor(ratio: number): string {
   return `rgb(${mix[0]} ${mix[1]} ${mix[2]})`;
 }
 
-export function voltageColor(ratio: number, scale: WireScale = 'classic'): string {
-  return scale === 'colorblind' ? colorblindColor(ratio) : classicColor(ratio);
+/** Kablonun rengi; theme verilirse o temanınki (dışa aktarılan resim her zaman açık), yoksa ekranın teması. */
+export function voltageColor(ratio: number, scale: WireScale = 'classic', theme?: 'light' | 'dark'): string {
+  const isDark = theme ? theme === 'dark' : dark;
+  return scale === 'colorblind' ? colorblindColor(ratio, isDark) : classicColor(ratio, isDark);
 }
 
 /** Klasik ölçekte açıklama degradesinin durakları (tokens.css'teki --color-v-* ile aynı). */
 const CLASSIC_LEGEND_STOPS = [-1, -0.5, 0, 0.25, 0.5, 0.75, 1];
 
+/** Renk açıklamasının durakları (soldan sağa −Vmax … +Vmax); theme verilirse o temanın renkleri. */
+export function voltageStops(scale: WireScale = 'classic', theme?: 'light' | 'dark'): string[] {
+  const stops = scale === 'colorblind' ? COLORBLIND_STOPS.map(([r]) => r) : CLASSIC_LEGEND_STOPS;
+  return stops.map((r) => voltageColor(r, scale, theme));
+}
+
 /** Renk açıklaması için CSS degradesi (soldan sağa −Vmax … +Vmax). */
 export function voltageGradient(scale: WireScale = 'classic'): string {
-  const stops = scale === 'colorblind' ? COLORBLIND_STOPS.map(([r]) => r) : CLASSIC_LEGEND_STOPS;
-  return `linear-gradient(to right, ${stops.map((r) => voltageColor(r, scale)).join(', ')})`;
+  return `linear-gradient(to right, ${voltageStops(scale).join(', ')})`;
 }
 
 /** Gerilimi bilinmeyen (devreye bağlı olmayan) kablolar; kesikli çizilir. */

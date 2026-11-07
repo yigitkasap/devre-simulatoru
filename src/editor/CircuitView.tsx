@@ -8,6 +8,7 @@ import type { Connectivity } from '../model/connectivity';
 import { partBounds } from '../model/geometry';
 import { GRID, type CircuitDoc } from '../model/types';
 import { UNKNOWN_WIRE_COLOR, UNKNOWN_WIRE_DASH, voltageColor } from './colors';
+import { useDrawStyle } from './drawStyle';
 import { METER_DISPLAY, meterFlipped, PartView } from './PartView';
 import type { Settings } from './settings';
 import type { SimFrame } from './useSimulation';
@@ -59,6 +60,7 @@ function bounds(doc: CircuitDoc) {
 
 export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth, underlay, overlay, selected, className = 'schematic block h-full w-full' }: CircuitViewProps) {
   const b = bounds(doc);
+  const style = useDrawStyle();
   return (
     <div className="h-full w-full overflow-auto overscroll-contain">
       <svg
@@ -75,7 +77,7 @@ export const CircuitView = memo(function CircuitView({ doc, connectivity, frame,
           let dash: string | undefined;
           if (frame) {
             const v = frame.wireVoltages.get(wire.id);
-            stroke = v === undefined ? UNKNOWN_WIRE_COLOR : voltageColor(v / frame.vmax, settings.wireScale);
+            stroke = v === undefined ? UNKNOWN_WIRE_COLOR : voltageColor(v / frame.vmax, settings.wireScale, style.exporting ? 'light' : undefined);
             if (v === undefined) dash = UNKNOWN_WIRE_DASH;
           }
           return (

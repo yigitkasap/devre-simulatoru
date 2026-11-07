@@ -37,6 +37,20 @@ describe('Şemayı indir / yazdır: çizimin bileşimi', () => {
     expect(img.markup).toContain('R &lt; 1 kΩ &amp; &quot;deneme&quot;');
   });
 
+  it('o anki değerlerle: sağ altta, şemanın altında renk ölçeği (degrade ve "Gerilim ±10 V"); resim 36 px uzar', () => {
+    const legend = { label: 'Gerilim ±10 V', colors: ['#1f4fbf', '#178a3a', '#c4291c'] };
+    const plain = composeSchematic(circuit, null, measure)!;
+    const img = composeSchematic(circuit, null, measure, legend)!;
+    expect(img.height - plain.height).toBe(36);
+    expect(img.markup).toContain('<g data-legend="">');
+    expect(img.markup).toContain('<stop offset="0%" stop-color="#1f4fbf"/><stop offset="50%" stop-color="#178a3a"/><stop offset="100%" stop-color="#c4291c"/>');
+    expect(img.markup).toContain('>Gerilim ±10 V</text>');
+    // Sağ kenara dayalı: x + genişlik = resmin genişliği − kenar boşluğu.
+    const chip = /<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="28" rx="14"/.exec(img.markup)!;
+    expect(Number(chip[1]) + Number(chip[3])).toBe(img.width - 24);
+    expect(Number(chip[2])).toBe(24 + 300 + 8);
+  });
+
   it('şemada çizim yoksa (viewBox yok ya da geçersiz) null', () => {
     expect(composeSchematic('<div></div>', null, measure)).toBeNull();
     expect(composeSchematic('<svg viewBox="NaN NaN NaN NaN"></svg>', null, measure)).toBeNull();

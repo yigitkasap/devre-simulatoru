@@ -11,7 +11,9 @@ import { labFigure } from '../i18n/foy';
 import { tr } from '../i18n/tr';
 import type { Connectivity } from '../model/connectivity';
 import type { CircuitDoc } from '../model/types';
+import { formatSI } from '../sim/units';
 import { canSharePng, datedName, saveFile } from './analysis/format';
+import { voltageStops } from './colors';
 import { standaloneSvg, svgsToLightPng } from './exportImage';
 import { Icon } from './icons';
 import { circuitMarkup, composeSchematic, headerMeta, type SchematicImage } from './schematicExport';
@@ -80,7 +82,9 @@ export function SchematicExportDialog({
         setState('empty');
         return;
       }
-      const composed = composeSchematic(await circuitMarkup(snap.doc, snap.connectivity, live ? snap.frame : null, snap.settings), header);
+      // O anki değerlerle: sağ altta gerilim renk ölçeği (ekrandaki çipin aynısı, açık temanın renkleri).
+      const legend = live && snap.frame ? { label: tr.sim.legendChip(formatSI(snap.frame.vmax, 'V', { trim: true })), colors: voltageStops(snap.settings.wireScale, 'light') } : null;
+      const composed = composeSchematic(await circuitMarkup(snap.doc, snap.connectivity, live ? snap.frame : null, snap.settings), header, undefined, legend);
       if (!composed) {
         setState('empty');
         return;
