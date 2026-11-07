@@ -2103,6 +2103,159 @@ try {
       box !== null && busy < elapsed * 0.2, `${Math.round(busy)} ms / ${elapsed} ms`);
     await page.context().close();
   }
+  // --- Şemayı indir / yazdır: PNG, SVG, yazdırma; her zaman açık renkler ve beyaz zemin (grafik PNG'si de) ---
+  {
+    const { readFileSync } = await import('node:fs');
+    const EX = 'BF245A: çıkış ve transfer karakteristiği';
+    // İndirilen PNG: boyu ve bir pikselin rengi (tarayıcıda çözülür).
+    const pngInfo = (page, file, x = 2, y = 2) => page.evaluate(async ([b64, px, py]) => {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+      const c = new OffscreenCanvas(bmp.width, bmp.height);
+      const g = c.getContext('2d');
+      g.drawImage(bmp, 0, 0);
+      const d = g.getImageData(px, py, 1, 1).data;
+      return { w: bmp.width, h: bmp.height, rgb: [d[0], d[1], d[2]] };
+    }, [readFileSync(file).toString('base64'), x, y]);
+    const download = async (page, click) => {
+      const [d] = await Promise.all([page.waitForEvent('download'), click()]);
+      return { name: d.suggestedFilename(), path: await d.path() };
+    };
+    const desktop = async (scheme) => {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: scheme });
+      await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+      await (await pickExample(page, (p) => p.getByRole('button', { name: EX, exact: true }))).click(); await page.waitForTimeout(500);
+      await page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+      return { ctx, page };
+    };
+    const dialogOf = (page) => page.getByRole('dialog', { name: 'Şemayı indir ya da yazdır' });
+    const ready = async (dlg) => {
+      await dlg.getByRole('button', { name: 'SVG indir' }).and(dlg.locator(':enabled')).waitFor({ timeout: 15000 }).catch(() => {});
+      await dlg.page().waitForTimeout(200);
+    };
+    {
+      const { ctx, page } = await desktop('light');
+      // Devre menüsünde (Ctrl+P kısayoluyla).
+      await page.locator('header').getByRole('button', { name: /BF245A/ }).first().click(); await page.waitForTimeout(150);
+      const item = page.getByRole('menuitem', { name: /Şemayı indir \/ yazdır…/ });
+      const itemText = ((await item.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      await item.click();
+      const dlg = dialogOf(page);
+      await ready(dlg);
+      const preview = await dlg.getByRole('img').evaluate((img) => ({ w: img.naturalWidth, alt: img.alt }));
+      const headerOn = await dlg.getByRole('checkbox', { name: /Başlık satırı/ }).isChecked();
+      const liveBox = dlg.getByRole('checkbox', { name: /O anki değerlerle/ });
+      const liveOff = (await liveBox.isDisabled()) && (await dlg.getByText('Devre çalışırken ya da duraklatılmışken seçilebilir.').count()) === 1;
+      const svgFile = await download(page, () => dlg.getByRole('button', { name: 'SVG indir' }).click());
+      const svg = readFileSync(svgFile.path, 'utf8');
+      const size = /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="(\d+)" height="(\d+)"/.exec(svg);
+      check('şemayı indir (masaüstü): devre menüsünde "Şemayı indir / yazdır… Ctrl+P"; pencerede önizleme, Başlık satırı açık, "O anki değerlerle" devre dururken kapalı; SVG tek başına açılır (var(--…) yok, yazı tipleri gömülü, beyaz zemin, başlık ve "Deney 5 · Şekil-15")',
+        /Şemayı indir \/ yazdır… ?Ctrl\+P/.test(itemText) && preview.w > 0 && headerOn && liveOff && /^sema-\d{4}-\d{2}-\d{2}\.svg$/.test(svgFile.name) && size !== null &&
+          !svg.includes('var(--') && svg.includes('@font-face') && svg.includes('data:font/woff2') && svg.includes('fill="#ffffff"') && svg.includes(EX) && svg.includes('Deney 5 · Şekil-15'),
+        `${itemText} · ${svgFile.name} ${size?.[1]}×${size?.[2]} · ${Math.round(svg.length / 1024)} KB`);
+      // PNG: iki kat çözünürlük, beyaz köşe.
+      const pngFile = await download(page, () => dlg.getByRole('button', { name: 'PNG indir' }).click());
+      const png = await pngInfo(page, pngFile.path);
+      // Başlıksız: önizleme alçalır, SVG'de başlık yok.
+      await dlg.getByRole('checkbox', { name: /Başlık satırı/ }).click();
+      await page.waitForTimeout(300); await ready(dlg);
+      const bare = readFileSync((await download(page, () => dlg.getByRole('button', { name: 'SVG indir' }).click())).path, 'utf8');
+      const bareSize = /width="(\d+)" height="(\d+)"/.exec(bare);
+      check('şemayı indir (masaüstü): PNG iki kat çözünürlükte, köşesi beyaz; Başlık satırı kapatılınca başlık yok, resim 62 px alçak',
+        /^sema-\d{4}-\d{2}-\d{2}\.png$/.test(pngFile.name) && png.w === 2 * Number(size?.[1]) && png.h === 2 * Number(size?.[2]) && png.rgb.every((c) => c >= 250) &&
+          !bare.includes(EX) && bareSize !== null && Number(size?.[2]) - Number(bareSize[2]) === 62,
+        `${png.w}×${png.h} rgb ${png.rgb} · başlıksız ${bareSize?.[1]}×${bareSize?.[2]}`);
+      // Yazdır: window.print çağrılırken yalnızca şema (#sema-yazdir) ve A4 yatay; yazdırma bitince kaldırılır.
+      await dlg.getByRole('checkbox', { name: /Başlık satırı/ }).click();
+      await page.waitForTimeout(300); await ready(dlg);
+      await page.evaluate(() => {
+        window.__printed = null;
+        window.print = () => {
+          const box = document.getElementById('sema-yazdir');
+          const page = [...document.querySelectorAll('style')].map((s) => s.textContent).find((t) => t.includes('@page')) ?? '';
+          window.__printed = { svg: box?.querySelector(':scope > svg') !== null && box !== null, page, hiddenOnScreen: box ? getComputedStyle(box).display === 'none' : null };
+        };
+      });
+      await dlg.getByRole('button', { name: 'Yazdır' }).click();
+      await page.waitForFunction(() => window.__printed !== null, null, { timeout: 5000 }).catch(() => {});
+      const printed = await page.evaluate(() => window.__printed);
+      await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+      await page.waitForTimeout(200);
+      const cleaned = (await page.locator('#sema-yazdir').count()) === 0 && !(await page.evaluate(() => [...document.querySelectorAll('style')].some((s) => s.textContent.includes('size: A4'))));
+      check('şemayı yazdır: yazdırılırken sayfada yalnızca şema (ekranda gizli), A4 yatay (şekil enine), yazdırma bitince kaldırılıyor',
+        printed !== null && printed.svg && printed.hiddenOnScreen === true && /size: A4 landscape/.test(printed.page) && cleaned, JSON.stringify(printed));
+      await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+      // O anki değerlerle: devre çalışırken seçilebilir; kablolar gerilimin rengiyle, A1 okumasıyla.
+      await page.locator('header').getByRole('button', { name: 'Oynat', exact: true }).click();
+      await page.waitForTimeout(1500);
+      await page.keyboard.press('Control+p');
+      const dlg2 = dialogOf(page);
+      await ready(dlg2);
+      const enabled = await dlg2.getByRole('checkbox', { name: /O anki değerlerle/ }).isEnabled();
+      await dlg2.getByRole('checkbox', { name: /O anki değerlerle/ }).click();
+      await page.waitForTimeout(300); await ready(dlg2);
+      const live = readFileSync((await download(page, () => dlg2.getByRole('button', { name: 'SVG indir' }).click())).path, 'utf8');
+      const strokes = new Set([...live.matchAll(/<polyline[^>]*stroke="([^"]+)"/g)].map((m) => m[1]));
+      check('şemayı indir: "O anki değerlerle" devre çalışırken seçilebiliyor; kablolar gerilimin rengiyle (birden çok renk), A1 okuması (mA) çizimde',
+        enabled && strokes.size > 1 && /\d,\d+\s?mA/.test(live.replace(/<[^>]+>/g, '')), `${strokes.size} renk`);
+      await page.keyboard.press('Escape');
+      await ctx.close();
+    }
+    {
+      // Koyu tema: ekran koyu kalır; şemanın ve Analiz grafiğinin PNG'si açık renkli, beyaz zeminli.
+      const { ctx, page } = await desktop('dark');
+      const screenDark = await page.evaluate(() => document.documentElement.dataset.theme);
+      await page.keyboard.press('Control+p');
+      const dlg = dialogOf(page);
+      await ready(dlg);
+      const svg = readFileSync((await download(page, () => dlg.getByRole('button', { name: 'SVG indir' }).click())).path, 'utf8');
+      const png = await pngInfo(page, (await download(page, () => dlg.getByRole('button', { name: 'PNG indir' }).click())).path);
+      check('şemayı indir (koyu tema): ekran koyu kalıyor; indirilen şema açık temanın renkleriyle (çizgiler #1d2733, koyu temanın #d9e0e7 yok), PNG beyaz zeminli',
+        screenDark === 'dark' && svg.includes('#1d2733') && !svg.includes('#d9e0e7') && png.rgb.every((c) => c >= 250), `${screenDark} · rgb ${png.rgb}`);
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: 'Analiz', exact: true }).click(); await page.waitForTimeout(300);
+      const drawer = page.getByRole('region', { name: 'Analiz' });
+      await drawer.getByRole('button', { name: /ID – VDS ailesi/ }).click();
+      await drawer.getByText(/^Tarama bitti/).waitFor({ timeout: 30000 }).catch(() => {});
+      const panelDark = await drawer.evaluate((el) => getComputedStyle(el).backgroundColor);
+      const graph = await download(page, () => drawer.getByRole('button', { name: 'PNG', exact: true }).click());
+      const g = await pngInfo(page, graph.path);
+      const mid = await pngInfo(page, graph.path, 4, Math.round(g.h / 2));
+      check('koyu temada indirilen grafik PNG’si beyaz zeminli (açık temanın renkleriyle); ekrandaki grafik koyu kalıyor',
+        /^tarama-\d{4}-\d{2}-\d{2}\.png$/.test(graph.name) && g.rgb.every((c) => c >= 250) && mid.rgb.every((c) => c >= 250) && panelDark !== 'rgb(255, 255, 255)',
+        `${graph.name} ${g.w}×${g.h} köşe ${g.rgb} · sol orta ${mid.rgb} · ekran ${panelDark}`);
+      await ctx.close();
+    }
+    {
+      // Telefon: dosya sayfasında; pencere tam ekran, üç düğme tek satırda (≥ 44 px, yazı kırılmıyor), PNG paylaş.
+      const { page } = await phone();
+      await openExample(page, EX);
+      await page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'canShare', { configurable: true, value: (d) => Array.isArray(d?.files) });
+        Object.defineProperty(navigator, 'share', { configurable: true, value: async (d) => { window.__shared = (d.files ?? []).map((f) => ({ name: f.name, type: f.type, size: f.size })); } });
+      });
+      await phoneFileSheet(page);
+      await page.getByRole('button', { name: 'Şemayı indir / yazdır…' }).tap();
+      const dlg = dialogOf(page);
+      await ready(dlg);
+      const box = await dlg.boundingBox();
+      const buttons = await dlg.getByRole('button', { name: /^(Yazdır|SVG indir|PNG paylaş)$/ }).evaluateAll((els) => els.map((e) => ({ h: e.getBoundingClientRect().height, y: Math.round(e.getBoundingClientRect().y), fits: e.scrollWidth <= e.clientWidth + 1 })));
+      await dlg.getByRole('button', { name: 'PNG paylaş' }).tap();
+      await page.waitForFunction(() => window.__shared !== undefined, null, { timeout: 8000 }).catch(() => {});
+      const shared = await page.evaluate(() => window.__shared ?? null);
+      check('şemayı indir (telefon): dosya sayfasında; pencere tam ekran; Yazdır, SVG, PNG paylaş tek satırda (≥ 44 px, yazılar sığıyor); PNG paylaş bir PNG dosyası paylaşıyor; sayfa kaymıyor',
+        box !== null && box.y <= 1 && box.height >= 843 && buttons.length === 3 && buttons.every((b) => b.h >= 44 && b.fits && b.y === buttons[0].y) &&
+          shared !== null && shared[0]?.type === 'image/png' && /^sema-\d{4}-\d{2}-\d{2}\.png$/.test(shared[0]?.name ?? '') && !(await pageScrolls(page)),
+        `${JSON.stringify(buttons)} · ${JSON.stringify(shared)}`);
+      await page.context().close();
+    }
+  }
   // --- Analiz → Eğri izleyici (A3, N3): Worker'da DC tarama, basamaklar, transfer, yük doğrusu, iptal ----
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
@@ -3386,8 +3539,8 @@ try {
     const themes = await more.getByRole('group', { name: 'Tema' }).getByRole('menuitemradio').allTextContents();
     await page.keyboard.press('Escape'); await page.waitForTimeout(100);
     const moreBack = (await more.count()) === 0 && (await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) === 'Daha fazla';
-    check('arayüz v4: devre menüsü "Devre": Yeni devre, Bilgisayardan aç… (Ctrl+O), Bilgisayara indir (Ctrl+S), Paylaş…, Görev oluştur…, Karta aktar (PCB, lehim)…; altta "Her değişiklik bu tarayıcıya kaydedilir"; menüde "JSON" yok; Esc kapatıp odağı düğmeye döndürüyor',
-      devreRows === 'Yeni devre|Bilgisayardan aç… [Ctrl+O]|Bilgisayara indir [Ctrl+S]|Paylaş…|Görev oluştur…|Karta aktar (PCB, lehim)…' && devreText.includes('Her değişiklik bu tarayıcıya kaydedilir') && !/JSON/i.test(devreText) && devreBack,
+    check('arayüz v4: devre menüsü "Devre": Yeni devre, Bilgisayardan aç… (Ctrl+O), Bilgisayara indir (Ctrl+S), Şemayı indir / yazdır… (Ctrl+P), Paylaş…, Görev oluştur…, Karta aktar (PCB, lehim)…; altta "Her değişiklik bu tarayıcıya kaydedilir"; menüde "JSON" yok; Esc kapatıp odağı düğmeye döndürüyor',
+      devreRows === 'Yeni devre|Bilgisayardan aç… [Ctrl+O]|Bilgisayara indir [Ctrl+S]|Şemayı indir / yazdır… [Ctrl+P]|Paylaş…|Görev oluştur…|Karta aktar (PCB, lehim)…' && devreText.includes('Her değişiklik bu tarayıcıya kaydedilir') && !/JSON/i.test(devreText) && devreBack,
       `${devreRows} · Esc ${devreBack}`);
     check('arayüz v4: Daha fazla menüsü: en üstte Tema (Sistem, Açık, Koyu); Ayarlar…, Klavye kısayolları (?), Yardım (F1), Kısa turu başlat, Tam ekran (F11); Esc kapatıp odağı düğmeye döndürüyor',
       themes.join('|') === 'Sistem|Açık|Koyu' && moreRows === 'Ayarlar…|Klavye kısayolları [?]|Yardım [F1]|Kısa turu başlat|Tam ekran [F11]' && moreBack,
