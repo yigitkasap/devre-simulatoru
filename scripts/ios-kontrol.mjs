@@ -2158,6 +2158,9 @@ try {
         /Şemayı indir \/ yazdır… ?Ctrl\+P/.test(itemText) && preview.w > 0 && headerOn && liveOff && /^sema-\d{4}-\d{2}-\d{2}\.svg$/.test(svgFile.name) && size !== null &&
           !svg.includes('var(--') && svg.includes('@font-face') && svg.includes('data:font/woff2') && svg.includes('fill="#ffffff"') && svg.includes(EX) && svg.includes('Deney 5 · Şekil-15'),
         `${itemText} · ${svgFile.name} ${size?.[1]}×${size?.[2]} · ${Math.round(svg.length / 1024)} KB`);
+      check('şemayı indir (sade çizim, föy gibi): ölçü aletlerinin boş göstergesi ("– – – A/V") yok; güç kaynağının ekranları siyah dolgu yerine beyaz zeminli ve ince çerçeveli, ayarlı değerleri ("10,0 V", "0,00 V") koyu yazıyla; renk ölçeği yok',
+        !svg.includes('– – –') && !svg.includes('#1e2a25') && !svg.includes('#a6f4bd') && svg.includes('>10,0 V<') && svg.includes('>0,00 V<') && !svg.includes('data-legend'),
+        `boş gösterge ${svg.includes('– – –')} · siyah ekran ${svg.includes('#1e2a25')}`);
       // PNG: iki kat çözünürlük, beyaz köşe.
       const pngFile = await download(page, () => dlg.getByRole('button', { name: 'PNG indir' }).click());
       const png = await pngInfo(page, pngFile.path);
@@ -2201,8 +2204,11 @@ try {
       await page.waitForTimeout(300); await ready(dlg2);
       const live = readFileSync((await download(page, () => dlg2.getByRole('button', { name: 'SVG indir' }).click())).path, 'utf8');
       const strokes = new Set([...live.matchAll(/<polyline[^>]*stroke="([^"]+)"/g)].map((m) => m[1]));
-      check('şemayı indir: "O anki değerlerle" devre çalışırken seçilebiliyor; kablolar gerilimin rengiyle (birden çok renk), A1 okuması (mA) çizimde',
-        enabled && strokes.size > 1 && /\d,\d+\s?mA/.test(live.replace(/<[^>]+>/g, '')), `${strokes.size} renk`);
+      const liveW = Number(/^<svg xmlns="[^"]+" width="(\d+)"/.exec(live)?.[1]);
+      const chip = /<g data-legend="">[\s\S]*?<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="28"[\s\S]*?>(Gerilim ±[^<]+)<\/text>/.exec(live);
+      check('şemayı indir: "O anki değerlerle" devre çalışırken seçilebiliyor; kablolar gerilimin rengiyle (birden çok renk), A1 okuması (mA) çizimde; sağ altta gerilim renk ölçeği ("Gerilim ±10 V", ekrandaki çip gibi)',
+        enabled && strokes.size > 1 && /\d,\d+\s?mA/.test(live.replace(/<[^>]+>/g, '')) && chip !== null && chip[4] === 'Gerilim ±10 V' && Math.abs(Number(chip[1]) + Number(chip[3]) - (liveW - 24)) < 1,
+        `${strokes.size} renk · ölçek ${chip?.[4]} sağ kenar ${chip ? Number(chip[1]) + Number(chip[3]) : '?'} / ${liveW - 24}`);
       await page.keyboard.press('Escape');
       await ctx.close();
     }
@@ -2229,6 +2235,17 @@ try {
       check('koyu temada indirilen grafik PNG’si beyaz zeminli (açık temanın renkleriyle); ekrandaki grafik koyu kalıyor',
         /^tarama-\d{4}-\d{2}-\d{2}\.png$/.test(graph.name) && g.rgb.every((c) => c >= 250) && mid.rgb.every((c) => c >= 250) && panelDark !== 'rgb(255, 255, 255)',
         `${graph.name} ${g.w}×${g.h} köşe ${g.rgb} · sol orta ${mid.rgb} · ekran ${panelDark}`);
+      await page.locator('header').getByRole('button', { name: 'Oynat', exact: true }).click();
+      await page.waitForTimeout(1500);
+      await page.keyboard.press('Control+p');
+      const dlg2 = dialogOf(page);
+      await ready(dlg2);
+      await dlg2.getByRole('checkbox', { name: /O anki değerlerle/ }).click();
+      await page.waitForTimeout(300); await ready(dlg2);
+      const liveDark = readFileSync((await download(page, () => dlg2.getByRole('button', { name: 'SVG indir' }).click())).path, 'utf8');
+      const hsl = [...liveDark.matchAll(/<polyline[^>]*stroke="(hsl\([^"]+\))"/g)].map((m) => m[1]);
+      check('şemayı indir (koyu tema, o anki değerlerle): kablolar açık temanın gerilim renkleriyle (doygunluk %75; koyu temanın %60 açık tonları yok)',
+        hsl.length > 0 && hsl.every((c) => / 75% /.test(c)), [...new Set(hsl)].slice(0, 3).join(', '));
       await ctx.close();
     }
     {
