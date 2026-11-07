@@ -1,6 +1,7 @@
 // Analiz grafiklerinin eksenleri, CSV ve dosya verme. Sayılar Türkçe biçimde (ondalık virgül).
 
 import { formatNumber } from '../../sim/units';
+import { svgsToLightPng } from '../exportImage';
 
 /** Eksen için "güzel" bölmeler (1-2-5 dizisi) ve bölme aralığı. */
 export function niceTicks(min: number, max: number, count = 5): { ticks: number[]; step: number } {
@@ -106,55 +107,20 @@ export function canSharePng(): boolean {
 }
 
 /**
- * SVG grafiğini PNG'ye çevirir: tema belirteçleri (var(--…)) ve yazı tipleri o anki değerleriyle
- * yazılır (resim dosyası CSS bilmez), zemin panel rengi.
+ * Grafiği PNG'ye çevirir: ekranda temaya göre çizilen grafik dışa aktarılırken her zaman açık temanın
+ * renkleriyle ve beyaz zeminle (şemanın dışa aktarımıyla aynı renk kümesi: editor/exportImage.ts).
  */
 export async function svgToPng(svg: SVGSVGElement, scale = 2): Promise<Blob | null> {
   return svgsToPng([svg], scale);
 }
 
-/** SVG'yi tema belirteçleri yerine konmuş bir resme çevirir. */
-async function svgImage(svg: SVGSVGElement, root: CSSStyleDeclaration): Promise<{ img: HTMLImageElement; width: number; height: number } | null> {
-  const clone = svg.cloneNode(true) as SVGSVGElement;
-  const { width, height } = svg.getBoundingClientRect();
-  clone.setAttribute('width', String(width));
-  clone.setAttribute('height', String(height));
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  const markup = new XMLSerializer()
-    .serializeToString(clone)
-    // Yazı tipi adları çift tırnaklı: öznitelik içinde tek tırnağa çevrilir (yoksa XML bozulur).
-    .replace(/var\((--[\w-]+)\)/g, (_, name: string) => (root.getPropertyValue(name).trim() || '#000000').replace(/"/g, "'"));
-  const img = new Image();
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
-  try {
-    await img.decode();
-  } catch {
-    return null;
-  }
-  return { img, width, height };
-}
-
-/** Birden çok grafik (Bode'da kazanç ve faz) alt alta tek PNG'de; zemin panel rengi. */
+/** Birden çok grafik (Bode'da kazanç ve faz) alt alta tek PNG'de; açık tema, beyaz zemin. */
 export async function svgsToPng(svgs: readonly SVGSVGElement[], scale = 2): Promise<Blob | null> {
-  const root = getComputedStyle(document.documentElement);
-  const images = await Promise.all(svgs.map((s) => svgImage(s, root)));
-  if (images.length === 0 || images.some((i) => i === null)) return null;
-  const parts = images as { img: HTMLImageElement; width: number; height: number }[];
-  const width = Math.max(...parts.map((p) => p.width));
-  const height = parts.reduce((h, p) => h + p.height, 0);
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(width * scale);
-  canvas.height = Math.round(height * scale);
-  const g = canvas.getContext('2d');
-  if (!g) return null;
-  g.fillStyle = root.getPropertyValue('--color-panel').trim() || '#ffffff';
-  g.fillRect(0, 0, canvas.width, canvas.height);
-  let y = 0;
-  for (const p of parts) {
-    g.drawImage(p.img, 0, Math.round(y * scale), Math.round(p.width * scale), Math.round(p.height * scale));
-    y += p.height;
-  }
-  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  const parts = svgs.map((svg) => {
+    const { width, height } = svg.getBoundingClientRect();
+    return { markup: new XMLSerializer().serializeToString(svg), width, height };
+  });
+  return svgsToLightPng(parts, scale);
 }
 
 /** Dosya adına tarih: "grafik-2026-10-30.png". */
