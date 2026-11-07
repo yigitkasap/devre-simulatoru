@@ -1983,6 +1983,60 @@ try {
       (await sheet.getByRole('button', { name: 'PNG paylaş' }).count()) === 0 && (await sheet.getByRole('button', { name: 'CSV paylaş' }).count()) === 1);
     await page.context().close();
   }
+  // --- Analiz ince ayar: katlayıcıda iki Vp pozitif; telefonda grafik Ayarlar kapalıyken boş yeri dolduruyor ---
+  {
+    // Telefonda açık grafiğin ölçüleri: SVG'nin boyu, Ayarlar'ın altı ile kayan bölmenin altı arası, kayma.
+    const layout = (page) => page.evaluate(() => {
+      const sheet = document.querySelector('section[aria-label="Analiz"]');
+      const svg = sheet.querySelector('svg[role=img]');
+      const fold = [...sheet.querySelectorAll('button[aria-expanded]')].find((b) => b.textContent.includes('Ayarlar'));
+      const pane = svg.closest('.overflow-y-auto');
+      const p = pane.getBoundingClientRect();
+      return { svg: svg.getBoundingClientRect().height, gap: p.bottom - fold.closest('div').getBoundingClientRect().bottom, scroll: pane.scrollHeight - pane.clientHeight };
+    });
+    const openGraph = async (example, card) => {
+      const { page } = await phone();
+      await openExample(page, example);
+      await page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+      await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
+      await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Analiz', exact: true }).tap(); await page.waitForTimeout(500);
+      const sheet = page.getByRole('region', { name: 'Analiz' });
+      await sheet.getByRole('button', { name: card }).tap(); await page.waitForTimeout(300);
+      return { page, sheet };
+    };
+    {
+      const { page, sheet } = await openGraph('Gerilim katlayıcı (ikileyici)', /^ADIM 2 · GERİLİM KATLAYICI/);
+      const chips = (await sheet.locator('span.rounded-full.bg-accent-soft').allTextContents()).map((c) => c.replace(/\s+/g, ' ').trim());
+      await sheet.getByRole('button', { name: /^Oynat/ }).first().tap();
+      await page.waitForTimeout(2500);
+      await sheet.getByRole('button', { name: 'Duraklat' }).tap().catch(() => {});
+      await page.waitForTimeout(300);
+      const values = await sheet.evaluate((el) => Object.fromEntries([...el.querySelectorAll('span.font-mono + b')].map((b) => [b.previousElementSibling.textContent.replace(/\s+/g, ' ').trim(), Number(b.textContent.replace(/[^\d,−-]/g, '').replace('−', '-').replace(',', '.'))])));
+      const [c1, c2, vc] = [values['Vp (C1)'], values['Vp (C2)'], values['Vç']];
+      check('katlayıcı (föy grafiği): föydeki gibi iki Vp de pozitif (B ters çevrilmiş): izler "Vp (C1)", "Vp (C2)", "Vç"; Vp ≈ 4,6 V, Vç ≈ Vp (C1) + Vp (C2)',
+        chips.join('|') === 'Vp (C1)|Vp (C2)|Vç' && c1 > 4.3 && c2 > 4.3 && Math.abs(c1 - c2) < 0.1 && Math.abs(vc - c1 - c2) < 0.05,
+        `${chips.join('|')} · ${JSON.stringify(values)}`);
+      const closed = await layout(page);
+      await sheet.getByRole('button', { name: 'Ayarlar' }).tap(); await page.waitForTimeout(300);
+      const open = await layout(page);
+      check('telefon (zaman grafiği): Ayarlar kapalıyken grafik altındaki boş yeri dolduruyor (Ayarlar bölmenin dibinde, kayma yok); Ayarlar açılınca grafik en az boyuna (210 px) dönüyor, bölme kayıyor; sayfa kaymıyor',
+        closed.svg > 260 && closed.gap <= 16 && closed.scroll <= 1 && Math.abs(open.svg - 210) <= 1 && open.scroll > 0 && !(await pageScrolls(page)),
+        `kapalı ${Math.round(closed.svg)} px, boşluk ${Math.round(closed.gap)} · açık ${Math.round(open.svg)} px, kayma ${open.scroll}`);
+      await page.context().close();
+    }
+    {
+      const { page, sheet } = await openGraph('BF245A: çıkış ve transfer karakteristiği', /ID – VDS ailesi/);
+      await sheet.locator('svg[role=img] [data-legend]').nth(2).waitFor({ timeout: 30000 }).catch(() => {});
+      await page.waitForTimeout(300);
+      const closed = await layout(page);
+      await sheet.getByRole('button', { name: 'Ayarlar' }).tap(); await page.waitForTimeout(300);
+      const open = await layout(page);
+      check('telefon (tarama grafiği): Ayarlar kapalıyken grafik altındaki boş yeri dolduruyor (≥ 450 px, kayma yok); açılınca en az boyuna (260 px + açıklama satırı) dönüyor, bölme kayıyor',
+        closed.svg >= 450 && closed.gap <= 16 && closed.scroll <= 1 && open.svg < 300 && open.svg >= 260 && open.scroll > 0 && !(await pageScrolls(page)),
+        `kapalı ${Math.round(closed.svg)} px, boşluk ${Math.round(closed.gap)} · açık ${Math.round(open.svg)} px, kayma ${open.scroll}`);
+      await page.context().close();
+    }
+  }
   // --- Analiz → Eğri izleyici (A3, N3): Worker'da DC tarama, basamaklar, transfer, yük doğrusu, iptal ----
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR', colorScheme: 'dark' });
