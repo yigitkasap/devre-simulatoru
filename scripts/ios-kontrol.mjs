@@ -5284,6 +5284,61 @@ try {
     check('baraj (masaüstü): ⋯ → "Simülatörde aç" devreyi o anki seviyeyle simülatörde açıyor', tankPart !== undefined && Math.abs(tankPart.props.level - 50) < 1 && opened.parts.filter((q) => q.type === 'led').length === 3, `${opened?.parts.length ?? 0} parça, %${tankPart?.props.level}`);
     await bCtx.close();
   }
+
+  // --- Telefon hızı: 4 kat yavaş işlemcide (iPhone 13 öykünmesi) bütün örnekler çalışırken ---------------
+  // Kare hızı en az 30/s, 100 ms'yi aşan görev yok (çözücünün süre sınırı kesin; çizim uzun sürünce hesap
+  // süresi kısalır). Simülasyon gerçek zamana yetişemeyince "yetişemiyor" simgesi üst çubukta, açıklaması
+  // Durum sayfasında. Örneklerin adları i18n/tr.ts'ten (EXAMPLES); her örnek yavaşlatılmadan açılır,
+  // 4 kat yavaşta oynatılır, 1,5 s sonra 2 s ölçülür.
+  {
+    const trText = readFileSync(new URL('../src/i18n/tr.ts', import.meta.url), 'utf8');
+    const block = trText.slice(trText.indexOf('const EXAMPLES: Record<ExampleId, ExampleTexts> = {'));
+    const titles = [...block.slice(0, block.indexOf('\n};')).matchAll(/^ {4}title: '([^']+)',$/gm)].map((m) => m[1]);
+    const { page, cdp } = await phone();
+    await page.addInitScript(() => {
+      window.__kareAraliklari = [];
+      window.__uzunGorevler = [];
+      let last = performance.now();
+      const tick = (now) => { window.__kareAraliklari.push(now - last); last = now; requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__uzunGorevler.push(Math.round(e.duration)); }).observe({ type: 'longtask' });
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    const rows = [];
+    let lagShown = null;
+    for (const title of titles) {
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await page.locator('header').getByRole('button', { name: 'Örnekler', exact: true }).tap(); await page.waitForTimeout(300);
+      await page.getByRole('searchbox', { name: 'Örnek ara' }).fill(title); await page.waitForTimeout(200);
+      await page.getByRole('button', { name: title, exact: true }).first().tap(); await page.waitForTimeout(700);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      await phoneBar(page).getByRole('button', { name: 'Oynat' }).tap();
+      await page.waitForTimeout(1500);
+      const t0 = await page.evaluate(() => { window.__kareAraliklari.length = 0; window.__uzunGorevler.length = 0; return performance.now(); });
+      await page.waitForTimeout(2000);
+      const r = await page.evaluate((t) => ({ n: window.__kareAraliklari.length, dt: performance.now() - t, long: Math.max(0, ...window.__uzunGorevler) }), t0);
+      // Yarım dalga doğrultmaç 4 kat yavaşta gerçek zamana yetişemez: simge üst çubukta, açıklama Durum sayfasında.
+      if (title === 'Yarım dalga doğrultmaç') {
+        const icon = await page.locator('header [data-lagging]').count();
+        await phoneBar(page).getByRole('button', { name: /: hız$/ }).tap(); await page.waitForTimeout(300);
+        const note = await page.getByRole('dialog').locator('[data-lagging]').textContent().catch(() => '');
+        await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+        if ((await page.getByRole('dialog').count()) > 0) await page.getByRole('dialog').getByRole('button', { name: 'Kapat' }).first().tap().catch(() => {});
+        lagShown = { icon, note: note ?? '' };
+      }
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+      await phoneBar(page).getByRole('button', { name: 'Durdur' }).tap(); await page.waitForTimeout(250);
+      rows.push({ title, fps: (r.n / r.dt) * 1000, long: r.long });
+    }
+    const slow = rows.filter((x) => x.fps < 30 || x.long > 100);
+    const worst = rows.slice().sort((a, b) => a.fps - b.fps).slice(0, 3).map((x) => `${x.title} ${x.fps.toFixed(1)}`).join(', ');
+    check(`telefon hızı (4 kat yavaş işlemci, CDP Emulation.setCPUThrottlingRate 4): ${titles.length} örneğin hepsi çalışırken en az 30 kare/s, 100 ms'yi aşan görev yok`,
+      titles.length >= 81 && rows.length === titles.length && slow.length === 0,
+      `en yavaş: ${worst} kare/s · en uzun görev ${Math.max(0, ...rows.map((x) => x.long))} ms${slow.length ? ' · KALAN: ' + slow.map((x) => `${x.title} ${x.fps.toFixed(1)} kare/s, ${x.long} ms`).join('; ') : ''}`);
+    check('telefon hızı: gerçek zamana yetişemeyen devrede (yarım dalga, 4 kat yavaş) üst çubukta "yetişemiyor" simgesi; Durum sayfasında açıklaması',
+      lagShown?.icon === 1 && /yetişemiyor/.test(lagShown?.note ?? ''), JSON.stringify(lagShown));
+    await page.context().close();
+  }
 } finally {
   await browser.close();
 }

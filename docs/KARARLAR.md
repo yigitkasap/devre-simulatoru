@@ -1031,9 +1031,12 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   simülasyonu durdurur. Değer, ad ve anahtar değişiklikleri simülasyonu durdurmaz;
   kondansatör gerilimleri ve yanmış LED'ler korunarak devre yeniden derlenir.
 - **Hız:** Kaydırıcı logaritmiktir (×10⁻⁶ … ×1) ve ×1, ×0,5, ×0,1, ×0,05, ×0,01, ×10⁻³ …
-  ×10⁻⁶ değerlerine yapışır. Bir karede en fazla 6000 adım atılır; bilgisayar yetişemezse
-  simülasyon gerçek zamandan geri kalır (donmaz) ve alt çubukta "gerçek zamana yetişemiyor"
-  uyarısı çıkar (son karelerin yarısından çoğu adım sınırına takıldıysa).
+  ×10⁻⁶ değerlerine yapışır. Bir karede en fazla 6000 adım atılır ve hesap süresi kesindir (süre
+  bitince kare kesilir, adım sınırına gelinmemiş olsa da). Sınır, gerçek zamana yetişmek için gereken
+  süredir (ölçülen hesap hızıyla, %50 paylı; en az 10, en çok 25 ms); kare aralığı 28 ms'yi aşarsa
+  (yavaş işlemci: çizimin kendisi uzun) farkla orantılı kısalır (en az 2 ms). Bilgisayar yetişemezse simülasyon gerçek zamandan geri kalır
+  (donmaz) ve üst çubukta "gerçek zamana yetişemiyor" simgesi çıkar (son karelerin yarısından
+  çoğu kesildiyse); telefonda açıklaması Durum sayfasında (süreye dokununca).
 - **Kablo akımları:** Çözücü kabloları tek düğümde birleştirdiği için kablo parçası
   başına akım ayrıca bulunur: pinlerin akımları bir kapsayan ağaç üzerinde toplanır, toprak
   sembolleri kendi kablo adasındaki dengesizliği karşılar. Kablolar kendi aralarında döngü
@@ -1728,6 +1731,32 @@ taramasında hata yok (atlama bağlantıları odakta 44 px yapıldı).
   hesaplanmaz (555'in her olayında Tarjan yapılıyordu).
 - Arayüzde kare bütçesi adım sayısıyla değil hesap süresiyle (10 ms): küçük adım isteyen devre,
   bilgisayar yetiştirdikçe "yetişemiyor" uyarısı almaz.
+
+### Telefon hızı (2026-11-07)
+
+Kullanılabilirlik taraması: 4 kat yavaşlatılmış işlemcide (iPhone 13 öykünmesi) 81 örneğin 34'ü 20 kare/s'nin
+altındaydı; AC kaynaklı föy deneyleri 5–7 kare/s, kare başına 150–300 ms'lik uzun görevler. Neden: süre
+sınırı yalnızca adım sayısı sınırı da dolunca uygulanıyordu (`overCount && outOfTime`); yavaş işlemcide
+adım sınırına gelinmeden kare uzuyordu.
+- Süre sınırı kesin: süre bitince kare kesilir; adım sayısı bütçesi süre kaldıkça en çok 4 katına kadar
+  aşılabilir (eskisi gibi).
+- Sınırın değeri cihaza göre: gerçek zamana yetişmek için gereken hesap süresi (1 ms'lik simülasyonun
+  ölçülen hesap süresiyle, %50 paylı; en az 10, en çok 25 ms): yetişebilen bilgisayarda kare kesilmez,
+  masaüstü eskisi gibi. Kare aralığı (yumuşatılmış) 28 ms'yi aşınca sınır kısalır (en az 2 ms): kare hızı
+  30/s'nin altına düşmez. Yalnızca sabit 10 ms'lik kesin sınır masaüstünü de yavaşlatıyordu: 144 Hz'lik
+  ekranda (karede 6,9 ms simülasyon) ağır kırpıcılar gerçek zamanın %56–86'sında kalıyordu.
+  Profil: 4 kat yavaşta karenin yarıdan fazlası çizim (React ≈ %16, tarayıcının stil/boyama işi ≈ %40);
+  ağır devrelerde (D flip-flop, adaptör) çizim tek başına 21–27 ms.
+- Sonuç (4 kat yavaş, 81 örnek): en yavaş örnek ≈ 35 kare/s (önce 34 örnek 20 kare/s'nin altında),
+  100 ms'yi aşan görev yok (önce kare başına 150–300 ms). Masaüstünde (144 Hz'lik ekranda, eski ve yeni
+  art arda) ağır föy örnekleri eskisi gibi gerçek zamanda (≥ 0,98); yalnızca çift yönlü kırpıcı, makine
+  yüklüyken eskisinde de yetişemiyordu (0,95; 16 kare/s, 71 ms'lik görevler), yenisinde 0,87 ve 37 kare/s
+  ("yetişemiyor" simgesiyle). Bedeli: yavaş telefonda ağır devreler gerçek zamanın gerisinde kalır
+  (yarım dalga 3 s'de ≈ 0,4 s; önce ≈ 1,6 s ama 6 kare/s). Denetimi ios-kontrol'de ("Telefon hızı").
+- Çözücüyü Web Worker'a taşımak (değerlendirildi, yapılmadı): ana iş parçacığı yalnızca çizer, çözücü
+  kare bütçesine bağlı kalmaz. Altyapı var (Analiz taramaları sweep.worker.ts'te); ama `buildFrame`, ses,
+  osiloskop ve iz kaydedicileri, Arduino, basılı düğmeler ve canlı değer değişiklikleri çözücüye
+  doğrudan erişiyor: bunların hepsi ileti ve her karede bir anlık görüntüye dönmeli.
 
 ### Arduino Uno (2026-10-27)
 
