@@ -61,3 +61,21 @@ describe('Kare bütçesi: süre sınırı kesin', () => {
     expect(rb.steps).toBe(20);
   });
 });
+
+describe('Kare bütçesi: kesilen kareler çözümü değiştirmez', () => {
+  it('her karesi kesilen simülasyon, aynı simülasyon anında kesintisizle aynı gerilimi verir', () => {
+    const plain = rc();
+    const cut = rc();
+    let clock = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => (clock += 1));
+    // Her çağrıda ≈ 3 adım: kare süresinin çoğu atlanır (simülasyon gerçek zamanın gerisinde kalır).
+    let truncated = 0;
+    while (cut.time < 0.05) if (cut.advance(1 / 60, 1e6, clock + 3).truncated) truncated++;
+    expect(truncated).toBeGreaterThan(10);
+    for (const t of [0.06, 0.075, 0.09]) {
+      plain.runUntil(t);
+      cut.runUntil(t);
+      expect(Math.abs(cut.measure('C')!.voltage - plain.measure('C')!.voltage)).toBeLessThan(0.005 * 5);
+    }
+  });
+});

@@ -176,7 +176,8 @@ export default function BarajSayfasi() {
   const [doc, setDoc] = useState<CircuitDoc>(() => lessonDoc('baraj-cubuk'));
   const connectivity = useMemo(() => buildConnectivity(doc), [doc]);
   const flowGraph = useMemo(() => buildFlowGraph(doc), [doc]);
-  const sim = useSimulation(doc, connectivity, flowGraph, appSettings.electronFlow);
+  // Suyun yükselişi dersin kendisi: yavaş cihazda kare hızı yerine simülasyonun ilerleyişi korunur.
+  const sim = useSimulation(doc, connectivity, flowGraph, appSettings.electronFlow, true, [], undefined, 'progress');
   const running = sim.status === 'running';
 
   // Simülasyon hep çalışır: açılışta, Başa al'da ve devre değişince (yapı değişti) yeniden başlar.

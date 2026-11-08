@@ -145,8 +145,10 @@ const MAX_STEPS_PER_FRAME = 6000;
  * olsa da (simülasyon gerçek zamanın gerisinde kalır, "yetişemiyor" göstergesi çıkar). Sınırın değeri:
  *   - Gerçek zamana yetişmek için gereken süre (ölçülen hesap hızıyla, %50 paylı): en az FRAME_COMPUTE_MS,
  *     en çok MAX_COMPUTE_MS. Bilgisayar yetiştirebildiği sürece kare kesilmez (masaüstü eskisi gibi).
- *   - Kare aralığı (yumuşatılmış) TARGET_FRAME_MS'yi aşarsa (yavaş işlemci, çizimin kendisi uzun) sınır
- *     farkla orantılı kısalır (en az MIN_COMPUTE_MS): kare hızı 30/s'nin altına düşmez, kare uzayıp donmaz.
+ *   - Kare aralığı (yumuşatılmış) TARGET_FRAME_MS'yi aşarsa (yavaş işlemci) sınır farkla orantılı kısalır
+ *     (en az MIN_COMPUTE_MS): kare hızı 30/s'nin altına düşmez, kare uzayıp donmaz.
+ *   - Ama çizim (React, stil, boyama) tek başına RENDER_BOUND_MS'yi aşıyorsa hesabı kısmak 30 kare/s'yi
+ *     sağlamaz, yalnızca simülasyonu durdurur: hesap payı kare süresinin MIN_COMPUTE_SHARE'inin altına inmez.
  * Adım bütçesi dolduktan sonra da süre kaldıkça adım atılır (en çok 4 katı): küçük adım isteyen devre
  * (yüksek frekanslı LC) bilgisayar yetiştirebildiği sürece uyarı almaz.
  */
@@ -154,6 +156,15 @@ const FRAME_COMPUTE_MS = 10;
 const MAX_COMPUTE_MS = 25;
 const TARGET_FRAME_MS = 28;
 const MIN_COMPUTE_MS = 2;
+const RENDER_BOUND_MS = 33;
+const MIN_COMPUTE_SHARE = 0.4;
+/**
+ * Kare bütçesinin önceliği. 'smooth' (simülatör): kare hızı korunur, yetişemeyen simülasyon geride kalır.
+ * 'progress' (baraj dersi: suyun yükselişi dersin kendisi, düzenleme yok): kare hızı korunmaz, hesap
+ * gerçek zamana yetişmeye çalışır (en çok PROGRESS_MAX_COMPUTE_MS); süre sınırı yine kesin.
+ */
+export type FramePriority = 'smooth' | 'progress';
+const PROGRESS_MAX_COMPUTE_MS = 200;
 /** Gerçek zamanlı kare süresinin üst sınırı: sekme arka planda kalınca büyük sıçramaları önler. */
 const MAX_FRAME_SECONDS = 0.1;
 /**
@@ -175,7 +186,10 @@ export function useSimulation(
   watched: readonly string[] = [],
   /** Analiz grafiğinin izleri: yalnızca bunlar kaydedilir. */
   traces: readonly TraceDef[] = NO_TRACES,
+  priority: FramePriority = 'smooth',
 ): SimulationApi {
+  const priorityRef = useRef(priority);
+  priorityRef.current = priority;
   const watchedRef = useRef(watched);
   watchedRef.current = watched;
   /** İzlenen parçaların ölçüm pencereleri. */
@@ -524,6 +538,8 @@ export function useSimulation(
     let fpsLimitMs = FRAME_COMPUTE_MS;
     /** Hesap hızı: 1 ms'lik simülasyonun kaç ms hesap sürdüğü (yumuşatılmış). */
     let costPerMs = 0;
+    /** Karede gerçekte harcanan hesap süresi (ms, yumuşatılmış): kare aralığının geri kalanı çizim. */
+    let spentMs = 0;
     const tick = (now: number) => {
       const sim = simRef.current;
       if (!sim || statusRef.current !== 'running') return;
@@ -538,14 +554,20 @@ export function useSimulation(
       const maxSteps = Math.min(MAX_STEPS_PER_FRAME, Math.ceil(simDt / sim.maxTimeStep) * 8 + 64);
       // İz varsa kayıt: AC kaynaksız devrede kare örnek anlarında bölünür (istatistikler birleştirilir).
       if (recorder.active && recorder.count === 0 && recorder.due < sim.time) recorder.reset(sim.time, speedRef.current, sim.hasAcSources);
-      const needMs = Math.min(MAX_COMPUTE_MS, Math.max(FRAME_COMPUTE_MS, 1.5 * costPerMs * simDt * 1000));
-      const computeMs = Math.min(fpsLimitMs, needMs);
+      const progress = priorityRef.current === 'progress';
+      const needMs = Math.min(progress ? PROGRESS_MAX_COMPUTE_MS : MAX_COMPUTE_MS, Math.max(FRAME_COMPUTE_MS, 1.5 * costPerMs * simDt * 1000));
+      const renderBound = frameMs - spentMs > RENDER_BOUND_MS;
+      const computeMs = progress ? needMs : Math.min(needMs, Math.max(fpsLimitMs, renderBound ? MIN_COMPUTE_SHARE * frameMs : 0));
       const simBefore = sim.time;
       const t0 = performance.now();
       const recorded = recorder.active ? advanceRecorded(sim, simDt, maxSteps, t0 + computeMs, recorder, watchedRef.current) : null;
       const result = recorded ? recorded.result : sim.advance(simDt, maxSteps, t0 + computeMs);
+      const spent = performance.now() - t0;
+      spentMs += (spent - spentMs) * 0.1;
       const advanced = (sim.time - simBefore) * 1000;
-      if (advanced > 0) costPerMs += ((performance.now() - t0) / advanced - costPerMs) * 0.1;
+      // Hesap hızı artınca hemen, azalınca yavaşça izlenir: devre ağırlaşınca (baraj doldurulmaya başlayınca)
+      // ihtiyaç bir anda büyür; yumuşatılarak izlenirse ilk saniyelerde hesap kısılır, simülasyon geride kalır.
+      if (advanced > 0) costPerMs = Math.max(spent / advanced, costPerMs + (spent / advanced - costPerMs) * 0.1);
       // Bütçe bittiyse istenen sürenin bir kısmı atlandı: kullanıcı uyarılır.
       lagSamples = (lagSamples * 0.9) + (result.truncated ? 0.1 : 0);
       if (!result.ok) {
