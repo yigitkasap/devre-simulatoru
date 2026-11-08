@@ -1800,6 +1800,15 @@ adım sınırına gelinmeden kare uzuyordu.
   kare bütçesine bağlı kalmaz. Altyapı var (Analiz taramaları sweep.worker.ts'te); ama `buildFrame`, ses,
   osiloskop ve iz kaydedicileri, Arduino, basılı düğmeler ve canlı değer değişiklikleri çözücüye
   doğrudan erişiyor: bunların hepsi ileti ve her karede bir anlık görüntüye dönmeli.
+- Tam ios-kontrol 4 kat yavaşta (`IOS_CPU=4`, 2026-11-08; ios-kontrol 4 kat yavaşta "Kur kipi" bölümünde
+  `boundingBox` zaman aşımıyla duruyor, main'de de: her üst düzey bölümü try/catch'e saran geçici kopyayla,
+  aynı betik iki derlemede art arda). 438 madde: dal 11, main 10 KALDI. İkisinde de kalan 7 madde 4 kat
+  yavaşlığın kendisi (zaman aşımı, dokunma/kaydırma süreleri, ≈ okumaların karede oynaması, baraj klavye
+  maddesi ikisinde aynı değerlerle). Yalnızca main'de kalan: Telefon hızı (2,7 kare/s), "yetişemiyor" simgesi,
+  baraj B6. Yalnızca dalda kalan 4 madde simülasyonun gerçek zamandan yavaş yürümesinden: canlı okumalar
+  gerçek zaman penceresinde toplandığı için BJT görevinde VCE 5,99 yerine 6,03–6,06 V (tahmin farkı %0,2
+  yerine %1,0), OSC1 girişindeki ampermetre "≈ 0,000 A" yerine anlık "1,526 pA", analiz imleç kutusu 5
+  noktaya biniyor (kayıt daha kısa simülasyon süresini kapsıyor). Normal hızda dördü de geçiyor.
 
 ### Arduino Uno (2026-10-27)
 
