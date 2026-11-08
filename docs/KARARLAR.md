@@ -1915,6 +1915,13 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   ≈ 3 500, üreteç ≈ 3 000, güç kaynağı ≈ 2 700, el multimetresi ≈ 1 000.
 - Eski 3B osiloskop izleri bölmeyle ölçekleniyordu (yol ekran pikseliyle, bölme başına 50): iz ekranın dışına
   taşıyordu; düzeldi.
+- **Kare hızı** (iPhone 13 öykünmesi, işlemci 4× yavaş, 3B, örnek çalışırken; 10 örnek: diyot-dc, yarim-dalga,
+  voltmetre-yukleme, 555-astabil, diyot-karakteristigi, negatif-kenetleyici, paralel-kirpici,
+  jfet-karakteristik, bjt-yukseltec, bjt-anahtar). Çizim tek başına (simülasyon durmuşken) 180 kare/s:
+  modeller yük değil. Çalışırken osiloskoplu örneklerde darboğaz simülasyon hesabı: bu dal tek başına main
+  gibi 4–8 kare/s (main 4–14). telefon-hizi'nin kare bütçesiyle birlikte (geçici yerel birleştirme) 10 örnek
+  30,9–58,2 kare/s, uzun görev yok; aynı ölçüm eski modellerle 33,1–53,6 (art arda). 30 kare/s hedefi
+  telefon-hizi main'e alınınca tutar.
 
 ### Performans ve hata taraması (2026-10-27)
 
