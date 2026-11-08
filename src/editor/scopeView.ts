@@ -128,6 +128,9 @@ function windowStart(rec: ScopeRecorder, data: ChannelData | null): { start: num
   return { start: Math.max(rec.start, latest), triggered: false };
 }
 
+/** Bir ondalığa yuvarlanmış sayı (yol yazısı için; toFixed'den çok daha hızlı, her karede 1000 kez çağrılır). */
+const r1 = (v: number) => Math.round(v * 10) / 10;
+
 function channelView(
   rec: ScopeRecorder,
   data: ChannelData,
@@ -157,20 +160,20 @@ function channelView(
     const min = data.min(s);
     const last = data.last(s);
     if (draw) {
-      const x = ((k - start) * dx).toFixed(1);
+      const x = r1((k - start) * dx);
       const yMax = toY(max);
       const yMin = toY(min);
       const command = parts.length === 0 ? 'M' : 'L';
       if (Math.abs(yMin - yMax) < 0.75) {
         const y = toY(last);
-        parts.push(`${command}${x},${y.toFixed(1)}`);
+        parts.push(`${command}${x},${r1(y)}`);
         previousY = y;
       } else {
         // Kovanın içinde sinyal hızla değişmiş: en küçükten en büyüğe dikey çizgi (önceki noktaya yakın uçtan).
         const nearMax = previousY !== null && Math.abs(previousY - yMax) < Math.abs(previousY - yMin);
         const first: number = nearMax ? yMax : yMin;
         const second: number = nearMax ? yMin : yMax;
-        parts.push(`${command}${x},${first.toFixed(1)} L${x},${second.toFixed(1)}`);
+        parts.push(`${command}${x},${r1(first)} L${x},${r1(second)}`);
         previousY = second;
       }
     }

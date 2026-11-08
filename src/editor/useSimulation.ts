@@ -147,16 +147,23 @@ const MAX_STEPS_PER_FRAME = 6000;
  *     en çok MAX_COMPUTE_MS. Bilgisayar yetiştirebildiği sürece kare kesilmez (masaüstü eskisi gibi).
  *   - Kare aralığı (yumuşatılmış) TARGET_FRAME_MS'yi aşarsa (yavaş işlemci) sınır farkla orantılı kısalır
  *     (en az MIN_COMPUTE_MS): kare hızı 30/s'nin altına düşmez, kare uzayıp donmaz.
- *   - Ama çizim (React, stil, boyama) tek başına RENDER_BOUND_MS'yi aşıyorsa hesabı kısmak 30 kare/s'yi
+ *   - Ama çizim (React, stil, boyama) tek başına RENDER_BOUND_ON_MS'yi aşıyorsa hesabı kısmak 30 kare/s'yi
  *     sağlamaz, yalnızca simülasyonu durdurur: hesap payı kare süresinin MIN_COMPUTE_SHARE'inin altına inmez.
  * Adım bütçesi dolduktan sonra da süre kaldıkça adım atılır (en çok 4 katı): küçük adım isteyen devre
  * (yüksek frekanslı LC) bilgisayar yetiştirebildiği sürece uyarı almaz.
  */
 const FRAME_COMPUTE_MS = 10;
 const MAX_COMPUTE_MS = 25;
-const TARGET_FRAME_MS = 28;
+const TARGET_FRAME_MS = 26;
 const MIN_COMPUTE_MS = 2;
-const RENDER_BOUND_MS = 33;
+const RENDER_BOUND_MS = 45;
+/**
+ * Çizim süresi tahmini bunu aşınca taban açılır, RENDER_BOUND_MS'nin altına inince kapanır. 30 kare/s 33 ms'de
+ * imkânsızlaşır ama eşik bilerek yüksek: tahmin karenin hesap dışındaki bütün işini (kare verisi, React,
+ * boyama, GC) içerir ve gürültülüdür; 4 kat yavaşta çizimi ≈ 30 ms olan örnekler (lojik devreler) gürültüyle
+ * 38 ms'yi aşınca taban onları 25 kare/s'ye düşürüyordu.
+ */
+const RENDER_BOUND_ON_MS = 50;
 const MIN_COMPUTE_SHARE = 0.4;
 /**
  * Kare bütçesinin önceliği. 'smooth' (simülatör): kare hızı korunur, yetişemeyen simülasyon geride kalır.
@@ -538,8 +545,14 @@ export function useSimulation(
     let fpsLimitMs = FRAME_COMPUTE_MS;
     /** Hesap hızı: 1 ms'lik simülasyonun kaç ms hesap sürdüğü (yumuşatılmış). */
     let costPerMs = 0;
-    /** Karede gerçekte harcanan hesap süresi (ms, yumuşatılmış): kare aralığının geri kalanı çizim. */
-    let spentMs = 0;
+    /** Son karede harcanan hesap süresi (ms): kare aralığının geri kalanı çizim. */
+    let lastSpent = 0;
+    /**
+     * Çizim süresi (ms, yavaş yumuşatılmış; örnek 80 ms'de kırpılır: açılıştaki uzun kareler tahmini
+     * şişirmesin) ve tabanın açık olup olmadığı (gecikmeli eşik).
+     */
+    let renderMs = 0;
+    let renderBound = false;
     const tick = (now: number) => {
       const sim = simRef.current;
       if (!sim || statusRef.current !== 'running') return;
@@ -547,6 +560,8 @@ export function useSimulation(
       const dtReal = Math.min(MAX_FRAME_SECONDS, interval / 1000);
       last = now;
       frameMs += (Math.min(interval, 200) - frameMs) * 0.1;
+      renderMs += (Math.min(80, Math.max(0, interval - lastSpent)) - renderMs) * 0.05;
+      renderBound = renderBound ? renderMs > RENDER_BOUND_MS : renderMs > RENDER_BOUND_ON_MS;
       fpsLimitMs = Math.min(MAX_COMPUTE_MS, Math.max(MIN_COMPUTE_MS, fpsLimitMs + (TARGET_FRAME_MS - frameMs) * 0.05));
       const simDt = dtReal * speedRef.current;
       sim.watch(watchedRef.current);
@@ -556,14 +571,13 @@ export function useSimulation(
       if (recorder.active && recorder.count === 0 && recorder.due < sim.time) recorder.reset(sim.time, speedRef.current, sim.hasAcSources);
       const progress = priorityRef.current === 'progress';
       const needMs = Math.min(progress ? PROGRESS_MAX_COMPUTE_MS : MAX_COMPUTE_MS, Math.max(FRAME_COMPUTE_MS, 1.5 * costPerMs * simDt * 1000));
-      const renderBound = frameMs - spentMs > RENDER_BOUND_MS;
       const computeMs = progress ? needMs : Math.min(needMs, Math.max(fpsLimitMs, renderBound ? MIN_COMPUTE_SHARE * frameMs : 0));
       const simBefore = sim.time;
       const t0 = performance.now();
       const recorded = recorder.active ? advanceRecorded(sim, simDt, maxSteps, t0 + computeMs, recorder, watchedRef.current) : null;
       const result = recorded ? recorded.result : sim.advance(simDt, maxSteps, t0 + computeMs);
       const spent = performance.now() - t0;
-      spentMs += (spent - spentMs) * 0.1;
+      lastSpent = spent;
       const advanced = (sim.time - simBefore) * 1000;
       // Hesap hızı artınca hemen, azalınca yavaşça izlenir: devre ağırlaşınca (baraj doldurulmaya başlayınca)
       // ihtiyaç bir anda büyür; yumuşatılarak izlenirse ilk saniyelerde hesap kısılır, simülasyon geride kalır.
