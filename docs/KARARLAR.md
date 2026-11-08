@@ -1048,9 +1048,11 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   ×10⁻⁶ değerlerine yapışır. Bir karede en fazla 6000 adım atılır ve hesap süresi kesindir (süre
   bitince kare kesilir, adım sınırına gelinmemiş olsa da). Sınır, gerçek zamana yetişmek için gereken
   süredir (ölçülen hesap hızıyla, %50 paylı; en az 10, en çok 25 ms); kare aralığı 28 ms'yi aşarsa
-  (yavaş işlemci: çizimin kendisi uzun) farkla orantılı kısalır (en az 2 ms). Bilgisayar yetişemezse simülasyon gerçek zamandan geri kalır
-  (donmaz) ve üst çubukta "gerçek zamana yetişemiyor" simgesi çıkar (son karelerin yarısından
-  çoğu kesildiyse); telefonda açıklaması Durum sayfasında (süreye dokununca).
+  (yavaş işlemci) farkla orantılı kısalır (en az 2 ms), ama çizim tek başına 33 ms'yi aşıyorsa hesap payı
+  kare süresinin %40'ının altına inmez. Baraj sayfasında kare hızı korunmaz (hesap en çok 200 ms). Bilgisayar
+  yetişemezse simülasyon gerçek zamandan geri kalır (donmaz) ve üst çubukta "gerçek zamana yetişemiyor"
+  simgesi çıkar (son karelerin yarısından çoğu kesildiyse); telefonda açıklaması Durum sayfasında
+  (süreye dokununca).
 - **Kablo akımları:** Çözücü kabloları tek düğümde birleştirdiği için kablo parçası
   başına akım ayrıca bulunur: pinlerin akımları bir kapsayan ağaç üzerinde toplanır, toprak
   sembolleri kendi kablo adasındaki dengesizliği karşılar. Kablolar kendi aralarında döngü
@@ -1761,6 +1763,28 @@ adım sınırına gelinmeden kare uzuyordu.
   ekranda (karede 6,9 ms simülasyon) ağır kırpıcılar gerçek zamanın %56–86'sında kalıyordu.
   Profil: 4 kat yavaşta karenin yarıdan fazlası çizim (React ≈ %16, tarayıcının stil/boyama işi ≈ %40);
   ağır devrelerde (D flip-flop, adaptör) çizim tek başına 21–27 ms.
+- Hesap payı tabanı (2026-11-08): çizim tek başına 33 ms'yi aşıyorsa (30 kare/s'ye hesabı kısarak da
+  ulaşılamaz) hesap payı kare süresinin %40'ının altına inmez; yoksa sınır 2 ms'ye kadar inip simülasyonu
+  durduruyordu (8 kat yavaşta yarım dalga 3 s'de ≈ 0,07 s ilerliyor, tabansız ≈ 0,01 s). Taban her zaman
+  uygulanınca (deneme) iki hedef de tutmuyordu: 4 kat yavaşta D flip-flopla frekans bölücü 26,4 ve yürüyen
+  ışık 25,3 kare/s'ye düştü (çizimleri ≈ 27 ms), baraj sahnesinde de hesap payı zaten ≈ %37 olduğu için su
+  hiç hızlanmadı.
+- Baraj sayfası `'progress'` önceliğiyle (useSimulation'ın son parametresi): suyun yükselişi dersin kendisi,
+  düzenleme yok; kare hızı korunmaz, hesap gerçek zamana yetişmeye çalışır (en çok 200 ms: 100 ms'lik karenin
+  simülasyonu %50 paylı sığsın; süre sınırı yine kesin). 4 kat yavaşta baraj devresi 1 ms simülasyon için
+  ≈ 1,15 ms hesap istiyor (gerçek zamana yetişemez): main'de 10 kare/s'de hesap payı ≈ %80, 'smooth' öncelikle
+  33 kare/s'de ≈ %37 ve su 8 s'de %57 yerine %37'ye çıkıyordu. Tavan 80 ms iken main'in 2–3 puan gerisindeydi.
+  Şimdi main'le aynı ya da önünde (telefonda "Seviye 1" sonrası 9 s'de %47–50, masaüstünde Doldur'dan 8 s
+  sonra main %50, dal %56).
+- Hesap hızı tahmini (1 ms simülasyonun hesap süresi) artınca hemen, azalınca yavaş izlenir: su dururken
+  devre ucuz, doldurma başlayınca ağırlaşır; yumuşatılarak izlenince ilk saniyelerde hesap kısılıyordu
+  (telefondaki "Seviye 1" maddesi bir koşuda 9 s'de %27'de kaldı).
+- Uyarı metni: "Simülasyon gerçek zamana yetişemiyor: devre bu cihaz için ağır ya da frekans yüksek. Hızı
+  düşürebilir ya da osiloskopta Oto’ya basabilirsin." "Sonuçlar doğru kalır" denmez: çözüm simülasyon
+  zamanında doğru kalır (adımlar hata denetimiyle seçilir, kesilen kare yalnızca kalan süreyi atlar;
+  `tests/kare-butcesi.test.ts`), ama ölçü aletlerinin ≈ okumaları gerçek zamanlı 0,4 s'lik pencerelerde
+  toplanır (`liveReadout.ts`): çok geride kalınca pencere bir periyottan kısa simülasyon zamanını kapsar
+  (ör. gerçek zamanın %2'sinde 8 ms, 50 Hz'in periyodu 20 ms) ve DC ortalama ya da etkin değer yanlış çıkar.
 - Sonuç (4 kat yavaş, 81 örnek): en yavaş örnek ≈ 35 kare/s (önce 34 örnek 20 kare/s'nin altında),
   100 ms'yi aşan görev yok (önce kare başına 150–300 ms). Masaüstünde (144 Hz'lik ekranda, eski ve yeni
   art arda) ağır föy örnekleri eskisi gibi gerçek zamanda (≥ 0,98); yalnızca çift yönlü kırpıcı, makine

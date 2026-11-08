@@ -9,6 +9,9 @@
 // Uyarı: öykünme gerçek iOS Safari'nin her davranışını yakalamaz (ör. dokunma alanı hatası burada
 // görünmüyordu); bu yüzden ilk bölüm iOS için konan kuralların yerinde durduğunu doğrudan denetler.
 // Dokunmatik davranışı değiştiren işlerde gerçek bir iPhone'da da denenmelidir.
+//
+// Yavaş cihaz: IOS_CPU=4 ile her sayfanın işlemcisi 4 kat yavaşlatılır (CDP Emulation.setCPUThrottlingRate);
+// bütün liste yavaş bir telefondaki gibi koşar.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -24,9 +27,11 @@ const browser = await chromium.launch({ channel: 'msedge' });
 // Hoş geldin penceresi yalnızca ilk ziyarette açılır; denetimler onu kapatılmış sayar ({ welcome: true }
 // verilen bağlam hariç).
 const rawNewContext = browser.newContext.bind(browser);
+const CPU_RATE = Number(process.env.IOS_CPU ?? 1);
 browser.newContext = async ({ welcome = false, ...options } = {}) => {
   const ctx = await rawNewContext(options);
   if (!welcome) await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
+  if (CPU_RATE > 1) ctx.on('page', (p) => { ctx.newCDPSession(p).then((s) => s.send('Emulation.setCPUThrottlingRate', { rate: CPU_RATE })).catch(() => {}); });
   return ctx;
 };
 const results = [];
