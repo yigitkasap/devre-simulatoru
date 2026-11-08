@@ -1047,8 +1047,8 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
 - **Hız:** Kaydırıcı logaritmiktir (×10⁻⁶ … ×1) ve ×1, ×0,5, ×0,1, ×0,05, ×0,01, ×10⁻³ …
   ×10⁻⁶ değerlerine yapışır. Bir karede en fazla 6000 adım atılır ve hesap süresi kesindir (süre
   bitince kare kesilir, adım sınırına gelinmemiş olsa da). Sınır, gerçek zamana yetişmek için gereken
-  süredir (ölçülen hesap hızıyla, %50 paylı; en az 10, en çok 25 ms); kare aralığı 28 ms'yi aşarsa
-  (yavaş işlemci) farkla orantılı kısalır (en az 2 ms), ama çizim tek başına 33 ms'yi aşıyorsa hesap payı
+  süredir (ölçülen hesap hızıyla, %50 paylı; en az 10, en çok 25 ms); kare aralığı 26 ms'yi aşarsa
+  (yavaş işlemci) farkla orantılı kısalır (en az 2 ms), ama çizim tek başına 50 ms'yi aşıyorsa hesap payı
   kare süresinin %40'ının altına inmez. Baraj sayfasında kare hızı korunmaz (hesap en çok 200 ms). Bilgisayar
   yetişemezse simülasyon gerçek zamandan geri kalır (donmaz) ve üst çubukta "gerçek zamana yetişemiyor"
   simgesi çıkar (son karelerin yarısından çoğu kesildiyse); telefonda açıklaması Durum sayfasında
@@ -1758,17 +1758,22 @@ adım sınırına gelinmeden kare uzuyordu.
   aşılabilir (eskisi gibi).
 - Sınırın değeri cihaza göre: gerçek zamana yetişmek için gereken hesap süresi (1 ms'lik simülasyonun
   ölçülen hesap süresiyle, %50 paylı; en az 10, en çok 25 ms): yetişebilen bilgisayarda kare kesilmez,
-  masaüstü eskisi gibi. Kare aralığı (yumuşatılmış) 28 ms'yi aşınca sınır kısalır (en az 2 ms): kare hızı
+  masaüstü eskisi gibi. Kare aralığı (yumuşatılmış) 26 ms'yi aşınca sınır kısalır (en az 2 ms): kare hızı
   30/s'nin altına düşmez. Yalnızca sabit 10 ms'lik kesin sınır masaüstünü de yavaşlatıyordu: 144 Hz'lik
   ekranda (karede 6,9 ms simülasyon) ağır kırpıcılar gerçek zamanın %56–86'sında kalıyordu.
   Profil: 4 kat yavaşta karenin yarıdan fazlası çizim (React ≈ %16, tarayıcının stil/boyama işi ≈ %40);
   ağır devrelerde (D flip-flop, adaptör) çizim tek başına 21–27 ms.
-- Hesap payı tabanı (2026-11-08): çizim tek başına 33 ms'yi aşıyorsa (30 kare/s'ye hesabı kısarak da
-  ulaşılamaz) hesap payı kare süresinin %40'ının altına inmez; yoksa sınır 2 ms'ye kadar inip simülasyonu
-  durduruyordu (8 kat yavaşta yarım dalga 3 s'de ≈ 0,07 s ilerliyor, tabansız ≈ 0,01 s). Taban her zaman
-  uygulanınca (deneme) iki hedef de tutmuyordu: 4 kat yavaşta D flip-flopla frekans bölücü 26,4 ve yürüyen
-  ışık 25,3 kare/s'ye düştü (çizimleri ≈ 27 ms), baraj sahnesinde de hesap payı zaten ≈ %37 olduğu için su
-  hiç hızlanmadı.
+- Hesap payı tabanı (2026-11-08): çizim tek başına çok uzunsa (tahmini 50 ms'yi aşınca açılır, 45 ms'nin
+  altına inince kapanır) hesabı kısmak kare hızını artırmaz, yalnızca simülasyonu durdurur: hesap payı kare
+  süresinin %40'ının altına inmez (8 kat yavaşta frekans bölücü). Çizim tahmini karenin hesap dışındaki bütün
+  işidir (kare verisi, React, boyama, GC), 80 ms'de kırpılır ve yavaş yumuşatılır. Eşik bilerek 33 ms'nin
+  (30 kare/s) üstünde: 33/38 ms'lik eşikte 4 kat yavaşta çizimi ≈ 30 ms olan lojik devreler gürültüyle tabana
+  girip 25 kare/s'ye düşüyordu. Taban her zaman uygulanınca (deneme) iki hedef de tutmuyordu: frekans bölücü
+  26,4, yürüyen ışık 25,3 kare/s; baraj sahnesinde de hesap payı zaten ≈ %37 olduğu için su hiç hızlanmadı.
+- Sınırda kalan örnek: D flip-flopla frekans bölücü 4 kat yavaşta çizimle sınırlı (hesap en altta, 2 ms; çizim
+  ≈ 30–32 ms; osiloskop yolunun yazılması toFixed yerine hızlı yuvarlamayla). 2026-11-07'de 33,7 kare/s üstünde
+  ölçülen sürüm (eaac920) 2026-11-08'de aynı makinede art arda 28,7–29,6 veriyor: makinenin durumu ölçümü
+  ±%15 oynatıyor; bu örnekte pay yok.
 - Baraj sayfası `'progress'` önceliğiyle (useSimulation'ın son parametresi): suyun yükselişi dersin kendisi,
   düzenleme yok; kare hızı korunmaz, hesap gerçek zamana yetişmeye çalışır (en çok 200 ms: 100 ms'lik karenin
   simülasyonu %50 paylı sığsın; süre sınırı yine kesin). 4 kat yavaşta baraj devresi 1 ms simülasyon için

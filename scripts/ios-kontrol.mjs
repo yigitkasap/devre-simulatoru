@@ -11,7 +11,8 @@
 // Dokunmatik davranışı değiştiren işlerde gerçek bir iPhone'da da denenmelidir.
 //
 // Yavaş cihaz: IOS_CPU=4 ile her sayfanın işlemcisi 4 kat yavaşlatılır (CDP Emulation.setCPUThrottlingRate);
-// bütün liste yavaş bir telefondaki gibi koşar.
+// bütün liste yavaş bir telefondaki gibi koşar. Betiğin sabit beklemeleri (waitForTimeout) ve zaman aşımları da
+// aynı kat uzar: maddeler betiğin acelesinden değil, uygulamanın davranışından kalsın.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -31,7 +32,14 @@ const CPU_RATE = Number(process.env.IOS_CPU ?? 1);
 browser.newContext = async ({ welcome = false, ...options } = {}) => {
   const ctx = await rawNewContext(options);
   if (!welcome) await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch { /* yok */ } });
-  if (CPU_RATE > 1) ctx.on('page', (p) => { ctx.newCDPSession(p).then((s) => s.send('Emulation.setCPUThrottlingRate', { rate: CPU_RATE })).catch(() => {}); });
+  if (CPU_RATE > 1) {
+    ctx.setDefaultTimeout(30000 * CPU_RATE);
+    ctx.on('page', (p) => {
+      const wait = p.waitForTimeout.bind(p);
+      p.waitForTimeout = (ms) => wait(ms * CPU_RATE);
+      ctx.newCDPSession(p).then((s) => s.send('Emulation.setCPUThrottlingRate', { rate: CPU_RATE })).catch(() => {});
+    });
+  }
   return ctx;
 };
 const results = [];
