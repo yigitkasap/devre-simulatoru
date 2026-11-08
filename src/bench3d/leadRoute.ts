@@ -2,7 +2,7 @@
 // masadaki parçaların gövdelerinin (kutularının) içinden geçerse kavis o uçta yükseltilir: pilin
 // uzak ucundaki (+) uçtan çıkan kablo pilin üstünden aşar (önceden gövdenin içinden geçiyordu).
 
-import { Box3, CubicBezierCurve3, Vector3 } from 'three';
+import { Box3, CubicBezierCurve3, CurvePath, LineCurve3, Vector3, type Curve } from 'three';
 
 export interface Obstacle {
   /** Gövdenin dünya kutusu. */
@@ -29,8 +29,8 @@ function curveOf(a: Vector3, b: Vector3, liftA: number, liftB: number): CubicBez
 }
 
 /** Yolun gövdelere girdiği örneklerin parametreleri (t, 0–1). */
-export function collisions(curve: CubicBezierCurve3, obstacles: readonly Obstacle[]): number[] {
-  const start = curve.v0;
+export function collisions(curve: Curve<Vector3>, obstacles: readonly Obstacle[]): number[] {
+  const start = curve.getPoint(0);
   const hits: number[] = [];
   const boxes = obstacles.map((o) => ({ box: o.box.clone().expandByScalar(CLEARANCE), own: o.own }));
   const p = new Vector3();
@@ -41,6 +41,33 @@ export function collisions(curve: CubicBezierCurve3, obstacles: readonly Obstacl
     if (boxes.some((o) => o.box.containsPoint(p) && !(o.own && near))) hits.push(t);
   }
   return hits;
+}
+
+/**
+ * Ön paneldeki soketten çıkan kablo: soketten `dir` yönünde düz çıkar, öne doğru yatay teğetle masaya
+ * sarkar, masada tahtaya doğru ilerler ve deliğin üstüne (`b`) yukarıdan iner. Parçalı (doğru + kübik
+ * Bézier'ler): masadaki kısım masanın altına salınmaz. `board`: breadboard'ların kutusu.
+ */
+export function socketCurve(from: Vector3, dir: Vector3, b: Vector3, board: Box3): CurvePath<Vector3> {
+  const flat = new Vector3(dir.x, 0, dir.z);
+  if (flat.lengthSq() < 1e-6) flat.set(0, 0, 1);
+  flat.normalize();
+  const table = 0.42;
+  const out = from.clone().addScaledVector(dir, 1.2);
+  // Soketin önünde masaya iniş: yüksek soketten çıkan kablo daha uzağa sarkar.
+  const reach = Math.min(9, 3 + 0.4 * Math.max(0, from.y - table));
+  const down = out.clone().addScaledVector(flat, reach).setY(table);
+  const path = new CurvePath<Vector3>();
+  path.add(new LineCurve3(from.clone(), out));
+  path.add(new CubicBezierCurve3(out, out.clone().addScaledVector(dir, reach * 0.45), down.clone().addScaledVector(flat, -reach * 0.4), down));
+  // Masadan deliğe: önce masada ilerler, tahtanın kenarını aşacak kadar yükselip deliğe dik iner.
+  const toHole = new Vector3(b.x - down.x, 0, b.z - down.z);
+  const run = toHole.length();
+  const heading = run > 1e-6 ? toHole.clone().divideScalar(run) : flat.clone();
+  const rise = Math.max(4, b.y - table + 2.5);
+  void board;
+  path.add(new CubicBezierCurve3(down, down.clone().addScaledVector(heading, run * 0.5), b.clone().add(new Vector3(0, rise, 0)), b.clone()));
+  return path;
 }
 
 /**

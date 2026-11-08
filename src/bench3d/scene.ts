@@ -39,7 +39,7 @@ import { dotSpeed, type SimFrame } from '../editor/useSimulation';
 import type { CircuitDoc, Part } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
-import { collisions, leadCurve, type Obstacle } from './leadRoute';
+import { collisions, leadCurve, socketCurve, type Obstacle } from './leadRoute';
 import { cableCurrents } from './cableFlow';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
@@ -109,8 +109,14 @@ interface Placed {
   readonly model: PartModel;
   readonly group: Group;
   readonly shadow: Mesh;
-  /** Kabloların bağlandığı uçlar (dünya koordinatı). */
-  readonly anchors: Vector3[];
+  /** Kabloların bağlandığı uçlar (dünya koordinatı); Tepeden görünümde ön soketli cihazlarda `compact`. */
+  anchors: Vector3[];
+  /** Uçların gerçek yeri (3B). */
+  readonly real: Vector3[];
+  /** Tepeden görünümde ön soketli cihazın uçları: tahtanın arkasında sıkışık sırada (yoksa null). */
+  compact: Vector3[] | null;
+  /** Ön paneldeki soketlerin dışa baktığı yön (dünya); yoksa kablo uçtan dik kalkar. */
+  readonly dirs: readonly (Vector3 | undefined)[];
   /** Etiketin bağlandığı nokta: gövdenin üstünün ortası (dünya). */
   readonly top: Vector3;
 }
@@ -220,7 +226,9 @@ export class BenchScene {
   /** Kablolar: önce plan.leads, sonra plan.jumpers sırasıyla. */
   private cablePaths: CablePath[] = [];
   /** Masadaki parçalardan gelen kabloların eğrileri ve engelleri (denetim: `cableHits`). */
-  private leadCurves: CubicBezierCurve3[] = [];
+  private leadCurves: Curve<Vector3>[] = [];
+  /** Son kurulan belge (Tepeden görünüme geçince kablolar yeniden kurulur). */
+  private lastDoc: CircuitDoc | null = null;
   private leadObstacles: Obstacle[][] = [];
   private cableAmps = new Float64Array(0);
   private cablePhases = new Float64Array(0);
@@ -355,7 +363,7 @@ export class BenchScene {
     for (const item of items.filter((i) => i.node.dataset.anchor === 'footprint')) {
       const placed = this.parts.get(item.node.dataset.id ?? '');
       if (!placed) continue;
-      const box = new Box3().setFromObject(placed.model.root);
+      const box = this.cardBox(placed);
       const corners = [box.min, box.max, new Vector3(box.min.x, box.max.y, box.max.z), new Vector3(box.max.x, box.min.y, box.min.z)].map(toScreen);
       const left = Math.min(...corners.map((c) => c.x));
       const right = Math.max(...corners.map((c) => c.x));
@@ -504,6 +512,7 @@ export class BenchScene {
       }
     } else {
       this.layoutKey = key;
+      this.lastDoc = doc;
       this.rebuild(doc, plan);
       this.applyTopLook();
       if (!this.fitted && doc.parts.length > 0) {
@@ -557,6 +566,7 @@ export class BenchScene {
       if (onBoard) this.parts.set(part.id, this.placeOnBoard(part, onBoard, plan.cols));
       else if (table) this.parts.set(part.id, this.placeOnTable(part, table));
     }
+    this.compactInstruments(plan);
     // Renkler: ağ başına (toprak siyah, besleme kırmızı, öbürleri sırayla; lehim rehberiyle aynı).
     const colorOf = netColors(plan);
     const holeTop = (h: Hole) => holeAt(h, plan.cols, BB.height);
@@ -584,16 +594,24 @@ export class BenchScene {
       }
       const to = holeTop(lead.hole);
       const color = lead.color ?? colorOf(lead.net);
-      const a1 = from.clone().add(new Vector3(0, 1.4, 0));
+      const dir = placed.dirs[lead.pin];
       const b1 = to.clone().add(new Vector3(0, 1.5, 0));
-      const dist = a1.distanceTo(b1);
-      const obstacles: Obstacle[] = bodies.map((b) => ({ box: b.box, own: b.id === lead.partId }));
+      // Ön paneldeki soketten çıkan kablo kendi gövdesinden dışarı çıkar: kendi kutusu (öndeki düğmeler,
+      // katlanmış kol) engel sayılmaz.
+      const obstacles: Obstacle[] = bodies.filter((b) => !(dir && b.id === lead.partId)).map((b) => ({ box: b.box, own: b.id === lead.partId }));
       this.leadObstacles.push(obstacles);
-      const curve = leadCurve(a1, b1, obstacles);
+      // Ön paneldeki soket: kablo önce öne çıkar, masaya sarkar; öbür uçlar dik kalkan alçak kavis.
+      const a1 = dir ? from.clone().addScaledVector(dir, 1.5) : from.clone().add(new Vector3(0, 1.4, 0));
+      const curve = dir ? socketCurve(a1, dir, b1, this.boardBox(plan)) : leadCurve(a1, b1, obstacles);
       this.leadCurves.push(curve);
       paths.push(cablePath(curve));
-      this.cables.add(new Mesh(new TubeGeometry(curve, Math.max(12, Math.round(dist * 1.5)), 0.28, 8, false), mat(color, 0.55)));
-      this.cables.add(mesh(plug, plugMat, from.x, from.y + 0.75, from.z));
+      this.cables.add(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), 0.28, 8, false), mat(color, 0.55)));
+      const tip = mesh(plug, plugMat, from.x, from.y + 0.75, from.z);
+      if (dir) {
+        tip.position.copy(from).addScaledVector(dir, 0.75);
+        tip.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), dir);
+      }
+      this.cables.add(tip);
       this.cables.add(mesh(plug, plugMat, to.x, to.y + 0.75, to.z));
       this.cables.add(rod(new Vector3(to.x, to.y - HOLE_DEPTH, to.z), to, 0.1, M.tin(), 6));
     }
@@ -603,7 +621,8 @@ export class BenchScene {
       const from = placed?.anchors[loose.pin];
       if (!placed || !from) continue;
       const center = new Box3().setFromObject(placed.group).getCenter(new Vector3());
-      const dir = new Vector3(from.x - center.x, 0, from.z - center.z);
+      const socket = placed.dirs[loose.pin];
+      const dir = socket ? new Vector3(socket.x, 0, socket.z) : new Vector3(from.x - center.x, 0, from.z - center.z);
       if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
       dir.normalize();
       const end = from.clone().addScaledVector(dir, 3.4).setY(0.4);
@@ -652,10 +671,17 @@ export class BenchScene {
     group.rotation.y = (at.rotation * Math.PI) / 180;
     group.updateMatrixWorld(true);
     const anchors = model.anchors.map((a) => a.clone().applyMatrix4(group.matrixWorld));
-    return this.finishPlacement(part, model, group, anchors, 0);
+    const dirs = model.anchorDirs?.map((d) => d.clone().applyQuaternion(group.quaternion).normalize()) ?? [];
+    return this.finishPlacement(part, model, group, anchors, 0, dirs);
   }
 
-  private finishPlacement(part: Part, model: PartModel, group: Group, anchors: Vector3[], base: number): Placed {
+  /** Breadboard'ların dünya kutusu (sokete takılı kablo masada sürünürken altına girmesin). */
+  private boardBox(plan: BreadboardPlan): Box3 {
+    const half = boardWidth(plan.cols) / 2;
+    return new Box3(new Vector3(-half, 0, -BB.depth / 2), new Vector3(half, BB.height, boardZ(plan.boards - 1) + BB.depth / 2));
+  }
+
+  private finishPlacement(part: Part, model: PartModel, group: Group, anchors: Vector3[], base: number, dirs: readonly (Vector3 | undefined)[] = []): Placed {
     group.add(model.root);
     group.userData.partId = part.id;
     mergeStatic(model.root);
@@ -671,7 +697,7 @@ export class BenchScene {
     shadow.scale.set(size.x * 1.2 + 1, size.z * 1.2 + 1, 1);
     this.scene.add(shadow);
     const top = new Vector3(center.x, box.max.y + 0.6, center.z);
-    return { key: partKey(part), part, model, group, shadow, anchors, top };
+    return { key: partKey(part), part, model, group, shadow, anchors, real: anchors, compact: null, dirs, top };
   }
 
   private removePart(placed: Placed): void {
@@ -747,6 +773,11 @@ export class BenchScene {
     if (insets) this.topInsets = insets;
     if (on === (this.topView !== null)) return;
     this.topView = on ? { cx: 0, cz: 0, scale: 10 } : null;
+    // Ön soketli cihazların uçları görünüme göre yer değiştirir: kablolar yeniden kurulur.
+    if (this.plan && this.lastDoc && [...this.parts.values()].some((p) => p.dirs.some(Boolean))) {
+      this.layoutKey = '';
+      this.setDoc(this.lastDoc, this.plan);
+    }
     this.controls.enabled = this.interactive && !on;
     this.applyTopLook();
     if (on) this.fitTop();
@@ -788,7 +819,7 @@ export class BenchScene {
     const cards = (plan ? [...plan.table.keys()] : []).flatMap((id) => {
       const placed = this.parts.get(id);
       if (!placed) return [];
-      const box = new Box3().setFromObject(placed.model.root);
+      const box = this.cardBox(placed);
       const node = nodes.find((n) => n.dataset.id === id);
       const pinZ = placed.anchors.length > 0 ? Math.max(...placed.anchors.map((a) => a.z)) : box.max.z;
       return [{ x0: box.min.x, x1: box.max.x, zTop: node ? null : box.min.z, pinZ, minW: Number(node?.dataset.minw ?? 0), h: Number(node?.dataset.h ?? 0) }];
@@ -897,17 +928,36 @@ export class BenchScene {
     this.userMoved = false;
     const box = new Box3();
     // Parçalara, kablolara ve breadboard'un kullanılan bölümüne sığdırılır.
-    for (const placed of this.parts.values()) box.expandByObject(placed.group);
-    for (const c of this.cables.children) box.expandByObject(c);
+    // Üstten görünümde uzun (dik duran) cihazlar ve kabloları sayılmaz: kadraj tahtaya ve alçak parçalara.
+    const top = view === 'top';
+    const tallTop = top && [...this.parts.values()].some((p) => new Box3().setFromObject(p.group).max.y > 12);
+    for (const placed of this.parts.values()) {
+      const own = new Box3().setFromObject(placed.group);
+      if (!(tallTop && own.max.y > 12)) box.union(own);
+    }
+    if (!tallTop) for (const c of this.cables.children) box.expandByObject(c);
     if (!this.boardView.isEmpty()) box.union(this.boardView);
     if (box.isEmpty()) box.set(new Vector3(-20, 0, -20), new Vector3(20, 5, 20));
     const center = box.getCenter(new Vector3());
     const size = box.getSize(new Vector3());
+    const elevation = ELEVATION[view];
+    // Masa üstü cihazlar (dik, uzun) varsa: kameranın açısıyla bütün nesnelerin köşeleri kadraja sığdırılır
+    // (yükseklik dahil, ortalı); yoksa düz tezgâh için eski yarıçap kuralı.
+    const tall = top ? null : this.tallFit(elevation, view);
+    if (tall) {
+      this.controls.target.copy(tall.target);
+      this.camera.position.copy(tall.target).add(new Vector3(0, Math.sin(elevation), Math.cos(elevation)).multiplyScalar(tall.distance));
+      this.camera.near = Math.max(0.5, tall.distance / 200);
+      this.camera.far = tall.distance * 20;
+      this.camera.updateProjectionMatrix();
+      this.controls.update();
+      this.dirty = true;
+      return;
+    }
     const radius = Math.max(size.x, size.z * 1.1, 20) / 2;
     const fov = (this.camera.fov * Math.PI) / 180;
     const aspect = Math.min(1.6, this.camera.aspect);
     const distance = (radius / Math.tan(fov / 2)) * (aspect < 1 ? 1.15 / aspect : 1.05) * (view === 'front' ? 1.12 : 1);
-    const elevation = ELEVATION[view];
     this.controls.target.copy(center).setY(0);
     this.camera.position.set(center.x, distance * Math.sin(elevation), center.z + distance * Math.cos(elevation));
     this.camera.near = Math.max(0.5, distance / 200);
@@ -915,6 +965,103 @@ export class BenchScene {
     this.camera.updateProjectionMatrix();
     this.controls.update();
     this.dirty = true;
+  }
+
+  /**
+   * Tepeden görünümde ön paneli soketli cihazların uçları: gerçek boyutlu cihazlar tahtadan çok geniş bir sıra
+   * kurar, kartlar tahtayı küçültürdü. Kartlar (soketlerin çevresi) tahtanın hemen arkasında yan yana dizilir;
+   * uçlar kartla birlikte kayar (kablolar kartlardan çıkar). 3B görünümde uçlar gerçek yerinde kalır.
+   */
+  private compactInstruments(plan: BreadboardPlan): void {
+    const devices = [...plan.table.keys()].flatMap((id) => {
+      const placed = this.parts.get(id);
+      return placed && placed.dirs.some(Boolean) && placed.real.length > 0 ? [placed] : [];
+    });
+    // Kartta uçlar soldan sağa gerçek sırasıyla, kısa sabit aralıkla (gerçek aralık kartı gereksiz genişletir).
+    const GAP = 4;
+    const PITCH = 5;
+    const PAD = 6;
+    const cards = devices.map((p) => ({ p, width: (p.real.length - 1) * PITCH + 2 * PAD }));
+    const total = cards.reduce((sum, c) => sum + c.width, 0) + GAP * Math.max(0, cards.length - 1);
+    let x = -total / 2;
+    const z = -BB.depth / 2 - 6;
+    for (const c of cards) {
+      const order = c.p.real.map((a, i) => ({ a, i })).sort((u, v) => u.a.x - v.a.x);
+      const compact: Vector3[] = new Array(c.p.real.length);
+      order.forEach(({ a, i }, k) => (compact[i] = new Vector3(x + PAD + k * PITCH, a.y, z)));
+      c.p.compact = compact;
+      x += c.width + GAP;
+    }
+    const top = this.topView !== null;
+    for (const p of this.parts.values()) p.anchors = top && p.compact ? p.compact : p.real;
+  }
+
+  /**
+   * Tepeden görünümdeki kartın kutusu: ön paneli soketli (dik duran) cihazda soketlerin çevresi (gövdenin
+   * tamamı kartı ve kadrajı tahtaya göre çok büyütürdü), öbür parçalarda modelin kutusu.
+   */
+  private cardBox(placed: Placed): Box3 {
+    const box = new Box3().setFromObject(placed.model.root);
+    if (!placed.dirs.some(Boolean) || placed.anchors.length === 0) return box;
+    const around = new Box3().setFromPoints(placed.anchors);
+    around.min.x -= 6;
+    around.max.x += 6;
+    around.min.z -= 10;
+    around.min.y = box.min.y;
+    around.max.y = Math.max(around.max.y, 1);
+    return around;
+  }
+
+  /**
+   * Uzun (dik duran) cihaz varsa kadraj: nesnelerin kutularının köşeleri, verilen yükseklik açısından bakan
+   * kameranın görüş alanına sığacak uzaklık ve ortalanmış hedef. Uzun nesne yoksa null.
+   */
+  private tallFit(elevation: number, view: CameraView): { target: Vector3; distance: number } | null {
+    const boxes: Box3[] = [];
+    for (const placed of this.parts.values()) boxes.push(new Box3().setFromObject(placed.group));
+    if (!boxes.some((b) => b.max.y > 12)) return null;
+    for (const c of this.cables.children) boxes.push(new Box3().setFromObject(c));
+    if (!this.boardView.isEmpty()) boxes.push(this.boardView.clone());
+    const corners = boxes.flatMap((b) =>
+      [0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z)),
+    );
+    const toCamera = new Vector3(0, Math.sin(elevation), Math.cos(elevation));
+    const right = new Vector3(1, 0, 0);
+    const up = new Vector3().crossVectors(right, toCamera.clone().negate());
+    // Altta düğme şeridi için pay (telefonda daha çok): içerik kadrajın üst kısmına sığdırılır.
+    const reserve = this.camera.aspect < 1 ? 0.2 : 0.06;
+    const tanFull = Math.tan((this.camera.fov * Math.PI) / 360);
+    const tanV = tanFull * (1 - reserve);
+    const tanH = tanFull * Math.min(1.6, this.camera.aspect);
+    const margin = view === 'front' ? 1.1 : 1.04;
+    const target = new Box3().setFromPoints(corners).getCenter(new Vector3());
+    let distance = 0;
+    for (let pass = 0; pass < 3; pass++) {
+      // Gereken uzaklık: her köşe görüş konisinin içinde kalsın.
+      distance = 0;
+      for (const p of corners) {
+        const v = p.clone().sub(target);
+        const along = v.dot(toCamera);
+        distance = Math.max(distance, along + Math.abs(v.dot(right)) / tanH, along + Math.abs(v.dot(up)) / tanV);
+      }
+      // Kadrajdaki yerleri (görüş açısının tanjantı): hedef, köşelerin ortasına kayar.
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      let y0 = Infinity;
+      let y1 = -Infinity;
+      for (const p of corners) {
+        const v = p.clone().sub(target);
+        const depth = distance - v.dot(toCamera);
+        x0 = Math.min(x0, v.dot(right) / depth);
+        x1 = Math.max(x1, v.dot(right) / depth);
+        y0 = Math.min(y0, v.dot(up) / depth);
+        y1 = Math.max(y1, v.dot(up) / depth);
+      }
+      target.addScaledVector(right, ((x0 + x1) / 2) * distance * 0.8).addScaledVector(up, ((y0 + y1) / 2) * distance * 0.8);
+    }
+    // Ortalanmış içerik paydan yukarı kayar (hedef aşağı).
+    target.addScaledVector(up, -reserve * tanFull * distance * margin);
+    return { target, distance: distance * margin };
   }
 
   /** Seçiliye yaklaş: parça kadrajın ortasında, yakından; bakış yönü (azimut) korunur. */

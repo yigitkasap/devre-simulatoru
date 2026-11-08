@@ -7,7 +7,7 @@ import { isLogicChip } from '../model/logicChips';
 import { partProp } from '../model/catalog';
 import { withAnchors } from './kit';
 import { arduinoModel } from './arduinoModel';
-import { dcsupplyModel, funcgenModel, meterModel, multimeterModel, oscilloscopeModel, tankModel } from './instruments';
+import { dcsupplyModel, dmmModel, funcgenModel, oscilloscopeModel, tankModel } from './instruments';
 import type { PartModel } from './model';
 import {
   batteryModel,
@@ -149,9 +149,9 @@ function build(part: Part): PartModel {
       return groundModel();
     case 'voltmeter':
     case 'ammeter':
-      return meterModel(part.type);
+      return dmmModel(part.type);
     case 'multimeter':
-      return multimeterModel();
+      return dmmModel('multimeter');
     case 'dcsupply':
       return dcsupplyModel();
     case 'funcgen':

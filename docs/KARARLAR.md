@@ -1875,6 +1875,47 @@ ve pinleri devre çözümüne bağlıdır.
   açıkken auto. ios-kontrol'de 3 madde (düğme 44 px ve sol altta, tek parmakla döndürme ve sayfa
   kaymıyor, Şema'ya dönüş).
 
+### 3B laboratuvar cihazları (2026-11-08)
+
+Multimetre, DC güç kaynağı, fonksiyon üreteci ve osiloskop yatık kutulardı (ekran üst yüze basılı, yazılar
+yan dönük). Artık laboratuvardaki türde, markasız modeller (`src/bench3d/instruments.ts`; logo, marka ve
+model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngilizce standart işaretler):
+- **El multimetresi** (multimetre, voltmetre, ampermetre): turuncu kauçuk kılıf, arkadaki ayağıyla 20° geriye
+  yaslı; gri LCD (yedi bölmeli 4 hane, eksi, AC/DC ve birim), FUNC/RANGE/MAX/HOLD, döner anahtar (OFF, V⎓,
+  V∿, Ω, mA, A, Hz; seçili kipe döner), 10A/COM/VΩmA soketleri. Voltmetre V⎓ (AC kipinde V∿), ampermetre mA;
+  kırmızı kablo VΩmA'da, 10A boş.
+- **DC güç kaynağı**: krem gövde, iki kanal; kırmızı A ve V göstergeleri (canlı), CURRENT ve VOLTAGE
+  düğmeleri (ayarlı akım sınırına ve gerilime göre döner), C.C (akım sınırında) ve C.V lambaları; − GND +
+  soketleri; INDEP/SERIES/PARALLEL, POWER ve sabit 5V/3A çıkışı görünür ama işlevsiz.
+- **Fonksiyon üreteci**: açık gri, öne katlanmış taşıma kolu; yeşil 5 haneli frekans göstergesi (Hz/kHz/MHz),
+  aralık tuşları, lambalı dalga biçimi tuşları (seçili olan yanar), FREQUENCY, DUTY, OFFSET, AMPL düğmeleri
+  (ayarlara göre döner), SWEEP ve −20dB (lambası "attenuate"e göre), OUTPUT 50Ω ve TTL BNC'leri, COM.
+- **Osiloskop** (dijital masa üstü): renkli ekran (siyah zemin, ızgara, CH1 sarı, CH2 mavi canlı izler; üstte
+  RUN/STOP ve zaman/bölme, altta kanalların volt/bölmesi ve bağlaşımı), menü tuşları, VOLTS/DIV ve TIME/DIV
+  (1-2-5 adımlarıyla döner), POSITION, TRIGGER LEVEL, sarı CH1 ve mavi CH2 tuşları, kırmızı RUN/STOP, mavi
+  AUTO; sarı halkalı CH1 (A), mavi halkalı CH2 (B) BNC, COM; EXT TRIG işlevsiz.
+- **Boyut ve yer**: gerçek boyutun %60'ı (tahta okunaklı kalsın; izin verilen en çok küçültme); dik durur, ön
+  paneli kameraya bakar; tahtanın 30 birim (≈ 76 mm) arkasında yan yana: uzakta oldukları için kamera yaklaşır,
+  öndeki tahta büyür, kablolar masaya sarkar. Uzun cihaz varsa kamera kadrajı bütün nesnelerin köşelerini
+  kameranın açısıyla sığdırır (altta düğme şeridi için pay); Üstten görünüm tahtaya odaklanır (cihazların
+  yalnızca soketli ön kısmı sayılır).
+- **Kablolar**: modelin `anchorDirs`'i soketin dışa baktığı yön; kablo soketten öne düz çıkar, yatay teğetle
+  masaya sarkar, masada tahtaya gider ve deliğe yukarıdan iner (`leadRoute.socketCurve`; doğru + kübik
+  Bézier'ler: masanın altına salınmaz). Fiş soketin ekseninde.
+- **Tahtada kur (Tepeden)**: cihaz kartları soketlerin çevresi kadar ve tahtanın hemen arkasında yan yana
+  sıkışık dizilir (uçlar kartla kayar); gerçek boyutlu sıra kartları çok yayıyor, tahtayı küçültüyordu. 3B'de
+  uçlar gerçek yerinde.
+- **Tahtadaki delikler değişmedi**: cihaz kablolarının deliği gövdenin yerine göre değil eski küçük modellerin
+  genişliğiyle (`TABLE.slot`) seçilir. Gerçek boyutlu sıra tahtadan geniş; gövdeye göre seçince güç kaynağının
+  kabloları rayın en uç deliğine gidiyor, + raylarını birleştiren köprü kayıp eğiliyordu (Tahtada kur'un
+  hazır kabloları ve görevlerdeki beklenen delikler değişirdi). 81 örneğin tahta yerleşimi (bacaklar, kablolar,
+  köprüler) main ile birebir aynı; yalnızca cihazların masadaki yeri değişti.
+- **Dokular ve üçgenler**: panel baskısı bir kez çizilen tuval (en çok 1024 px), ekranlar ayrı küçük dokular
+  (değer değişince, en çok saniyede 10 kez); kendi ışığı olan göstergeler (LED, osiloskop). Üçgen: osiloskop
+  ≈ 3 500, üreteç ≈ 3 000, güç kaynağı ≈ 2 700, el multimetresi ≈ 1 000.
+- Eski 3B osiloskop izleri bölmeyle ölçekleniyordu (yol ekran pikseliyle, bölme başına 50): iz ekranın dışına
+  taşıyordu; düzeldi.
+
 ### Performans ve hata taraması (2026-10-27)
 
 - `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,

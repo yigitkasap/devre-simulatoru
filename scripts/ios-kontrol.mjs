@@ -5599,6 +5599,80 @@ try {
       lagShown?.icon === 1 && /yetişemiyor/.test(lagShown?.note ?? ''), JSON.stringify(lagShown));
     await page.context().close();
   }
+
+  // --- 3B laboratuvar cihazları: dik, ön paneli öne bakan multimetre, güç kaynağı, üreteç, osiloskop ----------
+  // Ön paneldeki soketler kameraya (+z) bakar, kablolar oradan çıkar; ekranlar canlı (osiloskop izi, üretecin
+  // dalga biçimi lambası, güç kaynağının C.V lambası, multimetrenin anahtarı kipte); kablolar gövdelerden
+  // geçmez; Tahtada kur'un Tepeden görünümünde cihaz kartları tahtanın hemen arkasında yan yana.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const state = () => page.evaluate(() => {
+      const t = window.__tezgah;
+      return [...t.parts.values()].filter((p) => ['dcsupply', 'funcgen', 'oscilloscope', 'multimeter', 'voltmeter', 'ammeter'].includes(p.part.type)).map((p) => ({
+        label: p.part.label,
+        type: p.part.type,
+        front: p.dirs.length > 0 && p.dirs.every((d) => d && d.z > 0.9),
+        dial: p.model.root.userData.dial ?? null,
+        lamps: p.model.root.userData.lamps ?? null,
+        wave: p.model.root.userData.wave ?? null,
+        traces: p.model.root.userData.traces ?? null,
+        screen: p.model.root.userData.screen ?? null,
+      }));
+    });
+    const open = async (id) => {
+      await page.goto('about:blank');
+      await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(400);
+    };
+    const play = async () => { await page.getByRole('button', { name: /^Oynat/ }).first().click().catch(() => {}); await page.waitForTimeout(1500); };
+    await open('yarim-dalga');
+    await play();
+    const yd = await state();
+    const ydHits = await page.evaluate(() => window.__tezgah.cableHits());
+    await open('diyot-dc');
+    await play();
+    const dd = await state();
+    const ddHits = await page.evaluate(() => window.__tezgah.cableHits());
+    const by = (list, label) => list.find((x) => x.label === label) ?? {};
+    check('3B cihazlar (yarım dalga, 1N4001 DC): üreteç, osiloskop, güç kaynağı ve iki el multimetresinin ön soketleri kameraya bakıyor; kablolar gövdelerden geçmiyor',
+      yd.length === 2 && dd.length === 3 && [...yd, ...dd].every((x) => x.front) && ydHits === 0 && ddHits === 0, `${[...yd, ...dd].map((x) => `${x.label}:${x.front}`).join(' ')} · çakışma ${ydHits}/${ddHits}`);
+    check('3B cihazlar canlı: osiloskopta iki iz, üretecin sinüs lambası; güç kaynağında C.V; ampermetrenin anahtarı mA, voltmetreninki V⎓ ve ekranı defter kartıyla aynı okuma',
+      by(yd, 'OSC1').traces === 2 && by(yd, 'FG1').wave === 'sine' && by(dd, 'PS1').lamps === 'C.V|C.V' && by(dd, 'A1').dial === 'mA' && by(dd, 'V1').dial === 'V⎓' && /\d,\d+ V$/.test(by(dd, 'V1').screen ?? ''),
+      `${by(yd, 'OSC1').traces} iz · ${by(yd, 'FG1').wave} · ${by(dd, 'PS1').lamps} · A1 ${by(dd, 'A1').dial} · V1 ${by(dd, 'V1').dial} ${by(dd, 'V1').screen}`);
+    await ctx.close();
+  }
+  {
+    // Tahtada kur, Tepeden: cihaz kartları tahtanın arkasında yan yana; tahta kadrajın en az yarısı genişlikte.
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await (await pickExample(page, (p) => p.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }))).click(); await page.waitForTimeout(600);
+    await benchButton(page).click();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    await page.getByRole('button', { name: 'Tahtada kur' }).click(); await page.waitForTimeout(1500);
+    const layout = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('[data-anchor="footprint"]')].map((e) => e.getBoundingClientRect()).map((r) => ({ x0: r.left, x1: r.right, y1: r.bottom }));
+      const canvas = document.querySelector('canvas')?.getBoundingClientRect();
+      // Tahtanın ekrandaki genişliği ve arka kenarı (breadboard.ts: genişlik sütun + 3, derinlik 21,6).
+      const region = document.querySelector('[role=region][aria-label^="Breadboard"]');
+      const r = region.getBoundingClientRect();
+      const t = window.__tezgah.topTransform();
+      const cols = /63 sütun/.test(region.getAttribute('aria-label')) ? 63 : 30;
+      return { cards, canvasW: canvas?.width ?? 0, boardW: (cols + 3) * t.scale, boardTop: r.top + t.oy - 10.8 * t.scale };
+    });
+    const overlap = layout.cards.some((a, i) => layout.cards.some((b, j) => i < j && a.x0 < b.x1 && b.x0 < a.x1));
+    const behind = layout.cards.every((c) => c.y1 <= layout.boardTop + 4);
+    check('Tahtada kur (Tepeden, yarım dalga): FG1 ve OSC1 kartları tahtanın arkasında yan yana, üst üste binmiyor; tahta kadrajın en az yarısı genişlikte (okunaklı)',
+      layout.cards.length === 2 && !overlap && behind && layout.boardW >= 0.5 * layout.canvasW, `${layout.cards.length} kart · arkada ${behind} · tahta ${Math.round(layout.boardW)} / ${Math.round(layout.canvasW)} px`);
+    await ctx.close();
+  }
 } finally {
   await browser.close();
 }

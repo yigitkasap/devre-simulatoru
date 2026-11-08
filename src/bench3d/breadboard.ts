@@ -212,17 +212,30 @@ export function dipPins(type: DeviceType): readonly number[] {
 
 /** Masadaki parçaların yeri: sol sütun, arka sıra (cihazlar), ön sıra. */
 type Side = 'left' | 'back' | 'front';
-const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rotation: number }>> = {
+/**
+ * Arkadaki cihazların ön yüzüyle tahtanın arka kenarı arası: tezgâhın arkasında dururlar (uzakta küçük
+ * göründükleri için kamera yaklaşır, öndeki tahta büyür; kabloların masaya sarkacak yeri olur).
+ */
+const BACK_GAP = 30;
+
+/**
+ * `slot`: kabloların tahtada hangi deliğe gideceği için kullanılan genişlik (cihazların eski, küçük
+ * modellerininki). Gerçek boyutlu cihazların sırası tahtadan geniş; deliği gövdenin yerine göre seçmek
+ * kabloları rayların uç deliklerine iterdi, rayları birleştiren köprüler kayardı (Tahtada kur değişirdi).
+ */
+const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rotation: number; slot?: number }>> = {
   arduino: { side: 'left', w: 21, d: 27, rotation: 0 },
   battery: { side: 'left', w: 12, d: 5.4, rotation: 0 },
   acsource: { side: 'left', w: 10, d: 5, rotation: 0 },
   currentsource: { side: 'left', w: 10, d: 5, rotation: 0 },
-  dcsupply: { side: 'back', w: 11.6, d: 12.8, rotation: -90 },
-  funcgen: { side: 'back', w: 8.6, d: 12.8, rotation: -90 },
-  oscilloscope: { side: 'back', w: 8.6, d: 13.4, rotation: 90 },
-  voltmeter: { side: 'back', w: 11, d: 5.6, rotation: 0 },
-  ammeter: { side: 'back', w: 11, d: 5.6, rotation: 0 },
-  multimeter: { side: 'back', w: 12.5, d: 20.5, rotation: 0 },
+  // Laboratuvar cihazları (instruments.ts, gerçeğin %60'ı): dik, ön paneli öne bakar. d/2 gövdenin ortasından
+  // en öndeki düğmeye ya da kola kadar (arkası tahtadan uzakta kalır).
+  dcsupply: { side: 'back', w: 72, d: 68, rotation: 0, slot: 11.6 },
+  funcgen: { side: 'back', w: 63, d: 77, rotation: 0, slot: 8.6 },
+  oscilloscope: { side: 'back', w: 76, d: 35, rotation: 0, slot: 8.6 },
+  voltmeter: { side: 'back', w: 23, d: 34, rotation: 0, slot: 11 },
+  ammeter: { side: 'back', w: 23, d: 34, rotation: 0, slot: 11 },
+  multimeter: { side: 'back', w: 23, d: 34, rotation: 0, slot: 12.5 },
   lamp: { side: 'front', w: 9, d: 5, rotation: 0 },
   motor: { side: 'front', w: 12, d: 6, rotation: 0 },
   speaker: { side: 'front', w: 9, d: 6.5, rotation: 0 },
@@ -528,14 +541,21 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
       z += t.d + GAP;
     }
   }
+  /** Kablonun tahtadaki deliği bu x'e göre seçilir (`slot`). */
+  const leadX = new Map<string, number>();
   for (const side of ['back', 'front'] as const) {
     const items = sides[side].map((p) => ({ p, t: TABLE[p.type]! }));
     const total = items.reduce((s, i) => s + i.t.w, 0) + GAP * Math.max(0, items.length - 1);
+    const slots = items.reduce((s, i) => s + (i.t.slot ?? i.t.w), 0) + GAP * Math.max(0, items.length - 1);
     let x = -total / 2;
+    let sx = -slots / 2;
     for (const { p, t } of items) {
-      const z = side === 'back' ? top - 5 - t.d / 2 : boardsDepth + 5 + t.d / 2;
+      // Arkadaki cihazlarla tahta arasında ön panelden çıkan kabloların masaya sarkacağı kadar yer.
+      const z = side === 'back' ? top - BACK_GAP - t.d / 2 : boardsDepth + 5 + t.d / 2;
       table.set(p.id, { partId: p.id, x: x + t.w / 2, z, rotation: t.rotation });
+      leadX.set(p.id, sx + (t.slot ?? t.w) / 2);
       x += t.w + GAP;
+      sx += (t.slot ?? t.w) + GAP;
     }
   }
 
@@ -590,6 +610,7 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
     const place = table.get(part.id);
     if (!place) continue;
     const side = TABLE[part.type]!.side;
+    const aim = side === 'left' ? leftEdge : leadX.get(part.id) ?? place.x;
     const pinCount = netlist.elements.find((e) => e.id === part.id)!.pins.length;
     const led = new Set<string>();
     for (let pin = 0; pin < pinCount; pin++) {
@@ -604,11 +625,11 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
       if (role) {
         const rail = railFor(role, topSide);
         useRail(n, board, rail);
-        leads.push({ net: n, partId: part.id, pin, hole: railHole(board, rail, side === 'left' ? leftEdge : place.x) });
+        leads.push({ net: n, partId: part.id, pin, hole: railHole(board, rail, aim) });
         continue;
       }
       const half: 0 | 1 = topSide ? 0 : 1;
-      const s = stripFor(n, side === 'left' ? leftEdge : place.x, half, board);
+      const s = stripFor(n, aim, half, board);
       s.legs++;
       const prefer = s.half === 0 ? (topSide ? [0, 1, 4, 3, 2] : [4, 3, 0, 1, 2]) : topSide ? [5, 6, 9, 8, 7] : [9, 8, 5, 6, 7];
       leads.push({ net: n, partId: part.id, pin, hole: stripHole(s, freeRow(s, prefer) ?? prefer[0]!) });

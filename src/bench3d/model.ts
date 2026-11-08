@@ -28,6 +28,11 @@ export interface PartModel {
   /** Kabloların bağlandığı uçlar (yerel koordinat), pin sırasıyla. */
   readonly anchors: readonly Vector3[];
   /**
+   * Ön paneldeki soketin dışa baktığı yön (yerel, birim vektör), pin sırasıyla: kablo önce bu yönde çıkar,
+   * sonra masaya sarkar. Yoksa kablo uçtan dik kalkar.
+   */
+  readonly anchorDirs?: readonly Vector3[];
+  /**
    * Canlı değerleri uygular. Sürekli canlandırma gerekiyorsa (dönen motor, titreşen hoparlör) true
    * döner: sahne bir sonraki karede yeniden çizilir.
    */
