@@ -38,6 +38,8 @@ export interface Bench3DProps {
   readonly top?: TopInsets | null;
   /** Sahne kurulunca (ve kalkınca null) çağrılır: Tepeden görünümün dönüşümü ve kaydırma için. */
   readonly onScene?: (scene: BenchScene | null) => void;
+  /** Telefon düzeni (yatay tutulsa da): kadraj ve Cihazlar telefon kuralıyla. */
+  readonly phone?: boolean;
 }
 
 export default function Bench3D(props: Bench3DProps) {
@@ -71,6 +73,7 @@ export default function Bench3D(props: Bench3DProps) {
   }, []);
 
   useEffect(() => scene.current?.setTheme(dark), [dark]);
+  useEffect(() => scene.current?.setPhone(props.phone ? true : null), [props.phone]);
   useEffect(() => scene.current?.setOverlay(overlay), [overlay]);
   useEffect(() => scene.current?.setDoc(doc, plan), [doc, plan]);
   const insets = top ? `${top.top},${top.right},${top.bottom},${top.left},${top.boardOnly ? 1 : 0}` : null;

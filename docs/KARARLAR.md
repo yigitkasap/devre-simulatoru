@@ -1924,6 +1924,14 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   tek cihaz. BC107 yükselteç: osiloskop görüntünün %57'si (önce üç cihaz %24'ü); BF245A: iki multimetre yan yana
   %75 (önce üç cihaz %42). Parça etiketleri yanlardan kesilmez: noktası görüntüdeyse kenara dayanır, değilse gizlenir.
   ios-kontrol'deki "üç cihaz da kadrajda, sıra genişliğin %85'i" maddesi bu davranışa göre değişti.
+- **Telefonda 3B tam ekran (2026-11-09, kullanıcı kararı)**: tam ekranda 3B düğmeleri eski yerinde (alttan
+  100 px yukarıda) havada kalıyor, tahtanın üstüne biniyordu; "Şemayı küçült" en altta ayrı duruyordu. Artık bütün
+  düğmeler (Etiketler, Kamera, Karta aktar, Tahtada kur, Şemayı küçült) tam ekranda da şema kutusunun alt kenarında
+  tek sıra (10 px; alttaki çubuk yoksa kutu ekranın altına dayanır, güvenli alan kadar yukarıda). Tam ekrana girince
+  ve çıkınca kamera seçili görünüme yeniden sığar (kullanıcı kamerayı oynatmış olsa da; `BenchView.fitKey`). Yatay
+  tutulan telefon da telefon kuralıyla kadrajlanır (`BenchScene.setPhone`; eskiden 640 px'ten geniş tuval masaüstü
+  sayılıyor, tahta tam ekranda kadrajın %12'si kalıyordu). Tahta payı tam ekranda dikeyde ve yatayda %72 (1N4001 DC;
+  önce dikey %66, yatay %12); cihaz etiketleri yanlardan kesilmez. ios-kontrol: "3B tam ekran (telefon, dikey/yatay)".
 - **Etiketler**: çakışan (4 px aralı) etiket önce ucun sağına, soluna, bir kat yukarı ya da altına kayar; hiçbiri
   olmazsa gizlenir (eskiden doğrudan gizleniyor, birbirine değen etiketler üst üste görünüyordu). Parça etiketi
   üst kenardan taşmaz. Varsayılan kadrajda cihazın üstü kırpılınca etiketin noktası görüntünün dışında kalır:

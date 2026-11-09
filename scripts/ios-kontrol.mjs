@@ -5833,6 +5833,45 @@ try {
     check('3B ağ vurgusu (telefon, BF245A): kıskaca dokununca o ağ vurgulanıyor (öbürleri soluk)', tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1, `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0}`);
     await ph.context().close();
   }
+  // --- 3B tam ekran (telefon, dikey ve yatay): düğmeler alt kenarda tek sırada, kamera yeniden sığar ---------------
+  // Tam ekranda Etiketler, Kamera, Karta aktar, Tahtada kur ve Şemayı küçült tek sıra, 3B alanının alt kenarında
+  // (alt boşluk ≤ 24 px), hiçbiri tahtanın üstüne binmiyor; tahta kadraj genişliğinin en az %70'i; görünen cihaz
+  // etiketleri yanlardan kesilmiyor. Kamera elle oynatılmış olsa da tam ekrana girince ve çıkınca yeniden sığar.
+  for (const [w, h, yon] of [[390, 844, 'dikey'], [844, 390, 'yatay']]) {
+    const { page, cdp } = await phone(w, h);
+    await openExample(page, '1N4001: doğru akımda akım-gerilim ölçümü');
+    await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: '3B' }).tap();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
+    const measure = () => page.evaluate(() => {
+      const c = document.querySelector('main canvas').getBoundingClientRect();
+      const b = window.__tezgah.boardRect();
+      const board = b && { x0: b.x0 + c.left, y0: b.y0 + c.top, x1: b.x1 + c.left, y1: b.y1 + c.top };
+      const names = ['Etiketler', 'Kamera: Serbest', 'Karta aktar', 'Tahtada kur', 'Şemayı küçült', 'Şemayı tam ekran aç'];
+      const buttons = [...document.querySelectorAll('main button')].filter((e) => names.includes(e.getAttribute('aria-label') ?? '') && e.getBoundingClientRect().width > 0).map((e) => e.getBoundingClientRect());
+      const labels = [...document.querySelectorAll('[data-anchor="part"]')].filter((e) => getComputedStyle(e).opacity === '1').map((e) => e.getBoundingClientRect());
+      return {
+        share: b ? (b.x1 - b.x0) / c.width : 0,
+        count: buttons.length,
+        row: buttons.length > 0 && Math.max(...buttons.map((r) => r.top)) - Math.min(...buttons.map((r) => r.top)) < 2,
+        gap: buttons.length ? Math.round(c.bottom - Math.max(...buttons.map((r) => r.bottom))) : 999,
+        over: board ? buttons.some((r) => r.left < board.x1 && r.right > board.x0 && r.top < board.y1 && r.bottom > board.y0) : true,
+        cut: labels.some((r) => r.left < c.left - 0.5 || r.right > c.right + 0.5),
+      };
+    });
+    const camera = () => page.evaluate(() => window.__tezgah.camera.position.toArray().map((v) => v.toFixed(1)).join(','));
+    const box = await page.locator('main canvas').boundingBox();
+    await drag(page, cdp, { x: box.x + box.width * 0.5, y: box.y + box.height * 0.4 }, { x: box.x + box.width * 0.75, y: box.y + box.height * 0.5 });
+    const moved = await camera();
+    await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).tap(); await page.waitForTimeout(1200);
+    const full = await measure();
+    const refit = (await camera()) !== moved;
+    await page.getByRole('button', { name: 'Şemayı küçült' }).tap(); await page.waitForTimeout(1200);
+    const back = await measure();
+    check(`3B tam ekran (telefon, ${yon}, 1N4001 DC): beş düğme tek sırada alt kenarda (alt boşluk ≤ 24 px), hiçbiri tahtanın üstünde değil; tahta en az %70; etiketler kesilmiyor; girince ve çıkınca kamera yeniden sığıyor`,
+      full.count === 5 && full.row && full.gap <= 24 && !full.over && full.share >= 0.7 && !full.cut && refit && back.row && back.gap <= 24,
+      `${full.count} düğme · tek sıra ${full.row} · alt boşluk ${full.gap} px · tahtada ${full.over} · tahta %${Math.round(full.share * 100)} · kesik ${full.cut} · yeniden sığdı ${refit} · çıkınca tek sıra ${back.row}, %${Math.round(back.share * 100)}`);
+    await page.context().close();
+  }
 } finally {
   await browser.close();
 }

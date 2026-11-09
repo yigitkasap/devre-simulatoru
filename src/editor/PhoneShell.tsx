@@ -143,9 +143,9 @@ export function SchematicStrip({ doc, errors, warnings, onOpen }: { doc: Circuit
 }
 
 /** Şema kutusunun sağ altı: tam ekran / küçült. */
-export function SchematicButtons({ full, onFull }: { full: boolean; onFull: () => void }) {
+export function SchematicButtons({ full, onFull, bottom = 10 }: { full: boolean; onFull: () => void; bottom?: number | string }) {
   return (
-    <div className="absolute right-2.5 bottom-2.5 z-10 flex gap-1.5">
+    <div className="absolute right-2.5 z-10 flex gap-1.5" style={{ bottom }}>
       <button
         type="button"
         onClick={onFull}

@@ -140,6 +140,8 @@ export interface BenchViewProps {
   readonly onFocusDone: () => void;
   /** Telefon: sağ alttaki denetimlerin yeri (şema kutusunun tam ekran düğmesinin solunda). */
   readonly controlsInset?: { readonly right: number; readonly bottom: number | string };
+  /** Değişince kamera seçili görünüme yeniden sığdırılır (telefonda tam ekrana girip çıkınca). */
+  readonly fitKey?: string;
   readonly callbacks: BenchCallbacks;
   /** Tahtada kur: öğrencinin kurulumunun yerleşimi (tezgâh onunla kurulur). */
   readonly plan?: BreadboardPlan | null;
@@ -198,6 +200,18 @@ export function BenchView(props: BenchViewProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Telefonda tam ekrana girince ve çıkınca kamera yeniden sığdırılır (kullanıcı kamerayı oynatmış olsa da).
+  const fitKey = props.fitKey;
+  const firstFit = useRef(true);
+  useEffect(() => {
+    if (firstFit.current) {
+      firstFit.current = false;
+      return;
+    }
+    setCamera((c) => ('partId' in c ? { n: c.n + 1, view: 'free' } : { n: c.n + 1, view: c.view }));
+    setCameraLabel((l) => (l === 'part' ? 'free' : l));
+  }, [fitKey]);
 
   // Defterdeki "3B'de yaklaş".
   const { focusRequest, onFocusDone } = props;
@@ -275,6 +289,7 @@ export function BenchView(props: BenchViewProps) {
           callbacks={callbacks}
           plan={props.plan ?? null}
           top={top}
+          phone={phone}
           {...(props.onScene ? { onScene: props.onScene } : {})}
         />
       </Suspense>

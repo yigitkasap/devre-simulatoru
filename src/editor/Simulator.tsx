@@ -1740,6 +1740,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // Şema | 3B: devre şemada kurulur; 3B tezgâhta aynı devre masada (izlenir, anahtar ve
   // potansiyometreyle oynanır).
   // 3B tezgâhın ortak özellikleri (3B görünüm ve Tahtada kur).
+  const phoneEdge = connect === null && !addSheet && !analysis.open ? 10 : 'calc(10px + env(safe-area-inset-bottom))';
   const benchProps: Omit<BenchViewProps, 'onSchematic'> = {
     doc,
     connectivity,
@@ -1760,7 +1761,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     onKarta: () => setKartaOpen(true),
     focusRequest: benchFocus,
     onFocusDone: clearBenchFocus,
-    ...(phone ? { controlsInset: { right: 60, bottom: schematicFull ? 'calc(100px + env(safe-area-inset-bottom))' : 10 } } : {}),
+    // Telefon: 3B düğmeleri şema kutusunun alt kenarında, tam ekran düğmesiyle tek sırada (tam ekranda da). Alttaki
+    // çubuk yoksa kutu ekranın altına dayanır: güvenli alan kadar yukarıda.
+    ...(phone ? { controlsInset: { right: 60, bottom: phoneEdge }, fitKey: schematicFull ? 'tam' : 'kutu' } : {}),
     callbacks: {
       onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
       onToggle: (id) => {
@@ -2364,7 +2367,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             <main className={`relative shrink-0 bg-paper ${big ? 'min-h-0 flex-1' : 'border-b border-line'}`} style={big ? undefined : { height: mainHeight }}>
               {canvas}
               {!wiring && (
-                <SchematicButtons full={schematicFull} onFull={() => setSchematicFull((f) => !f)} />
+                <SchematicButtons full={schematicFull} onFull={() => setSchematicFull((f) => !f)} bottom={phoneEdge} />
               )}
             </main>
           )}

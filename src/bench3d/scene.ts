@@ -257,6 +257,8 @@ export class BenchScene {
   /** Cihazlar görünümünde gösterilen ilk cihaz (soldan sıra; −1: henüz seçilmedi) ve gösterilen cihaz sayısı. */
   private benchIndex = -1;
   private benchStep = 1;
+  /** Telefon düzeni (BenchView'den; null: tuvalin genişliğine göre). */
+  private phoneLayout: boolean | null = null;
   /** Cihazlar görünümünde (kamera oynatılana dek) yalnızca bu parçaların (masa üstü cihazlar) etiketi gösterilir. */
   private benchLabels: ReadonlySet<string> | null = null;
   private plan: BreadboardPlan | null = null;
@@ -1239,7 +1241,7 @@ export class BenchScene {
       keep.push(...boxCorners(new Box3().setFromObject(placed.group)));
     }
     const canvas = this.renderer.domElement;
-    const { elevation, share } = canvas.clientWidth < PHONE_WIDTH ? BENCH_FREE.phone : BENCH_FREE.desktop;
+    const { elevation, share } = this.isPhone() ? BENCH_FREE.phone : BENCH_FREE.desktop;
     const reserve = this.bottomReserve(0.5 - share / 2, 0.5 + share / 2) / Math.max(1, canvas.clientHeight);
     const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9);
     return { ...solved, elevation };
@@ -1279,9 +1281,16 @@ export class BenchScene {
     return { target: solved.target, distance: solved.distance, elevation: ELEVATION.bench };
   }
 
-  /** Telefon düzeni mi (dar tuval). */
+  /** Telefon düzeni mi: uygulama söylediyse o (yatay tutulan telefon da), yoksa dar tuval. */
   private isPhone(): boolean {
-    return this.renderer.domElement.clientWidth < PHONE_WIDTH;
+    return this.phoneLayout ?? this.renderer.domElement.clientWidth < PHONE_WIDTH;
+  }
+
+  /** Telefon düzeni (BenchView); null: tuvalin genişliğine göre. Değişince kadraj yenilenir. */
+  setPhone(phone: boolean | null): void {
+    if (phone === this.phoneLayout) return;
+    this.phoneLayout = phone;
+    if (this.fitted && !this.userMoved) this.fit(this.lastView);
   }
 
   /**
