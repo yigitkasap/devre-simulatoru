@@ -19,10 +19,11 @@ const POSITION_LIMIT = 4;
 export const voltsLabel = (v: number) => `${formatSI(v, 'V', { trim: true })}${tr.scope.perDiv}`;
 export const timeLabel = (t: number) => `${formatSI(t, 's', { trim: true })}${tr.scope.perDiv}`;
 
-function statsText(stats: ChannelStats): string {
+/** Ölçüm satırının parçaları ("Tepe-tepe 5,88 V", "Etkin 2,08 V", "f 1,00 kHz"); dar ekranda aralarından kırılır. */
+function statsParts(stats: ChannelStats): string[] {
   const parts = [`${tr.scope.peakToPeak} ${formatSI(stats.peakToPeak, 'V')}`, `${tr.scope.rms} ${formatSI(stats.rms, 'V')}`];
   if (stats.frequency !== null) parts.push(`${tr.scope.frequency} ${formatSI(stats.frequency, 'Hz')}`);
-  return parts.join('\u2002 ');
+  return parts;
 }
 
 export function stepIn(steps: readonly number[], value: number, direction: 1 | -1): number {
@@ -49,14 +50,21 @@ export function StatsLines({ view, settings, connected }: { view: ScopeView | nu
         if (add && index === 1) return null;
         const stats = view.channels[index]?.stats;
         const unconnected = add ? !connected[0] && !connected[1] : !connected[index];
-        const text = unconnected ? tr.scope.notConnected : stats ? statsText(stats) : '';
-        if (!text) return null;
+        const parts = unconnected ? [tr.scope.notConnected] : stats ? statsParts(stats) : [];
+        if (parts.length === 0) return null;
         const title = add ? tr.scope.sum(settings.invertB) : index === 1 && settings.invertB ? `${name} (${tr.scope.inverted})` : name;
+        // Ölçümler bölünmez; satır sığmazsa ölçümlerin arasından kırılır, sonraki satır kanal harfinden sonra
+        // başlar (dar ekranda kesilmesin: iPhone SE, yatay telefonun yan defteri).
         return (
-          <p key={name} className="whitespace-nowrap">
+          <p key={name} className="pl-[2ch] -indent-[2ch]">
             <b style={{ color: LIGHT_COLORS[index] }}>{title}</b>
             {'\u2002'}
-            {text}
+            {parts.map((part, i) => (
+              <span key={i}>
+                {i > 0 && '\u2002 '}
+                <span className="whitespace-nowrap">{part}</span>
+              </span>
+            ))}
           </p>
         );
       })}

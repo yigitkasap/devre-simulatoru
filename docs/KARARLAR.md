@@ -2541,6 +2541,17 @@ iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon
   maddesi (beş örnekte Daha fazla → Sığdır'dan sonra ölçer). Okunur yakınlıkta köşeye değmeyen bir yer
   yoksa (Gerilim bölücü, LED ve ön direnç 390 × 270 px'te) çalışırken gerilim çipi çizimin bir kısmının
   üstüne binebilir; okunurluk öncelikli, Sığdır köşeyi yine dışarıda bırakır.
+- Gece kararı: **dar ekranda cihaz kartları (madde 6).** Taramadaki kesilme öykünmede 375 px'te 1 V/b
+  ile görünmedi; kartın içi ≈ 330 px'in altına inince ("500 mV/b", "B (ters)" gibi uzun yazılarda ya da
+  kaydırma çubuğuyla) osiloskobun adımlayıcısında değer kesiliyor, ölçüm satırı taşıyordu. Düzen ekranın
+  değil kartın genişliğine göre (container query): osiloskobun kanal satırlarında ad kartın içi 332
+  px'in altında üstte, adımlayıcı ve düğme altında (SE'de alt alta, iPhone 13 ve Pixel 5'te yan yana);
+  ölçüm satırları ölçümlerin arasından alt satıra iner (sonraki satır kanal harfinden sonra başlar);
+  gelişmiş ayarlardaki konum adımlayıcıları 334 px'in altında tek sütun; üreteçte Kayma / Simetri, güç
+  kaynağında göstergeler ve adımlayıcılar 310 px'in altında alt alta. Aynı kurallar yatay telefonun yan
+  sütununda da işler.
+- Not: parça kartlarındaki canlı ölçüm kareleri (Gerilim, Akım, Güç) hızla değişen değerde "≈ −1,537 V"
+  gibi uzun yazıyı … ile kısaltıyor (D1, 375 ve 390 px). Cihaz kartı olmadığı için bu turda dokunulmadı.
 
 ### Lojik entegreler (Dalga 2, 2026-11-05)
 

@@ -62,6 +62,12 @@ function ToggleRow({ label, note, checked, onChange, touch = true }: { label: Re
   );
 }
 
+/**
+ * Yan yana iki adımlayıcı (ya da gösterge): kartın içi bu genişliğin altındaysa (yatay telefonun yan defteri,
+ * dar telefonlar) alt alta; her adımlayıcı en uzun değeriyle ("100 mA", "−1,5 V") ≈ 150 px ister.
+ */
+const PAIR_NARROW = '@max-[310px]:flex-col';
+
 function Jacks({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -166,7 +172,7 @@ export function FuncGenControls({
           onType={typed(part, 'amplitude', onChange)}
         />
       </div>
-      <div className="flex gap-2.5">
+      <div className={`flex gap-2.5 ${PAIR_NARROW}`}>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <Label panel="OFFSET">{tr.rack.offset}</Label>
           <Stepper
@@ -263,7 +269,7 @@ export function DcSupplyControls({
                 </StatusLamp>
               </span>
             </div>
-            <div className="flex gap-2">
+            <div className={`flex gap-2 ${PAIR_NARROW}`}>
               <div className="flex-1">
                 <Lcd value={formatNumber(Math.abs(voltage), 2)} unit="V" label={`${tr.rack.output(n)}: ${formatNumber(Math.abs(voltage), 2)} V`} />
               </div>
@@ -271,7 +277,7 @@ export function DcSupplyControls({
                 <Lcd value={formatNumber(Math.abs(current), 3)} unit="A" label={`${tr.rack.output(n)}: ${formatNumber(Math.abs(current), 3)} A`} />
               </div>
             </div>
-            <div className="flex gap-2.5">
+            <div className={`flex gap-2.5 ${PAIR_NARROW}`}>
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <Label>{tr.rack.voltage}</Label>
                 <Stepper

@@ -98,13 +98,13 @@ export function DeviceControls({ part, devices }: { part: Part; devices: DeviceH
       );
     case 'funcgen':
       return (
-        <div className="flex flex-col gap-3">
+        <div className="@container flex flex-col gap-3">
           <FuncGenControls part={part} output={devices.outputVoltage(part.id)} onChange={change} onJack={jack} touch={touch} />
         </div>
       );
     case 'dcsupply':
       return (
-        <div className="flex flex-col gap-3">
+        <div className="@container flex flex-col gap-3">
           <DcSupplyControls
             part={part}
             status={devices.status(part.id)}
@@ -125,6 +125,12 @@ export function DeviceControls({ part, devices }: { part: Part; devices: DeviceH
       return null;
   }
 }
+
+/**
+ * Osiloskobun dokunmatik satırları bu genişliğin altında (kartın içi; ad 74 px + en uzun değerli adımlayıcı
+ * ≈ 165 px + düğme 72 px + aralar) alt alta iner: ad tek başına bir satırda.
+ */
+const NARROW_LABEL = '@max-[332px]:w-full';
 
 /** Dokunmatik osiloskop satırının sağındaki düğme: dokundukça bir sonraki seçeneğe geçer (DP3: DC, "A ve B"). */
 function CycleButton<T extends string>({ label, options, value, onChange }: { label: string; options: ReadonlyArray<{ value: T; text: string }>; value: T; onChange: (value: T) => void }) {
@@ -192,15 +198,17 @@ function ScopeControls({
     />
   );
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="@container flex flex-col gap-2.5">
       <Screen part={part} view={view} settings={s} height={168} width="100%" onChange={onChange} />
       <StatsLines view={view} settings={s} connected={connected} />
       {touch ? (
-        // Dokunmatikte (telefon, tablet; DP3) her ayar bir satır: ad, adımlayıcı ve sırayla değişen düğme.
+        // Dokunmatikte (telefon, tablet; DP3) her ayar bir satır: ad, adımlayıcı ve sırayla değişen düğme. Dar
+        // kartta (iPhone SE, yatay telefonun yan defteri) ad üstte, adımlayıcı ve düğme altında: "500 mV/b"
+        // gibi değerler adımlayıcıda kesilmesin.
         <div className="flex flex-col gap-2">
           {CHANNELS.map((name, index) => (
-            <div key={name} className="flex items-center gap-2">
-              <span className={`${head} w-[74px] shrink-0`}>
+            <div key={name} className="flex flex-wrap items-center gap-2">
+              <span className={`${head} w-[74px] shrink-0 ${NARROW_LABEL}`}>
                 <ChannelBadge name={name} color={SCOPE_COLORS[index]!} />
                 {xy ? (index === 0 ? 'X' : 'Y') : tr.scope.channel(name)}
               </span>
@@ -213,8 +221,8 @@ function ScopeControls({
               />
             </div>
           ))}
-          <div className="flex items-center gap-2">
-            <span className={`${head} w-[74px] shrink-0`}>{tr.sim.time}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`${head} w-[74px] shrink-0 ${NARROW_LABEL}`}>{tr.sim.time}</span>
             <div className="min-w-0 flex-1">{timeStepper}</div>
             <CycleButton label={tr.scope.mode} options={modes} value={s.mode} onChange={(mode) => onChange({ mode })} />
           </div>
@@ -260,7 +268,7 @@ function ScopeControls({
       </button>
       {advanced && (
         <div id={advancedId} className="flex flex-col gap-3 rounded-md bg-panel-2 p-3">
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className={`grid grid-cols-2 gap-2.5 ${touch ? '@max-[334px]:grid-cols-1' : ''}`}>
             {CHANNELS.map((name, index) => {
               const position = s.position[index as 0 | 1];
               const horizontal = xy && index === 0;

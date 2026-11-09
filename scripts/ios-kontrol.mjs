@@ -5408,6 +5408,64 @@ try {
       `önce ${before.open} · paylaşım ${afterShare.open}/${afterShare.svg} · örnek ${afterExample.open}/${afterExample.svg}`);
     await page.context().close();
   }
+  for (const [w, h] of [[375, 667], [340, 720]]) {
+    // 6. Dar ekranda cihaz kartlarında yazı kesilmiyor: osiloskobun ölçüm satırları ölçümlerin arasından alt satıra
+    // iniyor, kanal satırlarında ad üstte (adımlayıcıda "500 mV/b" sığıyor); üreteç, güç kaynağı, multimetre.
+    const { page } = await phone(w, h);
+    // Yazı, satır içi olmayan kendi kutusundan ya da kırpan atasının kutusundan taşıyorsa (ya da … ile kısaltılmışsa) kesik.
+    const clipped = (card) => card.evaluate((root) => {
+      const out = [];
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const text = n.textContent.trim();
+        const el = n.parentElement;
+        if (!text || !el || el.closest('svg') || el.closest('.sr-only')) continue;
+        const range = document.createRange(); range.selectNodeContents(n);
+        const t = range.getBoundingClientRect();
+        if (t.width === 0) continue;
+        let own = el;
+        while (own && getComputedStyle(own).display === 'inline') own = own.parentElement;
+        const ob = own?.getBoundingClientRect();
+        if (ob && (t.left < ob.left - 1 || t.right > ob.right + 1)) { out.push(text.slice(0, 20)); continue; }
+        for (let a = el; a && a !== root.parentElement; a = a.parentElement) {
+          const cs = getComputedStyle(a);
+          if (cs.textOverflow === 'ellipsis' && a.scrollWidth > a.clientWidth + 1) { out.push(`…${text.slice(0, 20)}`); break; }
+          if (cs.overflowX !== 'visible') { const b = a.getBoundingClientRect(); if (t.left < b.left - 1 || t.right > b.right + 1) out.push(text.slice(0, 20)); break; }
+        }
+      }
+      return out;
+    });
+    const openCard = async (id) => {
+      const row = phoneNotebook(page).getByRole('button', { name: new RegExp(`^${id} ·`) }).first();
+      await row.scrollIntoViewIfNeeded(); await row.tap(); await page.waitForTimeout(900);
+      return phoneNotebook(page).getByRole('region', { name: new RegExp(`^${id} · `) }).first();
+    };
+    const rows = [];
+    await openExample(page, 'Yarım dalga doğrultmaç');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
+    const scope = await openCard('OSC1');
+    // A ve B kanalı 1 V/b → 500 mV/b (en uzun değerlerden), B ters (başlık "B (ters)").
+    await scope.getByRole('button', { name: 'A volt/bölme azalt' }).tap(); await page.waitForTimeout(150);
+    await scope.getByRole('button', { name: 'B volt/bölme azalt' }).tap(); await page.waitForTimeout(150);
+    await scope.getByRole('button', { name: /^Gelişmiş ayarlar/ }).tap(); await page.waitForTimeout(200);
+    await scope.getByRole('checkbox', { name: /^B ters/ }).check().catch(() => {});
+    await page.waitForTimeout(900);
+    const values = await scope.getByRole('spinbutton').allTextContents();
+    const stats = await scope.locator('div.font-mono > p').evaluateAll((ps) => ps.map((p) => { const r = document.createRange(); r.selectNodeContents(p); return new Set([...r.getClientRects()].map((x) => Math.round(x.top))).size; }));
+    rows.push({ id: 'OSC1', cut: await clipped(scope), extra: `${values.slice(0, 3).join(', ')} · ölçüm satırları ${stats.join('/')}` });
+    await scope.getByRole('button', { name: 'Kartı küçült' }).tap(); await page.waitForTimeout(300);
+    rows.push({ id: 'FG1', cut: await clipped(await openCard('FG1')) });
+    await openExample(page, 'Transistör anahtar: LED kollektörde');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
+    rows.push({ id: 'PS1', cut: await clipped(await openCard('PS1')) });
+    await openExample(page, 'Akım kaynağıyla Ohm yasası');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
+    rows.push({ id: 'MM1', cut: await clipped(await openCard('MM1')) });
+    check(`telefon arayüzü (6): dar ekranda cihaz kartlarında (osiloskop 500 mV/b ve B ters, üreteç, güç kaynağı, multimetre) yazı kesilmiyor (${w}×${h})`,
+      rows.every((r) => r.cut.length === 0) && values.some((v) => v.includes('500 mV')),
+      rows.map((r) => `${r.id}${r.cut.length ? `: ${r.cut.join(', ')}` : ' temiz'}${r.extra ? ` (${r.extra})` : ''}`).join(' · '));
+    await page.context().close();
+  }
   {
     // 7. Turun 4. adımı (İncele) boş devrede önce parça eklemeyi söylüyor ve Parça düğmesini gösteriyor; parça varken "Bir parçaya dokun".
     const ctx = await browser.newContext({ welcome: true, viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'tr-TR' });
