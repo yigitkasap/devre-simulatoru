@@ -1235,16 +1235,22 @@ export class BenchScene {
   private circuitFrame(): { target: Vector3; distance: number; elevation: number } | null {
     const tall = this.tallParts();
     if (tall.length === 0 || this.boardView.isEmpty()) return null;
+    const canvas = this.renderer.domElement;
+    // Yatay telefonda 3B alanı çok kısa: tahtadaki uzun parçaların (elektrolitik kondansatör) üstü kırpılabilir, tahta
+    // payı küçülmesin.
+    const short = this.isPhone() && canvas.clientWidth > canvas.clientHeight;
     const keep = boxCorners(this.boardView);
     for (const placed of this.parts.values()) {
       if (tall.includes(placed)) continue;
-      keep.push(...boxCorners(new Box3().setFromObject(placed.group)));
+      const box = new Box3().setFromObject(placed.group);
+      if (short && this.plan?.onBoard.has(placed.part.id)) box.max.y = Math.min(box.max.y, BB.height + 3);
+      keep.push(...boxCorners(box));
     }
-    const canvas = this.renderer.domElement;
     const { elevation, share } = this.isPhone() ? BENCH_FREE.phone : BENCH_FREE.desktop;
     const reserve = this.bottomReserve(0.5 - share / 2, 0.5 + share / 2) / Math.max(1, canvas.clientHeight);
-    const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9);
-    return { ...solved, elevation };
+    // Telefonda masadaki alçak parçalar (pil) kenara daha çok yaklaşabilir: tahta payı küçülmesin.
+    const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9, false, this.isPhone() ? 0.985 : 0.94);
+    return { target: solved.target, distance: solved.distance, elevation };
   }
 
   /**
@@ -1307,6 +1313,7 @@ export class BenchScene {
     bottom: number,
     top: number,
     middle = false,
+    wide = 0.94,
   ): { target: Vector3; distance: number; fill: number } {
     const toCamera = new Vector3(0, Math.sin(elevation), Math.cos(elevation));
     const forward = toCamera.clone().negate();
@@ -1337,7 +1344,7 @@ export class BenchScene {
       const eye = target.clone().addScaledVector(toCamera, distance);
       const f = extent(focus, eye);
       const k = extent(keep, eye);
-      const ratio = Math.max((f.x1 - f.x0) / (2 * share), (k.x1 - k.x0) / (2 * 0.94), (k.y1 - k.y0) / ((top - bottom) * 0.97));
+      const ratio = Math.max((f.x1 - f.x0) / (2 * share), (k.x1 - k.x0) / (2 * wide), (k.y1 - k.y0) / ((top - bottom) * 0.97));
       // Kaydırma: keep yatayda ortada, alt kenarı `bottom`un hemen üstünde (hedef sağa/yukarı gidince içerik sola/aşağı).
       target.addScaledVector(right, ((k.x0 + k.x1) / 2) * distance * tanH * 0.8);
       const shift = middle ? (k.y0 + k.y1) / 2 - (bottom + top) / 2 : k.y0 - (bottom + 0.02);

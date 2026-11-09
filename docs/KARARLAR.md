@@ -1932,6 +1932,10 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   tutulan telefon da telefon kuralıyla kadrajlanır (`BenchScene.setPhone`; eskiden 640 px'ten geniş tuval masaüstü
   sayılıyor, tahta tam ekranda kadrajın %12'si kalıyordu). Tahta payı tam ekranda dikeyde ve yatayda %72 (1N4001 DC;
   önce dikey %66, yatay %12); cihaz etiketleri yanlardan kesilmez. ios-kontrol: "3B tam ekran (telefon, dikey/yatay)".
+  **Gece kararı:** yatay telefonda 3B alanı çok kısa (≈ 276 px): tahtadaki uzun parçaların (elektrolitik
+  kondansatör) üstü kırpılabilir (kadrajda kartın 3 birim üstüne kadar sayılır), tahta payı küçülmez; telefonda masadaki
+  alçak parçalar (pil) kenara %98,5'e kadar yaklaşabilir (önce %94). 10 örnekte tahta payı: tam ekran dikey %72
+  (pilli iki örnek %68), yatay %71–72; tam ekran dışında telefon %72 (pilli %70, önce %67), masaüstü %47.
 - **Etiketler**: çakışan (4 px aralı) etiket önce ucun sağına, soluna, bir kat yukarı ya da altına kayar; hiçbiri
   olmazsa gizlenir (eskiden doğrudan gizleniyor, birbirine değen etiketler üst üste görünüyordu). Parça etiketi
   üst kenardan taşmaz. Varsayılan kadrajda cihazın üstü kırpılınca etiketin noktası görüntünün dışında kalır:
@@ -1941,7 +1945,8 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   "3B: çalışırken parçaların etiketleri (… ampermetrede akım)" bunu yakaladı (2026-11-09).
 - **Kablolar**: modelin `anchorDirs`'i soketin dışa baktığı yön; kablo soketten öne düz çıkar, yatay teğetle
   masaya sarkar, masada tahtaya gider ve deliğe yukarıdan iner (`leadRoute.socketCurve`; doğru + kübik
-  Bézier'ler: masanın altına salınmaz). Fiş soketin ekseninde.
+  Bézier'ler: masanın altına salınmaz). Fiş soketin ekseninde. 2026-11-09'dan beri kablo deliğe girmez, timsah
+  kıskaçla biter ve kıskacın kuyruğuna onun ekseni boyunca girer ("3B: cihaz kabloları, timsah kıskaç").
 - **Tahtada kur (Tepeden)**: cihaz kartları soketlerin çevresi kadar ve tahtanın hemen arkasında yan yana
   sıkışık dizilir (uçlar kartla kayar); gerçek boyutlu sıra kartları çok yayıyor, tahtayı küçültüyordu. 3B'de
   uçlar gerçek yerinde.
@@ -2012,6 +2017,11 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   renginde: COM ve − soketleri siyah (toprak), +, VΩmA kırmızı, osiloskobun CH1 sarı, CH2 mavi (`anchorColors`).
   **Gece kararı:** üretecin OUTPUT ve TTL soketleri renksiz (çelik) BNC: kablo ağın renginde kalır. Güç kaynağının
   2. kanalının + ucu toprağa gidiyorsa da kablo kırmızı (soket rengi; kural "COM, − siyah").
+- **Kare hızı** (iPhone 13 öykünmesi, işlemci 4× yavaş, örnek çalışırken, 10 örnek): kıskaçlar, kısa teller ve yeni
+  cihaz boyutlarıyla 34,7–64,6 kare/s, uzun görev yok (öncesi aynı makinede 35,3–60,7). Kıskacın geometrileri bütün
+  kıskaçlarda ortak, malzemeleri kablonun rengine göre paylaşılır. Yerleşim (kıskaçlar, köprülerin biçimi) yalnızca
+  devre değişince hesaplanır: en ağır örnekte (yürüyen ışık, 30 köprü) ≈ 75 ms, kıskaçlı en ağır örnekte ≈ 70 ms
+  (normal hızda, düğümde).
 
 ### Performans ve hata taraması (2026-10-27)
 
