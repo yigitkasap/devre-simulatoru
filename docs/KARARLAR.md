@@ -1058,8 +1058,8 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   başına akım ayrıca bulunur: pinlerin akımları bir kapsayan ağaç üzerinde toplanır, toprak
   sembolleri kendi kablo adasındaki dengesizliği karşılar. Kablolar kendi aralarında döngü
   oluşturuyorsa döngüyü kapatan parçada nokta gösterilmez.
-- **Akım noktalarının hızı:** 8 + 22·log₁₀(I / 1 µA) piksel/s, 4 ile 150 arasında
-  sınırlı (1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140). 10 nA'in altında noktalar hareketsizdir:
+- **Akım noktalarının hızı (2026-11-09'da değişti, "Teşhis ve metinler" 4c):** eskiden 8 + 22·log₁₀(I / 1 µA)
+  piksel/s, 4 ile 150 arasında sınırlı (1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140). 10 nA'in altında noktalar hareketsizdir:
   ters diyot sızıntısı ve gmin kaynaklı 10⁻¹¹ A düzeyindeki akımlar gösterilmez, 10 MΩ'luk
   voltmetrenin çektiği µA düzeyindeki akım gösterilir (kullanıcı kararı). Nokta hızı
   simülasyon hızı ayarından bağımsızdır; yalnızca akımın büyüklüğünü gösterir (kullanıcı kararı).
@@ -2876,3 +2876,14 @@ ios-kontrol "Föy metinleri").
 - Gece kararı: öbür parçaların kartlarındaki canlı ölçümler (direncin akımı vb.) değişmedi: JFET'in kapı akımı
   (≈ 11 pA, föyün 3. adımının cevabında) gerçek bir değerdir ve kartta görünmeye devam eder; yalnızca ölçü aletinin
   ekranı gerçek bir aletin çözünürlüğüyle sınırlı.
+
+**4c. Akım noktaları 1 µA'in altında neredeyse durur** (`src/editor/useSimulation.ts` → `dotSpeed`,
+`tests/readouts.test.ts`, ios-kontrol "Akım noktaları 1 µA'in altında").
+
+- Eskiden en düşük hız 4 piksel/s idi; voltmetrenin içinden geçen µA altı akımda (10 MΩ, 5 V: 0,5 µA) noktalar
+  belirgin hareket ediyordu (eski kullanıcı kararı: "voltmetrenin çektiği µA düzeyindeki akım gösterilir"; bu istekle
+  değişti). Yeni eğri: 1 µA ve üstünde 1 + (73/3)·log₁₀(I / 1 µA) piksel/s (1 µA ≈ 1, 1 mA ≈ 74 eskisi gibi, 1 A ≈ 147,
+  en çok 150); 1 µA'in altında I / 1 µA piksel/s (0,5 µA → 0,5; noktalar 16 piksel arayla, biri ötekinin yerine
+  ≈ 30 s'de gelir); 10 nA'in altında hareketsiz. Eğri 1 µA'de süreklidir. 3B'deki noktalar aynı eğrinin onda biri.
+- Gece kararı: "neredeyse dursun" için 1 µA'de 1 piksel/s seçildi (16 piksellik aralığı 16 s'de geçer); 1 mA'deki
+  hız korunduğu için µA–mA arası biraz yavaşladı (10 µA: 30 → 25, 100 µA: 52 → 50 piksel/s).

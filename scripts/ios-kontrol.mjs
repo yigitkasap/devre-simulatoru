@@ -5800,6 +5800,36 @@ try {
     await ctx.close();
   }
 
+  // --- Akım noktaları 1 µA'in altında neredeyse duruyor (voltmetrenin içinden geçen akım) ---------------------------------
+  {
+    // 5 V'luk pil ve doğrudan uçlarına bağlı 10 MΩ'luk voltmetre: döngüde 0,5 µA.
+    const seed = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 5, internalResistance: 0 } },
+      { id: 'p2', type: 'voltmeter', label: 'V1', x: 12, y: 0, rotation: 90, props: {} },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [12, -6], [12, -4]] },
+      { id: 'w2', points: [[0, 4], [0, 6], [12, 6], [12, 4]] },
+    ] };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(seed));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(600);
+    const offsets = () => page.locator('svg.schematic line[stroke-dasharray="0 16"]').evaluateAll((ls) => ls.map((l) => Number(l.getAttribute('stroke-dashoffset'))));
+    const a = await offsets();
+    const t0 = Date.now();
+    await new Promise((r) => setTimeout(r, 3000));
+    const b = await offsets();
+    const seconds = (Date.now() - t0) / 1000;
+    // Desen 16 px'te bir yinelenir: en kısa çevresel fark.
+    const moved = a.map((x, i) => { const d = Math.abs(((b[i] ?? x) - x) % 16); return Math.min(d, 16 - d); });
+    const fastest = Math.max(0, ...moved) / seconds;
+    check('akım noktaları: voltmetrenin 0,5 µA’lik akımında noktalar neredeyse duruyor (≤ 1 piksel/s; eskiden 4 piksel/s)',
+      a.length >= 2 && fastest <= 1, `${a.length} nokta çizgisi · en hızlısı ${fastest.toFixed(2)} piksel/s`);
+    await ctx.close();
+  }
+
   // --- Telefon hızı: 4 kat yavaş işlemcide (iPhone 13 öykünmesi) bütün örnekler çalışırken ---------------
   // Kare hızı en az 30/s, 100 ms'yi aşan görev yok (çözücünün süre sınırı kesin; çizim uzun sürünce hesap
   // süresi kısalır). Simülasyon gerçek zamana yetişemeyince "yetişemiyor" simgesi üst çubukta, açıklaması

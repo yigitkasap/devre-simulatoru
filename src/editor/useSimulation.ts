@@ -123,19 +123,25 @@ export interface SimulationApi {
 
 /**
  * Bu akımın altında noktalar hareketsiz kalır: ters diyot sızıntısı ve gmin kaynaklı
- * 10⁻¹¹ A düzeyindeki akımlar gösterilmez, voltmetrenin çektiği µA düzeyindeki akım gösterilir.
+ * 10⁻¹¹ A düzeyindeki akımlar gösterilmez.
  */
 export const MIN_ANIMATED_CURRENT = 10e-9;
 
+/** Bu akımın altında noktalar neredeyse durur (voltmetrenin içinden geçen µA altı akım). */
+export const SLOW_CURRENT = 1e-6;
+
 /**
- * Akım noktalarının hızı (dünya pikseli/saniye), logaritmik ölçek:
- * 1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140 piksel/s; böylece hem µA hem A düzeyi görülebilir.
- * Simülasyon hızı ayarından bağımsızdır: yalnızca akımın büyüklüğünü gösterir.
+ * Akım noktalarının hızı (dünya pikseli/saniye). 1 µA'den yukarı logaritmik: 1 µA ≈ 1, 1 mA ≈ 74,
+ * 1 A ≈ 147 piksel/s (en çok 150); böylece hem µA hem A düzeyi görülebilir. 1 µA'in altında doğrusal ve
+ * neredeyse duruyor (0,5 µA → 0,5 piksel/s; noktalar 16 piksel arayla: biri ötekinin yerine ≈ 30 s'de
+ * gelir), 10 nA'in altında hareketsiz. Simülasyon hızı ayarından bağımsızdır: yalnızca akımın büyüklüğünü
+ * gösterir.
  */
 export function dotSpeed(current: number): number {
   const abs = Math.abs(current);
   if (abs < MIN_ANIMATED_CURRENT) return 0;
-  return Math.min(150, Math.max(4, 8 + 22 * Math.log10(abs / 1e-6)));
+  if (abs < SLOW_CURRENT) return abs / SLOW_CURRENT;
+  return Math.min(150, 1 + (73 / 3) * Math.log10(abs / SLOW_CURRENT));
 }
 
 /** Bir karede atılabilecek zaman adımı bütçesi (yavaş bilgisayarda donmayı önler). */

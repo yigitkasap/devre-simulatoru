@@ -125,12 +125,18 @@ describe('Ölçü aletinin çözünürlüğü: hesabın kalıntıları 0', () =>
 });
 
 describe('Akım noktaları', () => {
-  it('10 nA altında hareketsiz, voltmetrenin µA akımı görünür, logaritmik hız', () => {
+  it('10 nA altında hareketsiz, 1 µA altında neredeyse duruyor (voltmetrenin akımı), üstünde logaritmik hız', () => {
     expect(dotSpeed(2e-11)).toBe(0); // ters diyot sızıntısı
     expect(dotSpeed(9e-9)).toBe(0);
-    expect(dotSpeed(1e-6)).toBeCloseTo(8); // 10 MΩ voltmetre ≈ 1 µA
+    expect(dotSpeed(0.5e-6)).toBeCloseTo(0.5); // 10 MΩ voltmetre 5 V'ta 0,5 µA: 16 px'lik aralık ≈ 30 s
+    expect(dotSpeed(0.9e-6)).toBeLessThan(1);
+    expect(dotSpeed(1e-6)).toBeCloseTo(1);
+    expect(dotSpeed(1.2e-6)).toBeLessThan(3); // 12 V / 10 MΩ
     expect(dotSpeed(1e-3)).toBeCloseTo(74);
-    expect(dotSpeed(1)).toBeCloseTo(140);
+    expect(dotSpeed(1)).toBeCloseTo(147);
+    expect(dotSpeed(100)).toBe(150);
     expect(dotSpeed(-1e-3)).toBe(dotSpeed(1e-3));
+    // Süreklilik: 1 µA'in iki yanında aynı hız.
+    expect(dotSpeed(0.999999e-6)).toBeCloseTo(dotSpeed(1.000001e-6), 4);
   });
 });
