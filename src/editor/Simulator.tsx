@@ -2136,6 +2136,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const boxHeight = Math.round(Math.max(layout.landscape ? 120 : 132, Math.min(270, phoneAreaHeight * 0.42)));
     // Alttaki çubuk: Parça ekle ya da Analiz sayfası açıkken gizli (alanı sayfaya bırakır; eski yüzen düğmeler gibi).
     const bottomBar = !wiring && !addSheet && !analysis.open;
+    // Bildirim defterin altında, alttaki çubuğun hemen üstünde, akışta (defterin satırlarını örtmez); tam ekranda,
+    // kablo bağlarken ve alt sayfalar açıkken eskisi gibi yüzer.
+    const inlineToast = !big && bottomBar;
     // Parça ekle sayfası şema kutusunun üstüne binmez (WebKit, touch-action: none bölgesini üstüne binen
     // katmana da uygulayabiliyor): sayfa büyüdükçe kutu kısalır; tam boyda devre şeridi kalır.
     const mainHeight = addSheet && sheetHeight > 0 ? Math.max(0, Math.min(boxHeight, Math.round(phoneAreaHeight - sheetHeight))) : boxHeight;
@@ -2396,6 +2399,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                   notebook
                 )}
               </TouchUi.Provider>
+              {inlineToast && <Toast toast={toast} inline onDone={hideToast} />}
             </section>
           )}
           {wiring && (
@@ -2462,7 +2466,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         {taskDialogEl}
         {overlays}
         {/* Alttaki çubuk 76 px (güvenli alan Toast'ta ayrıca eklenir). */}
-        <Toast toast={toast} offset={wiring ? 92 : analysis.open ? 92 : addSheet ? sheetHeight + 12 : layout.landscape ? 68 : 88} onDone={hideToast} />
+        {!inlineToast && <Toast toast={toast} offset={wiring ? 92 : analysis.open ? 92 : addSheet ? sheetHeight + 12 : layout.landscape ? 68 : 88} onDone={hideToast} />}
       </div>
     );
   }

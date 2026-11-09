@@ -5402,6 +5402,34 @@ try {
       `${rows.length} öğe · en düşük ${rows.slice(0, 2).map((r) => `${r.name} ${r.c.toFixed(2)}`).join(', ')}`);
     await ctx.close();
   }
+  for (const [w, h] of [[375, 667], [390, 844], [844, 390]]) {
+    // 7. "Paylaşılan devre açıldı · Geri al" bildirimi defterin satırlarını örtmüyor: alttaki çubuğun hemen üstünde, akışta.
+    const { page } = await phone(w, h);
+    await openExample(page, 'LED ve ön direnç');
+    await page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' }).waitFor({ state: 'detached', timeout: 8000 }).catch(() => {});
+    const shared = JSON.parse(readFileSync(new URL('../src/examples/gerilim-bolucu.json', import.meta.url), 'utf8'));
+    await page.evaluate((hash) => { window.location.hash = hash; }, `#d=${lz.compressToEncodedURIComponent(JSON.stringify(shared))}`);
+    await page.waitForTimeout(700);
+    const toast = page.getByRole('status').filter({ hasText: 'Paylaşılan devre açıldı.' });
+    const tb = await toast.boundingBox();
+    const bb = await phoneBar(page).boundingBox();
+    const list = await page.locator('#defter').boundingBox();
+    // Defterin görünen satırları (kaydırma kutusunun dışında kalan kısım sayılmaz); bildirimin kendi düğmesi hariç.
+    const covered = tb === null ? [] : await page.locator('#defter').getByRole('button').evaluateAll((els, t) => {
+      const clip = document.getElementById('defter').getBoundingClientRect();
+      return els.filter((e) => {
+        const r = e.getBoundingClientRect();
+        const top = Math.max(r.top, clip.top);
+        const bottom = Math.min(r.bottom, clip.bottom);
+        return r.height > 0 && bottom > top && r.left < t.x + t.width && r.right > t.x && top < t.y + t.height && bottom > t.y;
+      }).map((e) => (e.getAttribute('aria-label') ?? e.textContent).trim().slice(0, 16));
+    }, tb);
+    const gap = tb && bb ? bb.y - (tb.y + tb.height) : -1;
+    check(`telefon arayüzü (7, bildirim): "Paylaşılan devre açıldı · Geri al" alttaki çubuğun hemen üstünde (arada 0–16 px), defterin üstüne binmiyor; defter bildirimin üstünde bitiyor (${w}×${h})`,
+      tb !== null && (await toast.getByRole('button', { name: 'Geri al' }).count()) === 1 && gap >= 0 && gap <= 16 && covered.length === 0 && list !== null && list.y + list.height <= tb.y + 0.5,
+      `arada ${Math.round(gap)} px · defterin altı ${Math.round((list?.y ?? 0) + (list?.height ?? 0))}, bildirim ${Math.round(tb?.y ?? 0)}${covered.length ? ` · örttüğü: ${covered.join(', ')}` : ''}`);
+    await page.context().close();
+  }
 
   // --- Kablo yolu (masaüstü): sıfırdan kurulan devrelerde beklenmeyen bağlantı yok -----------------------
   // Kullanıcı testinde L biçimli yolun köşesi başka bir kablonun köşesine ya da bir uca düşmüş, kablo başka

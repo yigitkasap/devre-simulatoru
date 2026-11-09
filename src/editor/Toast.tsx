@@ -38,15 +38,17 @@ export function useToast(): [ToastMessage | null, (text: string, tone?: ToastMes
 /**
  * `offset`: alttan uzaklık (px); telefonda alt çubuğun ve alt sayfanın üstünde. Genişlik içeriğe göre (w-max):
  * left: 50% ile kendiliğinden genişlik ekranın yarısında kalır, kısa bildirim de iki satıra bölünürdü.
+ * `inline`: sayfanın akışında, bulunduğu sütunun altında (telefonda defterin altı, alttaki çubuğun hemen
+ * üstü): içeriğin üstüne binmez, görünürken defter kısalır.
  */
-export function Toast({ toast, offset = 112, onDone }: { toast: ToastMessage | null; offset?: number; onDone?: () => void }) {
+export function Toast({ toast, offset = 112, inline = false, onDone }: { toast: ToastMessage | null; offset?: number; inline?: boolean; onDone?: () => void }) {
   if (!toast) return null;
-  return (
+  const box = (
     <div
       key={toast.id}
       role={toast.tone === 'error' ? 'alert' : 'status'}
-      style={{ bottom: `calc(${Math.round(offset)}px + env(safe-area-inset-bottom))` }}
-      className={`fixed left-1/2 z-50 flex w-max max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-lg pl-4 text-sm shadow-lg ${
+      style={inline ? undefined : { bottom: `calc(${Math.round(offset)}px + env(safe-area-inset-bottom))` }}
+      className={`${inline ? '' : 'fixed left-1/2 z-50 -translate-x-1/2 '}flex w-max max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg pl-4 text-sm shadow-lg ${
         toast.action ? 'py-0.5 pr-1' : 'pointer-events-none py-2 pr-4'
       } ${toast.tone === 'error' ? 'bg-danger text-on-ink' : 'bg-ink text-on-ink'}`}
     >
@@ -64,5 +66,12 @@ export function Toast({ toast, offset = 112, onDone }: { toast: ToastMessage | n
         </button>
       )}
     </div>
+  );
+  return inline ? (
+    <div data-toast-slot="" className="flex shrink-0 justify-center bg-panel px-4 pt-1.5 pb-2">
+      {box}
+    </div>
+  ) : (
+    box
   );
 }

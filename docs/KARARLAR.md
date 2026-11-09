@@ -2513,6 +2513,12 @@ iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon
   yazı `accent-ink`); koyu panelde kenarlık ve halka 3,7:1 (≥ 3:1). Açık temaya dokunulmadı (#1f6feb,
   beyazla 4,78:1). Yalnızca simgenin rengini değiştirmek yerine belirteç koyulaştırıldı: aynı beyaz-mavi
   çift turun İleri düğmesinde ve 30'dan fazla yerde daha var.
+- Gece kararı: **bildirim telefonda akışta (madde 7).** "Paylaşılan devre açıldı · Geri al" gibi
+  bildirimler alttaki çubuğun 88 px üstünde yüzüyor, defterin son satırlarını örtüyordu (SE'de R2 ve V1,
+  yatayda B1 ve GND1). Telefonun olağan düzeninde bildirim defterin sütununun altında, alttaki çubuğun
+  hemen üstünde akışta durur (`<Toast inline>`): görünürken defter kısalır, içerik kaymaz ve örtülmez.
+  Şema kutusunun boyu değişmez (tuval yeniden sığdırılmaz). Tam ekran şemada, kablo bağlarken ve Parça
+  ekle / Analiz açıkken bildirim eskisi gibi yüzer (orada altta defter yok).
 
 ### Lojik entegreler (Dalga 2, 2026-11-05)
 
