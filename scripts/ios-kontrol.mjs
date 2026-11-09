@@ -5545,6 +5545,78 @@ try {
     }
   }
 
+  // --- Teşhis: kısa devre edilen parça ("R1 kısa devre edildi"), üretecin OUT'u COM'a kısa devre, LED mesajı bağlama göre --
+  {
+    /** Masaüstü sayfası; devre `seed` ile açılır. */
+    async function seeded(seed) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+      await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(seed));
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      return { ctx, page };
+    }
+    // LED ve ön direnç; R1'in iki ucu üstten dolaşan bir kabloyla birleşik (w4).
+    const shortedR1 = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 5, internalResistance: 0 } },
+      { id: 'p2', type: 'resistor', label: 'R1', x: 12, y: -6, rotation: 0, props: { resistance: 330 } },
+      { id: 'p3', type: 'led', label: 'LED1', x: 24, y: 0, rotation: 90, props: { color: 'red' } },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [8, -6]] },
+      { id: 'w2', points: [[16, -6], [24, -6], [24, -4]] },
+      { id: 'w3', points: [[24, 4], [24, 6], [0, 6], [0, 4]] },
+      { id: 'w4', points: [[8, -6], [8, -10], [16, -10], [16, -6]] },
+    ] };
+    {
+      const { ctx, page } = await seeded(shortedR1);
+      await page.waitForTimeout(400);
+      const card = notebook(page).getByRole('region', { name: 'Uyarı · R1 kısa devre edildi' });
+      const cardText = ((await card.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      await card.getByRole('button', { name: 'R1’i göster' }).click().catch(() => {});
+      await page.waitForTimeout(250);
+      const r1Card = await notebook(page).getByRole('region', { name: /^R1 · Direnç/ }).count();
+      const lit = await page.locator('svg.schematic [data-highlight], svg.schematic .highlight, svg.schematic [stroke-opacity="0.35"]').count();
+      check('teşhis: R1’in iki ucu kabloyla birleşikken (çalışmadan) uyarı kartı "R1 kısa devre edildi"; "R1’i göster" R1’in kartını açıyor',
+        (await card.count()) === 1 && /R1 direncinin iki ucu aynı noktaya bağlı/.test(cardText) && r1Card === 1,
+        `${cardText.slice(0, 120)} · R1 kartı ${r1Card} · vurgu ${lit}`);
+      // Çalıştırınca LED yanar: mesaj ön direncin kısa devresini söyler, "ön direnç ekle" demez.
+      await page.getByRole('button', { name: 'Oynat' }).first().click(); await page.waitForTimeout(800);
+      const ledCard = notebook(page).getByRole('region', { name: 'Hata · LED yandı' });
+      const ledText = ((await ledCard.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      check('teşhis: ön direnci kısa devre edilmiş LED yanınca hata kartı "R1 kısa devre edilmiş … kabloyu kaldır" diyor, "Seri bir ön direnç ekle" demiyor',
+        (await ledCard.count()) === 1 && ledText.includes('R1 kısa devre edilmiş') && !ledText.includes('Seri bir ön direnç ekle'), ledText.slice(0, 160));
+      await ctx.close();
+    }
+    // Aynı devre, kısa devre kablosu yok, R1 = 10 Ω: ön direnç var ama küçük.
+    {
+      const small = { ...shortedR1, parts: shortedR1.parts.map((p) => (p.label === 'R1' ? { ...p, props: { resistance: 10 } } : p)), wires: shortedR1.wires.slice(0, 3) };
+      const { ctx, page } = await seeded(small);
+      await page.getByRole('button', { name: 'Oynat' }).first().click(); await page.waitForTimeout(800);
+      const text = ((await notebook(page).getByRole('region', { name: 'Hata · LED yandı' }).textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      check('teşhis: ön direnci küçük LED yanınca "R1 ön direnci bu gerilim için küçük", "Seri bir ön direnç ekle" yok; kısa devre uyarısı yok',
+        text.includes('R1 ön direnci bu gerilim için küçük') && !text.includes('Seri bir ön direnç ekle') && (await notebook(page).getByRole('region', { name: /kısa devre edildi$/ }).count()) === 0, text.slice(0, 160));
+      await ctx.close();
+    }
+    // Fonksiyon üretecinin OUT'u kabloyla COM'a bağlı.
+    {
+      const gen = { version: 1, parts: [
+        { id: 'p1', type: 'funcgen', label: 'FG1', x: 0, y: 0, rotation: 0, props: {} },
+        { id: 'p2', type: 'resistor', label: 'R1', x: 16, y: 0, rotation: 90, props: { resistance: 1000 } },
+      ], wires: [
+        { id: 'w1', points: [[5, -2], [8, -2], [8, 2], [5, 2]] },
+        { id: 'w2', points: [[8, -2], [8, -6], [16, -6], [16, -4]] },
+        { id: 'w3', points: [[16, 4], [16, 6], [8, 6], [8, 2]] },
+      ] };
+      const { ctx, page } = await seeded(gen);
+      await page.waitForTimeout(400);
+      const card = notebook(page).getByRole('region', { name: 'Uyarı · FG1 çıkışı kısa devre' });
+      const text = ((await card.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      check('teşhis: fonksiyon üretecinin OUT’u COM’a kısa devreyken uyarı kartı "FG1 çıkışı kısa devre" (OUT ucu COM ucuyla aynı noktaya bağlı), "FG1’i göster" var',
+        (await card.count()) === 1 && text.includes('OUT ucu COM ucuyla aynı noktaya bağlı') && (await card.getByRole('button', { name: 'FG1’i göster' }).count()) === 1, text.slice(0, 140));
+      await ctx.close();
+    }
+  }
+
   // --- Telefon hızı: 4 kat yavaş işlemcide (iPhone 13 öykünmesi) bütün örnekler çalışırken ---------------
   // Kare hızı en az 30/s, 100 ms'yi aşan görev yok (çözücünün süre sınırı kesin; çizim uzun sürünce hesap
   // süresi kısalır). Simülasyon gerçek zamana yetişemeyince "yetişemiyor" simgesi üst çubukta, açıklaması

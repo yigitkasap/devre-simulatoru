@@ -79,9 +79,14 @@ import { useFocusMode } from './fullscreen';
 import {
   earthTrapItem,
   findEarthTrap,
+  findShortedGenerators,
+  findShortedParts,
   itemFromDiagnostic,
+  ledAdvice,
   messageKey,
   seriesResistor,
+  shortedGeneratorItem,
+  shortedPartItem,
   suggestedResistor,
   type MessageItem,
 } from './messages';
@@ -998,13 +1003,24 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     }
   }, [connectivity]);
 
+  /**
+   * İki ucu aynı noktaya düşen parçalar ve OUT'u COM'a kısa devre üreteçler. Arıza bulmada yok: gizli kısa
+   * devre arızasını ele verirdi.
+   */
+  const shorted = useMemo(
+    () => (compiled && !fault ? { parts: findShortedParts(compiled), generators: findShortedGenerators(compiled) } : { parts: [], generators: [] }),
+    [compiled, fault],
+  );
+
   const diagnosticContext = useMemo<DiagnosticContext>(() => {
     const byId = new Map(doc.parts.map((p) => [p.id, p]));
     return {
       label: (id) => byId.get(id)?.label ?? id,
       type: (id) => byId.get(id)?.type,
+      // Yanan LED'in önerisi bağlama göre: ön direnç küçük, kısa devre edilmiş ya da hiç yok.
+      ledAdvice: (id) => (compiled ? ledAdvice(id, compiled, shorted.parts, doc) : { kind: 'no-resistor' }),
     };
-  }, [doc]);
+  }, [doc, compiled, shorted]);
 
   /** Toprak tuzağı: topraklı cihazların COM'ları şebeke toprağıyla birleşip bir parçayı kısa devre ediyor. */
   const earthTrap = useMemo(() => (compiled ? findEarthTrap(compiled) : null), [compiled]);
@@ -1024,10 +1040,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       items.push(itemFromDiagnostic(d, diagnosticContext));
     }
     if (earthTrap) items.push(earthTrapItem(earthTrap, doc));
+    // Kısa devre edilen parçalar (toprak tuzağının kısa devre ettikleri tuzak mesajında) ve üretecin çıkışı.
+    const trapped = new Set(earthTrap?.shorted ?? []);
+    for (const s of shorted.parts) if (!trapped.has(s.id)) items.push(shortedPartItem(s, doc));
+    for (const s of shorted.generators) items.push(shortedGeneratorItem(s, doc));
     // Önce hatalar, sonra uyarılar, en son bilgiler (kendi içlerinde sıra korunur).
     const rank = { error: 0, warning: 1, info: 2 } as const;
     return items.sort((a, b) => rank[a.severity] - rank[b.severity]);
-  }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc, fault]);
+  }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, shorted, doc, fault]);
 
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
 

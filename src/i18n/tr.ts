@@ -62,11 +62,33 @@ const LOGIC_MODEL_NOTES: Record<string, string> = {
     'Bacaklar: a 7, b 6, c 4, d 2, e 1, f 9, g 10, DP 5, ortak katot 3 ve 8.',
 };
 
+/**
+ * Yanan ya da aşırı akımdaki LED için önerinin bağlamı (editor/messages.ts → ledAdvice): seri ön direnç
+ * var ama küçük, ön direnç kısa devre edilmiş ya da hiç ön direnç yok.
+ */
+export type LedAdvice =
+  | { readonly kind: 'no-resistor' }
+  | { readonly kind: 'resistor' | 'resistor-shorted'; readonly label: string };
+
 export interface DiagnosticContext {
   /** Bileşenin tuvaldeki adı (R1, B2...). */
   label(id: string): string;
   /** Bileşenin türü. */
   type(id: string): DeviceType | undefined;
+  /** LED'in ön direnç durumu (verilmezse "ön direnç ekle" önerilir). */
+  ledAdvice?(ledId: string): LedAdvice;
+}
+
+/** LED mesajlarının düzeltme cümlesi: bağlama göre ön direnç ekle, büyüt ya da kısa devresini kaldır. */
+function ledFix(advice: LedAdvice | undefined, forwardVoltage: number): string {
+  const vf = `(Bu LED için V_{f} ≈ ${formatSI(forwardVoltage, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`;
+  if (advice?.kind === 'resistor-shorted') {
+    return `Akımı sınırlaması gereken ${advice.label} kısa devre edilmiş: iki ucu aynı noktaya bağlı, akım ${ek(advice.label, 'i')} atlayıp kablodan geçiyor. ${ek(advice.label, 'in')} uçlarını birleştiren kabloyu kaldır.`;
+  }
+  if (advice?.kind === 'resistor') {
+    return `${advice.label} ön direnci bu gerilim için küçük: ${ek(advice.label, 'i')} büyüt, R = (V_{kaynak} − V_{f}) / I. ${vf}`;
+  }
+  return `Seri bir ön direnç ekle: R = (V_{kaynak} − V_{f}) / I. ${vf}`;
 }
 
 const DEVICE_NAMES: Record<DeviceType, string> = {
@@ -473,8 +495,7 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
         detail:
           `${firstLabel}: LED’den ${formatSI(p.current ?? 0, 'A')} geçti, ama bu LED en fazla ` +
           `${formatSI(p.maxCurrent ?? 0, 'A', { trim: true })}’e dayanabilir. ` +
-          'Seri bir ön direnç ekle: R = (V_{kaynak} − V_{f}) / I. ' +
-          `(Bu LED için V_{f} ≈ ${formatSI(p.forwardVoltage ?? 0, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`,
+          ledFix(first ? ctx.ledAdvice?.(first) : undefined, p.forwardVoltage ?? 0),
       };
     case 'regulator-dropout': {
       const v = (x: number | undefined) => formatSI(x ?? 0, 'V', { digits: 3 });
@@ -3359,6 +3380,29 @@ export const tr = {
       `${scope} ve ${generator} COM uçları şebeke toprağıyla birleşiyor; ${shorted} kısa devre oldu. Prob toprağını ${generator} COM ile aynı noktaya bağla.`,
     earthTrapGeneric: (instruments: string, shorted: string) =>
       `${instruments} şebeke toprağıyla birleşiyor; ${shorted} kısa devre oldu. Toprağa bağlı uçları aynı noktaya bağla ya da cihazın şebeke toprağı bağlantısını kaldır.`,
+    /** İki ucu aynı noktaya düşen parça (editor/messages.ts → findShortedParts). */
+    shortedTitle: (label: string) => `${label} kısa devre edildi`,
+    shortedDetail: (label: string, type: DeviceType | undefined, via: 'wire' | 'ground') => {
+      const owner = type ? `${label} ${DEVICE_GENITIVE[type]}` : label;
+      const where = via === 'ground' ? ' (ikisi de toprakta; toprak noktaları birbirine bağlıdır)' : '';
+      const effect =
+        type === 'led'
+          ? ' LED ışık vermez.'
+          : type === 'ammeter' || type === 'multimeter'
+            ? ' Ölçü aleti 0 gösterir: akımı ölçmek için akımın yoluna seri bağla.'
+            : type === 'switch' || type === 'pushbutton'
+              ? ' Anahtarın konumu bir şey değiştirmez.'
+              : type === 'fuse'
+                ? ' Sigorta devreyi koruyamaz.'
+                : '';
+      const fix = via === 'ground' ? ' Uçlarından birini topraktan ayır.' : ` İki ucu birleştiren kabloyu kaldır ya da ${ek(label, 'i')} başka yere bağla.`;
+      return `${owner} iki ucu aynı noktaya bağlı${where}: akım ${ek(label, 'i')} atlayıp ${via === 'ground' ? 'toprak üzerinden' : 'kablodan'} geçer, ${label} devrede iş görmez.${effect}${fix}`;
+    },
+    /** Fonksiyon üretecinin OUT ucu COM'a kısa devre. */
+    generatorShortedTitle: (label: string) => `${label} çıkışı kısa devre`,
+    generatorShorted: (label: string, via: 'wire' | 'ground') =>
+      `${label} fonksiyon üretecinin OUT ucu COM ucuyla aynı noktaya bağlı${via === 'ground' ? ' (ikisi de toprakta; topraklı üretecin COM ucu şebeke toprağıdır)' : ''}: çıkış kısa devre. ` +
+      'Üretecin gerilimi 50 Ω’luk iç direncine düşer, devreye sinyal ulaşmaz. OUT’u devrenin girişine, COM’u ortak hatta bağla.',
     repair: 'Onar',
     setResistor: (label: string, value: string) => `${ek(label, 'i')} ${value} yap`,
     severity: { error: 'Hata', warning: 'Uyarı', info: 'Bilgi' },

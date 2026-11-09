@@ -2751,3 +2751,37 @@ denetimi atlanan (yeni durumla yeniden çözülen) adımın içinde kayboluyordu
 **Testler:** `tests/timer555.test.ts`: 555-ses ve frekans bölücüde 100 µs'lik parçalarla (uygulamadaki gibi)
 ve 2 µs'lik adımla ölçülen frekans %0,5 içinde; `tests/examples-lojik.test.ts`: 968 / 484 Hz; ios-kontrol:
 frekans bölücüde uygulamanın osiloskobu 968 / 484 Hz'i %0,5 içinde gösteriyor.
+
+### Teşhis ve metinler (2026-11-09)
+
+**1. Kısa devre teşhisi** (`src/editor/messages.ts`, `tests/messages.test.ts`, ios-kontrol "Teşhis: kısa devre edilen parça").
+
+- **Kısa devre edilen parça:** iki uçlu bir parçanın iki ucu aynı kablo ağındaysa ya da ikisi de topraktaysa (toprak
+  sembolleri ve topraklı cihazların COM uçları derlemede tek düğümdür) uyarı: başlık "R1 kısa devre edildi", metin
+  "R1 direncinin iki ucu aynı noktaya bağlı: akım R1’i atlayıp kablodan geçer, R1 devrede iş görmez." ve türe göre
+  sonuç (LED ışık vermez; ampermetre 0 gösterir; anahtarın konumu bir şey değiştirmez; sigorta koruyamaz) ile
+  çözüm. Kartta "R1’i göster" parçayı vurgular ve kartını açar; kablo ağıyla kısa devrede ağın kabloları da
+  vurgulanır. Simülasyon durmuşken de görünür (uyarı kartı; tuval rozeti çalışırken).
+- Kapsam: direnç, kondansatör, bobin, diyotlar, LED, LDR, NTC, lamba, hoparlör, buzzer, sigorta, motor, anahtar,
+  basmalı düğme, ampermetre ve A kipindeki multimetre. Dışarıda kalanlar ve nedeni: kaynakların kendi mesajları var
+  (ideal pilde "Direnç içermeyen döngü", iç dirençli pilde ve AC kaynakta çalışırken "Kısa devre"); akım kaynağının
+  kısa devresi zararsız; voltmetre ve V / Ω kipindeki multimetre iki ucu aynı noktadayken yalnızca 0 okur (bir
+  kablonun iki ucunu ölçmek süreklilik denemesidir); üç ve daha çok uçlu parçalarda iki ucun birleşmesi çoğu
+  zaman bilerek yapılır (potansiyometrenin sürgüsü bir uca, 555'in TRIG–THR'si, işlemsel yükseltecin izleyicisi).
+- **Toprak tuzağıyla ilişki:** topraklı cihazın (osiloskop, üreteç) COM'u yüzünden kısa devre olan parça yalnızca
+  "Toprak tuzağı" mesajında anlatılır (tek mesaj). Topraklı cihaz yokken (iki toprak sembolü arasında bir parça)
+  eskiden tuzak mesajı cihaz adı boş çıkıyordu ("  şebeke toprağıyla birleşiyor"); artık tuzak değil, "kısa devre
+  edildi" uyarısıdır (`findEarthTrap` en az bir topraklı cihaz ister).
+- **Fonksiyon üretecinin çıkışı:** OUT ucu COM ile aynı kablo ağındaysa ya da ikisi de topraktaysa (topraklı
+  üretecin OUT'u bir toprak sembolüne bağlıysa) uyarı "FG1 çıkışı kısa devre": gerilim 50 Ω'luk iç dirence düşer,
+  devreye sinyal ulaşmaz. Topraksız üretecin OUT'u toprağa bağlıysa kısa devre değildir.
+- Gece kararı: yalnızca OUT uyarı alır (kullanıcının istediği). TTL çıkışı aynı yapıda (50 Ω) ve aynı biçimde kısa
+  devre olabilir; kapsamı büyütmemek için eklenmedi, istenirse `findShortedGenerators`'a TTL ucu (1) eklenir.
+- **Arıza bulmada** bu iki uyarı yok: gizli "kısa devre" arızasını ele verirdi.
+- **LED mesajı bağlama göre:** yanan LED'in kartı (ve 4. maddedeki aşırı akım uyarısı) önerisini devreden alır
+  (`ledAdvice`): LED'e seri tek bir direnç varsa "R1 ön direnci bu gerilim için küçük: R1’i büyüt …" (düzeltme
+  düğmesi "R1’i … Ω yap" eskisi gibi); seri direnç bulunamaz ama devrede kısa devre edilmiş bir direnç varsa
+  (önce LED'in uçlarından seri ampermetreler üzerinden ulaşılan ağlarda) "Akımı sınırlaması gereken R1 kısa devre
+  edilmiş … kabloyu kaldır"; hiçbiri yoksa eskisi gibi "Seri bir ön direnç ekle". LED'in kendisi kısa devre
+  edilmişse yanamaz (akım kablodan geçer); onu "LED1 kısa devre edildi" uyarısı "LED ışık vermez" diye anlatır.
+- Örneklerin hiçbirinde yeni uyarı çıkmıyor (toprak tuzağı örneğinde D4 tuzak mesajında kalıyor; birim testi).
