@@ -3417,6 +3417,19 @@ export const tr = {
     repair: 'Onar',
     menu: (label: string) => `${label} menüsü`,
   },
+  /** Son devreler (editor/recentCircuits.ts): yerine başka devre açılan devrenin bu tarayıcıdaki kaydı. */
+  recent: {
+    title: 'Son devreler',
+    menu: 'Son devreler…',
+    note: 'Örnek açtığında, Yeni devre dediğinde ya da başka bir devre açtığında kurulu devre buraya kaydedilir (bu tarayıcıda, son 5 devre). Birini açınca kurulu devre de listeye girer.',
+    empty: 'Henüz kayıt yok. Örnek açtığında ya da Yeni devre dediğinde kurulu devre buraya kaydedilir.',
+    open: 'Aç',
+    openLabel: (title: string, time: string) => `${title}, ${time}: aç`,
+    parts: (n: number) => `${n} parça`,
+    close: 'Kapat',
+    restored: 'Son devrelerden açıldı.',
+    broken: 'Bu kayıt okunamadı.',
+  },
   balloon: {
     repair: 'Onar',
     close: 'Kapat',

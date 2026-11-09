@@ -2785,3 +2785,17 @@ frekans bölücüde uygulamanın osiloskobu 968 / 484 Hz'i %0,5 içinde gösteri
   edilmiş … kabloyu kaldır"; hiçbiri yoksa eskisi gibi "Seri bir ön direnç ekle". LED'in kendisi kısa devre
   edilmişse yanamaz (akım kablodan geçer); onu "LED1 kısa devre edildi" uyarısı "LED ışık vermez" diye anlatır.
 - Örneklerin hiçbirinde yeni uyarı çıkmıyor (toprak tuzağı örneğinde D4 tuzak mesajında kalıyor; birim testi).
+
+**2. Son devreler** (`src/editor/recentCircuits.ts`, `RecentDialog.tsx`, `tests/son-devreler.test.ts`, ios-kontrol
+"Son devreler").
+
+- Örnek açmak, Yeni devre, dosyadan ya da bağlantıdan açmak, arıza görevi ve Son devrelerden geri yüklemek kurulu
+  devrenin yerine geçer (eskisi gibi onay sorulmaz, bildirimde Geri al). Artık yerine geçmeden önce kurulu devre
+  (analiz bölümüyle) bu tarayıcıda `devre-simulatoru:son-devreler` anahtarında en çok 5 kayıtlık listeye yazılır:
+  adı (örneğin başlığı, görevin adı ya da "Devrem"), parça sayısı ve zamanı. Gömülü görünümde kayıt yok.
+- Açmak: masaüstünde Daha fazla → "Son devreler…" (penceresi) ve Örnekler penceresinin yan listesinin altındaki
+  "Son devreler N"; telefonda Daha fazla sayfasındaki "Son devreler" satırı (alt görünüm) ve Örnekler'in ana
+  ekranının altındaki satır. Bir kayda basınca devre geri gelir; o sırada kurulu devre de listeye girer.
+- Gece kararı: boş devre ve hiç değiştirilmemiş örnek kaydedilmez (örneğin kendisi her zaman Örnekler'de); aynı
+  devre (analiz dahil aynı yazım) iki kez girmez, yenisi başa geçer. Değiştirilmemiş dosya, paylaşım bağlantısı ve
+  arıza görevi kaydedilir: kullanıcının elinde başka kopyası olmayabilir.

@@ -3475,8 +3475,8 @@ try {
     const hadBack = (await backButton.count()) === 1;
     if (hadBack) { await backButton.tap(); await page.waitForTimeout(300); }
     const backHome = (await moreSheet.getByRole('button', { name: 'Ayarlar', exact: true }).count()) === 1;
-    check('telefonda ⋯ (v4): kutular Analiz, Geri al, Yinele, Sığdır; satırlar Ayarlar, Yardım, Kısa turu başlat (Örnekler, Dosya ve Klavye kısayolları yok); Yardım sayfasında dokunma hareketleri, "Daha fazla" ile geri (P14)',
-      tiles.join('|') === 'Analiz|Geri al|Yinele|Sığdır' && rows.join('|') === 'Ayarlar|Yardım|Kısa turu başlat' && more.includes('Uca dokun') && hadBack && backHome &&
+    check('telefonda ⋯ (v4): kutular Analiz, Geri al, Yinele, Sığdır; satırlar Son devreler, Ayarlar, Yardım, Kısa turu başlat (Örnekler, Dosya ve Klavye kısayolları yok); Yardım sayfasında dokunma hareketleri, "Daha fazla" ile geri (P14)',
+      tiles.join('|') === 'Analiz|Geri al|Yinele|Sığdır' && rows.join('|') === 'Son devreler|Ayarlar|Yardım|Kısa turu başlat' && more.includes('Uca dokun') && hadBack && backHome &&
         (await moreSheet.getByRole('button', { name: 'Örnekler', exact: true }).count()) === 0 && (await moreSheet.getByRole('button', { name: 'Dosya', exact: true }).count()) === 0,
       `${tiles.join('|')} · ${rows.join('|')} · ${more.slice(0, 40)}`);
     await ctx.close();
@@ -3628,8 +3628,8 @@ try {
     check('arayüz v4: devre menüsü "Devre": Yeni devre, Bilgisayardan aç… (Ctrl+O), Bilgisayara indir (Ctrl+S), Şemayı indir / yazdır… (Ctrl+P), Paylaş…, Görev oluştur…, Karta aktar (PCB, lehim)…; altta "Her değişiklik bu tarayıcıya kaydedilir"; menüde "JSON" yok; Esc kapatıp odağı düğmeye döndürüyor',
       devreRows === 'Yeni devre|Bilgisayardan aç… [Ctrl+O]|Bilgisayara indir [Ctrl+S]|Şemayı indir / yazdır… [Ctrl+P]|Paylaş…|Görev oluştur…|Karta aktar (PCB, lehim)…' && devreText.includes('Her değişiklik bu tarayıcıya kaydedilir') && !/JSON/i.test(devreText) && devreBack,
       `${devreRows} · Esc ${devreBack}`);
-    check('arayüz v4: Daha fazla menüsü: en üstte Tema (Sistem, Açık, Koyu); Ayarlar…, Klavye kısayolları (?), Yardım (F1), Kısa turu başlat, Tam ekran (F11); Esc kapatıp odağı düğmeye döndürüyor',
-      themes.join('|') === 'Sistem|Açık|Koyu' && moreRows === 'Ayarlar…|Klavye kısayolları [?]|Yardım [F1]|Kısa turu başlat|Tam ekran [F11]' && moreBack,
+    check('arayüz v4: Daha fazla menüsü: en üstte Tema (Sistem, Açık, Koyu); Son devreler…, Ayarlar…, Klavye kısayolları (?), Yardım (F1), Kısa turu başlat, Tam ekran (F11); Esc kapatıp odağı düğmeye döndürüyor',
+      themes.join('|') === 'Sistem|Açık|Koyu' && moreRows === 'Son devreler…|Ayarlar…|Klavye kısayolları [?]|Yardım [F1]|Kısa turu başlat|Tam ekran [F11]' && moreBack,
       `${themes.join('|')} · ${moreRows} · Esc ${moreBack}`);
     // Ayarlar… düğmenin altında açılır; Klavye kısayolları ve Yardım yardım penceresini ilgili sekmede açar.
     await (await openMore(page)).getByRole('menuitem', { name: 'Ayarlar…' }).click(); await page.waitForTimeout(150);
@@ -5613,6 +5613,83 @@ try {
       const text = ((await card.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
       check('teşhis: fonksiyon üretecinin OUT’u COM’a kısa devreyken uyarı kartı "FG1 çıkışı kısa devre" (OUT ucu COM ucuyla aynı noktaya bağlı), "FG1’i göster" var',
         (await card.count()) === 1 && text.includes('OUT ucu COM ucuyla aynı noktaya bağlı') && (await card.getByRole('button', { name: 'FG1’i göster' }).count()) === 1, text.slice(0, 140));
+      await ctx.close();
+    }
+  }
+
+  // --- Son devreler: örnek açmak ya da Yeni devre kurulu devreyi listeye yazar (son 5, yerel), geri yüklenir ------------
+  {
+    // Kayıtlı (örnek olmayan) bir devre: üç parça.
+    const mine = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
+      { id: 'p2', type: 'resistor', label: 'R1', x: 12, y: -6, rotation: 0, props: { resistance: 4700 } },
+      { id: 'p3', type: 'resistor', label: 'R7', x: 24, y: 0, rotation: 90, props: { resistance: 2200 } },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [8, -6]] },
+      { id: 'w2', points: [[16, -6], [24, -6], [24, -4]] },
+      { id: 'w3', points: [[24, 4], [24, 6], [0, 6], [0, 4]] },
+    ] };
+    const seededCtx = async (options) => {
+      const ctx = await browser.newContext(options);
+      await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); localStorage.removeItem('devre-simulatoru:son-devreler'); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(mine));
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      return { ctx, page };
+    };
+    const recentStore = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:son-devreler') ?? '[]'));
+    // Masaüstü.
+    {
+      const { ctx, page } = await seededCtx({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+      await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(250);
+      await page.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await page.waitForTimeout(500);
+      const afterExample = await recentStore(page);
+      // Değişmemiş örneğin yerine başka örnek açılınca örnek listeye girmez.
+      await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(250);
+      const examplesRecent = page.getByRole('dialog', { name: 'Örnekler' }).getByRole('button', { name: /^Son devreler/ });
+      const examplesLink = ((await examplesRecent.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(500);
+      const afterSecond = await recentStore(page);
+      await (await openMore(page)).getByRole('menuitem', { name: 'Son devreler…' }).click(); await page.waitForTimeout(250);
+      const dlg = page.getByRole('dialog', { name: 'Son devreler' });
+      const entries = await dlg.locator('ul button').count();
+      const entryText = ((await dlg.locator('ul button').first().textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      await dlg.locator('ul button').first().click(); await page.waitForTimeout(500);
+      const restored = await doc(page);
+      const toast = ((await page.getByRole('status').filter({ hasText: 'Son devrelerden açıldı' }).count()) > 0);
+      check('Son devreler (masaüstü): örnek açınca kayıtlı devre (3 parça, "Devrem") listeye giriyor; değişmemiş örnek girmiyor; Örnekler penceresinde "Son devreler 1"',
+        afterExample.length === 1 && afterExample[0].title === 'Devrem' && afterExample[0].parts === 3 && afterSecond.length === 1 && /Son devreler ?1/.test(examplesLink),
+        `${afterExample.length} → ${afterSecond.length} kayıt · "${examplesLink}"`);
+      check('Son devreler (masaüstü): Daha fazla → Son devreler… penceresi kaydı gösteriyor; basınca devre geri geliyor (B1, R1 4,7 kΩ, R7), bildirim "Son devrelerden açıldı"',
+        entries === 1 && /Devrem/.test(entryText) && /3 parça/.test(entryText) && restored?.parts?.map((p) => p.label).join(',') === 'B1,R1,R7' && restored.parts[1].props.resistance === 4700 && toast,
+        `${entries} kayıt "${entryText}" · ${restored?.parts?.map((p) => p.label).join(',')} · bildirim ${toast}`);
+      // Geri yüklenen devre "Yeni devre" ile değişince aynı devre ikinci kez girmez.
+      await circuitButton(page).click(); await page.waitForTimeout(150);
+      await page.getByRole('menu', { name: 'Devre' }).getByRole('menuitem', { name: 'Yeni devre' }).click(); await page.waitForTimeout(500);
+      const afterNew = await recentStore(page);
+      check('Son devreler: Yeni devre de kurulu devreyi kaydediyor; aynı devre ikinci kez girmiyor (1 kayıt)', afterNew.length === 1 && afterNew[0].parts === 3, `${afterNew.length} kayıt`);
+      await ctx.close();
+    }
+    // Telefon: Örnekler'den örnek aç, Daha fazla → Son devreler → kayda dokun.
+    {
+      const { ctx, page } = await seededCtx({
+        viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+      });
+      await openExample(page, 'LED ve ön direnç');
+      await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(350);
+      const sheet = page.getByRole('dialog', { name: 'Daha fazla' });
+      const row = sheet.getByRole('button', { name: 'Son devreler', exact: true });
+      const rowBox = await row.boundingBox();
+      await row.tap(); await page.waitForTimeout(300);
+      const items = sheet.locator('ul button');
+      const n = await items.count();
+      const itemBox = await items.first().boundingBox();
+      await items.first().tap(); await page.waitForTimeout(600);
+      const restored = await doc(page);
+      check('Son devreler (telefon): Daha fazla → Son devreler satırı (≥ 44 px) kaydı gösteriyor (≥ 44 px), dokununca kayıtlı devre geri geliyor, sayfa kapanıyor',
+        (rowBox?.height ?? 0) >= 44 && n === 1 && (itemBox?.height ?? 0) >= 44 && restored?.parts?.map((p) => p.label).join(',') === 'B1,R1,R7' && (await sheet.count()) === 0,
+        `satır ${Math.round(rowBox?.height ?? 0)} px · ${n} kayıt (${Math.round(itemBox?.height ?? 0)} px) · ${restored?.parts?.map((p) => p.label).join(',')}`);
       await ctx.close();
     }
   }

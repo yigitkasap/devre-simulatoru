@@ -75,6 +75,8 @@ import { HelpDialog, type HelpTab } from './HelpDialog';
 import { markWelcomeSeen, Tour, welcomeSeen, WelcomeDialog, type TourStep } from './Welcome';
 import type { PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
+import { RecentDialog } from './RecentDialog';
+import { loadRecent, restoreRecent, saveRecent, withRecent, worthRemembering, type RecentEntry } from './recentCircuits';
 import { useFocusMode } from './fullscreen';
 import {
   earthTrapItem,
@@ -342,6 +344,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [flash, setFlash] = useState<Highlight | null>(null);
   const [share, setShare] = useState<ShareTab | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
+  /** Son devreler: yerine başka devre açılan devrelerin bu tarayıcıdaki kaydı (en çok 5) ve penceresi. */
+  const [recent, setRecent] = useState<RecentEntry[]>(() => loadRecent());
+  const [recentOpen, setRecentOpen] = useState(false);
   const [fitRequest, setFitRequest] = useState(0);
   // Tam ekran (masaüstü, tablet): önce devre sığdırılır, böylece defter gizlenince yeni alana yeniden sığar.
   const focus = useFocusMode(() => canvasRef.current?.fit());
@@ -876,6 +881,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // --- Yükleme (örnek, dosya, paylaşım bağlantısı, yeni devre) ---------------------------
   /** Yeni bir belge yükler; önceki belge geri alma geçmişinde kalır. */
   const loadDoc = (next: CircuitDoc, message: string, example: ExampleId | null = null, nextAnalysis: AnalysisDoc = EMPTY_ANALYSIS, nextTask: TaskDef | null = null) => {
+    // Kurulu devre yerine geçmeden önce Son devreler'e yazılır (boş devre ve değişmemiş örnek hariç; gömülü
+    // görünümde kayıt yok).
+    if (embed === null && worthRemembering(doc, activeExample ? exampleDoc(activeExample) : null)) {
+      const list = withRecent(loadRecent(), doc, analysis.doc, circuitTitle, Date.now());
+      saveRecent(list);
+      setRecent(list);
+    }
     // Yeni devre görevin bekçisinden geçmez; görev kipi yalnızca görev dosyasıyla sürer.
     rawDispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
     analysis.setDoc(nextAnalysis);
@@ -911,6 +923,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const loadExample = (id: ExampleId) => {
     const next = exampleDoc(id);
     if (next) loadDoc(next, tr.examples.loaded, id);
+  };
+  /** Son devrelerden bir kaydı geri yükler (kurulu devre de listeye girer; bildirimde Geri al). */
+  const openRecent = (entry: RecentEntry) => {
+    setRecentOpen(false);
+    setModal(null);
+    const restored = restoreRecent(entry);
+    if (restored) loadDoc(restored.doc, tr.recent.restored, null, restored.analysis);
+    else showToast(tr.recent.broken, 'error');
   };
   /** Hazır arıza senaryosu (Örnekler → Arıza bul): devre arıza göreviyle açılır. */
   const loadScenario = (id: FaultScenarioId) => {
@@ -1875,7 +1895,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // Klavye kısayolları (onaylı liste, M12): + / − yakınlaştır, Shift+1 sığdır, P oynat/duraklat,
   // Alt+1…3 panel sekmeleri, ? yardım. Yazı alanlarında ve açık pencerelerde çalışmaz. Tuşlar e.key ve
   // e.code ile okunur; Türkçe Q klavyede de aynı.
-  const dialogOpen = share !== null || examplesOpen || modal !== null || stopAsk || helpOpen || welcomeOpen || schematicOpen;
+  const dialogOpen = share !== null || examplesOpen || recentOpen || modal !== null || stopAsk || helpOpen || welcomeOpen || schematicOpen;
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   shortcutRef.current = (e: KeyboardEvent) => {
     if (dialogOpen || e.defaultPrevented) return;
@@ -2070,8 +2090,18 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         setExamplesOpen(false);
         loadScenario(id);
       }}
+      {...(embed === null
+        ? {
+            onRecent: () => {
+              setExamplesOpen(false);
+              setRecentOpen(true);
+            },
+            recentCount: recent.length,
+          }
+        : {})}
     />
   );
+  const recentDialog = recentOpen && <RecentDialog entries={recent} onOpen={openRecent} onClose={() => setRecentOpen(false)} touch={phone || tablet} />;
 
   const taskDialogEl = taskDialog && (
     <TouchUi.Provider value={phone || tablet}>
@@ -2248,6 +2278,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               setWelcomeOpen(true);
             }}
             onTheme={(choice) => updateSettings({ theme: choice })}
+            recent={recent}
+            onOpenRecent={openRecent}
           />
         )}
         {stopAsk && (
@@ -2260,6 +2292,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           />
         )}
         {examplesDialog}
+        {recentDialog}
         {shareDialogEl}
       </>
     );
@@ -2525,6 +2558,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           onShortcuts={() => setHelpTab('keys')}
           onHelp={() => setHelpTab('pointer')}
           onWelcome={() => setWelcomeOpen(true)}
+          {...(embed === null ? { onRecent: () => setRecentOpen(true) } : {})}
           view={boardMode ? null : { mode: viewMode, onChange: setViewMode }}
           touch={tablet}
           theme={settings.theme}
@@ -2685,6 +2719,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           />
         )}
         {examplesDialog}
+        {recentDialog}
         {taskDialogEl}
         {overlays}
         <Toast toast={toast} onDone={hideToast} />
