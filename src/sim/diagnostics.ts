@@ -29,8 +29,13 @@ export type DiagnosticCode =
   | 'ground-return'
   /** Pilden, iç direncine göre çok büyük akım çekiliyor. */
   | 'short-circuit'
-  /** LED'den mutlak en büyük değerinden fazla akım geçti ve LED yandı. */
+  /**
+   * LED yandı: akım tepe sınırını (I_FP) aştı (hemen) ya da uzun süre aşırı akımla eklemi en yüksek
+   * sıcaklığı aştı (ısınarak; params.cause 1).
+   */
   | 'led-burned'
+  /** LED'den sürekli sınırından (I_F) fazla akım geçiyor: ısınıyor, henüz yanmadı (uyarı). */
+  | 'led-overcurrent'
   /** LED ya da 1N4001 veri sayfasındaki en büyük ters gerilimden fazlasını görüyor (uyarı). */
   | 'reverse-voltage'
   /** Dirence güç sınırından fazla güç düşüyor (AC'de bir periyodun ortalaması). */

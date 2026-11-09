@@ -330,8 +330,9 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   | Mavi    | 3,3 V      | 30 mA           | 4,4 | 5 Ω  | ≈ 1·10⁻¹⁴ A     |
 
 - **LED parlaklığı:** (I / 20 mA)^(1/2,2), en fazla 1.
-- **LED yanması anlıktır:** Akım mutlak en büyük değeri bir adımda bile aşarsa LED yanar ve o
-  adım LED açık devre olarak yeniden çözülür.
+- **LED yanması (2026-11-09'a kadar anlıktı):** akım mutlak en büyük değeri (30 mA) bir adımda bile aşarsa
+  LED yanıyordu. Artık kademeli: aşağıda "Teşhis ve metinler", 4. madde. Yanan LED'in o adımı yine LED açık
+  devre olarak yeniden çözülür.
 - **Newton-Raphson gerilim sınırlaması:** Görevdeki formül (Vold > 0 iken) aynen uygulanır.
   Vold ≤ 0 iken Vnew = N·VT·ln(Vnew/(N·VT)) kullanılır; ters kutuplanmış bir eklemin
   0,3 V'luk adımlarla tırmanmasını önler. Yakınsama için düğüm gerilimlerine ek olarak eklem
@@ -2821,3 +2822,44 @@ ios-kontrol "Föy metinleri").
   "Volt/bölme ve zaman/bölmeyi sinyale göre seçer" açıklaması (düğmenin `aria-describedby`'ı; adı yine "Oto",
   föydeki gibi). Telefonda 44 px. Föydeki iki yer "OSC1 kartındaki Oto’ya bas" diye adresi verir. Gelişmiş'te
   konum, B ters, tetik, giriş, şebeke toprağı ve jaklar kaldı.
+
+**4a. LED'in kademeli yanması** (`src/sim/devices/led.ts`, `engine.ts` → `elapseDevices`, `tests/led-yanma.test.ts`,
+`tests/examples.test.ts`, ios-kontrol "LED kademeli yanma").
+
+- Eskiden akım 30 mA'i (yeşilde 25 mA) bir adımda bile aşınca LED hemen yanıyordu (5 V, 100 Ω'da 31 mA ile).
+  Artık üç kademe, sınırlar veri sayfasından:
+  1. **Uyarı:** akım (AC'de periyot tepesi) sürekli sınırı I_F'yi aşınca "LED aşırı akımda" uyarısı (çalışırken
+     rozet ve kart): akım, eklem sıcaklığı ve bu güçte varacağı sıcaklık; o sıcaklık sınırı aşmıyorsa "bu akımda
+     yanmaz ama ışığı zayıflar ve ömrü kısalır" (veri sayfasının notu: "Excess driving current and / or operating
+     temperature higher than recommended conditions may result in severe light degradation or premature
+     failure"), aşıyorsa "bu akımda kalırsa eklem sınırı aşar ve LED yanar". Öneri cümlesi bağlama göre (1. madde).
+  2. **Uzun süre aşırı akım:** eklemin sıcaklığı T_j = 25 °C + ΔT, dΔT/dt = (R_th JA · P − ΔT) / τ (P = V · I
+     LED'in harcadığı güç); T_j veri sayfasındaki en yüksek değeri aşınca LED yanar ("ısınarak yandı").
+  3. **Çok yüksek akım:** akım tepe ileri akımını I_FP'yi aşarsa LED hemen yanar ("hemen yandı").
+- Değerler (Kingbright 5 mm T-1 3/4; L-53 serisinin ABD adlandırması WP7113, aynı yongalar):
+
+  | Renk | Veri sayfası | I_F | I_FP (1/10 görev, 0,1 ms) | T_j en çok | R_th JA |
+  |---|---|---:|---:|---:|---:|
+  | Kırmızı | WP7113SRD/D (Super Bright Red, GaAlAs), DSAF2433 V.9A, 08/05/2020 | 30 mA | 155 mA | 115 °C | 580 °C/W |
+  | Sarı | WP7113YD (GaAsP/GaP), DSAF2448 V.11B, 01/08/2026 | 30 mA | 140 mA | 110 °C | 560 °C/W |
+  | Yeşil | WP7113GD (GaP), DSAE9335 V.12B, 04/02/2019 | 25 mA | 140 mA | 110 °C | 600 °C/W |
+  | Mavi | WP7113QBC/D (InGaN), DSAG3481 V.18B, 03/26/2025 | 30 mA | 150 mA | 115 °C | 610 °C/W |
+
+  (Eski L-53SRD-C veri sayfası, DSAA5833 V.5, 2007: 30 mA, 155 mA, 75 mW; aynı.) Ortam 25 °C (sınırların verildiği
+  sıcaklık). Ters gerilim sınırı (5 V) değişmedi.
+- Sonuç (kırmızı, 5 V, `led-on-direnc`): 100 Ω'da 31 mA, uyarı, eklem ≈ 59 °C'ye çıkar, yanmaz; 47 Ω'da 63 mA,
+  ≈ 99 °C, yanmaz; 39 Ω'da 75 mA, ≈ 114 °C, yanmaz; 33 Ω'da 88 mA ≈ 19 s'de, 22 Ω'da 127 mA ≈ 8 s'de ısınarak yanar;
+  15 Ω'da 178 mA, hemen. Örneğin metni buna göre yazıldı ("100 Ω'a düşür: … uyarı çıkar, LED ısınır ama yanmaz.
+  22 Ω'da … ≈ 8 s'de … ısınarak yanar. 15 Ω'da … hemen yanar."). Örneklerin hiçbiri ilk 1,5 s'de yeni LED uyarısı
+  vermiyor (tarandı).
+- DC (zamandan bağımsız) devrede motor adım atmaz: süre geçerken bileşenlerin zamanla değişen durumu için
+  `Device.elapse(x, dt)` eklendi (yalnızca LED kullanır); ardından `checkLimits` sorulur, LED yandıysa devre yeniden
+  çözülür. Zamana bağlı devrede ısınma her kabul edilen adımda (`accept`). İki yolda yanma anı aynı (test).
+- Onarılan LED soğuktur (yeni LED); değer değişikliğinde (devre yeniden derlenince) sıcaklık korunur.
+- Gece kararı: ısıl zaman sabiti τ = 10 s (veri sayfalarında yok; varsayım). Tek zaman sabiti, gerçek bir 5 mm LED'in
+  yongası, bacakları ve kılıfı ayrı hızlarla ısınır; 10 s, aşırı akımda yanmanın saniyeler içinde görünmesi için
+  seçildi. Gece kararı: sürekli sınırla eklem sınırı arasındaki akımlarda (kırmızıda ≈ 30–75 mA) LED hiç yanmaz,
+  yalnızca uyarı alır: veri sayfasının ısıl sınırı aşılmıyor; "uzun sürede yanma" istenirse süreye bağlı ek bir
+  kural (veri sayfasında dayanağı yok) gerekir. Gece kararı: kart üzerindeki LED balonu yanma nedenini ayırmıyor
+  ("Üzerinden ≈ … geçti; en fazla 30 mA’e dayanır."); ayrıntı hata kartında. 7 segment göstergenin segmentleri ve
+  optokuplörün LED'i değişmedi (istek dışı): segment 30 mA'de hemen yanar.

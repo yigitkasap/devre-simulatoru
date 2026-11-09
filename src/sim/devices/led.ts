@@ -15,8 +15,14 @@ export const LED_NOMINAL_CURRENT = 20e-3;
 export interface LedModelParams {
   /** 20 mA'deki ileri gerilim (V), 5 mm LED veri sayfalarından. */
   readonly forwardVoltage: number;
-  /** Mutlak en büyük sürekli akım (A); aşılırsa LED yanar. */
+  /** Mutlak en büyük sürekli (DC) ileri akım I_F (A); aşılınca uyarı (LED ısınır), hemen yanmaz. */
   readonly maxCurrent: number;
+  /** Tepe ileri akımı I_FP (A; veri sayfasında 1/10 görev, 0,1 ms darbe): aşılınca LED hemen yanar. */
+  readonly peakCurrent: number;
+  /** En yüksek eklem sıcaklığı T_j (°C): eklem bunu aşınca LED yanar. */
+  readonly maxJunction: number;
+  /** Eklemden ortama ısıl direnç R_th JA (K/W). */
+  readonly thermalResistance: number;
   /** Eklemin ideallik (emisyon) katsayısı N. */
   readonly emission: number;
   /** Seri direnç Rs (Ω). */
@@ -28,12 +34,26 @@ export interface LedModelParams {
 // N, Is'yi çok küçültmeyecek şekilde 2-6 aralığında seçildi (Is ≈ 10⁻¹⁴ A mertebesi).
 // Is, 20 mA'de veri sayfasındaki ileri gerilimi verecek şekilde hesaplanır:
 //   Vf = Vj + I·Rs,  Is = I / (exp(Vj/(N·VT)) − 1)
+// Sınırlar (I_F, I_FP, T_j, R_th JA) Kingbright 5 mm (T-1 3/4) veri sayfalarından; kaynaklar docs/KARARLAR.md,
+// "Teşhis ve metinler", 4. madde: kırmızı WP7113SRD/D (L-53SRD; DSAF2433 V.9A), sarı WP7113YD (DSAF2448
+// V.11B), yeşil WP7113GD (DSAE9335 V.12B), mavi WP7113QBC/D (DSAG3481 V.18B).
 export const LED_MODELS: Readonly<Record<LedColor, LedModelParams>> = {
-  red: { forwardVoltage: 1.85, maxCurrent: 30e-3, emission: 2.6, seriesResistance: 2, lightColor: '#ff3b30' },
-  yellow: { forwardVoltage: 2.1, maxCurrent: 30e-3, emission: 2.8, seriesResistance: 2.5, lightColor: '#ffc107' },
-  green: { forwardVoltage: 2.2, maxCurrent: 25e-3, emission: 3.0, seriesResistance: 3, lightColor: '#34c759' },
-  blue: { forwardVoltage: 3.3, maxCurrent: 30e-3, emission: 4.4, seriesResistance: 5, lightColor: '#2f7bff' },
+  red: { forwardVoltage: 1.85, maxCurrent: 30e-3, peakCurrent: 155e-3, maxJunction: 115, thermalResistance: 580, emission: 2.6, seriesResistance: 2, lightColor: '#ff3b30' },
+  yellow: { forwardVoltage: 2.1, maxCurrent: 30e-3, peakCurrent: 140e-3, maxJunction: 110, thermalResistance: 560, emission: 2.8, seriesResistance: 2.5, lightColor: '#ffc107' },
+  green: { forwardVoltage: 2.2, maxCurrent: 25e-3, peakCurrent: 140e-3, maxJunction: 110, thermalResistance: 600, emission: 3.0, seriesResistance: 3, lightColor: '#34c759' },
+  blue: { forwardVoltage: 3.3, maxCurrent: 30e-3, peakCurrent: 150e-3, maxJunction: 115, thermalResistance: 610, emission: 4.4, seriesResistance: 5, lightColor: '#2f7bff' },
 };
+
+/** Ortam sıcaklığı (°C): veri sayfalarının sınırları T_A = 25 °C içindir. */
+export const LED_AMBIENT = 25;
+/**
+ * Eklemin ısıl zaman sabiti (s). Veri sayfalarında yok (varsayım): tek bir zaman sabitiyle aşırı akımda
+ * yanma saniyeler içinde olur (docs/KARARLAR.md, "Teşhis ve metinler", 4. madde).
+ */
+export const LED_THERMAL_TIME = 10;
+
+/** Yanmanın nedeni: tepe akımı aşıldı (hemen) ya da eklem en yüksek sıcaklığı aştı (ısınarak). */
+export type LedBurnCause = 'peak' | 'heat';
 
 export function ledSaturationCurrent(params: LedModelParams): number {
   const junctionVoltage = params.forwardVoltage - LED_NOMINAL_CURRENT * params.seriesResistance;
@@ -53,6 +73,10 @@ export function ledBrightness(current: number): number {
  * LED. Pinler: [0] = anot, [1] = katot. İç yapı:
  *   anot ── Rs ── (iç düğüm) ── pn eklemi ── katot
  * Yanmış LED açık devredir: matrise hiçbir şey eklemez.
+ *
+ * Yanma kademelidir: akım sürekli sınırı (I_F) aşınca uyarı (LED ısınır); eklem sıcaklığı
+ * T_j = T_A + ΔT, dΔT/dt = (R_th·P − ΔT) / τ ile izlenir ve en yüksek değeri aşınca LED yanar (uzun süre
+ * aşırı akım); akım tepe sınırını (I_FP) aşarsa hemen yanar (çok yüksek akım).
  */
 export class LedDevice extends Device {
   readonly type = 'led';
@@ -61,6 +85,9 @@ export class LedDevice extends Device {
   readonly junction: Junction;
   burned = false;
   burnCurrent = 0;
+  burnCause: LedBurnCause = 'peak';
+  /** Eklemin ortamdan sıcaklık farkı ΔT (K). */
+  heat = 0;
 
   constructor(init: DeviceInit) {
     super(init);
@@ -115,6 +142,28 @@ export class LedDevice extends Device {
   override accept(x: Float64Array, ctx: StepContext): void {
     this.junction.accept();
     this.reverse.add(this.reverseVoltage(x), ctx.h, ctx.window);
+    this.peak.add(this.currentAt(x), ctx.h, ctx.window);
+    this.warm(x, ctx.h);
+  }
+
+  /** DC devrede adım atılmadan geçen süre: eklem aynı güçle ısınmayı sürdürür. */
+  override elapse(x: Float64Array, dt: number): void {
+    this.warm(x, dt);
+  }
+
+  /** Eklemin sıcaklık farkı `dt` boyunca sabit güçle: ΔT → R_th·P, zaman sabiti τ (tam çözüm). */
+  private warm(x: Float64Array, dt: number): void {
+    if (dt <= 0 || this.burned) return;
+    const power = Math.max(0, this.currentAt(x) * (this.v(x, 0) - this.v(x, 1)));
+    this.heat += (this.params.thermalResistance * power - this.heat) * (1 - Math.exp(-dt / LED_THERMAL_TIME));
+  }
+
+  /** Akımın periyot içindeki tepesi (AC'de uyarı yarım periyotta yanıp sönmesin). */
+  private peak = new WindowPeak();
+
+  /** Eklem sıcaklığı (°C). */
+  get junctionTemperature(): number {
+    return LED_AMBIENT + this.heat;
   }
 
   /** Ters gerilimin periyot içindeki tepesi. */
@@ -125,10 +174,31 @@ export class LedDevice extends Device {
     return Math.max(0, this.v(x, 1) - this.v(x, 0));
   }
 
-  /** Ters gerilim veri sayfasındaki 5 V'u aşarsa uyarı (yalnızca uyarı: bozulma modellenmez). */
+  /**
+   * Ters gerilim veri sayfasındaki 5 V'u aşarsa uyarı (yalnızca uyarı: bozulma modellenmez). Akım sürekli
+   * sınırı (I_F) aşarsa aşırı akım uyarısı: eklemin sıcaklığı ve bu güçte varacağı sıcaklıkla.
+   */
   override ratingWarnings(x: Float64Array): readonly RatingWarning[] {
+    const warnings: RatingWarning[] = [];
     const voltage = this.reverse.value(this.reverseVoltage(x));
-    return voltage > LED_MAX_REVERSE_VOLTAGE ? [{ code: 'reverse-voltage', params: { voltage, limit: LED_MAX_REVERSE_VOLTAGE } }] : [];
+    if (voltage > LED_MAX_REVERSE_VOLTAGE) warnings.push({ code: 'reverse-voltage', params: { voltage, limit: LED_MAX_REVERSE_VOLTAGE } });
+    const current = this.peak.value(this.currentAt(x));
+    if (!this.burned && current > this.params.maxCurrent) {
+      const power = Math.max(0, this.currentAt(x) * (this.v(x, 0) - this.v(x, 1)));
+      warnings.push({
+        code: 'led-overcurrent',
+        params: {
+          current,
+          maxCurrent: this.params.maxCurrent,
+          peakCurrent: this.params.peakCurrent,
+          temperature: this.junctionTemperature,
+          steadyTemperature: LED_AMBIENT + this.params.thermalResistance * power,
+          maxTemperature: this.params.maxJunction,
+          forwardVoltage: this.params.forwardVoltage,
+        },
+      });
+    }
+    return warnings;
   }
 
   private currentAt(x: Float64Array): number {
@@ -136,15 +206,16 @@ export class LedDevice extends Device {
     return (this.v(x, 0) - this.v(x, 2)) / this.params.seriesResistance;
   }
 
+  /** Tepe akımı aşıldıysa (hemen) ya da eklem en yüksek sıcaklığı aştıysa (ısınarak) LED yanar. */
   override checkLimits(x: Float64Array): boolean {
     if (this.burned) return false;
     const current = this.currentAt(x);
-    if (current > this.params.maxCurrent) {
-      this.burned = true;
-      this.burnCurrent = current;
-      return true;
-    }
-    return false;
+    const cause: LedBurnCause | null = current > this.params.peakCurrent ? 'peak' : this.junctionTemperature > this.params.maxJunction ? 'heat' : null;
+    if (cause === null) return false;
+    this.burned = true;
+    this.burnCurrent = current;
+    this.burnCause = cause;
+    return true;
   }
 
   measure(x: Float64Array): Measurement {
@@ -165,15 +236,20 @@ export class LedDevice extends Device {
     if (prev instanceof LedDevice) {
       this.burned = prev.burned;
       this.burnCurrent = prev.burnCurrent;
+      this.burnCause = prev.burnCause;
+      this.heat = prev.heat;
       this.reverse.adopt(prev.reverse);
+      this.peak.adopt(prev.peak);
       if (prev.color === this.color) this.junction.copyStateFrom(prev.junction);
     }
   }
 
+  /** Onarım yeni bir LED takmaktır: soğuk. */
   override repair(): boolean {
     if (!this.burned) return false;
     this.burned = false;
     this.burnCurrent = 0;
+    this.heat = 0;
     return true;
   }
 }

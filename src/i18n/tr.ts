@@ -489,14 +489,33 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           (ac ? 'Gerçek bir kaynak bu durumda aşırı ısınır ya da sigortası atar.' : 'Gerçek bir pil bu durumda hızla ısınır ve boşalır.'),
       };
     }
-    case 'led-burned':
+    case 'led-burned': {
+      const max = formatSI(p.maxCurrent ?? 0, 'A', { trim: true });
       return {
         title: 'LED yandı',
         detail:
-          `${firstLabel}: LED’den ${formatSI(p.current ?? 0, 'A')} geçti, ama bu LED en fazla ` +
-          `${formatSI(p.maxCurrent ?? 0, 'A', { trim: true })}’e dayanabilir. ` +
+          ((p.cause ?? 0) === 1
+            ? `${firstLabel}: LED’den uzun süre ${formatSI(p.current ?? 0, 'A')} geçti ve ısınarak yandı (eklemi ${formatNumber(p.maxTemperature ?? 0, 0)} °C’yi aştı); sürekli en fazla ${max}’e dayanır. `
+            : `${firstLabel}: LED’den ${formatSI(p.current ?? 0, 'A')} geçti ve hemen yandı: bu LED kısa bir darbede bile en fazla ` +
+              `${formatSI(p.peakCurrent ?? 0, 'A', { trim: true })}’e, sürekli ${max}’e dayanabilir. `) +
           ledFix(first ? ctx.ledAdvice?.(first) : undefined, p.forwardVoltage ?? 0),
       };
+    }
+    case 'led-overcurrent': {
+      const max = formatSI(p.maxCurrent ?? 0, 'A', { trim: true });
+      const limit = p.maxTemperature ?? 0;
+      const willBurn = (p.steadyTemperature ?? 0) > limit;
+      return {
+        title: 'LED aşırı akımda',
+        detail:
+          `${firstLabel}: LED’den ${formatSI(p.current ?? 0, 'A')} geçiyor; sürekli en fazla ${max}’e dayanır. ` +
+          `LED ısınıyor (eklem ≈ ${formatNumber(p.temperature ?? 0, 0)} °C, en çok ${formatNumber(limit, 0)} °C): ` +
+          (willBurn
+            ? 'bu akımda kalırsa eklem sınırı aşar ve LED yanar. '
+            : 'bu akımda yanmaz ama ışığı zayıflar ve ömrü kısalır (veri sayfası). ') +
+          ledFix(first ? ctx.ledAdvice?.(first) : undefined, p.forwardVoltage ?? 0),
+      };
+    }
     case 'regulator-dropout': {
       const v = (x: number | undefined) => formatSI(x ?? 0, 'V', { digits: 3 });
       return {
@@ -1127,7 +1146,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     description:
       'İdeal 5 V’luk pil, 330 Ω’luk ön direnç, ampermetre ve kırmızı bir LED tek bir döngüde seri bağlı: akım pilin + ucundan çıkar, LED’den geçer ve alt hattan pilin − ucuna döner.',
     purpose:
-      'LED’i güvenli bir akımla yakar. LED iletirken üzerindeki gerilim neredeyse sabittir (kırmızıda ≈ 1,8 V); kalan gerilim ön dirence düşer ve akımı Ohm yasası belirler: I = (5 V − 1,8 V) / 330 Ω ≈ 9,7 mA. Direnç olmasaydı akımı sınırlayan bir şey kalmazdı. Ön direnci 100 Ω’a düşür: akım 30 mA’i aşar ve LED yanar.',
+      'LED’i güvenli bir akımla yakar. LED iletirken üzerindeki gerilim neredeyse sabittir (kırmızıda ≈ 1,8 V); kalan gerilim ön dirence düşer ve akımı Ohm yasası belirler: I = (5 V − 1,8 V) / 330 Ω ≈ 9,7 mA. Direnç olmasaydı akımı sınırlayan bir şey kalmazdı. Ön direnci 100 Ω’a düşür: akım ≈ 31 mA olur ve LED’in sürekli sınırını (30 mA) aşar; uyarı çıkar, LED ısınır (eklem ≈ 59 °C) ama yanmaz. 22 Ω’da ≈ 127 mA geçer: eklem ≈ 8 s’de 115 °C’yi aşar ve LED ısınarak yanar. 15 Ω’da akım tepe sınırını (155 mA) aşar ve LED hemen yanar.',
     everyday:
       'Cihazlardaki açık/kapalı ve şarj ışıkları, klavye ve ekran arka ışıkları, araç ve trafik LED’leri: her LED’in önünde akımı sınırlayan bir direnç ya da bir LED sürücüsü vardır.',
   },

@@ -206,6 +206,7 @@ export interface RatingWarning {
   readonly code: Extract<
     DiagnosticCode,
     | 'reverse-voltage'
+    | 'led-overcurrent'
     | 'resistor-overpower'
     | 'capacitor-reverse'
     | 'motor-overload'
@@ -285,6 +286,12 @@ export abstract class Device {
 
   /** Adım kabul edildi: durumu kaydet. */
   accept(_x: Float64Array, _ctx: StepContext): void {}
+
+  /**
+   * Zamandan bağımsız (DC) devrede adım atılmadan `dt` saniye geçti; çözüm `x` değişmedi. Zamanla değişen
+   * iç durumu olan bileşen (LED'in ısınması) durumunu ilerletir; ardından checkLimits sorulur.
+   */
+  elapse(_x: Float64Array, _dt: number): void {}
 
   /**
    * Son kabul edilen adımda bileşenin kipi değişti mi (regülatörün akım sınırından ayara geçmesi gibi)

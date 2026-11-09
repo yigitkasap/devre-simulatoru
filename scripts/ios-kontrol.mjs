@@ -5740,6 +5740,37 @@ try {
     await page.context().close();
   }
 
+  // --- LED kademeli yanma: önce "LED aşırı akımda" uyarısı (ısınma), çok yüksek akımda hemen yanma ---------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('dialog', { name: 'Örnekler' }).getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await page.waitForTimeout(400);
+    const setR1 = async (value) => {
+      if ((await page.getByLabel('Direnç', { exact: true }).count()) === 0) await notebook(page).getByRole('button', { name: /^R1 ·/ }).first().click();
+      const field = page.getByLabel('Direnç', { exact: true });
+      await field.fill(value); await field.press('Enter'); await page.waitForTimeout(300);
+    };
+    await setR1('100');
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click();
+    await waitSimTime(page, 2);
+    const warnCard = notebook(page).getByRole('region', { name: 'Uyarı · LED aşırı akımda' });
+    const warnText = ((await warnCard.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    const balloonsWarm = await page.getByRole('alertdialog', { name: /LED1 yandı/ }).count();
+    check('LED kademeli (masaüstü): ön direnç 100 Ω (≈ 31 mA) iken 2 s sonra LED yanmamış; uyarı kartı "LED aşırı akımda", eklem sıcaklığı ve "R1 ön direnci … küçük"',
+      (await warnCard.count()) === 1 && /31,0\d? mA geçiyor/.test(warnText) && /eklem ≈ \d+ °C/.test(warnText) && warnText.includes('yanmaz ama') && warnText.includes('R1 ön direnci') && balloonsWarm === 0,
+      `${warnText.slice(0, 170)} · balon ${balloonsWarm}`);
+    await setR1('10');
+    await page.waitForTimeout(700);
+    const balloon = page.getByRole('alertdialog', { name: /LED1 yandı/ });
+    const burnText = ((await notebook(page).getByRole('region', { name: 'Hata · LED yandı' }).textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    check('LED kademeli (masaüstü): ön direnç 10 Ω (tepe sınırı 155 mA aşılır) olunca LED hemen yanıyor: balon ve "hemen yandı … 155 mA" hata kartı',
+      (await balloon.count()) === 1 && burnText.includes('hemen yandı') && burnText.includes('155 mA'), burnText.slice(0, 160));
+    await ctx.close();
+  }
+
   // --- Telefon hızı: 4 kat yavaş işlemcide (iPhone 13 öykünmesi) bütün örnekler çalışırken ---------------
   // Kare hızı en az 30/s, 100 ms'yi aşan görev yok (çözücünün süre sınırı kesin; çizim uzun sürünce hesap
   // süresi kısalır). Simülasyon gerçek zamana yetişemeyince "yetişemiyor" simgesi üst çubukta, açıklaması
