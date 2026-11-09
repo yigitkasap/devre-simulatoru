@@ -1940,6 +1940,14 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   (telefon-hizi'den önce) 4–8 kare/s. Dal telefon-hizi'nin üzerinde (2026-11-09): 10 örnek 32,1–53,3 kare/s,
   uzun görev yok (eski modellerle aynı ölçüm 33,1–53,6).
 
+### 3B: cihaz kabloları, timsah kıskaç (2026-11-09)
+
+Laboratuvarda cihaz kabloları (güç kaynağı, osiloskop, fonksiyon üreteci, multimetre) muz fiş – kablo – timsah
+kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon değişmez; yalnızca 3B gösterim.
+- **Bir delik tek tel ya da tek bacak alır** (7): Tahtada kur'un yerleşiminde (planBreadboard → buildFromPlan:
+  örnek yerleşim ipucu, görevlerin hazır kabloları ve beklenen delikleri) ve görevlerin başlangıç tahtalarında
+  hiçbir delikte iki uç yok; 81 örnekte birim testi (`tests/tahta-delik.test.ts`).
+
 ### Performans ve hata taraması (2026-10-27)
 
 - `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,
