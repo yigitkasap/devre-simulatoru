@@ -62,6 +62,8 @@ export function ViewToggle({ mode, onChange, touch }: { mode: ViewMode; onChange
     <div
       role="group"
       aria-label={tr.bench.viewGroup}
+      // 3B etiketleri (scene.ts → positionOverlay) bu düğmenin altına girmez.
+      data-label-obstacle
       className={`pointer-events-auto absolute left-3 z-10 flex items-center px-0.5 before:absolute before:inset-x-0 before:rounded-md before:bg-panel-2 before:shadow-md before:ring-1 before:ring-line before:content-[''] ${
         touch ? 'top-1.5 h-11 before:top-1.5 before:bottom-1.5' : 'top-3 h-8 before:inset-y-0'
       }`}

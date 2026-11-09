@@ -220,6 +220,8 @@ export class BenchScene {
   private readonly controls: OrbitControls;
   private readonly pmrem: PMREMGenerator;
   private readonly parts = new Map<string, Placed>();
+  /** Parçanın gövde kutusu (dünya); yerleşim değişince parçalar yeniden kurulur, önbellek kendiliğinden boşalır. */
+  private readonly bodyBoxes = new WeakMap<Placed, Box3>();
   private readonly cables = new Group();
   private readonly boards = new Group();
   /** Son kurulan yerleşimin imzası (değişmediyse sahne yeniden kurulmaz). */
@@ -378,6 +380,15 @@ export class BenchScene {
       x1: o.offsetLeft + o.offsetWidth,
       y1: o.offsetTop + o.offsetHeight,
     }));
+    // Tuvalin üstüne binen denetimler ([data-label-obstacle]: telefonda sol üstteki Şema | 3B): üst kenara inen
+    // etiket bunların altına girmez.
+    const c = canvas.getBoundingClientRect();
+    for (const o of document.querySelectorAll<HTMLElement>('[data-label-obstacle]')) {
+      const r = o.getBoundingClientRect();
+      if (r.width > 0 && r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom) {
+        taken.push({ x0: r.left - c.left, y0: r.top - c.top, x1: r.right - c.left, y1: r.bottom - c.top });
+      }
+    }
     const p = new Vector3();
     const toScreen = (world: Vector3) => {
       p.copy(world).project(this.view);
@@ -459,10 +470,23 @@ export class BenchScene {
                 { x0: x - item.w / 2, y0: y - 2 * item.h - 12 },
                 { x0: x - item.w / 2, y0: y + 8 },
               ];
+        // Varsayılan kadrajda arkadaki cihazların üstü kırpılır: etiketin noktası görüntünün üstünde kalınca
+        // etiket üst kenara, gövdenin görünen kısmının üstüne iner (iki sıra). Gövdenin görünen genişliği etiketin
+        // yarısından azsa (cihaz kadrajın kenarında) etiket başka cihazın üstüne kaymasın diye gösterilmez.
+        // Parça etiketi üst kenardan taşmaz.
+        if (pin === undefined && placed && y - item.h - 4 < 0) {
+          const body = this.screenBox(placed, toScreen);
+          const lo = Math.max(body.x0, 0);
+          const hi = Math.min(body.x1, w);
+          if (hi - lo >= item.w / 2 && body.y1 > item.h + 8) {
+            const x0 = Math.max(4, Math.min(Math.max(x - item.w / 2, lo), hi - item.w, w - item.w - 4));
+            spots.push({ x0, y0: 4 }, { x0, y0: item.h + 12 });
+          }
+        }
         const GAP = 4;
         for (const box of spots) {
           const rect = { ...box, x1: box.x0 + item.w, y1: box.y0 + item.h };
-          const inView = z > -1 && z < 1 && rect.x1 > 0 && rect.y1 > 0 && rect.x0 < w && rect.y0 < h;
+          const inView = z > -1 && z < 1 && rect.x1 > 0 && (pin === undefined ? rect.y0 >= 0 : rect.y1 > 0) && rect.x0 < w && rect.y0 < h;
           const clash = pin === undefined && taken.some((r) => rect.x0 < r.x1 + GAP && rect.x1 > r.x0 - GAP && rect.y0 < r.y1 + GAP && rect.y1 > r.y0 - GAP);
           if (!inView || clash) continue;
           show = true;
@@ -545,6 +569,16 @@ export class BenchScene {
       const ys = pts.map((q) => ((1 - q.y) / 2) * canvas.clientHeight);
       return [{ id: placed.part.id, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }];
     });
+  }
+
+  /** Parça gövdesinin ekrandaki dikdörtgeni (px); dünya kutusu parça başına bir kez hesaplanır. */
+  private screenBox(placed: Placed, toScreen: (world: Vector3) => { x: number; y: number }): { x0: number; y0: number; x1: number; y1: number } {
+    let box = this.bodyBoxes.get(placed);
+    if (!box) this.bodyBoxes.set(placed, (box = new Box3().setFromObject(placed.group)));
+    const pts = boxCorners(box).map((q) => toScreen(q));
+    const xs = pts.map((q) => q.x);
+    const ys = pts.map((q) => q.y);
+    return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
   }
 
   /** Denetim (ios-kontrol): masadaki bir parçanın gövdesinin içinden geçen kablo sayısı. */

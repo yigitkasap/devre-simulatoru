@@ -1911,7 +1911,12 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   oynatılana dek gizli. Telefonda bütün sıra 390 px'e sığınca göstergeler okunmuyordu: tek cihaz (önce osiloskop,
   yoksa ortadaki), Cihazlar yeniden seçilince sağdaki (sona gelince baştan); yanlardakiler kaydırılarak görülür.
 - **Etiketler**: çakışan (4 px aralı) etiket önce ucun sağına, soluna, bir kat yukarı ya da altına kayar; hiçbiri
-  olmazsa gizlenir (eskiden doğrudan gizleniyor, birbirine değen etiketler üst üste görünüyordu).
+  olmazsa gizlenir (eskiden doğrudan gizleniyor, birbirine değen etiketler üst üste görünüyordu). Parça etiketi
+  üst kenardan taşmaz. Varsayılan kadrajda cihazın üstü kırpılınca etiketin noktası görüntünün dışında kalır:
+  etiket üst kenara, gövdenin görünen kısmının üstüne iner (iki sıra; telefonda sol üstteki Şema | 3B
+  `data-label-obstacle` ile atlanır). Gövdenin görünen genişliği etiketin yarısından azsa (cihaz kadrajın
+  kenarında) etiket başka cihazın üstüne kaymasın diye gizlenir; o cihaz "Cihazlar" ile görülür. ios-kontrol
+  "3B: çalışırken parçaların etiketleri (… ampermetrede akım)" bunu yakaladı (2026-11-09).
 - **Kablolar**: modelin `anchorDirs`'i soketin dışa baktığı yön; kablo soketten öne düz çıkar, yatay teğetle
   masaya sarkar, masada tahtaya gider ve deliğe yukarıdan iner (`leadRoute.socketCurve`; doğru + kübik
   Bézier'ler: masanın altına salınmaz). Fiş soketin ekseninde.
