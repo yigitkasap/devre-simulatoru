@@ -1917,6 +1917,13 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   sığacak en yakından, denetimlerin üstünde ortalı; devre parçalarının etiketleri (panelleri örterdi) kamera
   oynatılana dek gizli. Telefonda bütün sıra 390 px'e sığınca göstergeler okunmuyordu: tek cihaz (önce osiloskop,
   yoksa ortadaki), Cihazlar yeniden seçilince sağdaki (sona gelince baştan); yanlardakiler kaydırılarak görülür.
+- **Cihazlar görünümü, masaüstü (2026-11-09, kullanıcı kararı)**: bütün sıra kadraja sığınca cihazlar ekranın üst
+  yarısında küçük kalıyor, alt yarı boş kalıyordu. Artık ön paneller kullanılabilir yüksekliğin (alttaki denetimlerin
+  üstü) en az %70'ini dolduracak kadar yakından: sıra sığmıyorsa sığan kadar cihaz (önce osiloskop, yoksa ortadaki),
+  Cihazlar yeniden seçilince sağdakiler (sona gelince baştan); yanlardakiler kısmen görünür. Telefonda eskisi gibi
+  tek cihaz. BC107 yükselteç: osiloskop görüntünün %57'si (önce üç cihaz %24'ü); BF245A: iki multimetre yan yana
+  %75 (önce üç cihaz %42). Parça etiketleri yanlardan kesilmez: noktası görüntüdeyse kenara dayanır, değilse gizlenir.
+  ios-kontrol'deki "üç cihaz da kadrajda, sıra genişliğin %85'i" maddesi bu davranışa göre değişti.
 - **Etiketler**: çakışan (4 px aralı) etiket önce ucun sağına, soluna, bir kat yukarı ya da altına kayar; hiçbiri
   olmazsa gizlenir (eskiden doğrudan gizleniyor, birbirine değen etiketler üst üste görünüyordu). Parça etiketi
   üst kenardan taşmaz. Varsayılan kadrajda cihazın üstü kırpılınca etiketin noktası görüntünün dışında kalır:

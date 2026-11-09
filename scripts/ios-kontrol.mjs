@@ -5689,6 +5689,7 @@ try {
       const devices = t.deviceRects().map((d) => ({ id: d.id, x0: d.x0, x1: d.x1, y0: d.y0, y1: d.y1, vis: Math.max(0, Math.min(d.x1, c.width) - Math.max(d.x0, 0)) / (d.x1 - d.x0) }));
       return {
         w: c.width,
+        h: c.height,
         share: b ? (b.x1 - b.x0) / c.width : 0,
         under: b ? reserve.some((r) => b.x0 < r.x1 && r.x0 < b.x1 && b.y1 > r.y0) : true,
         boardTop: b?.y0 ?? 0,
@@ -5721,14 +5722,25 @@ try {
     check('3B kadraj (masaüstü, 1N4001 DC): tahta kadraj genişliğinin en az %45’i, alttaki 3B düğmelerinin üstünde; cihazların ön panelleri tahtanın arkasında; etiketler üst üste binmiyor',
       dd.share >= 0.45 && !dd.under && behind && !dd.clash && dd.labels.length >= 2,
       `tahta %${Math.round(dd.share * 100)} · altta ${dd.under} · arkada ${behind} · etiket ${dd.labels.length}, çakışma ${dd.clash}`);
+    // Cihazlar (masaüstü, 2026-11-09): ön paneller görüntünün yüksekliğini dolduracak kadar yakından; bütün sıra
+    // sığmıyorsa sığan kadarı (önce osiloskop), yeniden seçince sağdakiler. Etiketler yanlardan kesilmez.
+    const full = (f) => f.devices.filter((d) => d.vis > 0.99);
+    const tallest = (f) => Math.max(0, ...full(f).map((d) => (Math.min(d.y1, f.h) - Math.max(d.y0, 0)) / f.h));
+    const labelsIn = (f) => page.evaluate(() => { const c = document.querySelector('canvas').getBoundingClientRect(); return [...document.querySelectorAll('[data-anchor="part"]')].filter((e) => getComputedStyle(e).opacity === '1').every((e) => { const r = e.getBoundingClientRect(); return r.left >= c.left - 0.5 && r.right <= c.right + 0.5; }); });
     await open(page, 'bjt-yukseltec');
     const menu = await pickCam(page, 'Cihazlar', false);
     const bench = await frame(page);
-    const span = bench.devices.length ? (Math.max(...bench.devices.map((d) => d.x1)) - Math.min(...bench.devices.map((d) => d.x0))) / bench.w : 0;
+    const benchIn = await labelsIn(bench);
     const onlyDevices = bench.labels.every((id) => bench.devices.some((d) => d.id === id));
-    check('3B kadraj (masaüstü, BC107 yükselteç): kamera menüsünde “Cihazlar”; üç cihaz da kadrajda, sıra kadraj genişliğinin en az %85’i; yalnızca cihazların etiketleri',
-      menu && bench.devices.length === 3 && bench.devices.every((d) => d.vis > 0.99) && span >= 0.85 && onlyDevices,
-      `${menu} · ${bench.devices.map((d) => Math.round(d.vis * 100)).join('/')} · %${Math.round(span * 100)} · ${bench.labels.length} etiket`);
+    await pickCam(page, 'Cihazlar', false);
+    const bench2 = await frame(page);
+    const moved = full(bench2).map((d) => d.id).join() !== full(bench).map((d) => d.id).join();
+    await open(page, 'jfet-karakteristik');
+    await pickCam(page, 'Cihazlar', false);
+    const meters = await frame(page);
+    check('3B Cihazlar (masaüstü): ön paneller görüntünün yüksekliğinin en az yarısı (BC107: osiloskop; BF245A: iki multimetre yan yana); yeniden seçince sıradaki cihaz; yalnızca cihazların etiketleri, yanlardan kesilmiyor',
+      menu && full(bench).some((d) => d.id) && tallest(bench) >= 0.5 && moved && onlyDevices && benchIn && full(meters).length >= 2 && tallest(meters) >= 0.6,
+      `${menu} · ${full(bench).map((d) => d.id).join('+')} %${Math.round(tallest(bench) * 100)} → ${full(bench2).map((d) => d.id).join('+')} · BF245A ${full(meters).map((d) => d.id).join('+')} %${Math.round(tallest(meters) * 100)} · etiket içeride ${benchIn}`);
     await ctx.close();
 
     const { page: ph } = await phone();

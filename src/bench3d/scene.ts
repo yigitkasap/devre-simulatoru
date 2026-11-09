@@ -109,6 +109,8 @@ function boxCorners(b: Box3): Vector3[] {
 const BENCH_FREE = { desktop: { elevation: (36 * Math.PI) / 180, share: 0.47 }, phone: { elevation: (30 * Math.PI) / 180, share: 0.72 } };
 /** Bu genişlikten dar tuval telefon sayılır (px). */
 const PHONE_WIDTH = 640;
+/** Cihazlar görünümü (masaüstü): ön paneller kullanılabilir yüksekliğin en az bu kadarını doldurur. */
+const BENCH_FILL = 0.7;
 
 /** Akım noktaları: aralık (birim), yarıçap ve hız ölçeği (şemadaki piksel/s → birim/s). */
 const DOT_SPACING = 2.6;
@@ -252,8 +254,9 @@ export class BenchScene {
   /** Kullanıcı kamerayı elle oynattı mı (oynatmadıysa alan değişince yeniden sığdırılır). */
   private userMoved = false;
   private lastView: CameraView = 'free';
-  /** Telefonda Cihazlar görünümünün yaklaştığı cihaz (soldan sıra; −1: henüz seçilmedi). */
+  /** Cihazlar görünümünde gösterilen ilk cihaz (soldan sıra; −1: henüz seçilmedi) ve gösterilen cihaz sayısı. */
   private benchIndex = -1;
+  private benchStep = 1;
   /** Cihazlar görünümünde (kamera oynatılana dek) yalnızca bu parçaların (masa üstü cihazlar) etiketi gösterilir. */
   private benchLabels: ReadonlySet<string> | null = null;
   private plan: BreadboardPlan | null = null;
@@ -503,10 +506,13 @@ export class BenchScene {
             spots.push({ x0, y0: 4 }, { x0, y0: item.h + 12 });
           }
         }
+        // Parça etiketi yanlardan kesilmez: noktası görüntüdeyse kenara dayanmış konum da denenir.
+        if (pin === undefined && x >= 0 && x <= w) spots.splice(1, 0, { x0: Math.max(4, Math.min(w - item.w - 4, x - item.w / 2)), y0: y - item.h - 4 });
         const GAP = 4;
         for (const box of spots) {
           const rect = { ...box, x1: box.x0 + item.w, y1: box.y0 + item.h };
-          const inView = z > -1 && z < 1 && rect.x1 > 0 && (pin === undefined ? rect.y0 >= 0 : rect.y1 > 0) && rect.x0 < w && rect.y0 < h;
+          const inside = pin === undefined ? rect.x0 >= 0 && rect.x1 <= w && rect.y0 >= 0 : rect.x1 > 0 && rect.x0 < w && rect.y1 > 0;
+          const inView = z > -1 && z < 1 && inside && rect.y0 < h;
           const clash = pin === undefined && taken.some((r) => rect.x0 < r.x1 + GAP && rect.x1 > r.x0 - GAP && rect.y0 < r.y1 + GAP && rect.y1 > r.y0 - GAP);
           if (!inView || clash) continue;
           show = true;
@@ -1091,7 +1097,8 @@ export class BenchScene {
    * cihazlara. `request`: kullanıcı seçti (telefonda Cihazlar yeniden seçilince sıradaki cihaza geçer).
    */
   fit(view: CameraView = 'free', request = false): void {
-    if (view === 'bench' && request) this.benchIndex = this.lastView === 'bench' && !this.userMoved ? this.benchIndex + 1 : -1;
+    // Cihazlar yeniden seçilince sağdaki cihaz(lar); sona gelince baştan.
+    if (view === 'bench' && request) this.benchIndex = this.lastView === 'bench' && !this.userMoved ? this.benchIndex + this.benchStep : -1;
     this.lastView = view;
     this.userMoved = false;
     this.benchLabels = view === 'bench' ? new Set(this.tallParts().map((p) => p.part.id)) : null;
@@ -1248,18 +1255,33 @@ export class BenchScene {
     const tall = this.tallParts().sort((a, b) => a.group.position.x - b.group.position.x);
     if (tall.length === 0) return null;
     const canvas = this.renderer.domElement;
-    let shown = tall;
-    if (canvas.clientWidth < PHONE_WIDTH && tall.length > 1) {
-      if (this.benchIndex < 0) {
-        const scope = tall.findIndex((p) => p.part.type === 'oscilloscope');
-        this.benchIndex = scope >= 0 ? scope : Math.floor((tall.length - 1) / 2);
-      }
-      shown = [tall[this.benchIndex % tall.length]!];
+    const bottom = -1 + (2 * this.bottomReserve(0, 1)) / Math.max(1, canvas.clientHeight);
+    const solve = (list: readonly Placed[]) => {
+      const corners = list.flatMap((p) => boxCorners(new Box3().setFromObject(p.group)));
+      return this.solveFrame(ELEVATION.bench, corners, corners, 0.96, bottom, 0.96, true);
+    };
+    // Kaç cihaz yan yana: telefonda tek; masaüstünde ön paneller görüntünün yüksekliğinin en az BENCH_FILL'ini
+    // dolduracak kadar (bütün sıra genişse daha azı; yanlardakiler Cihazlar yeniden seçilince).
+    const first = (n: number) => {
+      const scope = tall.findIndex((p) => p.part.type === 'oscilloscope');
+      const center = scope >= 0 ? scope : Math.floor((tall.length - 1) / 2);
+      return Math.max(0, Math.min(tall.length - n, center - Math.floor((n - 1) / 2)));
+    };
+    let n = 1;
+    if (!this.isPhone()) {
+      for (n = tall.length; n > 1; n--) if (solve(tall.slice(first(n), first(n) + n)).fill >= BENCH_FILL) break;
     }
-    const corners = shown.flatMap((p) => boxCorners(new Box3().setFromObject(p.group)));
-    const reserve = this.bottomReserve(0, 1) / Math.max(1, canvas.clientHeight);
-    const solved = this.solveFrame(ELEVATION.bench, corners, corners, 0.96, -1 + 2 * reserve, 0.96, true);
-    return { ...solved, elevation: ELEVATION.bench };
+    this.benchStep = n;
+    if (n >= tall.length) this.benchIndex = 0;
+    else if (this.benchIndex < 0) this.benchIndex = first(n);
+    else if (this.benchIndex > tall.length - n) this.benchIndex = this.benchIndex >= tall.length ? 0 : tall.length - n;
+    const solved = solve(tall.slice(this.benchIndex, this.benchIndex + n));
+    return { target: solved.target, distance: solved.distance, elevation: ELEVATION.bench };
+  }
+
+  /** Telefon düzeni mi (dar tuval). */
+  private isPhone(): boolean {
+    return this.renderer.domElement.clientWidth < PHONE_WIDTH;
   }
 
   /**
@@ -1276,7 +1298,7 @@ export class BenchScene {
     bottom: number,
     top: number,
     middle = false,
-  ): { target: Vector3; distance: number } {
+  ): { target: Vector3; distance: number; fill: number } {
     const toCamera = new Vector3(0, Math.sin(elevation), Math.cos(elevation));
     const forward = toCamera.clone().negate();
     const right = new Vector3(1, 0, 0);
@@ -1313,7 +1335,9 @@ export class BenchScene {
       target.addScaledVector(up, shift * distance * tanV * 0.8);
       distance *= Math.pow(ratio, 0.7);
     }
-    return { target, distance };
+    const eye = target.clone().addScaledVector(toCamera, distance);
+    const k = extent(keep, eye);
+    return { target, distance, fill: (k.y1 - k.y0) / (top - bottom) };
   }
 
   /**
