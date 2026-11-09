@@ -2037,6 +2037,10 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   genişliğinin %72'si. **Gece kararı:** kısa alanda (iPhone SE) cihazlar tamamen görünürse tahta payı %59'a düşüyor:
   tahta payı (≥ %70) öncelikli, cihazların üstü eskisi gibi kırpılır. Yatayda (T2'nin yerleşimi, 523 × 333) 3B alanı
   bozulmuyor, tahta %72. ios-kontrol "Telefon 3B (…): 3B alanı ekranın ≈ %60'ı …".
+  ios-kontrol'deki "ipucu sahnenin altında, düğmelerin üstünde" maddesi buna göre değişti (üstte, tahtanın üstünde değil).
+- **3B tam ekran düğmesinin adı**: 3B görünümde telefonun tam ekran düğmesi "3B’yi tam ekran aç" / "3B’yi küçült"
+  (erişilebilir ad ve ipucu); şemada eskisi gibi "Şemayı tam ekran aç" / "Şemayı küçült". ios-kontrol'ün 3B tam ekran
+  ve 3B (telefon) maddeleri yeni adla.
 
 ### Performans ve hata taraması (2026-10-27)
 

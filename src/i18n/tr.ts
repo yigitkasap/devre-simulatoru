@@ -3811,6 +3811,9 @@ export const tr = {
     connectButton: 'Kablo bağla',
     schematicFull: 'Şemayı tam ekran aç',
     schematicSmall: 'Şemayı küçült',
+    /** 3B görünümde aynı düğme. */
+    benchFull: '3B’yi tam ekran aç',
+    benchSmall: '3B’yi küçült',
     schematic: 'Şema',
     stripSummary: (parts: number, problems: string) => `${parts} parça · ${problems}`,
     problemsShort: (errors: number, warnings: number) =>

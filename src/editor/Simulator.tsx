@@ -2540,6 +2540,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                     setFitRequest((n) => n + 1);
                   }}
                   bottom={phoneEdge}
+                  bench={viewMode === 'bench'}
                 />
               )}
             </main>

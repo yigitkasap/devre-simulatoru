@@ -3357,10 +3357,11 @@ try {
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
     const labels = await page.locator('[data-anchor="part"]').allTextContents();
     const tag = await page.getByRole('button', { name: 'Etiketler' }).boundingBox();
-    const full = await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).boundingBox();
+    const full = await page.getByRole('button', { name: '3B’yi tam ekran aç' }).boundingBox();
     check('3B (telefon): etiket yalnızca ölçü aletinde (seçim yokken); Etiketler, Kamera ve Karta aktar sağ altta, 44 px',
       labels.length === 1 && labels[0].startsWith('A1') && tag !== null && tag.height >= 43.5 && full !== null && Math.abs(tag.y - full.y) < 2 && tag.x < full.x, labels.join(' | '));
-    // İlk açılıştaki hareket ipucu: sahnenin altında, düğmelerin üstünde; görünen hiçbir etiketin üstüne binmiyor.
+    // İlk açılıştaki hareket ipucu (2026-11-10): üstte, Şema | 3B düğmesinin altında (altta tahtanın üstüne geliyordu);
+    // tahtanın üstünde değil, görünen hiçbir etiketin üstüne binmiyor.
     const hint = await page.getByText(/^Bir parmak: döndür/).boundingBox();
     const area = await page.locator('main').boundingBox();
     const hintClash = await page.evaluate(() => {
@@ -3371,9 +3372,11 @@ try {
         return b.left < h.right && b.right > h.left && b.top < h.bottom && b.bottom > h.top;
       }).map((e) => e.textContent);
     });
-    check('3B (telefon): ilk açılıştaki "Bir parmak: döndür…" ipucu sahnenin altında, düğmelerin üstünde; etiketlerin üstüne binmiyor',
-      hint !== null && area !== null && tag !== null && hint.y > area.y + area.height / 2 && hint.y + hint.height <= tag.y + 1 && hintClash.length === 0 && labels.length === 1,
-      hint ? `ipucu ${Math.round(hint.y)}–${Math.round(hint.y + hint.height)}, düğmeler ${Math.round(tag?.y ?? 0)} · ${hintClash.join(', ')}` : 'ipucu yok');
+    const toggle = await page.getByRole('group', { name: 'Görünüm' }).boundingBox();
+    const boardTop = await page.evaluate(() => { const c = document.querySelector('main canvas').getBoundingClientRect(); return c.top + window.__tezgah.boardRect().y0; });
+    check('3B (telefon): ilk açılıştaki "Bir parmak: döndür…" ipucu üstte, Şema | 3B düğmesinin altında, tahtanın üstünde değil; etiketlerin üstüne binmiyor',
+      hint !== null && area !== null && toggle !== null && hint.y >= toggle.y + toggle.height - 1 && hint.y < area.y + area.height / 2 && hint.y + hint.height <= boardTop && hintClash.length === 0 && labels.length === 1,
+      hint ? `ipucu ${Math.round(hint.y)}–${Math.round(hint.y + hint.height)}, Şema | 3B altı ${Math.round((toggle?.y ?? 0) + (toggle?.height ?? 0))}, tahtanın üstü ${Math.round(boardTop)} · ${hintClash.join(', ')}` : 'ipucu yok');
     await page.context().close();
   }
 
@@ -6500,7 +6503,7 @@ try {
       const c = document.querySelector('main canvas').getBoundingClientRect();
       const b = window.__tezgah.boardRect();
       const board = b && { x0: b.x0 + c.left, y0: b.y0 + c.top, x1: b.x1 + c.left, y1: b.y1 + c.top };
-      const names = ['Etiketler', 'Kamera: Serbest', 'Karta aktar', 'Tahtada kur', 'Şemayı küçült', 'Şemayı tam ekran aç'];
+      const names = ['Etiketler', 'Kamera: Serbest', 'Karta aktar', 'Tahtada kur', '3B’yi küçült', '3B’yi tam ekran aç'];
       const buttons = [...document.querySelectorAll('main button')].filter((e) => names.includes(e.getAttribute('aria-label') ?? '') && e.getBoundingClientRect().width > 0).map((e) => e.getBoundingClientRect());
       const labels = [...document.querySelectorAll('[data-anchor="part"]')].filter((e) => getComputedStyle(e).opacity === '1').map((e) => e.getBoundingClientRect());
       return {
@@ -6516,12 +6519,12 @@ try {
     const box = await page.locator('main canvas').boundingBox();
     await drag(page, cdp, { x: box.x + box.width * 0.5, y: box.y + box.height * 0.4 }, { x: box.x + box.width * 0.75, y: box.y + box.height * 0.5 });
     const moved = await camera();
-    await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).tap(); await page.waitForTimeout(1200);
+    await page.getByRole('button', { name: '3B’yi tam ekran aç' }).tap(); await page.waitForTimeout(1200);
     const full = await measure();
     const refit = (await camera()) !== moved;
-    await page.getByRole('button', { name: 'Şemayı küçült' }).tap(); await page.waitForTimeout(1200);
+    await page.getByRole('button', { name: '3B’yi küçült' }).tap(); await page.waitForTimeout(1200);
     const back = await measure();
-    check(`3B tam ekran (telefon, ${yon}, 1N4001 DC): beş düğme tek sırada alt kenarda (alt boşluk ≤ 24 px), hiçbiri tahtanın üstünde değil; tahta en az %70; etiketler kesilmiyor; girince ve çıkınca kamera yeniden sığıyor`,
+    check(`3B tam ekran (telefon, ${yon}, 1N4001 DC): beş düğme ("3B’yi tam ekran aç" / "3B’yi küçült" dahil) tek sırada alt kenarda (alt boşluk ≤ 24 px), hiçbiri tahtanın üstünde değil; tahta en az %70; etiketler kesilmiyor; girince ve çıkınca kamera yeniden sığıyor`,
       full.count === 5 && full.row && full.gap <= 24 && !full.over && full.share >= 0.7 && !full.cut && refit && back.row && back.gap <= 24,
       `${full.count} düğme · tek sıra ${full.row} · alt boşluk ${full.gap} px · tahtada ${full.over} · tahta %${Math.round(full.share * 100)} · kesik ${full.cut} · yeniden sığdı ${refit} · çıkınca tek sıra ${back.row}, %${Math.round(back.share * 100)}`);
     await page.context().close();
@@ -6547,6 +6550,8 @@ try {
     check(`Telefon 3B (${cihaz}): ${portrait ? '3B alanı ekranın ≈ %60’ı' : '3B alanı bozulmuyor'}; düğmeler ve ipucu tahtanın üstünde değil; tahta en az %70${cihaz === 'iPhone 13' ? '; cihazların üstü kırpılmıyor' : ''}`,
       (portrait ? area.frac >= 0.55 && area.frac <= 0.65 : area.h >= 300) && area.hint === false && !area.buttons && area.share >= 0.7 && (cihaz !== 'iPhone 13' || area.top >= 0),
       `${area.w}×${area.h} (%${Math.round(area.frac * 100)}) · ipucu tahtada ${area.hint} · düğme tahtada ${area.buttons} · tahta %${Math.round(area.share * 100)} · cihazların üstü ${Math.round(area.top)} px`);
+    // 7b. Tam ekran düğmesinin adı 3B'de "3B’yi tam ekran aç" (erişilebilir ad ve ipucu); şemada "Şemayı tam ekran aç".
+    const fullName = await page.locator('main button[aria-label$="tam ekran aç"]').evaluate((e) => `${e.getAttribute('aria-label')}|${e.getAttribute('title')}`).catch(() => '');
     // 1. Kamera menüsü telefonda alt sayfa: tamamı ekranda, seçenekler en az 44 px; seçince kapanır.
     await page.getByRole('button', { name: /^Kamera:/ }).tap(); await page.waitForTimeout(300);
     const menu = await page.evaluate(() => {
@@ -6560,6 +6565,10 @@ try {
     check(`Telefon 3B (${cihaz}): kamera menüsü alt sayfa, tamamı ekranda, seçenekler en az 44 px; Cihazlar seçilince kapanıyor`,
       menu !== null && menu.inside && menu.bottom <= 1 && menu.items >= 4 && menu.min >= 44 && closed && label === 'Kamera: Cihazlar',
       menu ? `ekranda ${menu.inside} · alt ${menu.bottom} px · ${menu.items} seçenek, en kısa ${Math.round(menu.min)} px · kapandı ${closed} · ${label}` : 'menü yok');
+    await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: 'Şema' }).tap(); await page.waitForTimeout(500);
+    const schematicName = await page.locator('main button[aria-label$="tam ekran aç"]').getAttribute('aria-label').catch(() => '');
+    check(`Telefon 3B (${cihaz}): tam ekran düğmesi 3B'de "3B’yi tam ekran aç" (ad ve ipucu), şemada "Şemayı tam ekran aç"`,
+      fullName === '3B’yi tam ekran aç|3B’yi tam ekran aç' && schematicName === 'Şemayı tam ekran aç', `${fullName} · şemada ${schematicName}`);
     await page.context().close();
   }
 } finally {

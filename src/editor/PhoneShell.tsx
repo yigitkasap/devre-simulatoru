@@ -143,13 +143,16 @@ export function SchematicStrip({ doc, errors, warnings, onOpen }: { doc: Circuit
 }
 
 /** Şema kutusunun sağ altı: tam ekran / küçült. */
-export function SchematicButtons({ full, onFull, bottom = 10 }: { full: boolean; onFull: () => void; bottom?: number | string }) {
+export function SchematicButtons({ full, onFull, bottom = 10, bench = false }: { full: boolean; onFull: () => void; bottom?: number | string; bench?: boolean }) {
+  // 3B görünümde düğme 3B'yi büyütür: adı da öyle (erişilebilir ad ve ipucu).
+  const label = bench ? (full ? tr.phone.benchSmall : tr.phone.benchFull) : full ? tr.phone.schematicSmall : tr.phone.schematicFull;
   return (
     <div className="absolute right-2.5 z-10 flex gap-1.5" style={{ bottom }}>
       <button
         type="button"
         onClick={onFull}
-        aria-label={full ? tr.phone.schematicSmall : tr.phone.schematicFull}
+        aria-label={label}
+        title={label}
         aria-pressed={full}
         className="flex h-11 w-11 items-center justify-center rounded-md border border-line bg-panel text-ink shadow-md active:bg-panel-2"
       >
