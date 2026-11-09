@@ -244,7 +244,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '1',
         text: 'Şekil-2’deki devreyi kurunuz. V_{i} giriş gerilimini 0–1 V (DC) aralığında 0,1 V ve 1–5 V aralığında 1 V’luk adımlarla arttırarak devreden geçen akım ve V_{o} çıkış gerilimlerini okuyunuz. Elde ettiğiniz verilerden akım-gerilim karakteristik eğrisini (I-V) grafik kağıdına çiziniz ve diyotun hangi yarıiletkenden yapıldığını belirleyiniz.',
-        sim: 'Devre kurulu: V_{i} güç kaynağının (PS1) 1. çıkışı, A1 akımı, V1 1 kΩ’un uçlarındaki V_{o}’yu gösteriyor. Oynat’a bas; cihaz rafında PS1’in 1. çıkış gerilimini adım adım değiştir ve her adımda A1 ile V1’i oku. Diyodun gerilimi V_{D} = V_{i} − V_{o}.',
+        sim: 'Devre kurulu: V_{i} güç kaynağının (PS1) 1. çıkışı, A1 akımı, V1 1 kΩ’un uçlarındaki V_{o}’yu gösteriyor. Oynat’a bas; defterde PS1’in kartını aç (masaüstünde sağdaki Defter, telefonda şemanın altı), 1. çıkışın gerilimini adım adım değiştir ve her adımda A1 ile V1’i oku. Diyodun gerilimi V_{D} = V_{i} − V_{o}.',
         answer:
           'Simülasyonda ölçülen tablo (V_{i} → I, V_{D}): 0,2 V → 4 µA, 0,20 V; 0,5 V → 0,13 mA, 0,37 V; 1 V → 0,55 mA, 0,45 V; 2 V → 1,50 mA, 0,50 V; 5 V → 4,44 mA, 0,56 V. Akım V_{D} ≈ 0,3–0,4 V’a kadar yok denecek kadar küçüktür; sonra hızla artar ve V_{D} 0,5–0,6 V civarında kalır. Bu eşik silisyuma özgüdür (germanyumda ≈ 0,2–0,3 V olurdu): 1N4001 silisyum diyottur. Kaynağı ters bağlarsan (diyodu ters çevir) 5 V’ta akım 1 µA’in altında kalır.',
       },
@@ -264,7 +264,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '2b',
         text: 'Giriş sinyalinin frekansını 1 kHz ile 1 MHz arasında değiştirerek diyotun V_{eşik} geriliminde ve I-V eğrisinde değişiklik olup olmadığını kontrol ediniz. Değişiklikler varsa nedenini açıklayınız.',
-        sim: 'Cihaz rafında FG1’in frekansını sırayla 10 kHz, 100 kHz ve 1 MHz yap; X-Y ekranında sol (ters) kolun aşağı inmesine ve eğrinin ilmek açmasına bak.',
+        sim: 'Defterdeki FG1 kartında frekansı sırayla 10 kHz, 100 kHz ve 1 MHz yap; X-Y ekranında sol (ters) kolun aşağı inmesine ve eğrinin ilmek açmasına bak.',
         answer:
           '1 kHz’te eğri tek bir çizgidir; ters yönde en çok ≈ −0,07 mA geçer. Frekans artınca sol (ters) kol aşağı iner ve eğri ilmek açar: ters tepe akımı 10 kHz’te ≈ −1,4 mA, 100 kHz’te ≈ −4,9 mA, 1 MHz’te ≈ −5,1 mA; ileri tepe 4,2–4,4 mA arasında kalır. Akımın 1 mA’i geçtiği giriş gerilimi de küçülür (1 kHz’te ≈ 1,48 V, 1 MHz’te ≈ 1,19 V): eşik düşmüş gibi görünür. Nedeni diyodun yük depolamasıdır: ileri yönde iletirken eklemde azınlık taşıyıcı yükü birikir (1N4001’in modelinde geçiş süresi ≈ 5,8 µs). Giriş ters dönünce bu yük boşalana kadar diyot ters yönde de iletir (ters toparlanma). Periyot bu süreyle karşılaştırılabilir olunca (100 kHz’te 10 µs) diyot kesime gidemez. 1N4001 şebeke frekansı için yapılmış yavaş bir diyottur; yüksek frekansta hızlı ya da Schottky diyot kullanılır.',
       },
@@ -310,7 +310,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '1',
         text: 'Diyot (1N4001) ve R_{L} direncini 1 kΩ alarak Şekil-4a’da verilen yarım dalga doğrultucusunu kurunuz. Girişe genliği 3 V olan sinüs sinyali uygulayınız. Giriş ve çıkış dalga şekillerini osiloskopta aynı anda gözleyip frekansı 1 kHz’ten 1 MHz’e kadar yavaşça artırarak oluşan değişimleri belirleyiniz ve nedenlerini belirtiniz. Aynı işlemi 5 V’luk giriş gerilimi için tekrarlayınız.',
-        sim: 'Devre kurulu: FG1 1 kHz, 6 V tepe-tepe (3 V genlik); S4 kapalı (R_{L} bağlı), S1–S3 açık. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta, ikisi de 1 V/bölme. Oynat’a bas; cihaz rafında FG1’in frekansını 10 kHz, 100 kHz ve 1 MHz yap, her seferinde Oto’ya bas. 5 V genlik için tepe-tepe değeri 10 V yap.',
+        sim: 'Devre kurulu: FG1 1 kHz, 6 V tepe-tepe (3 V genlik); S4 kapalı (R_{L} bağlı), S1–S3 açık. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta, ikisi de 1 V/bölme. Oynat’a bas; defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı) frekansı 10 kHz, 100 kHz ve 1 MHz yap, her seferinde OSC1 kartındaki Oto’ya bas. 5 V genlik için tepe-tepe değeri 10 V yap.',
         answer:
           '3 V genlikte, 1 kHz’te çıkış yalnızca pozitif yarılardan oluşur: tepe ≈ 2,36 V (girişin 3 V’undan diyotta ve üretecin 50 Ω’unda ≈ 0,64 V düşer), negatif yarılarda ≈ 0 V; ortalaması ≈ 0,69 V (ideal formül V_{T} / π tepeden ≈ 0,75 V verir; fark, diyodun eşiği aşılana kadar akım geçmemesinden). Frekans artınca her negatif yarının başında çıkış eksiye iner: 10 kHz’te ≈ −0,79 V, 100 kHz’te ≈ −2,91 V, 1 MHz’te ≈ −3,11 V. Ortalama 100 kHz’te ≈ 0,34 V’a, 1 MHz’te ≈ 0,05 V’a düşer: 1 MHz’te diyot artık doğrultmaz, giriş iki yönde de geçer. Nedeni Deney 1’deki ters toparlanmadır: iletimde biriken yük boşalana kadar (1N4001’in modelinde ≈ 5,8 µs) diyot ters yönde de iletir; yarım periyot bu süreye yaklaşınca (100 kHz’te 5 µs) negatif yarının çoğu geçer. 5 V genlikte de aynı: 1 kHz’te tepe ≈ 4,23 V, ortalama ≈ 1,28 V; ters tepe 10 kHz’te ≈ −1,41 V, 100 kHz’te ≈ −4,88 V, 1 MHz’te ≈ −5,07 V; 1 MHz’te ortalama ≈ 0,10 V.',
       },
@@ -343,7 +343,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '1',
         text: 'Şekil-9’daki devreleri kurunuz ve girişlerine 1 kHz frekanslı önce sinüs daha sonra kare dalga uygulayınız. Giriş ve çıkış sinyallerini osiloskopta aynı anda gözleyerek ölçekli olarak çiziniz.',
-        sim: 'Devre kurulu: FG1 1 kHz, 10 V tepe-tepe sinüs; C = 2,2 µF, 1N4001’in anodu çıkışta, R = 10 kΩ. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta, ikisi de DC kuplaj, 5 V/bölme; zaman/bölme 0,5 ms. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+        sim: 'Devre kurulu: FG1 1 kHz, 10 V tepe-tepe sinüs; C = 2,2 µF, 1N4001’in anodu çıkışta, R = 10 kΩ. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta, ikisi de DC kuplaj, 5 V/bölme; zaman/bölme 0,5 ms. Oynat’a bas; kare dalga için defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı) dalga biçimini Kare yap.',
         answer:
           'Sinüste (10 V tepe-tepe) giriş ±5 V salınırken çıkış ≈ +0,57 V ile ≈ −9,11 V arasında salınır: biçim ve tepe-tepe değer (≈ 9,7 V) aynı, dalga yalnızca aşağı kaymıştır (ortalaması ≈ −4,16 V). Pozitif tepede diyot iletir ve kondansatör girişin tepesine yakın bir gerilime dolar; bu gerilim girişe seri bir pil gibi bütün dalgayı aşağı taşır. Üst seviye 0 değil ≈ +0,57 V’tur: diyodun iletim gerilimi. Oynat’a bastıktan sonra kenetleme birkaç periyotta oturur (ilk periyotta alt tepe ≈ −8,49 V). Kare dalgada (±5 V) çıkış ≈ +0,52 V ile ≈ −9,52 V arasında bir kare dalgadır: föydeki Şekil-7b’deki gibi 0 ile −(V_{1} + V_{2}) = −10 V arası, diyot gerilimi kadar yukarıda. Alt seviyede kondansatör 10 kΩ üzerinden biraz boşalır: yarım periyotta ≈ 0,2 V yükselir. R · C = 22 ms, yarım periyottan (0,5 ms) çok büyük olduğu için bu eğim küçüktür. 5 V/bölmede çıkış sıfırın hemen üstünden yaklaşık iki bölme aşağıya uzanır.',
       },
@@ -382,7 +382,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '',
         text: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
-        sim: 'Devre kurulu: 1N4001’in katodu üreteçte, anodu çıkışta; 10 kΩ çıkıştan alt hatta. A ve B 5 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+        sim: 'Devre kurulu: 1N4001’in katodu üreteçte, anodu çıkışta; 10 kΩ çıkıştan alt hatta. A ve B 5 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı) dalga biçimini Kare yap.',
         answer:
           'Diyot sinyalin yolunda seri durur ve yalnızca giriş negatifken iletir. Sinüste çıkış girişin negatif yarısıdır: ≈ −9,47 V’a iner (girişin −10 V’undan diyotta ≈ 0,5 V düşer); pozitif yarıda çıkış ≈ 0 V’ta kalır (10 kΩ onu sıfıra çeker). Kare dalgada çıkış negatif yarıda ≈ −9,47 V, pozitif yarıda 0 V. Girişin −10 V’tan +10 V’a sıçradığı anda çıkışta ≈ +10,4 V’a çıkan, ≈ 3–4 µs süren dar bir sivri görülür: iletimde biriken yük boşalana kadar diyot ters yönde de iletir (Deney 1’deki ters toparlanma). 0,5 ms/bölmede bu sivri ince bir çizgi gibidir; görmek için zaman/bölmeyi 2 µs’ye indir.',
       },
@@ -395,7 +395,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '',
         text: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
-        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; 1N4001’in anodu çıkışta, katodu DC güç kaynağının 4 V’luk 1. çıkışında. A ve B 5 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; 1N4001’in anodu çıkışta, katodu DC güç kaynağının 4 V’luk 1. çıkışında. A ve B 5 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı) dalga biçimini Kare yap.',
         answer:
           'Çıkış 4 V + V_{D}’yi geçmeye çalışınca diyot iletir ve fazla gerilim 10 kΩ’un üzerine düşer: pozitif tepeler ≈ 4,45 V’ta düz kesilir (diyottan ≈ 0,55 mA geçtiği için V_{D} ≈ 0,45 V). Negatif yarı olduğu gibi geçer: ≈ −9,90 V (osiloskobun 1 MΩ’luk girişi 10 kΩ ile küçük bir bölücü oluşturur). Kare dalgada çıkış iki seviyelidir: ≈ +4,45 V ve ≈ −9,90 V.',
       },
@@ -408,7 +408,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '',
         text: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
-        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; D1’in anodu çıkışta, katodu 3 V’luk pilin + ucunda; D2’nin katodu çıkışta, anodu 2 V’luk pilin − ucunda (pillerin öbür uçları alt hatta). A 5 V/bölme, B 2 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; D1’in anodu çıkışta, katodu 3 V’luk pilin + ucunda; D2’nin katodu çıkışta, anodu 2 V’luk pilin − ucunda (pillerin öbür uçları alt hatta). A 5 V/bölme, B 2 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı) dalga biçimini Kare yap.',
         answer:
           'İki yönde de kırpar: çıkış 3 V + V_{D}’yi geçince D1, −(2 V + V_{D})’nin altına inince D2 iletir. Sinüs ≈ +3,46 V ile ≈ −2,46 V arasında, üstü ve altı düz kesilmiş bir dalgaya dönüşür; kare dalgada çıkış ≈ +3,46 V ve ≈ −2,46 V seviyeli bir kare dalgadır. Seviyeler kaynakların gerilimine bir diyot gerilimi (≈ 0,46 V) eklenerek bulunur.',
       },
@@ -421,7 +421,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '',
         text: 'Şekil-13’teki devreleri kurarak girişlere sinüs ve kare dalga uygulayınız. Çıkışları osiloskopta gözleyerek ölçekli olarak çiziniz.',
-        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; iki diyodun da katodu çıkışta: D1’in anodu 3 V’luk pilin + ucunda, D2’nin anodu 2 V’luk pilin − ucunda. A 5 V/bölme, B 2 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için cihaz rafında FG1’in dalga biçimini Kare yap.',
+        sim: 'Devre kurulu: 10 kΩ üreteçten çıkışa; iki diyodun da katodu çıkışta: D1’in anodu 3 V’luk pilin + ucunda, D2’nin anodu 2 V’luk pilin − ucunda. A 5 V/bölme, B 2 V/bölme. Föy genliği vermiyor; kırpma seviyelerini aşsın diye FG1 1 kHz, 20 V tepe-tepe (±10 V) sinüs. Osiloskop “A ve B (Y-t)” kipinde: A girişte, B çıkışta. Oynat’a bas; kare dalga için defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı) dalga biçimini Kare yap.',
         answer:
           'İki diyot da katotla çıkışa bağlı: çıkış anotlarından birinin bir diyot gerilimi altına inince o diyot iletir. D1’in anodu +3 V’ta olduğundan çıkış ≈ +2,51 V’un (3 V − V_{D}) altına inemez; D2’nin anodu −2 V’ta, eşiği çok aşağıda kalır ve hiç iletmez. Üst tarafta kırpma yoktur: çıkış ≈ +2,51 V ile ≈ +9,90 V arasında salınır, sinüsün yalnızca üst kısmı geçer. Kare dalgada çıkış ≈ +9,90 V ile ≈ +2,51 V arasındadır.',
       },
@@ -439,7 +439,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '2',
         text: 'V_{GS} gerilimini sıfır volt alınız. V_{DS} gerilimini sıfır volttan başlayarak 8 V’a kadar 0,2 V aralıklarla, 8–15 V arasında da 1 V aralıklarla arttırınız ve her adımda I_{D}’yi okuyunuz. Transistörünüzün zarar görmemesi için V_{DS} ve I_{D}’nin maksimum değerleri ile V_{DS} · I_{D} çarpımı transistör kataloğunda belirtilen limitleri aşmamalıdır.',
-        sim: 'PS1’in 2. çıkışı 0 V (V_{GS} = 0). Cihaz rafında PS1’in 1. çıkışını (V_{DD}) artırarak V1’de istenen V_{DS}’yi bul, A1’de I_{D}’yi oku. V_{DD} = V_{DS} + I_{D} · 100 Ω: 15 V’luk V_{DS} için V_{DD} ≈ 15,45 V.',
+        sim: 'PS1’in 2. çıkışı 0 V (V_{GS} = 0). Defterdeki PS1 kartında 1. çıkışı (V_{DD}) artırarak V1’de istenen V_{DS}’yi bul, A1’de I_{D}’yi oku. V_{DD} = V_{DS} + I_{D} · 100 Ω: 15 V’luk V_{DS} için V_{DD} ≈ 15,45 V.',
         answer:
           'Simülasyonda V_{GS} = 0 için (V_{DS} → I_{D}): 0,2 V → 0,77 mA; 0,4 V → 1,44 mA; 0,6 V → 2,03 mA; 1 V → 2,93 mA; 1,4 V → 3,47 mA; 1,8 V → 3,63 mA; 2 V → 3,64 mA; 4 V → 3,77 mA; 8 V → 4,02 mA; 10 V → 4,14 mA; 15 V → 4,45 mA. V_{DS} ≈ 1,7 V’a kadar I_{D} hızla artar (kanal direnç gibi); sonra eğri yataylaşır (doyum): 2 V’tan 15 V’a akım yalnızca ≈ %22 artar. Kırılma noktası V_{DS} = V_{GS} − V_{P} = 1,74 V. Güvenlik: en büyük güç 15 V · 4,45 mA ≈ 67 mW; BF245A’nın kataloğunda P_{tot} 300 mW, V_{DS} en çok 30 V, yani sınırların çok altında.',
       },
@@ -499,7 +499,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '3',
         text: 'Giriş sinyalinin genliğini yavaşça artırarak (~2 V’a kadar) çıkış dalga şeklindeki değişimi gözleyiniz. Nasıl bir değişim olmaktadır, nedenini açıklayınız.',
-        sim: 'Cihaz rafında FG1’in tepe-tepe değerini 1 V, 2 V ve 4 V yap; B’yi DC kuplaja ve 5 V/bölmeye al, kırpılmanın hangi gerilimlerde olduğunu gör.',
+        sim: 'Defterdeki FG1 kartında tepe-tepe değerini 1 V, 2 V ve 4 V yap; B’yi DC kuplaja ve 5 V/bölmeye al, kırpılmanın hangi gerilimlerde olduğunu gör.',
         answer:
           'Çıkış giderek bozulur ve kazanç düşer. 1 V tepe-tepe girişte çıkış 1,36–9,36 V (8,0 V tepe-tepe, kazanç ≈ 8,0): alt yarı yukarıdakinden kısadır. 2 V tepe-tepe girişte 1,20–12,87 V: altı düzleşir. Nedenleri: (i) girişin pozitif yarısında kapı-source eklemi ileri kutuplanır, kapı ≈ 0,66 V’ta kalır ve R_{g}’den ≈ 34 µA geçer; (ii) drain ≈ 1,2 V’a inince V_{DS} < V_{GS} − V_{P} olur, transistör doyumdan çıkar (omik bölge) ve akım daha fazla artamaz; (iii) negatif yarıda i_{d} karesel olarak azalır, iki yarı eşit büyümez. 4 V tepe-tepe girişte (2 V genlik) üstü de düzleşir: υ_{GS} V_{P}’nin (−1,74 V) altına inince kanal kapanır, i_{d} = 0 ve drain V_{DD}’ye (≈ 14,98 V) çıkar.',
       },
@@ -534,7 +534,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '3',
         text: 'Giriş sinyalinin genliğini ve frekansını arttırarak çıkış sinyalinde, dolayısı ile gerilim kazancındaki, değişimi inceleyiniz.',
-        sim: 'Cihaz rafında FG1’in tepe-tepe değerini 0,4 V, 0,6 V, 0,8 V ve 1 V yap; sonra 0,2 V’a dönüp frekansı 10 kHz, 100 kHz, 500 kHz ve 1 MHz yap (her seferinde Oto’ya bas).',
+        sim: 'Defterdeki FG1 kartında tepe-tepe değerini 0,4 V, 0,6 V, 0,8 V ve 1 V yap; sonra 0,2 V’a dönüp frekansı 10 kHz, 100 kHz, 500 kHz ve 1 MHz yap (her seferinde OSC1 kartındaki Oto’ya bas).',
         answer:
           'Genlik (1 kHz): 0,4 V tepe-tepe girişte kazanç ≈ 16,2, 0,6 V’ta ≈ 15,8 (kollektör 1,50–10,98 V): iki yarı eşit büyümez, çünkü kollektör akımı baz-emetör geriliminin üstel fonksiyonudur. 0,8 V’ta alt tepe ≈ 0,23 V’ta düzleşir (doyum), kazanç ≈ 14,6; 1 V’ta üst tepe de V_{CC}’de (≈ 11,99 V) düzleşir (kesim), kazanç ≈ 11,8. Frekans (0,2 V tepe-tepe): kazanç 10 kHz’te ≈ 16,3, 100 kHz’te ≈ 15,7, 500 kHz’te ≈ 9,7, 1 MHz’te ≈ 5,6. Yüksek frekansta transistörün iç kapasiteleri, özellikle Miller etkisiyle (1 + K_{υ}) kat büyüyen baz-kollektör kapasitesi, bazı R_{B} üzerinden besleyen sinyali azaltır. Kazanç 350 kHz ile 400 kHz arasında 1 kHz’teki değerin 1/√2’sine (≈ 11,5) iner: üst kesim frekansı ≈ 370 kHz.',
       },
@@ -578,7 +578,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
       {
         no: '5',
         text: 'Giriş sinyalinin genliğini yavaşça artırarak (~1 V’a kadar) çıkış dalga şeklindeki değişimi gözleyiniz. Nasıl bir değişim olmaktadır, nedenini açıklayınız.',
-        sim: 'Cihaz rafında FG1’in tepe-tepe değerini 0,2 V, 0,5 V ve 1 V yap; B’yi DC kuplaja ve 5 V/bölmeye al.',
+        sim: 'Defterdeki FG1 kartında tepe-tepe değerini 0,2 V, 0,5 V ve 1 V yap; B’yi DC kuplaja ve 5 V/bölmeye al.',
         answer:
           'Genlik büyüdükçe kazanç düşer ve çıkış önce asimetrik bozulur (0,05 V tepe-tepede 3,60–11,40 V, oran ≈ 156; 0,1 V’ta 2,25–13,97 V), sonra iki yandan kırpılır: 0,2 V’ta üst tepe V_{DD}’de düzleşir (0,68–14,99 V), 1 V’ta drain ≈ 0,01 V ile 14,99 V arasında, kare dalgaya benzer (oran ≈ 15). Negatif yarıda kapı eşiğin (≈ 3,83 V) altına iner, transistör kesime girer ve drain V_{DD}’ye çıkar; pozitif yarıda drain akımı R_{D}’nin izin verdiği en büyük değere (≈ 15 mA) ulaşır, transistör omik bölgeye girer ve drain ≈ 0 V’a iner.',
       },

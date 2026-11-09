@@ -2126,6 +2126,8 @@ export const tr = {
     trigger: 'Tetik',
     auto: 'Oto',
     autoTitle: 'Bölme ayarlarını sinyale göre seç',
+    /** Kartta Oto düğmesinin yanındaki açıklama (föy "Oto’ya bas" der). */
+    autoHint: 'Volt/bölme ve zaman/bölmeyi sinyale göre seçer',
     channel: (c: string) => `Kanal ${c}`,
     notConnected: 'bağlı değil',
     stopped: 'Ekranı görmek için Oynat’a bas.',

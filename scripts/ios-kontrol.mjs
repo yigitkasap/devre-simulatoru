@@ -3984,7 +3984,7 @@ try {
   await notebook(rp).getByRole('button', { name: /^Gelişmiş/ }).click(); await rp.waitForTimeout(150);
   await notebook(rp).getByRole('button', { name: 'Oto', exact: true }).click(); await rp.waitForTimeout(300);
   const autoToast = (await rp.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
-  check('masaüstü (v3): çalışırken osiloskop kartı tetik durumunu gösteriyor; Gelişmiş’teki Oto neyin değiştiğini bildiriyor', autoToast && (status.includes('Tetikleniyor') || status.includes('Tetiklenmiyor')), status.slice(0, 40));
+  check('masaüstü (v3): çalışırken osiloskop kartı tetik durumunu gösteriyor; karttaki Oto (2026-11-09’dan beri Gelişmiş’in dışında) neyin değiştiğini bildiriyor', autoToast && (status.includes('Tetikleniyor') || status.includes('Tetiklenmiyor')), status.slice(0, 40));
   // Üretecin çıkış satırı AC'de anlık değeri değil, 0,4 s'lik pencerenin etkin değerini gösterir (her karede zıplamaz; simetrik AC işaretsiz).
   const fgRegion = notebook(rp).getByRole('region', { name: 'FG1 · Fonksiyon üreteci' });
   if (!(await fgRegion.count())) await notebook(rp).getByRole('button', { name: /^FG1 ·/ }).click();
@@ -5692,6 +5692,52 @@ try {
         `satır ${Math.round(rowBox?.height ?? 0)} px · ${n} kayıt (${Math.round(itemBox?.height ?? 0)} px) · ${restored?.parts?.map((p) => p.label).join(',')}`);
       await ctx.close();
     }
+  }
+
+  // --- Föy metinleri: cihaz rafı yerine defterdeki cihaz kartı; osiloskop kartında Oto görünür ve açıklamalı ------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300);
+    await page.getByRole('dialog', { name: 'Örnekler' }).getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).click(); await page.waitForTimeout(500);
+    const region = notebook(page).getByRole('region', { name: /^Örnek · Deney/ });
+    await region.getByRole('button').first().click(); await page.waitForTimeout(300);
+    const steps = ((await region.getByRole('region', { name: 'Adımlar ve sorular' }).textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    check('föy metni (masaüstü, yarım dalga): "cihaz rafı" yok; "defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı)" ve "OSC1 kartındaki Oto’ya bas"',
+      !/cihaz raf/i.test(steps) && steps.includes('defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı)') && steps.includes('OSC1 kartındaki Oto’ya bas'),
+      steps.slice(steps.indexOf('Oynat'), steps.indexOf('Oynat') + 150));
+    // Föyün dediği yerde: FG1'in kartında dalga biçimi ve frekans, OSC1'in kartında Gelişmiş açılmadan Oto.
+    await notebook(page).getByRole('button', { name: /^FG1 ·/ }).click(); await page.waitForTimeout(250);
+    const fg = notebook(page).getByRole('region', { name: 'FG1 · Fonksiyon üreteci' });
+    const fgControls = { kare: await fg.getByRole('radio', { name: 'Kare' }).count(), frekans: await fg.getByRole('spinbutton', { name: 'Frekans' }).count() };
+    await notebook(page).getByRole('button', { name: /^OSC1 ·/ }).click(); await page.waitForTimeout(250);
+    const osc = notebook(page).getByRole('region', { name: 'OSC1 · Osiloskop' });
+    const oto = osc.getByRole('button', { name: 'Oto', exact: true });
+    const advancedOpen = await osc.getByRole('button', { name: /^Gelişmiş/ }).getAttribute('aria-expanded');
+    const otoVisible = (await oto.count()) === 1 && (await oto.isVisible());
+    const otoHint = await oto.evaluate((b) => document.getElementById(b.getAttribute('aria-describedby') ?? '')?.textContent ?? '').catch(() => '');
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(600);
+    await oto.click(); await page.waitForTimeout(300);
+    const toast = (await page.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
+    check('föy metni (masaüstü): FG1 kartında dalga biçimi (Kare) ve Frekans var; OSC1 kartında Oto Gelişmiş kapalıyken görünür, yanında "Volt/bölme ve zaman/bölmeyi sinyale göre seçer"; basınca "Oto:" bildirimi',
+      fgControls.kare === 1 && fgControls.frekans === 1 && advancedOpen === 'false' && otoVisible && otoHint === 'Volt/bölme ve zaman/bölmeyi sinyale göre seçer' && toast,
+      `${JSON.stringify(fgControls)} · Gelişmiş ${advancedOpen} · Oto ${otoVisible} "${otoHint}" · bildirim ${toast}`);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'Yarım dalga doğrultmaç');
+    await phoneNotebook(page).getByRole('button', { name: /^OSC1 ·/ }).tap(); await page.waitForTimeout(500);
+    const card = phoneNotebook(page).getByRole('region', { name: 'OSC1 · Osiloskop' });
+    const oto = card.getByRole('button', { name: 'Oto', exact: true });
+    await oto.scrollIntoViewIfNeeded().catch(() => {});
+    const box = await oto.boundingBox();
+    const advancedOpen = await card.getByRole('button', { name: /^Gelişmiş ayarlar/ }).getAttribute('aria-expanded');
+    check('föy metni (telefon): osiloskop kartında Oto Gelişmiş ayarlar kapalıyken görünür ve en az 44 px',
+      advancedOpen === 'false' && box !== null && box.height >= 44 && box.width >= 44, `Gelişmiş ${advancedOpen} · ${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)}`);
+    await page.context().close();
   }
 
   // --- Telefon hızı: 4 kat yavaş işlemcide (iPhone 13 öykünmesi) bütün örnekler çalışırken ---------------

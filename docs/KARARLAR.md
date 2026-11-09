@@ -2799,3 +2799,25 @@ frekans bölücüde uygulamanın osiloskobu 968 / 484 Hz'i %0,5 içinde gösteri
 - Gece kararı: boş devre ve hiç değiştirilmemiş örnek kaydedilmez (örneğin kendisi her zaman Örnekler'de); aynı
   devre (analiz dahil aynı yazım) iki kez girmez, yenisi başa geçer. Değiştirilmemiş dosya, paylaşım bağlantısı ve
   arıza görevi kaydedilir: kullanıcının elinde başka kopyası olmayabilir.
+
+**3. Föy metinleri ve Oto** (`src/i18n/foy.ts`, `src/editor/DeviceCards.tsx`, `tests/foy-cihaz-metinleri.test.ts`,
+ios-kontrol "Föy metinleri").
+
+- Cihaz rafı arayüz v3'te kalktı (5. adım): osiloskop, fonksiyon üreteci, DC güç kaynağı ve su haznesi defterin
+  kartlarıdır (masaüstünde ve tablette sağdaki Defter, telefonda şemanın altındaki defter; kartın satırına basınca
+  açılır). Föy kartlarındaki "cihaz rafında" geçen 12 adım metni (7'si küçük harfle, ilk adımların "Devre kurulu: …
+  Oynat’a bas; cihaz rafında …" cümlesinde; 5'i "Cihaz rafında …" diye başlayan adım metni) buna göre yazıldı:
+  ilk adımlarda "defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı)" ya da "defterde
+  PS1’in kartını aç (…)", öbür adımlarda "Defterdeki FG1 kartında …". Ayarın adı kartdakiyle aynı (dalga biçimi
+  Kare, frekans, tepe-tepe, 1. çıkış).
+- Gece kararı: kullanıcının "(cihaz nerede ve nasıl eklenir)" notu için metinler cihazın nerede durduğunu ve
+  ayarına nasıl ulaşılacağını söyler; cihaz ekleme (Parça ekle → Laboratuvar cihazları) yazılmadı, çünkü föy
+  devreleri kurulu gelir ve cihazlar zaten devrededir.
+- Föy dışında kalan "cihaz rafı" izleri (değiştirilmedi): `Canvas.tsx` (Highlight yorumu), `DeviceCards.tsx` (dosya
+  başı yorumu), `InspectTab.tsx` (`RACK_DEVICES` yorumu); `tr.rack.title` ("Cihaz rafı") ve `tr.rack.settingsInRack`
+  hiçbir yerde kullanılmıyor (eski metinler).
+- **Oto:** osiloskop kartındaki Oto düğmesi "Gelişmiş"in içindeydi; föyün iki yerinde ("her seferinde Oto’ya bas")
+  bulunması zordu. Artık kanal ve zaman ayarlarının altında, Gelişmiş'in hemen üstünde, her zaman görünür; yanında
+  "Volt/bölme ve zaman/bölmeyi sinyale göre seçer" açıklaması (düğmenin `aria-describedby`'ı; adı yine "Oto",
+  föydeki gibi). Telefonda 44 px. Föydeki iki yer "OSC1 kartındaki Oto’ya bas" diye adresi verir. Gelişmiş'te
+  konum, B ters, tetik, giriş, şebeke toprağı ve jaklar kaldı.
