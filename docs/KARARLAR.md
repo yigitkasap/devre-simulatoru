@@ -2504,6 +2504,11 @@ iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon
   onun arkasında kalıyordu; `loadDoc` telefonda Analiz'i kapatır. Masaüstünde Analiz şemanın yanında bir
   çekmece olduğu için açık kalır.
 
+- **Turun 4. adımı boş devrede (madde 7):** İncele adımı devrede parça yokken "Devrede henüz parça yok.
+  Önce … bir parça ekle; sonra parçaya dokun" der (`tr.tour.inspectEmpty`) ve vurgu çerçevesi İncele'nin
+  hedefi (defter) yerine Parça ekle'yi gösterir. Adımlar "İleri" ile atlanabildiği için boş devrede 4.
+  adıma gelinebiliyor.
+
 ### Lojik entegreler (Dalga 2, 2026-11-05)
 
 Yeni parçalar ("Parça ekle → Lojik entegreler"): 7400 (4 × NAND), 7402 (4 × NOR), 7404 (6 × DEĞİL),

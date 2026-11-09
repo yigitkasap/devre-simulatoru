@@ -2020,6 +2020,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         <Tour
           step={tour.step}
           variant={variant}
+          empty={doc.parts.length === 0}
           onNext={() => setTour((t) => (t && t.step < 3 ? { ...t, step: (t.step + 1) as TourStep, parts: doc.parts.length, wires: doc.wires.length } : t))}
           onClose={finishTour}
         />

@@ -5354,6 +5354,35 @@ try {
       `önce ${before.open} · paylaşım ${afterShare.open}/${afterShare.svg} · örnek ${afterExample.open}/${afterExample.svg}`);
     await page.context().close();
   }
+  {
+    // 7. Turun 4. adımı (İncele) boş devrede önce parça eklemeyi söylüyor ve Parça düğmesini gösteriyor; parça varken "Bir parçaya dokun".
+    const ctx = await browser.newContext({ welcome: true, viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const tour = page.getByRole('dialog', { name: 'Kısa tur' });
+    const stepFour = async () => {
+      await page.getByRole('dialog', { name: /hoş geldin/ }).getByRole('button', { name: /Kısa tur/ }).tap(); await page.waitForTimeout(300);
+      for (let i = 0; i < 3; i++) { await tour.getByRole('button', { name: 'İleri', exact: true }).tap(); await page.waitForTimeout(250); }
+      const text = ((await tour.textContent()) ?? '').replace(/\s+/g, ' ');
+      // Vurgu çerçevesi (tur kartının yanındaki mavi çerçeve) Parça düğmesinin çevresinde mi.
+      const ring = await page.locator('div.pointer-events-none.fixed.border-accent').boundingBox();
+      const add = await phoneBar(page).getByRole('button', { name: 'Parça', exact: true }).boundingBox();
+      const onAdd = ring !== null && add !== null && Math.abs(ring.x + 4 - add.x) < 2 && Math.abs(ring.y + 4 - add.y) < 2;
+      await tour.getByRole('button', { name: 'Turu bitir' }).tap(); await page.waitForTimeout(250);
+      return { text, onAdd };
+    };
+    const empty = await stepFour();
+    await addPart(page, 'Direnç');
+    await page.getByRole('dialog', { name: 'Parça ekle' }).getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(300);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Kısa turu başlat' }).tap(); await page.waitForTimeout(400);
+    const withPart = await stepFour();
+    check('telefon arayüzü (7, tur): turun 4. adımı boş devrede "Devrede henüz parça yok… Parça’dan bir parça ekle" diyor ve Parça düğmesini çerçeveliyor; parça varken "Bir parçaya dokun"',
+      empty.text.includes('Adım 4 / 4') && empty.text.includes('Devrede henüz parça yok') && !empty.text.includes('Bir parçaya dokun') && empty.onAdd && withPart.text.includes('Bir parçaya dokun') && !withPart.text.includes('henüz parça yok'),
+      `${empty.text.replace(/^.*?İncele/, '').slice(0, 60)} · çerçeve Parça'da ${empty.onAdd} · ${withPart.text.replace(/^.*?İncele/, '').slice(0, 30)}`);
+    await ctx.close();
+  }
 
   // --- Kablo yolu (masaüstü): sıfırdan kurulan devrelerde beklenmeyen bağlantı yok -----------------------
   // Kullanıcı testinde L biçimli yolun köşesi başka bir kablonun köşesine ya da bir uca düşmüş, kablo başka

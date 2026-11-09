@@ -4079,6 +4079,12 @@ export const tr = {
         tablet: 'Bir parçaya dokun: kartı sağdaki defterde açılır; değeri **−/+** ile canlı değiştir.',
       },
     ] as ReadonlyArray<{ title: string; desktop: string; phone: string; tablet: string }>,
+    /** 4. adım (İncele) devrede parça yokken: önce parça eklenir. */
+    inspectEmpty: {
+      desktop: 'Devrede henüz parça yok. Önce sağdaki defterden bir parça ekle; sonra parçaya tıkla: gerilim, akım ve gücü sağdaki panelde gör.',
+      phone: 'Devrede henüz parça yok. Önce alttaki **Parça**’dan bir parça ekle; sonra parçaya dokun: kartı açılır, değeri **−/+** ile canlı değiştir.',
+      tablet: 'Devrede henüz parça yok. Önce sağdaki defterde **Parça ekle**ye dokun; sonra parçaya dokun: kartı defterde açılır.',
+    },
   },
   toast: {
     undo: 'Geri al',

@@ -168,11 +168,25 @@ export type TourStep = 0 | 1 | 2 | 3;
 /** Adımların hedefleri (data-tour). */
 const TARGETS = ['parts', 'canvas', 'play', 'inspect'] as const;
 
-export function Tour({ step, variant, onNext, onClose }: { step: TourStep; variant: 'desktop' | 'phone' | 'tablet'; onNext: () => void; onClose: () => void }) {
+export function Tour({
+  step,
+  variant,
+  empty = false,
+  onNext,
+  onClose,
+}: {
+  step: TourStep;
+  variant: 'desktop' | 'phone' | 'tablet';
+  /** Devrede parça yok: İncele adımı önce parça eklemeyi söyler ve Parça ekle'yi gösterir. */
+  empty?: boolean;
+  onNext: () => void;
+  onClose: () => void;
+}) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const [cardSize, setCardSize] = useState({ w: 320, h: 160 });
-  const target = TARGETS[step];
+  const inspectEmpty = step === 3 && empty;
+  const target = inspectEmpty ? TARGETS[0] : TARGETS[step];
   useLayoutEffect(() => {
     let frame = 0;
     const update = () => {
@@ -189,9 +203,9 @@ export function Tour({ step, variant, onNext, onClose }: { step: TourStep; varia
   useLayoutEffect(() => {
     const el = cardRef.current;
     if (el) setCardSize({ w: el.offsetWidth, h: el.offsetHeight });
-  }, [step, rect === null]);
+  }, [step, rect === null, inspectEmpty]);
 
-  const texts = tr.tour.steps[step];
+  const texts = inspectEmpty ? { ...tr.tour.steps[step]!, ...tr.tour.inspectEmpty } : tr.tour.steps[step]!;
   const text = variant === 'desktop' ? texts.desktop : variant === 'phone' ? texts.phone : texts.tablet;
   // Kartın yeri: hedefin sağında, sığmazsa solunda, sonra altında ya da üstünde.
   const vw = window.innerWidth;
