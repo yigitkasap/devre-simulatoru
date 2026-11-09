@@ -2222,7 +2222,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const side = layout.landscape && !big;
     const strip = schematicStrip && !big && !side;
     // Şema kutusu: dikeyde yaklaşık 270 px; kısa ekranda (yatay telefon) kalan alanın % 42'si (en az 120 px).
-    const boxHeight = Math.round(Math.max(layout.landscape ? 120 : 132, Math.min(270, phoneAreaHeight * 0.42)));
+    // Dikeyde 3B'de kutu ekranın ≈ %60'ı (altta defterin en az 120 px'i kalır).
+    const benchBox = viewMode === 'bench' && !layout.landscape ? Math.min(Math.round(window.innerHeight * 0.6), phoneAreaHeight - 120) : 0;
+    const boxHeight = Math.round(Math.max(layout.landscape ? 120 : 132, Math.min(270, phoneAreaHeight * 0.42), benchBox));
     // Alttaki çubuk: Parça ekle ya da Analiz sayfası açıkken gizli (alanı sayfaya bırakır; eski yüzen düğmeler gibi).
     const bottomBar = !wiring && !addSheet && !analysis.open;
     // Bildirim defterin altında, alttaki çubuğun hemen üstünde, akışta (defterin satırlarını örtmez); tam ekranda,

@@ -106,7 +106,7 @@ function boxCorners(b: Box3): Vector3[] {
  * Masa üstü cihaz varken Serbest: yükseklik açısı (alçaldıkça tahta daha az yer kaplar, arkadaki ön paneller
  * daha çok görünür; telefonun 3B alanı kısa) ve tahtanın kadraj genişliğindeki payı.
  */
-const BENCH_FREE = { desktop: { elevation: (36 * Math.PI) / 180, share: 0.47 }, phone: { elevation: (30 * Math.PI) / 180, share: 0.72 } };
+const BENCH_FREE = { desktop: { elevation: (36 * Math.PI) / 180, share: 0.47 }, phone: { elevation: (30 * Math.PI) / 180, share: 0.72 }, tall: (24 * Math.PI) / 180, floor: 0.7 };
 /** Bu genişlikten dar tuval telefon sayılır (px). */
 const PHONE_WIDTH = 640;
 /** Cihazlar görünümü (masaüstü): ön paneller kullanılabilir yüksekliğin en az bu kadarını doldurur. */
@@ -1246,10 +1246,19 @@ export class BenchScene {
       if (short && this.plan?.onBoard.has(placed.part.id)) box.max.y = Math.min(box.max.y, BB.height + 3);
       keep.push(...boxCorners(box));
     }
+    // Dikey telefonda (3B alanı ekranın ≈ %60'ı, 2026-11-10) cihazların üstü kırpılmaz: ön panelleri dikeyde tamamen
+    // görünür (yanlardakiler yine kadrajın dışına taşabilir); biraz daha alçaktan (24°) bakılır, tahta payı korunsun.
+    // Kısa alanda (iPhone SE) cihazlar tamamen görünürse tahta payı %70'in altına düşer: o zaman eskisi gibi üstleri kırpılır.
+    const tops = this.isPhone() && !short && canvas.clientHeight >= canvas.clientWidth ? tall.flatMap((p) => boxCorners(new Box3().setFromObject(p.group))) : [];
     const { elevation, share } = this.isPhone() ? BENCH_FREE.phone : BENCH_FREE.desktop;
     const reserve = this.bottomReserve(0.5 - share / 2, 0.5 + share / 2) / Math.max(1, canvas.clientHeight);
     // Telefonda masadaki alçak parçalar (pil) kenara daha çok yaklaşabilir: tahta payı küçülmesin.
-    const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9, false, this.isPhone() ? 0.985 : 0.94);
+    const wide = this.isPhone() ? 0.985 : 0.94;
+    if (tops.length > 0) {
+      const whole = this.solveFrame(BENCH_FREE.tall, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.97, false, wide, tops);
+      if (whole.share >= BENCH_FREE.floor) return { target: whole.target, distance: whole.distance, elevation: BENCH_FREE.tall };
+    }
+    const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9, false, wide);
     return { target: solved.target, distance: solved.distance, elevation };
   }
 
@@ -1304,6 +1313,7 @@ export class BenchScene {
    * her noktanın derinliği ayrı): `focus` köşelerinin ekrandaki genişliği kadraj genişliğinin `share` kadarı;
    * `keep` köşeleri yatayda kadraja, dikeyde `bottom` ile `top` (NDC, −1 ekranın altı) arasına sığar ve alttan
    * `bottom` çizgisine oturur (`middle`: ikisinin ortasında). Sığmazsa uzaklık artar (focus `share`'den küçük kalır).
+   * `tops`: yalnızca dikeyde (üst kenarın altında) kalması gereken noktalar (yanlardan taşabilir).
    */
   private solveFrame(
     elevation: number,
@@ -1314,7 +1324,8 @@ export class BenchScene {
     top: number,
     middle = false,
     wide = 0.94,
-  ): { target: Vector3; distance: number; fill: number } {
+    tops: readonly Vector3[] = [],
+  ): { target: Vector3; distance: number; fill: number; share: number } {
     const toCamera = new Vector3(0, Math.sin(elevation), Math.cos(elevation));
     const forward = toCamera.clone().negate();
     const right = new Vector3(1, 0, 0);
@@ -1344,6 +1355,7 @@ export class BenchScene {
       const eye = target.clone().addScaledVector(toCamera, distance);
       const f = extent(focus, eye);
       const k = extent(keep, eye);
+      if (tops.length > 0) k.y1 = Math.max(k.y1, extent(tops, eye).y1);
       const ratio = Math.max((f.x1 - f.x0) / (2 * share), (k.x1 - k.x0) / (2 * wide), (k.y1 - k.y0) / ((top - bottom) * 0.97));
       // Kaydırma: keep yatayda ortada, alt kenarı `bottom`un hemen üstünde (hedef sağa/yukarı gidince içerik sola/aşağı).
       target.addScaledVector(right, ((k.x0 + k.x1) / 2) * distance * tanH * 0.8);
@@ -1353,7 +1365,8 @@ export class BenchScene {
     }
     const eye = target.clone().addScaledVector(toCamera, distance);
     const k = extent(keep, eye);
-    return { target, distance, fill: (k.y1 - k.y0) / (top - bottom) };
+    const f = extent(focus, eye);
+    return { target, distance, fill: (k.y1 - k.y0) / (top - bottom), share: (f.x1 - f.x0) / 2 };
   }
 
   /**

@@ -235,6 +235,8 @@ export function BenchView(props: BenchViewProps) {
   // İpucu sağ alttaki düğmelerin (44 px) hemen üstünde.
   const controlsBottom = props.controlsInset?.bottom ?? 16;
   const hintBottom = typeof controlsBottom === 'number' ? controlsBottom + 52 : `calc(${controlsBottom} + 52px)`;
+  // Telefonda ipucu üstte, Şema | 3B düğmesinin altında: altta tahtanın üstüne geliyordu (cihazların önüne biner,
+  // etiketler ondan kaçar; birkaç saniye sonra kalkar).
 
   const pickCamera = (choice: CameraChoice) => {
     setCameraLabel(choice);
@@ -331,7 +333,7 @@ export function BenchView(props: BenchViewProps) {
           ))}
         {props.overlayExtra}
         {hint && (
-          <p data-obstacle className="absolute left-3 m-0 max-w-[calc(100%-24px)] rounded-md bg-panel/90 px-2 py-1 text-label text-ink-2 shadow-sm" style={{ bottom: hintBottom }}>
+          <p data-obstacle className="absolute left-3 m-0 max-w-[calc(100%-24px)] rounded-md bg-panel/90 px-2 py-1 text-label text-ink-2 shadow-sm" style={phone ? { top: 56 } : { bottom: hintBottom }}>
             {tr.bench.hintPhone}
           </p>
         )}

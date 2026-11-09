@@ -2030,6 +2030,13 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   yatayda ekranın üstünden taşıyordu. Artık sayfanın altında alt sayfa (body'de; arkası karartılı, dokununca kapanır;
   seçenekler 44 px, 16 px yazı, güvenli alan kadar boşluk). ios-kontrol "Telefon 3B (…): kamera menüsü alt sayfa"
   (iPhone 13, iPhone SE, yatay).
+- **Dikeyde 3B alanı büyük**: 3B açıkken şema kutusu ekran yüksekliğinin ≈ %60'ı (iPhone 13'te 270 → 505 px, SE'de
+  224 → 399 px; altta defterin en az 120 px'i kalır). İlk açılıştaki "Bir parmak: döndür…" ipucu altta tahtanın
+  üstüne geliyordu: telefonda üstte, Şema | 3B düğmesinin altında. Varsayılan kadrajda cihazların üstü kırpılmaz:
+  dikey telefonda biraz daha alçaktan (24°) bakılır, ön paneller dikeyde tamamen görünür, tahta yine kadraj
+  genişliğinin %72'si. **Gece kararı:** kısa alanda (iPhone SE) cihazlar tamamen görünürse tahta payı %59'a düşüyor:
+  tahta payı (≥ %70) öncelikli, cihazların üstü eskisi gibi kırpılır. Yatayda (T2'nin yerleşimi, 523 × 333) 3B alanı
+  bozulmuyor, tahta %72. ios-kontrol "Telefon 3B (…): 3B alanı ekranın ≈ %60'ı …".
 
 ### Performans ve hata taraması (2026-10-27)
 

@@ -6533,6 +6533,20 @@ try {
     await openExample(page, '1N4001: doğru akımda akım-gerilim ölçümü');
     await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: '3B' }).tap();
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
+    // 2. Dikeyde 3B alanı ekranın ≈ %60'ı; düğmeler ve ipucu (ilk açılışta) tahtanın üstünde değil; tahta en az %70;
+    // iPhone 13'te cihazların üstü kırpılmıyor (SE'de alan kısa: tahta payı için kırpılabilir); yatayda 3B alanı bozulmuyor.
+    const area = await page.evaluate(() => {
+      const t = window.__tezgah; const c = document.querySelector('main canvas').getBoundingClientRect(); const b = t.boardRect();
+      const board = { x0: b.x0 + c.left, y0: b.y0 + c.top, x1: b.x1 + c.left, y1: b.y1 + c.top };
+      const over = (r) => r.left < board.x1 && r.right > board.x0 && r.top < board.y1 && r.bottom > board.y0;
+      const hint = document.querySelector('[data-obstacle]')?.getBoundingClientRect();
+      const buttons = [...document.querySelectorAll('[data-fit-reserve] button, main button[aria-label$="tam ekran aç"]')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
+      return { frac: c.height / innerHeight, w: Math.round(c.width), h: Math.round(c.height), share: (b.x1 - b.x0) / c.width, hint: hint ? over(hint) : null, buttons: buttons.some(over), top: Math.min(...t.deviceRects().map((d) => d.y0)) };
+    });
+    const portrait = h > w;
+    check(`Telefon 3B (${cihaz}): ${portrait ? '3B alanı ekranın ≈ %60’ı' : '3B alanı bozulmuyor'}; düğmeler ve ipucu tahtanın üstünde değil; tahta en az %70${cihaz === 'iPhone 13' ? '; cihazların üstü kırpılmıyor' : ''}`,
+      (portrait ? area.frac >= 0.55 && area.frac <= 0.65 : area.h >= 300) && area.hint === false && !area.buttons && area.share >= 0.7 && (cihaz !== 'iPhone 13' || area.top >= 0),
+      `${area.w}×${area.h} (%${Math.round(area.frac * 100)}) · ipucu tahtada ${area.hint} · düğme tahtada ${area.buttons} · tahta %${Math.round(area.share * 100)} · cihazların üstü ${Math.round(area.top)} px`);
     // 1. Kamera menüsü telefonda alt sayfa: tamamı ekranda, seçenekler en az 44 px; seçince kapanır.
     await page.getByRole('button', { name: /^Kamera:/ }).tap(); await page.waitForTimeout(300);
     const menu = await page.evaluate(() => {
