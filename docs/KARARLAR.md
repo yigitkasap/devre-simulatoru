@@ -1898,6 +1898,13 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   paneli kameraya bakar; en öndeki düğmesi tahtanın 14 birim (≈ 36 mm) arkasında, yan yana: kabloların ön
   soketten çıkıp masaya sarkacağı kadar yer (2026-11-08'de 30 birimdi, kablolar çok uzundu). Üstten görünüm
   tahtaya odaklanır (cihazların yalnızca soketli ön kısmı sayılır).
+- **Cihaz boyutları (2026-11-09, kullanıcı kararı)**: el multimetresi (multimetre, voltmetre, ampermetre) 92 × 182 mm
+  çizilmişti; laboratuvardaki tip (PM8233D) kılıfsız 67 × 140 mm, kılıfla yaklaşık 75 × 150 mm (PM8233D+ satış
+  sayfası: 148 × 74 × 42 mm): model bütün olarak 150 / 182 oranında küçülür (75,8 × 150 × 41,2 mm; `DMM_FIT`). DC güç
+  kaynağı gerçeğin %50'si (`SUPPLY_SCALE`, %60'a göre ≈ %15 küçük); üreteç ve osiloskop %60'ta. Masadaki yerleri
+  (`breadboard.ts` → TABLE: güç kaynağı 60 × 57, el multimetresi 19 × 28 birim) küçüldü; kabloların delikleri (`slot`)
+  aynı. Tahta payı korunuyor (10 örnek: masaüstü %47, telefon %72, pilli iki örnek %67); kablolar gövdelerden
+  geçmiyor, etiketler çakışmıyor (ios-kontrol 3B, Tahtada kur ve Karta aktar bölümleri 128 madde geçti).
 - **Varsayılan kadraj (Serbest, 2026-11-09)**: masa üstü cihaz varken bütün nesneleri sığdırmak tahtayı
   küçültüyordu (1N4001 DC'de kadrajın ≈ %25'i, telefonda alttaki düğmelerin arkasında). Artık tahtaya odaklı:
   tahta kadraj genişliğinin masaüstünde %47'si (36°), telefonda %72'si (30°; 3B alanı kısa, alçak açıda tahta

@@ -3,7 +3,8 @@
 // adı yok), panel yazıları laboratuvardaki gibi İngilizce standart işaretler. Masa üstü cihazlar dik durur,
 // ön paneli kameraya (+z) bakar; el multimetresi arkadaki ayağıyla hafif geriye yaslanır.
 //
-// Boyutlar gerçek cihazın milimetresiyle verilir; tahta okunaklı kalsın diye tezgâhta gerçeğin %60'ı (mm()).
+// Boyutlar gerçek cihazın milimetresiyle verilir; tahta okunaklı kalsın diye tezgâhta gerçeğin %60'ı (mm()); DC güç
+// kaynağı %50'si (SUPPLY_SCALE), el multimetresi kılıflı PM8233D ölçüsüne (75 × 150 mm) küçültülür (DMM_FIT).
 // Gövdeler yuvarlatılmış kutular, düğmeler silindir, tuşlar kutu; malzemeler paylaşılır (kit.mat). Panel
 // baskısı bir kez çizilen tuval dokusudur; ekranlar ayrı, küçük tuval dokuları (en çok 1024 px) ve değer
 // değişince (en çok saniyede 10 kez) yeniden çizilir. Sıklık sınırına takılan değişiklik bekletilir
@@ -43,6 +44,19 @@ const SANS = '"IBM Plex Sans", system-ui, sans-serif';
 
 /** Cihazlar gerçek boyutun bu kadarı (tahta okunaklı kalsın; en çok %40 küçültme). */
 export const INSTRUMENT_SCALE = 0.6;
+/** DC güç kaynağı daha küçük: gerçeğin %50'si (%60'a göre ≈ %15 küçük; 2026-11-09). */
+export const SUPPLY_SCALE = 0.5;
+/**
+ * El multimetresi: model 92 × 182 mm kılıflı gövdeyle çizilir; laboratuvardaki tip (PM8233D) kılıfla yaklaşık
+ * 75 × 150 mm (PM8233D+: 148 × 74 × 42 mm): bütün model 150 / 182 oranında küçülür (75,8 × 150 × 41,2 mm).
+ */
+export const DMM_FIT = 150 / 182;
+
+/** Modeli kökünden `k` oranında küçültür (uçlar da; yönler aynı). */
+function resized(model: PartModel, k: number): PartModel {
+  model.root.scale.setScalar(k);
+  return { ...model, anchors: model.anchors.map((a) => a.clone().multiplyScalar(k)) };
+}
 /** Gerçek boyut (mm) → tezgâh birimi (2,54 mm), INSTRUMENT_SCALE ile. */
 const mm = (v: number) => (v * INSTRUMENT_SCALE) / 2.54;
 /** Tuval dokularının en büyük kenarı (px). */
@@ -593,7 +607,7 @@ export function dmmModel(kind: DmmKind): PartModel {
   const initial = kind === 'ammeter' ? 'mA' : 'V⎓';
   draw('– – –', initial, false, 'DC');
   turn(initial);
-  return {
+  return resized({
     root,
     anchors,
     anchorDirs: [dir, dir.clone()],
@@ -609,7 +623,7 @@ export function dmmModel(kind: DmmKind): PartModel {
       return lcd.redraw(`${text}|${at}|${ctx.active}|${mark}`, ctx.now, () => draw(text, at, ctx.active || ohm, mark));
     },
     dispose: lcd.dispose,
-  };
+  }, DMM_FIT);
 }
 
 // --- DC güç kaynağı ------------------------------------------------------------------------------------------
@@ -724,7 +738,7 @@ export function dcsupplyModel(): PartModel {
     l.cc.set(false);
     l.cv.set(false);
   });
-  return {
+  return resized({
     root,
     anchors,
     anchorDirs: anchors.map(() => FRONT.clone()),
@@ -760,7 +774,7 @@ export function dcsupplyModel(): PartModel {
         l.cv.material.dispose();
       });
     },
-  };
+  }, SUPPLY_SCALE / INSTRUMENT_SCALE);
 }
 
 // --- Fonksiyon üreteci ---------------------------------------------------------------------------------------
