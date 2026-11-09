@@ -5327,6 +5327,34 @@ try {
     await bCtx.close();
   }
 
+  // --- Telefon arayüzü taraması (2026-11-09): okunur şema, Analiz, yatay düzen, dar kartlar, tur, kontrast, bildirim ---
+  // Telefon arayüzü taramasının (iPhone 13, iPhone SE, Pixel 5, yatay, koyu tema) maddeleri; docs/KARARLAR.md →
+  // "Telefon arayüzü taraması".
+  {
+    // 4. Analiz açık bırakılınca sonradan açılan paylaşım bağlantısı ve örnek telefonda Analiz kapalı açılıyor.
+    const { page } = await phone();
+    await openExample(page, 'LED ve ön direnç');
+    const analysis = page.getByRole('region', { name: 'Analiz', exact: true });
+    const state = async () => ({ open: await analysis.count(), svg: await page.locator('svg.schematic').isVisible().catch(() => false) });
+    await phoneMoreTile(page, 'Analiz');
+    const before = await state();
+    const shared = JSON.parse(readFileSync(new URL('../src/examples/rc-dolma.json', import.meta.url), 'utf8'));
+    await page.evaluate((h) => { window.location.hash = h; }, `#d=${lz.compressToEncodedURIComponent(JSON.stringify(shared))}`);
+    await page.waitForTimeout(900);
+    const afterShare = await state();
+    const sharedParts = (await doc(page)).parts.length;
+    await phoneMoreTile(page, 'Analiz');
+    // Analiz açıkken üst çubuk onun altında kalır: Örnekler düğmesine DOM'dan basılır (başka bir yoldan açılmış gibi).
+    await page.locator('header').getByRole('button', { name: 'Örnekler', exact: true }).dispatchEvent('click'); await page.waitForTimeout(400);
+    await page.getByRole('searchbox', { name: 'Örnek ara' }).fill('Gerilim bölücü'); await page.waitForTimeout(200);
+    await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).tap(); await page.waitForTimeout(800);
+    const afterExample = await state();
+    check('telefon arayüzü (4): Analiz açık bırakılınca sonradan açılan paylaşım bağlantısı ve örnek telefonda Analiz kapalı, şema görünür açılıyor',
+      before.open === 1 && afterShare.open === 0 && afterShare.svg && sharedParts === shared.parts.length && afterExample.open === 0 && afterExample.svg,
+      `önce ${before.open} · paylaşım ${afterShare.open}/${afterShare.svg} · örnek ${afterExample.open}/${afterExample.svg}`);
+    await page.context().close();
+  }
+
   // --- Kablo yolu (masaüstü): sıfırdan kurulan devrelerde beklenmeyen bağlantı yok -----------------------
   // Kullanıcı testinde L biçimli yolun köşesi başka bir kablonun köşesine ya da bir uca düşmüş, kablo başka
   // bir kablonun ucunun üstünden geçmişti: multimetre LED yerine pilin − ucunu ölçtü, fonksiyon üretecinin

@@ -886,7 +886,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     setPlacing(null);
     setCabling(null);
     setBoardSession(null);
-    // Telefonda örneğin kartı defterin üstünde: şema kutusu ve defter görünür.
+    // Telefonda örneğin kartı defterin üstünde: şema kutusu ve defter görünür. Analiz telefonda tam ekran
+    // sayfa: açık bırakıldıysa yeni devre (örnek, paylaşım bağlantısı, dosya) onun arkasında açılmasın.
+    if (phone) analysis.setOpen(false);
     setAddSheet(null);
     setSchematicFull(false);
     setSchematicStrip(false);

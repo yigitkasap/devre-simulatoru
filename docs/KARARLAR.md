@@ -2494,6 +2494,16 @@ Tasarım: `docs/tasarim-v3` → "Analiz katmanı (N1–N9)". Simülasyon motorun
     yalnızca öğrencininkileri kaldırır). "Güç rayları bağlı": güç kaynaklarının raylara giden
     kabloları ve raylar arası kablolar takılı gelir.
 
+### Telefon arayüzü taraması (2026-11-09)
+
+Telefon arayüzü taramasından (iPhone 13 390 × 844, iPhone SE 375 × 667, Pixel 5 393 × 851, yatay
+iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon arayüzü taraması" bölümü.
+
+- **Yeni devrede Analiz kapalı (madde 4):** Analiz telefonda ekranı kaplayan bir sayfa. Açık
+  bırakıldıysa sonradan açılan devre (örnek, aynı sekmede açılan paylaşım bağlantısı, dosya, yeni devre)
+  onun arkasında kalıyordu; `loadDoc` telefonda Analiz'i kapatır. Masaüstünde Analiz şemanın yanında bir
+  çekmece olduğu için açık kalır.
+
 ### Lojik entegreler (Dalga 2, 2026-11-05)
 
 Yeni parçalar ("Parça ekle → Lojik entegreler"): 7400 (4 × NAND), 7402 (4 × NOR), 7404 (6 × DEĞİL),
