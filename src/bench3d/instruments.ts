@@ -3,7 +3,8 @@
 // adı yok), panel yazıları laboratuvardaki gibi İngilizce standart işaretler. Masa üstü cihazlar dik durur,
 // ön paneli kameraya (+z) bakar; el multimetresi arkadaki ayağıyla hafif geriye yaslanır.
 //
-// Boyutlar gerçek cihazın milimetresiyle verilir; tahta okunaklı kalsın diye tezgâhta gerçeğin %60'ı (mm()).
+// Boyutlar gerçek cihazın milimetresiyle verilir; tahta okunaklı kalsın diye tezgâhta gerçeğin %60'ı (mm()); DC güç
+// kaynağı %50'si (SUPPLY_SCALE), el multimetresi kılıflı PM8233D ölçüsüne (75 × 150 mm) küçültülür (DMM_FIT).
 // Gövdeler yuvarlatılmış kutular, düğmeler silindir, tuşlar kutu; malzemeler paylaşılır (kit.mat). Panel
 // baskısı bir kez çizilen tuval dokusudur; ekranlar ayrı, küçük tuval dokuları (en çok 1024 px) ve değer
 // değişince (en çok saniyede 10 kez) yeniden çizilir. Sıklık sınırına takılan değişiklik bekletilir
@@ -43,11 +44,26 @@ const SANS = '"IBM Plex Sans", system-ui, sans-serif';
 
 /** Cihazlar gerçek boyutun bu kadarı (tahta okunaklı kalsın; en çok %40 küçültme). */
 export const INSTRUMENT_SCALE = 0.6;
+/** DC güç kaynağı daha küçük: gerçeğin %50'si (%60'a göre ≈ %15 küçük; 2026-11-09). */
+export const SUPPLY_SCALE = 0.5;
+/**
+ * El multimetresi: model 92 × 182 mm kılıflı gövdeyle çizilir; laboratuvardaki tip (PM8233D) kılıfla yaklaşık
+ * 75 × 150 mm (PM8233D+: 148 × 74 × 42 mm): bütün model 150 / 182 oranında küçülür (75,8 × 150 × 41,2 mm).
+ */
+export const DMM_FIT = 150 / 182;
+
+/** Modeli kökünden `k` oranında küçültür (uçlar da; yönler aynı). */
+function resized(model: PartModel, k: number): PartModel {
+  model.root.scale.setScalar(k);
+  return { ...model, anchors: model.anchors.map((a) => a.clone().multiplyScalar(k)) };
+}
 /** Gerçek boyut (mm) → tezgâh birimi (2,54 mm), INSTRUMENT_SCALE ile. */
 const mm = (v: number) => (v * INSTRUMENT_SCALE) / 2.54;
 /** Tuval dokularının en büyük kenarı (px). */
 const MAX_TEXTURE = 1024;
 const FRONT = new Vector3(0, 0, 1);
+/** Soketlerin renkleri: kırmızı (+, VΩmA), siyah (−, COM), yeşil (GND); osiloskobun kanal halkaları. */
+const SOCKET = { red: '#c8312a', black: '#1d1f23', green: '#2f8f4e', ch1: '#f2c230', ch2: '#3d8fe0' } as const;
 
 // --- Ortak parçalar ------------------------------------------------------------------------------------------
 
@@ -536,7 +552,7 @@ export function dmmModel(kind: DmmKind): PartModel {
   // Soketler: 10A (kırmızı, kablo bağlanmaz), COM (siyah), VΩmA (kırmızı).
   const socketY = 6 + 15;
   const jacks = [at(fw - 15, socketY), at(fw / 2, socketY), at(15, socketY)];
-  device.add(put(jack('#c8312a'), jacks[0]!), put(jack('#1d1f23'), jacks[1]!), put(jack('#c8312a'), jacks[2]!));
+  device.add(put(jack(SOCKET.red), jacks[0]!), put(jack(SOCKET.black), jacks[1]!), put(jack(SOCKET.red), jacks[2]!));
   // Ayak (arkada, yarı yükseklikte menteşeli).
   device.rotation.x = -(DMM.lean * Math.PI) / 180;
   device.updateMatrix();
@@ -591,10 +607,11 @@ export function dmmModel(kind: DmmKind): PartModel {
   const initial = kind === 'ammeter' ? 'mA' : 'V⎓';
   draw('– – –', initial, false, 'DC');
   turn(initial);
-  return {
+  return resized({
     root,
     anchors,
     anchorDirs: [dir, dir.clone()],
+    anchorColors: [SOCKET.red, SOCKET.black],
     update(ctx: LiveContext) {
       const at = dialOf(kind, ctx);
       turn(at);
@@ -606,7 +623,7 @@ export function dmmModel(kind: DmmKind): PartModel {
       return lcd.redraw(`${text}|${at}|${ctx.active}|${mark}`, ctx.now, () => draw(text, at, ctx.active || ohm, mark));
     },
     dispose: lcd.dispose,
-  };
+  }, DMM_FIT);
 }
 
 // --- DC güç kaynağı ------------------------------------------------------------------------------------------
@@ -693,7 +710,7 @@ export function dcsupplyModel(): PartModel {
   const anchors: Vector3[] = [];
   chX.forEach((x) => {
     const jx = [x + 24, x + chW / 2, x + chW - 24];
-    root.add(put(jack('#1d1f23'), at(jx[0]!, 13)), put(jack('#2f8f4e'), at(jx[1]!, 13)), put(jack('#c8312a'), at(jx[2]!, 13)));
+    root.add(put(jack(SOCKET.black), at(jx[0]!, 13)), put(jack(SOCKET.green), at(jx[1]!, 13)), put(jack(SOCKET.red), at(jx[2]!, 13)));
     // Pin sırası: 1+, 1−, 2+, 2− (katalog).
     anchors.push(at(jx[2]!, 13, mm(5.2)), at(jx[0]!, 13, mm(5.2)));
   });
@@ -721,10 +738,11 @@ export function dcsupplyModel(): PartModel {
     l.cc.set(false);
     l.cv.set(false);
   });
-  return {
+  return resized({
     root,
     anchors,
     anchorDirs: anchors.map(() => FRONT.clone()),
+    anchorColors: [SOCKET.red, SOCKET.black, SOCKET.red, SOCKET.black],
     update(ctx) {
       const outs = ctx.status?.outputs;
       let waiting = false;
@@ -756,7 +774,7 @@ export function dcsupplyModel(): PartModel {
         l.cv.material.dispose();
       });
     },
-  };
+  }, SUPPLY_SCALE / INSTRUMENT_SCALE);
 }
 
 // --- Fonksiyon üreteci ---------------------------------------------------------------------------------------
@@ -857,7 +875,7 @@ export function funcgenModel(): PartModel {
   const outAt = at(215, 20);
   const ttlAt = at(194, 20);
   const comAt = at(235, 20);
-  root.add(put(bnc(), outAt), put(bnc(), ttlAt), put(jack('#1d1f23'), comAt));
+  root.add(put(bnc(), outAt), put(bnc(), ttlAt), put(jack(SOCKET.black), comAt));
   const anchors = [outAt.clone().add(new Vector3(0, 0, mm(9.3))), ttlAt.clone().add(new Vector3(0, 0, mm(9.3))), comAt.clone().add(new Vector3(0, 0, mm(5.2)))];
   const draw = (digits: string, unit: string) => {
     const { ctx: c, W, H } = screen;
@@ -876,6 +894,8 @@ export function funcgenModel(): PartModel {
     root,
     anchors,
     anchorDirs: anchors.map(() => FRONT.clone()),
+    // OUTPUT ve TTL renksiz (çelik) BNC: kablo ağın rengini alır.
+    anchorColors: [undefined, undefined, SOCKET.black],
     update(ctx) {
       const wave = strProp(ctx.props, 'waveform', ['sine', 'square', 'triangle'], 'sine');
       const f = numProp(ctx.props, 'frequency', 1000);
@@ -979,7 +999,7 @@ export function oscilloscopeModel(): PartModel {
   const aAt = at(206, 12);
   const bAt = at(236, 12);
   const comAt = at(262, 12);
-  root.add(put(bnc('#f2c230'), aAt), put(bnc('#3d8fe0'), bAt), put(jack('#1d1f23'), comAt), put(bnc(), at(290, 12)));
+  root.add(put(bnc(SOCKET.ch1), aAt), put(bnc(SOCKET.ch2), bAt), put(jack(SOCKET.black), comAt), put(bnc(), at(290, 12)));
   root.add(put(key(12, 8, 4, '#2b2e33'), at(22, 17)));
   const anchors = [aAt.clone().add(new Vector3(0, 0, mm(9.3))), bAt.clone().add(new Vector3(0, 0, mm(9.3))), comAt.clone().add(new Vector3(0, 0, mm(5.2)))];
   const COLORS = ['#ffd43b', '#4dc3ff'];
@@ -1068,6 +1088,7 @@ export function oscilloscopeModel(): PartModel {
     root,
     anchors,
     anchorDirs: anchors.map(() => FRONT.clone()),
+    anchorColors: [SOCKET.ch1, SOCKET.ch2, SOCKET.black],
     update(ctx) {
       const view = ctx.active ? ctx.scope : undefined;
       const paths = view ? view.channels.map((c) => c.path) : ['', ''];

@@ -54,6 +54,8 @@ function axial(type: DeviceType, body: Group, halfLength: number, height: number
   const root = new Group();
   const anchors = pinAnchors(type);
   body.position.y = height;
+  // Gövde (bacaklar hariç): kıskaçlar ve kısa teller bacaklara değil gövdeye göre yerleşir (clips.ts).
+  body.userData.body = true;
   root.add(body);
   root.add(lead(new Vector3(-halfLength, height, 0), anchors[0]!));
   root.add(lead(new Vector3(halfLength, height, 0), anchors[1]!));
@@ -64,6 +66,7 @@ function axial(type: DeviceType, body: Group, halfLength: number, height: number
 function radial(type: DeviceType, body: Group, spacing: number, legTop: number): PartModel {
   const root = new Group();
   const anchors = pinAnchors(type);
+  body.userData.body = true;
   root.add(body);
   root.add(legDown(new Vector3(-spacing / 2, legTop, 0), anchors[0]!));
   root.add(legDown(new Vector3(spacing / 2, legTop, 0), anchors[1]!));

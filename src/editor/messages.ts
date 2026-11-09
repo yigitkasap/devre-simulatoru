@@ -1,11 +1,12 @@
 // Mesajlar sekmesindeki satırlar: çözücünün tanılamaları (topoloji ve çalışma sırasındaki uyarılar) ve
-// editörün kendi bulguları (toprak tuzağı). Çözücü yalnızca kod ve sayı döndürür; başlık ve açıklama
-// burada Türkçeleştirilir. Saf fonksiyonlar; arayüzden bağımsız test edilir.
+// editörün kendi bulguları (toprak tuzağı, kısa devre edilen parça, üretecin kısa devre çıkışı). Çözücü
+// yalnızca kod ve sayı döndürür; başlık ve açıklama burada Türkçeleştirilir. Saf fonksiyonlar; arayüzden
+// bağımsız test edilir.
 
-import { tr, type DiagnosticContext } from '../i18n/tr';
+import { tr, type DiagnosticContext, type LedAdvice } from '../i18n/tr';
 import type { CircuitDoc } from '../model/types';
 import type { CompiledCircuit, Diagnostic } from '../sim';
-import { DEVICE_MODELS } from '../sim/devices';
+import { DEVICE_MODELS, multimeterMode } from '../sim/devices';
 import type { DeviceType } from '../sim/netlist';
 
 /** Bilgi: bir sorun değil, açıklama (ör. toprağa bağlı olmayan parçanın kendi sıfır noktası). */
@@ -102,9 +103,150 @@ export function findEarthTrap(compiled: CompiledCircuit): EarthTrap | null {
     const [a, b] = el.pins.map((pin) => (wiring.has(pin) ? wiring.findKey(pin) : pin)) as [string, string];
     if (a !== b && earthed.has(a) && earthed.has(b)) shorted.push(el.id);
   }
-  if (shorted.length === 0) return null;
   const instruments = [...earthed.values()].flat();
+  // Topraklı cihaz yoksa (yalnızca toprak sembolleri) tuzak değil, sıradan kısa devre: findShortedParts söyler.
+  if (shorted.length === 0 || instruments.length === 0) return null;
   return { instruments, shorted };
+}
+
+// --- Kısa devre edilen parça ve üretecin çıkışı ----------------------------------------------
+
+/**
+ * İki ucu aynı noktaya düştüğünde "kısa devre edildi" denen iki uçlu parçalar. Kaynakların kendi
+ * mesajları var (ideal pilde "Direnç içermeyen döngü", iç dirençli pilde ve AC kaynakta çalışırken
+ * "Kısa devre"); akım kaynağının kısa devresi zararsızdır. Voltmetre (ve V, Ω kipindeki multimetre) iki
+ * ucu aynı noktadayken yalnızca 0 okur, bir kablonun iki ucunu ölçmek de olağandır (süreklilik):
+ * kısa devre sayılmaz. A kipindeki multimetre ampermetre gibidir.
+ */
+const SHORTABLE_PARTS: ReadonlySet<DeviceType> = new Set<DeviceType>([
+  'resistor',
+  'capacitor',
+  'inductor',
+  'diode',
+  'schottky',
+  'zener',
+  'led',
+  'ldr',
+  'ntc',
+  'lamp',
+  'speaker',
+  'buzzer',
+  'fuse',
+  'motor',
+  'switch',
+  'pushbutton',
+  'ammeter',
+  'multimeter',
+]);
+
+/** Kısa devre edilen parça: iki ucu aynı kablo ağında (`wire`) ya da ikisi de toprakta (`ground`). */
+export interface ShortedPart {
+  readonly id: string;
+  readonly via: 'wire' | 'ground';
+  /** Kablo ağıyla kısa devrede ağın anahtarı (kabloları vurgulanır). */
+  readonly net?: string;
+}
+
+/**
+ * Kablo ağının kökü ve toprakta olan kökler: toprak sembollerinin ve topraklı cihazların (osiloskop,
+ * fonksiyon üreteci) COM uçlarının ağları birbirine bağlıdır (derlemede tek düğüm).
+ */
+function groundedRoots(compiled: CompiledCircuit) {
+  const { wiring, netlist } = compiled;
+  const root = (pin: string) => (wiring.has(pin) ? wiring.findKey(pin) : pin);
+  const grounded = new Set<string>();
+  for (const el of netlist.elements) if (el.type === 'ground') for (const pin of el.pins) grounded.add(root(pin));
+  for (const pin of compiled.earthedPins) grounded.add(root(pin));
+  return { root, grounded };
+}
+
+/** İki ucu aynı noktaya düşen parçalar (devre sırasıyla). */
+export function findShortedParts(compiled: CompiledCircuit): ShortedPart[] {
+  const { root, grounded } = groundedRoots(compiled);
+  const result: ShortedPart[] = [];
+  for (const el of compiled.netlist.elements) {
+    if (!SHORTABLE_PARTS.has(el.type) || el.pins.length !== 2) continue;
+    if (el.type === 'multimeter' && multimeterMode(el.props) !== 'a') continue;
+    const [a, b] = el.pins.map(root) as [string, string];
+    if (a === b) result.push({ id: el.id, via: 'wire', net: a });
+    else if (grounded.has(a) && grounded.has(b)) result.push({ id: el.id, via: 'ground' });
+  }
+  return result;
+}
+
+/** OUT ucu COM'a kısa devre olan fonksiyon üreteçleri (kabloyla ya da ikisi de toprakta). */
+export function findShortedGenerators(compiled: CompiledCircuit): ShortedPart[] {
+  const { root, grounded } = groundedRoots(compiled);
+  const result: ShortedPart[] = [];
+  for (const el of compiled.netlist.elements) {
+    if (el.type !== 'funcgen') continue;
+    // Uçlar: [0] OUT, [1] TTL, [2] COM.
+    const out = root(el.pins[0]!);
+    const com = root(el.pins[2]!);
+    if (out === com) result.push({ id: el.id, via: 'wire', net: out });
+    else if (grounded.has(out) && grounded.has(com)) result.push({ id: el.id, via: 'ground' });
+  }
+  return result;
+}
+
+export function shortedPartItem(s: ShortedPart, doc: CircuitDoc): MessageItem {
+  const part = doc.parts.find((p) => p.id === s.id);
+  const label = part?.label ?? s.id;
+  return {
+    key: `part-shorted|${s.id}`,
+    severity: 'warning',
+    code: 'part-shorted',
+    elementIds: [s.id],
+    netKeys: s.net ? [s.net] : [],
+    title: tr.messages.shortedTitle(label),
+    detail: tr.messages.shortedDetail(label, part?.type, s.via),
+  };
+}
+
+export function shortedGeneratorItem(s: ShortedPart, doc: CircuitDoc): MessageItem {
+  const label = doc.parts.find((p) => p.id === s.id)?.label ?? s.id;
+  return {
+    key: `generator-shorted|${s.id}`,
+    severity: 'warning',
+    code: 'generator-shorted',
+    elementIds: [s.id],
+    netKeys: s.net ? [s.net] : [],
+    title: tr.messages.generatorShortedTitle(label),
+    detail: tr.messages.generatorShorted(label, s.via),
+  };
+}
+
+/**
+ * Yanan ya da aşırı akımdaki LED için bağlama göre öneri: LED'e seri bir ön direnç var mı (varsa
+ * küçük), ön direnç kısa devre mi edilmiş (akımı başka bir kısa devre aşırı yapıyor), yoksa hiç yok mu.
+ */
+export function ledAdvice(ledId: string, compiled: CompiledCircuit, shorted: readonly ShortedPart[], doc: CircuitDoc): LedAdvice {
+  const label = (id: string) => doc.parts.find((p) => p.id === id)?.label ?? id;
+  const series = seriesResistor(ledId, compiled);
+  if (series) return { kind: 'resistor', label: label(series) };
+  const shortedResistors = shorted.filter((s) => compiled.deviceById.get(s.id)?.type === 'resistor').map((s) => s.id);
+  if (shortedResistors.length === 0) return { kind: 'no-resistor' };
+  // LED'in uçlarından (seri ampermetreler üzerinden) ulaşılan ağlarda kısa devre edilmiş direnç; yoksa
+  // devredeki ilk kısa devre edilmiş direnç.
+  const { wiring, netlist } = compiled;
+  const root = (pin: string) => (wiring.has(pin) ? wiring.findKey(pin) : pin);
+  const led = netlist.elements.find((e) => e.id === ledId);
+  const seen = new Set<string>();
+  let frontier = (led?.pins ?? []).map(root);
+  for (let hop = 0; hop < 4 && frontier.length > 0; hop++) {
+    const next: string[] = [];
+    for (const net of frontier) {
+      if (seen.has(net)) continue;
+      seen.add(net);
+      for (const el of netlist.elements) {
+        if (el.id === ledId || !el.pins.some((p) => root(p) === net)) continue;
+        if (shortedResistors.includes(el.id)) return { kind: 'resistor-shorted', label: label(el.id) };
+        if (el.type === 'ammeter') next.push(...el.pins.map(root));
+      }
+    }
+    frontier = next;
+  }
+  return { kind: 'resistor-shorted', label: label(shortedResistors[0]!) };
 }
 
 export function earthTrapItem(trap: EarthTrap, doc: CircuitDoc): MessageItem {

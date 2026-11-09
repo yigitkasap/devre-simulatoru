@@ -19,14 +19,17 @@ export interface ToastMessage {
 const DURATION_MS = 4000;
 const ACTION_DURATION_MS = 5000;
 
-export function useToast(): [ToastMessage | null, (text: string, tone?: ToastMessage['tone'], action?: ToastAction) => void, () => void] {
+/** Bildirimi gösterir; bildirimin kimliğini döndürür (yalnızca o bildirimi kapatmak için: hideToast(id)). */
+export function useToast(): [ToastMessage | null, (text: string, tone?: ToastMessage['tone'], action?: ToastAction) => number, (id?: number) => void] {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const counter = useRef(0);
   const show = useCallback((text: string, tone: ToastMessage['tone'] = 'info', action?: ToastAction) => {
     counter.current += 1;
     setToast({ text, tone, id: counter.current, ...(action ? { action } : {}) });
+    return counter.current;
   }, []);
-  const hide = useCallback(() => setToast(null), []);
+  /** Bildirimi kapatır; `id` verilirse yalnızca hâlâ o bildirim gösteriliyorsa. */
+  const hide = useCallback((id?: number) => setToast((t) => (id === undefined || t?.id === id ? null : t)), []);
   useEffect(() => {
     if (!toast) return undefined;
     const timer = window.setTimeout(() => setToast(null), toast.action ? ACTION_DURATION_MS : DURATION_MS);

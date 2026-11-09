@@ -3,7 +3,8 @@
 // (kaydedilir, paylaşılır, geri alınabilir; simülasyonu durdurmaz).
 //
 // Osiloskop: kart genişliğinde ekran, altında ölçüm satırları; Kanal A, Kanal B (V/b, AC / GND / DC)
-// ve Zaman (s/b, kip); konum, B ters, tetik ve Oto, giriş ve şebeke toprağı, jaklar "Gelişmiş" altında.
+// ve Zaman (s/b, kip); altında açıklamalı Oto düğmesi (föy "Oto’ya bas" der: görünür olmalı); konum,
+// B ters, tetik, giriş ve şebeke toprağı, jaklar "Gelişmiş" altında.
 // Üreteç ve güç kaynağı telefondaki denetimleri sıkı boyutta kullanır.
 
 import { useId, useState } from 'react';
@@ -170,6 +171,7 @@ function ScopeControls({
   const xy = s.mode === 'xy';
   const [advanced, setAdvanced] = useState(false);
   const advancedId = useId();
+  const autoHintId = useId();
   const head = 'flex items-center gap-1.5 text-label font-semibold';
   const couplings = (['ac', 'gnd', 'dc'] as const).filter((c) => SCOPE_COUPLINGS.includes(c)).map((c) => ({ value: c, text: tr.scope.couplings[c] ?? c }));
   const modes = SCOPE_MODES.map((m) => ({ value: m, text: tr.rack.modes[m] ?? m }));
@@ -256,6 +258,20 @@ function ScopeControls({
           </div>
         </div>
       )}
+      <div className="flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={onAuto}
+          title={tr.scope.autoTitle}
+          aria-describedby={autoHintId}
+          className={`shrink-0 rounded-md bg-ink px-3 text-small font-semibold text-on-ink hover:brightness-125 ${touch ? 'h-11 min-w-11' : 'h-9'}`}
+        >
+          {tr.scope.auto}
+        </button>
+        <span id={autoHintId} className="min-w-0 text-small leading-snug text-muted">
+          {tr.scope.autoHint}
+        </span>
+      </div>
       <button
         type="button"
         onClick={() => setAdvanced((a) => !a)}
@@ -297,26 +313,16 @@ function ScopeControls({
             <input type="checkbox" checked={s.invertB} onChange={(e) => onChange({ invertB: e.target.checked })} className="h-[18px] w-[18px] accent-ink" />
             {tr.rack.invert} <small className="font-mono text-muted">INV</small>
           </label>
-          <div className="flex items-end gap-2">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <span className={head}>{tr.scope.trigger}</span>
-              <Segmented<ScopeTrigger>
-                touch={touch}
-                disabled={xy}
-                label={tr.scope.trigger}
-                options={SCOPE_TRIGGERS.map((t) => ({ value: t, text: t === 'A' ? tr.rack.triggerA : t }))}
-                value={s.trigger}
-                onChange={(trigger) => onChange({ trigger })}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={onAuto}
-              title={tr.scope.autoTitle}
-              className={`shrink-0 rounded-md bg-ink px-3 text-small font-semibold text-on-ink hover:brightness-125 ${touch ? 'h-11' : 'h-9'}`}
-            >
-              {tr.scope.auto}
-            </button>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className={head}>{tr.scope.trigger}</span>
+            <Segmented<ScopeTrigger>
+              touch={touch}
+              disabled={xy}
+              label={tr.scope.trigger}
+              options={SCOPE_TRIGGERS.map((t) => ({ value: t, text: t === 'A' ? tr.rack.triggerA : t }))}
+              value={s.trigger}
+              onChange={(trigger) => onChange({ trigger })}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <span className={head}>{tr.rack.input}</span>

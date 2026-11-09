@@ -28,6 +28,8 @@ export interface CircuitViewProps {
   readonly overlay?: ReactNode;
   /** Vurgulanan (seçili) parçalar: 3B'nin köşesindeki küçük şema. */
   readonly selected?: readonly string[];
+  /** Vurgulanan düğümün kabloları (3B'de üstüne gelinen ağ): vurgu renginde, kalın; öbür kablolar soluk. */
+  readonly highlightWires?: ReadonlySet<string> | null;
   /** Çizimin sınıfı (varsayılan: tuvalle aynı "schematic"). */
   readonly className?: string;
 }
@@ -58,7 +60,7 @@ function bounds(doc: CircuitDoc) {
   return { x: x0 - pad, y: y0 - pad, w: x1 - x0 + 2 * pad + 6, h: y1 - y0 + 2 * pad };
 }
 
-export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth, underlay, overlay, selected, className = 'schematic block h-full w-full' }: CircuitViewProps) {
+export const CircuitView = memo(function CircuitView({ doc, connectivity, frame, settings, label, minWidth, underlay, overlay, selected, highlightWires, className = 'schematic block h-full w-full' }: CircuitViewProps) {
   const b = bounds(doc);
   const style = useDrawStyle();
   return (
@@ -80,13 +82,16 @@ export const CircuitView = memo(function CircuitView({ doc, connectivity, frame,
             stroke = v === undefined ? UNKNOWN_WIRE_COLOR : voltageColor(v / frame.vmax, settings.wireScale, style.exporting ? 'light' : undefined);
             if (v === undefined) dash = UNKNOWN_WIRE_DASH;
           }
+          const lit = highlightWires?.has(wire.id);
           return (
             <polyline
               key={wire.id}
+              data-highlight={lit ? '' : undefined}
               points={wire.points.map((p) => `${p.x * GRID},${p.y * GRID}`).join(' ')}
               fill="none"
-              stroke={stroke}
-              strokeWidth={frame ? 3 : 2}
+              stroke={lit ? 'var(--color-accent)' : stroke}
+              strokeOpacity={highlightWires && !lit ? 0.35 : undefined}
+              strokeWidth={lit ? 5 : frame ? 3 : 2}
               strokeDasharray={dash}
               strokeLinejoin="round"
               strokeLinecap="round"

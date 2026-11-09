@@ -62,11 +62,33 @@ const LOGIC_MODEL_NOTES: Record<string, string> = {
     'Bacaklar: a 7, b 6, c 4, d 2, e 1, f 9, g 10, DP 5, ortak katot 3 ve 8.',
 };
 
+/**
+ * Yanan ya da aşırı akımdaki LED için önerinin bağlamı (editor/messages.ts → ledAdvice): seri ön direnç
+ * var ama küçük, ön direnç kısa devre edilmiş ya da hiç ön direnç yok.
+ */
+export type LedAdvice =
+  | { readonly kind: 'no-resistor' }
+  | { readonly kind: 'resistor' | 'resistor-shorted'; readonly label: string };
+
 export interface DiagnosticContext {
   /** Bileşenin tuvaldeki adı (R1, B2...). */
   label(id: string): string;
   /** Bileşenin türü. */
   type(id: string): DeviceType | undefined;
+  /** LED'in ön direnç durumu (verilmezse "ön direnç ekle" önerilir). */
+  ledAdvice?(ledId: string): LedAdvice;
+}
+
+/** LED mesajlarının düzeltme cümlesi: bağlama göre ön direnç ekle, büyüt ya da kısa devresini kaldır. */
+function ledFix(advice: LedAdvice | undefined, forwardVoltage: number): string {
+  const vf = `(Bu LED için V_{f} ≈ ${formatSI(forwardVoltage, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`;
+  if (advice?.kind === 'resistor-shorted') {
+    return `Akımı sınırlaması gereken ${advice.label} kısa devre edilmiş: iki ucu aynı noktaya bağlı, akım ${ek(advice.label, 'i')} atlayıp kablodan geçiyor. ${ek(advice.label, 'in')} uçlarını birleştiren kabloyu kaldır.`;
+  }
+  if (advice?.kind === 'resistor') {
+    return `${advice.label} ön direnci bu gerilim için küçük: ${ek(advice.label, 'i')} büyüt, R = (V_{kaynak} − V_{f}) / I. ${vf}`;
+  }
+  return `Seri bir ön direnç ekle: R = (V_{kaynak} − V_{f}) / I. ${vf}`;
 }
 
 const DEVICE_NAMES: Record<DeviceType, string> = {
@@ -467,15 +489,33 @@ function describeDiagnostic(d: Diagnostic, ctx: DiagnosticContext): { title: str
           (ac ? 'Gerçek bir kaynak bu durumda aşırı ısınır ya da sigortası atar.' : 'Gerçek bir pil bu durumda hızla ısınır ve boşalır.'),
       };
     }
-    case 'led-burned':
+    case 'led-burned': {
+      const max = formatSI(p.maxCurrent ?? 0, 'A', { trim: true });
       return {
         title: 'LED yandı',
         detail:
-          `${firstLabel}: LED’den ${formatSI(p.current ?? 0, 'A')} geçti, ama bu LED en fazla ` +
-          `${formatSI(p.maxCurrent ?? 0, 'A', { trim: true })}’e dayanabilir. ` +
-          'Seri bir ön direnç ekle: R = (V_{kaynak} − V_{f}) / I. ' +
-          `(Bu LED için V_{f} ≈ ${formatSI(p.forwardVoltage ?? 0, 'V', { trim: true })}, I için 20 mA seçebilirsin.)`,
+          ((p.cause ?? 0) === 1
+            ? `${firstLabel}: LED’den uzun süre ${formatSI(p.current ?? 0, 'A')} geçti ve ısınarak yandı (eklemi ${formatNumber(p.maxTemperature ?? 0, 0)} °C’yi aştı); sürekli en fazla ${max}’e dayanır. `
+            : `${firstLabel}: LED’den ${formatSI(p.current ?? 0, 'A')} geçti ve hemen yandı: bu LED kısa bir darbede bile en fazla ` +
+              `${formatSI(p.peakCurrent ?? 0, 'A', { trim: true })}’e, sürekli ${max}’e dayanabilir. `) +
+          ledFix(first ? ctx.ledAdvice?.(first) : undefined, p.forwardVoltage ?? 0),
       };
+    }
+    case 'led-overcurrent': {
+      const max = formatSI(p.maxCurrent ?? 0, 'A', { trim: true });
+      const limit = p.maxTemperature ?? 0;
+      const willBurn = (p.steadyTemperature ?? 0) > limit;
+      return {
+        title: 'LED aşırı akımda',
+        detail:
+          `${firstLabel}: LED’den ${formatSI(p.current ?? 0, 'A')} geçiyor; sürekli en fazla ${max}’e dayanır. ` +
+          `LED ısınıyor (eklem ≈ ${formatNumber(p.temperature ?? 0, 0)} °C, en çok ${formatNumber(limit, 0)} °C): ` +
+          (willBurn
+            ? 'bu akımda kalırsa eklem sınırı aşar ve LED yanar. '
+            : 'bu akımda yanmaz ama ışığı zayıflar ve ömrü kısalır (veri sayfası). ') +
+          ledFix(first ? ctx.ledAdvice?.(first) : undefined, p.forwardVoltage ?? 0),
+      };
+    }
     case 'regulator-dropout': {
       const v = (x: number | undefined) => formatSI(x ?? 0, 'V', { digits: 3 });
       return {
@@ -1106,7 +1146,7 @@ const EXAMPLES: Record<ExampleId, ExampleTexts> = {
     description:
       'İdeal 5 V’luk pil, 330 Ω’luk ön direnç, ampermetre ve kırmızı bir LED tek bir döngüde seri bağlı: akım pilin + ucundan çıkar, LED’den geçer ve alt hattan pilin − ucuna döner.',
     purpose:
-      'LED’i güvenli bir akımla yakar. LED iletirken üzerindeki gerilim neredeyse sabittir (kırmızıda ≈ 1,8 V); kalan gerilim ön dirence düşer ve akımı Ohm yasası belirler: I = (5 V − 1,8 V) / 330 Ω ≈ 9,7 mA. Direnç olmasaydı akımı sınırlayan bir şey kalmazdı. Ön direnci 100 Ω’a düşür: akım 30 mA’i aşar ve LED yanar.',
+      'LED’i güvenli bir akımla yakar. LED iletirken üzerindeki gerilim neredeyse sabittir (kırmızıda ≈ 1,8 V); kalan gerilim ön dirence düşer ve akımı Ohm yasası belirler: I = (5 V − 1,8 V) / 330 Ω ≈ 9,7 mA. Direnç olmasaydı akımı sınırlayan bir şey kalmazdı. Ön direnci 100 Ω’a düşür: akım ≈ 31 mA olur ve LED’in sürekli sınırını (30 mA) aşar; uyarı çıkar, LED ısınır (eklem ≈ 59 °C) ama yanmaz. 22 Ω’da ≈ 127 mA geçer: eklem ≈ 8 s’de 115 °C’yi aşar ve LED ısınarak yanar. 15 Ω’da akım tepe sınırını (155 mA) aşar ve LED hemen yanar.',
     everyday:
       'Cihazlardaki açık/kapalı ve şarj ışıkları, klavye ve ekran arka ışıkları, araç ve trafik LED’leri: her LED’in önünde akımı sınırlayan bir direnç ya da bir LED sürücüsü vardır.',
   },
@@ -2105,6 +2145,8 @@ export const tr = {
     trigger: 'Tetik',
     auto: 'Oto',
     autoTitle: 'Bölme ayarlarını sinyale göre seç',
+    /** Kartta Oto düğmesinin yanındaki açıklama (föy "Oto’ya bas" der). */
+    autoHint: 'Volt/bölme ve zaman/bölmeyi sinyale göre seçer',
     channel: (c: string) => `Kanal ${c}`,
     notConnected: 'bağlı değil',
     stopped: 'Ekranı görmek için Oynat’a bas.',
@@ -2580,6 +2622,10 @@ export const tr = {
     miniLabel: 'Küçük şema: aynı devre, seçili parça vurgulu',
     hintPhone: 'Bir parmak: döndür · iki parmak: yakınlaştır ve kaydır',
     focus: '3B’de yaklaş',
+    /** Cihaz kablolarının birleşme noktası: ağın adı ve kablo sayısı ("GND · 3 kablo"). */
+    junction: (name: string, count: number) => `${name} · ${count} kablo`,
+    /** Toprak ağının birleşme etiketindeki adı. */
+    groundNet: 'GND',
   },
   /** Tahtada kur (T1–T6): şemadaki devre tepeden görünen breadboard'a kurulur. */
   tahta: {
@@ -3355,6 +3401,29 @@ export const tr = {
       `${scope} ve ${generator} COM uçları şebeke toprağıyla birleşiyor; ${shorted} kısa devre oldu. Prob toprağını ${generator} COM ile aynı noktaya bağla.`,
     earthTrapGeneric: (instruments: string, shorted: string) =>
       `${instruments} şebeke toprağıyla birleşiyor; ${shorted} kısa devre oldu. Toprağa bağlı uçları aynı noktaya bağla ya da cihazın şebeke toprağı bağlantısını kaldır.`,
+    /** İki ucu aynı noktaya düşen parça (editor/messages.ts → findShortedParts). */
+    shortedTitle: (label: string) => `${label} kısa devre edildi`,
+    shortedDetail: (label: string, type: DeviceType | undefined, via: 'wire' | 'ground') => {
+      const owner = type ? `${label} ${DEVICE_GENITIVE[type]}` : label;
+      const where = via === 'ground' ? ' (ikisi de toprakta; toprak noktaları birbirine bağlıdır)' : '';
+      const effect =
+        type === 'led'
+          ? ' LED ışık vermez.'
+          : type === 'ammeter' || type === 'multimeter'
+            ? ' Ölçü aleti 0 gösterir: akımı ölçmek için akımın yoluna seri bağla.'
+            : type === 'switch' || type === 'pushbutton'
+              ? ' Anahtarın konumu bir şey değiştirmez.'
+              : type === 'fuse'
+                ? ' Sigorta devreyi koruyamaz.'
+                : '';
+      const fix = via === 'ground' ? ' Uçlarından birini topraktan ayır.' : ` İki ucu birleştiren kabloyu kaldır ya da ${ek(label, 'i')} başka yere bağla.`;
+      return `${owner} iki ucu aynı noktaya bağlı${where}: akım ${ek(label, 'i')} atlayıp ${via === 'ground' ? 'toprak üzerinden' : 'kablodan'} geçer, ${label} devrede iş görmez.${effect}${fix}`;
+    },
+    /** Fonksiyon üretecinin OUT ucu COM'a kısa devre. */
+    generatorShortedTitle: (label: string) => `${label} çıkışı kısa devre`,
+    generatorShorted: (label: string, via: 'wire' | 'ground') =>
+      `${label} fonksiyon üretecinin OUT ucu COM ucuyla aynı noktaya bağlı${via === 'ground' ? ' (ikisi de toprakta; topraklı üretecin COM ucu şebeke toprağıdır)' : ''}: çıkış kısa devre. ` +
+      'Üretecin gerilimi 50 Ω’luk iç direncine düşer, devreye sinyal ulaşmaz. OUT’u devrenin girişine, COM’u ortak hatta bağla.',
     repair: 'Onar',
     setResistor: (label: string, value: string) => `${ek(label, 'i')} ${value} yap`,
     severity: { error: 'Hata', warning: 'Uyarı', info: 'Bilgi' },
@@ -3368,6 +3437,19 @@ export const tr = {
     remove: 'Sil',
     repair: 'Onar',
     menu: (label: string) => `${label} menüsü`,
+  },
+  /** Son devreler (editor/recentCircuits.ts): yerine başka devre açılan devrenin bu tarayıcıdaki kaydı. */
+  recent: {
+    title: 'Son devreler',
+    menu: 'Son devreler…',
+    note: 'Örnek açtığında, Yeni devre dediğinde ya da başka bir devre açtığında kurulu devre buraya kaydedilir (bu tarayıcıda, son 5 devre). Birini açınca kurulu devre de listeye girer.',
+    empty: 'Henüz kayıt yok. Örnek açtığında ya da Yeni devre dediğinde kurulu devre buraya kaydedilir.',
+    open: 'Aç',
+    openLabel: (title: string, time: string) => `${title}, ${time}: aç`,
+    parts: (n: number) => `${n} parça`,
+    close: 'Kapat',
+    restored: 'Son devrelerden açıldı.',
+    broken: 'Bu kayıt okunamadı.',
   },
   balloon: {
     repair: 'Onar',

@@ -209,8 +209,8 @@ function SettingsPanel({
 }
 
 /**
- * Daha fazla (⋯): en üstte Tema (Sistem / Açık / Koyu bölmeli düğme); Ayarlar…, Klavye kısayolları (?),
- * Yardım (F1), Kısa turu başlat, Tam ekran (F11).
+ * Daha fazla (⋯): en üstte Tema (Sistem / Açık / Koyu bölmeli düğme); Son devreler…, Ayarlar…, Klavye
+ * kısayolları (?), Yardım (F1), Kısa turu başlat, Tam ekran (F11).
  */
 function MoreMenu(props: {
   touch: boolean;
@@ -222,6 +222,8 @@ function MoreMenu(props: {
   onShortcuts: () => void;
   onHelp: () => void;
   onWelcome: () => void;
+  /** Son devreler penceresi (yoksa menüde satır yok: gömülü görünüm). */
+  onRecent?: () => void;
   fullscreen: FullscreenControls;
 }) {
   const menu = useMenu();
@@ -277,6 +279,7 @@ function MoreMenu(props: {
               </div>
             </div>
             <MenuSeparator />
+            {props.onRecent && <MenuItem icon="list" label={tr.recent.menu} title={tr.recent.note} touch={props.touch} onSelect={pick(props.onRecent)} />}
             <MenuItem icon="settings" label={t.settings} touch={props.touch} onSelect={pick(() => setSettingsOpen(true))} />
             <MenuItem icon="keyboard" label={t.shortcuts} shortcut="?" touch={props.touch} onSelect={pick(props.onShortcuts)} />
             <MenuItem icon="help" label={t.help} shortcut="F1" touch={props.touch} onSelect={pick(props.onHelp)} />
@@ -498,6 +501,8 @@ export interface DeskTopBarProps {
   readonly onShortcuts: () => void;
   readonly onHelp: () => void;
   readonly onWelcome: () => void;
+  /** Daha fazla → Son devreler… (yerine başka devre açılan devrelerin kaydı). */
+  readonly onRecent?: () => void;
   /** Şema / 3B tezgâh seçimi; null: gösterilmez (Tahtada kur). */
   readonly view: { readonly mode: ViewMode; readonly onChange: (mode: ViewMode) => void } | null;
   /** Tablet: aynı çubuk dokunmatik boyutta (44 px düğmeler). */
@@ -669,6 +674,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
           onShortcuts={props.onShortcuts}
           onHelp={props.onHelp}
           onWelcome={props.onWelcome}
+          {...(props.onRecent ? { onRecent: props.onRecent } : {})}
           fullscreen={props.fullscreen}
         />
         <span className="w-2 shrink-0" aria-hidden="true" />

@@ -39,6 +39,9 @@ export interface ExamplesDialogProps {
   readonly onClose: () => void;
   /** Kartların küçük şeması için (direnç çizimi, kablo renkleri). */
   readonly settings: Pick<Settings, 'resistorStyle' | 'wireScale'>;
+  /** Son devreler penceresini aç (yerine örnek açılan devreler); kayıt sayısıyla. */
+  readonly onRecent?: () => void;
+  readonly recentCount?: number;
 }
 
 const t = () => tr.examples.browser;
@@ -58,10 +61,12 @@ export function ExamplesDialog(props: ExamplesDialogProps) {
       onBoard: (id: ExampleId) => latest.current.onBoard?.(id),
       onFault: (id: FaultScenarioId) => latest.current.onFault(id),
       onClose: () => latest.current.onClose(),
+      onRecent: () => latest.current.onRecent?.(),
     }),
     [],
   );
   const hasBoard = props.onBoard !== undefined;
+  const hasRecent = props.onRecent !== undefined;
   const stable = useMemo<ExamplesDialogProps>(
     () => ({
       phone: props.phone,
@@ -72,8 +77,9 @@ export function ExamplesDialog(props: ExamplesDialogProps) {
       onFault: actions.onFault,
       onClose: actions.onClose,
       ...(hasBoard ? { onBoard: actions.onBoard } : {}),
+      ...(hasRecent ? { onRecent: actions.onRecent, recentCount: props.recentCount ?? 0 } : {}),
     }),
-    [props.phone, props.activeExample, props.activeFault, props.settings, hasBoard, actions],
+    [props.phone, props.activeExample, props.activeFault, props.settings, hasBoard, hasRecent, props.recentCount, actions],
   );
   return <DialogBody {...stable} />;
 }
@@ -372,6 +378,15 @@ function DesktopExamples(props: ExamplesDialogProps) {
             <hr className="my-3 border-line" />
             <p className="m-0 mb-1 px-2.5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{t().general}</p>
             <ul className="m-0 flex list-none flex-col gap-0.5 p-0">{generalSections.map(navRow)}</ul>
+            {props.onRecent && (
+              <div className="mt-3 border-t border-line pt-3">
+                <button type="button" onClick={props.onRecent} className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-ink hover:bg-app">
+                  <Icon name="list" className="h-4 w-4 shrink-0 text-muted" />
+                  <span className="min-w-0 flex-1 truncate">{tr.recent.title}</span>
+                  <span className="shrink-0 font-mono text-[12px] text-muted">{props.recentCount ?? 0}</span>
+                </button>
+              </div>
+            )}
           </nav>
           <div ref={listRef} onScroll={spy} onWheel={unpin} onTouchStart={unpin} onKeyDown={unpin} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pt-5 pb-8">
             {q && matches > 0 && <p className="m-0 mb-4 text-sm text-ink-2">{t().results(q, matches)}</p>}
@@ -559,6 +574,16 @@ function PhoneExamples(props: ExamplesDialogProps) {
         <section aria-label={t().general} className="overflow-hidden rounded-2xl border border-line">
           {generalSections.map((s, i) => row(s, i === 0))}
         </section>
+        {props.onRecent && (
+          <section aria-label={tr.recent.title} className="mt-5 overflow-hidden rounded-2xl border border-line">
+            <button type="button" onClick={props.onRecent} className="flex min-h-12 w-full items-center gap-3 px-4 text-left active:bg-app">
+              <Icon name="list" className="h-5 w-5 shrink-0 text-muted" />
+              <span className="min-w-0 flex-1 truncate text-[15px] font-medium">{tr.recent.title}</span>
+              <span className="shrink-0 font-mono text-[13px] text-muted">{props.recentCount ?? 0}</span>
+              <Icon name="chevron" className="h-[18px] w-[18px] shrink-0 text-muted" />
+            </button>
+          </section>
+        )}
       </>
     );
   }

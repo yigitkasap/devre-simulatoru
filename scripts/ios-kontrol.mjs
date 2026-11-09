@@ -3485,8 +3485,8 @@ try {
     const hadBack = (await backButton.count()) === 1;
     if (hadBack) { await backButton.tap(); await page.waitForTimeout(300); }
     const backHome = (await moreSheet.getByRole('button', { name: 'Ayarlar', exact: true }).count()) === 1;
-    check('telefonda ⋯ (v4): kutular Analiz, Geri al, Yinele, Sığdır; satırlar Ayarlar, Yardım, Kısa turu başlat (Örnekler, Dosya ve Klavye kısayolları yok); Yardım sayfasında dokunma hareketleri, "Daha fazla" ile geri (P14)',
-      tiles.join('|') === 'Analiz|Geri al|Yinele|Sığdır' && rows.join('|') === 'Ayarlar|Yardım|Kısa turu başlat' && more.includes('Uca dokun') && hadBack && backHome &&
+    check('telefonda ⋯ (v4): kutular Analiz, Geri al, Yinele, Sığdır; satırlar Son devreler, Ayarlar, Yardım, Kısa turu başlat (Örnekler, Dosya ve Klavye kısayolları yok); Yardım sayfasında dokunma hareketleri, "Daha fazla" ile geri (P14)',
+      tiles.join('|') === 'Analiz|Geri al|Yinele|Sığdır' && rows.join('|') === 'Son devreler|Ayarlar|Yardım|Kısa turu başlat' && more.includes('Uca dokun') && hadBack && backHome &&
         (await moreSheet.getByRole('button', { name: 'Örnekler', exact: true }).count()) === 0 && (await moreSheet.getByRole('button', { name: 'Dosya', exact: true }).count()) === 0,
       `${tiles.join('|')} · ${rows.join('|')} · ${more.slice(0, 40)}`);
     await ctx.close();
@@ -3638,8 +3638,8 @@ try {
     check('arayüz v4: devre menüsü "Devre": Yeni devre, Bilgisayardan aç… (Ctrl+O), Bilgisayara indir (Ctrl+S), Şemayı indir / yazdır… (Ctrl+P), Paylaş…, Görev oluştur…, Karta aktar (PCB, lehim)…; altta "Her değişiklik bu tarayıcıya kaydedilir"; menüde "JSON" yok; Esc kapatıp odağı düğmeye döndürüyor',
       devreRows === 'Yeni devre|Bilgisayardan aç… [Ctrl+O]|Bilgisayara indir [Ctrl+S]|Şemayı indir / yazdır… [Ctrl+P]|Paylaş…|Görev oluştur…|Karta aktar (PCB, lehim)…' && devreText.includes('Her değişiklik bu tarayıcıya kaydedilir') && !/JSON/i.test(devreText) && devreBack,
       `${devreRows} · Esc ${devreBack}`);
-    check('arayüz v4: Daha fazla menüsü: en üstte Tema (Sistem, Açık, Koyu); Ayarlar…, Klavye kısayolları (?), Yardım (F1), Kısa turu başlat, Tam ekran (F11); Esc kapatıp odağı düğmeye döndürüyor',
-      themes.join('|') === 'Sistem|Açık|Koyu' && moreRows === 'Ayarlar…|Klavye kısayolları [?]|Yardım [F1]|Kısa turu başlat|Tam ekran [F11]' && moreBack,
+    check('arayüz v4: Daha fazla menüsü: en üstte Tema (Sistem, Açık, Koyu); Son devreler…, Ayarlar…, Klavye kısayolları (?), Yardım (F1), Kısa turu başlat, Tam ekran (F11); Esc kapatıp odağı düğmeye döndürüyor',
+      themes.join('|') === 'Sistem|Açık|Koyu' && moreRows === 'Son devreler…|Ayarlar…|Klavye kısayolları [?]|Yardım [F1]|Kısa turu başlat|Tam ekran [F11]' && moreBack,
       `${themes.join('|')} · ${moreRows} · Esc ${moreBack}`);
     // Ayarlar… düğmenin altında açılır; Klavye kısayolları ve Yardım yardım penceresini ilgili sekmede açar.
     await (await openMore(page)).getByRole('menuitem', { name: 'Ayarlar…' }).click(); await page.waitForTimeout(150);
@@ -3661,7 +3661,14 @@ try {
 
     // 5. Kısayollar: Ctrl+O dosya seçici, Ctrl+S indirme (devre-YYYY-AA-GG.json), F1 yardım (Fare ve dokunma), F11 tam ekran.
     await page.locator('#tuval').focus();
-    const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 4000 }).catch(() => null), page.keyboard.press('Control+o')]);
+    // Dosya seçicinin yakalanması (Playwright → CDP Page.setInterceptFileChooserDialog) tuşa basmadan önce açık
+    // olmalı: waitForEvent ile tuş aynı anda gönderilince 4 kat yavaş işlemcide tuş bazen önce işleniyordu. Uygulama
+    // input.click()'i 1–2 ms içinde kullanıcı etkinliğiyle çağırıyor ama seçici yakalanmıyor, olay 60 s'de de
+    // gelmiyordu (ölçüm: docs/KARARLAR.md, "Teşhis ve metinler", 6. madde). Yakalama baştan açılır, bir gidiş-dönüş
+    // beklenir; bekleme süresi de IOS_CPU ile ölçeklenir.
+    page.on('filechooser', () => {});
+    await page.evaluate(() => 0);
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 4000 * CPU_RATE }).catch(() => null), page.keyboard.press('Control+o')]);
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 4000 }).catch(() => null), page.keyboard.press('Control+s')]);
     const saved = download ? JSON.parse(readFileSync(await download.path(), 'utf8')) : null;
     await page.keyboard.press('F1'); await page.waitForTimeout(200);
@@ -3997,7 +4004,7 @@ try {
   await notebook(rp).getByRole('button', { name: /^Gelişmiş/ }).click(); await rp.waitForTimeout(150);
   await notebook(rp).getByRole('button', { name: 'Oto', exact: true }).click(); await rp.waitForTimeout(300);
   const autoToast = (await rp.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
-  check('masaüstü (v3): çalışırken osiloskop kartı tetik durumunu gösteriyor; Gelişmiş’teki Oto neyin değiştiğini bildiriyor', autoToast && (status.includes('Tetikleniyor') || status.includes('Tetiklenmiyor')), status.slice(0, 40));
+  check('masaüstü (v3): çalışırken osiloskop kartı tetik durumunu gösteriyor; karttaki Oto (2026-11-09’dan beri Gelişmiş’in dışında) neyin değiştiğini bildiriyor', autoToast && (status.includes('Tetikleniyor') || status.includes('Tetiklenmiyor')), status.slice(0, 40));
   // Üretecin çıkış satırı AC'de anlık değeri değil, 0,4 s'lik pencerenin etkin değerini gösterir (her karede zıplamaz; simetrik AC işaretsiz).
   const fgRegion = notebook(rp).getByRole('region', { name: 'FG1 · Fonksiyon üreteci' });
   if (!(await fgRegion.count())) await notebook(rp).getByRole('button', { name: /^FG1 ·/ }).click();
@@ -5845,6 +5852,353 @@ try {
     }
   }
 
+  // --- Teşhis: kısa devre edilen parça ("R1 kısa devre edildi"), üretecin OUT'u COM'a kısa devre, LED mesajı bağlama göre --
+  {
+    /** Masaüstü sayfası; devre `seed` ile açılır. */
+    async function seeded(seed) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+      await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(seed));
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      return { ctx, page };
+    }
+    // LED ve ön direnç; R1'in iki ucu üstten dolaşan bir kabloyla birleşik (w4).
+    const shortedR1 = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 5, internalResistance: 0 } },
+      { id: 'p2', type: 'resistor', label: 'R1', x: 12, y: -6, rotation: 0, props: { resistance: 330 } },
+      { id: 'p3', type: 'led', label: 'LED1', x: 24, y: 0, rotation: 90, props: { color: 'red' } },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [8, -6]] },
+      { id: 'w2', points: [[16, -6], [24, -6], [24, -4]] },
+      { id: 'w3', points: [[24, 4], [24, 6], [0, 6], [0, 4]] },
+      { id: 'w4', points: [[8, -6], [8, -10], [16, -10], [16, -6]] },
+    ] };
+    {
+      const { ctx, page } = await seeded(shortedR1);
+      await page.waitForTimeout(400);
+      const card = notebook(page).getByRole('region', { name: 'Uyarı · R1 kısa devre edildi' });
+      const cardText = ((await card.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      await card.getByRole('button', { name: 'R1’i göster' }).click().catch(() => {});
+      await page.waitForTimeout(250);
+      const r1Card = await notebook(page).getByRole('region', { name: /^R1 · Direnç/ }).count();
+      const lit = await page.locator('svg.schematic [data-highlight], svg.schematic .highlight, svg.schematic [stroke-opacity="0.35"]').count();
+      check('teşhis: R1’in iki ucu kabloyla birleşikken (çalışmadan) uyarı kartı "R1 kısa devre edildi"; "R1’i göster" R1’in kartını açıyor',
+        (await card.count()) === 1 && /R1 direncinin iki ucu aynı noktaya bağlı/.test(cardText) && r1Card === 1,
+        `${cardText.slice(0, 120)} · R1 kartı ${r1Card} · vurgu ${lit}`);
+      // Çalıştırınca LED yanar: mesaj ön direncin kısa devresini söyler, "ön direnç ekle" demez.
+      await page.getByRole('button', { name: 'Oynat' }).first().click(); await page.waitForTimeout(800);
+      const ledCard = notebook(page).getByRole('region', { name: 'Hata · LED yandı' });
+      const ledText = ((await ledCard.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      check('teşhis: ön direnci kısa devre edilmiş LED yanınca hata kartı "R1 kısa devre edilmiş … kabloyu kaldır" diyor, "Seri bir ön direnç ekle" demiyor',
+        (await ledCard.count()) === 1 && ledText.includes('R1 kısa devre edilmiş') && !ledText.includes('Seri bir ön direnç ekle'), ledText.slice(0, 160));
+      await ctx.close();
+    }
+    // Aynı devre, kısa devre kablosu yok, R1 = 10 Ω: ön direnç var ama küçük.
+    {
+      const small = { ...shortedR1, parts: shortedR1.parts.map((p) => (p.label === 'R1' ? { ...p, props: { resistance: 10 } } : p)), wires: shortedR1.wires.slice(0, 3) };
+      const { ctx, page } = await seeded(small);
+      await page.getByRole('button', { name: 'Oynat' }).first().click(); await page.waitForTimeout(800);
+      const text = ((await notebook(page).getByRole('region', { name: 'Hata · LED yandı' }).textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      check('teşhis: ön direnci küçük LED yanınca "R1 ön direnci bu gerilim için küçük", "Seri bir ön direnç ekle" yok; kısa devre uyarısı yok',
+        text.includes('R1 ön direnci bu gerilim için küçük') && !text.includes('Seri bir ön direnç ekle') && (await notebook(page).getByRole('region', { name: /kısa devre edildi$/ }).count()) === 0, text.slice(0, 160));
+      await ctx.close();
+    }
+    // Fonksiyon üretecinin OUT'u kabloyla COM'a bağlı.
+    {
+      const gen = { version: 1, parts: [
+        { id: 'p1', type: 'funcgen', label: 'FG1', x: 0, y: 0, rotation: 0, props: {} },
+        { id: 'p2', type: 'resistor', label: 'R1', x: 16, y: 0, rotation: 90, props: { resistance: 1000 } },
+      ], wires: [
+        { id: 'w1', points: [[5, -2], [8, -2], [8, 2], [5, 2]] },
+        { id: 'w2', points: [[8, -2], [8, -6], [16, -6], [16, -4]] },
+        { id: 'w3', points: [[16, 4], [16, 6], [8, 6], [8, 2]] },
+      ] };
+      const { ctx, page } = await seeded(gen);
+      await page.waitForTimeout(400);
+      const card = notebook(page).getByRole('region', { name: 'Uyarı · FG1 çıkışı kısa devre' });
+      const text = ((await card.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      check('teşhis: fonksiyon üretecinin OUT’u COM’a kısa devreyken uyarı kartı "FG1 çıkışı kısa devre" (OUT ucu COM ucuyla aynı noktaya bağlı), "FG1’i göster" var',
+        (await card.count()) === 1 && text.includes('OUT ucu COM ucuyla aynı noktaya bağlı') && (await card.getByRole('button', { name: 'FG1’i göster' }).count()) === 1, text.slice(0, 140));
+      await ctx.close();
+    }
+  }
+
+  // --- Son devreler: örnek açmak ya da Yeni devre kurulu devreyi listeye yazar (son 5, yerel), geri yüklenir ------------
+  {
+    // Kayıtlı (örnek olmayan) bir devre: üç parça.
+    const mine = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
+      { id: 'p2', type: 'resistor', label: 'R1', x: 12, y: -6, rotation: 0, props: { resistance: 4700 } },
+      { id: 'p3', type: 'resistor', label: 'R7', x: 24, y: 0, rotation: 90, props: { resistance: 2200 } },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [8, -6]] },
+      { id: 'w2', points: [[16, -6], [24, -6], [24, -4]] },
+      { id: 'w3', points: [[24, 4], [24, 6], [0, 6], [0, 4]] },
+    ] };
+    const seededCtx = async (options) => {
+      const ctx = await browser.newContext(options);
+      await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); localStorage.removeItem('devre-simulatoru:son-devreler'); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(mine));
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      return { ctx, page };
+    };
+    const recentStore = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:son-devreler') ?? '[]'));
+    // Masaüstü.
+    {
+      const { ctx, page } = await seededCtx({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+      await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(250);
+      await page.getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await page.waitForTimeout(500);
+      const afterExample = await recentStore(page);
+      // Değişmemiş örneğin yerine başka örnek açılınca örnek listeye girmez.
+      await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(250);
+      const examplesRecent = page.getByRole('dialog', { name: 'Örnekler' }).getByRole('button', { name: /^Son devreler/ });
+      const examplesLink = ((await examplesRecent.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      await page.getByRole('button', { name: 'Gerilim bölücü', exact: true }).click(); await page.waitForTimeout(500);
+      const afterSecond = await recentStore(page);
+      await (await openMore(page)).getByRole('menuitem', { name: 'Son devreler…' }).click(); await page.waitForTimeout(250);
+      const dlg = page.getByRole('dialog', { name: 'Son devreler' });
+      const entries = await dlg.locator('ul button').count();
+      const entryText = ((await dlg.locator('ul button').first().textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      await dlg.locator('ul button').first().click(); await page.waitForTimeout(500);
+      const restored = await doc(page);
+      const toast = ((await page.getByRole('status').filter({ hasText: 'Son devrelerden açıldı' }).count()) > 0);
+      check('Son devreler (masaüstü): örnek açınca kayıtlı devre (3 parça, "Devrem") listeye giriyor; değişmemiş örnek girmiyor; Örnekler penceresinde "Son devreler 1"',
+        afterExample.length === 1 && afterExample[0].title === 'Devrem' && afterExample[0].parts === 3 && afterSecond.length === 1 && /Son devreler ?1/.test(examplesLink),
+        `${afterExample.length} → ${afterSecond.length} kayıt · "${examplesLink}"`);
+      check('Son devreler (masaüstü): Daha fazla → Son devreler… penceresi kaydı gösteriyor; basınca devre geri geliyor (B1, R1 4,7 kΩ, R7), bildirim "Son devrelerden açıldı"',
+        entries === 1 && /Devrem/.test(entryText) && /3 parça/.test(entryText) && restored?.parts?.map((p) => p.label).join(',') === 'B1,R1,R7' && restored.parts[1].props.resistance === 4700 && toast,
+        `${entries} kayıt "${entryText}" · ${restored?.parts?.map((p) => p.label).join(',')} · bildirim ${toast}`);
+      // Geri yüklenen devre "Yeni devre" ile değişince aynı devre ikinci kez girmez.
+      await circuitButton(page).click(); await page.waitForTimeout(150);
+      await page.getByRole('menu', { name: 'Devre' }).getByRole('menuitem', { name: 'Yeni devre' }).click(); await page.waitForTimeout(500);
+      const afterNew = await recentStore(page);
+      check('Son devreler: Yeni devre de kurulu devreyi kaydediyor; aynı devre ikinci kez girmiyor (1 kayıt)', afterNew.length === 1 && afterNew[0].parts === 3, `${afterNew.length} kayıt`);
+      await ctx.close();
+    }
+    // Telefon: Örnekler'den örnek aç, Daha fazla → Son devreler → kayda dokun.
+    {
+      const { ctx, page } = await seededCtx({
+        viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+      });
+      await openExample(page, 'LED ve ön direnç');
+      await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(350);
+      const sheet = page.getByRole('dialog', { name: 'Daha fazla' });
+      const row = sheet.getByRole('button', { name: 'Son devreler', exact: true });
+      const rowBox = await row.boundingBox();
+      await row.tap(); await page.waitForTimeout(300);
+      const items = sheet.locator('ul button');
+      const n = await items.count();
+      const itemBox = await items.first().boundingBox();
+      await items.first().tap(); await page.waitForTimeout(600);
+      const restored = await doc(page);
+      check('Son devreler (telefon): Daha fazla → Son devreler satırı (≥ 44 px) kaydı gösteriyor (≥ 44 px), dokununca kayıtlı devre geri geliyor, sayfa kapanıyor',
+        (rowBox?.height ?? 0) >= 44 && n === 1 && (itemBox?.height ?? 0) >= 44 && restored?.parts?.map((p) => p.label).join(',') === 'B1,R1,R7' && (await sheet.count()) === 0,
+        `satır ${Math.round(rowBox?.height ?? 0)} px · ${n} kayıt (${Math.round(itemBox?.height ?? 0)} px) · ${restored?.parts?.map((p) => p.label).join(',')}`);
+      await ctx.close();
+    }
+  }
+
+  // --- Föy metinleri: cihaz rafı yerine defterdeki cihaz kartı; osiloskop kartında Oto görünür ve açıklamalı ------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300);
+    await page.getByRole('dialog', { name: 'Örnekler' }).getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).click(); await page.waitForTimeout(500);
+    const region = notebook(page).getByRole('region', { name: /^Örnek · Deney/ });
+    await region.getByRole('button').first().click(); await page.waitForTimeout(300);
+    const steps = ((await region.getByRole('region', { name: 'Adımlar ve sorular' }).textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    check('föy metni (masaüstü, yarım dalga): "cihaz rafı" yok; "defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı)" ve "OSC1 kartındaki Oto’ya bas"',
+      !/cihaz raf/i.test(steps) && steps.includes('defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı)') && steps.includes('OSC1 kartındaki Oto’ya bas'),
+      steps.slice(steps.indexOf('Oynat'), steps.indexOf('Oynat') + 150));
+    // Föyün dediği yerde: FG1'in kartında dalga biçimi ve frekans, OSC1'in kartında Gelişmiş açılmadan Oto.
+    await notebook(page).getByRole('button', { name: /^FG1 ·/ }).click(); await page.waitForTimeout(250);
+    const fg = notebook(page).getByRole('region', { name: 'FG1 · Fonksiyon üreteci' });
+    const fgControls = { kare: await fg.getByRole('radio', { name: 'Kare' }).count(), frekans: await fg.getByRole('spinbutton', { name: 'Frekans' }).count() };
+    await notebook(page).getByRole('button', { name: /^OSC1 ·/ }).click(); await page.waitForTimeout(250);
+    const osc = notebook(page).getByRole('region', { name: 'OSC1 · Osiloskop' });
+    const oto = osc.getByRole('button', { name: 'Oto', exact: true });
+    const advancedOpen = await osc.getByRole('button', { name: /^Gelişmiş/ }).getAttribute('aria-expanded');
+    const otoVisible = (await oto.count()) === 1 && (await oto.isVisible());
+    const otoHint = await oto.evaluate((b) => document.getElementById(b.getAttribute('aria-describedby') ?? '')?.textContent ?? '').catch(() => '');
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(600);
+    await oto.click(); await page.waitForTimeout(300);
+    const toast = (await page.getByRole('status').filter({ hasText: 'Oto:' }).count()) > 0;
+    check('föy metni (masaüstü): FG1 kartında dalga biçimi (Kare) ve Frekans var; OSC1 kartında Oto Gelişmiş kapalıyken görünür, yanında "Volt/bölme ve zaman/bölmeyi sinyale göre seçer"; basınca "Oto:" bildirimi',
+      fgControls.kare === 1 && fgControls.frekans === 1 && advancedOpen === 'false' && otoVisible && otoHint === 'Volt/bölme ve zaman/bölmeyi sinyale göre seçer' && toast,
+      `${JSON.stringify(fgControls)} · Gelişmiş ${advancedOpen} · Oto ${otoVisible} "${otoHint}" · bildirim ${toast}`);
+    await ctx.close();
+  }
+  {
+    const { page } = await phone();
+    await openExample(page, 'Yarım dalga doğrultmaç');
+    await phoneNotebook(page).getByRole('button', { name: /^OSC1 ·/ }).tap(); await page.waitForTimeout(500);
+    const card = phoneNotebook(page).getByRole('region', { name: 'OSC1 · Osiloskop' });
+    const oto = card.getByRole('button', { name: 'Oto', exact: true });
+    await oto.scrollIntoViewIfNeeded().catch(() => {});
+    const box = await oto.boundingBox();
+    const advancedOpen = await card.getByRole('button', { name: /^Gelişmiş ayarlar/ }).getAttribute('aria-expanded');
+    check('föy metni (telefon): osiloskop kartında Oto Gelişmiş ayarlar kapalıyken görünür ve en az 44 px',
+      advancedOpen === 'false' && box !== null && box.height >= 44 && box.width >= 44, `Gelişmiş ${advancedOpen} · ${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)}`);
+    await page.context().close();
+  }
+
+  // --- LED kademeli yanma: önce "LED aşırı akımda" uyarısı (ısınma), çok yüksek akımda hemen yanma ---------------------
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(200);
+    await page.getByRole('dialog', { name: 'Örnekler' }).getByRole('button', { name: 'LED ve ön direnç', exact: true }).click(); await page.waitForTimeout(400);
+    const setR1 = async (value) => {
+      if ((await page.getByLabel('Direnç', { exact: true }).count()) === 0) await notebook(page).getByRole('button', { name: /^R1 ·/ }).first().click();
+      const field = page.getByLabel('Direnç', { exact: true });
+      await field.fill(value); await field.press('Enter'); await page.waitForTimeout(300);
+    };
+    await setR1('100');
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click();
+    await waitSimTime(page, 2);
+    const warnCard = notebook(page).getByRole('region', { name: 'Uyarı · LED aşırı akımda' });
+    const warnText = ((await warnCard.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    const balloonsWarm = await page.getByRole('alertdialog', { name: /LED1 yandı/ }).count();
+    check('LED kademeli (masaüstü): ön direnç 100 Ω (≈ 31 mA) iken 2 s sonra LED yanmamış; uyarı kartı "LED aşırı akımda", eklem sıcaklığı ve "R1 ön direnci … küçük"',
+      (await warnCard.count()) === 1 && /31,0\d? mA geçiyor/.test(warnText) && /eklem ≈ \d+ °C/.test(warnText) && warnText.includes('yanmaz ama') && warnText.includes('R1 ön direnci') && balloonsWarm === 0,
+      `${warnText.slice(0, 170)} · balon ${balloonsWarm}`);
+    await setR1('10');
+    await page.waitForTimeout(700);
+    const balloon = page.getByRole('alertdialog', { name: /LED1 yandı/ });
+    const burnText = ((await notebook(page).getByRole('region', { name: 'Hata · LED yandı' }).textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+    check('LED kademeli (masaüstü): ön direnç 10 Ω (tepe sınırı 155 mA aşılır) olunca LED hemen yanıyor: balon ve "hemen yandı … 155 mA" hata kartı',
+      (await balloon.count()) === 1 && burnText.includes('hemen yandı') && burnText.includes('155 mA'), burnText.slice(0, 160));
+    await ctx.close();
+  }
+
+  // --- Ölçü aletinin çözünürlüğü: hesabın kalıntıları (pA, pV) ekranda 0 ---------------------------------------------
+  {
+    // Ampermetrenin − ucu boşta (akım yalnızca kalıntı); voltmetre akım geçmeyen R1'in uçlarında.
+    const seed = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
+      { id: 'p2', type: 'ammeter', label: 'A1', x: 8, y: -8, rotation: 0, props: {} },
+      { id: 'p3', type: 'resistor', label: 'R1', x: 16, y: 0, rotation: 90, props: { resistance: 1000 } },
+      { id: 'p4', type: 'voltmeter', label: 'V1', x: 24, y: 0, rotation: 90, props: {} },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -8], [4, -8]] },
+      { id: 'w2', points: [[16, 4], [16, 8], [0, 8], [0, 4]] },
+      { id: 'w3', points: [[16, -4], [24, -4]] },
+      { id: 'w4', points: [[24, 4], [24, 8], [16, 8]] },
+    ] };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(seed));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click();
+    await waitSimTime(page, 1); await page.waitForTimeout(500);
+    const cards = await page.evaluate(() => Object.fromEntries(['p2', 'p4'].map((id) => [id, document.querySelector(`[data-card="${id}"]`)?.textContent?.replace(/^.*(Ampermetre|Voltmetre)/, '').trim() ?? null])));
+    const gauges = await page.locator('svg.schematic text[fill="#a6f4bd"]').allTextContents();
+    check('ölçü aleti: boşta uçlu ampermetre ve akım geçmeyen dirençteki voltmetre 0 gösteriyor (pA, pV kalıntısı yok)',
+      /(^|\D)0,000 A$/.test(cards.p2 ?? '') && /(^|\D)0,000 V$/.test(cards.p4 ?? '') && !/[pf][AV]/.test(`${cards.p2}${cards.p4}`) && gauges.length === 2 && gauges.every((g) => /^0,000 [AV]$/.test(g)),
+      `kart A1 ${cards.p2} · V1 ${cards.p4} · ekran ${gauges.join(' | ')}`);
+    await ctx.close();
+  }
+
+  // --- Akım noktaları 1 µA'in altında neredeyse duruyor (voltmetrenin içinden geçen akım) ---------------------------------
+  {
+    // 5 V'luk pil ve doğrudan uçlarına bağlı 10 MΩ'luk voltmetre: döngüde 0,5 µA.
+    const seed = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 5, internalResistance: 0 } },
+      { id: 'p2', type: 'voltmeter', label: 'V1', x: 12, y: 0, rotation: 90, props: {} },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -6], [12, -6], [12, -4]] },
+      { id: 'w2', points: [[0, 4], [0, 6], [12, 6], [12, 4]] },
+    ] };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(seed));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(600);
+    const offsets = () => page.locator('svg.schematic line[stroke-dasharray="0 16"]').evaluateAll((ls) => ls.map((l) => Number(l.getAttribute('stroke-dashoffset'))));
+    const a = await offsets();
+    const t0 = Date.now();
+    await new Promise((r) => setTimeout(r, 3000));
+    const b = await offsets();
+    const seconds = (Date.now() - t0) / 1000;
+    // Desen 16 px'te bir yinelenir: en kısa çevresel fark.
+    const moved = a.map((x, i) => { const d = Math.abs(((b[i] ?? x) - x) % 16); return Math.min(d, 16 - d); });
+    const fastest = Math.max(0, ...moved) / seconds;
+    check('akım noktaları: voltmetrenin 0,5 µA’lik akımında noktalar neredeyse duruyor (≤ 1 piksel/s; eskiden 4 piksel/s)',
+      a.length >= 2 && fastest <= 1, `${a.length} nokta çizgisi · en hızlısı ${fastest.toFixed(2)} piksel/s`);
+    await ctx.close();
+  }
+
+  // --- Beklenmeyen bağlantı bildirimi: Geri al yalnızca o kabloyu kaldırır; başka değişiklikte bildirim kapanır ----------
+  {
+    // R1'in 2. ucunun üstünden geçen (ona bağlı olmayan) kablo: R2'nin 2. ucundan yukarı (Kablo yolu 3. bölümüyle aynı).
+    const seed = { version: 1, parts: [
+      { id: 'p1', type: 'resistor', label: 'R1', x: 0, y: 0, rotation: 0, props: { resistance: 1000 } },
+      { id: 'p2', type: 'resistor', label: 'R2', x: 0, y: 12, rotation: 0, props: { resistance: 1000 } },
+      { id: 'p3', type: 'resistor', label: 'R3', x: 16, y: 0, rotation: 0, props: { resistance: 1000 } },
+    ], wires: [{ id: 'w1', points: [[4, 12], [4, -6]] }] };
+    const open = async () => {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+      await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(seed));
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      return { ctx, page };
+    };
+    const saved = async (page) => { await page.waitForTimeout(500); return page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre'))); };
+    const at = (page, gx, gy) => page.evaluate(([x, y]) => {
+      const svg = document.querySelector('svg.schematic'); const g = svg.querySelector('g[transform]');
+      const m = g.getAttribute('transform').match(/translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)/); const r = svg.getBoundingClientRect();
+      return { x: r.left + Number(m[1]) + x * 10 * Number(m[3]), y: r.top + Number(m[2]) + y * 10 * Number(m[3]) };
+    }, [gx, gy]);
+    /** R3'ün 1. ucundan (12, 0) R1'in 2. ucuna (4, 0) fareyle kablo; bildirim. */
+    const drawWire = async (page) => {
+      const a = await at(page, 12, 0); const b = await at(page, 4, 0);
+      await page.mouse.move(a.x, a.y); await page.mouse.down();
+      await page.mouse.move(b.x, b.y, { steps: 12 }); await page.mouse.up(); await page.waitForTimeout(300);
+      return page.getByRole('alert').filter({ hasText: 'bıraktığın' });
+    };
+    // 1. Bildirim açıkken başka bir değişiklik (R2'nin değeri): bildirim kapanır, kablo yerinde kalır.
+    {
+      const { ctx, page } = await open();
+      const alert = await drawWire(page);
+      const shown = await alert.count();
+      { const r2 = await at(page, 0, 12); await page.mouse.click(r2.x, r2.y); await page.waitForTimeout(250); }
+      const field = page.getByLabel('Direnç', { exact: true });
+      await field.fill('2,2k'); await field.press('Enter'); await page.waitForTimeout(400);
+      const after = await page.getByRole('alert').filter({ hasText: 'bıraktığın' }).count();
+      const d = await saved(page);
+      check('beklenmeyen bağlantı: bildirim açıkken başka bir değişiklik yapılınca (R2 = 2,2 kΩ) bildirim kapanıyor; kablo ve değişiklik yerinde (Geri al yanlış adımı geri alamaz)',
+        shown === 1 && after === 0 && d.wires.length === 2 && d.parts.find((p) => p.label === 'R2').props.resistance === 2200,
+        `bildirim ${shown} → ${after} · ${d.wires.length} kablo · R2 ${d.parts.find((p) => p.label === 'R2').props.resistance}`);
+      await ctx.close();
+    }
+    // 2. Bildirimdeki Geri al yalnızca kabloyu kaldırır (önceki değişiklik yerinde kalır).
+    {
+      const { ctx, page } = await open();
+      { const r2 = await at(page, 0, 12); await page.mouse.click(r2.x, r2.y); await page.waitForTimeout(250); }
+      const field = page.getByLabel('Direnç', { exact: true });
+      await field.fill('4,7k'); await field.press('Enter'); await page.waitForTimeout(300);
+      await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+      const alert = await drawWire(page);
+      await alert.getByRole('button', { name: 'Geri al' }).click().catch(() => {});
+      const d = await saved(page);
+      check('beklenmeyen bağlantı: bildirimdeki Geri al yalnızca o kabloyu kaldırıyor (önceki değişiklik R2 = 4,7 kΩ yerinde)',
+        d.wires.length === 1 && d.parts.find((p) => p.label === 'R2').props.resistance === 4700 && (await page.getByRole('alert').filter({ hasText: 'bıraktığın' }).count()) === 0,
+        `${d.wires.length} kablo · R2 ${d.parts.find((p) => p.label === 'R2').props.resistance}`);
+      await ctx.close();
+    }
+  }
+
   // --- Telefon hızı: 4 kat yavaş işlemcide (iPhone 13 öykünmesi) bütün örnekler çalışırken ---------------
   // Kare hızı en az 30/s, 100 ms'yi aşan görev yok (çözücünün süre sınırı kesin; çizim uzun sürünce hesap
   // süresi kısalır). Simülasyon gerçek zamana yetişemeyince "yetişemiyor" simgesi üst çubukta, açıklaması
@@ -5989,6 +6343,7 @@ try {
       const devices = t.deviceRects().map((d) => ({ id: d.id, x0: d.x0, x1: d.x1, y0: d.y0, y1: d.y1, vis: Math.max(0, Math.min(d.x1, c.width) - Math.max(d.x0, 0)) / (d.x1 - d.x0) }));
       return {
         w: c.width,
+        h: c.height,
         share: b ? (b.x1 - b.x0) / c.width : 0,
         under: b ? reserve.some((r) => b.x0 < r.x1 && r.x0 < b.x1 && b.y1 > r.y0) : true,
         boardTop: b?.y0 ?? 0,
@@ -6021,14 +6376,25 @@ try {
     check('3B kadraj (masaüstü, 1N4001 DC): tahta kadraj genişliğinin en az %45’i, alttaki 3B düğmelerinin üstünde; cihazların ön panelleri tahtanın arkasında; etiketler üst üste binmiyor',
       dd.share >= 0.45 && !dd.under && behind && !dd.clash && dd.labels.length >= 2,
       `tahta %${Math.round(dd.share * 100)} · altta ${dd.under} · arkada ${behind} · etiket ${dd.labels.length}, çakışma ${dd.clash}`);
+    // Cihazlar (masaüstü, 2026-11-09): ön paneller görüntünün yüksekliğini dolduracak kadar yakından; bütün sıra
+    // sığmıyorsa sığan kadarı (önce osiloskop), yeniden seçince sağdakiler. Etiketler yanlardan kesilmez.
+    const full = (f) => f.devices.filter((d) => d.vis > 0.99);
+    const tallest = (f) => Math.max(0, ...full(f).map((d) => (Math.min(d.y1, f.h) - Math.max(d.y0, 0)) / f.h));
+    const labelsIn = (f) => page.evaluate(() => { const c = document.querySelector('canvas').getBoundingClientRect(); return [...document.querySelectorAll('[data-anchor="part"]')].filter((e) => getComputedStyle(e).opacity === '1').every((e) => { const r = e.getBoundingClientRect(); return r.left >= c.left - 0.5 && r.right <= c.right + 0.5; }); });
     await open(page, 'bjt-yukseltec');
     const menu = await pickCam(page, 'Cihazlar', false);
     const bench = await frame(page);
-    const span = bench.devices.length ? (Math.max(...bench.devices.map((d) => d.x1)) - Math.min(...bench.devices.map((d) => d.x0))) / bench.w : 0;
+    const benchIn = await labelsIn(bench);
     const onlyDevices = bench.labels.every((id) => bench.devices.some((d) => d.id === id));
-    check('3B kadraj (masaüstü, BC107 yükselteç): kamera menüsünde “Cihazlar”; üç cihaz da kadrajda, sıra kadraj genişliğinin en az %85’i; yalnızca cihazların etiketleri',
-      menu && bench.devices.length === 3 && bench.devices.every((d) => d.vis > 0.99) && span >= 0.85 && onlyDevices,
-      `${menu} · ${bench.devices.map((d) => Math.round(d.vis * 100)).join('/')} · %${Math.round(span * 100)} · ${bench.labels.length} etiket`);
+    await pickCam(page, 'Cihazlar', false);
+    const bench2 = await frame(page);
+    const moved = full(bench2).map((d) => d.id).join() !== full(bench).map((d) => d.id).join();
+    await open(page, 'jfet-karakteristik');
+    await pickCam(page, 'Cihazlar', false);
+    const meters = await frame(page);
+    check('3B Cihazlar (masaüstü): ön paneller görüntünün yüksekliğinin en az yarısı (BC107: osiloskop; BF245A: iki multimetre yan yana); yeniden seçince sıradaki cihaz; yalnızca cihazların etiketleri, yanlardan kesilmiyor',
+      menu && full(bench).some((d) => d.id) && tallest(bench) >= 0.5 && moved && onlyDevices && benchIn && full(meters).length >= 2 && tallest(meters) >= 0.6,
+      `${menu} · ${full(bench).map((d) => d.id).join('+')} %${Math.round(tallest(bench) * 100)} → ${full(bench2).map((d) => d.id).join('+')} · BF245A ${full(meters).map((d) => d.id).join('+')} %${Math.round(tallest(meters) * 100)} · etiket içeride ${benchIn}`);
     await ctx.close();
 
     const { page: ph } = await phone();
@@ -6049,6 +6415,116 @@ try {
       scope !== undefined && next !== undefined && next.id !== scope.id,
       `${scope?.id ?? '—'} → ${next?.id ?? '—'} · ${first.devices.map((d) => `${d.id}:${Math.round(d.vis * 100)}`).join(' ')}`);
     await ph.context().close();
+  }
+  // --- 3B cihaz kabloları: timsah kıskaç, bir delikte tek tel, birleşme etiketi, ağ vurgusu ------------------
+  // Cihaz kabloları deliğe girmez: kıskaç eksenli parçanın bacağını ya da kısa dik telin ucunu tutar, aynı ağdakiler
+  // zincirlenir; tahtada hiçbir delikte iki şey yok; birleşme noktasında "GND · 3 kablo". Fare kablonun üstüne
+  // gelince (telefonda dokununca) o ağın kabloları ve bacakları parlar, öbürleri soluklaşır, küçük şemada düğüm.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const report = async (id) => {
+      await page.goto('about:blank');
+      await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      return page.evaluate(() => {
+        const r = window.__tezgah.clipReport();
+        const labels = [...document.querySelectorAll('[data-anchor="junction"]')].map((e) => ({ net: e.dataset.net, text: e.textContent, shown: getComputedStyle(e).opacity === '1' }));
+        return { ...r, labels };
+      });
+    };
+    const jf = await report('jfet-karakteristik');
+    const yd = await report('yarim-dalga');
+    const kinds = (r) => r.clips.map((c) => c.kind[0]).join('');
+    const label = (r, net) => r.labels.find((l) => l.net === net);
+    const gnd = (r) => r.junctions.find((j) => /GND/.test(label(r, j.net)?.text ?? ''));
+    check('3B kıskaç (BF245A, yarım dalga): hiçbir delikte iki tel ya da bacak yok; bütün cihaz kabloları kıskaçla (bacak, kısa tel ya da zincir), deliğe takılı cihaz kablosu yok',
+      jf.doubled === 0 && yd.doubled === 0 && jf.plugged === 0 && yd.plugged === 0 && jf.clips.length === 8 && yd.clips.length === 5 && jf.clips.some((c) => c.kind === 'leg') && jf.clips.some((c) => c.kind === 'chain'),
+      `BF245A ${kinds(jf)} · iki şey ${jf.doubled} · fişli ${jf.plugged} | yarım dalga ${kinds(yd)} · iki şey ${yd.doubled} · fişli ${yd.plugged}`);
+    check('3B kıskaç: birleşme etiketi ağın adı ve kablo sayısı (BF245A: "GND · 3 kablo", "RD 2. uç · 2 kablo"; yarım dalga: GND iki kablo), etiketler görünür',
+      label(jf, gnd(jf)?.net)?.text === 'GND · 3 kablo' && jf.labels.some((l) => l.text === 'RD 2. uç · 2 kablo') && jf.labels.every((l) => l.shown) && jf.junctions.length === 2 &&
+        /^GND · 2 kablo$/.test(label(yd, gnd(yd)?.net)?.text ?? '') && yd.labels.length === yd.junctions.length,
+      `${jf.labels.map((l) => `${l.text}${l.shown ? '' : ' (gizli)'}`).join(' | ')} || ${yd.labels.map((l) => l.text).join(' | ')}`);
+    // Fare birleşme noktasının (ilk kıskacın ağzı) üstüne gelince GND ağı vurgulanır.
+    await page.goto(`${URL0}embed/?ornek=jfet-karakteristik`, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const net = jf.junctions.find((j) => j.count === 3)?.net;
+    const at = await page.evaluate((net) => {
+      const t = window.__tezgah; const p = t.junctionAt.get(net).clone().project(t.camera); const c = document.querySelector('canvas').getBoundingClientRect();
+      return { x: c.left + ((p.x + 1) / 2) * c.width, y: c.top + ((1 - p.y) / 2) * c.height };
+    }, net);
+    let lit = { net: null };
+    for (let dy = 0; dy < 40 && !lit.net; dy += 3) {
+      await page.mouse.move(at.x, at.y - dy); await page.waitForTimeout(120);
+      lit = await page.evaluate(() => window.__tezgah.netHighlight());
+    }
+    const mini = await page.locator('polyline[data-highlight]').count();
+    await page.mouse.move(5, 300); await page.waitForTimeout(300);
+    const off = await page.evaluate(() => window.__tezgah.netHighlight());
+    check('3B ağ vurgusu (masaüstü, BF245A): fare GND birleşme noktasının üstüne gelince GND kabloları parlıyor, öbürleri soluk, bacağı işaretli; küçük şemada düğümün kabloları vurgulu; fare çekilince kalkıyor',
+      lit.net === net && lit.lit >= 4 && lit.dim >= 4 && lit.legs >= 1 && mini >= 1 && off.net === null && off.lit === 0 && off.dim === 0,
+      `${lit.net} · parlak ${lit.lit} · soluk ${lit.dim} · bacak ${lit.legs} · küçük şema ${mini} · sonra ${off.net}`);
+    await ctx.close();
+    // Telefonda dokununca: kıskaca dokunmak vurgular, yeniden dokunmak kaldırır.
+    const { page: ph, cdp } = await phone();
+    await ph.context().addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
+    await ph.goto(`${URL0}embed/?ornek=jfet-karakteristik&gorunum=tam`, { waitUntil: 'networkidle' });
+    await ph.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+    await ph.waitForTimeout(800);
+    const pt = await ph.evaluate((net) => {
+      const t = window.__tezgah; const p = t.junctionAt.get(net).clone().project(t.camera); const c = document.querySelector('canvas').getBoundingClientRect();
+      return { x: c.left + ((p.x + 1) / 2) * c.width, y: c.top + ((1 - p.y) / 2) * c.height };
+    }, net);
+    let tapped = { net: null };
+    for (let dy = 0; dy < 30 && !tapped.net; dy += 3) {
+      await tap(ph, cdp, { x: pt.x, y: pt.y - dy }); await ph.waitForTimeout(150);
+      tapped = await ph.evaluate(() => window.__tezgah.netHighlight());
+    }
+    check('3B ağ vurgusu (telefon, BF245A): kıskaca dokununca o ağ vurgulanıyor (öbürleri soluk)', tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1, `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0}`);
+    await ph.context().close();
+  }
+  // --- 3B tam ekran (telefon, dikey ve yatay): düğmeler alt kenarda tek sırada, kamera yeniden sığar ---------------
+  // Tam ekranda Etiketler, Kamera, Karta aktar, Tahtada kur ve Şemayı küçült tek sıra, 3B alanının alt kenarında
+  // (alt boşluk ≤ 24 px), hiçbiri tahtanın üstüne binmiyor; tahta kadraj genişliğinin en az %70'i; görünen cihaz
+  // etiketleri yanlardan kesilmiyor. Kamera elle oynatılmış olsa da tam ekrana girince ve çıkınca yeniden sığar.
+  for (const [w, h, yon] of [[390, 844, 'dikey'], [844, 390, 'yatay']]) {
+    const { page, cdp } = await phone(w, h);
+    await openExample(page, '1N4001: doğru akımda akım-gerilim ölçümü');
+    await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: '3B' }).tap();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
+    const measure = () => page.evaluate(() => {
+      const c = document.querySelector('main canvas').getBoundingClientRect();
+      const b = window.__tezgah.boardRect();
+      const board = b && { x0: b.x0 + c.left, y0: b.y0 + c.top, x1: b.x1 + c.left, y1: b.y1 + c.top };
+      const names = ['Etiketler', 'Kamera: Serbest', 'Karta aktar', 'Tahtada kur', 'Şemayı küçült', 'Şemayı tam ekran aç'];
+      const buttons = [...document.querySelectorAll('main button')].filter((e) => names.includes(e.getAttribute('aria-label') ?? '') && e.getBoundingClientRect().width > 0).map((e) => e.getBoundingClientRect());
+      const labels = [...document.querySelectorAll('[data-anchor="part"]')].filter((e) => getComputedStyle(e).opacity === '1').map((e) => e.getBoundingClientRect());
+      return {
+        share: b ? (b.x1 - b.x0) / c.width : 0,
+        count: buttons.length,
+        row: buttons.length > 0 && Math.max(...buttons.map((r) => r.top)) - Math.min(...buttons.map((r) => r.top)) < 2,
+        gap: buttons.length ? Math.round(c.bottom - Math.max(...buttons.map((r) => r.bottom))) : 999,
+        over: board ? buttons.some((r) => r.left < board.x1 && r.right > board.x0 && r.top < board.y1 && r.bottom > board.y0) : true,
+        cut: labels.some((r) => r.left < c.left - 0.5 || r.right > c.right + 0.5),
+      };
+    });
+    const camera = () => page.evaluate(() => window.__tezgah.camera.position.toArray().map((v) => v.toFixed(1)).join(','));
+    const box = await page.locator('main canvas').boundingBox();
+    await drag(page, cdp, { x: box.x + box.width * 0.5, y: box.y + box.height * 0.4 }, { x: box.x + box.width * 0.75, y: box.y + box.height * 0.5 });
+    const moved = await camera();
+    await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).tap(); await page.waitForTimeout(1200);
+    const full = await measure();
+    const refit = (await camera()) !== moved;
+    await page.getByRole('button', { name: 'Şemayı küçült' }).tap(); await page.waitForTimeout(1200);
+    const back = await measure();
+    check(`3B tam ekran (telefon, ${yon}, 1N4001 DC): beş düğme tek sırada alt kenarda (alt boşluk ≤ 24 px), hiçbiri tahtanın üstünde değil; tahta en az %70; etiketler kesilmiyor; girince ve çıkınca kamera yeniden sığıyor`,
+      full.count === 5 && full.row && full.gap <= 24 && !full.over && full.share >= 0.7 && !full.cut && refit && back.row && back.gap <= 24,
+      `${full.count} düğme · tek sıra ${full.row} · alt boşluk ${full.gap} px · tahtada ${full.over} · tahta %${Math.round(full.share * 100)} · kesik ${full.cut} · yeniden sığdı ${refit} · çıkınca tek sıra ${back.row}, %${Math.round(back.share * 100)}`);
+    await page.context().close();
   }
 } finally {
   await browser.close();

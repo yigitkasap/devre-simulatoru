@@ -516,6 +516,9 @@ export class CircuitSimulator {
           params: {
             current: device.burnCurrent,
             maxCurrent: device.params.maxCurrent,
+            peakCurrent: device.params.peakCurrent,
+            maxTemperature: device.params.maxJunction,
+            cause: device.burnCause === 'heat' ? 1 : 0,
             forwardVoltage: device.params.forwardVoltage,
           },
         });
@@ -792,7 +795,10 @@ export class CircuitSimulator {
     try {
       if (!this.isTransient) {
         this.time += dt;
-        const error = this.solvedVersion === this.version ? null : this.solveDC();
+        let error = this.solvedVersion === this.version ? null : this.solveDC();
+        // Adım atılmasa da süre geçer: iç durumu zamanla değişen bileşen (LED'in ısınması) ilerler; sınır
+        // aşıldıysa (LED yandı) devre yeniden çözülür.
+        if (!error && dt > 0 && this.elapseDevices(dt)) error = this.solveDC();
         if (!error) this.observe();
         return this.result(0, error);
       }
@@ -801,6 +807,20 @@ export class CircuitSimulator {
       if (e instanceof SingularMatrixError) return this.result(0, this.singularDiagnostic(e.column));
       throw e;
     }
+  }
+
+  /** DC devrede `dt` saniye geçti: bileşenlerin zamanla değişen durumu ve sınırları; bir bileşen değiştiyse true. */
+  private elapseDevices(dt: number): boolean {
+    let changed = false;
+    for (const device of this.circuit.devices) {
+      device.elapse(this.x, dt);
+      if (device.checkLimits(this.x)) {
+        changed = true;
+        this.burnedThisCall.push(device.id);
+      }
+    }
+    if (changed) this.invalidate();
+    return changed;
   }
 
   /** runUntil: son adım istenen ana tam denk getirilir. */

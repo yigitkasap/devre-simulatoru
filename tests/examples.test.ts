@@ -70,13 +70,42 @@ describe('Örnekler', () => {
     });
   }
 
-  it('LED ve ön direnç: ≈ 9,7 mA; 100 Ω ile LED yanar', () => {
+  it('LED ve ön direnç: ≈ 9,7 mA; 100 Ω’da ≈ 31 mA uyarı (yanmaz, eklem ≈ 59 °C), 22 Ω’da ≈ 8 s’de ısınarak, 15 Ω’da hemen yanar', () => {
     const doc = load('led-on-direnc');
+    const led = idOf(doc, 'LED1');
     const i = simulate(doc).measure(idOf(doc, 'A1'))!.current;
     expect(i).toBeGreaterThan(9.6e-3);
     expect(i).toBeLessThan(9.8e-3);
-    const burned = simulate(withProps(doc, 'R1', { resistance: 100 }));
-    expect(burned.status(idOf(doc, 'LED1')).burned).toBe(true);
+    // Metindeki sayılar (tr.examples.texts['led-on-direnc'].purpose).
+    const purpose = tr.examples.texts['led-on-direnc'].purpose!;
+    // 100 Ω: sürekli sınırın (30 mA) üstünde; uyarı, 60 s sonra da yanmamış.
+    const warm = simulate(withProps(doc, 'R1', { resistance: 100 }));
+    warm.advance(60);
+    expect(warm.status(led).burned).toBe(false);
+    const warning = warm.runtimeDiagnostics.find((d) => d.code === 'led-overcurrent');
+    expect(warning?.params?.current).toBeGreaterThan(30.5e-3);
+    expect(warning?.params?.current).toBeLessThan(31.5e-3);
+    expect(warning?.params?.temperature).toBeGreaterThan(57);
+    expect(warning?.params?.temperature).toBeLessThan(61);
+    expect(purpose).toContain('≈ 31 mA');
+    expect(purpose).toContain('≈ 59 °C');
+    // 22 Ω: ≈ 127 mA, eklem ≈ 8 s'de 115 °C'yi aşar.
+    const hot = simulate(withProps(doc, 'R1', { resistance: 22 }));
+    let t = 0;
+    while (!hot.status(led).burned && t < 30) {
+      hot.advance(0.05);
+      t += 0.05;
+    }
+    expect(t).toBeGreaterThan(7.5);
+    expect(t).toBeLessThan(9);
+    expect(hot.runtimeDiagnostics.find((d) => d.code === 'led-burned')?.params?.cause).toBe(1);
+    expect(purpose).toContain('≈ 127 mA');
+    expect(purpose).toContain('≈ 8 s');
+    // 15 Ω: tepe sınırı (155 mA) aşılır, LED hemen yanar.
+    const flash = simulate(withProps(doc, 'R1', { resistance: 15 }));
+    flash.advance(0.016);
+    expect(flash.status(led).burned).toBe(true);
+    expect(flash.runtimeDiagnostics.find((d) => d.code === 'led-burned')?.params?.cause).toBe(0);
   });
 
   it('Gerilim bölücü: 4,5 V', () => {

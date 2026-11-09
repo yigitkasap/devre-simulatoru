@@ -36,14 +36,18 @@ import {
 } from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { dotSpeed, type SimFrame } from '../editor/useSimulation';
+import { pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
 import { collisions, leadCurve, socketCurve, type Obstacle } from './leadRoute';
 import { cableCurrents } from './cableFlow';
+import { CLIP_DEVICES, clipGroups } from './clipPlan';
+import { clipMesh, stubMesh } from './clipModel';
+import { CABLE_RADIUS, CLIP, PLUG, clipPose, clipTail, clippedPlan, jumperShapes, layoutClips, type BoardBody, type ClipLayout } from './clips';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
-import { buildPartModel } from './registry';
+import { holeAt, placeBoardPart, placeTablePart, type Placement } from './placement';
 import { BACKGROUND, createControls, createRenderer, lightScene, radialTexture } from './stage';
 
 export interface BenchCallbacks {
@@ -58,6 +62,8 @@ export interface BenchCallbacks {
   onCamera?(): void;
   /** Tepeden görünüm (Tahtada kur) kaydırıldı, yakınlaştı ya da boyutu değişti. */
   onView?(): void;
+  /** Bir ağın kabloları vurgulandı (kablonun ya da kıskacın üstüne gelince, telefonda dokununca) ya da vurgu kalktı (null). */
+  onNet?(net: string | null): void;
 }
 
 /** Tepeden görünümde ekran = dünya · scale + (ox, oy) (piksel; x sağa, z aşağı). */
@@ -103,6 +109,8 @@ function boxCorners(b: Box3): Vector3[] {
 const BENCH_FREE = { desktop: { elevation: (36 * Math.PI) / 180, share: 0.47 }, phone: { elevation: (30 * Math.PI) / 180, share: 0.72 } };
 /** Bu genişlikten dar tuval telefon sayılır (px). */
 const PHONE_WIDTH = 640;
+/** Cihazlar görünümü (masaüstü): ön paneller kullanılabilir yüksekliğin en az bu kadarını doldurur. */
+const BENCH_FILL = 0.7;
 
 /** Akım noktaları: aralık (birim), yarıçap ve hız ölçeği (şemadaki piksel/s → birim/s). */
 const DOT_SPACING = 2.6;
@@ -142,12 +150,11 @@ interface Placed {
   readonly dirs: readonly (Vector3 | undefined)[];
   /** Etiketin bağlandığı nokta: gövdenin üstünün ortası (dünya). */
   readonly top: Vector3;
-}
-
-/** Deliğin dünya koordinatı (`y`: ağzı BB.height, bacağın bittiği yer BB.height − HOLE_DEPTH). */
-function holeAt(h: Hole, cols: number, y: number): Vector3 {
-  const { x, z } = holeXZ(h, cols);
-  return new Vector3(x, y, z);
+  /** Soketlerin rengi (cihaz kablosu bu renkte; modelde varsa). */
+  readonly colors: readonly (string | undefined)[];
+  /** Bütün modelin ve bacaksız gövdenin kutusu (dünya, yerleşirken). */
+  readonly box: Box3;
+  readonly body: Box3;
 }
 
 function partKey(part: Part): string {
@@ -247,8 +254,11 @@ export class BenchScene {
   /** Kullanıcı kamerayı elle oynattı mı (oynatmadıysa alan değişince yeniden sığdırılır). */
   private userMoved = false;
   private lastView: CameraView = 'free';
-  /** Telefonda Cihazlar görünümünün yaklaştığı cihaz (soldan sıra; −1: henüz seçilmedi). */
+  /** Cihazlar görünümünde gösterilen ilk cihaz (soldan sıra; −1: henüz seçilmedi) ve gösterilen cihaz sayısı. */
   private benchIndex = -1;
+  private benchStep = 1;
+  /** Telefon düzeni (BenchView'den; null: tuvalin genişliğine göre). */
+  private phoneLayout: boolean | null = null;
   /** Cihazlar görünümünde (kamera oynatılana dek) yalnızca bu parçaların (masa üstü cihazlar) etiketi gösterilir. */
   private benchLabels: ReadonlySet<string> | null = null;
   private plan: BreadboardPlan | null = null;
@@ -256,8 +266,20 @@ export class BenchScene {
   private cablePaths: CablePath[] = [];
   /** Masadaki parçalardan gelen kabloların eğrileri ve engelleri (denetim: `cableHits`). */
   private leadCurves: Curve<Vector3>[] = [];
-  /** Son kurulan belge (Tepeden görünüme geçince kablolar yeniden kurulur). */
+  /** Son kurulan belge ve Tahtada kur kurulumu (Tepeden görünüme geçince kablolar yeniden kurulur). */
   private lastDoc: CircuitDoc | null = null;
+  private lastOverride: BreadboardPlan | null = null;
+  /** Cihaz kablolarının kıskaçları (3B; Tepeden görünümde yok: kablolar deliklere iner). */
+  private clipLayout: ClipLayout | null = null;
+  /** Akım noktaları için plan: cihaz kablolarının delikleri kıskacın tuttuğu yerinki. */
+  private flowPlan: BreadboardPlan | null = null;
+  /** Birleşme noktaları (ağ → dünya noktası): HTML katmanındaki [data-anchor="junction"] etiketleri. */
+  private junctionAt = new Map<string, Vector3>();
+  /** Vurgulanan ağ, bacaklarının işaretleri ve malzemelerin soluk / parlak kopyaları. */
+  private highlighted: string | null = null;
+  private readonly legGlow = new Group();
+  private readonly dimmed = new Map<Material, Material>();
+  private readonly lit = new Map<Material, Material>();
   private leadObstacles: Obstacle[][] = [];
   private cableAmps = new Float64Array(0);
   private cablePhases = new Float64Array(0);
@@ -295,7 +317,7 @@ export class BenchScene {
     this.ring.visible = false;
     this.dots.count = 0;
     this.dots.frustumCulled = false;
-    this.scene.add(this.ring, this.boards, this.partsGroup, this.cables, this.dots);
+    this.scene.add(this.ring, this.boards, this.partsGroup, this.cables, this.dots, this.legGlow);
 
     // Fare eşlemesi stage.ts'te (sol kaydırır, orta / sağ döndürür). Tıklama (sürüklemeden) seçer.
     this.controls = createControls(this.camera, canvas, { min: 8, max: 900 });
@@ -309,6 +331,7 @@ export class BenchScene {
     canvas.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('pointercancel', this.onPointerUp);
+    canvas.addEventListener('pointerleave', this.onPointerLeave);
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);
@@ -447,10 +470,12 @@ export class BenchScene {
       if (node.dataset.anchor === 'footprint') continue;
       const placed = this.parts.get(node.dataset.id ?? '');
       const pin = node.dataset.pin;
-      const world = placed ? (pin !== undefined ? placed.anchors[Number(pin)] : placed.top) : undefined;
+      // Birleşme noktasının etiketi (ağın adı ve kablo sayısı): ilk kıskacın ağzının biraz üstünde.
+      const junction = node.dataset.anchor === 'junction' ? this.junctionAt.get(node.dataset.net ?? '') : undefined;
+      const world = placed ? (pin !== undefined ? placed.anchors[Number(pin)] : placed.top) : junction?.clone().setY(junction.y + 1.5);
       let show = false;
       // Cihazlar görünümünde devre parçalarının etiketleri cihazların ön panellerini örterdi.
-      const hidden = this.benchLabels !== null && !this.userMoved && placed !== undefined && !this.benchLabels.has(placed.part.id);
+      const hidden = this.benchLabels !== null && !this.userMoved && (placed === undefined || !this.benchLabels.has(placed.part.id));
       if (world && !hidden) {
         const { x, y, z } = pinSpots.get(node) ?? toScreen(world);
         if (node.dataset.exact !== undefined) {
@@ -483,10 +508,13 @@ export class BenchScene {
             spots.push({ x0, y0: 4 }, { x0, y0: item.h + 12 });
           }
         }
+        // Parça etiketi yanlardan kesilmez: noktası görüntüdeyse kenara dayanmış konum da denenir.
+        if (pin === undefined && x >= 0 && x <= w) spots.splice(1, 0, { x0: Math.max(4, Math.min(w - item.w - 4, x - item.w / 2)), y0: y - item.h - 4 });
         const GAP = 4;
         for (const box of spots) {
           const rect = { ...box, x1: box.x0 + item.w, y1: box.y0 + item.h };
-          const inView = z > -1 && z < 1 && rect.x1 > 0 && (pin === undefined ? rect.y0 >= 0 : rect.y1 > 0) && rect.x0 < w && rect.y0 < h;
+          const inside = pin === undefined ? rect.x0 >= 0 && rect.x1 <= w && rect.y0 >= 0 : rect.x1 > 0 && rect.x0 < w && rect.y1 > 0;
+          const inView = z > -1 && z < 1 && inside && rect.y0 < h;
           const clash = pin === undefined && taken.some((r) => rect.x0 < r.x1 + GAP && rect.x1 > r.x0 - GAP && rect.y0 < r.y1 + GAP && rect.y1 > r.y0 - GAP);
           if (!inView || clash) continue;
           show = true;
@@ -581,6 +609,31 @@ export class BenchScene {
     return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
   }
 
+  /**
+   * Denetim (ios-kontrol): tahtadaki dolu delikler (bacaklar, köprüler, kıskaçsız kablolar, kısa teller) ve iki
+   * şey takılı delik sayısı; cihaz kablolarının kıskaçları (bacak, kısa tel, zincir) ve birleşme noktaları.
+   */
+  clipReport(): { holes: number; doubled: number; clips: Array<{ part: string; pin: number; kind: string; net: string }>; plugged: number; junctions: Array<{ net: string; count: number }> } {
+    const plan = this.plan;
+    const layout = this.clipLayout;
+    if (!plan) return { holes: 0, doubled: 0, clips: [], plugged: 0, junctions: [] };
+    const key = (h: Hole) => (h.kind === 'strip' ? `${h.board}:s${h.col}:${h.row}` : `${h.board}:r${h.rail}:${h.k}`);
+    const all = [
+      ...[...plan.onBoard.values()].flatMap((p) => [...p.holes, ...(p.extraHoles ?? [])]),
+      ...plan.jumpers.flatMap((j) => [j.a, j.b]),
+      ...plan.leads.filter((_, i) => !layout?.clips.has(i)).map((l) => l.hole),
+      ...(layout?.stubs ?? []).map((s) => s.hole),
+    ].map(key);
+    const devices = plan.leads.flatMap((l, i) => (CLIP_DEVICES.has(this.parts.get(l.partId)?.part.type ?? 'ground') ? [i] : []));
+    return {
+      holes: new Set(all).size,
+      doubled: all.length - new Set(all).size,
+      clips: [...(layout?.clips.values() ?? [])].map((c) => ({ part: plan.leads[c.lead]!.partId, pin: plan.leads[c.lead]!.pin, kind: c.kind, net: c.net })),
+      plugged: devices.filter((i) => !layout?.clips.has(i)).length,
+      junctions: [...this.junctionAt.keys()].map((net) => ({ net, count: layout?.junctions.find((j) => j.net === net)?.count ?? 0 })),
+    };
+  }
+
   /** Denetim (ios-kontrol): masadaki bir parçanın gövdesinin içinden geçen kablo sayısı. */
   cableHits(): number {
     return this.leadCurves.filter((curve, i) => collisions(curve, this.leadObstacles[i] ?? []).length > 0).length;
@@ -598,6 +651,7 @@ export class BenchScene {
   /** Devre; `override` verilirse (Tahtada kur: öğrencinin kurulumu) tezgâh onunla kurulur. */
   setDoc(doc: CircuitDoc, override: BreadboardPlan | null = null): void {
     const plan = override ?? planBreadboard(doc);
+    this.lastOverride = override;
     const key = JSON.stringify([
       doc.parts.map(partKey),
       [...plan.onBoard.values()],
@@ -629,6 +683,7 @@ export class BenchScene {
 
   /** Breadboard'lar, parçalar, jumper'lar ve kablolar baştan kurulur. */
   private rebuild(doc: CircuitDoc, plan: BreadboardPlan): void {
+    if (this.highlighted !== null) this.highlightNet(null);
     for (const placed of this.parts.values()) this.removePart(placed);
     this.parts.clear();
     for (const child of [...this.boards.children, ...this.cables.children]) {
@@ -671,51 +726,73 @@ export class BenchScene {
     const colorOf = netColors(plan);
     const holeTop = (h: Hole) => holeAt(h, plan.cols, BB.height);
     const jumperPaths: CablePath[] = [];
-    for (const j of plan.jumpers) {
-      const jumper = jumperMesh(holeTop(j.a), holeTop(j.b), j.color ?? colorOf(j.net));
-      this.cables.add(jumper);
+    // Kıskaçlı cihaz kablolarının fişi yok; jumper telleri birbirinin ve fişlerin içinden geçmez (clips.ts).
+    const clipLeads = new Set(this.topView ? [] : clipGroups(doc, plan, this.lastOverride === null).flatMap((g) => g.leads));
+    const shapes = jumperShapes(plan, clipLeads);
+    for (const [i, j] of plan.jumpers.entries()) {
+      const jumper = jumperMesh(holeTop(j.a), holeTop(j.b), j.color ?? colorOf(j.net), shapes[i]);
+      this.cables.add(this.netTag(jumper, j.net));
       jumperPaths.push(cablePath(jumper.userData.curve as Curve<Vector3>));
     }
-    const plug = new BoxGeometry(0.75, 1.5, 0.75);
+    const plug = new BoxGeometry(PLUG.width, PLUG.height, PLUG.width);
     const plugMat = mat('#1b1c1f', 0.6);
     // Masadaki parçaların gövdeleri: kablolar içlerinden geçmez (pilin uzak ucundan çıkan kablo üstünden aşar).
     const bodies = [...plan.table.keys()].flatMap((id) => {
       const placed = this.parts.get(id);
       return placed ? [{ id, box: new Box3().setFromObject(placed.model.root) }] : [];
     });
+    // Cihaz kabloları timsah kıskaçla biter (clips.ts): kıskaç bacağı ya da kısa dik telin ucunu tutar, aynı ağdakiler
+    // zincirlenir. Tepeden görünümde (Tahtada kur) kablolar eskisi gibi deliklere iner.
+    const layout = this.topView ? null : layoutClips({ doc, plan, chain: this.lastOverride === null, bodies: this.boardBodies(plan), shapes, socket: (i) => {
+      const lead = plan.leads[i]!;
+      return this.parts.get(lead.partId)?.anchors[lead.pin];
+    } });
+    this.clipLayout = layout;
+    this.flowPlan = layout ? clippedPlan(plan, layout) : plan;
+    this.junctionAt = new Map((layout?.junctions ?? []).map((j) => [j.net, j.at]));
     this.leadObstacles = [];
     this.leadCurves = [];
-    for (const lead of plan.leads) {
+    const leadColor = new Map<number, string>();
+    plan.leads.forEach((lead, i) => {
       const placed = this.parts.get(lead.partId);
       const from = placed?.anchors[lead.pin];
-      if (!from) {
+      if (!placed || !from) {
         paths.push({ points: [], length: 0 });
-        continue;
+        return;
       }
-      const to = holeTop(lead.hole);
-      const color = lead.color ?? colorOf(lead.net);
+      const clip = layout?.clips.get(i);
+      // Cihaz kablosu soketin renginde (renksiz BNC'de ağın renginde); öbürleri ağın renginde.
+      const color = lead.color ?? (clip ? placed.colors[lead.pin] : undefined) ?? colorOf(lead.net);
+      leadColor.set(i, color);
+      const to = clip ? clipTail(clip) : holeTop(lead.hole);
       const dir = placed.dirs[lead.pin];
-      const b1 = to.clone().add(new Vector3(0, 1.5, 0));
+      const b1 = clip ? to : to.clone().add(new Vector3(0, 1.5, 0));
       // Ön paneldeki soketten çıkan kablo kendi gövdesinden dışarı çıkar: kendi kutusu (öndeki düğmeler,
       // katlanmış kol) engel sayılmaz.
       const obstacles: Obstacle[] = bodies.filter((b) => !(dir && b.id === lead.partId)).map((b) => ({ box: b.box, own: b.id === lead.partId }));
       this.leadObstacles.push(obstacles);
       // Ön paneldeki soket: kablo önce öne çıkar, masaya sarkar; öbür uçlar dik kalkan alçak kavis.
       const a1 = dir ? from.clone().addScaledVector(dir, 1.5) : from.clone().add(new Vector3(0, 1.4, 0));
-      const curve = dir ? socketCurve(a1, dir, b1, this.boardBox(plan)) : leadCurve(a1, b1, obstacles);
+      const curve = dir ? socketCurve(a1, dir, b1, this.boardBox(plan), clip?.axis) : leadCurve(a1, b1, obstacles);
       this.leadCurves.push(curve);
       paths.push(cablePath(curve));
-      this.cables.add(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), 0.28, 8, false), mat(color, 0.55)));
+      this.cables.add(this.netTag(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), CABLE_RADIUS, 8, false), mat(color, 0.55)), lead.net));
       const tip = mesh(plug, plugMat, from.x, from.y + 0.75, from.z);
       if (dir) {
         tip.position.copy(from).addScaledVector(dir, 0.75);
         tip.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), dir);
       }
       this.cables.add(tip);
-      this.cables.add(mesh(plug, plugMat, to.x, to.y + 0.75, to.z));
+      if (clip) {
+        this.cables.add(this.netTag(clipMesh(clip, color), lead.net));
+        return;
+      }
+      this.cables.add(this.netTag(mesh(plug, plugMat, to.x, to.y + 0.75, to.z), lead.net));
       this.cables.add(rod(new Vector3(to.x, to.y - HOLE_DEPTH, to.z), to, 0.1, M.tin(), 6));
-    }
-    // Tahtada kur: takılmamış alet kabloları aletin önünde masaya sarkar (fişi masada).
+    });
+    // Kısa dik teller: onları tutan (zincirin ilk) kıskacın kablosunun renginde.
+    for (const stub of layout?.stubs ?? []) this.cables.add(this.netTag(stubMesh(stub, leadColor.get(stub.lead) ?? colorOf(stub.net)), stub.net));
+    // Tahtada kur: takılmamış alet kabloları aletin önünde masaya sarkar (ucundaki kıskaç masada).
     for (const loose of plan.loose ?? []) {
       const placed = this.parts.get(loose.partId);
       const from = placed?.anchors[loose.pin];
@@ -727,10 +804,16 @@ export class BenchScene {
       dir.normalize();
       const end = from.clone().addScaledVector(dir, 3.4).setY(0.4);
       const curve = new CubicBezierCurve3(from.clone().add(new Vector3(0, 0.4, 0)), from.clone().addScaledVector(dir, 1.2).add(new Vector3(0, 1.4, 0)), end.clone().addScaledVector(dir, -0.6).add(new Vector3(0, 0.8, 0)), end);
-      this.cables.add(new Mesh(new TubeGeometry(curve, 16, 0.28, 8, false), mat(loose.color, 0.55)));
-      const tip = mesh(plug, plugMat, end.x, 0.4, end.z);
-      tip.rotation.set(Math.PI / 2, 0, -Math.atan2(dir.x, dir.z));
-      this.cables.add(tip);
+      const color = (CLIP_DEVICES.has(placed.part.type) ? placed.colors[loose.pin] : undefined) ?? loose.color;
+      this.cables.add(new Mesh(new TubeGeometry(curve, 16, CABLE_RADIUS, 8, false), mat(color, 0.55)));
+      if (CLIP_DEVICES.has(placed.part.type)) {
+        // Kıskaç masada yatar: kuyruğu kablonun ucunda, ağzı öne bakar.
+        this.cables.add(clipMesh(clipPose(end.clone().addScaledVector(dir, CLIP.length).setY(CLIP.height * 0.39), dir.clone().negate(), 0), color));
+      } else {
+        const tip = mesh(plug, plugMat, end.x, 0.4, end.z);
+        tip.rotation.set(Math.PI / 2, 0, -Math.atan2(dir.x, dir.z));
+        this.cables.add(tip);
+      }
     }
     this.cablePaths = [...paths, ...jumperPaths];
     this.cableAmps = new Float64Array(this.cablePaths.length);
@@ -740,39 +823,28 @@ export class BenchScene {
 
   /** Breadboard'a takılan parça: gövde deliklerin arasında, bacaklar deliklere. */
   private placeOnBoard(part: Part, at: BoardPart, cols: number): Placed {
-    const holeIn = (h: Hole) => holeAt(h, cols, BB.height - HOLE_DEPTH);
-    const holes = at.holes.map(holeIn);
-    const extra = (at.extraHoles ?? []).map(holeIn);
-    const group = new Group();
-    const all = [...holes, ...extra];
-    const center = all.reduce((c, h) => c.add(h), new Vector3()).multiplyScalar(1 / all.length);
-    if (at.mount === 'axial' || at.mount === 'radial') {
-      const [a, b] = holes as [Vector3, Vector3];
-      group.position.set((a.x + b.x) / 2, BB.height, (a.z + b.z) / 2);
-      group.rotation.y = Math.atan2(-(b.z - a.z), b.x - a.x);
-    } else if (at.mount === 'to92') {
-      // Yerel z ekseni sütunlar boyunca: düz (yazılı) yüz izleyiciye bakar. Gövde üç deliğin ortasında.
-      group.position.set(center.x, BB.height, center.z);
-      group.rotation.y = Math.PI / 2;
-    } else {
-      group.position.set(center.x, BB.height, center.z);
-    }
-    group.updateMatrixWorld(true);
-    const local = (v: Vector3) => group.worldToLocal(v.clone());
-    const model = buildPartModel(part, holes.map(local), extra.map(local));
-    return this.finishPlacement(part, model, group, holes, BB.height);
+    return this.finishPlacement(part, placeBoardPart(part, at, cols));
   }
 
   /** Masadaki parça: plandaki yerde; bacakları/uçları kendi modelinde. */
   private placeOnTable(part: Part, at: TablePart): Placed {
-    const model = buildPartModel(part);
-    const group = new Group();
-    group.position.set(at.x, 0, at.z);
-    group.rotation.y = (at.rotation * Math.PI) / 180;
-    group.updateMatrixWorld(true);
-    const anchors = model.anchors.map((a) => a.clone().applyMatrix4(group.matrixWorld));
-    const dirs = model.anchorDirs?.map((d) => d.clone().applyQuaternion(group.quaternion).normalize()) ?? [];
-    return this.finishPlacement(part, model, group, anchors, 0, dirs);
+    return this.finishPlacement(part, placeTablePart(part, at));
+  }
+
+  /** Kablonun (ve alt nesnelerinin) ağı: üstüne gelince o ağ vurgulanır. */
+  private netTag<T extends Object3D>(o: T, net: string): T {
+    o.userData.net = net;
+    return o;
+  }
+
+  /** Tahtadaki parçaların kutuları (kıskaçların yerleşimi: clips.ts). */
+  private boardBodies(plan: BreadboardPlan): Map<string, BoardBody> {
+    const out = new Map<string, BoardBody>();
+    for (const id of plan.onBoard.keys()) {
+      const placed = this.parts.get(id);
+      if (placed) out.set(id, { body: placed.body });
+    }
+    return out;
   }
 
   /** Breadboard'ların dünya kutusu (sokete takılı kablo masada sürünürken altına girmesin). */
@@ -781,8 +853,8 @@ export class BenchScene {
     return new Box3(new Vector3(-half, 0, -BB.depth / 2), new Vector3(half, BB.height, boardZ(plan.boards - 1) + BB.depth / 2));
   }
 
-  private finishPlacement(part: Part, model: PartModel, group: Group, anchors: Vector3[], base: number, dirs: readonly (Vector3 | undefined)[] = []): Placed {
-    group.add(model.root);
+  private finishPlacement(part: Part, placement: Placement): Placed {
+    const { model, group, anchors, base, dirs } = placement;
     group.userData.partId = part.id;
     mergeStatic(model.root);
     this.partsGroup.add(group);
@@ -797,7 +869,7 @@ export class BenchScene {
     shadow.scale.set(size.x * 1.2 + 1, size.z * 1.2 + 1, 1);
     this.scene.add(shadow);
     const top = new Vector3(center.x, box.max.y + 0.6, center.z);
-    return { key: partKey(part), part, model, group, shadow, anchors, real: anchors, compact: null, dirs, top };
+    return { key: partKey(part), part, model, group, shadow, anchors, real: anchors, compact: null, dirs, top, colors: placement.colors, box: placement.box, body: placement.body };
   }
 
   private removePart(placed: Placed): void {
@@ -839,7 +911,7 @@ export class BenchScene {
     }
     // Kablo akımları (akım noktaları): breadboard grupları için Kirchhoff akım kuralı (cableFlow.ts).
     if (this.plan && this.frame && this.active && this.dotsOn) {
-      const { leads, jumpers } = cableCurrents(this.plan, this.frame.pinFlows);
+      const { leads, jumpers } = cableCurrents(this.flowPlan ?? this.plan, this.frame.pinFlows);
       this.cableAmps = Float64Array.from([...leads, ...jumpers]);
     } else {
       this.cableAmps = new Float64Array(this.cablePaths.length);
@@ -876,7 +948,7 @@ export class BenchScene {
     // Ön soketli cihazların uçları görünüme göre yer değiştirir: kablolar yeniden kurulur.
     if (this.plan && this.lastDoc && [...this.parts.values()].some((p) => p.dirs.some(Boolean))) {
       this.layoutKey = '';
-      this.setDoc(this.lastDoc, this.plan);
+      this.setDoc(this.lastDoc, this.lastOverride);
     }
     this.controls.enabled = this.interactive && !on;
     this.applyTopLook();
@@ -1027,7 +1099,8 @@ export class BenchScene {
    * cihazlara. `request`: kullanıcı seçti (telefonda Cihazlar yeniden seçilince sıradaki cihaza geçer).
    */
   fit(view: CameraView = 'free', request = false): void {
-    if (view === 'bench' && request) this.benchIndex = this.lastView === 'bench' && !this.userMoved ? this.benchIndex + 1 : -1;
+    // Cihazlar yeniden seçilince sağdaki cihaz(lar); sona gelince baştan.
+    if (view === 'bench' && request) this.benchIndex = this.lastView === 'bench' && !this.userMoved ? this.benchIndex + this.benchStep : -1;
     this.lastView = view;
     this.userMoved = false;
     this.benchLabels = view === 'bench' ? new Set(this.tallParts().map((p) => p.part.id)) : null;
@@ -1162,16 +1235,22 @@ export class BenchScene {
   private circuitFrame(): { target: Vector3; distance: number; elevation: number } | null {
     const tall = this.tallParts();
     if (tall.length === 0 || this.boardView.isEmpty()) return null;
+    const canvas = this.renderer.domElement;
+    // Yatay telefonda 3B alanı çok kısa: tahtadaki uzun parçaların (elektrolitik kondansatör) üstü kırpılabilir, tahta
+    // payı küçülmesin.
+    const short = this.isPhone() && canvas.clientWidth > canvas.clientHeight;
     const keep = boxCorners(this.boardView);
     for (const placed of this.parts.values()) {
       if (tall.includes(placed)) continue;
-      keep.push(...boxCorners(new Box3().setFromObject(placed.group)));
+      const box = new Box3().setFromObject(placed.group);
+      if (short && this.plan?.onBoard.has(placed.part.id)) box.max.y = Math.min(box.max.y, BB.height + 3);
+      keep.push(...boxCorners(box));
     }
-    const canvas = this.renderer.domElement;
-    const { elevation, share } = canvas.clientWidth < PHONE_WIDTH ? BENCH_FREE.phone : BENCH_FREE.desktop;
+    const { elevation, share } = this.isPhone() ? BENCH_FREE.phone : BENCH_FREE.desktop;
     const reserve = this.bottomReserve(0.5 - share / 2, 0.5 + share / 2) / Math.max(1, canvas.clientHeight);
-    const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9);
-    return { ...solved, elevation };
+    // Telefonda masadaki alçak parçalar (pil) kenara daha çok yaklaşabilir: tahta payı küçülmesin.
+    const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9, false, this.isPhone() ? 0.985 : 0.94);
+    return { target: solved.target, distance: solved.distance, elevation };
   }
 
   /**
@@ -1184,18 +1263,40 @@ export class BenchScene {
     const tall = this.tallParts().sort((a, b) => a.group.position.x - b.group.position.x);
     if (tall.length === 0) return null;
     const canvas = this.renderer.domElement;
-    let shown = tall;
-    if (canvas.clientWidth < PHONE_WIDTH && tall.length > 1) {
-      if (this.benchIndex < 0) {
-        const scope = tall.findIndex((p) => p.part.type === 'oscilloscope');
-        this.benchIndex = scope >= 0 ? scope : Math.floor((tall.length - 1) / 2);
-      }
-      shown = [tall[this.benchIndex % tall.length]!];
+    const bottom = -1 + (2 * this.bottomReserve(0, 1)) / Math.max(1, canvas.clientHeight);
+    const solve = (list: readonly Placed[]) => {
+      const corners = list.flatMap((p) => boxCorners(new Box3().setFromObject(p.group)));
+      return this.solveFrame(ELEVATION.bench, corners, corners, 0.96, bottom, 0.96, true);
+    };
+    // Kaç cihaz yan yana: telefonda tek; masaüstünde ön paneller görüntünün yüksekliğinin en az BENCH_FILL'ini
+    // dolduracak kadar (bütün sıra genişse daha azı; yanlardakiler Cihazlar yeniden seçilince).
+    const first = (n: number) => {
+      const scope = tall.findIndex((p) => p.part.type === 'oscilloscope');
+      const center = scope >= 0 ? scope : Math.floor((tall.length - 1) / 2);
+      return Math.max(0, Math.min(tall.length - n, center - Math.floor((n - 1) / 2)));
+    };
+    let n = 1;
+    if (!this.isPhone()) {
+      for (n = tall.length; n > 1; n--) if (solve(tall.slice(first(n), first(n) + n)).fill >= BENCH_FILL) break;
     }
-    const corners = shown.flatMap((p) => boxCorners(new Box3().setFromObject(p.group)));
-    const reserve = this.bottomReserve(0, 1) / Math.max(1, canvas.clientHeight);
-    const solved = this.solveFrame(ELEVATION.bench, corners, corners, 0.96, -1 + 2 * reserve, 0.96, true);
-    return { ...solved, elevation: ELEVATION.bench };
+    this.benchStep = n;
+    if (n >= tall.length) this.benchIndex = 0;
+    else if (this.benchIndex < 0) this.benchIndex = first(n);
+    else if (this.benchIndex > tall.length - n) this.benchIndex = this.benchIndex >= tall.length ? 0 : tall.length - n;
+    const solved = solve(tall.slice(this.benchIndex, this.benchIndex + n));
+    return { target: solved.target, distance: solved.distance, elevation: ELEVATION.bench };
+  }
+
+  /** Telefon düzeni mi: uygulama söylediyse o (yatay tutulan telefon da), yoksa dar tuval. */
+  private isPhone(): boolean {
+    return this.phoneLayout ?? this.renderer.domElement.clientWidth < PHONE_WIDTH;
+  }
+
+  /** Telefon düzeni (BenchView); null: tuvalin genişliğine göre. Değişince kadraj yenilenir. */
+  setPhone(phone: boolean | null): void {
+    if (phone === this.phoneLayout) return;
+    this.phoneLayout = phone;
+    if (this.fitted && !this.userMoved) this.fit(this.lastView);
   }
 
   /**
@@ -1212,7 +1313,8 @@ export class BenchScene {
     bottom: number,
     top: number,
     middle = false,
-  ): { target: Vector3; distance: number } {
+    wide = 0.94,
+  ): { target: Vector3; distance: number; fill: number } {
     const toCamera = new Vector3(0, Math.sin(elevation), Math.cos(elevation));
     const forward = toCamera.clone().negate();
     const right = new Vector3(1, 0, 0);
@@ -1242,14 +1344,16 @@ export class BenchScene {
       const eye = target.clone().addScaledVector(toCamera, distance);
       const f = extent(focus, eye);
       const k = extent(keep, eye);
-      const ratio = Math.max((f.x1 - f.x0) / (2 * share), (k.x1 - k.x0) / (2 * 0.94), (k.y1 - k.y0) / ((top - bottom) * 0.97));
+      const ratio = Math.max((f.x1 - f.x0) / (2 * share), (k.x1 - k.x0) / (2 * wide), (k.y1 - k.y0) / ((top - bottom) * 0.97));
       // Kaydırma: keep yatayda ortada, alt kenarı `bottom`un hemen üstünde (hedef sağa/yukarı gidince içerik sola/aşağı).
       target.addScaledVector(right, ((k.x0 + k.x1) / 2) * distance * tanH * 0.8);
       const shift = middle ? (k.y0 + k.y1) / 2 - (bottom + top) / 2 : k.y0 - (bottom + 0.02);
       target.addScaledVector(up, shift * distance * tanV * 0.8);
       distance *= Math.pow(ratio, 0.7);
     }
-    return { target, distance };
+    const eye = target.clone().addScaledVector(toCamera, distance);
+    const k = extent(keep, eye);
+    return { target, distance, fill: (k.y1 - k.y0) / (top - bottom) };
   }
 
   /**
@@ -1373,12 +1477,18 @@ export class BenchScene {
   };
 
   private readonly onPointerMove = (e: PointerEvent) => {
+    // Fareyle bir kablonun ya da kıskacın üstüne gelince o ağ vurgulanır (dokunmatikte dokununca: onPointerUp).
+    if (!this.drag && e.pointerType === 'mouse' && e.buttons === 0 && !this.topView) this.highlightNet(this.pickNet(e));
     if (!this.drag) return;
     const position = Math.max(0, Math.min(100, this.drag.start + (e.clientX - this.drag.x) * 0.5));
     if (Math.abs(position - this.drag.position) >= 0.5) {
       this.drag.position = Math.round(position);
       this.cb.onKnob(this.drag.id, this.drag.position, false);
     }
+  };
+
+  private readonly onPointerLeave = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') this.highlightNet(null);
   };
 
   private readonly onPointerUp = (e: PointerEvent) => {
@@ -1403,9 +1513,107 @@ export class BenchScene {
     }
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || e.type === 'pointercancel') return;
     const hit = this.pick(e);
+    // Dokunmatikte parçanın dışında bir kabloya ya da kıskaca dokununca o ağ vurgulanır; yeniden dokununca kalkar.
+    const net = e.pointerType !== 'mouse' && !this.topView ? this.pickNet(e) : null;
+    if (net && !hit) {
+      this.highlightNet(this.highlighted === net ? null : net);
+      return;
+    }
+    if (e.pointerType !== 'mouse') this.highlightNet(null);
     if (hit && hit.model.interaction === 'toggle' && this.active) this.cb.onToggle(hit.part.id);
     else this.cb.onSelect(hit?.part.id ?? null);
   };
+
+  /** İşaretçinin altındaki kablonun (kıskaç, kısa tel, köprü dahil) ağı; önünde parça varsa null. */
+  private pickNet(e: PointerEvent): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    const ray = new Raycaster();
+    ray.setFromCamera(ndc, this.view);
+    const parts = ray.intersectObject(this.partsGroup, true)[0]?.distance ?? Infinity;
+    for (const hit of ray.intersectObject(this.cables, true)) {
+      if (hit.distance > parts) break;
+      let o: Object3D | null = hit.object;
+      while (o && o.userData.net === undefined) o = o.parent;
+      if (o) return o.userData.net as string;
+    }
+    return null;
+  }
+
+  /**
+   * Ağı vurgular: o ağın kabloları, kıskaçları, kısa telleri ve köprüleri parlar, tahtadaki bacaklarının üstünde
+   * mavi işaret (seçim halkasının rengi); öbür kablolar ve ağa dokunmayan parçalar soluklaşır. null: vurgu kalkar.
+   */
+  private highlightNet(net: string | null): void {
+    if (net === this.highlighted) return;
+    this.highlighted = net;
+    for (const g of this.legGlow.children) (g as Mesh).geometry.dispose();
+    this.legGlow.clear();
+    const swap = (root: Object3D, kind: 'dim' | 'lit' | null) => {
+      root.traverse((o) => {
+        if (!(o instanceof Mesh) || Array.isArray(o.material)) return;
+        const base = (o.userData.baseMaterial as Material | undefined) ?? o.material;
+        o.userData.baseMaterial = base;
+        o.material = kind ? this.tinted(base, kind) : base;
+      });
+    };
+    const plan = this.plan;
+    const touches = new Set<string>();
+    if (net && plan) for (const [key, n] of plan.netOf) if (n === net) touches.add(key.split('#')[0]!);
+    for (const child of this.cables.children) swap(child, net === null ? null : child.userData.net === net ? 'lit' : 'dim');
+    for (const placed of this.parts.values()) swap(placed.group, net === null || touches.has(placed.part.id) ? null : 'dim');
+    if (net && plan) {
+      for (const [id, at] of plan.onBoard) {
+        at.holes.forEach((h, pin) => {
+          if (plan.netOf.get(pinKey(id, pin)) !== net) return;
+          const foot = holeAt(h, plan.cols, BB.height);
+          this.legGlow.add(rod(foot, foot.clone().setY(BB.height + 1.3), 0.24, this.ringMaterial, 10));
+        });
+      }
+    }
+    this.cb.onNet?.(net);
+    this.dirty = true;
+  }
+
+  /** Malzemenin soluk (yarı saydam) ya da parlak (kendi renginde ışıyan) kopyası (önbellekte). */
+  private tinted(base: Material, kind: 'dim' | 'lit'): Material {
+    const cache = kind === 'dim' ? this.dimmed : this.lit;
+    let m = cache.get(base);
+    if (!m) {
+      m = base.clone();
+      if (kind === 'dim') {
+        m.transparent = true;
+        m.opacity = 0.18;
+        m.depthWrite = false;
+      } else if (m instanceof MeshStandardMaterial) {
+        m.emissive = m.color.clone();
+        m.emissiveIntensity = 0.55;
+      }
+      cache.set(base, m);
+    }
+    return m;
+  }
+
+  /** Denetim (ios-kontrol): vurgulanan ağ, parlayan ve soluklaşan kablo sayısı, işaretli bacak sayısı. */
+  netHighlight(): { net: string | null; lit: number; dim: number; legs: number } {
+    const state = (child: Object3D): 'lit' | 'dim' | null => {
+      let found: 'lit' | 'dim' | null = null;
+      child.traverse((o) => {
+        if (found || !(o instanceof Mesh)) return;
+        const base = o.userData.baseMaterial as Material | undefined;
+        if (base && o.material === this.lit.get(base)) found = 'lit';
+        else if (base && o.material === this.dimmed.get(base)) found = 'dim';
+      });
+      return found;
+    };
+    const states = this.cables.children.map(state);
+    return { net: this.highlighted, lit: states.filter((x) => x === 'lit').length, dim: states.filter((x) => x === 'dim').length, legs: this.legGlow.children.length };
+  }
+
+  /** Denetim (ios-kontrol): ağı vurgular (kablonun üstüne gelmek gibi); null kaldırır. */
+  highlight(net: string | null): void {
+    this.highlightNet(net);
+  }
 
   // --- Çizim döngüsü ----------------------------------------------------------------------------------
 
@@ -1448,6 +1656,8 @@ export class BenchScene {
     (this.table.material as Material).dispose();
     this.ring.geometry.dispose();
     this.ringMaterial.dispose();
+    for (const m of [...this.dimmed.values(), ...this.lit.values()]) m.dispose();
+    for (const g of this.legGlow.children) (g as Mesh).geometry.dispose();
     this.shadowTexture.dispose();
     this.scene.environment?.dispose();
     this.pmrem.dispose();

@@ -9,6 +9,8 @@ import type { SaveState } from './autosave';
 import { Icon, type IconName } from './icons';
 import type { Settings, ThemeChoice } from './settings';
 import { PhoneHelp } from './HelpDialog';
+import { RecentList } from './RecentDialog';
+import type { RecentEntry } from './recentCircuits';
 import { SpeedOptions } from './SimBar';
 import { SettingsFields } from './TopBar';
 import type { SimStatus } from './useSimulation';
@@ -196,17 +198,20 @@ export interface MoreSheetProps {
   readonly onWelcome: () => void;
   /** Renk teması: Sistem / Açık / Koyu. */
   readonly onTheme: (choice: ThemeChoice) => void;
+  /** Son devreler: kayıtlar ve birini geri yükleme. */
+  readonly recent: readonly RecentEntry[];
+  readonly onOpenRecent: (entry: RecentEntry) => void;
 }
 
 const THEME_CHOICES = ['system', 'light', 'dark'] as const;
 
 /**
  * Daha fazla (arayüz v4): üstte Analiz, Geri al, Yinele, Sığdır; altında masaüstündeki menünün sırası:
- * Tema (Sistem / Açık / Koyu), Ayarlar, Yardım, Kısa turu başlat. Ayarlar ve yardım aynı sayfada açılır
- * (geri düğmesiyle döner). Klavye kısayolları telefonda yok (tablette masaüstünün Daha fazla menüsünde).
+ * Tema (Sistem / Açık / Koyu), Son devreler, Ayarlar, Yardım, Kısa turu başlat. Son devreler, ayarlar ve
+ * yardım aynı sayfada açılır (geri düğmesiyle döner). Klavye kısayolları telefonda yok (tablette masaüstünün Daha fazla menüsünde).
  */
-export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, canRedo, onUndo, onRedo, onFit, onTour, onWelcome, onTheme }: MoreSheetProps) {
-  const [view, setView] = useState<'menu' | 'settings' | 'help'>('menu');
+export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, canRedo, onUndo, onRedo, onFit, onTour, onWelcome, onTheme, recent, onOpenRecent }: MoreSheetProps) {
+  const [view, setView] = useState<'menu' | 'settings' | 'help' | 'recent'>('menu');
   const t = tr.topbar.more;
   const quick: Array<{ icon: IconName; label: string; run: () => void; disabled?: boolean }> = [
     { icon: 'chart', label: tr.analysis.button, run: onAnalysis },
@@ -215,7 +220,7 @@ export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, 
     { icon: 'fit', label: tr.bench.fit, run: onFit },
   ];
   const row = 'flex min-h-[52px] w-full items-center gap-3 rounded-md px-2 text-left text-[15px] font-medium active:bg-panel-2';
-  const title = view === 'settings' ? tr.settings.title : view === 'help' ? t.help : null;
+  const title = view === 'settings' ? tr.settings.title : view === 'help' ? t.help : view === 'recent' ? tr.recent.title : null;
   return (
     <ModalSheet label={tr.phone.moreTitle} onClose={onClose}>
       {title === null ? (
@@ -254,6 +259,11 @@ export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, 
             </div>
           </div>
           <div className="flex shrink-0 flex-col border-t border-line pt-2">
+            <button type="button" onClick={() => setView('recent')} className={row}>
+              <Icon name="list" className="h-5 w-5 shrink-0" />
+              <span className="flex-1">{tr.recent.title}</span>
+              <Icon name="chevron" className="h-4 w-4 text-muted" />
+            </button>
             <button type="button" onClick={() => setView('settings')} className={row}>
               <Icon name="settings" className="h-5 w-5 shrink-0" />
               <span className="flex-1">{tr.settings.title}</span>
@@ -280,7 +290,16 @@ export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, 
             <h3 className="min-w-0 flex-1 truncate pr-2 text-right text-[15px] font-semibold">{title}</h3>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-3" style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}>
-            {view === 'settings' ? <SettingsFields settings={settings} onChange={onSettings} touch onWelcome={onWelcome} /> : <PhoneHelp onTour={onTour} />}
+            {view === 'settings' ? (
+              <SettingsFields settings={settings} onChange={onSettings} touch onWelcome={onWelcome} />
+            ) : view === 'recent' ? (
+              <div className="flex flex-col gap-3">
+                <p className="m-0 text-[14px] leading-normal text-ink-2">{tr.recent.note}</p>
+                <RecentList entries={recent} onOpen={onOpenRecent} touch />
+              </div>
+            ) : (
+              <PhoneHelp onTour={onTour} />
+            )}
           </div>
         </div>
       )}

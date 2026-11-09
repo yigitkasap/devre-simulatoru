@@ -229,14 +229,15 @@ const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rota
   battery: { side: 'left', w: 12, d: 5.4, rotation: 0 },
   acsource: { side: 'left', w: 10, d: 5, rotation: 0 },
   currentsource: { side: 'left', w: 10, d: 5, rotation: 0 },
-  // Laboratuvar cihazları (instruments.ts, gerçeğin %60'ı): dik, ön paneli öne bakar. d/2 gövdenin ortasından
-  // en öndeki düğmeye ya da kola kadar (arkası tahtadan uzakta kalır).
-  dcsupply: { side: 'back', w: 72, d: 68, rotation: 0, slot: 11.6 },
+  // Laboratuvar cihazları (instruments.ts; üreteç ve osiloskop gerçeğin %60'ı, güç kaynağı %50'si, el multimetresi
+  // kılıflı 75 × 150 mm'nin %60'ı): dik, ön paneli öne bakar. d/2 gövdenin ortasından en öndeki düğmeye ya da kola
+  // kadar (arkası tahtadan uzakta kalır). `slot` değişmedi: kabloların delikleri aynı.
+  dcsupply: { side: 'back', w: 60, d: 57, rotation: 0, slot: 11.6 },
   funcgen: { side: 'back', w: 63, d: 77, rotation: 0, slot: 8.6 },
   oscilloscope: { side: 'back', w: 76, d: 35, rotation: 0, slot: 8.6 },
-  voltmeter: { side: 'back', w: 23, d: 34, rotation: 0, slot: 11 },
-  ammeter: { side: 'back', w: 23, d: 34, rotation: 0, slot: 11 },
-  multimeter: { side: 'back', w: 23, d: 34, rotation: 0, slot: 12.5 },
+  voltmeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 11 },
+  ammeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 11 },
+  multimeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 12.5 },
   lamp: { side: 'front', w: 9, d: 5, rotation: 0 },
   motor: { side: 'front', w: 12, d: 6, rotation: 0 },
   speaker: { side: 'front', w: 9, d: 6.5, rotation: 0 },

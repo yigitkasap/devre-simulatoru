@@ -330,8 +330,9 @@ Görev tanımında açık bırakılan, sonradan istenen ya da ortamdan kaynaklan
   | Mavi    | 3,3 V      | 30 mA           | 4,4 | 5 Ω  | ≈ 1·10⁻¹⁴ A     |
 
 - **LED parlaklığı:** (I / 20 mA)^(1/2,2), en fazla 1.
-- **LED yanması anlıktır:** Akım mutlak en büyük değeri bir adımda bile aşarsa LED yanar ve o
-  adım LED açık devre olarak yeniden çözülür.
+- **LED yanması (2026-11-09'a kadar anlıktı):** akım mutlak en büyük değeri (30 mA) bir adımda bile aşarsa
+  LED yanıyordu. Artık kademeli: aşağıda "Teşhis ve metinler", 4. madde. Yanan LED'in o adımı yine LED açık
+  devre olarak yeniden çözülür.
 - **Newton-Raphson gerilim sınırlaması:** Görevdeki formül (Vold > 0 iken) aynen uygulanır.
   Vold ≤ 0 iken Vnew = N·VT·ln(Vnew/(N·VT)) kullanılır; ters kutuplanmış bir eklemin
   0,3 V'luk adımlarla tırmanmasını önler. Yakınsama için düğüm gerilimlerine ek olarak eklem
@@ -1057,8 +1058,8 @@ sensörler, ses ve koruma, entegreler); sekiz aşama, her biri ayrı commit. Bu 
   başına akım ayrıca bulunur: pinlerin akımları bir kapsayan ağaç üzerinde toplanır, toprak
   sembolleri kendi kablo adasındaki dengesizliği karşılar. Kablolar kendi aralarında döngü
   oluşturuyorsa döngüyü kapatan parçada nokta gösterilmez.
-- **Akım noktalarının hızı:** 8 + 22·log₁₀(I / 1 µA) piksel/s, 4 ile 150 arasında
-  sınırlı (1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140). 10 nA'in altında noktalar hareketsizdir:
+- **Akım noktalarının hızı (2026-11-09'da değişti, "Teşhis ve metinler" 4c):** eskiden 8 + 22·log₁₀(I / 1 µA)
+  piksel/s, 4 ile 150 arasında sınırlı (1 µA ≈ 8, 1 mA ≈ 74, 1 A ≈ 140). 10 nA'in altında noktalar hareketsizdir:
   ters diyot sızıntısı ve gmin kaynaklı 10⁻¹¹ A düzeyindeki akımlar gösterilmez, 10 MΩ'luk
   voltmetrenin çektiği µA düzeyindeki akım gösterilir (kullanıcı kararı). Nokta hızı
   simülasyon hızı ayarından bağımsızdır; yalnızca akımın büyüklüğünü gösterir (kullanıcı kararı).
@@ -1898,6 +1899,13 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   paneli kameraya bakar; en öndeki düğmesi tahtanın 14 birim (≈ 36 mm) arkasında, yan yana: kabloların ön
   soketten çıkıp masaya sarkacağı kadar yer (2026-11-08'de 30 birimdi, kablolar çok uzundu). Üstten görünüm
   tahtaya odaklanır (cihazların yalnızca soketli ön kısmı sayılır).
+- **Cihaz boyutları (2026-11-09, kullanıcı kararı)**: el multimetresi (multimetre, voltmetre, ampermetre) 92 × 182 mm
+  çizilmişti; laboratuvardaki tip (PM8233D) kılıfsız 67 × 140 mm, kılıfla yaklaşık 75 × 150 mm (PM8233D+ satış
+  sayfası: 148 × 74 × 42 mm): model bütün olarak 150 / 182 oranında küçülür (75,8 × 150 × 41,2 mm; `DMM_FIT`). DC güç
+  kaynağı gerçeğin %50'si (`SUPPLY_SCALE`, %60'a göre ≈ %15 küçük); üreteç ve osiloskop %60'ta. Masadaki yerleri
+  (`breadboard.ts` → TABLE: güç kaynağı 60 × 57, el multimetresi 19 × 28 birim) küçüldü; kabloların delikleri (`slot`)
+  aynı. Tahta payı korunuyor (10 örnek: masaüstü %47, telefon %72, pilli iki örnek %67); kablolar gövdelerden
+  geçmiyor, etiketler çakışmıyor (ios-kontrol 3B, Tahtada kur ve Karta aktar bölümleri 128 madde geçti).
 - **Varsayılan kadraj (Serbest, 2026-11-09)**: masa üstü cihaz varken bütün nesneleri sığdırmak tahtayı
   küçültüyordu (1N4001 DC'de kadrajın ≈ %25'i, telefonda alttaki düğmelerin arkasında). Artık tahtaya odaklı:
   tahta kadraj genişliğinin masaüstünde %47'si (36°), telefonda %72'si (30°; 3B alanı kısa, alçak açıda tahta
@@ -1910,6 +1918,25 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   sığacak en yakından, denetimlerin üstünde ortalı; devre parçalarının etiketleri (panelleri örterdi) kamera
   oynatılana dek gizli. Telefonda bütün sıra 390 px'e sığınca göstergeler okunmuyordu: tek cihaz (önce osiloskop,
   yoksa ortadaki), Cihazlar yeniden seçilince sağdaki (sona gelince baştan); yanlardakiler kaydırılarak görülür.
+- **Cihazlar görünümü, masaüstü (2026-11-09, kullanıcı kararı)**: bütün sıra kadraja sığınca cihazlar ekranın üst
+  yarısında küçük kalıyor, alt yarı boş kalıyordu. Artık ön paneller kullanılabilir yüksekliğin (alttaki denetimlerin
+  üstü) en az %70'ini dolduracak kadar yakından: sıra sığmıyorsa sığan kadar cihaz (önce osiloskop, yoksa ortadaki),
+  Cihazlar yeniden seçilince sağdakiler (sona gelince baştan); yanlardakiler kısmen görünür. Telefonda eskisi gibi
+  tek cihaz. BC107 yükselteç: osiloskop görüntünün %57'si (önce üç cihaz %24'ü); BF245A: iki multimetre yan yana
+  %75 (önce üç cihaz %42). Parça etiketleri yanlardan kesilmez: noktası görüntüdeyse kenara dayanır, değilse gizlenir.
+  ios-kontrol'deki "üç cihaz da kadrajda, sıra genişliğin %85'i" maddesi bu davranışa göre değişti.
+- **Telefonda 3B tam ekran (2026-11-09, kullanıcı kararı)**: tam ekranda 3B düğmeleri eski yerinde (alttan
+  100 px yukarıda) havada kalıyor, tahtanın üstüne biniyordu; "Şemayı küçült" en altta ayrı duruyordu. Artık bütün
+  düğmeler (Etiketler, Kamera, Karta aktar, Tahtada kur, Şemayı küçült) tam ekranda da şema kutusunun alt kenarında
+  tek sıra (10 px; alttaki çubuk yoksa kutu ekranın altına dayanır, güvenli alan kadar yukarıda). Tam ekrana girince
+  ve çıkınca kamera seçili görünüme yeniden sığar (kullanıcı kamerayı oynatmış olsa da; `BenchView.fitKey`). Yatay
+  tutulan telefon da telefon kuralıyla kadrajlanır (`BenchScene.setPhone`; eskiden 640 px'ten geniş tuval masaüstü
+  sayılıyor, tahta tam ekranda kadrajın %12'si kalıyordu). Tahta payı tam ekranda dikeyde ve yatayda %72 (1N4001 DC;
+  önce dikey %66, yatay %12); cihaz etiketleri yanlardan kesilmez. ios-kontrol: "3B tam ekran (telefon, dikey/yatay)".
+  **Gece kararı:** yatay telefonda 3B alanı çok kısa (≈ 276 px): tahtadaki uzun parçaların (elektrolitik
+  kondansatör) üstü kırpılabilir (kadrajda kartın 3 birim üstüne kadar sayılır), tahta payı küçülmez; telefonda masadaki
+  alçak parçalar (pil) kenara %98,5'e kadar yaklaşabilir (önce %94). 10 örnekte tahta payı: tam ekran dikey %72
+  (pilli iki örnek %68), yatay %71–72; tam ekran dışında telefon %72 (pilli %70, önce %67), masaüstü %47.
 - **Etiketler**: çakışan (4 px aralı) etiket önce ucun sağına, soluna, bir kat yukarı ya da altına kayar; hiçbiri
   olmazsa gizlenir (eskiden doğrudan gizleniyor, birbirine değen etiketler üst üste görünüyordu). Parça etiketi
   üst kenardan taşmaz. Varsayılan kadrajda cihazın üstü kırpılınca etiketin noktası görüntünün dışında kalır:
@@ -1919,7 +1946,8 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   "3B: çalışırken parçaların etiketleri (… ampermetrede akım)" bunu yakaladı (2026-11-09).
 - **Kablolar**: modelin `anchorDirs`'i soketin dışa baktığı yön; kablo soketten öne düz çıkar, yatay teğetle
   masaya sarkar, masada tahtaya gider ve deliğe yukarıdan iner (`leadRoute.socketCurve`; doğru + kübik
-  Bézier'ler: masanın altına salınmaz). Fiş soketin ekseninde.
+  Bézier'ler: masanın altına salınmaz). Fiş soketin ekseninde. 2026-11-09'dan beri kablo deliğe girmez, timsah
+  kıskaçla biter ve kıskacın kuyruğuna onun ekseni boyunca girer ("3B: cihaz kabloları, timsah kıskaç").
 - **Tahtada kur (Tepeden)**: cihaz kartları soketlerin çevresi kadar ve tahtanın hemen arkasında yan yana
   sıkışık dizilir (uçlar kartla kayar); gerçek boyutlu sıra kartları çok yayıyor, tahtayı küçültüyordu. 3B'de
   uçlar gerçek yerinde.
@@ -1939,6 +1967,62 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   modeller yük değil. Çalışırken osiloskoplu örneklerde darboğaz simülasyon hesabı: kare bütçesi olmadan
   (telefon-hizi'den önce) 4–8 kare/s. Dal telefon-hizi'nin üzerinde (2026-11-09): 10 örnek 32,1–53,3 kare/s,
   uzun görev yok (eski modellerle aynı ölçüm 33,1–53,6).
+
+### 3B: cihaz kabloları, timsah kıskaç (2026-11-09)
+
+Laboratuvarda cihaz kabloları (güç kaynağı, osiloskop, fonksiyon üreteci, multimetre) muz fiş – kablo – timsah
+kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon değişmez; yalnızca 3B gösterim.
+- **Bir delik tek tel ya da tek bacak alır** (7): Tahtada kur'un yerleşiminde (planBreadboard → buildFromPlan:
+  örnek yerleşim ipucu, görevlerin hazır kabloları ve beklenen delikleri) ve görevlerin başlangıç tahtalarında
+  hiçbir delikte iki uç yok; 81 örnekte birim testi (`tests/tahta-delik.test.ts`).
+- **Kıskaç** (8; `src/bench3d/clipPlan.ts` gruplar, `clips.ts` yerleşim, `clipModel.ts` model): cihaz kablosunun
+  ucu timsah kıskaç. Bir ağa cihaz kablosu gidiyorsa kıskaç önce ağdaki eksenli parçanın (direnç, diyot, Schottky,
+  zener) bacağını, gövdeyle kart arasındaki dik kısmından tutar; yoksa ağın şeridine ya da rayına kısa dik tel
+  takılır, kıskaç onun soyuk ucunu tutar. Aynı ağdaki öbür cihaz kabloları ayrı delik kullanmaz: her biri öncekinin
+  (yer yoksa ilkinin) metal çenesini tutar (zincir). Kıskaç kabloya, cihazın soketine doğru 55° kalkar; kablo
+  kıskacın kuyruğuna onun ekseni boyunca girer (`leadRoute.socketCurve`'ün `end`'i).
+- **Gece kararı:** "açıkta tutulabilecek bacak" yalnızca eksenli parçaların bacakları: öbür bacak en az 3 delik
+  ötede, kıskaç başka bacağa değmez. Dik (radyal) iki bacaklıların, TO-92'nin, entegrelerin bacakları bir delik
+  aralığında yan yana (kıskaç komşu bacağa değer), sayılmadı.
+- **Gece kararı:** planın (planBreadboard) delikleri değişmedi: Tahtada kur'un hazır kabloları ve görevlerin
+  beklenen delikleri aynı. Kısa tel planın o kablo için ayırdığı deliğe takılır; bacağı ya da başka kıskacı tutan
+  kabloların planlı delikleri 3B'de boş kalır. Akım noktaları için cihaz kablosunun deliği kıskacın bağlandığı
+  deliktir (`clippedPlan`). Tahtada kur kurulumunun 3B'sinde (öğrencinin taktığı delikler) her cihaz kablosu kendi
+  deliğindeki kısa teli tutar: zincir ve bacak yok, öğrencinin seçtiği delik görünür kalır. Tepeden görünümde
+  kablolar eskisi gibi deliğe iner (kıskaç yok). Takılmamış cihaz kablosunun kıskacı masada yatar.
+- **Ölçüler** (gerçek parçalardan): kıskaç Mueller BU-30C mini timsah kıskacı, 27,69 × 5,08 × 7,87 mm, ağız en çok
+  4,8 mm (Mueller BU-30 veri sayfası; DigiKey, Farnell); kılıf kablonun renginde (Mueller BU-2030-A: muz fişten
+  yalıtımlı timsah kıskaca test kablosu, kılıf kablo renginde). Kısa tel 22 AWG tek damarlı, yalıtım Ø 1,45 mm,
+  iletken Ø 0,643 mm (Alpha Wire 3051/1); soyuk uç 7 mm (Global Specialties WK-1 hazır tel takımı veri sayfası).
+  **Gece kararı:** kısa telin yalıtımının tahtanın üstündeki boyu 5 mm (kaynak bulunamadı; telin ucu kıskaca
+  yetecek kadar yukarıda, yaklaşık bir parmak boğumu). Muz fiş: pim Ø 4 mm (4 mm muz fiş standardı; Pomona 1325
+  4,0–4,2 mm sokete uyar); fişin gövde ölçüsü bulunamadı, soketteki fiş modeli değişmedi.
+- **Çakışma yok** (9): kıskaçlar, kısa teller, kıskaçtan çıkan kabloların başı (2,5 birim), köprüler (jumper) ve
+  masadaki parçaların dupont fişleri birbirinin içine girmez; kıskaçlar ve kısa teller parçaların gövdelerine de
+  (bacaklar ince, sayılmaz). Her kıskaç için adaylar sırayla denenir: bacaklar, planın deliği, ağın şeridindeki ya
+  da rayındaki öbür boş delikler (bir delik boşluk bırakılır), sonra gövdesi deliğin üstünü örten parçanın altından
+  alçakta ya da kartın üstünde yatay çıkıp dikilen eğik tel; her adayda cihaza bakan yön, sonra yanlara açılan
+  16 yön ve 4 eğim. Köprüler: bir telin dik ucu başka bir telin altında kalıyorsa üstteki ondan yüksek geçer; aynı
+  sırada iç içe iki telden kısa olanın ortası yana açılır (ucundan ≈ 0,7 birim sonra), öbürü onun ucunun üstünden;
+  kalan çakışmada en yakın çakışmasız yükseklik ve yana açılma (`clips.jumperShapes`, delikler değişmez). Fiş
+  0,75 birim (1,9 mm), köprü Ø 1 mm, kısa tel Ø 1,45 mm, kablo Ø 1,4 mm: hepsi bir delik aralığından (2,54 mm)
+  dar. Test (`tests/kiskac-3b.test.ts`, 81 örnek): her cihaz kablosu kıskaçla bağlı, ağ başına tek bağlantı noktası,
+  3B'de bir delikte tek tel ya da bacak, çakışma 0 (önceden köprüler 65, kıskaçların ilk hâli 201 çakışma).
+  Kablolar havada birbirinin üstünden geçebilir (masadan kıskaca giden uzun kısımlar sayılmaz).
+- **Kafa karıştırmasın** (10): birleşme noktasında (zincirin ilk kıskacının ağzı) küçük etiket: ağın adı ve kablo
+  sayısı ("GND · 3 kablo"; iki ya da daha çok cihaz kablosu buluşunca). Ağın adı analizdeki düğüm adı
+  (`nodeName`); toprak "GND"; ölçü aletleri ve osiloskop ad vermez ("V1" yerine "RD 2. uç"). Fare bir kablonun,
+  kıskacın, kısa telin ya da köprünün üstüne gelince (telefonda dokununca; yeniden dokununca kalkar) o ağın kabloları
+  kendi renginde parlar, tahtadaki bacaklarının üstünde mavi işaret (seçim halkasının rengi), öbür kablolar ve ağa
+  dokunmayan parçalar soluklaşır; köşedeki küçük şemada o düğümün kabloları vurgu renginde. Cihaz kablosu soketin
+  renginde: COM ve − soketleri siyah (toprak), +, VΩmA kırmızı, osiloskobun CH1 sarı, CH2 mavi (`anchorColors`).
+  **Gece kararı:** üretecin OUTPUT ve TTL soketleri renksiz (çelik) BNC: kablo ağın renginde kalır. Güç kaynağının
+  2. kanalının + ucu toprağa gidiyorsa da kablo kırmızı (soket rengi; kural "COM, − siyah").
+- **Kare hızı** (iPhone 13 öykünmesi, işlemci 4× yavaş, örnek çalışırken, 10 örnek): kıskaçlar, kısa teller ve yeni
+  cihaz boyutlarıyla 34,7–64,6 kare/s, uzun görev yok (öncesi aynı makinede 35,3–60,7). Kıskacın geometrileri bütün
+  kıskaçlarda ortak, malzemeleri kablonun rengine göre paylaşılır. Yerleşim (kıskaçlar, köprülerin biçimi) yalnızca
+  devre değişince hesaplanır: en ağır örnekte (yürüyen ışık, 30 köprü) ≈ 75 ms, kıskaçlı en ağır örnekte ≈ 70 ms
+  (normal hızda, düğümde).
 
 ### Performans ve hata taraması (2026-10-27)
 
@@ -2746,3 +2830,166 @@ denetimi atlanan (yeni durumla yeniden çözülen) adımın içinde kayboluyordu
 **Testler:** `tests/timer555.test.ts`: 555-ses ve frekans bölücüde 100 µs'lik parçalarla (uygulamadaki gibi)
 ve 2 µs'lik adımla ölçülen frekans %0,5 içinde; `tests/examples-lojik.test.ts`: 968 / 484 Hz; ios-kontrol:
 frekans bölücüde uygulamanın osiloskobu 968 / 484 Hz'i %0,5 içinde gösteriyor.
+
+### Teşhis ve metinler (2026-11-09)
+
+**1. Kısa devre teşhisi** (`src/editor/messages.ts`, `tests/messages.test.ts`, ios-kontrol "Teşhis: kısa devre edilen parça").
+
+- **Kısa devre edilen parça:** iki uçlu bir parçanın iki ucu aynı kablo ağındaysa ya da ikisi de topraktaysa (toprak
+  sembolleri ve topraklı cihazların COM uçları derlemede tek düğümdür) uyarı: başlık "R1 kısa devre edildi", metin
+  "R1 direncinin iki ucu aynı noktaya bağlı: akım R1’i atlayıp kablodan geçer, R1 devrede iş görmez." ve türe göre
+  sonuç (LED ışık vermez; ampermetre 0 gösterir; anahtarın konumu bir şey değiştirmez; sigorta koruyamaz) ile
+  çözüm. Kartta "R1’i göster" parçayı vurgular ve kartını açar; kablo ağıyla kısa devrede ağın kabloları da
+  vurgulanır. Simülasyon durmuşken de görünür (uyarı kartı; tuval rozeti çalışırken).
+- Kapsam: direnç, kondansatör, bobin, diyotlar, LED, LDR, NTC, lamba, hoparlör, buzzer, sigorta, motor, anahtar,
+  basmalı düğme, ampermetre ve A kipindeki multimetre. Dışarıda kalanlar ve nedeni: kaynakların kendi mesajları var
+  (ideal pilde "Direnç içermeyen döngü", iç dirençli pilde ve AC kaynakta çalışırken "Kısa devre"); akım kaynağının
+  kısa devresi zararsız; voltmetre ve V / Ω kipindeki multimetre iki ucu aynı noktadayken yalnızca 0 okur (bir
+  kablonun iki ucunu ölçmek süreklilik denemesidir); üç ve daha çok uçlu parçalarda iki ucun birleşmesi çoğu
+  zaman bilerek yapılır (potansiyometrenin sürgüsü bir uca, 555'in TRIG–THR'si, işlemsel yükseltecin izleyicisi).
+- **Toprak tuzağıyla ilişki:** topraklı cihazın (osiloskop, üreteç) COM'u yüzünden kısa devre olan parça yalnızca
+  "Toprak tuzağı" mesajında anlatılır (tek mesaj). Topraklı cihaz yokken (iki toprak sembolü arasında bir parça)
+  eskiden tuzak mesajı cihaz adı boş çıkıyordu ("  şebeke toprağıyla birleşiyor"); artık tuzak değil, "kısa devre
+  edildi" uyarısıdır (`findEarthTrap` en az bir topraklı cihaz ister).
+- **Fonksiyon üretecinin çıkışı:** OUT ucu COM ile aynı kablo ağındaysa ya da ikisi de topraktaysa (topraklı
+  üretecin OUT'u bir toprak sembolüne bağlıysa) uyarı "FG1 çıkışı kısa devre": gerilim 50 Ω'luk iç dirence düşer,
+  devreye sinyal ulaşmaz. Topraksız üretecin OUT'u toprağa bağlıysa kısa devre değildir.
+- Gece kararı: yalnızca OUT uyarı alır (kullanıcının istediği). TTL çıkışı aynı yapıda (50 Ω) ve aynı biçimde kısa
+  devre olabilir; kapsamı büyütmemek için eklenmedi, istenirse `findShortedGenerators`'a TTL ucu (1) eklenir.
+- **Arıza bulmada** bu iki uyarı yok: gizli "kısa devre" arızasını ele verirdi.
+- **LED mesajı bağlama göre:** yanan LED'in kartı (ve 4. maddedeki aşırı akım uyarısı) önerisini devreden alır
+  (`ledAdvice`): LED'e seri tek bir direnç varsa "R1 ön direnci bu gerilim için küçük: R1’i büyüt …" (düzeltme
+  düğmesi "R1’i … Ω yap" eskisi gibi); seri direnç bulunamaz ama devrede kısa devre edilmiş bir direnç varsa
+  (önce LED'in uçlarından seri ampermetreler üzerinden ulaşılan ağlarda) "Akımı sınırlaması gereken R1 kısa devre
+  edilmiş … kabloyu kaldır"; hiçbiri yoksa eskisi gibi "Seri bir ön direnç ekle". LED'in kendisi kısa devre
+  edilmişse yanamaz (akım kablodan geçer); onu "LED1 kısa devre edildi" uyarısı "LED ışık vermez" diye anlatır.
+- Örneklerin hiçbirinde yeni uyarı çıkmıyor (toprak tuzağı örneğinde D4 tuzak mesajında kalıyor; birim testi).
+
+**2. Son devreler** (`src/editor/recentCircuits.ts`, `RecentDialog.tsx`, `tests/son-devreler.test.ts`, ios-kontrol
+"Son devreler").
+
+- Örnek açmak, Yeni devre, dosyadan ya da bağlantıdan açmak, arıza görevi ve Son devrelerden geri yüklemek kurulu
+  devrenin yerine geçer (eskisi gibi onay sorulmaz, bildirimde Geri al). Artık yerine geçmeden önce kurulu devre
+  (analiz bölümüyle) bu tarayıcıda `devre-simulatoru:son-devreler` anahtarında en çok 5 kayıtlık listeye yazılır:
+  adı (örneğin başlığı, görevin adı ya da "Devrem"), parça sayısı ve zamanı. Gömülü görünümde kayıt yok.
+- Açmak: masaüstünde Daha fazla → "Son devreler…" (penceresi) ve Örnekler penceresinin yan listesinin altındaki
+  "Son devreler N"; telefonda Daha fazla sayfasındaki "Son devreler" satırı (alt görünüm) ve Örnekler'in ana
+  ekranının altındaki satır. Bir kayda basınca devre geri gelir; o sırada kurulu devre de listeye girer.
+- Gece kararı: boş devre ve hiç değiştirilmemiş örnek kaydedilmez (örneğin kendisi her zaman Örnekler'de); aynı
+  devre (analiz dahil aynı yazım) iki kez girmez, yenisi başa geçer. Değiştirilmemiş dosya, paylaşım bağlantısı ve
+  arıza görevi kaydedilir: kullanıcının elinde başka kopyası olmayabilir.
+
+**3. Föy metinleri ve Oto** (`src/i18n/foy.ts`, `src/editor/DeviceCards.tsx`, `tests/foy-cihaz-metinleri.test.ts`,
+ios-kontrol "Föy metinleri").
+
+- Cihaz rafı arayüz v3'te kalktı (5. adım): osiloskop, fonksiyon üreteci, DC güç kaynağı ve su haznesi defterin
+  kartlarıdır (masaüstünde ve tablette sağdaki Defter, telefonda şemanın altındaki defter; kartın satırına basınca
+  açılır). Föy kartlarındaki "cihaz rafında" geçen 12 adım metni (7'si küçük harfle, ilk adımların "Devre kurulu: …
+  Oynat’a bas; cihaz rafında …" cümlesinde; 5'i "Cihaz rafında …" diye başlayan adım metni) buna göre yazıldı:
+  ilk adımlarda "defterdeki FG1 kartında (masaüstünde sağdaki Defter, telefonda şemanın altı)" ya da "defterde
+  PS1’in kartını aç (…)", öbür adımlarda "Defterdeki FG1 kartında …". Ayarın adı kartdakiyle aynı (dalga biçimi
+  Kare, frekans, tepe-tepe, 1. çıkış).
+- Gece kararı: kullanıcının "(cihaz nerede ve nasıl eklenir)" notu için metinler cihazın nerede durduğunu ve
+  ayarına nasıl ulaşılacağını söyler; cihaz ekleme (Parça ekle → Laboratuvar cihazları) yazılmadı, çünkü föy
+  devreleri kurulu gelir ve cihazlar zaten devrededir.
+- Föy dışında kalan "cihaz rafı" izleri (değiştirilmedi): `Canvas.tsx` (Highlight yorumu), `DeviceCards.tsx` (dosya
+  başı yorumu), `InspectTab.tsx` (`RACK_DEVICES` yorumu); `tr.rack.title` ("Cihaz rafı") ve `tr.rack.settingsInRack`
+  hiçbir yerde kullanılmıyor (eski metinler).
+- **Oto:** osiloskop kartındaki Oto düğmesi "Gelişmiş"in içindeydi; föyün iki yerinde ("her seferinde Oto’ya bas")
+  bulunması zordu. Artık kanal ve zaman ayarlarının altında, Gelişmiş'in hemen üstünde, her zaman görünür; yanında
+  "Volt/bölme ve zaman/bölmeyi sinyale göre seçer" açıklaması (düğmenin `aria-describedby`'ı; adı yine "Oto",
+  föydeki gibi). Telefonda 44 px. Föydeki iki yer "OSC1 kartındaki Oto’ya bas" diye adresi verir. Gelişmiş'te
+  konum, B ters, tetik, giriş, şebeke toprağı ve jaklar kaldı.
+
+**4a. LED'in kademeli yanması** (`src/sim/devices/led.ts`, `engine.ts` → `elapseDevices`, `tests/led-yanma.test.ts`,
+`tests/examples.test.ts`, ios-kontrol "LED kademeli yanma").
+
+- Eskiden akım 30 mA'i (yeşilde 25 mA) bir adımda bile aşınca LED hemen yanıyordu (5 V, 100 Ω'da 31 mA ile).
+  Artık üç kademe, sınırlar veri sayfasından:
+  1. **Uyarı:** akım (AC'de periyot tepesi) sürekli sınırı I_F'yi aşınca "LED aşırı akımda" uyarısı (çalışırken
+     rozet ve kart): akım, eklem sıcaklığı ve bu güçte varacağı sıcaklık; o sıcaklık sınırı aşmıyorsa "bu akımda
+     yanmaz ama ışığı zayıflar ve ömrü kısalır" (veri sayfasının notu: "Excess driving current and / or operating
+     temperature higher than recommended conditions may result in severe light degradation or premature
+     failure"), aşıyorsa "bu akımda kalırsa eklem sınırı aşar ve LED yanar". Öneri cümlesi bağlama göre (1. madde).
+  2. **Uzun süre aşırı akım:** eklemin sıcaklığı T_j = 25 °C + ΔT, dΔT/dt = (R_th JA · P − ΔT) / τ (P = V · I
+     LED'in harcadığı güç); T_j veri sayfasındaki en yüksek değeri aşınca LED yanar ("ısınarak yandı").
+  3. **Çok yüksek akım:** akım tepe ileri akımını I_FP'yi aşarsa LED hemen yanar ("hemen yandı").
+- Değerler (Kingbright 5 mm T-1 3/4; L-53 serisinin ABD adlandırması WP7113, aynı yongalar):
+
+  | Renk | Veri sayfası | I_F | I_FP (1/10 görev, 0,1 ms) | T_j en çok | R_th JA |
+  |---|---|---:|---:|---:|---:|
+  | Kırmızı | WP7113SRD/D (Super Bright Red, GaAlAs), DSAF2433 V.9A, 08/05/2020 | 30 mA | 155 mA | 115 °C | 580 °C/W |
+  | Sarı | WP7113YD (GaAsP/GaP), DSAF2448 V.11B, 01/08/2026 | 30 mA | 140 mA | 110 °C | 560 °C/W |
+  | Yeşil | WP7113GD (GaP), DSAE9335 V.12B, 04/02/2019 | 25 mA | 140 mA | 110 °C | 600 °C/W |
+  | Mavi | WP7113QBC/D (InGaN), DSAG3481 V.18B, 03/26/2025 | 30 mA | 150 mA | 115 °C | 610 °C/W |
+
+  (Eski L-53SRD-C veri sayfası, DSAA5833 V.5, 2007: 30 mA, 155 mA, 75 mW; aynı.) Ortam 25 °C (sınırların verildiği
+  sıcaklık). Ters gerilim sınırı (5 V) değişmedi.
+- Sonuç (kırmızı, 5 V, `led-on-direnc`): 100 Ω'da 31 mA, uyarı, eklem ≈ 59 °C'ye çıkar, yanmaz; 47 Ω'da 63 mA,
+  ≈ 99 °C, yanmaz; 39 Ω'da 75 mA, ≈ 114 °C, yanmaz; 33 Ω'da 88 mA ≈ 19 s'de, 22 Ω'da 127 mA ≈ 8 s'de ısınarak yanar;
+  15 Ω'da 178 mA, hemen. Örneğin metni buna göre yazıldı ("100 Ω'a düşür: … uyarı çıkar, LED ısınır ama yanmaz.
+  22 Ω'da … ≈ 8 s'de … ısınarak yanar. 15 Ω'da … hemen yanar."). Örneklerin hiçbiri ilk 1,5 s'de yeni LED uyarısı
+  vermiyor (tarandı).
+- DC (zamandan bağımsız) devrede motor adım atmaz: süre geçerken bileşenlerin zamanla değişen durumu için
+  `Device.elapse(x, dt)` eklendi (yalnızca LED kullanır); ardından `checkLimits` sorulur, LED yandıysa devre yeniden
+  çözülür. Zamana bağlı devrede ısınma her kabul edilen adımda (`accept`). İki yolda yanma anı aynı (test).
+- Onarılan LED soğuktur (yeni LED); değer değişikliğinde (devre yeniden derlenince) sıcaklık korunur.
+- Gece kararı: ısıl zaman sabiti τ = 10 s (veri sayfalarında yok; varsayım). Tek zaman sabiti, gerçek bir 5 mm LED'in
+  yongası, bacakları ve kılıfı ayrı hızlarla ısınır; 10 s, aşırı akımda yanmanın saniyeler içinde görünmesi için
+  seçildi. Gece kararı: sürekli sınırla eklem sınırı arasındaki akımlarda (kırmızıda ≈ 30–75 mA) LED hiç yanmaz,
+  yalnızca uyarı alır: veri sayfasının ısıl sınırı aşılmıyor; "uzun sürede yanma" istenirse süreye bağlı ek bir
+  kural (veri sayfasında dayanağı yok) gerekir. Gece kararı: kart üzerindeki LED balonu yanma nedenini ayırmıyor
+  ("Üzerinden ≈ … geçti; en fazla 30 mA’e dayanır."); ayrıntı hata kartında. 7 segment göstergenin segmentleri ve
+  optokuplörün LED'i değişmedi (istek dışı): segment 30 mA'de hemen yanar.
+
+**4b. Ölçü aletinde hesabın kalıntıları 0** (`src/editor/readouts.ts` → `METER_RESOLUTION`, `meterRound`;
+`tests/readouts.test.ts`, ios-kontrol "Ölçü aletinin çözünürlüğü").
+
+- Ampermetre boşta uçla ya da akım geçmeyen dalda "0,003 pA", voltmetre "pV" gösteriyordu: gmin ve yuvarlamanın
+  kalıntısı (eski eşik 10⁻¹⁵). Ölçü aletinin ekranı otomatik ölçekli, 4 anlamlı basamak ve en ince aralığı µV / µA
+  ("Ölçü aleti ekranı"); bu aralıkta son basamak 0,001 µ = 1 nV / 1 nA. Gece kararı: çözünürlük 1 nV / 1 nA; altı
+  "0,000 V" / "0,000 A". Kapsam: ölçü aletinin ekranı (şema göstergesi, defter kartı, 3B etiketi ve ekranı aynı
+  okumayı kullanır), kartındaki "Anlık", "Devreden çektiği akım" / "Gerilim düşümü" satırları ve iç direnç notu.
+  1 nA ve üstü eskisi gibi ("450,0 nA").
+- Gece kararı: öbür parçaların kartlarındaki canlı ölçümler (direncin akımı vb.) değişmedi: JFET'in kapı akımı
+  (≈ 11 pA, föyün 3. adımının cevabında) gerçek bir değerdir ve kartta görünmeye devam eder; yalnızca ölçü aletinin
+  ekranı gerçek bir aletin çözünürlüğüyle sınırlı.
+
+**4c. Akım noktaları 1 µA'in altında neredeyse durur** (`src/editor/useSimulation.ts` → `dotSpeed`,
+`tests/readouts.test.ts`, ios-kontrol "Akım noktaları 1 µA'in altında").
+
+- Eskiden en düşük hız 4 piksel/s idi; voltmetrenin içinden geçen µA altı akımda (10 MΩ, 5 V: 0,5 µA) noktalar
+  belirgin hareket ediyordu (eski kullanıcı kararı: "voltmetrenin çektiği µA düzeyindeki akım gösterilir"; bu istekle
+  değişti). Yeni eğri: 1 µA ve üstünde 1 + (73/3)·log₁₀(I / 1 µA) piksel/s (1 µA ≈ 1, 1 mA ≈ 74 eskisi gibi, 1 A ≈ 147,
+  en çok 150); 1 µA'in altında I / 1 µA piksel/s (0,5 µA → 0,5; noktalar 16 piksel arayla, biri ötekinin yerine
+  ≈ 30 s'de gelir); 10 nA'in altında hareketsiz. Eğri 1 µA'de süreklidir. 3B'deki noktalar aynı eğrinin onda biri.
+- Gece kararı: "neredeyse dursun" için 1 µA'de 1 piksel/s seçildi (16 piksellik aralığı 16 s'de geçer); 1 mA'deki
+  hız korunduğu için µA–mA arası biraz yavaşladı (10 µA: 30 → 25, 100 µA: 52 → 50 piksel/s).
+
+**5. Beklenmeyen bağlantı bildiriminin Geri al'ı** (`src/editor/Simulator.tsx` → `warnUnexpectedLink`,
+`unexpectedWatch`; `Toast.tsx`; ios-kontrol "Beklenmeyen bağlantı bildirimi").
+
+- Bildirimdeki Geri al genel geri almaydı: bildirim açıkken (5 s) başka bir değişiklik yapılırsa Geri al kablo yerine
+  o değişikliği geri alıyordu. Artık bildirim, kablodan sonraki ilk değişiklikte (belge kablonun eklendiği hâlden
+  ayrılınca: değer, taşıma, silme, Ctrl+Z…) kapanır ve kablonun yanıp sönmesi durur; Geri al yalnızca belge hâlâ
+  kablonun eklendiği hâldeyken çalışır, yani yalnızca o kabloyu kaldırır.
+- Gece kararı: "Geri al yalnızca o kabloyu kaldırsın ya da başka değişiklikte bildirim kapansın" seçeneklerinden
+  ikincisi (ve onunla birlikte birincisi) uygulandı; kabloyu kimliğiyle silmek, kablo eklenirken bölünen öbür
+  kabloları (T bağlantısı) geri getirmezdi. Öbür Geri al'lı bildirimler (silme, örnek / dosya açma) değişmedi
+  (istek dışı); onlar da aynı biçimde genel geri almadır.
+- `useToast`'un göster işlevi bildirimin kimliğini döndürür; kapat işlevi kimlik verilirse yalnızca o bildirimi kapatır.
+
+**6. Ctrl+O, 4 kat yavaşta ara sıra dosya seçici yok** (ios-kontrol "Arayüz v4", kısayollar maddesi).
+
+- Ölçüm (yerel önizleme, IOS_CPU = 4, maddenin önceki adımları aynen; sayfaya baştan eklenen dinleyicilerle):
+  uygulamanın Ctrl+O işleyicisi her koşuda tuştan 1–2 ms sonra `input.click()`'i çağırdı, o anda kullanıcı etkinliği
+  vardı (`navigator.userActivation.isActive`), açık pencere yoktu ve odak tuvaldeydi. Koşuların 2 / 5'inde
+  Playwright'ın `filechooser` olayı 60 s beklense de hiç gelmedi; gelen koşularda 17–24 ms'de geldi. Yani sorun
+  sabit 4 s bekleme değil (olay ya hemen geliyor ya hiç gelmiyor) ve uygulama değil: Playwright dosya seçiciyi
+  yakalamayı (CDP `Page.setInterceptFileChooserDialog`) `waitForEvent` çağrılınca açıyor; tuş aynı anda
+  gönderildiği için yavaş işlemcide tuş bazen yakalama açılmadan işleniyor, seçici yakalanmadan (başsız tarayıcıda
+  hemen kapanarak) açılıyordu. Doğrulama: yakalama tuştan önce açılıp bir gidiş-dönüş beklenince (`page.on(
+  'filechooser')` + `page.evaluate`) 6 / 6 koşuda olay 12–15 ms'de geldi.
+- Düzeltme betikte: yakalama baştan açılır, bir gidiş-dönüş beklenir; bekleme süresi de (kullanıcının istediği gibi)
+  IOS_CPU ile ölçeklenir (4000 × IOS_CPU ms). Uygulamada değişiklik yok. Düzeltilmiş madde 4 kat yavaşta 6 / 6
+  koşuda geçti (seçici 10–16 ms'de), normal hızda 2 / 2 (6–7 ms).

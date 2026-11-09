@@ -75,13 +75,20 @@ import { HelpDialog, type HelpTab } from './HelpDialog';
 import { markWelcomeSeen, Tour, welcomeSeen, WelcomeDialog, type TourStep } from './Welcome';
 import type { PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
+import { RecentDialog } from './RecentDialog';
+import { loadRecent, restoreRecent, saveRecent, withRecent, worthRemembering, type RecentEntry } from './recentCircuits';
 import { useFocusMode } from './fullscreen';
 import {
   earthTrapItem,
   findEarthTrap,
+  findShortedGenerators,
+  findShortedParts,
   itemFromDiagnostic,
+  ledAdvice,
   messageKey,
   seriesResistor,
+  shortedGeneratorItem,
+  shortedPartItem,
   suggestedResistor,
   type MessageItem,
 } from './messages';
@@ -343,6 +350,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const [flash, setFlash] = useState<Highlight | null>(null);
   const [share, setShare] = useState<ShareTab | null>(null);
   const [examplesOpen, setExamplesOpen] = useState(false);
+  /** Son devreler: yerine başka devre açılan devrelerin bu tarayıcıdaki kaydı (en çok 5) ve penceresi. */
+  const [recent, setRecent] = useState<RecentEntry[]>(() => loadRecent());
+  const [recentOpen, setRecentOpen] = useState(false);
   const [fitRequest, setFitRequest] = useState(0);
   // Tam ekran (masaüstü, tablet): önce devre sığdırılır, böylece defter gizlenince yeni alana yeniden sığar.
   const focus = useFocusMode(() => canvasRef.current?.fit());
@@ -877,6 +887,13 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // --- Yükleme (örnek, dosya, paylaşım bağlantısı, yeni devre) ---------------------------
   /** Yeni bir belge yükler; önceki belge geri alma geçmişinde kalır. */
   const loadDoc = (next: CircuitDoc, message: string, example: ExampleId | null = null, nextAnalysis: AnalysisDoc = EMPTY_ANALYSIS, nextTask: TaskDef | null = null) => {
+    // Kurulu devre yerine geçmeden önce Son devreler'e yazılır (boş devre ve değişmemiş örnek hariç; gömülü
+    // görünümde kayıt yok).
+    if (embed === null && worthRemembering(doc, activeExample ? exampleDoc(activeExample) : null)) {
+      const list = withRecent(loadRecent(), doc, analysis.doc, circuitTitle, Date.now());
+      saveRecent(list);
+      setRecent(list);
+    }
     // Yeni devre görevin bekçisinden geçmez; görev kipi yalnızca görev dosyasıyla sürer.
     rawDispatch({ type: 'commit', doc: next, selection: EMPTY_SELECTION });
     analysis.setDoc(nextAnalysis);
@@ -914,6 +931,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   const loadExample = (id: ExampleId) => {
     const next = exampleDoc(id);
     if (next) loadDoc(next, tr.examples.loaded, id);
+  };
+  /** Son devrelerden bir kaydı geri yükler (kurulu devre de listeye girer; bildirimde Geri al). */
+  const openRecent = (entry: RecentEntry) => {
+    setRecentOpen(false);
+    setModal(null);
+    const restored = restoreRecent(entry);
+    if (restored) loadDoc(restored.doc, tr.recent.restored, null, restored.analysis);
+    else showToast(tr.recent.broken, 'error');
   };
   /** Hazır arıza senaryosu (Örnekler → Arıza bul): devre arıza göreviyle açılır. */
   const loadScenario = (id: FaultScenarioId) => {
@@ -1006,13 +1031,24 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     }
   }, [connectivity]);
 
+  /**
+   * İki ucu aynı noktaya düşen parçalar ve OUT'u COM'a kısa devre üreteçler. Arıza bulmada yok: gizli kısa
+   * devre arızasını ele verirdi.
+   */
+  const shorted = useMemo(
+    () => (compiled && !fault ? { parts: findShortedParts(compiled), generators: findShortedGenerators(compiled) } : { parts: [], generators: [] }),
+    [compiled, fault],
+  );
+
   const diagnosticContext = useMemo<DiagnosticContext>(() => {
     const byId = new Map(doc.parts.map((p) => [p.id, p]));
     return {
       label: (id) => byId.get(id)?.label ?? id,
       type: (id) => byId.get(id)?.type,
+      // Yanan LED'in önerisi bağlama göre: ön direnç küçük, kısa devre edilmiş ya da hiç yok.
+      ledAdvice: (id) => (compiled ? ledAdvice(id, compiled, shorted.parts, doc) : { kind: 'no-resistor' }),
     };
-  }, [doc]);
+  }, [doc, compiled, shorted]);
 
   /** Toprak tuzağı: topraklı cihazların COM'ları şebeke toprağıyla birleşip bir parçayı kısa devre ediyor. */
   const earthTrap = useMemo(() => (compiled ? findEarthTrap(compiled) : null), [compiled]);
@@ -1032,10 +1068,14 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       items.push(itemFromDiagnostic(d, diagnosticContext));
     }
     if (earthTrap) items.push(earthTrapItem(earthTrap, doc));
+    // Kısa devre edilen parçalar (toprak tuzağının kısa devre ettikleri tuzak mesajında) ve üretecin çıkışı.
+    const trapped = new Set(earthTrap?.shorted ?? []);
+    for (const s of shorted.parts) if (!trapped.has(s.id)) items.push(shortedPartItem(s, doc));
+    for (const s of shorted.generators) items.push(shortedGeneratorItem(s, doc));
     // Önce hatalar, sonra uyarılar, en son bilgiler (kendi içlerinde sıra korunur).
     const rank = { error: 0, warning: 1, info: 2 } as const;
     return items.sort((a, b) => rank[a.severity] - rank[b.severity]);
-  }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, doc, fault]);
+  }, [compiled, sim.frame?.runtime, sim.notice, diagnosticContext, earthTrap, shorted, doc, fault]);
 
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
 
@@ -1310,15 +1350,42 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     window.clearTimeout(flashTimer.current);
     setFlash({ parts: new Set(link.parts), wires: new Set([link.wireId]), severity: 'warning', pins: link.pins });
     flashTimer.current = window.setTimeout(() => setFlash(null), 5000);
-    showToast(tr.canvas.unexpectedLink(link.names), 'error', {
+    const watch = { toast: 0, before: doc, after: null as CircuitDoc | null };
+    watch.toast = showToast(tr.canvas.unexpectedLink(link.names), 'error', {
       label: tr.toast.undo,
       run: () => {
         window.clearTimeout(flashTimer.current);
         setFlash(null);
-        dispatch({ type: 'undo' });
+        unexpectedWatch.current = null;
+        // Yalnızca o kablo: belge kablo eklendikten beri değişmediyse son adım (kablonun eklenmesi) geri alınır.
+        if (watch.after !== null && docRef.current === watch.after) dispatch({ type: 'undo' });
       },
     });
+    unexpectedWatch.current = watch;
   };
+  /**
+   * Beklenmeyen bağlantı bildirimi açıkken başka bir değişiklik yapılırsa bildirim kapanır: Geri al o anki son
+   * değişikliği (kabloyu değil) geri alırdı. `before` kablodan önceki belge, `after` kablonun eklendiği belge.
+   */
+  const unexpectedWatch = useRef<{ toast: number; before: CircuitDoc; after: CircuitDoc | null } | null>(null);
+  useEffect(() => {
+    const watch = unexpectedWatch.current;
+    if (!watch) return;
+    if (watch.after === null && state.past[state.past.length - 1] === watch.before && doc !== watch.before) {
+      watch.after = doc;
+      return;
+    }
+    if (doc === watch.after) return;
+    unexpectedWatch.current = null;
+    hideToast(watch.toast);
+    window.clearTimeout(flashTimer.current);
+    setFlash(null);
+  }, [doc, state.past, hideToast]);
+  // Bildirim kendiliğinden kapandıysa (ya da yerine başka bildirim geldiyse) izleme biter.
+  useEffect(() => {
+    const watch = unexpectedWatch.current;
+    if (watch && toast?.id !== watch.toast) unexpectedWatch.current = null;
+  }, [toast]);
 
   // --- Telefon ve tablet -----------------------------------------------------------------------
   // Tuvalin kipi: Bağla (kablo bağlarken), Ölç (çalışıyor ya da duraklatılmış; yapı kilitli) ya da Kur.
@@ -1749,6 +1816,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // Şema | 3B: devre şemada kurulur; 3B tezgâhta aynı devre masada (izlenir, anahtar ve
   // potansiyometreyle oynanır).
   // 3B tezgâhın ortak özellikleri (3B görünüm ve Tahtada kur).
+  const phoneEdge = connect === null && !addSheet && !analysis.open ? 10 : 'calc(10px + env(safe-area-inset-bottom))';
   const benchProps: Omit<BenchViewProps, 'onSchematic'> = {
     doc,
     connectivity,
@@ -1769,7 +1837,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     onKarta: () => setKartaOpen(true),
     focusRequest: benchFocus,
     onFocusDone: clearBenchFocus,
-    ...(phone ? { controlsInset: { right: 60, bottom: schematicFull ? 'calc(100px + env(safe-area-inset-bottom))' : 10 } } : {}),
+    // Telefon: 3B düğmeleri şema kutusunun alt kenarında, tam ekran düğmesiyle tek sırada (tam ekranda da). Alttaki
+    // çubuk yoksa kutu ekranın altına dayanır: güvenli alan kadar yukarıda.
+    ...(phone ? { controlsInset: { right: 60, bottom: phoneEdge }, fitKey: schematicFull ? 'tam' : 'kutu' } : {}),
     callbacks: {
       onSelect: (id) => dispatch({ type: 'select', selection: id ? { parts: [id], wires: [] } : EMPTY_SELECTION }),
       onToggle: (id) => {
@@ -1861,7 +1931,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   // Klavye kısayolları (onaylı liste, M12): + / − yakınlaştır, Shift+1 sığdır, P oynat/duraklat,
   // Alt+1…3 panel sekmeleri, ? yardım. Yazı alanlarında ve açık pencerelerde çalışmaz. Tuşlar e.key ve
   // e.code ile okunur; Türkçe Q klavyede de aynı.
-  const dialogOpen = share !== null || examplesOpen || modal !== null || stopAsk || helpOpen || welcomeOpen || schematicOpen;
+  const dialogOpen = share !== null || examplesOpen || recentOpen || modal !== null || stopAsk || helpOpen || welcomeOpen || schematicOpen;
   const shortcutRef = useRef<(e: KeyboardEvent) => void>(() => {});
   shortcutRef.current = (e: KeyboardEvent) => {
     if (dialogOpen || e.defaultPrevented) return;
@@ -2057,8 +2127,18 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         setExamplesOpen(false);
         loadScenario(id);
       }}
+      {...(embed === null
+        ? {
+            onRecent: () => {
+              setExamplesOpen(false);
+              setRecentOpen(true);
+            },
+            recentCount: recent.length,
+          }
+        : {})}
     />
   );
+  const recentDialog = recentOpen && <RecentDialog entries={recent} onOpen={openRecent} onClose={() => setRecentOpen(false)} touch={phone || tablet} />;
 
   const taskDialogEl = taskDialog && (
     <TouchUi.Provider value={phone || tablet}>
@@ -2240,6 +2320,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               setWelcomeOpen(true);
             }}
             onTheme={(choice) => updateSettings({ theme: choice })}
+            recent={recent}
+            onOpenRecent={openRecent}
           />
         )}
         {stopAsk && (
@@ -2252,6 +2334,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           />
         )}
         {examplesDialog}
+        {recentDialog}
         {shareDialogEl}
       </>
     );
@@ -2454,6 +2537,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
                     setSchematicFull((f) => !f);
                     setFitRequest((n) => n + 1);
                   }}
+                  bottom={phoneEdge}
                 />
               )}
             </main>
@@ -2553,6 +2637,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           onShortcuts={() => setHelpTab('keys')}
           onHelp={() => setHelpTab('pointer')}
           onWelcome={() => setWelcomeOpen(true)}
+          {...(embed === null ? { onRecent: () => setRecentOpen(true) } : {})}
           view={boardMode ? null : { mode: viewMode, onChange: setViewMode }}
           touch={tablet}
           theme={settings.theme}
@@ -2713,6 +2798,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           />
         )}
         {examplesDialog}
+        {recentDialog}
         {taskDialogEl}
         {overlays}
         <Toast toast={toast} onDone={hideToast} />

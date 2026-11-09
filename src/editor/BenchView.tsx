@@ -6,9 +6,12 @@
 // aletlerinin etiketi. Seçili transistörde uçların harfleri. Hareket ipucu Yardım'da; telefonda 3B ilk
 // açılışta bir kez tek satır.
 
-import { Suspense, lazy, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { CameraRequest } from '../bench3d/Bench3D';
-import type { BreadboardPlan } from '../bench3d/breadboard';
+import { planBreadboard, type BreadboardPlan } from '../bench3d/breadboard';
+import { clipJunctions } from '../bench3d/clipPlan';
+import { netIndex, nodeName, type NetIndex } from './analysis/traces';
+import { wireKey } from '../model/connectivity';
 import type { BenchCallbacks, BenchScene, CameraView, TopInsets } from '../bench3d/scene';
 import { tr } from '../i18n/tr';
 import type { Connectivity } from '../model/connectivity';
@@ -137,6 +140,8 @@ export interface BenchViewProps {
   readonly onFocusDone: () => void;
   /** Telefon: sağ alttaki denetimlerin yeri (şema kutusunun tam ekran düğmesinin solunda). */
   readonly controlsInset?: { readonly right: number; readonly bottom: number | string };
+  /** Değişince kamera seçili görünüme yeniden sığdırılır (telefonda tam ekrana girip çıkınca). */
+  readonly fitKey?: string;
   readonly callbacks: BenchCallbacks;
   /** Tahtada kur: öğrencinin kurulumunun yerleşimi (tezgâh onunla kurulur). */
   readonly plan?: BreadboardPlan | null;
@@ -172,6 +177,19 @@ export function BenchView(props: BenchViewProps) {
   const slow = useSlowFrame(props.active ? (props.labelFrame === undefined ? frame : props.labelFrame) : null);
   const single = selection.length === 1 ? selection[0]! : null;
 
+  // Cihaz kablolarının birleşme noktaları ("GND · 3 kablo") ve üstüne gelinen ağ (küçük şemada vurgulanır). Tahtada
+  // kur kurulumunun 3B'sinde kablolar zincirlenmez: birleşme yok.
+  const schematicPlan = useMemo(() => (props.plan ? null : planBreadboard(doc)), [doc, props.plan]);
+  const index = useMemo(() => netIndex(doc, props.connectivity), [doc, props.connectivity]);
+  const junctions = useMemo(() => (schematicPlan ? clipJunctions(doc, schematicPlan).map((j) => ({ ...j, name: netName(j.net, schematicPlan, index) })) : []), [doc, schematicPlan, index]);
+  const [hoverNet, setHoverNet] = useState<string | null>(null);
+  const highlightWires = useMemo(() => {
+    if (!hoverNet || !schematicPlan) return null;
+    const nets = new Set<number>();
+    for (const [key, net] of schematicPlan.netOf) if (net === hoverNet) nets.add(index.netOf(key) ?? -1);
+    return new Set(doc.wires.filter((w) => nets.has(index.netOf(wireKey(w.id)) ?? -2)).map((w) => w.id));
+  }, [hoverNet, schematicPlan, index, doc.wires]);
+
   // Küçük şema yalnızca yer varken (sağ alttaki denetimlerle çakışmasın).
   const host = useRef<HTMLDivElement>(null);
   const [roomy, setRoomy] = useState(false);
@@ -182,6 +200,18 @@ export function BenchView(props: BenchViewProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Telefonda tam ekrana girince ve çıkınca kamera yeniden sığdırılır (kullanıcı kamerayı oynatmış olsa da).
+  const fitKey = props.fitKey;
+  const firstFit = useRef(true);
+  useEffect(() => {
+    if (firstFit.current) {
+      firstFit.current = false;
+      return;
+    }
+    setCamera((c) => ('partId' in c ? { n: c.n + 1, view: 'free' } : { n: c.n + 1, view: c.view }));
+    setCameraLabel((l) => (l === 'part' ? 'free' : l));
+  }, [fitKey]);
 
   // Defterdeki "3B'de yaklaş".
   const { focusRequest, onFocusDone } = props;
@@ -209,7 +239,7 @@ export function BenchView(props: BenchViewProps) {
     setCameraLabel(choice);
     setCamera((c) => (choice === 'part' ? (single ? { n: c.n + 1, view: 'part', partId: single } : c) : { n: c.n + 1, view: choice }));
   };
-  const callbacks: BenchCallbacks = { ...props.callbacks, onCamera: () => setCameraLabel('free') };
+  const callbacks: BenchCallbacks = { ...props.callbacks, onCamera: () => setCameraLabel('free'), onNet: setHoverNet };
 
   // Etiketler: telefonda yalnızca seçili parça ve ölçü aletleri; toprak sembolü etiketsiz.
   const top = props.top ?? null;
@@ -259,6 +289,7 @@ export function BenchView(props: BenchViewProps) {
           callbacks={callbacks}
           plan={props.plan ?? null}
           top={top}
+          phone={phone}
           {...(props.onScene ? { onScene: props.onScene } : {})}
         />
       </Suspense>
@@ -269,6 +300,20 @@ export function BenchView(props: BenchViewProps) {
         {labelled.map((part) => (
           <BenchLabel key={part.id} part={part} frame={slow && (!props.liveHidden || METERS.has(part.type)) ? slow : null} measured={props.measured} selected={selection.includes(part.id)} />
         ))}
+        {!top &&
+          labels &&
+          junctions.map((j) => (
+            <span
+              key={`j-${j.net}`}
+              data-anchor="junction"
+              data-net={j.net}
+              data-priority={2}
+              aria-hidden="true"
+              className="absolute top-0 left-0 rounded-md bg-ink px-2 py-1 text-[12px] leading-tight font-semibold whitespace-nowrap text-on-ink opacity-0 shadow-md"
+            >
+              {tr.bench.junction(j.name, j.count)}
+            </span>
+          ))}
         {lettered &&
           (tr.devices.pinTags[lettered.type] ?? []).map((letter, i) => (
             <span
@@ -311,6 +356,7 @@ export function BenchView(props: BenchViewProps) {
               settings={settings}
               label={tr.bench.miniLabel}
               selected={selection}
+              highlightWires={highlightWires}
               className="block h-full w-full"
             />
           </span>
@@ -376,6 +422,17 @@ export function BenchView(props: BenchViewProps) {
 
     </div>
   );
+}
+
+/** Ölçü aletleri ve osiloskop düğüme ad vermez (ağın adı devrenin parçalarından; toprak "GND"). */
+const NAMELESS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter', 'multimeter', 'oscilloscope']);
+
+function netName(net: string, plan: BreadboardPlan, index: NetIndex): string {
+  if (plan.roles.get(net) === 'ground') return tr.bench.groundNet;
+  const n = index.netOf(net);
+  if (n !== undefined && n === index.ground) return tr.bench.groundNet;
+  const named: NetIndex = { ...index, pins: (k) => index.pins(k).filter((p) => !NAMELESS.has(p.part.type)) };
+  return nodeName(net, named);
 }
 
 /** Kameraya dönük etiket: ad · değer; çalışırken ölçüm (ölçü aletinde büyük). Seçili parçanınki mavi. */
