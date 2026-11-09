@@ -2519,6 +2519,28 @@ iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon
   hemen üstünde akışta durur (`<Toast inline>`): görünürken defter kısalır, içerik kaymaz ve örtülmez.
   Şema kutusunun boyu değişmez (tuval yeniden sığdırılmaz). Tam ekran şemada, kablo bağlarken ve Parça
   ekle / Analiz açıkken bildirim eskisi gibi yüzer (orada altta defter yok).
+- Gece kararı: **okunur şema (madde 3).** Telefonda okunur yakınlık %90 (`PHONE_READABLE_SCALE`):
+  parçaların ad ve değer yazıları (11 px) ekranda 9,9 px. Değerlerin gizlendiği eşik %100'den %90'a indi
+  (yazılar okunurken değerler de görünsün; iki ayrı eşik olmasın). %100 seçilseydi küçük kutuda devreler
+  daha çok taşacaktı.
+- Kendiliğinden yapılan sığdırmalar (sayfa açılışı, örnek, paylaşım bağlantısı, dosya, yeni devre, tam
+  ekrana giriş ve çıkış) okunur yakınlığın altına inmez (`fit('readable')`, `view.ts → readableFit`):
+  sığmayan devre ortalanır ve kaydırılabilir kalır. Devre o yakınlıkta sığıyor ama ortada sağ alttaki
+  gerilim çipine ve tam ekran düğmesine değiyorsa yukarı, sola ya da sol üste yaslanır (`legendFit.ts →
+  readableAvoiding`). Sığdır (şemanın sağ üstündeki düğme ve Daha fazla → Sığdır) bütün devreyi
+  gösterir; değerler gizli olabilir. Devrenin bir kısmı tuvalin dışındayken Sığdır düğmesi görünür (önce
+  yalnızca kullanıcı kaydırınca). Tuvalin boyu değişince son sığdırmanın türüyle yeniden sığar.
+- Tam ekrana girerken ve çıkarken devre her zaman yeni alana sığar: önce yalnızca görünüm
+  "sığdırılmış"ken sığıyordu; kullanıcı şemayı kaydırmış ya da yakınlaştırmışsa yakınlık eski kutudaki
+  gibi kalıyordu (%43, %65).
+- Ölçüler (LED ve ön direnç, açılış): iPhone 13 %65 → %90, iPhone SE %49 → %90, Pixel 5 %65 → %90;
+  yazılar 7,2 / 5,4 px → 9,9 px. Kaydırıp tam ekrana geçince iPhone 13 %65'te kalıyordu → %92. SE'de
+  devre kutudan taşar, kaydırılır.
+- ios-kontrol'de davranışı bilerek değişen iki madde güncellendi: "arıza (telefon)" (açılışta çipte
+  yalnızca "Arıza bulma"; "değerler gizli" Sığdır'dan sonra) ve "arayüz v4 düzeltmeleri"nin gerilim çipi
+  maddesi (beş örnekte Daha fazla → Sığdır'dan sonra ölçer). Okunur yakınlıkta köşeye değmeyen bir yer
+  yoksa (Gerilim bölücü, LED ve ön direnç 390 × 270 px'te) çalışırken gerilim çipi çizimin bir kısmının
+  üstüne binebilir; okunurluk öncelikli, Sığdır köşeyi yine dışarıda bırakır.
 
 ### Lojik entegreler (Dalga 2, 2026-11-05)
 

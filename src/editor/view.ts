@@ -11,6 +11,12 @@ export interface View {
 
 export const MIN_SCALE = 0.25;
 export const MAX_SCALE = 5;
+/**
+ * Telefonda okunur yakınlık: parçaların adları ve değerleri (11 px) ekranda ≈ 10 px. Altında değerler gizlenir;
+ * devre açılınca (örnek, paylaşım, dosya, tam ekrana geçiş) yakınlık bunun altına inmez, sığmayan devre
+ * ortalanır ve kaydırılabilir kalır (yalnızca Sığdır bütün devreyi gösterir).
+ */
+export const PHONE_READABLE_SCALE = 0.9;
 
 export function clampScale(scale: number): number {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
@@ -40,4 +46,15 @@ export function fitView(box: Box, width: number, height: number, padding = 48, m
   const cx = (box.x + box.w / 2) * GRID;
   const cy = (box.y + box.h / 2) * GRID;
   return { scale, x: width / 2 - cx * scale, y: height / 2 - cy * scale };
+}
+
+/**
+ * Okunur sığdırma: `fitted` (sığdırılmış görünüm) okunur yakınlığın altındaysa yakınlık `min` olur, kutunun
+ * ortası (top px'ten aşağısı ayrılmış) alanın ortasına gelir. Izgara birimindeki kutu, ekran pikselinde alan.
+ */
+export function readableFit(fitted: View, box: Box, width: number, height: number, top: number, min: number): View {
+  if (fitted.scale >= min) return fitted;
+  const cx = (box.x + box.w / 2) * GRID;
+  const cy = (box.y + box.h / 2) * GRID;
+  return { scale: min, x: width / 2 - cx * min, y: top + (height - top) / 2 - cy * min };
 }

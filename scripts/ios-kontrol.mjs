@@ -3107,9 +3107,12 @@ try {
     const { page } = await phone();
     const tools = { voltage: true, resistance: true, scope: true, ammeter: true };
     await page.goto('about:blank'); await page.goto(faultUrl({ tools }), { waitUntil: 'networkidle' }); await page.waitForTimeout(800);
+    // Telefon arayüzü taraması (3): devre okunur yakınlıkta (%90, değerler görünür) açılır; Sığdır bütün devreyi gösterir.
+    const openChip = ((await page.locator('p').filter({ hasText: /^Arıza bulma/ }).first().textContent()) ?? '').replace(/\s+/g, ' ');
+    await page.locator('main').getByRole('button', { name: 'Devreyi ekrana sığdır', exact: true }).tap(); await page.waitForTimeout(400);
     const chip = ((await page.locator('p').filter({ hasText: /^Arıza bulma/ }).first().textContent()) ?? '').replace(/\s+/g, ' ');
     const percent = await page.getByText(/^%\d+ · değerler gizli$/).count();
-    check('arıza (telefon): yakınlaştırma yüzdesi kutusu yok; "değerler gizli" Arıza bulma çipinin içinde', percent === 0 && /^Arıza bulma ?· değerler gizli$/.test(chip), `${percent} · ${chip}`);
+    check('arıza (telefon): okunur yakınlıkta açılınca çip yalnızca "Arıza bulma"; Sığdır ile uzaklaşınca yakınlaştırma yüzdesi kutusu yok, "değerler gizli" Arıza bulma çipinin içinde', percent === 0 && /^Arıza bulma$/.test(openChip.trim()) && /^Arıza bulma ?· değerler gizli$/.test(chip), `${percent} · ${openChip} → ${chip}`);
     const pt = await screen(page, 51, -2.3); await page.touchscreen.tap(pt.x, pt.y); await page.waitForTimeout(400);
     const menu = await page.getByRole('menuitem').allTextContents();
     const itemH = (await page.getByRole('menuitem').first().boundingBox())?.height ?? 0;
@@ -3778,6 +3781,9 @@ try {
     const chipRows = [];
     for (const name of ['RC dolma', 'Gerilim bölücü', 'LED ve ön direnç', 'Yarım dalga doğrultmaç', 'Transistör anahtar: LED kollektörde']) {
       if (name !== 'RC dolma') await openExample(page, name);
+      // Telefon arayüzü taraması (3): örnek okunur yakınlıkta (%90) açılır; o yakınlıkta köşeye değmeyen yer yoksa çip
+      // çizimin üstüne binebilir. Sığdır (Daha fazla → Sığdır) köşeyi dışarıda bırakır.
+      await phoneMoreTile(page, 'Sığdır');
       await phoneBar(page).getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(700);
       const chip = page.getByRole('button', { name: 'Gösterim: kablo gerilimi ölçeği' });
       const cb = await chip.boundingBox();
@@ -3797,7 +3803,7 @@ try {
         text: `${name}: çip ${Math.round(cb?.width ?? 0)}×${Math.round(cb?.height ?? 0)}, düğmeyle arası ${Math.round((fb?.x ?? 0) - ((cb?.x ?? 0) + (cb?.width ?? 0)))} px${hits.length ? `, değiyor: ${hits.join(', ')}` : ''}` });
       await phoneBar(page).getByRole('button', { name: 'Durdur', exact: true }).tap(); await page.waitForTimeout(300);
     }
-    check('arayüz v4 düzeltmeleri (telefon 390): gerilim çipi sağ altta, tam ekran düğmesinin solunda, düğmeyle aynı boyda (44 px) tek satır; beş örnekte de Sığdır sonrası çip ve düğme çizime binmiyor',
+    check('arayüz v4 düzeltmeleri (telefon 390): gerilim çipi sağ altta, tam ekran düğmesinin solunda, düğmeyle aynı boyda (44 px) tek satır; beş örnekte de Sığdır (Daha fazla → Sığdır) sonrası çip ve düğme çizime binmiyor',
       chipRows.every((x) => x.ok), chipRows.filter((x) => !x.ok).map((x) => x.text).join(' · ') || chipRows[0].text);
 
     // 2. Daha fazla düğmesinin adı içerikle aynı (Paylaş devre sayfasında; burada yok). 5. Klavye kısayolları telefonda yok.
@@ -5330,6 +5336,54 @@ try {
   // --- Telefon arayüzü taraması (2026-11-09): okunur şema, Analiz, yatay düzen, dar kartlar, tur, kontrast, bildirim ---
   // Telefon arayüzü taramasının (iPhone 13, iPhone SE, Pixel 5, yatay, koyu tema) maddeleri; docs/KARARLAR.md →
   // "Telefon arayüzü taraması".
+  for (const device of [{ w: 390, h: 844, dpr: 3 }, { w: 375, h: 667, dpr: 2 }, { w: 393, h: 851, dpr: 2.75, android: true }]) {
+    // 3. Şema okunur yakınlıkta açılıyor (parça yazıları ≥ ≈ 10 px, değerler görünür); sığmayan devre kaydırılabilir,
+    // Sığdır düğmesi görünür; tam ekrana girerken ve çıkarken (kullanıcı kaydırmış olsa da) yeniden sığıyor.
+    const { w, h } = device;
+    const ctx = await browser.newContext({
+      viewport: { width: w, height: h }, deviceScaleFactor: device.dpr, isMobile: true, hasTouch: true, locale: 'tr-TR',
+      userAgent: device.android ? 'Mozilla/5.0 (Linux; Android 13; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36' : undefined,
+    });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    const cdp = await ctx.newCDPSession(page);
+    const info = () => page.evaluate(() => {
+      const svg = document.querySelector('svg.schematic');
+      const g = svg.querySelector('g[transform]');
+      const scale = Number(g.getAttribute('transform').match(/scale\(([-\d.]+)\)/)[1]);
+      const box = svg.getBoundingClientRect();
+      const c = g.getBoundingClientRect();
+      // Parçaların ad ve değer yazıları (PartView: 11 px).
+      const font = Math.min(...[...svg.querySelectorAll('text')].filter((t) => t.style.fontSize === '11px').map(() => 11 * scale));
+      return { scale, font, values: svg.querySelectorAll('text.tabular').length, inside: c.left >= box.left - 1 && c.top >= box.top - 1 && c.right <= box.right + 1 && c.bottom <= box.bottom + 1, dx: c.left + c.width / 2 - (box.left + box.width / 2) };
+    });
+    const hidden = () => page.getByText(/değerler gizli/).count();
+    const fitButton = page.locator('main').getByRole('button', { name: 'Devreyi ekrana sığdır', exact: true });
+    await openExample(page, 'LED ve ön direnç');
+    const open = await info();
+    const openFit = await fitButton.count();
+    // Kullanıcı şemayı biraz kaydırıyor, sonra tam ekran.
+    const svgBox = await page.locator('svg.schematic').boundingBox();
+    await drag(page, cdp, { x: svgBox.x + svgBox.width * 0.4, y: svgBox.y + svgBox.height * 0.5 }, { x: svgBox.x + svgBox.width * 0.4 + 40, y: svgBox.y + svgBox.height * 0.5 + 20 });
+    const panned = await info();
+    await page.getByRole('button', { name: 'Şemayı tam ekran aç' }).tap(); await page.waitForTimeout(600);
+    const full = await info();
+    await page.getByRole('button', { name: /^Şemayı küçült/ }).tap(); await page.waitForTimeout(600);
+    const back = await info();
+    const refit = (v) => v.scale >= 0.9 - 1e-6 && (v.inside || Math.abs(v.dx) <= 4);
+    check(`telefon arayüzü (3): örnek okunur yakınlıkta açılıyor (≥ %90, parça yazıları ≥ 9,9 px, değerler görünür); tam ekrana girerken ve çıkarken, kaydırılmış olsa da yeniden sığıyor (${w}×${h})`,
+      open.scale >= 0.9 - 1e-6 && open.font >= 9.85 && open.values >= 3 && (await hidden()) === 0 && Math.abs(panned.dx) > 15 && refit(full) && refit(back) && openFit === (open.inside ? 0 : 1),
+      `açılış %${Math.round(open.scale * 100)}, yazı ${open.font.toFixed(1)} px, ${open.values} değer, sığdı ${open.inside}, Sığdır ${openFit} · tam ekran %${Math.round(full.scale * 100)} (orta ${Math.round(full.dx)}) · çıkış %${Math.round(back.scale * 100)} (orta ${Math.round(back.dx)})`);
+    if (!back.inside) {
+      // Sığmayan devrede Sığdır bütün devreyi gösterir (değerler gizli olabilir); düğme kaybolur.
+      await fitButton.tap(); await page.waitForTimeout(300);
+      const all = await info();
+      check(`telefon arayüzü (3): sığmayan devrede Sığdır düğmesi bütün devreyi gösteriyor, sonra gizleniyor (${w}×${h})`,
+        all.inside && all.scale < 0.9 && (await fitButton.count()) === 0 && (await hidden()) === 1, `%${Math.round(all.scale * 100)}`);
+    }
+    await ctx.close();
+  }
   {
     // 4. Analiz açık bırakılınca sonradan açılan paylaşım bağlantısı ve örnek telefonda Analiz kapalı açılıyor.
     const { page } = await phone();

@@ -69,8 +69,8 @@ import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
 import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from './state';
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
-import { circuitShapes, fitAvoiding, phoneCornerRect, type Rect } from './legendFit';
-import { clampScale, fitView, screenToGrid, snap, zoomAt, type View } from './view';
+import { circuitShapes, fitAvoiding, phoneCornerRect, readableAvoiding, type Rect } from './legendFit';
+import { clampScale, fitView, PHONE_READABLE_SCALE, screenToGrid, snap, zoomAt, type View } from './view';
 
 /** Simülasyon sırasında tıklanınca (ya da basılı tutulunca) kullanılan parçalar: imleç el olur. */
 const OPERATED: ReadonlySet<DeviceType> = new Set(['switch', 'spdt', 'pushbutton']);
@@ -534,6 +534,12 @@ export function Canvas({
   // görünümün merkezi korunur (N02 → yeniden sığdırma kuralları).
   const fittedRef = useRef(true);
   const [isFitted, setIsFitted] = useState(true);
+  /**
+   * Son sığdırmanın türü: "readable" telefonda kendiliğinden yapılanlar (açılış, yeni devre, tam ekrana geçiş;
+   * okunur yakınlığın altına inmez), "all" Sığdır (bütün devre). Tuvalin boyu değişince aynı türle yeniden sığar.
+   */
+  const fitMode = useRef<FitMode>('all');
+  const autoFit: FitMode = phone ? 'readable' : 'all';
   const markUnfitted = () => {
     fittedRef.current = false;
     setIsFitted(false);
@@ -545,7 +551,7 @@ export function Canvas({
     if (!viewInitialized.current || previous.width === 0 || size.width === 0) return;
     if (previous.width === size.width && previous.height === size.height) return;
     if (fittedRef.current && docBounds(doc)) {
-      fit();
+      fit(fitMode.current);
       return;
     }
     // Merkez korunur; seçili parça (alt sayfanın arkasında kalmasın diye) görünür alana alınır.
@@ -557,13 +563,14 @@ export function Canvas({
   useEffect(() => {
     if (viewInitialized.current || size.width === 0) return;
     viewInitialized.current = true;
-    if (docBounds(doc)) fit();
+    if (docBounds(doc)) fit(autoFit);
     else setView({ x: size.width / 2, y: size.height / 2, scale: size.width < 640 ? 1.1 : 1.5 });
   }, [size, doc]);
 
-  const fit = () => {
+  const fit = (mode: FitMode = 'all') => {
     fittedRef.current = true;
     setIsFitted(true);
+    fitMode.current = mode;
     const bounds = docBounds(doc);
     if (!bounds) {
       setView((v) => ({ ...v, x: size.width / 2, y: size.height / 2 }));
@@ -581,7 +588,11 @@ export function Canvas({
     const fitted = phone
       ? fitAvoiding(shapes, bounds, Math.max(1, size.width), height, 20, phoneCornerRect(Math.max(1, size.width), height))
       : fitAvoiding(shapes, bounds, Math.max(1, size.width), Math.max(1, size.height), 48, avoidRect);
-    setView({ ...fitted, y: fitted.y + top });
+    const next = { ...fitted, y: fitted.y + top };
+    // Telefonda kendiliğinden sığdırma okunur yakınlığın altına inmez: sığmayan devre ortalanır, kaydırılabilir.
+    const w = Math.max(1, size.width);
+    const h = Math.max(1, size.height);
+    setView(phone && mode === 'readable' ? readableAvoiding(shapes, next, bounds, w, h, top, 20, phoneCornerRect(w, h), PHONE_READABLE_SCALE) : next);
   };
 
   const reveal = (partIds: readonly string[], wireIds: readonly string[]) => {
@@ -611,7 +622,7 @@ export function Canvas({
   };
 
   useEffect(() => {
-    if (fitRequest > 0 && size.width > 0) fit();
+    if (fitRequest > 0 && size.width > 0) fit(autoFit);
     // Yalnızca yeni bir sığdırma isteğinde çalışır.
   }, [fitRequest]);
 
@@ -657,7 +668,7 @@ export function Canvas({
       markUnfitted();
       setView((v) => zoomAt(v, size.width / 2, size.height / 2, 1 / ZOOM_STEP));
     },
-    fit,
+    fit: () => fit('all'),
     reveal,
     addPartAtCenter,
     placeAtClient,
@@ -1716,8 +1727,19 @@ export function Canvas({
               : 'cursor-default';
 
   const selectedCount = selection.parts.length + selection.wires.length;
-  // Telefonda uzaklaşınca (%100'ün altında) değerler ve uç halkaları gizlenir; seçili parçada görünür.
-  const lod = phone !== null && view.scale < 1;
+  // Telefonda uzaklaşınca (okunur yakınlığın, %90'ın altında) değerler ve uç halkaları gizlenir; seçili parçada
+  // görünür.
+  const lod = phone !== null && view.scale < PHONE_READABLE_SCALE - 1e-6;
+  // Devrenin bir kısmı tuvalin dışında (okunur yakınlıkta açılan büyük devre): telefonda Sığdır düğmesi görünür.
+  const bounds = useMemo(() => docBounds(doc), [doc]);
+  const overflowing =
+    phone !== null &&
+    bounds !== null &&
+    size.width > 0 &&
+    (bounds.x * GRID * view.scale + view.x < -2 ||
+      bounds.y * GRID * view.scale + view.y < -2 ||
+      (bounds.x + bounds.w) * GRID * view.scale + view.x > size.width + 2 ||
+      (bounds.y + bounds.h) * GRID * view.scale + view.y > size.height + 2);
   const bagla = phone?.mode === 'bagla';
   const hint: CanvasHint =
     simActive && tool.kind === 'select' && interaction.kind === 'idle'
@@ -2467,10 +2489,10 @@ export function Canvas({
           );
         })}
 
-      {phone && !isFitted && !bagla && !phone.strip && doc.parts.length > 0 && (
+      {phone && (!isFitted || overflowing) && !bagla && !phone.strip && doc.parts.length > 0 && (
         <button
           type="button"
-          onClick={fit}
+          onClick={() => fit('all')}
           aria-label={tr.toolbar.fit}
           title={tr.toolbar.fit}
           className={`absolute right-2.5 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-panel/95 text-ink shadow-sm ${
@@ -2955,6 +2977,9 @@ function RubberBand({ box, scale }: { box: Box; scale: number }) {
 }
 
 /** Belgedeki her şeyi kapsayan kutu (ızgara birimi). */
+/** Sığdırmanın türü (bkz. Canvas → fitMode). */
+type FitMode = 'readable' | 'all';
+
 function docBounds(doc: CircuitDoc): Box | null {
   let box: Box | null = null;
   for (const part of doc.parts) {

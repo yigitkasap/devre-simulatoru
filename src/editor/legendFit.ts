@@ -6,7 +6,7 @@ import type { Box } from '../model/catalog';
 import { partBounds } from '../model/geometry';
 import { GRID, type CircuitDoc } from '../model/types';
 import { METER_DISPLAY, meterDisplayRect } from './PartView';
-import { fitView, type View } from './view';
+import { fitView, readableFit, type View } from './view';
 
 /** Ekran dikdörtgeni (px, tuvalin sol üst köşesine göre). */
 export interface Rect {
@@ -89,4 +89,30 @@ export function phoneCornerRect(width: number, height: number): Rect {
   const { margin, button, gap, chip } = PHONE_CORNER;
   const w = chip + gap + button;
   return { x: width - margin - w, y: height - margin - button, w, h: button };
+}
+
+/**
+ * Telefonda okunur sığdırma (bkz. view.ts → readableFit): sığdırılmış görünüm okunur yakınlığın altındaysa
+ * yakınlık `min` olur ve devre ortalanır. Devre o yakınlıkta alana sığıyor ama ortada sağ alttaki köşeye
+ * (gerilim çipi, tam ekran düğmesi) değiyorsa yukarı, sola ya da sol üste yaslanır (değmeyen ilk konum).
+ */
+export function readableAvoiding(
+  shapes: CircuitShapes,
+  fitted: View,
+  box: Box,
+  width: number,
+  height: number,
+  top: number,
+  padding: number,
+  corner: Rect | null,
+  min: number,
+): View {
+  const base = readableFit(fitted, box, width, height, top, min);
+  if (base === fitted || !corner || !circuitHits(shapes, base, corner)) return base;
+  const g = GRID * min;
+  const fits = box.w * g <= width - 2 * padding && box.h * g <= height - top - 2 * padding;
+  if (!fits) return base;
+  const up = { ...base, y: top + padding - box.y * g };
+  const left = { ...base, x: padding - box.x * g };
+  return [up, left, { ...up, x: left.x }].find((v) => !circuitHits(shapes, v, corner)) ?? base;
 }

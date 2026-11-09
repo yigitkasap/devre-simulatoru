@@ -2370,7 +2370,15 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             <main className={`relative shrink-0 bg-paper ${big ? 'min-h-0 flex-1' : 'border-b border-line'}`} style={big ? undefined : { height: mainHeight }}>
               {canvas}
               {!wiring && (
-                <SchematicButtons full={schematicFull} onFull={() => setSchematicFull((f) => !f)} />
+                <SchematicButtons
+                  full={schematicFull}
+                  onFull={() => {
+                    // Tam ekrana girerken ve çıkarken devre yeni alana (okunur yakınlıkta) yeniden sığar; kullanıcı
+                    // şemayı kaydırmış ya da yakınlaştırmış olsa da.
+                    setSchematicFull((f) => !f);
+                    setFitRequest((n) => n + 1);
+                  }}
+                />
               )}
             </main>
           )}
