@@ -2503,11 +2503,16 @@ iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon
   bırakıldıysa sonradan açılan devre (örnek, aynı sekmede açılan paylaşım bağlantısı, dosya, yeni devre)
   onun arkasında kalıyordu; `loadDoc` telefonda Analiz'i kapatır. Masaüstünde Analiz şemanın yanında bir
   çekmece olduğu için açık kalır.
-
-- **Turun 4. adımı boş devrede (madde 7):** İncele adımı devrede parça yokken "Devrede henüz parça yok.
-  Önce … bir parça ekle; sonra parçaya dokun" der (`tr.tour.inspectEmpty`) ve vurgu çerçevesi İncele'nin
-  hedefi (defter) yerine Parça ekle'yi gösterir. Adımlar "İleri" ile atlanabildiği için boş devrede 4.
-  adıma gelinebiliyor.
+- Gece kararı: **turun 4. adımı boş devrede (madde 7).** İncele adımı devrede parça yokken "Devrede
+  henüz parça yok. Önce … bir parça ekle; sonra parçaya dokun" der (`tr.tour.inspectEmpty`) ve vurgu
+  çerçevesi İncele'nin hedefi (defter) yerine Parça ekle'yi gösterir (yapılacak iş orada). Adımlar
+  "İleri" ile atlanabildiği için boş devrede 4. adıma gelinebiliyor.
+- Gece kararı: **koyu temada mavi dolgu (madde 7).** Hoş geldin penceresindeki "Örnekle başla" simge
+  kutusu (beyaz simge, `bg-accent`) koyu temada 4,37:1'di. Koyu `--color-accent` #2a74ec → #2670e6
+  (beyazla 4,62:1). Belirteç koyu temada yalnızca dolgu, kenarlık ve halka olarak kullanılıyor (mavi
+  yazı `accent-ink`); koyu panelde kenarlık ve halka 3,7:1 (≥ 3:1). Açık temaya dokunulmadı (#1f6feb,
+  beyazla 4,78:1). Yalnızca simgenin rengini değiştirmek yerine belirteç koyulaştırıldı: aynı beyaz-mavi
+  çift turun İleri düğmesinde ve 30'dan fazla yerde daha var.
 
 ### Lojik entegreler (Dalga 2, 2026-11-05)
 

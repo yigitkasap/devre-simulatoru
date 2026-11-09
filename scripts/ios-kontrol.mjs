@@ -5383,6 +5383,25 @@ try {
       `${empty.text.replace(/^.*?İncele/, '').slice(0, 60)} · çerçeve Parça'da ${empty.onAdd} · ${withPart.text.replace(/^.*?İncele/, '').slice(0, 30)}`);
     await ctx.close();
   }
+  {
+    // 7. Koyu temada hoş geldin penceresi: bütün yazılar ve beyaz simgeli mavi kutu (Örnekle başla) en az 4,5:1.
+    const ctx = await browser.newContext({ welcome: true, viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR', colorScheme: 'dark' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' }); await page.waitForTimeout(500);
+    const welcome = page.getByRole('dialog', { name: /hoş geldin/ });
+    const rows = [];
+    for (const item of await welcome.locator('h2, span, b, button').all()) {
+      const kind = await item.evaluate((el) => ([...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) ? 'yazı' : el.querySelector(':scope > svg') && getComputedStyle(el).backgroundColor !== 'rgba(0, 0, 0, 0)' ? 'simge' : null));
+      if (!kind) continue;
+      rows.push({ name: ((await item.textContent()) ?? '').trim().slice(0, 24) || kind, c: await contrastOf(page, item) });
+    }
+    rows.sort((a, b) => a.c - b.c);
+    check('telefon arayüzü (7, kontrast): koyu temada hoş geldin penceresinde bütün yazılar ve Örnekle başla’nın beyaz simgeli mavi kutusu en az 4,5:1 (koyu accent)',
+      (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark' && rows.length >= 10 && rows[0].c >= 4.5,
+      `${rows.length} öğe · en düşük ${rows.slice(0, 2).map((r) => `${r.name} ${r.c.toFixed(2)}`).join(', ')}`);
+    await ctx.close();
+  }
 
   // --- Kablo yolu (masaüstü): sıfırdan kurulan devrelerde beklenmeyen bağlantı yok -----------------------
   // Kullanıcı testinde L biçimli yolun köşesi başka bir kablonun köşesine ya da bir uca düşmüş, kablo başka
