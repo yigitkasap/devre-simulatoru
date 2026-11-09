@@ -2887,3 +2887,16 @@ ios-kontrol "Föy metinleri").
   ≈ 30 s'de gelir); 10 nA'in altında hareketsiz. Eğri 1 µA'de süreklidir. 3B'deki noktalar aynı eğrinin onda biri.
 - Gece kararı: "neredeyse dursun" için 1 µA'de 1 piksel/s seçildi (16 piksellik aralığı 16 s'de geçer); 1 mA'deki
   hız korunduğu için µA–mA arası biraz yavaşladı (10 µA: 30 → 25, 100 µA: 52 → 50 piksel/s).
+
+**5. Beklenmeyen bağlantı bildiriminin Geri al'ı** (`src/editor/Simulator.tsx` → `warnUnexpectedLink`,
+`unexpectedWatch`; `Toast.tsx`; ios-kontrol "Beklenmeyen bağlantı bildirimi").
+
+- Bildirimdeki Geri al genel geri almaydı: bildirim açıkken (5 s) başka bir değişiklik yapılırsa Geri al kablo yerine
+  o değişikliği geri alıyordu. Artık bildirim, kablodan sonraki ilk değişiklikte (belge kablonun eklendiği hâlden
+  ayrılınca: değer, taşıma, silme, Ctrl+Z…) kapanır ve kablonun yanıp sönmesi durur; Geri al yalnızca belge hâlâ
+  kablonun eklendiği hâldeyken çalışır, yani yalnızca o kabloyu kaldırır.
+- Gece kararı: "Geri al yalnızca o kabloyu kaldırsın ya da başka değişiklikte bildirim kapansın" seçeneklerinden
+  ikincisi (ve onunla birlikte birincisi) uygulandı; kabloyu kimliğiyle silmek, kablo eklenirken bölünen öbür
+  kabloları (T bağlantısı) geri getirmezdi. Öbür Geri al'lı bildirimler (silme, örnek / dosya açma) değişmedi
+  (istek dışı); onlar da aynı biçimde genel geri almadır.
+- `useToast`'un göster işlevi bildirimin kimliğini döndürür; kapat işlevi kimlik verilirse yalnızca o bildirimi kapatır.

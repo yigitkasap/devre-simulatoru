@@ -1342,15 +1342,42 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     window.clearTimeout(flashTimer.current);
     setFlash({ parts: new Set(link.parts), wires: new Set([link.wireId]), severity: 'warning', pins: link.pins });
     flashTimer.current = window.setTimeout(() => setFlash(null), 5000);
-    showToast(tr.canvas.unexpectedLink(link.names), 'error', {
+    const watch = { toast: 0, before: doc, after: null as CircuitDoc | null };
+    watch.toast = showToast(tr.canvas.unexpectedLink(link.names), 'error', {
       label: tr.toast.undo,
       run: () => {
         window.clearTimeout(flashTimer.current);
         setFlash(null);
-        dispatch({ type: 'undo' });
+        unexpectedWatch.current = null;
+        // Yalnızca o kablo: belge kablo eklendikten beri değişmediyse son adım (kablonun eklenmesi) geri alınır.
+        if (watch.after !== null && docRef.current === watch.after) dispatch({ type: 'undo' });
       },
     });
+    unexpectedWatch.current = watch;
   };
+  /**
+   * Beklenmeyen bağlantı bildirimi açıkken başka bir değişiklik yapılırsa bildirim kapanır: Geri al o anki son
+   * değişikliği (kabloyu değil) geri alırdı. `before` kablodan önceki belge, `after` kablonun eklendiği belge.
+   */
+  const unexpectedWatch = useRef<{ toast: number; before: CircuitDoc; after: CircuitDoc | null } | null>(null);
+  useEffect(() => {
+    const watch = unexpectedWatch.current;
+    if (!watch) return;
+    if (watch.after === null && state.past[state.past.length - 1] === watch.before && doc !== watch.before) {
+      watch.after = doc;
+      return;
+    }
+    if (doc === watch.after) return;
+    unexpectedWatch.current = null;
+    hideToast(watch.toast);
+    window.clearTimeout(flashTimer.current);
+    setFlash(null);
+  }, [doc, state.past, hideToast]);
+  // Bildirim kendiliğinden kapandıysa (ya da yerine başka bildirim geldiyse) izleme biter.
+  useEffect(() => {
+    const watch = unexpectedWatch.current;
+    if (watch && toast?.id !== watch.toast) unexpectedWatch.current = null;
+  }, [toast]);
 
   // --- Telefon ve tablet -----------------------------------------------------------------------
   // Tuvalin kipi: Bağla (kablo bağlarken), Ölç (çalışıyor ya da duraklatılmış; yapı kilitli) ya da Kur.

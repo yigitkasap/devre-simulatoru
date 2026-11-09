@@ -5830,6 +5830,68 @@ try {
     await ctx.close();
   }
 
+  // --- Beklenmeyen bağlantı bildirimi: Geri al yalnızca o kabloyu kaldırır; başka değişiklikte bildirim kapanır ----------
+  {
+    // R1'in 2. ucunun üstünden geçen (ona bağlı olmayan) kablo: R2'nin 2. ucundan yukarı (Kablo yolu 3. bölümüyle aynı).
+    const seed = { version: 1, parts: [
+      { id: 'p1', type: 'resistor', label: 'R1', x: 0, y: 0, rotation: 0, props: { resistance: 1000 } },
+      { id: 'p2', type: 'resistor', label: 'R2', x: 0, y: 12, rotation: 0, props: { resistance: 1000 } },
+      { id: 'p3', type: 'resistor', label: 'R3', x: 16, y: 0, rotation: 0, props: { resistance: 1000 } },
+    ], wires: [{ id: 'w1', points: [[4, 12], [4, -6]] }] };
+    const open = async () => {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+      await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(seed));
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await page.goto(URL0, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(400);
+      return { ctx, page };
+    };
+    const saved = async (page) => { await page.waitForTimeout(500); return page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre'))); };
+    const at = (page, gx, gy) => page.evaluate(([x, y]) => {
+      const svg = document.querySelector('svg.schematic'); const g = svg.querySelector('g[transform]');
+      const m = g.getAttribute('transform').match(/translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)/); const r = svg.getBoundingClientRect();
+      return { x: r.left + Number(m[1]) + x * 10 * Number(m[3]), y: r.top + Number(m[2]) + y * 10 * Number(m[3]) };
+    }, [gx, gy]);
+    /** R3'ün 1. ucundan (12, 0) R1'in 2. ucuna (4, 0) fareyle kablo; bildirim. */
+    const drawWire = async (page) => {
+      const a = await at(page, 12, 0); const b = await at(page, 4, 0);
+      await page.mouse.move(a.x, a.y); await page.mouse.down();
+      await page.mouse.move(b.x, b.y, { steps: 12 }); await page.mouse.up(); await page.waitForTimeout(300);
+      return page.getByRole('alert').filter({ hasText: 'bıraktığın' });
+    };
+    // 1. Bildirim açıkken başka bir değişiklik (R2'nin değeri): bildirim kapanır, kablo yerinde kalır.
+    {
+      const { ctx, page } = await open();
+      const alert = await drawWire(page);
+      const shown = await alert.count();
+      { const r2 = await at(page, 0, 12); await page.mouse.click(r2.x, r2.y); await page.waitForTimeout(250); }
+      const field = page.getByLabel('Direnç', { exact: true });
+      await field.fill('2,2k'); await field.press('Enter'); await page.waitForTimeout(400);
+      const after = await page.getByRole('alert').filter({ hasText: 'bıraktığın' }).count();
+      const d = await saved(page);
+      check('beklenmeyen bağlantı: bildirim açıkken başka bir değişiklik yapılınca (R2 = 2,2 kΩ) bildirim kapanıyor; kablo ve değişiklik yerinde (Geri al yanlış adımı geri alamaz)',
+        shown === 1 && after === 0 && d.wires.length === 2 && d.parts.find((p) => p.label === 'R2').props.resistance === 2200,
+        `bildirim ${shown} → ${after} · ${d.wires.length} kablo · R2 ${d.parts.find((p) => p.label === 'R2').props.resistance}`);
+      await ctx.close();
+    }
+    // 2. Bildirimdeki Geri al yalnızca kabloyu kaldırır (önceki değişiklik yerinde kalır).
+    {
+      const { ctx, page } = await open();
+      { const r2 = await at(page, 0, 12); await page.mouse.click(r2.x, r2.y); await page.waitForTimeout(250); }
+      const field = page.getByLabel('Direnç', { exact: true });
+      await field.fill('4,7k'); await field.press('Enter'); await page.waitForTimeout(300);
+      await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+      const alert = await drawWire(page);
+      await alert.getByRole('button', { name: 'Geri al' }).click().catch(() => {});
+      const d = await saved(page);
+      check('beklenmeyen bağlantı: bildirimdeki Geri al yalnızca o kabloyu kaldırıyor (önceki değişiklik R2 = 4,7 kΩ yerinde)',
+        d.wires.length === 1 && d.parts.find((p) => p.label === 'R2').props.resistance === 4700 && (await page.getByRole('alert').filter({ hasText: 'bıraktığın' }).count()) === 0,
+        `${d.wires.length} kablo · R2 ${d.parts.find((p) => p.label === 'R2').props.resistance}`);
+      await ctx.close();
+    }
+  }
+
   // --- Telefon hızı: 4 kat yavaş işlemcide (iPhone 13 öykünmesi) bütün örnekler çalışırken ---------------
   // Kare hızı en az 30/s, 100 ms'yi aşan görev yok (çözücünün süre sınırı kesin; çizim uzun sürünce hesap
   // süresi kısalır). Simülasyon gerçek zamana yetişemeyince "yetişemiyor" simgesi üst çubukta, açıklaması
