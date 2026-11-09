@@ -2900,3 +2900,18 @@ ios-kontrol "Föy metinleri").
   kabloları (T bağlantısı) geri getirmezdi. Öbür Geri al'lı bildirimler (silme, örnek / dosya açma) değişmedi
   (istek dışı); onlar da aynı biçimde genel geri almadır.
 - `useToast`'un göster işlevi bildirimin kimliğini döndürür; kapat işlevi kimlik verilirse yalnızca o bildirimi kapatır.
+
+**6. Ctrl+O, 4 kat yavaşta ara sıra dosya seçici yok** (ios-kontrol "Arayüz v4", kısayollar maddesi).
+
+- Ölçüm (yerel önizleme, IOS_CPU = 4, maddenin önceki adımları aynen; sayfaya baştan eklenen dinleyicilerle):
+  uygulamanın Ctrl+O işleyicisi her koşuda tuştan 1–2 ms sonra `input.click()`'i çağırdı, o anda kullanıcı etkinliği
+  vardı (`navigator.userActivation.isActive`), açık pencere yoktu ve odak tuvaldeydi. Koşuların 2 / 5'inde
+  Playwright'ın `filechooser` olayı 60 s beklense de hiç gelmedi; gelen koşularda 17–24 ms'de geldi. Yani sorun
+  sabit 4 s bekleme değil (olay ya hemen geliyor ya hiç gelmiyor) ve uygulama değil: Playwright dosya seçiciyi
+  yakalamayı (CDP `Page.setInterceptFileChooserDialog`) `waitForEvent` çağrılınca açıyor; tuş aynı anda
+  gönderildiği için yavaş işlemcide tuş bazen yakalama açılmadan işleniyor, seçici yakalanmadan (başsız tarayıcıda
+  hemen kapanarak) açılıyordu. Doğrulama: yakalama tuştan önce açılıp bir gidiş-dönüş beklenince (`page.on(
+  'filechooser')` + `page.evaluate`) 6 / 6 koşuda olay 12–15 ms'de geldi.
+- Düzeltme betikte: yakalama baştan açılır, bir gidiş-dönüş beklenir; bekleme süresi de (kullanıcının istediği gibi)
+  IOS_CPU ile ölçeklenir (4000 × IOS_CPU ms). Uygulamada değişiklik yok. Düzeltilmiş madde 4 kat yavaşta 6 / 6
+  koşuda geçti (seçici 10–16 ms'de), normal hızda 2 / 2 (6–7 ms).

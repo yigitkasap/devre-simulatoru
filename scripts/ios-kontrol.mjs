@@ -3651,7 +3651,14 @@ try {
 
     // 5. Kısayollar: Ctrl+O dosya seçici, Ctrl+S indirme (devre-YYYY-AA-GG.json), F1 yardım (Fare ve dokunma), F11 tam ekran.
     await page.locator('#tuval').focus();
-    const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 4000 }).catch(() => null), page.keyboard.press('Control+o')]);
+    // Dosya seçicinin yakalanması (Playwright → CDP Page.setInterceptFileChooserDialog) tuşa basmadan önce açık
+    // olmalı: waitForEvent ile tuş aynı anda gönderilince 4 kat yavaş işlemcide tuş bazen önce işleniyordu. Uygulama
+    // input.click()'i 1–2 ms içinde kullanıcı etkinliğiyle çağırıyor ama seçici yakalanmıyor, olay 60 s'de de
+    // gelmiyordu (ölçüm: docs/KARARLAR.md, "Teşhis ve metinler", 6. madde). Yakalama baştan açılır, bir gidiş-dönüş
+    // beklenir; bekleme süresi de IOS_CPU ile ölçeklenir.
+    page.on('filechooser', () => {});
+    await page.evaluate(() => 0);
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser', { timeout: 4000 * CPU_RATE }).catch(() => null), page.keyboard.press('Control+o')]);
     const [download] = await Promise.all([page.waitForEvent('download', { timeout: 4000 }).catch(() => null), page.keyboard.press('Control+s')]);
     const saved = download ? JSON.parse(readFileSync(await download.path(), 'utf8')) : null;
     await page.keyboard.press('F1'); await page.waitForTimeout(200);
