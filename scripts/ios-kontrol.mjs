@@ -5771,6 +5771,35 @@ try {
     await ctx.close();
   }
 
+  // --- Ölçü aletinin çözünürlüğü: hesabın kalıntıları (pA, pV) ekranda 0 ---------------------------------------------
+  {
+    // Ampermetrenin − ucu boşta (akım yalnızca kalıntı); voltmetre akım geçmeyen R1'in uçlarında.
+    const seed = { version: 1, parts: [
+      { id: 'p1', type: 'battery', label: 'B1', x: 0, y: 0, rotation: 90, props: { voltage: 9, internalResistance: 0 } },
+      { id: 'p2', type: 'ammeter', label: 'A1', x: 8, y: -8, rotation: 0, props: {} },
+      { id: 'p3', type: 'resistor', label: 'R1', x: 16, y: 0, rotation: 90, props: { resistance: 1000 } },
+      { id: 'p4', type: 'voltmeter', label: 'V1', x: 24, y: 0, rotation: 90, props: {} },
+    ], wires: [
+      { id: 'w1', points: [[0, -4], [0, -8], [4, -8]] },
+      { id: 'w2', points: [[16, 4], [16, 8], [0, 8], [0, 4]] },
+      { id: 'w3', points: [[16, -4], [24, -4]] },
+      { id: 'w4', points: [[24, 4], [24, 8], [16, 8]] },
+    ] };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { try { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } } catch {} }, JSON.stringify(seed));
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await page.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click();
+    await waitSimTime(page, 1); await page.waitForTimeout(500);
+    const cards = await page.evaluate(() => Object.fromEntries(['p2', 'p4'].map((id) => [id, document.querySelector(`[data-card="${id}"]`)?.textContent?.replace(/^.*(Ampermetre|Voltmetre)/, '').trim() ?? null])));
+    const gauges = await page.locator('svg.schematic text[fill="#a6f4bd"]').allTextContents();
+    check('ölçü aleti: boşta uçlu ampermetre ve akım geçmeyen dirençteki voltmetre 0 gösteriyor (pA, pV kalıntısı yok)',
+      /(^|\D)0,000 A$/.test(cards.p2 ?? '') && /(^|\D)0,000 V$/.test(cards.p4 ?? '') && !/[pf][AV]/.test(`${cards.p2}${cards.p4}`) && gauges.length === 2 && gauges.every((g) => /^0,000 [AV]$/.test(g)),
+      `kart A1 ${cards.p2} · V1 ${cards.p4} · ekran ${gauges.join(' | ')}`);
+    await ctx.close();
+  }
+
   // --- Telefon hızı: 4 kat yavaş işlemcide (iPhone 13 öykünmesi) bütün örnekler çalışırken ---------------
   // Kare hızı en az 30/s, 100 ms'yi aşan görev yok (çözücünün süre sınırı kesin; çizim uzun sürünce hesap
   // süresi kısalır). Simülasyon gerçek zamana yetişemeyince "yetişemiyor" simgesi üst çubukta, açıklaması

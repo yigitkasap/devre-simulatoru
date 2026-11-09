@@ -2863,3 +2863,16 @@ ios-kontrol "Föy metinleri").
   kural (veri sayfasında dayanağı yok) gerekir. Gece kararı: kart üzerindeki LED balonu yanma nedenini ayırmıyor
   ("Üzerinden ≈ … geçti; en fazla 30 mA’e dayanır."); ayrıntı hata kartında. 7 segment göstergenin segmentleri ve
   optokuplörün LED'i değişmedi (istek dışı): segment 30 mA'de hemen yanar.
+
+**4b. Ölçü aletinde hesabın kalıntıları 0** (`src/editor/readouts.ts` → `METER_RESOLUTION`, `meterRound`;
+`tests/readouts.test.ts`, ios-kontrol "Ölçü aletinin çözünürlüğü").
+
+- Ampermetre boşta uçla ya da akım geçmeyen dalda "0,003 pA", voltmetre "pV" gösteriyordu: gmin ve yuvarlamanın
+  kalıntısı (eski eşik 10⁻¹⁵). Ölçü aletinin ekranı otomatik ölçekli, 4 anlamlı basamak ve en ince aralığı µV / µA
+  ("Ölçü aleti ekranı"); bu aralıkta son basamak 0,001 µ = 1 nV / 1 nA. Gece kararı: çözünürlük 1 nV / 1 nA; altı
+  "0,000 V" / "0,000 A". Kapsam: ölçü aletinin ekranı (şema göstergesi, defter kartı, 3B etiketi ve ekranı aynı
+  okumayı kullanır), kartındaki "Anlık", "Devreden çektiği akım" / "Gerilim düşümü" satırları ve iç direnç notu.
+  1 nA ve üstü eskisi gibi ("450,0 nA").
+- Gece kararı: öbür parçaların kartlarındaki canlı ölçümler (direncin akımı vb.) değişmedi: JFET'in kapı akımı
+  (≈ 11 pA, föyün 3. adımının cevabında) gerçek bir değerdir ve kartta görünmeye devam eder; yalnızca ölçü aletinin
+  ekranı gerçek bir aletin çözünürlüğüyle sınırlı.

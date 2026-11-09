@@ -73,6 +73,21 @@ const ohm = (x: number) => formatSI(x, 'Ω');
 const ohmValue = (x: number) => formatSI(x, 'Ω', { trim: true, digits: 4 });
 
 /**
+ * Ölçü aletinin çözünürlüğü: ekran otomatik ölçekli, 4 anlamlı basamak, en ince aralığı µV / µA ("1,000 µA";
+ * docs/KARARLAR.md, "Ölçü aleti ekranı"): son basamak 1 nV / 1 nA. Bunun altındaki değerler hesabın
+ * kalıntısıdır (gmin, yuvarlama; ör. "0,003 pA", pV): ekran 0 gösterir.
+ */
+export const METER_RESOLUTION = 1e-9;
+
+/** Ölçü aletinin göstereceği değer: çözünürlüğün altı 0. */
+export function meterRound(value: number): number {
+  return Math.abs(value) < METER_RESOLUTION ? 0 : value;
+}
+
+/** Ölçü aletinin ekranı ve satırları: 4 anlamlı basamak, çözünürlüğün altı 0. */
+const meterFormat = (value: number, unit: 'V' | 'A') => formatSI(meterRound(value), unit, { digits: 4 });
+
+/**
  * Pasif bileşenlerde akım ve gerilim büyüklük olarak gösterilir (yönü akım noktaları gösterir);
  * kaynakta ve ölçü aletlerinde işaret anlamlı olduğu için korunur.
  */
@@ -632,15 +647,15 @@ export function partReadout(part: Part, m: Measurement, status: DeviceStatus = {
       // Gösterge anlık değerden ayrıysa (AC kaynaklı devre ya da AC kipi) ikisi de gösterilir.
       const averaged = ac || Math.abs(value - instantaneous) > 1e-12 + 1e-9 * Math.abs(instantaneous);
       const rows: ReadoutRow[] = [{ label: t.reading, value: meterText(part, m, status) ?? '' }];
-      if (averaged) rows.push({ label: t.instant, value: formatSI(instantaneous, voltmeter ? 'V' : 'A', { digits: 4 }) });
-      rows.push(voltmeter ? { label: t.drawnCurrent, value: a(I) } : { label: t.voltageDrop, value: v(V) });
+      if (averaged) rows.push({ label: t.instant, value: meterFormat(instantaneous, voltmeter ? 'V' : 'A') });
+      rows.push(voltmeter ? { label: t.drawnCurrent, value: meterFormat(I, 'A') } : { label: t.voltageDrop, value: meterFormat(V, 'V') });
       const base = voltmeter
         ? ideal
           ? t.idealVoltmeter
-          : t.realVoltmeter(ohmValue(R), a(I))
+          : t.realVoltmeter(ohmValue(R), meterFormat(I, 'A'))
         : ideal
           ? t.idealAmmeter
-          : t.realAmmeter(ohmValue(R), v(V));
+          : t.realAmmeter(ohmValue(R), meterFormat(V, 'V'));
       return { title, rows, note: averaged ? `${ac ? t.acMode : t.dcMode} ${base}` : base };
     }
   }
@@ -655,6 +670,6 @@ export function meterText(part: Part, m: Measurement, status: DeviceStatus = {})
   if (role !== 'voltmeter' && role !== 'ammeter') return null;
   const voltmeter = role === 'voltmeter';
   const { ac, value } = meterValue(part.props, voltmeter ? m.voltage : m.current, status);
-  const text = formatSI(value, voltmeter ? 'V' : 'A', { digits: 4 });
+  const text = meterFormat(value, voltmeter ? 'V' : 'A');
   return ac ? `${text}~` : text;
 }
