@@ -40,7 +40,10 @@ const doc_part = (doc: CircuitDoc, id: string): Part | undefined => doc.parts.fi
  * (16 + 40) ve üstündeki takma / Denetle çipi (alttan 72 px'te, 44 px).
  */
 const TOP_INSETS = { top: 56, right: 16, bottom: 120, left: 16 } as const;
-/** Telefonda (T5): tahta, üst çubuk ile küçük alt sayfa arasına yüksekliğiyle sığar; yatay kaydırılır. */
+/**
+ * Telefonda (T5): tahta üst çubuk ile alttaki sayfa arasına sığar; 2026-11-10'dan beri tamamı (genişliği de), sayfanın
+ * o anki yüksekliğine göre (sayfa büyüyünce ya da küçülünce yeniden sığar).
+ */
 const PHONE_INSETS = { top: 60, right: 8, bottom: 214, left: 8, boardOnly: true } as const;
 
 /** Tahtaya takılan parçalar (masadakiler ve toprak sembolü hariç), planın sırasıyla (soldan sağa). */
@@ -105,6 +108,8 @@ export interface BoardStageProps {
   readonly onRedo: () => void;
   /** Telefon (T5): sıkışık üst çubuk, tahta yüksekliğine sığar; araçlar ve sonuç alttaki sayfada. */
   readonly phone?: boolean;
+  /** Telefon: alttaki sayfanın yüksekliği (px; tahta onun üstüne sığar). */
+  readonly sheetHeight?: number;
   /** Tahtanın komutları (telefonda alttaki sayfa da kullanır: Kablo, delik adı yaz). */
   readonly commands?: RefObject<BoardCommands | null>;
   /** Görevde hazır gelenler (kilitli). */
@@ -283,7 +288,7 @@ export function BoardStage(props: BoardStageProps) {
         callbacks={{ ...bench.callbacks, onView }}
         plan={plan}
         inBoard
-        top={top ? (phone ? PHONE_INSETS : TOP_INSETS) : null}
+        top={top ? (phone ? { ...PHONE_INSETS, bottom: Math.max(PHONE_INSETS.bottom, Math.round((props.sheetHeight ?? 0) + 8)) } : TOP_INSETS) : null}
         onScene={setScene}
         overlayExtra={
           <>

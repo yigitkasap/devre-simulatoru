@@ -1885,6 +1885,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           buildKey={boardKey}
           onMarks={boardMarks}
           phone={phone}
+          sheetHeight={sheetHeight}
           locks={boardLocks}
           commands={boardCommands}
           onUndo={() => {

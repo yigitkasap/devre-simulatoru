@@ -2041,6 +2041,12 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
 - **3B tam ekran düğmesinin adı**: 3B görünümde telefonun tam ekran düğmesi "3B’yi tam ekran aç" / "3B’yi küçült"
   (erişilebilir ad ve ipucu); şemada eskisi gibi "Şemayı tam ekran aç" / "Şemayı küçült". ios-kontrol'ün 3B tam ekran
   ve 3B (telefon) maddeleri yeni adla.
+- **Tahtada kur, telefonda tahtanın tamamı**: tepeden görünümde tahta eskiden (T5) yalnızca yüksekliğine sığıyor, yatay
+  kayıyordu (delik aralığı ≥ 22 px). Artık tamamı (genişliği de) üst çubuk ile alttaki sayfanın arasına sığar, ortalı;
+  sayfa büyüyüp küçülünce yeniden sığar (`BoardMode` sayfanın yüksekliğini kenar boşluğuna katar, `BenchScene.setTop`
+  kenarlar değişince yeniden sığdırır). **Gece kararı:** delikler küçüldü (iPhone 13'te yarım sayfada ≈ 9–11 px
+  aralık); takarken büyüteç zaten gösteriyor (T5'in öbür maddeleri geçiyor). ios-kontrol "Tahtada kur (telefon): …
+  tahta yüksekliğine sığıyor (≥ 22 px, yatay kayar)" maddesi buna göre değişti.
 
 ### Performans ve hata taraması (2026-10-27)
 

@@ -942,7 +942,10 @@ export class BenchScene {
 
   /** Tepeden görünüm açık/kapalı. Açılınca tahtaya ve masadaki parçalara sığdırılır. */
   setTop(on: boolean, insets?: TopInsets): void {
+    const changed = insets !== undefined && JSON.stringify(insets) !== JSON.stringify(this.topInsets);
     if (insets) this.topInsets = insets;
+    // Açıkken kenarlar değişti (telefonda alttaki sayfa büyüdü ya da küçüldü): tahtanın tamamı yeniden sığar.
+    if (on && this.topView && changed && this.topInsets.boardOnly) this.fitTop();
     if (on === (this.topView !== null)) return;
     this.topView = on ? { cx: 0, cz: 0, scale: 10 } : null;
     // Ön soketli cihazların uçları görünüme göre yer değiştirir: kablolar yeniden kurulur.
@@ -976,10 +979,10 @@ export class BenchScene {
       const half = boardWidth(plan.cols) / 2;
       const z0 = -BB.depth / 2;
       const z1 = boardZ(plan.boards - 1) + BB.depth / 2;
-      const scale = Math.min(60, h / ((z1 - z0) * 1.02));
-      const viewW = canvas.clientWidth / scale;
+      // Tahtanın tamamı sığar (genişliği de; telefon 2026-11-10), kenar boşlukları arasında ortalı.
+      const scale = Math.min(60, h / ((z1 - z0) * 1.02), w / (2 * half * 1.02));
       const viewH = canvas.clientHeight / scale;
-      this.topView = { scale, cx: -half - left / scale + viewW / 2 - 0.4, cz: z0 - top / scale + viewH / 2 - ((h / scale - (z1 - z0)) / 2) };
+      this.topView = { scale, cx: (right - left) / 2 / scale, cz: z0 - top / scale + viewH / 2 - ((h / scale - (z1 - z0)) / 2) };
       this.applyTop();
       return;
     }

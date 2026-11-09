@@ -4668,9 +4668,12 @@ try {
       return { x: rect.left + (col - 15.5) * t.scale + t.ox, y: rect.top + (row < 5 ? -5.5 + row : 1.5 + (row - 5)) * t.scale + t.oy };
     }, name);
     const pitch = await page.evaluate(() => window.__tezgah.topTransform().scale);
-    check('Tahtada kur (telefon): 3B’den açılıyor; tahta yüksekliğine sığıyor (delik aralığı ≥ 22 px, tahta yatay kayar); parça kutusu alttaki sayfada (0 / 4 takılı, Tak düğmeleri, 4 kablo çipi)',
-      sheetText.includes('Parça kutusu') && sheetText.includes('0 / 4 takılı') && (await sheet.getByRole('button', { name: /: tahtaya tak$/ }).count()) === 4 && (await sheet.getByRole('button', { name: /kablosunu tak$/ }).count()) === 4 && pitch >= 22,
-      `aralık ${pitch.toFixed(1)} px`);
+    // 2026-11-10 (telefon-3b, 7c): tahtanın tamamı telefona sığar (önce yüksekliğine sığıp yatay kayıyordu, delik
+    // aralığı ≥ 22 px); delikler küçüldü, takarken büyüteç gösterir.
+    const wholeX = await page.evaluate(() => { const t = window.__tezgah.topTransform(); const r = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect(); return [r.left + t.ox - 16.5 * t.scale, r.left + t.ox + 16.5 * t.scale, innerWidth]; });
+    check('Tahtada kur (telefon): 3B’den açılıyor; tahtanın tamamı ekranda (genişliği de; delik aralığı ≥ 8 px); parça kutusu alttaki sayfada (0 / 4 takılı, Tak düğmeleri, 4 kablo çipi)',
+      sheetText.includes('Parça kutusu') && sheetText.includes('0 / 4 takılı') && (await sheet.getByRole('button', { name: /: tahtaya tak$/ }).count()) === 4 && (await sheet.getByRole('button', { name: /kablosunu tak$/ }).count()) === 4 && pitch >= 8 && wholeX[0] >= -1 && wholeX[1] <= wholeX[2] + 1,
+      `aralık ${pitch.toFixed(1)} px · tahta x ${Math.round(wholeX[0])}–${Math.round(wholeX[1])} / ${wholeX[2]}`);
     // Oynat tahtanın üstünde yüzmüyor: alttaki sayfanın içinde; takarken hiç yok.
     const playAtEntry = await page.getByRole('button', { name: 'Oynat', exact: true }).boundingBox();
     const sheetBox = await sheet.boundingBox();
@@ -6569,6 +6572,22 @@ try {
     const schematicName = await page.locator('main button[aria-label$="tam ekran aç"]').getAttribute('aria-label').catch(() => '');
     check(`Telefon 3B (${cihaz}): tam ekran düğmesi 3B'de "3B’yi tam ekran aç" (ad ve ipucu), şemada "Şemayı tam ekran aç"`,
       fullName === '3B’yi tam ekran aç|3B’yi tam ekran aç' && schematicName === 'Şemayı tam ekran aç', `${fullName} · şemada ${schematicName}`);
+    // 7c. Tahtada kur, Tepeden: tahtanın tamamı (genişliği de) üst çubuk ile alttaki sayfa arasında.
+    await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: '3B' }).tap();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(600);
+    await page.getByRole('button', { name: 'Tahtada kur' }).first().tap(); await page.waitForTimeout(1500);
+    const fit = await page.evaluate(() => {
+      const t = window.__tezgah; const tr = t?.topTransform(); const region = document.querySelector('[role=region][aria-label^="Breadboard"]');
+      if (!tr || !region) return null;
+      const r = region.getBoundingClientRect(); const cols = /63 sütun/.test(region.getAttribute('aria-label')) ? 63 : 30; const half = (cols + 3) / 2;
+      const box = { x0: r.left + tr.ox - half * tr.scale, x1: r.left + tr.ox + half * tr.scale, y0: r.top + tr.oy - 10.8 * tr.scale, y1: r.top + tr.oy + 10.8 * tr.scale };
+      const sheets = [...document.querySelectorAll('[role=region],[role=dialog]')].filter((e) => e !== region).map((e) => e.getBoundingClientRect()).filter((q) => q.width > innerWidth * 0.5 && q.bottom >= innerHeight - 100 && q.top > 60);
+      const sheetTop = sheets.length ? Math.min(...sheets.map((q) => q.top)) : innerHeight;
+      return { ...box, sheetTop, w: innerWidth };
+    });
+    check(`Telefon 3B (${cihaz}): Tahtada kur tepeden görünümünde tahtanın tamamı ekranda, alttaki sayfanın üstünde`,
+      fit !== null && fit.x0 >= -1 && fit.x1 <= fit.w + 1 && fit.y0 >= 0 && fit.y1 <= fit.sheetTop + 1,
+      fit ? `tahta x ${Math.round(fit.x0)}–${Math.round(fit.x1)} / ${fit.w}, y ${Math.round(fit.y0)}–${Math.round(fit.y1)} · sayfanın üstü ${Math.round(fit.sheetTop)}` : 'tahta yok');
     await page.context().close();
   }
 } finally {
