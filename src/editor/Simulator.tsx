@@ -138,6 +138,12 @@ function loadSavedSession(): FaultSession {
 /** Kararlı okuma: multimetrenin yazısı bu kadar değişmeden kalınca günlüğe yazılır (ms). */
 const STABLE_MS = 1200;
 
+/**
+ * Yatay telefonun sağ sütunu (defter ya da Parça ekle ve alttaki çubuk): 844 px'te 321 px; şema solda
+ * genişliğin kalanında ve bütün yükseklikte (ekranın yarısından çoğu).
+ */
+const SIDE_PANEL_WIDTH = 'clamp(300px, 38%, 360px)';
+
 /** Kayıtlı devreyle birlikte açık olan görev (sayfa yenilenince görev kipi sürsün). */
 function loadSavedTask(): TaskDef | null {
   try {
@@ -1671,7 +1677,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               lockChip: false,
               onLockChipClose: () => {},
               ...(phone && connect ? { connectHeader: true } : {}),
-              ...(phone && addSheet === 'full' ? { strip: true } : {}),
+              // Yatayın yan sütununda Parça ekle şemayı küçültmez (şerit yok).
+              ...(phone && addSheet === 'full' && !(layout.landscape && !connect && !schematicFull) ? { strip: true } : {}),
               ...(tablet ? { emptyHint: tr.canvas.empty } : {}),
               ...(phone && fault ? { faultChip: true } : {}),
             }
@@ -2131,7 +2138,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const taskFrozen = task !== null && !task.allowNew;
     const wiring = connect !== null;
     const big = wiring || schematicFull;
-    const strip = schematicStrip && !big;
+    // Yatay telefon: şema solda bütün yükseklikte, defter (ya da Parça ekle) ve alttaki çubuk sağdaki sütunda.
+    const side = layout.landscape && !big;
+    const strip = schematicStrip && !big && !side;
     // Şema kutusu: dikeyde yaklaşık 270 px; kısa ekranda (yatay telefon) kalan alanın % 42'si (en az 120 px).
     const boxHeight = Math.round(Math.max(layout.landscape ? 120 : 132, Math.min(270, phoneAreaHeight * 0.42)));
     // Alttaki çubuk: Parça ekle ya da Analiz sayfası açıkken gizli (alanı sayfaya bırakır; eski yüzen düğmeler gibi).
@@ -2340,9 +2349,72 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       );
     }
 
+    const notebookSection = (
+      <section data-tour="inspect" aria-label={tr.notebook.label} className="flex min-h-0 flex-1 flex-col">
+        <TouchUi.Provider value>
+          {phoneFaultSheet && fault ? (
+            <PhoneFaultSheet
+              symptom={fault.symptom}
+              session={faultSession}
+              askExpected={fault.askExpected}
+              mode={meter.mode}
+              onMode={(mode) => setMeter((m) => ({ ...m, mode }))}
+              reading={meterReading}
+              red={redLabel}
+              black={blackLabel}
+              placing={meter.placing}
+              onPlace={(placing) => setMeter((m) => ({ ...m, placing }))}
+              tools={fault.tools}
+              wrong={wrongReport}
+              onExpected={setExpected}
+              onHint={() => setFaultSession((s) => ({ ...s, hints: Math.min(tr.fault.hints.list.length, s.hints + 1) }))}
+              onReport={startReport}
+            />
+          ) : (
+            notebook
+          )}
+        </TouchUi.Provider>
+        {inlineToast && <Toast toast={toast} inline onDone={hideToast} />}
+      </section>
+    );
+    const partsBody = (compact: boolean) => (
+      <PartsSheetBody
+        settings={settings}
+        recent={recentParts}
+        chainTo={chainTo}
+        onChainOff={() => setChainOff(true)}
+        onAdd={addFromSheet}
+        allowed={addable}
+        onDrop={(type, x, y) => canvasRef.current?.placeAtClient(type, x, y)}
+        onDragging={setPartDragging}
+        {...(compact ? { compact: true, onClose: () => setAddSheet(null) } : {})}
+      />
+    );
+    const bottomBarEl = bottomBar && (
+      <PhoneBottomBar
+        compact={layout.landscape}
+        status={sim.status}
+        time={sim.frame?.time ?? 0}
+        canEdit={!taskFrozen && !fault}
+        canConnect={doc.parts.length > 0 && viewMode === 'schematic'}
+        addOpen={addOpen}
+        speedOpen={modal === 'status'}
+        onAdd={() => setAddSheet((s) => (s ? null : 'half'))}
+        onConnect={() => {
+          setAddSheet(null);
+          startConnect();
+        }}
+        onPlay={play}
+        onPause={sim.pause}
+        onStop={sim.stop}
+        onSpeed={() => setModal('status')}
+      />
+    );
+
     // Dikey ve yatay telefon (DP1–DP4): üst çubuk; şema kutusu (karta odaklanınca şerit, tam ekranda ya
-    // da kablo bağlarken bütün alan); altında defter; yüzen düğmeler. Tuval kipler arasında aynı yerde
-    // kalır (yeniden kurulmaz).
+    // da kablo bağlarken bütün alan); altında defter; yüzen düğmeler. Yatayda (telefon arayüzü taraması, 5)
+    // şema solda bütün yükseklikte, sağdaki sütunda defter ya da Parça ekle ve alttaki çubuk. Tuval kipler
+    // arasında aynı yerde kalır (yeniden kurulmaz).
     return (
       <div className="app-root flex flex-col overflow-hidden bg-panel-2" style={{ paddingLeft: 'env(safe-area-inset-left)', paddingRight: 'env(safe-area-inset-right)' }}>
         {skipLink}
@@ -2363,11 +2435,15 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             onMore={() => setModal('more')}
           />
         )}
-        <div ref={phoneAreaRef} className="relative flex min-h-0 flex-1 flex-col">
+        <div ref={phoneAreaRef} className={`relative flex min-h-0 flex-1 ${side ? 'flex-row' : 'flex-col'}`}>
           {strip ? (
             <SchematicStrip doc={doc} errors={errorCount} warnings={warningCount} onOpen={() => setSchematicStrip(false)} />
           ) : (
-            <main className={`relative shrink-0 bg-paper ${big ? 'min-h-0 flex-1' : 'border-b border-line'}`} style={big ? undefined : { height: mainHeight }}>
+            <main
+              className={`relative bg-paper ${side ? 'min-h-0 min-w-0 flex-1' : big ? 'min-h-0 shrink-0 flex-1' : 'shrink-0 border-b border-line'}`}
+              // Yatayda şema ekranın altına iner: ana ekran çubuğunun (güvenli alan) üstünde biter.
+              style={side ? { marginBottom: 'env(safe-area-inset-bottom)' } : big ? undefined : { height: mainHeight }}
+            >
               {canvas}
               {!wiring && (
                 <SchematicButtons
@@ -2382,38 +2458,26 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               )}
             </main>
           )}
-          {!big && (
-            <section data-tour="inspect" aria-label={tr.notebook.label} className="flex min-h-0 flex-1 flex-col">
-              <TouchUi.Provider value>
-                {phoneFaultSheet && fault ? (
-                  <PhoneFaultSheet
-                    symptom={fault.symptom}
-                    session={faultSession}
-                    askExpected={fault.askExpected}
-                    mode={meter.mode}
-                    onMode={(mode) => setMeter((m) => ({ ...m, mode }))}
-                    reading={meterReading}
-                    red={redLabel}
-                    black={blackLabel}
-                    placing={meter.placing}
-                    onPlace={(placing) => setMeter((m) => ({ ...m, placing }))}
-                    tools={fault.tools}
-                    wrong={wrongReport}
-                    onExpected={setExpected}
-                    onHint={() => setFaultSession((s) => ({ ...s, hints: Math.min(tr.fault.hints.list.length, s.hints + 1) }))}
-                    onReport={startReport}
-                  />
+          {!big &&
+            (side ? (
+              <div className="flex shrink-0 flex-col border-l border-line bg-panel" style={{ width: SIDE_PANEL_WIDTH }}>
+                {addSheet ? (
+                  // Yatayda Parça ekle alttan açılmaz: sağdaki sütunda; şema solda görünür kalır (sürükleyip bırakmak için).
+                  <section role="dialog" aria-label={tr.phone.addTitle} className={`flex min-h-0 flex-1 flex-col pt-2 ${partDragging ? 'opacity-25' : ''}`}>
+                    {partsBody(true)}
+                  </section>
                 ) : (
-                  notebook
+                  notebookSection
                 )}
-              </TouchUi.Provider>
-              {inlineToast && <Toast toast={toast} inline onDone={hideToast} />}
-            </section>
-          )}
+                {bottomBarEl}
+              </div>
+            ) : (
+              notebookSection
+            ))}
           {wiring && (
             <WiringFooter canUndo={state.past.length > 0} hasStart={connect.start !== null} onUndo={() => dispatch({ type: 'undo' })} onClear={() => setConnect({ start: null })} />
           )}
-          {addSheet && !wiring && (
+          {addSheet && !wiring && !side && (
             <BottomSheet
               size={addSheet}
               sizes={['half', 'full']}
@@ -2427,16 +2491,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               onClose={() => setAddSheet(null)}
             >
               <SheetHeader title={tr.phone.addTitle} onClose={() => setAddSheet(null)} />
-              <PartsSheetBody
-                settings={settings}
-                recent={recentParts}
-                chainTo={chainTo}
-                onChainOff={() => setChainOff(true)}
-                onAdd={addFromSheet}
-                allowed={addable}
-                onDrop={(type, x, y) => canvasRef.current?.placeAtClient(type, x, y)}
-                onDragging={setPartDragging}
-              />
+              {partsBody(false)}
             </BottomSheet>
           )}
           {/* Analiz telefonda tam ekran sayfa (analiz v2): ekranı kaplar, içerik içeride kayar. */}
@@ -2450,31 +2505,12 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
             </section>
           )}
         </div>
-        {bottomBar && (
-          <PhoneBottomBar
-            compact={layout.landscape}
-            status={sim.status}
-            time={sim.frame?.time ?? 0}
-            canEdit={!taskFrozen && !fault}
-            canConnect={doc.parts.length > 0 && viewMode === 'schematic'}
-            addOpen={addOpen}
-            speedOpen={modal === 'status'}
-            onAdd={() => setAddSheet((s) => (s ? null : 'half'))}
-            onConnect={() => {
-              setAddSheet(null);
-              startConnect();
-            }}
-            onPlay={play}
-            onPause={sim.pause}
-            onStop={sim.stop}
-            onSpeed={() => setModal('status')}
-          />
-        )}
+        {!side && bottomBarEl}
         {modals}
         {taskDialogEl}
         {overlays}
         {/* Alttaki çubuk 76 px (güvenli alan Toast'ta ayrıca eklenir). */}
-        {!inlineToast && <Toast toast={toast} offset={wiring ? 92 : analysis.open ? 92 : addSheet ? sheetHeight + 12 : layout.landscape ? 68 : 88} onDone={hideToast} />}
+        {!inlineToast && <Toast toast={toast} offset={wiring ? 92 : analysis.open ? 92 : addSheet ? (side ? 12 : sheetHeight + 12) : layout.landscape ? 68 : 88} onDone={hideToast} />}
       </div>
     );
   }

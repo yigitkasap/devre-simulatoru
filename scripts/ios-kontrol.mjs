@@ -1282,17 +1282,19 @@ try {
     await ctx.close();
   }
 
-  // --- Yatay telefon: dikeyle aynı düzen, şema kutusu daha kısa -------------------------------
+  // --- Yatay telefon: şema solda bütün yükseklikte, defter ve alttaki çubuk sağdaki sütunda (telefon arayüzü taraması) ---
   {
     const { page, cdp } = await phone(844, 390);
     const head = await page.locator('header').first().boundingBox();
     const box = await page.locator('main').boundingBox();
     const nb = await phoneNotebook(page).boundingBox();
-    // v4: en altta sabit çubuk (yatayda ince, 44 px düğmeler) da yer kaplar; defter yine en az 150 px, şema kutusu en az 120 px.
+    // Telefon arayüzü taraması (5): eskiden dikeyle aynı düzendi (şema 120 px'lik şerit, altında defter); artık şema
+    // solda üst çubuğun altındaki bütün yükseklikte, sağdaki sütunda defter ve en altında alttaki çubuk (44 px düğmeler).
     const lbar = await phoneBar(page).boundingBox();
-    check('yatay telefonda dikeyle aynı düzen: üst çubuk, kısa şema kutusu, altında defter (en az 150 px), en altta alttaki çubuk',
-      head !== null && head.height <= 57.5 && box !== null && box.height >= 120 && box.height <= 160 && nb !== null && nb.height >= 150 && lbar !== null && lbar.y >= nb.y + nb.height - 1,
-      `şema ${Math.round(box?.height ?? 0)} px, defter ${Math.round(nb?.height ?? 0)} px, alttaki çubuk ${Math.round(lbar?.height ?? 0)} px`);
+    check('yatay telefonda şema solda bütün yükseklikte (genişliğin en az yarısı), sağdaki sütunda defter (en az 150 px) ve altında alttaki çubuk',
+      head !== null && head.height <= 57.5 && box !== null && box.width >= 422 && box.height >= 390 - 57 - 2 && nb !== null && nb.height >= 150 && nb.x >= box.x + box.width - 1 &&
+        lbar !== null && lbar.x >= box.x + box.width - 1 && lbar.y >= nb.y + nb.height - 1,
+      `şema ${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)} px, defter ${Math.round(nb?.width ?? 0)}×${Math.round(nb?.height ?? 0)} px, alttaki çubuk ${Math.round(lbar?.width ?? 0)}×${Math.round(lbar?.height ?? 0)} px`);
     await openExample(page, 'LED ve ön direnç');
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
     const r1 = await part(page, 'R1');
@@ -1310,7 +1312,12 @@ try {
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(300);
     await phoneNotebook(page).getByRole('button', { name: /^OSC1 ·/ }).tap(); await page.waitForTimeout(800);
     const screenBox = await phoneNotebook(page).getByRole('img', { name: /^Osiloskop ekranı/ }).first().boundingBox();
-    check('yatayda osiloskop kartının ekranı geniş (defter tam genişlik)', screenBox !== null && screenBox.width > 600, screenBox ? `${Math.round(screenBox.width)} px` : 'yok');
+    const nbBox = await phoneNotebook(page).boundingBox();
+    const svgBox = await page.locator('svg.schematic').boundingBox();
+    // Telefon arayüzü taraması (5): defter sağdaki sütunda; osiloskop ekranı sütunun genişliğinde, şema solda görünür.
+    check('yatayda osiloskop kartının ekranı sağdaki sütunun genişliğinde (en az 240 px), şema solda görünür kalıyor',
+      screenBox !== null && nbBox !== null && screenBox.width >= 240 && screenBox.x >= nbBox.x && screenBox.x + screenBox.width <= nbBox.x + nbBox.width + 1 && svgBox !== null && svgBox.width >= 422,
+      screenBox ? `ekran ${Math.round(screenBox.width)} px, şema ${Math.round(svgBox?.width ?? 0)} px` : 'yok');
     await page.context().close();
   }
 
@@ -5465,6 +5472,83 @@ try {
       rows.every((r) => r.cut.length === 0) && values.some((v) => v.includes('500 mV')),
       rows.map((r) => `${r.id}${r.cut.length ? `: ${r.cut.join(', ')}` : ' temiz'}${r.extra ? ` (${r.extra})` : ''}`).join(' · '));
     await page.context().close();
+  }
+  for (const [w, h] of [[844, 390], [667, 375]]) {
+    // 5. Yatay telefon: çizim alanı ekranın çoğunu alıyor; Parça ekle sağdaki sütunda en az iki sıra parça gösteriyor
+    // (şema solda görünür kalıyor); Daha fazla ve devre sayfasında en az iki satır; 3B aynı yuvada; sayfa kaymıyor.
+    const { page } = await phone(w, h);
+    await openExample(page, 'LED ve ön direnç');
+    const main = await page.locator('main').boundingBox();
+    const area = (main.width * main.height) / (w * h);
+    await phoneBar(page).getByRole('button', { name: 'Parça', exact: true }).tap(); await page.waitForTimeout(500);
+    const dialog = page.getByRole('dialog', { name: 'Parça ekle' });
+    const dialogBox = await dialog.boundingBox();
+    const svgOpen = await page.locator('svg.schematic').boundingBox();
+    // Kaydırma kutusunun içinde tamamı görünen parça düğmelerinin sıraları.
+    const visibleRows = () => dialog.getByRole('button', { name: / ekle$/ }).evaluateAll((els) => {
+      const tops = new Set();
+      for (const e of els) {
+        const r = e.getBoundingClientRect();
+        let top = 0; let bottom = window.innerHeight;
+        for (let a = e.parentElement; a; a = a.parentElement) { const cs = getComputedStyle(a); if (cs.overflowY === 'auto' || cs.overflowY === 'hidden') { const b = a.getBoundingClientRect(); top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); } }
+        if (r.height >= 44 && r.top >= top - 1 && r.bottom <= bottom + 1) tops.add(Math.round(r.top));
+      }
+      return tops.size;
+    });
+    const rows = await visibleRows();
+    const before = (await doc(page)).parts.length;
+    await dialog.getByRole('button', { name: 'Direnç ekle' }).tap(); await page.waitForTimeout(400);
+    const added = (await doc(page)).parts.length === before + 1;
+    // Zincirle ekle şeridi açıkken (seçili parça) de en az iki sıra.
+    const chainRows = await visibleRows();
+    const closeBox = await dialog.getByRole('button', { name: 'Kapat', exact: true }).boundingBox();
+    await dialog.getByRole('button', { name: 'Kapat', exact: true }).tap(); await page.waitForTimeout(300);
+    check(`telefon arayüzü (5): yatayda şema ekranın en az yarısı (844 px'te; 667 px'te %45) (solda bütün yükseklik); Parça ekle sağdaki sütunda, şema görünür kalıyor, en az iki sıra parça (zincirle ekle şeridiyle de), kapat 44 px (${w}×${h})`,
+      area >= (w >= 800 ? 0.5 : 0.45) && main.height >= h - 57 - 2 && dialogBox !== null && dialogBox.x >= main.x + main.width - 1 && svgOpen !== null && svgOpen.width >= main.width - 1 && rows >= 2 && chainRows >= 2 && added && closeBox !== null && closeBox.height >= 43.5 && !(await pageScrolls(page)),
+      `şema ${Math.round(main.width)}×${Math.round(main.height)} px (%${Math.round(area * 100)}) · Parça ekle ${Math.round(dialogBox?.width ?? 0)}×${Math.round(dialogBox?.height ?? 0)} px, ${rows} sıra (zincirle ${chainRows})`);
+    // Alttan açılan sayfalar: tamamı görünen en az iki satır (44 px'lik düğmeler).
+    const sheetRows = (dlg) => dlg.getByRole('button').evaluateAll((els) => els.filter((e) => {
+      const r = e.getBoundingClientRect();
+      let top = 0; let bottom = window.innerHeight;
+      for (let a = e.parentElement; a; a = a.parentElement) { const cs = getComputedStyle(a); if (cs.overflowY === 'auto' || cs.overflowY === 'hidden') { const b = a.getBoundingClientRect(); top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom); } }
+      return r.height >= 44 && r.top >= top - 1 && r.bottom <= bottom + 1;
+    }).map((e) => Math.round(e.getBoundingClientRect().top))).then((t) => new Set(t).size);
+    await page.locator('header').getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(400);
+    const more = await sheetRows(page.getByRole('dialog', { name: 'Daha fazla' }));
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Kapat', exact: true }).first().tap(); await page.waitForTimeout(300);
+    await phoneFileSheet(page);
+    const file = await sheetRows(page.getByRole('dialog', { name: 'Dosya' }));
+    await page.getByRole('dialog', { name: 'Dosya' }).getByRole('button', { name: 'Kapat', exact: true }).first().tap(); await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(300);
+    await phoneBar(page).getByRole('button', { name: /: hız$/ }).tap(); await page.waitForTimeout(400);
+    const speed = await sheetRows(page.getByRole('dialog', { name: 'Simülasyon' }));
+    await page.getByRole('dialog', { name: 'Simülasyon' }).getByRole('button', { name: /^Durdur/ }).tap(); await page.waitForTimeout(300);
+    // 3B: aynı yuva (yalnızca boyu ölçülür; 3B'nin kendi düzenine dokunulmadı).
+    await page.locator('main').getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: /^3B/ }).tap(); await page.waitForTimeout(2500);
+    const bench = await page.locator('main canvas').first().boundingBox();
+    await page.locator('main').getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: 'Şema', exact: true }).tap(); await page.waitForTimeout(300);
+    check(`telefon arayüzü (5): yatayda Daha fazla, devre sayfası ve Simülasyon sayfasında tamamı görünen en az iki satır; 3B şemanın yuvasında (${w}×${h})`,
+      more >= 2 && file >= 2 && speed >= 2 && bench !== null && Math.abs(bench.width - main.width) <= 2 && Math.abs(bench.height - main.height) <= 2 && !(await pageScrolls(page)),
+      `Daha fazla ${more} · devre sayfası ${file} · Simülasyon ${speed} satır · 3B ${Math.round(bench?.width ?? 0)}×${Math.round(bench?.height ?? 0)} px`);
+    await page.context().close();
+  }
+  {
+    // 5. Yatay telefon, koyu tema: yan sütun ve şema koyu zeminde; cihaz kartı (osiloskop) sağdaki sütunda kesilmiyor.
+    const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR', colorScheme: 'dark' });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await page.goto(URL0, { waitUntil: 'networkidle' });
+    await openExample(page, 'Yarım dalga doğrultmaç');
+    await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(500);
+    await phoneNotebook(page).getByRole('button', { name: /^OSC1 ·/ }).tap(); await page.waitForTimeout(900);
+    const card = phoneNotebook(page).getByRole('region', { name: 'OSC1 · Osiloskop' });
+    const overflowing = await card.evaluate((root) => [...root.querySelectorAll('*')].filter((e) => !e.closest('svg') && e.getBoundingClientRect().right > root.getBoundingClientRect().right + 1).length);
+    const values = await card.getByRole('spinbutton').evaluateAll((els) => els.filter((e) => { const r = document.createRange(); r.selectNodeContents(e); const t = r.getBoundingClientRect(); const b = e.getBoundingClientRect(); return t.left < b.left - 1 || t.right > b.right + 1; }).length);
+    const bg = await page.evaluate(() => getComputedStyle(document.querySelector('main')).backgroundColor);
+    check('telefon arayüzü (5): yatay telefon koyu temada (şema koyu kağıtta); sağdaki sütundaki osiloskop kartında taşan öğe ve kesilen değer yok',
+      (await page.evaluate(() => document.documentElement.dataset.theme)) === 'dark' && bg === 'rgb(17, 23, 29)' && overflowing === 0 && values === 0,
+      `${bg} · taşan ${overflowing} · kesik değer ${values}`);
+    await ctx.close();
   }
   {
     // 7. Turun 4. adımı (İncele) boş devrede önce parça eklemeyi söylüyor ve Parça düğmesini gösteriyor; parça varken "Bir parçaya dokun".

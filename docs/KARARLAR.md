@@ -2552,6 +2552,25 @@ iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon
   sütununda da işler.
 - Not: parça kartlarındaki canlı ölçüm kareleri (Gerilim, Akım, Güç) hızla değişen değerde "≈ −1,537 V"
   gibi uzun yazıyı … ile kısaltıyor (D1, 375 ve 390 px). Cihaz kartı olmadığı için bu turda dokunulmadı.
+- Gece kararı: **yatay telefon (madde 5).** Yatayda (yükseklik < 500 px) şema solda, üst çubuğun
+  altındaki bütün yükseklikte; sağda `clamp(300px, 38%, 360px)` genişliğinde bir sütun: defter ve en
+  altında alttaki çubuk. 844 × 390'da şema 844 × 119 → 523 × 333 px (ekranın %30'u → %53'ü), defter 844
+  × 156 → 320 × 276 px. Karta odaklanınca şema şeride küçülmez (yan yana sığıyor). Tam ekran düğmesi
+  şemayı bütün genişliğe açar, defter gizlenir ("parça listesi gizlenebilir"). Sütun %38'den geniş
+  olsaydı şema ekranın yarısının altına düşecekti; 300 px'ten dar olsaydı defterin kartları sıkışacaktı
+  (dar kart kuralları için bkz. madde 6).
+- Parça ekle yatayda alttan açılmaz; sağdaki sütunda defterin yerine açılır, şema solda görünür kalır
+  (basılı tutup şemaya sürükleme çalışır). Sıkı görünüm (`PartsSheetBody compact`): başlık satırı yok
+  (aria-label "Parça ekle"; kapat düğmesi aramanın yanında, 44 px), parça düğmeleri 84 → 68 px, alt not
+  yok. Tamamı görünen parça sırası 0 → 3 (zincirle ekle şeridi açıkken en az 2). Daha fazla, devre
+  sayfası ve Simülasyon sayfası yatayda zaten en az iki satır gösteriyordu; değişmedi.
+- 3B aynı yuvayı kullanır: yatayda 3B alanı 844 × 120 → 523 × 333 px. 3B'nin kendi iç düzenine
+  dokunulmadı.
+- Yatayda şema ekranın altına kadar iner; ana ekran çubuğu için `env(safe-area-inset-bottom)` kadar pay
+  bırakır (alttaki çubuk sağdaki sütunda kendi güvenli alan payını ekler).
+- ios-kontrol'ün "Yatay telefon" bölümündeki iki madde yeni düzene göre güncellendi: şema solda bütün
+  yükseklikte, defter ve alttaki çubuk sağda; osiloskop ekranı sütunun genişliğinde (eskiden defter tam
+  genişlikti, ekran > 600 px).
 
 ### Lojik entegreler (Dalga 2, 2026-11-05)
 

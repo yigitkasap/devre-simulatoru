@@ -47,9 +47,16 @@ export interface PartsSheetProps {
   readonly grouped?: boolean;
   /** Eklenebilen türler (arıza bulmada yalnızca ampermetre); verilmezse hepsi. */
   readonly allowed?: ReadonlySet<DeviceType> | null;
+  /**
+   * Yatay telefonun yan sütunu (≈ 330 px yükseklik): başlık satırı yok (kapat düğmesi aramanın yanında), düğmeler
+   * 68 px, alt not yok; en az iki sıra parça görünür.
+   */
+  readonly compact?: boolean;
+  /** Sıkı görünümde aramanın yanındaki kapat düğmesi. */
+  readonly onClose?: () => void;
 }
 
-export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, onDrop, onDragging, grouped = false, allowed = null }: PartsSheetProps) {
+export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, onDrop, onDragging, grouped = false, allowed = null, compact = false, onClose }: PartsSheetProps) {
   const ok = (type: DeviceType) => !allowed || allowed.has(type);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<PartsCategory>('favorites');
@@ -121,7 +128,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-4">
+    <div className={`flex min-h-0 flex-1 flex-col px-4 ${compact ? 'gap-2' : 'gap-2.5'}`}>
       {chainTo && (
         <div className="flex min-h-10 shrink-0 items-center gap-2 rounded-lg bg-accent-soft py-0.5 pr-0.5 pl-3 text-sm text-accent-ink">
           <Icon name="wire" className="h-[18px] w-[18px] shrink-0" />
@@ -138,17 +145,29 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
           </button>
         </div>
       )}
-      <label className="flex h-11 shrink-0 items-center gap-2 rounded-md border border-line-2 px-3 text-muted focus-within:border-accent">
-        <Icon name="search" className="h-[18px] w-[18px] shrink-0" />
-        <span className="sr-only">{tr.library.searchLabel}</span>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={tr.library.search}
-          className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
-        />
-      </label>
+      <div className="flex shrink-0 items-center gap-1">
+        <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-md border border-line-2 px-3 text-muted focus-within:border-accent">
+          <Icon name="search" className="h-[18px] w-[18px] shrink-0" />
+          <span className="sr-only">{tr.library.searchLabel}</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={tr.library.search}
+            className="min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-muted"
+          />
+        </label>
+        {compact && onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={tr.phone.close}
+            className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted active:bg-app"
+          >
+            <Icon name="close" />
+          </button>
+        )}
+      </div>
       {!query.trim() && !grouped && (
         <div role="tablist" aria-label={tr.library.title} className="no-scrollbar fade-right -mr-4 flex shrink-0 gap-1.5 overflow-x-auto overscroll-contain pr-4">
           {categories.map((c) => {
@@ -221,7 +240,9 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
                   }}
                   onPointerUp={(e) => endPress({ x: e.clientX, y: e.clientY })}
                   onPointerCancel={() => endPress(null)}
-                  className="no-callout flex h-[84px] w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-line bg-panel px-1 text-[13.5px] font-medium text-ink active:border-accent active:bg-accent-soft/50"
+                  className={`no-callout flex w-full flex-col items-center justify-center rounded-xl border border-line bg-panel px-1 text-[13.5px] font-medium text-ink active:border-accent active:bg-accent-soft/50 ${
+                    compact ? 'h-[68px] gap-1' : 'h-[84px] gap-1.5'
+                  }`}
                 >
                   <SymbolIcon type={type} resistorStyle={settings.resistorStyle} className="h-[26px] w-11" />
                   <span className="max-w-full truncate">{tr.devices.names[type]}</span>
@@ -233,7 +254,7 @@ export function PartsSheetBody({ settings, recent, chainTo, onChainOff, onAdd, o
           ))
         )}
       </div>
-      <p className="-mx-4 shrink-0 border-t border-app px-4 pt-2 pb-2.5 text-[12.5px] text-muted">{tr.phone.addFooter}</p>
+      {!compact && <p className="-mx-4 shrink-0 border-t border-app px-4 pt-2 pb-2.5 text-[12.5px] text-muted">{tr.phone.addFooter}</p>}
       {ghost && (
         <div
           className="pointer-events-none fixed z-[70] flex flex-col items-center gap-1 rounded-xl border-2 border-accent bg-panel/95 px-3 py-2 text-label font-semibold shadow-lg"
