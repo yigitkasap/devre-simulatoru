@@ -32,6 +32,8 @@ export interface PartModel {
    * sonra masaya sarkar. Yoksa kablo uçtan dik kalkar.
    */
   readonly anchorDirs?: readonly Vector3[];
+  /** Ön paneldeki soketin rengi, pin sırasıyla (renksiz BNC'de undefined): cihaz kablosu bu renkte. */
+  readonly anchorColors?: readonly (string | undefined)[];
   /**
    * Canlı değerleri uygular. Sürekli canlandırma gerekiyorsa (dönen motor, titreşen hoparlör) true
    * döner: sahne bir sonraki karede yeniden çizilir.

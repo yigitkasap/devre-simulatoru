@@ -46,9 +46,10 @@ export function collisions(curve: Curve<Vector3>, obstacles: readonly Obstacle[]
 /**
  * Ön paneldeki soketten çıkan kablo: soketten `dir` yönünde düz çıkar, öne doğru yatay teğetle masaya
  * sarkar, masada tahtaya doğru ilerler ve deliğin üstüne (`b`) yukarıdan iner. Parçalı (doğru + kübik
- * Bézier'ler): masadaki kısım masanın altına salınmaz. `board`: breadboard'ların kutusu.
+ * Bézier'ler): masadaki kısım masanın altına salınmaz. `board`: breadboard'ların kutusu. `end` verilirse
+ * kablo `b`'ye o yönden girer (timsah kıskacının kuyruğu: kıskacın ekseni boyunca).
  */
-export function socketCurve(from: Vector3, dir: Vector3, b: Vector3, board: Box3): CurvePath<Vector3> {
+export function socketCurve(from: Vector3, dir: Vector3, b: Vector3, board: Box3, end?: Vector3): CurvePath<Vector3> {
   const flat = new Vector3(dir.x, 0, dir.z);
   if (flat.lengthSq() < 1e-6) flat.set(0, 0, 1);
   flat.normalize();
@@ -66,7 +67,8 @@ export function socketCurve(from: Vector3, dir: Vector3, b: Vector3, board: Box3
   const heading = run > 1e-6 ? toHole.clone().divideScalar(run) : flat.clone();
   const rise = Math.max(4, b.y - table + 2.5);
   void board;
-  path.add(new CubicBezierCurve3(down, down.clone().addScaledVector(heading, run * 0.5), b.clone().add(new Vector3(0, rise, 0)), b.clone()));
+  const last = end ? b.clone().addScaledVector(end, Math.min(rise, 4.5)) : b.clone().add(new Vector3(0, rise, 0));
+  path.add(new CubicBezierCurve3(down, down.clone().addScaledVector(heading, run * 0.5), last, b.clone()));
   return path;
 }
 

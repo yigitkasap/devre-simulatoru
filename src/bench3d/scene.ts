@@ -41,9 +41,12 @@ import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPa
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
 import { collisions, leadCurve, socketCurve, type Obstacle } from './leadRoute';
 import { cableCurrents } from './cableFlow';
+import { CLIP_DEVICES, clipGroups } from './clipPlan';
+import { clipMesh, stubMesh } from './clipModel';
+import { CABLE_RADIUS, CLIP, PLUG, clipPose, clipTail, clippedPlan, jumperShapes, layoutClips, type BoardBody, type ClipLayout } from './clips';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
-import { buildPartModel } from './registry';
+import { holeAt, placeBoardPart, placeTablePart, type Placement } from './placement';
 import { BACKGROUND, createControls, createRenderer, lightScene, radialTexture } from './stage';
 
 export interface BenchCallbacks {
@@ -142,12 +145,11 @@ interface Placed {
   readonly dirs: readonly (Vector3 | undefined)[];
   /** Etiketin bağlandığı nokta: gövdenin üstünün ortası (dünya). */
   readonly top: Vector3;
-}
-
-/** Deliğin dünya koordinatı (`y`: ağzı BB.height, bacağın bittiği yer BB.height − HOLE_DEPTH). */
-function holeAt(h: Hole, cols: number, y: number): Vector3 {
-  const { x, z } = holeXZ(h, cols);
-  return new Vector3(x, y, z);
+  /** Soketlerin rengi (cihaz kablosu bu renkte; modelde varsa). */
+  readonly colors: readonly (string | undefined)[];
+  /** Bütün modelin ve bacaksız gövdenin kutusu (dünya, yerleşirken). */
+  readonly box: Box3;
+  readonly body: Box3;
 }
 
 function partKey(part: Part): string {
@@ -256,8 +258,15 @@ export class BenchScene {
   private cablePaths: CablePath[] = [];
   /** Masadaki parçalardan gelen kabloların eğrileri ve engelleri (denetim: `cableHits`). */
   private leadCurves: Curve<Vector3>[] = [];
-  /** Son kurulan belge (Tepeden görünüme geçince kablolar yeniden kurulur). */
+  /** Son kurulan belge ve Tahtada kur kurulumu (Tepeden görünüme geçince kablolar yeniden kurulur). */
   private lastDoc: CircuitDoc | null = null;
+  private lastOverride: BreadboardPlan | null = null;
+  /** Cihaz kablolarının kıskaçları (3B; Tepeden görünümde yok: kablolar deliklere iner). */
+  private clipLayout: ClipLayout | null = null;
+  /** Akım noktaları için plan: cihaz kablolarının delikleri kıskacın tuttuğu yerinki. */
+  private flowPlan: BreadboardPlan | null = null;
+  /** Birleşme noktaları (ağ → dünya noktası): HTML katmanındaki [data-anchor="junction"] etiketleri. */
+  private junctionAt = new Map<string, Vector3>();
   private leadObstacles: Obstacle[][] = [];
   private cableAmps = new Float64Array(0);
   private cablePhases = new Float64Array(0);
@@ -581,6 +590,31 @@ export class BenchScene {
     return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
   }
 
+  /**
+   * Denetim (ios-kontrol): tahtadaki dolu delikler (bacaklar, köprüler, kıskaçsız kablolar, kısa teller) ve iki
+   * şey takılı delik sayısı; cihaz kablolarının kıskaçları (bacak, kısa tel, zincir) ve birleşme noktaları.
+   */
+  clipReport(): { holes: number; doubled: number; clips: Array<{ part: string; pin: number; kind: string; net: string }>; plugged: number; junctions: Array<{ net: string; count: number }> } {
+    const plan = this.plan;
+    const layout = this.clipLayout;
+    if (!plan) return { holes: 0, doubled: 0, clips: [], plugged: 0, junctions: [] };
+    const key = (h: Hole) => (h.kind === 'strip' ? `${h.board}:s${h.col}:${h.row}` : `${h.board}:r${h.rail}:${h.k}`);
+    const all = [
+      ...[...plan.onBoard.values()].flatMap((p) => [...p.holes, ...(p.extraHoles ?? [])]),
+      ...plan.jumpers.flatMap((j) => [j.a, j.b]),
+      ...plan.leads.filter((_, i) => !layout?.clips.has(i)).map((l) => l.hole),
+      ...(layout?.stubs ?? []).map((s) => s.hole),
+    ].map(key);
+    const devices = plan.leads.flatMap((l, i) => (CLIP_DEVICES.has(this.parts.get(l.partId)?.part.type ?? 'ground') ? [i] : []));
+    return {
+      holes: new Set(all).size,
+      doubled: all.length - new Set(all).size,
+      clips: [...(layout?.clips.values() ?? [])].map((c) => ({ part: plan.leads[c.lead]!.partId, pin: plan.leads[c.lead]!.pin, kind: c.kind, net: c.net })),
+      plugged: devices.filter((i) => !layout?.clips.has(i)).length,
+      junctions: [...this.junctionAt.keys()].map((net) => ({ net, count: layout?.junctions.find((j) => j.net === net)?.count ?? 0 })),
+    };
+  }
+
   /** Denetim (ios-kontrol): masadaki bir parçanın gövdesinin içinden geçen kablo sayısı. */
   cableHits(): number {
     return this.leadCurves.filter((curve, i) => collisions(curve, this.leadObstacles[i] ?? []).length > 0).length;
@@ -598,6 +632,7 @@ export class BenchScene {
   /** Devre; `override` verilirse (Tahtada kur: öğrencinin kurulumu) tezgâh onunla kurulur. */
   setDoc(doc: CircuitDoc, override: BreadboardPlan | null = null): void {
     const plan = override ?? planBreadboard(doc);
+    this.lastOverride = override;
     const key = JSON.stringify([
       doc.parts.map(partKey),
       [...plan.onBoard.values()],
@@ -671,51 +706,73 @@ export class BenchScene {
     const colorOf = netColors(plan);
     const holeTop = (h: Hole) => holeAt(h, plan.cols, BB.height);
     const jumperPaths: CablePath[] = [];
-    for (const j of plan.jumpers) {
-      const jumper = jumperMesh(holeTop(j.a), holeTop(j.b), j.color ?? colorOf(j.net));
-      this.cables.add(jumper);
+    // Kıskaçlı cihaz kablolarının fişi yok; jumper telleri birbirinin ve fişlerin içinden geçmez (clips.ts).
+    const clipLeads = new Set(this.topView ? [] : clipGroups(doc, plan, this.lastOverride === null).flatMap((g) => g.leads));
+    const shapes = jumperShapes(plan, clipLeads);
+    for (const [i, j] of plan.jumpers.entries()) {
+      const jumper = jumperMesh(holeTop(j.a), holeTop(j.b), j.color ?? colorOf(j.net), shapes[i]);
+      this.cables.add(this.netTag(jumper, j.net));
       jumperPaths.push(cablePath(jumper.userData.curve as Curve<Vector3>));
     }
-    const plug = new BoxGeometry(0.75, 1.5, 0.75);
+    const plug = new BoxGeometry(PLUG.width, PLUG.height, PLUG.width);
     const plugMat = mat('#1b1c1f', 0.6);
     // Masadaki parçaların gövdeleri: kablolar içlerinden geçmez (pilin uzak ucundan çıkan kablo üstünden aşar).
     const bodies = [...plan.table.keys()].flatMap((id) => {
       const placed = this.parts.get(id);
       return placed ? [{ id, box: new Box3().setFromObject(placed.model.root) }] : [];
     });
+    // Cihaz kabloları timsah kıskaçla biter (clips.ts): kıskaç bacağı ya da kısa dik telin ucunu tutar, aynı ağdakiler
+    // zincirlenir. Tepeden görünümde (Tahtada kur) kablolar eskisi gibi deliklere iner.
+    const layout = this.topView ? null : layoutClips({ doc, plan, chain: this.lastOverride === null, bodies: this.boardBodies(plan), shapes, socket: (i) => {
+      const lead = plan.leads[i]!;
+      return this.parts.get(lead.partId)?.anchors[lead.pin];
+    } });
+    this.clipLayout = layout;
+    this.flowPlan = layout ? clippedPlan(plan, layout) : plan;
+    this.junctionAt = new Map((layout?.junctions ?? []).map((j) => [j.net, j.at]));
     this.leadObstacles = [];
     this.leadCurves = [];
-    for (const lead of plan.leads) {
+    const leadColor = new Map<number, string>();
+    plan.leads.forEach((lead, i) => {
       const placed = this.parts.get(lead.partId);
       const from = placed?.anchors[lead.pin];
-      if (!from) {
+      if (!placed || !from) {
         paths.push({ points: [], length: 0 });
-        continue;
+        return;
       }
-      const to = holeTop(lead.hole);
-      const color = lead.color ?? colorOf(lead.net);
+      const clip = layout?.clips.get(i);
+      // Cihaz kablosu soketin renginde (renksiz BNC'de ağın renginde); öbürleri ağın renginde.
+      const color = lead.color ?? (clip ? placed.colors[lead.pin] : undefined) ?? colorOf(lead.net);
+      leadColor.set(i, color);
+      const to = clip ? clipTail(clip) : holeTop(lead.hole);
       const dir = placed.dirs[lead.pin];
-      const b1 = to.clone().add(new Vector3(0, 1.5, 0));
+      const b1 = clip ? to : to.clone().add(new Vector3(0, 1.5, 0));
       // Ön paneldeki soketten çıkan kablo kendi gövdesinden dışarı çıkar: kendi kutusu (öndeki düğmeler,
       // katlanmış kol) engel sayılmaz.
       const obstacles: Obstacle[] = bodies.filter((b) => !(dir && b.id === lead.partId)).map((b) => ({ box: b.box, own: b.id === lead.partId }));
       this.leadObstacles.push(obstacles);
       // Ön paneldeki soket: kablo önce öne çıkar, masaya sarkar; öbür uçlar dik kalkan alçak kavis.
       const a1 = dir ? from.clone().addScaledVector(dir, 1.5) : from.clone().add(new Vector3(0, 1.4, 0));
-      const curve = dir ? socketCurve(a1, dir, b1, this.boardBox(plan)) : leadCurve(a1, b1, obstacles);
+      const curve = dir ? socketCurve(a1, dir, b1, this.boardBox(plan), clip?.axis) : leadCurve(a1, b1, obstacles);
       this.leadCurves.push(curve);
       paths.push(cablePath(curve));
-      this.cables.add(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), 0.28, 8, false), mat(color, 0.55)));
+      this.cables.add(this.netTag(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), CABLE_RADIUS, 8, false), mat(color, 0.55)), lead.net));
       const tip = mesh(plug, plugMat, from.x, from.y + 0.75, from.z);
       if (dir) {
         tip.position.copy(from).addScaledVector(dir, 0.75);
         tip.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), dir);
       }
       this.cables.add(tip);
-      this.cables.add(mesh(plug, plugMat, to.x, to.y + 0.75, to.z));
+      if (clip) {
+        this.cables.add(this.netTag(clipMesh(clip, color), lead.net));
+        return;
+      }
+      this.cables.add(this.netTag(mesh(plug, plugMat, to.x, to.y + 0.75, to.z), lead.net));
       this.cables.add(rod(new Vector3(to.x, to.y - HOLE_DEPTH, to.z), to, 0.1, M.tin(), 6));
-    }
-    // Tahtada kur: takılmamış alet kabloları aletin önünde masaya sarkar (fişi masada).
+    });
+    // Kısa dik teller: onları tutan (zincirin ilk) kıskacın kablosunun renginde.
+    for (const stub of layout?.stubs ?? []) this.cables.add(this.netTag(stubMesh(stub, leadColor.get(stub.lead) ?? colorOf(stub.net)), stub.net));
+    // Tahtada kur: takılmamış alet kabloları aletin önünde masaya sarkar (ucundaki kıskaç masada).
     for (const loose of plan.loose ?? []) {
       const placed = this.parts.get(loose.partId);
       const from = placed?.anchors[loose.pin];
@@ -727,10 +784,16 @@ export class BenchScene {
       dir.normalize();
       const end = from.clone().addScaledVector(dir, 3.4).setY(0.4);
       const curve = new CubicBezierCurve3(from.clone().add(new Vector3(0, 0.4, 0)), from.clone().addScaledVector(dir, 1.2).add(new Vector3(0, 1.4, 0)), end.clone().addScaledVector(dir, -0.6).add(new Vector3(0, 0.8, 0)), end);
-      this.cables.add(new Mesh(new TubeGeometry(curve, 16, 0.28, 8, false), mat(loose.color, 0.55)));
-      const tip = mesh(plug, plugMat, end.x, 0.4, end.z);
-      tip.rotation.set(Math.PI / 2, 0, -Math.atan2(dir.x, dir.z));
-      this.cables.add(tip);
+      const color = (CLIP_DEVICES.has(placed.part.type) ? placed.colors[loose.pin] : undefined) ?? loose.color;
+      this.cables.add(new Mesh(new TubeGeometry(curve, 16, CABLE_RADIUS, 8, false), mat(color, 0.55)));
+      if (CLIP_DEVICES.has(placed.part.type)) {
+        // Kıskaç masada yatar: kuyruğu kablonun ucunda, ağzı öne bakar.
+        this.cables.add(clipMesh(clipPose(end.clone().addScaledVector(dir, CLIP.length).setY(CLIP.height * 0.39), dir.clone().negate(), 0), color));
+      } else {
+        const tip = mesh(plug, plugMat, end.x, 0.4, end.z);
+        tip.rotation.set(Math.PI / 2, 0, -Math.atan2(dir.x, dir.z));
+        this.cables.add(tip);
+      }
     }
     this.cablePaths = [...paths, ...jumperPaths];
     this.cableAmps = new Float64Array(this.cablePaths.length);
@@ -740,39 +803,28 @@ export class BenchScene {
 
   /** Breadboard'a takılan parça: gövde deliklerin arasında, bacaklar deliklere. */
   private placeOnBoard(part: Part, at: BoardPart, cols: number): Placed {
-    const holeIn = (h: Hole) => holeAt(h, cols, BB.height - HOLE_DEPTH);
-    const holes = at.holes.map(holeIn);
-    const extra = (at.extraHoles ?? []).map(holeIn);
-    const group = new Group();
-    const all = [...holes, ...extra];
-    const center = all.reduce((c, h) => c.add(h), new Vector3()).multiplyScalar(1 / all.length);
-    if (at.mount === 'axial' || at.mount === 'radial') {
-      const [a, b] = holes as [Vector3, Vector3];
-      group.position.set((a.x + b.x) / 2, BB.height, (a.z + b.z) / 2);
-      group.rotation.y = Math.atan2(-(b.z - a.z), b.x - a.x);
-    } else if (at.mount === 'to92') {
-      // Yerel z ekseni sütunlar boyunca: düz (yazılı) yüz izleyiciye bakar. Gövde üç deliğin ortasında.
-      group.position.set(center.x, BB.height, center.z);
-      group.rotation.y = Math.PI / 2;
-    } else {
-      group.position.set(center.x, BB.height, center.z);
-    }
-    group.updateMatrixWorld(true);
-    const local = (v: Vector3) => group.worldToLocal(v.clone());
-    const model = buildPartModel(part, holes.map(local), extra.map(local));
-    return this.finishPlacement(part, model, group, holes, BB.height);
+    return this.finishPlacement(part, placeBoardPart(part, at, cols));
   }
 
   /** Masadaki parça: plandaki yerde; bacakları/uçları kendi modelinde. */
   private placeOnTable(part: Part, at: TablePart): Placed {
-    const model = buildPartModel(part);
-    const group = new Group();
-    group.position.set(at.x, 0, at.z);
-    group.rotation.y = (at.rotation * Math.PI) / 180;
-    group.updateMatrixWorld(true);
-    const anchors = model.anchors.map((a) => a.clone().applyMatrix4(group.matrixWorld));
-    const dirs = model.anchorDirs?.map((d) => d.clone().applyQuaternion(group.quaternion).normalize()) ?? [];
-    return this.finishPlacement(part, model, group, anchors, 0, dirs);
+    return this.finishPlacement(part, placeTablePart(part, at));
+  }
+
+  /** Kablonun (ve alt nesnelerinin) ağı: üstüne gelince o ağ vurgulanır. */
+  private netTag<T extends Object3D>(o: T, net: string): T {
+    o.userData.net = net;
+    return o;
+  }
+
+  /** Tahtadaki parçaların kutuları (kıskaçların yerleşimi: clips.ts). */
+  private boardBodies(plan: BreadboardPlan): Map<string, BoardBody> {
+    const out = new Map<string, BoardBody>();
+    for (const id of plan.onBoard.keys()) {
+      const placed = this.parts.get(id);
+      if (placed) out.set(id, { body: placed.body });
+    }
+    return out;
   }
 
   /** Breadboard'ların dünya kutusu (sokete takılı kablo masada sürünürken altına girmesin). */
@@ -781,8 +833,8 @@ export class BenchScene {
     return new Box3(new Vector3(-half, 0, -BB.depth / 2), new Vector3(half, BB.height, boardZ(plan.boards - 1) + BB.depth / 2));
   }
 
-  private finishPlacement(part: Part, model: PartModel, group: Group, anchors: Vector3[], base: number, dirs: readonly (Vector3 | undefined)[] = []): Placed {
-    group.add(model.root);
+  private finishPlacement(part: Part, placement: Placement): Placed {
+    const { model, group, anchors, base, dirs } = placement;
     group.userData.partId = part.id;
     mergeStatic(model.root);
     this.partsGroup.add(group);
@@ -797,7 +849,7 @@ export class BenchScene {
     shadow.scale.set(size.x * 1.2 + 1, size.z * 1.2 + 1, 1);
     this.scene.add(shadow);
     const top = new Vector3(center.x, box.max.y + 0.6, center.z);
-    return { key: partKey(part), part, model, group, shadow, anchors, real: anchors, compact: null, dirs, top };
+    return { key: partKey(part), part, model, group, shadow, anchors, real: anchors, compact: null, dirs, top, colors: placement.colors, box: placement.box, body: placement.body };
   }
 
   private removePart(placed: Placed): void {
@@ -839,7 +891,7 @@ export class BenchScene {
     }
     // Kablo akımları (akım noktaları): breadboard grupları için Kirchhoff akım kuralı (cableFlow.ts).
     if (this.plan && this.frame && this.active && this.dotsOn) {
-      const { leads, jumpers } = cableCurrents(this.plan, this.frame.pinFlows);
+      const { leads, jumpers } = cableCurrents(this.flowPlan ?? this.plan, this.frame.pinFlows);
       this.cableAmps = Float64Array.from([...leads, ...jumpers]);
     } else {
       this.cableAmps = new Float64Array(this.cablePaths.length);
@@ -876,7 +928,7 @@ export class BenchScene {
     // Ön soketli cihazların uçları görünüme göre yer değiştirir: kablolar yeniden kurulur.
     if (this.plan && this.lastDoc && [...this.parts.values()].some((p) => p.dirs.some(Boolean))) {
       this.layoutKey = '';
-      this.setDoc(this.lastDoc, this.plan);
+      this.setDoc(this.lastDoc, this.lastOverride);
     }
     this.controls.enabled = this.interactive && !on;
     this.applyTopLook();

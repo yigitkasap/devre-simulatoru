@@ -1947,6 +1947,40 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
 - **Bir delik tek tel ya da tek bacak alır** (7): Tahtada kur'un yerleşiminde (planBreadboard → buildFromPlan:
   örnek yerleşim ipucu, görevlerin hazır kabloları ve beklenen delikleri) ve görevlerin başlangıç tahtalarında
   hiçbir delikte iki uç yok; 81 örnekte birim testi (`tests/tahta-delik.test.ts`).
+- **Kıskaç** (8; `src/bench3d/clipPlan.ts` gruplar, `clips.ts` yerleşim, `clipModel.ts` model): cihaz kablosunun
+  ucu timsah kıskaç. Bir ağa cihaz kablosu gidiyorsa kıskaç önce ağdaki eksenli parçanın (direnç, diyot, Schottky,
+  zener) bacağını, gövdeyle kart arasındaki dik kısmından tutar; yoksa ağın şeridine ya da rayına kısa dik tel
+  takılır, kıskaç onun soyuk ucunu tutar. Aynı ağdaki öbür cihaz kabloları ayrı delik kullanmaz: her biri öncekinin
+  (yer yoksa ilkinin) metal çenesini tutar (zincir). Kıskaç kabloya, cihazın soketine doğru 55° kalkar; kablo
+  kıskacın kuyruğuna onun ekseni boyunca girer (`leadRoute.socketCurve`'ün `end`'i).
+- **Gece kararı:** "açıkta tutulabilecek bacak" yalnızca eksenli parçaların bacakları: öbür bacak en az 3 delik
+  ötede, kıskaç başka bacağa değmez. Dik (radyal) iki bacaklıların, TO-92'nin, entegrelerin bacakları bir delik
+  aralığında yan yana (kıskaç komşu bacağa değer), sayılmadı.
+- **Gece kararı:** planın (planBreadboard) delikleri değişmedi: Tahtada kur'un hazır kabloları ve görevlerin
+  beklenen delikleri aynı. Kısa tel planın o kablo için ayırdığı deliğe takılır; bacağı ya da başka kıskacı tutan
+  kabloların planlı delikleri 3B'de boş kalır. Akım noktaları için cihaz kablosunun deliği kıskacın bağlandığı
+  deliktir (`clippedPlan`). Tahtada kur kurulumunun 3B'sinde (öğrencinin taktığı delikler) her cihaz kablosu kendi
+  deliğindeki kısa teli tutar: zincir ve bacak yok, öğrencinin seçtiği delik görünür kalır. Tepeden görünümde
+  kablolar eskisi gibi deliğe iner (kıskaç yok). Takılmamış cihaz kablosunun kıskacı masada yatar.
+- **Ölçüler** (gerçek parçalardan): kıskaç Mueller BU-30C mini timsah kıskacı, 27,69 × 5,08 × 7,87 mm, ağız en çok
+  4,8 mm (Mueller BU-30 veri sayfası; DigiKey, Farnell); kılıf kablonun renginde (Mueller BU-2030-A: muz fişten
+  yalıtımlı timsah kıskaca test kablosu, kılıf kablo renginde). Kısa tel 22 AWG tek damarlı, yalıtım Ø 1,45 mm,
+  iletken Ø 0,643 mm (Alpha Wire 3051/1); soyuk uç 7 mm (Global Specialties WK-1 hazır tel takımı veri sayfası).
+  **Gece kararı:** kısa telin yalıtımının tahtanın üstündeki boyu 5 mm (kaynak bulunamadı; telin ucu kıskaca
+  yetecek kadar yukarıda, yaklaşık bir parmak boğumu). Muz fiş: pim Ø 4 mm (4 mm muz fiş standardı; Pomona 1325
+  4,0–4,2 mm sokete uyar); fişin gövde ölçüsü bulunamadı, soketteki fiş modeli değişmedi.
+- **Çakışma yok** (9): kıskaçlar, kısa teller, kıskaçtan çıkan kabloların başı (2,5 birim), köprüler (jumper) ve
+  masadaki parçaların dupont fişleri birbirinin içine girmez; kıskaçlar ve kısa teller parçaların gövdelerine de
+  (bacaklar ince, sayılmaz). Her kıskaç için adaylar sırayla denenir: bacaklar, planın deliği, ağın şeridindeki ya
+  da rayındaki öbür boş delikler (bir delik boşluk bırakılır), sonra gövdesi deliğin üstünü örten parçanın altından
+  alçakta ya da kartın üstünde yatay çıkıp dikilen eğik tel; her adayda cihaza bakan yön, sonra yanlara açılan
+  16 yön ve 4 eğim. Köprüler: bir telin dik ucu başka bir telin altında kalıyorsa üstteki ondan yüksek geçer; aynı
+  sırada iç içe iki telden kısa olanın ortası yana açılır (ucundan ≈ 0,7 birim sonra), öbürü onun ucunun üstünden;
+  kalan çakışmada en yakın çakışmasız yükseklik ve yana açılma (`clips.jumperShapes`, delikler değişmez). Fiş
+  0,75 birim (1,9 mm), köprü Ø 1 mm, kısa tel Ø 1,45 mm, kablo Ø 1,4 mm: hepsi bir delik aralığından (2,54 mm)
+  dar. Test (`tests/kiskac-3b.test.ts`, 81 örnek): her cihaz kablosu kıskaçla bağlı, ağ başına tek bağlantı noktası,
+  3B'de bir delikte tek tel ya da bacak, çakışma 0 (önceden köprüler 65, kıskaçların ilk hâli 201 çakışma).
+  Kablolar havada birbirinin üstünden geçebilir (masadan kıskaca giden uzun kısımlar sayılmaz).
 
 ### Performans ve hata taraması (2026-10-27)
 
