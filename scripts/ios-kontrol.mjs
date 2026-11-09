@@ -50,6 +50,26 @@ const check = (name, ok, extra = '') => {
 };
 const problems = [];
 
+/** Masaüstünde Simülasyon bölgesindeki süre (s); okunamazsa null. */
+async function simTime(page) {
+  const text = await page.getByRole('region', { name: 'Simülasyon' }).first().innerText().catch(() => '');
+  const m = /(\d[\d.,]*)\s*(µs|ms|s)\b/.exec(text);
+  return m ? Number(m[1].replace(/\./g, '').replace(',', '.')) * (m[2] === 's' ? 1 : m[2] === 'ms' ? 1e-3 : 1e-6) : null;
+}
+/**
+ * Simülasyon zamanı en az `seconds` olana dek bekler (gerçek zamanla; IOS_CPU beklemeyi uzatmaz). Ölçüm
+ * pencereleri simülasyon zamanında dolar (DISPLAY_WINDOW × hız): yavaş işlemcide simülasyon gerçek zamanın
+ * gerisinde kalınca okuma ancak o kadar simülasyon süresinden sonra gelir. Normal hızda hemen döner.
+ */
+async function waitSimTime(page, seconds, timeoutMs = 300000) {
+  const end = Date.now() + timeoutMs;
+  for (;;) {
+    const t = await simTime(page);
+    if ((t !== null && t >= seconds) || Date.now() > end) return t;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
 async function phone(width = 390, height = 844) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR',
@@ -1645,7 +1665,9 @@ try {
     // Kayıt: S1 çalışırken kapanır, kondansatör dolar.
     const sim = page.getByRole('region', { name: 'Simülasyon' });
     await sim.getByRole('button', { name: 'Oynat' }).click(); await page.waitForTimeout(150);
-    at = await screen(page, 8, -8); await page.mouse.click(at.x, at.y); await page.waitForTimeout(900);
+    at = await screen(page, 8, -8); await page.mouse.click(at.x, at.y);
+    const closedAt = (await simTime(page)) ?? 0;
+    await page.waitForTimeout(900); await waitSimTime(page, closedAt + 0.85);
     await sim.getByRole('button', { name: 'Duraklat' }).click(); await page.waitForTimeout(400);
     const info = ((await drawer.locator('dl').textContent()) ?? '').replace(/\s+/g, ' ');
     const chartLabel = (await drawer.getByRole('img').getAttribute('aria-label')) ?? '';
@@ -2632,6 +2654,8 @@ try {
       q1 === 200 && betaOff && stepOff && cardActions === 0 && toast && (await st.getByText('Q1 silindi.').count()) === 0, `β = ${q1} · ${betaOff} ${stepOff} ${cardActions} ${toast}`);
     await st.keyboard.press('Escape');
     await st.getByRole('region', { name: 'Simülasyon' }).getByRole('button', { name: 'Oynat' }).click(); await st.waitForTimeout(1500);
+    // VCE pencerenin ortalaması: ilk pencere açılıştaki geçici durumu da içerir, ikincisi (0,8 s) oturmuş.
+    await waitSimTime(st, 0.9);
     const vce = ((await card.locator('li').first().textContent()) ?? '').replace(/\s+/g, ' ');
     await card.getByRole('button', { name: 'Bode ile ölç' }).first().click();
     await st.getByRole('region', { name: 'Analiz' }).getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
@@ -2761,7 +2785,7 @@ try {
     const measuringLine = await card.getByText('Ölçülüyor…').count();
     await st.waitForTimeout(1200);
     await drawer.getByText('✓ Ölçüm bitti').waitFor({ timeout: 60000 }).catch(() => {});
-    await st.waitForTimeout(400);
+    await st.waitForTimeout(400); await waitSimTime(st, 0.9);
     const cardText = ((await card.textContent()) ?? '').replace(/\s+/g, ' ');
     check('tahmin (öğrenci, analiz düzeltmeleri ikinci tur 3): kaydedince "Şimdi Oynat’a bas", devre çalışınca "Ölçülüyor…", hedeflerin hepsi ölçülünce bu satır kalkıyor ve karşılaştırma görünüyor ("2 tahminin 1 tanesi ölçülenle uyuştu")',
       savedLine === 1 && measuringLine === 1 && !cardText.includes('Tahminler kaydedildi') && !cardText.includes('Ölçülüyor') && cardText.includes('Karşılaştırma: 2 tahminin 1 tanesi ölçülenle uyuştu.'),
@@ -3037,6 +3061,7 @@ try {
     const plugged = await saved();
     const meter = plugged.parts.find((x) => x.type === 'ammeter');
     await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(1500);
+    await waitSimTime(page, 0.5);
     const shown = await page.locator('svg.schematic').getByText(/A$/).allTextContents();
     await page.getByRole('button', { name: 'Durdur', exact: true }).first().click(); await page.waitForTimeout(300);
     pt = await screen(page, meter.x, meter.y); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(300);
@@ -3045,7 +3070,7 @@ try {
     const after = await saved();
     check('arıza (ampermetre, masaüstü): kabloya tıkla → "Buraya ampermetre tak": A1 kablonun üstünde, kablonun yönünde (kablo ikiye bölünüyor, gösterge çalışıyor); ampermetreye tıkla → "Ampermetreyi kaldır": kablolar birebir eski hâline dönüyor',
       menu.join('|') === 'Buraya ampermetre tak' && meter !== undefined && meter.y === -2 && meter.rotation === 0 && plugged.parts.length === before.parts.length + 1 && plugged.wires.length === before.wires.length + 1 &&
-        shown.some((x) => /\d A$/.test(x)) && menu2.join('|') === 'Ampermetreyi kaldır' && JSON.stringify(after.wires) === JSON.stringify(before.wires) && after.parts.length === before.parts.length,
+        shown.some((x) => /\d [pnµm]?A$/.test(x)) && menu2.join('|') === 'Ampermetreyi kaldır' && JSON.stringify(after.wires) === JSON.stringify(before.wires) && after.parts.length === before.parts.length,
       `${menu.join('|')} · ${meter?.x},${meter?.y} · ${plugged.parts?.length}/${plugged.wires?.length} · ${shown.join(',')} · ${menu2.join('|')}`);
     // 3B: etiketlerde yalnızca ölçü aletlerinin değeri (PS1, FG1 değersiz), Akım düğmesi yok; panelden ampermetre → şemaya dön, "Bir kabloya tıkla".
     await page.getByRole('button', { name: 'Oynat', exact: true }).first().click(); await page.waitForTimeout(500);
@@ -3964,10 +3989,14 @@ try {
   const fgRegion = notebook(rp).getByRole('region', { name: 'FG1 · Fonksiyon üreteci' });
   if (!(await fgRegion.count())) await notebook(rp).getByRole('button', { name: /^FG1 ·/ }).click();
   await rp.waitForTimeout(900);
+  // Pencereler simülasyon zamanında dolar: yavaş işlemcide ilk tam pencereler gelene dek beklenir.
+  await waitSimTime(rp, 0.9);
   const fgOuts = [];
+  // Okumalar gerçek zamanda 100 ms arayla (IOS_CPU uzatmaz): ≈ 0,8 s'de pencere en çok üç kez yenilenir.
+  const realWait = (ms) => new Promise((r) => setTimeout(r, ms));
   for (let i = 0; i < 8; i++) {
     fgOuts.push(((await fgRegion.textContent()) ?? '').match(/Çıkış \(OUT − COM\) ([^·]+)·/)?.[1]?.trim() ?? '');
-    await rp.waitForTimeout(100);
+    await realWait(100);
   }
   // ≈ 1 s'lik okumada pencere (0,4 s) en çok üç kez yenilenir; düzeltmeden önce her okuma farklıydı.
   const changes = (texts) => texts.filter((t, i) => i > 0 && t !== texts[i - 1]).length;
@@ -3988,7 +4017,7 @@ try {
     if (!text.includes('En düşük')) continue;
     for (let i = 0; i < 6; i++) {
       wireTexts.push(((await notebook(rp).textContent()) ?? '').match(/ortalama\s*(≈ [^E]+?)En düşük/)?.[1]?.trim() ?? '');
-      await rp.waitForTimeout(100);
+      await realWait(100);
     }
     break;
   }

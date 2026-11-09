@@ -42,6 +42,46 @@ describe('Canlı ölçümler: kararlı gösterim', () => {
     expect(new Set(rows.slice(30, 50).map((r) => r[0])).size).toBeLessThanOrEqual(2);
   });
 
+  it('simülasyon gerçek zamanın gerisinde (karede 1/6000 s, normal hızın %1’i): pencere yine 0,4 s simülasyon süresi; etkin değer 7,07 V', () => {
+    // Gerçek zamanlı pencere (0,4 s = 24 kare) burada 4 ms simülasyon tutardı: 50 Hz'in periyodunun beşte biri.
+    const sim = new CircuitSimulator(
+      circuit().acsource('AC1', 'a', 'gnd', { amplitude: 10, frequency: 50 }).ground('G1', 'gnd').resistor('R1', 'a', 'gnd', 1000).build(),
+    );
+    const p = part('R1', 'resistor', { resistance: 1000 });
+    sim.watch([p.id]);
+    const window = new LiveWindow();
+    const summaries = new Set<unknown>();
+    for (let i = 0; i < 2700; i++) {
+      expect(sim.advance(1 / 6000, 6000).ok).toBe(true);
+      window.add(sim.watchedStats(p.id), 1 / 6000);
+      summaries.add(window.summary);
+    }
+    // İlk kare ve 0,4 s'de bir: 0,45 s'de iki özet.
+    expect(summaries.size).toBe(2);
+    const r = stableReadout(p, sim.measure(p.id)!, sim.status(p.id), window.summary)!;
+    expect(r.rows[0]!.value).toMatch(/^≈ 7,0\d\d V$/);
+  });
+
+  it('yavaş çekimde (hız 0,01) pencere 0,4 × 0,01 s simülasyon: gerçek zamanda yine 0,4 s (24 kare)', () => {
+    const sim = new CircuitSimulator(
+      circuit().acsource('AC1', 'a', 'gnd', { amplitude: 10, frequency: 5 }).ground('G1', 'gnd').resistor('R1', 'a', 'gnd', 1000).build(),
+    );
+    sim.watch(['R1']);
+    const window = new LiveWindow();
+    let updates = 0;
+    let previous = window.summary;
+    for (let i = 0; i < 240; i++) {
+      expect(sim.advance(0.01 / 60, 6000).ok).toBe(true);
+      window.add(sim.watchedStats('R1'), 0.01 / 60, 0.4 * 0.01);
+      if (window.summary !== previous) updates++;
+      previous = window.summary;
+    }
+    // 240 kare (4 s gerçek zaman): ilk kare ve 24 karede bir (kayan noktalı toplam 0,4'ün hemen altında
+    // kalırsa 25 karede bir).
+    expect(updates).toBeGreaterThanOrEqual(10);
+    expect(updates).toBeLessThanOrEqual(11);
+  });
+
   it('yükü asimetrik AC (diyotlu yük, 50 Ω çıkış direnci): etkin değer işaretsiz; tek kutuplu değer işaretli', () => {
     // 1N4001 X-Y örneğindeki gibi: üretecin çıkışı (o) pozitif yarıda biraz düşer, ortalaması hafif
     // negatif olur; "≈ −3,4 V" değil "≈ 3,4 V" yazmalı. Ters diyotlu dirençte yalnızca negatif yarı

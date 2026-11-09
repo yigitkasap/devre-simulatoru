@@ -1784,12 +1784,21 @@ adım sınırına gelinmeden kare uzuyordu.
 - Hesap hızı tahmini (1 ms simülasyonun hesap süresi) artınca hemen, azalınca yavaş izlenir: su dururken
   devre ucuz, doldurma başlayınca ağırlaşır; yumuşatılarak izlenince ilk saniyelerde hesap kısılıyordu
   (telefondaki "Seviye 1" maddesi bir koşuda 9 s'de %27'de kaldı).
-- Uyarı metni: "Simülasyon gerçek zamana yetişemiyor: devre bu cihaz için ağır ya da frekans yüksek. Hızı
-  düşürebilir ya da osiloskopta Oto’ya basabilirsin." "Sonuçlar doğru kalır" denmez: çözüm simülasyon
-  zamanında doğru kalır (adımlar hata denetimiyle seçilir, kesilen kare yalnızca kalan süreyi atlar;
-  `tests/kare-butcesi.test.ts`), ama ölçü aletlerinin ≈ okumaları gerçek zamanlı 0,4 s'lik pencerelerde
-  toplanır (`liveReadout.ts`): çok geride kalınca pencere bir periyottan kısa simülasyon zamanını kapsar
-  (ör. gerçek zamanın %2'sinde 8 ms, 50 Hz'in periyodu 20 ms) ve DC ortalama ya da etkin değer yanlış çıkar.
+- Uyarı metni: "Simülasyon gerçek zamana yetişemiyor: devre bu cihaz için ağır ya da frekans yüksek. Süre
+  daha yavaş akar ama sonuçlar doğru kalır. Hızı düşürebilir ya da osiloskopta Oto’ya basabilirsin." Çözüm
+  simülasyon zamanında doğru kalır (adımlar hata denetimiyle seçilir, kesilen kare yalnızca kalan süreyi atlar;
+  `tests/kare-butcesi.test.ts`). Ölçü aletlerinin ≈ okumaları, kablo değerleri ve görev hedeflerinin ortalaması
+  2026-11-09'dan beri simülasyon zamanındaki pencerelerde toplanır (`liveReadout.ts`): pencere DISPLAY_WINDOW ×
+  hız simülasyon saniyesi; normal akışta gerçek zamanda yine 0,4 s, geride kalınca okuma geç gelir ama aynı
+  simülasyon süresini kapsar (`tests/canli-olcum.test.ts`). Önce gerçek zamanlı 0,4 s'lik pencerelerdi: çok
+  geride kalınca bir periyottan kısa simülasyon süresi kapsanıyor, ortalama ve etkin değer yanlış çıkıyordu
+  (bu yüzden cümle bir süre çıkarılmıştı). METER_REFRESH (saniyede 4 okuma), osiloskop ölçüm satırlarının
+  tutulması ve analiz grafiğinin yenilenmesi gerçek zamanda kalır: yalnızca gösterimin yenilenme hızı, okunan
+  değer son tamamlanan pencereden gelir.
+- Bedeli: ağır devrede ilk okuma gecikir. 4 kat yavaş masaüstünde BJT yükselteci (kuplajlı) gerçek zamanın
+  %0,6'sında ilerliyor (main %26'da ama 3–4 kare/s): VCE'nin oturmuş ortalaması (ikinci pencere, 0,8 s) ≈ 140 s
+  sonra gelir. İlk pencere açılıştaki geçici durumu da içerir (normal hızda 6,088 V, sonrakiler 5,990 V).
+  ios-kontrol'de okuma bekleyen maddeler gerçek süre yerine simülasyon zamanını bekler (`waitSimTime`).
 - Sonuç (4 kat yavaş, 81 örnek): en yavaş örnek ≈ 35 kare/s (önce 34 örnek 20 kare/s'nin altında),
   100 ms'yi aşan görev yok (önce kare başına 150–300 ms). Masaüstünde (144 Hz'lik ekranda, eski ve yeni
   art arda) ağır föy örnekleri eskisi gibi gerçek zamanda (≥ 0,98); yalnızca çift yönlü kırpıcı, makine
@@ -1800,15 +1809,15 @@ adım sınırına gelinmeden kare uzuyordu.
   kare bütçesine bağlı kalmaz. Altyapı var (Analiz taramaları sweep.worker.ts'te); ama `buildFrame`, ses,
   osiloskop ve iz kaydedicileri, Arduino, basılı düğmeler ve canlı değer değişiklikleri çözücüye
   doğrudan erişiyor: bunların hepsi ileti ve her karede bir anlık görüntüye dönmeli.
-- Tam ios-kontrol 4 kat yavaşta (`IOS_CPU=4`, 2026-11-08; ios-kontrol 4 kat yavaşta "Kur kipi" bölümünde
-  `boundingBox` zaman aşımıyla duruyor, main'de de: her üst düzey bölümü try/catch'e saran geçici kopyayla,
-  aynı betik iki derlemede art arda). 438 madde: dal 11, main 10 KALDI. İkisinde de kalan 7 madde 4 kat
-  yavaşlığın kendisi (zaman aşımı, dokunma/kaydırma süreleri, ≈ okumaların karede oynaması, baraj klavye
-  maddesi ikisinde aynı değerlerle). Yalnızca main'de kalan: Telefon hızı (2,7 kare/s), "yetişemiyor" simgesi,
-  baraj B6. Yalnızca dalda kalan 4 madde simülasyonun gerçek zamandan yavaş yürümesinden: canlı okumalar
-  gerçek zaman penceresinde toplandığı için BJT görevinde VCE 5,99 yerine 6,03–6,06 V (tahmin farkı %0,2
-  yerine %1,0), OSC1 girişindeki ampermetre "≈ 0,000 A" yerine anlık "1,526 pA", analiz imleç kutusu 5
-  noktaya biniyor (kayıt daha kısa simülasyon süresini kapsıyor). Normal hızda dördü de geçiyor.
+- Tam ios-kontrol 4 kat yavaşta (`IOS_CPU=4`; ios-kontrol 4 kat yavaşta "Kur kipi" bölümünde `boundingBox`
+  zaman aşımıyla duruyor, main'de de: her üst düzey bölümü try/catch'e saran geçici kopyayla, aynı betik iki
+  derlemede art arda). 2026-11-08, 438 madde: dal 11, main 10 KALDI; yalnızca dalda kalan 4 madde (BJT VCE,
+  tahmin farkı, OSC1 girişindeki ampermetre, analiz imleci) simülasyon gerçek zamanın gerisindeyken gerçek
+  zamanlı pencerelerden ve sabit gerçek süre beklemelerinden. 2026-11-09: pencereler simülasyon zamanında,
+  okuma bekleyen maddeler `waitSimTime`le; ampermetre maddesi gösterge metninde SI önekini de kabul eder
+  (osiloskop girişindeki akım sıfır; 4 kat yavaşta tam pencerede gürültü salınım sayılmaz, canlı "0,003 pA",
+  main'de kısa pencere "≈ 0,000 A"); üretecin ve kablonun ≈ okumalarının "karede zıplamıyor" maddeleri 100 ms'lik
+  aralığı gerçek zamanda bekler (IOS_CPU okumaları 3,2 s'ye yayıyor, pencere sayısı artıyordu).
 
 ### Arduino Uno (2026-10-27)
 

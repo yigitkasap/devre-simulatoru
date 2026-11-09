@@ -1841,12 +1841,12 @@ export const tr = {
     conventionalNote: 'Noktalar geleneksel akım yönünü gösterir: dış devrede + uçtan − uca.',
     stoppedByEdit: 'Devrenin yapısı değiştiği için simülasyon durduruldu.',
     /**
-     * "Sonuçlar doğru kalır" denmez: çözüm simülasyon zamanında doğru kalır ama ölçü aletlerinin ≈ okumaları
-     * gerçek zamanlı pencerelerde (liveReadout.ts, DISPLAY_WINDOW) toplanır; çok geride kalınca pencere bir
-     * periyottan kısa simülasyon zamanını kapsar ve DC ortalama ya da etkin değer yanlış çıkabilir.
+     * "Sonuçlar doğru kalır": çözüm simülasyon zamanında doğru kalır (kesilen kare yalnızca kalan süreyi atlar;
+     * tests/kare-butcesi.test.ts) ve ölçü aletlerinin ≈ okumaları simülasyon zamanındaki pencerelerde
+     * (liveReadout.ts, DISPLAY_WINDOW × hız) toplanır: geride kalınca okuma geç gelir ama aynı süreyi kapsar.
      */
     lagging:
-      'Simülasyon gerçek zamana yetişemiyor: devre bu cihaz için ağır ya da frekans yüksek. Hızı düşürebilir ya da osiloskopta Oto’ya basabilirsin.',
+      'Simülasyon gerçek zamana yetişemiyor: devre bu cihaz için ağır ya da frekans yüksek. Süre daha yavaş akar ama sonuçlar doğru kalır. Hızı düşürebilir ya da osiloskopta Oto’ya basabilirsin.',
     cannotRun: 'Simülasyon başlamadı:',
     status: { running: 'Çalışıyor', paused: 'Duraklatıldı', stopped: 'Durduruldu' },
     legend: 'Kablo gerilimi',

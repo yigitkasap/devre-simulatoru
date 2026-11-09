@@ -1,6 +1,8 @@
 // Canlı ölçümlerin kararlı gösterimi (gerçek bir multimetre gibi): motor, izlenen bileşenin ölçüm
-// ve durum yapraklarını her adımda tümler (sim/watch.ts); burada bu istatistikler DISPLAY_WINDOW
-// saniyelik (gerçek zaman) pencerelerde toplanır.
+// ve durum yapraklarını her adımda tümler (sim/watch.ts); burada bu istatistikler simülasyon zamanında
+// DISPLAY_WINDOW × hız saniyelik pencerelerde toplanır: simülasyon yetişirken gerçek zamanda DISPLAY_WINDOW;
+// gerçek zamanın gerisinde kalınca okuma geç gelir ama yine aynı simülasyon süresini kapsar (ortalama ve
+// etkin değer doğru kalır).
 //
 //   - Sabit ya da tek yönde değişen (kondansatörün dolması gibi) değer olduğu gibi, her karede canlı
 //     gösterilir.
@@ -15,13 +17,17 @@ import type { Part } from '../model/types';
 import { mergeStats, type DeviceStatus, type KeyStats, type Measurement } from '../sim';
 import { meterRole, meterText, partReadout, type Readout, type ReadoutRow } from './readouts';
 
-/** Salınan değerlerin güncellenme aralığı (gerçek zaman, s): multimetrelerin ≈ 2–3 okuma/s'si. */
+/**
+ * Salınan değerlerin güncellenme aralığı (s, simülasyon yetişirken gerçek zamanda): multimetrelerin
+ * ≈ 2–3 okuma/s'si. Pencere simülasyon zamanında ölçülür: DISPLAY_WINDOW × hız.
+ */
 export const DISPLAY_WINDOW = 0.4;
 
 /**
  * Ölçü aletlerinin okuma aralığı (gerçek zaman, s): gerçek bir multimetre gibi saniyede 4 okuma.
  * Okuma karede bir kez hesaplanır (meterReadings); şemadaki gösterge, defter kartı, 3B etiketi ve
- * 3B aletin ekranı aynı okumayı gösterir.
+ * 3B aletin ekranı aynı okumayı gösterir. Yalnızca gösterimin yenilenme hızı: okunan değer son
+ * tamamlanan pencereden (simülasyon zamanı) gelir, gerçek zamanda yenilenmesi sonucu değiştirmez.
  */
 export const METER_REFRESH = 0.25;
 
@@ -31,22 +37,25 @@ export type LiveSummary = ReadonlyMap<string, KeyStats>;
 /** Bir bileşenin pencere toplayıcısı. */
 export class LiveWindow {
   private acc = new Map<string, KeyStats>();
-  private real = 0;
+  private span = 0;
   /** Son tamamlanan pencere; henüz yoksa null. */
   summary: LiveSummary | null = null;
 
-  /** Bir karenin istatistiklerini ekler; pencere dolduysa özet güncellenir. */
-  add(stats: ReadonlyMap<string, KeyStats> | null, dtReal: number, window = DISPLAY_WINDOW): void {
+  /**
+   * Bir karenin istatistiklerini ekler; pencere dolduysa özet güncellenir. `dt` karede ilerleyen
+   * simülasyon süresi, `window` pencerenin simülasyon süresi (s).
+   */
+  add(stats: ReadonlyMap<string, KeyStats> | null, dt: number, window = DISPLAY_WINDOW): void {
     if (!stats) return;
     for (const [key, s] of stats) {
       const previous = this.acc.get(key);
       this.acc.set(key, previous ? mergeStats(previous, s) : { ...s, values: [...s.values] });
     }
-    this.real += dtReal;
-    if (this.real >= window || this.summary === null) {
+    this.span += dt;
+    if (this.span >= window || this.summary === null) {
       this.summary = this.acc;
       this.acc = new Map();
-      this.real = 0;
+      this.span = 0;
     }
   }
 }
@@ -80,12 +89,13 @@ export class NodeWindow {
   private min = Infinity;
   private max = -Infinity;
   private variation = 0;
-  private real = 0;
+  private span = 0;
   private previous: number | null = null;
   /** Son tamamlanan pencere; henüz yoksa null. */
   summary: NodeSummary | null = null;
 
-  add(s: NodeSample, dtReal: number, window = DISPLAY_WINDOW): void {
+  /** `dt` karede ilerleyen simülasyon süresi, `window` pencerenin simülasyon süresi (s). */
+  add(s: NodeSample, dt: number, window = DISPLAY_WINDOW): void {
     const from = this.previous ?? s.mean;
     const lo = Math.min(s.min, from, s.end);
     const hi = Math.max(s.max, from, s.end);
@@ -93,10 +103,10 @@ export class NodeWindow {
     this.previous = s.end;
     this.min = Math.min(this.min, s.min);
     this.max = Math.max(this.max, s.max);
-    this.sum += s.mean * dtReal;
-    this.time += dtReal;
-    this.real += dtReal;
-    if (this.real >= window || this.summary === null) {
+    this.sum += s.mean * dt;
+    this.time += dt;
+    this.span += dt;
+    if (this.span >= window || this.summary === null) {
       const span = this.max - this.min;
       const varying = span > 1e-6 * Math.max(Math.abs(this.max), Math.abs(this.min)) + 1e-9 && this.variation > 1.5 * span;
       this.summary = { mean: this.time > 0 ? this.sum / this.time : s.mean, min: this.min, max: this.max, varying };
@@ -105,7 +115,7 @@ export class NodeWindow {
       this.min = Infinity;
       this.max = -Infinity;
       this.variation = 0;
-      this.real = 0;
+      this.span = 0;
     }
   }
 }

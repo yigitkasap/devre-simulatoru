@@ -248,12 +248,14 @@ export function useSimulation(
   }, []);
 
   /**
-   * Motorun şu anki durumundan bir kare hazırlar; noktaları dtReal kadar ilerletir.
+   * Motorun şu anki durumundan bir kare hazırlar; noktaları dtReal kadar ilerletir. Ölçüm pencereleri
+   * karede ilerleyen simülasyon süresiyle (dtSim) dolar: pencere DISPLAY_WINDOW × hız simülasyon saniyesi.
    * AC devrede kablo renkleri, akım noktaları ve LED parlaklığı karenin ortalamasından çizilir:
    * anlık değerler kare hızında örneklenince titrer ya da yanıltıcı biçimde yavaş dalgalanırdı.
    */
-  const buildFrame = useCallback((sim: CircuitSimulator, dtReal: number, lagging = false, merged: ReadonlyMap<string, ReadonlyMap<string, KeyStats>> | null = null): SimFrame => {
+  const buildFrame = useCallback((sim: CircuitSimulator, dtReal: number, lagging = false, merged: ReadonlyMap<string, ReadonlyMap<string, KeyStats>> | null = null, dtSim = 0): SimFrame => {
     const { doc: d, flowGraph: graph, electronFlow: electrons, connectivity: conn } = latest.current;
+    const windowSpan = DISPLAY_WINDOW * speedRef.current;
     const vmax = Math.max(sim.maxSourceVoltage(), 1e-6);
     const direction = electrons ? -1 : 1;
     const averaged = sim.hasAcSources;
@@ -272,7 +274,7 @@ export function useSimulation(
       const range = averaged ? sim.voltageRangeAt(key) : null;
       let w = nodeWindows.get(wire.id);
       if (!w) nodeWindows.set(wire.id, (w = new NodeWindow()));
-      w.add({ mean: v, min: range?.min ?? Math.min(v, end), max: range?.max ?? Math.max(v, end), end }, dtReal);
+      w.add({ mean: v, min: range?.min ?? Math.min(v, end), max: range?.max ?? Math.max(v, end), end }, dtSim, windowSpan);
       if (w.summary) wireSummaries.set(wire.id, w.summary);
     }
     const measurements = new Map<string, Measurement>();
@@ -406,7 +408,7 @@ export function useSimulation(
       let w = windows.get(id);
       if (!w) windows.set(id, (w = new LiveWindow()));
       // Kayıt kareyi parçalara böldüyse istatistikler bütün parçaların birleşimi.
-      w.add(merged ? (merged.get(id) ?? null) : sim.watchedStats(id), dtReal);
+      w.add(merged ? (merged.get(id) ?? null) : sim.watchedStats(id), dtSim, windowSpan);
       if (w.summary) summaries.set(id, w.summary);
     }
 
@@ -590,7 +592,7 @@ export function useSimulation(
         setFrame(buildFrame(sim, 0));
         return;
       }
-      setFrame(buildFrame(sim, dtReal, lagSamples > 0.5, recorded?.stats ?? null));
+      setFrame(buildFrame(sim, dtReal, lagSamples > 0.5, recorded?.stats ?? null, sim.time - simBefore));
       audio.current?.render(sim.devices, sim.time, soundRef.current && speedRef.current === 1 && lagSamples <= 0.5);
       raf = requestAnimationFrame(tick);
     };
