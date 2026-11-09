@@ -1931,10 +1931,9 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
 - **Kare hızı** (iPhone 13 öykünmesi, işlemci 4× yavaş, 3B, örnek çalışırken; 10 örnek: diyot-dc, yarim-dalga,
   voltmetre-yukleme, 555-astabil, diyot-karakteristigi, negatif-kenetleyici, paralel-kirpici,
   jfet-karakteristik, bjt-yukseltec, bjt-anahtar). Çizim tek başına (simülasyon durmuşken) 180 kare/s:
-  modeller yük değil. Çalışırken osiloskoplu örneklerde darboğaz simülasyon hesabı: bu dal tek başına main
-  gibi 4–8 kare/s (main 4–14). telefon-hizi'nin kare bütçesiyle birlikte (geçici yerel birleştirme) 10 örnek
-  30,9–58,2 kare/s, uzun görev yok; aynı ölçüm eski modellerle 33,1–53,6 (art arda). 30 kare/s hedefi
-  telefon-hizi main'e alınınca tutar.
+  modeller yük değil. Çalışırken osiloskoplu örneklerde darboğaz simülasyon hesabı: kare bütçesi olmadan
+  (telefon-hizi'den önce) 4–8 kare/s. Dal telefon-hizi'nin üzerinde (2026-11-09): 10 örnek 32,1–53,3 kare/s,
+  uzun görev yok (eski modellerle aynı ölçüm 33,1–53,6).
 
 ### Performans ve hata taraması (2026-10-27)
 
