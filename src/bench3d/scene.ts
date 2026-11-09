@@ -77,9 +77,32 @@ export interface TopInsets {
   readonly boardOnly?: boolean;
 }
 
-/** Kamera görünümleri: Serbest (önden ve yukarıdan, 52°), Üstten, Önden (alçaktan). */
-export type CameraView = 'free' | 'top' | 'front';
-const ELEVATION: Record<CameraView, number> = { free: (52 * Math.PI) / 180, top: Math.PI * 0.47, front: (14 * Math.PI) / 180 };
+/**
+ * Kamera görünümleri: Serbest (önden ve yukarıdan, 52°; masa üstü cihaz varsa 40° ve tahtaya odaklı), Üstten,
+ * Önden (alçaktan), Cihazlar (masa üstü cihazların ön panelleri, alçaktan).
+ */
+export type CameraView = 'free' | 'top' | 'front' | 'bench';
+const ELEVATION: Record<CameraView, number> = {
+  free: (52 * Math.PI) / 180,
+  top: Math.PI * 0.47,
+  front: (14 * Math.PI) / 180,
+  bench: (12 * Math.PI) / 180,
+};
+/** Bundan yüksek parça (birim) masa üstü cihaz sayılır. */
+const TALL = 12;
+
+/** Kutunun sekiz köşesi. */
+function boxCorners(b: Box3): Vector3[] {
+  return [0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z));
+}
+
+/**
+ * Masa üstü cihaz varken Serbest: yükseklik açısı (alçaldıkça tahta daha az yer kaplar, arkadaki ön paneller
+ * daha çok görünür; telefonun 3B alanı kısa) ve tahtanın kadraj genişliğindeki payı.
+ */
+const BENCH_FREE = { desktop: { elevation: (36 * Math.PI) / 180, share: 0.47 }, phone: { elevation: (30 * Math.PI) / 180, share: 0.72 } };
+/** Bu genişlikten dar tuval telefon sayılır (px). */
+const PHONE_WIDTH = 640;
 
 /** Akım noktaları: aralık (birim), yarıçap ve hız ölçeği (şemadaki piksel/s → birim/s). */
 const DOT_SPACING = 2.6;
@@ -222,6 +245,10 @@ export class BenchScene {
   /** Kullanıcı kamerayı elle oynattı mı (oynatmadıysa alan değişince yeniden sığdırılır). */
   private userMoved = false;
   private lastView: CameraView = 'free';
+  /** Telefonda Cihazlar görünümünün yaklaştığı cihaz (soldan sıra; −1: henüz seçilmedi). */
+  private benchIndex = -1;
+  /** Cihazlar görünümünde (kamera oynatılana dek) yalnızca bu parçaların (masa üstü cihazlar) etiketi gösterilir. */
+  private benchLabels: ReadonlySet<string> | null = null;
   private plan: BreadboardPlan | null = null;
   /** Kablolar: önce plan.leads, sonra plan.jumpers sırasıyla. */
   private cablePaths: CablePath[] = [];
@@ -411,21 +438,37 @@ export class BenchScene {
       const pin = node.dataset.pin;
       const world = placed ? (pin !== undefined ? placed.anchors[Number(pin)] : placed.top) : undefined;
       let show = false;
-      if (world) {
+      // Cihazlar görünümünde devre parçalarının etiketleri cihazların ön panellerini örterdi.
+      const hidden = this.benchLabels !== null && !this.userMoved && placed !== undefined && !this.benchLabels.has(placed.part.id);
+      if (world && !hidden) {
         const { x, y, z } = pinSpots.get(node) ?? toScreen(world);
         if (node.dataset.exact !== undefined) {
           node.style.transform = `translate(${Math.round(x - item.w / 2)}px, ${Math.round(y - item.h / 2)}px)`;
           node.style.opacity = z > -1 && z < 1 ? '1' : '0';
           continue;
         }
-        const box = pin !== undefined ? { x0: x - item.w / 2, y0: y - item.h / 2 } : { x0: x - item.w / 2, y0: y - item.h - 4 };
-        const rect = { ...box, x1: box.x0 + item.w, y1: box.y0 + item.h };
-        const inView = z > -1 && z < 1 && rect.x1 > 0 && rect.y1 > 0 && rect.x0 < w && rect.y0 < h;
-        const clash = pin === undefined && taken.some((r) => rect.x0 < r.x1 && rect.x1 > r.x0 && rect.y0 < r.y1 && rect.y1 > r.y0);
-        if (inView && !clash) {
+        // Parça etiketi: önce ucun üstünde; başka bir etiketle (4 px aralı) çakışırsa sağında, solunda, bir
+        // kat yukarıda ya da altında; hiçbiri olmazsa gizlenir. Uç harfi her zaman ucun üstünde.
+        const spots =
+          pin !== undefined
+            ? [{ x0: x - item.w / 2, y0: y - item.h / 2 }]
+            : [
+                { x0: x - item.w / 2, y0: y - item.h - 4 },
+                { x0: x + 6, y0: y - item.h - 4 },
+                { x0: x - item.w - 6, y0: y - item.h - 4 },
+                { x0: x - item.w / 2, y0: y - 2 * item.h - 12 },
+                { x0: x - item.w / 2, y0: y + 8 },
+              ];
+        const GAP = 4;
+        for (const box of spots) {
+          const rect = { ...box, x1: box.x0 + item.w, y1: box.y0 + item.h };
+          const inView = z > -1 && z < 1 && rect.x1 > 0 && rect.y1 > 0 && rect.x0 < w && rect.y0 < h;
+          const clash = pin === undefined && taken.some((r) => rect.x0 < r.x1 + GAP && rect.x1 > r.x0 - GAP && rect.y0 < r.y1 + GAP && rect.y1 > r.y0 - GAP);
+          if (!inView || clash) continue;
           show = true;
           if (pin === undefined) taken.push(rect);
           node.style.transform = `translate(${Math.round(rect.x0)}px, ${Math.round(rect.y0)}px)`;
+          break;
         }
       }
       node.style.opacity = show ? '1' : '0';
@@ -479,6 +522,29 @@ export class BenchScene {
     material.needsUpdate = true;
     old?.dispose();
     this.dirty = true;
+  }
+
+  /** Denetim (ios-kontrol): tahtanın (kullanılan bölümü) tuvaldeki dikdörtgeni (px). */
+  boardRect(): { x0: number; y0: number; x1: number; y1: number } | null {
+    if (this.boardView.isEmpty()) return null;
+    const canvas = this.renderer.domElement;
+    const pts = boxCorners(this.boardView).map((c) => c.project(this.view));
+    const xs = pts.map((q) => ((q.x + 1) / 2) * canvas.clientWidth);
+    const ys = pts.map((q) => ((1 - q.y) / 2) * canvas.clientHeight);
+    return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+  }
+
+  /** Denetim (ios-kontrol): masa üstü cihazların tuvaldeki dikdörtgenleri (px), parça kimliğiyle. */
+  deviceRects(): Array<{ id: string; x0: number; y0: number; x1: number; y1: number }> {
+    const canvas = this.renderer.domElement;
+    return [...this.parts.values()].flatMap((placed) => {
+      const box = new Box3().setFromObject(placed.group);
+      if (box.max.y <= TALL) return [];
+      const pts = boxCorners(box).map((c) => c.project(this.view));
+      const xs = pts.map((q) => ((q.x + 1) / 2) * canvas.clientWidth);
+      const ys = pts.map((q) => ((1 - q.y) / 2) * canvas.clientHeight);
+      return [{ id: placed.part.id, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }];
+    });
   }
 
   /** Denetim (ios-kontrol): masadaki bir parçanın gövdesinin içinden geçen kablo sayısı. */
@@ -922,10 +988,24 @@ export class BenchScene {
 
   // --- Kamera ---------------------------------------------------------------------------------------
 
-  /** Bütün devre görünsün: Serbest (önden ve yukarıdan, 52°), Üstten ya da Önden (alçaktan). */
-  fit(view: CameraView = 'free'): void {
+  /**
+   * Bütün devre görünsün: Serbest (önden ve yukarıdan, 52°), Üstten ya da Önden (alçaktan); Cihazlar masa üstü
+   * cihazlara. `request`: kullanıcı seçti (telefonda Cihazlar yeniden seçilince sıradaki cihaza geçer).
+   */
+  fit(view: CameraView = 'free', request = false): void {
+    if (view === 'bench' && request) this.benchIndex = this.lastView === 'bench' && !this.userMoved ? this.benchIndex + 1 : -1;
     this.lastView = view;
     this.userMoved = false;
+    this.benchLabels = view === 'bench' ? new Set(this.tallParts().map((p) => p.part.id)) : null;
+    // Masa üstü cihazlar (dik, uzun) varsa: Serbest tahtaya odaklanır (cihazların ön panelleri arkada, üstleri
+    // kırpılabilir), Cihazlar ön panellere yaklaşır.
+    if (view === 'free' || view === 'bench') {
+      const framed = view === 'bench' ? this.benchFrame() : this.circuitFrame();
+      if (framed) {
+        this.placeCamera(framed.target, framed.distance, framed.elevation);
+        return;
+      }
+    }
     const box = new Box3();
     // Parçalara, kablolara ve breadboard'un kullanılan bölümüne sığdırılır.
     // Üstten görünümde uzun (dik duran) cihazlar ve kabloları sayılmaz: kadraj tahtaya ve alçak parçalara.
@@ -945,13 +1025,7 @@ export class BenchScene {
     // (yükseklik dahil, ortalı); yoksa düz tezgâh için eski yarıçap kuralı.
     const tall = top ? null : this.tallFit(elevation, view);
     if (tall) {
-      this.controls.target.copy(tall.target);
-      this.camera.position.copy(tall.target).add(new Vector3(0, Math.sin(elevation), Math.cos(elevation)).multiplyScalar(tall.distance));
-      this.camera.near = Math.max(0.5, tall.distance / 200);
-      this.camera.far = tall.distance * 20;
-      this.camera.updateProjectionMatrix();
-      this.controls.update();
-      this.dirty = true;
+      this.placeCamera(tall.target, tall.distance, elevation);
       return;
     }
     const radius = Math.max(size.x, size.z * 1.1, 20) / 2;
@@ -1010,6 +1084,138 @@ export class BenchScene {
     around.min.y = box.min.y;
     around.max.y = Math.max(around.max.y, 1);
     return around;
+  }
+
+  /** Kamerayı hedefe verilen uzaklıktan ve yükseklik açısından (azimut 0: önden) bakacak biçimde yerleştirir. */
+  private placeCamera(target: Vector3, distance: number, elevation: number): void {
+    this.controls.target.copy(target);
+    this.camera.position.copy(target).add(new Vector3(0, Math.sin(elevation), Math.cos(elevation)).multiplyScalar(distance));
+    this.camera.near = Math.max(0.5, distance / 200);
+    this.camera.far = distance * 20;
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+    this.dirty = true;
+  }
+
+  /** Masa üstü cihazlar (dik duran, uzun parçalar). */
+  private tallParts(): Placed[] {
+    return [...this.parts.values()].filter((p) => new Box3().setFromObject(p.group).max.y > TALL);
+  }
+
+  /**
+   * Tuvalin altındaki denetimlerin (3B düğmeleri, küçük şema: [data-fit-reserve]) kapladığı yükseklik (px):
+   * yalnızca yatayda verilen aralıkla (0–1, tuval genişliğine göre) örtüşenler sayılır.
+   */
+  private bottomReserve(from: number, to: number): number {
+    const canvas = this.renderer.domElement;
+    const host = this.overlay?.parentElement;
+    const c = canvas.getBoundingClientRect();
+    if (!host || c.height === 0) return 0;
+    let top = c.bottom;
+    for (const el of host.querySelectorAll<HTMLElement>('[data-fit-reserve]')) {
+      const r = el.getBoundingClientRect();
+      if (r.height === 0 || r.right < c.left + from * c.width || r.left > c.left + to * c.width) continue;
+      top = Math.min(top, r.top);
+    }
+    return c.bottom - top + 8;
+  }
+
+  /**
+   * Serbest (masa üstü cihaz varken): tahta kadraj genişliğinin BENCH_FREE payı kadarı, tahta ve masadaki alçak
+   * parçalar alttaki denetimlerin üstünde; arkadaki cihazların ön panelleri tahtanın üstünde görünür, üstleri
+   * ve yanları kırpılabilir. Masa üstü cihaz yoksa null (eski kadraj).
+   */
+  private circuitFrame(): { target: Vector3; distance: number; elevation: number } | null {
+    const tall = this.tallParts();
+    if (tall.length === 0 || this.boardView.isEmpty()) return null;
+    const keep = boxCorners(this.boardView);
+    for (const placed of this.parts.values()) {
+      if (tall.includes(placed)) continue;
+      keep.push(...boxCorners(new Box3().setFromObject(placed.group)));
+    }
+    const canvas = this.renderer.domElement;
+    const { elevation, share } = canvas.clientWidth < PHONE_WIDTH ? BENCH_FREE.phone : BENCH_FREE.desktop;
+    const reserve = this.bottomReserve(0.5 - share / 2, 0.5 + share / 2) / Math.max(1, canvas.clientHeight);
+    const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9);
+    return { ...solved, elevation };
+  }
+
+  /**
+   * Cihazlar: masa üstü cihazların ön panelleri alçaktan, kadraja sığacak en yakından (ekranlar okunsun),
+   * alttaki denetimlerin üstünde ortalı. Telefonda bütün sıra göstergeleri okunamayacak kadar küçültür: tek
+   * cihaz (önce osiloskop, yoksa ortadaki), Cihazlar yeniden seçilince sağdaki; yanlardakiler kaydırılarak
+   * görülür. Masa üstü cihaz yoksa null.
+   */
+  private benchFrame(): { target: Vector3; distance: number; elevation: number } | null {
+    const tall = this.tallParts().sort((a, b) => a.group.position.x - b.group.position.x);
+    if (tall.length === 0) return null;
+    const canvas = this.renderer.domElement;
+    let shown = tall;
+    if (canvas.clientWidth < PHONE_WIDTH && tall.length > 1) {
+      if (this.benchIndex < 0) {
+        const scope = tall.findIndex((p) => p.part.type === 'oscilloscope');
+        this.benchIndex = scope >= 0 ? scope : Math.floor((tall.length - 1) / 2);
+      }
+      shown = [tall[this.benchIndex % tall.length]!];
+    }
+    const corners = shown.flatMap((p) => boxCorners(new Box3().setFromObject(p.group)));
+    const reserve = this.bottomReserve(0, 1) / Math.max(1, canvas.clientHeight);
+    const solved = this.solveFrame(ELEVATION.bench, corners, corners, 0.96, -1 + 2 * reserve, 0.96, true);
+    return { ...solved, elevation: ELEVATION.bench };
+  }
+
+  /**
+   * Verilen yükseklik açısından (azimut 0) bakan kamera için hedef ve uzaklık, sayısal yinelemeyle (perspektifte
+   * her noktanın derinliği ayrı): `focus` köşelerinin ekrandaki genişliği kadraj genişliğinin `share` kadarı;
+   * `keep` köşeleri yatayda kadraja, dikeyde `bottom` ile `top` (NDC, −1 ekranın altı) arasına sığar ve alttan
+   * `bottom` çizgisine oturur (`middle`: ikisinin ortasında). Sığmazsa uzaklık artar (focus `share`'den küçük kalır).
+   */
+  private solveFrame(
+    elevation: number,
+    focus: readonly Vector3[],
+    keep: readonly Vector3[],
+    share: number,
+    bottom: number,
+    top: number,
+    middle = false,
+  ): { target: Vector3; distance: number } {
+    const toCamera = new Vector3(0, Math.sin(elevation), Math.cos(elevation));
+    const forward = toCamera.clone().negate();
+    const right = new Vector3(1, 0, 0);
+    const up = new Vector3().crossVectors(right, forward);
+    const tanV = Math.tan((this.camera.fov * Math.PI) / 360);
+    const tanH = tanV * Math.max(0.2, this.camera.aspect);
+    const target = new Box3().setFromPoints([...focus]).getCenter(new Vector3());
+    let distance = new Box3().setFromPoints([...keep]).getSize(new Vector3()).length() * 2;
+    const extent = (points: readonly Vector3[], eye: Vector3) => {
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      let y0 = Infinity;
+      let y1 = -Infinity;
+      for (const p of points) {
+        const v = p.clone().sub(eye);
+        const depth = Math.max(1e-3, v.dot(forward));
+        const x = v.dot(right) / (depth * tanH);
+        const y = v.dot(up) / (depth * tanV);
+        x0 = Math.min(x0, x);
+        x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y);
+        y1 = Math.max(y1, y);
+      }
+      return { x0, x1, y0, y1 };
+    };
+    for (let i = 0; i < 60; i++) {
+      const eye = target.clone().addScaledVector(toCamera, distance);
+      const f = extent(focus, eye);
+      const k = extent(keep, eye);
+      const ratio = Math.max((f.x1 - f.x0) / (2 * share), (k.x1 - k.x0) / (2 * 0.94), (k.y1 - k.y0) / ((top - bottom) * 0.97));
+      // Kaydırma: keep yatayda ortada, alt kenarı `bottom`un hemen üstünde (hedef sağa/yukarı gidince içerik sola/aşağı).
+      target.addScaledVector(right, ((k.x0 + k.x1) / 2) * distance * tanH * 0.8);
+      const shift = middle ? (k.y0 + k.y1) / 2 - (bottom + top) / 2 : k.y0 - (bottom + 0.02);
+      target.addScaledVector(up, shift * distance * tanV * 0.8);
+      distance *= Math.pow(ratio, 0.7);
+    }
+    return { target, distance };
   }
 
   /**

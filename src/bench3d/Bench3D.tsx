@@ -84,7 +84,7 @@ export default function Bench3D(props: Bench3DProps) {
   useEffect(() => {
     if (camera.n === 0) return;
     if (camera.view === 'part') scene.current?.focus(camera.partId);
-    else scene.current?.fit(camera.view);
+    else scene.current?.fit(camera.view, true);
   }, [camera]);
   useEffect(() => {
     if (zoom.n > 0) scene.current?.zoom(zoom.factor);

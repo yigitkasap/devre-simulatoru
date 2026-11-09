@@ -156,7 +156,9 @@ export interface BenchViewProps {
 }
 
 type CameraChoice = CameraView | 'part';
-const CAMERA_CHOICES: readonly CameraChoice[] = ['free', 'top', 'front', 'part'];
+const CAMERA_CHOICES: readonly CameraChoice[] = ['free', 'top', 'front', 'bench', 'part'];
+/** Masa üstü cihazlar (dik duran): kamera menüsünde "Cihazlar" yalnızca bunlardan biri varken. */
+const BENCH_DEVICES: ReadonlySet<DeviceType> = new Set(['dcsupply', 'funcgen', 'oscilloscope', 'voltmeter', 'ammeter', 'multimeter']);
 
 export function BenchView(props: BenchViewProps) {
   const { doc, frame, selection, touch, phone, settings } = props;
@@ -292,6 +294,7 @@ export function BenchView(props: BenchViewProps) {
           type="button"
           onClick={props.onSchematic}
           aria-label={tr.bench.backToSchematic}
+          data-fit-reserve
           className="absolute bottom-4 left-4 z-10 flex w-[230px] flex-col overflow-hidden rounded-xl border border-line-2 bg-panel text-left shadow-md hover:border-accent"
         >
           <span className="flex items-center justify-between border-b border-line px-3 py-2 text-label">
@@ -313,7 +316,9 @@ export function BenchView(props: BenchViewProps) {
       )}
 
       {/* Sağ alt: 3B seçenekleri ve altında görünüm kutusu (şemadaki "− + Sığdır | 3B" kutusunun karşılığı). */}
+      {/* data-fit-reserve: kamera kadrajında (scene.ts → bottomReserve) tahta bu denetimlerin üstünde kalır. */}
       {!top && <div
+        data-fit-reserve
         className="pointer-events-none absolute z-10 flex max-w-[calc(100%-32px)] flex-col items-end gap-2"
         style={props.controlsInset ? { right: props.controlsInset.right, bottom: props.controlsInset.bottom } : { right: 16, bottom: 16 }}
       >
@@ -325,7 +330,14 @@ export function BenchView(props: BenchViewProps) {
           });
         })}
         {!phone && !props.liveHidden && toggle('dots', tr.bench.current, settings.currentDots, () => props.onSettings({ currentDots: !settings.currentDots }))}
-        <CameraMenu choice={cameraLabel} canFocus={single !== null} phone={phone} touch={touch} onPick={pickCamera} />
+        <CameraMenu
+          choice={cameraLabel}
+          canFocus={single !== null}
+          devices={doc.parts.some((p) => BENCH_DEVICES.has(p.type))}
+          phone={phone}
+          touch={touch}
+          onPick={pickCamera}
+        />
         {doc.parts.length > 0 && (
           <button type="button" onClick={props.onKarta} aria-label={phone ? tr.karta.open : undefined} title={tr.karta.open} className={button(false, iconOnly)}>
             <Icon name="board" className="h-[18px] w-[18px]" />
@@ -389,8 +401,22 @@ function BenchLabel({ part, frame, measured, selected }: { part: Part; frame: Si
   );
 }
 
-/** Kamera menüsü: Serbest, Üstten, Önden, Seçiliye yaklaş (sağ altta; yukarı açılır). */
-function CameraMenu({ choice, canFocus, phone, touch, onPick }: { choice: CameraChoice; canFocus: boolean; phone: boolean; touch: boolean; onPick: (choice: CameraChoice) => void }) {
+/** Kamera menüsü: Serbest, Üstten, Önden, Cihazlar (masa üstü cihaz varsa), Seçiliye yaklaş (sağ altta; yukarı açılır). */
+function CameraMenu({
+  choice,
+  canFocus,
+  devices,
+  phone,
+  touch,
+  onPick,
+}: {
+  choice: CameraChoice;
+  canFocus: boolean;
+  devices: boolean;
+  phone: boolean;
+  touch: boolean;
+  onPick: (choice: CameraChoice) => void;
+}) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -428,7 +454,7 @@ function CameraMenu({ choice, canFocus, phone, touch, onPick }: { choice: Camera
       </button>
       {open && (
         <div role="menu" aria-label={tr.bench.camera} className="absolute right-0 bottom-full mb-2 w-56 rounded-lg border border-line bg-panel p-1.5 shadow-lg">
-          {CAMERA_CHOICES.map((c) => (
+          {CAMERA_CHOICES.filter((c) => c !== 'bench' || devices).map((c) => (
             <button
               key={c}
               type="button"

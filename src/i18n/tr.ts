@@ -2573,7 +2573,7 @@ export const tr = {
     labels: 'Etiketler',
     current: 'Akım',
     camera: 'Kamera',
-    cameras: { free: 'Serbest', top: 'Üstten', front: 'Önden', part: 'Seçiliye yaklaş' } as Record<string, string>,
+    cameras: { free: 'Serbest', top: 'Üstten', front: 'Önden', bench: 'Cihazlar', part: 'Seçiliye yaklaş' } as Record<string, string>,
     cameraButton: (name: string) => `Kamera: ${name}`,
     backToSchematic: 'Şemaya dön',
     enlarge: 'Büyüt',

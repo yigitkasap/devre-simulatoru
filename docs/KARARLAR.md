@@ -1895,10 +1895,23 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   (1-2-5 adımlarıyla döner), POSITION, TRIGGER LEVEL, sarı CH1 ve mavi CH2 tuşları, kırmızı RUN/STOP, mavi
   AUTO; sarı halkalı CH1 (A), mavi halkalı CH2 (B) BNC, COM; EXT TRIG işlevsiz.
 - **Boyut ve yer**: gerçek boyutun %60'ı (tahta okunaklı kalsın; izin verilen en çok küçültme); dik durur, ön
-  paneli kameraya bakar; tahtanın 30 birim (≈ 76 mm) arkasında yan yana: uzakta oldukları için kamera yaklaşır,
-  öndeki tahta büyür, kablolar masaya sarkar. Uzun cihaz varsa kamera kadrajı bütün nesnelerin köşelerini
-  kameranın açısıyla sığdırır (altta düğme şeridi için pay); Üstten görünüm tahtaya odaklanır (cihazların
-  yalnızca soketli ön kısmı sayılır).
+  paneli kameraya bakar; en öndeki düğmesi tahtanın 14 birim (≈ 36 mm) arkasında, yan yana: kabloların ön
+  soketten çıkıp masaya sarkacağı kadar yer (2026-11-08'de 30 birimdi, kablolar çok uzundu). Üstten görünüm
+  tahtaya odaklanır (cihazların yalnızca soketli ön kısmı sayılır).
+- **Varsayılan kadraj (Serbest, 2026-11-09)**: masa üstü cihaz varken bütün nesneleri sığdırmak tahtayı
+  küçültüyordu (1N4001 DC'de kadrajın ≈ %25'i, telefonda alttaki düğmelerin arkasında). Artık tahtaya odaklı:
+  tahta kadraj genişliğinin masaüstünde %47'si (36°), telefonda %72'si (30°; 3B alanı kısa, alçak açıda tahta
+  daha az yer kaplar); tahta ve masadaki alçak parçalar alttaki 3B denetimlerinin ([data-fit-reserve]: düğmeler,
+  küçük şema; yalnızca tahtanın sütununda olanlar) üstüne oturur; arkadaki cihazların ön panelleri tahtanın
+  üstünde görünür, üstleri ve yanları kırpılabilir (`scene.circuitFrame`, `solveFrame`: perspektifte noktaların
+  derinliği ayrı olduğu için sayısal yineleme). Tahta büyükken yalnızca ortadaki cihaz tam görünür (cihaz sırası
+  tahtanın 3–6 katı geniş; cihazları uzaklaştırmak kabloları uzatır): bütün paneller için "Cihazlar".
+- **Cihazlar görünümü** (kamera menüsü, yalnızca masa üstü cihaz varken): ön paneller alçaktan (12°), kadraja
+  sığacak en yakından, denetimlerin üstünde ortalı; devre parçalarının etiketleri (panelleri örterdi) kamera
+  oynatılana dek gizli. Telefonda bütün sıra 390 px'e sığınca göstergeler okunmuyordu: tek cihaz (önce osiloskop,
+  yoksa ortadaki), Cihazlar yeniden seçilince sağdaki (sona gelince baştan); yanlardakiler kaydırılarak görülür.
+- **Etiketler**: çakışan (4 px aralı) etiket önce ucun sağına, soluna, bir kat yukarı ya da altına kayar; hiçbiri
+  olmazsa gizlenir (eskiden doğrudan gizleniyor, birbirine değen etiketler üst üste görünüyordu).
 - **Kablolar**: modelin `anchorDirs`'i soketin dışa baktığı yön; kablo soketten öne düz çıkar, yatay teğetle
   masaya sarkar, masada tahtaya gider ve deliğe yukarıdan iner (`leadRoute.socketCurve`; doğru + kübik
   Bézier'ler: masanın altına salınmaz). Fiş soketin ekseninde.

@@ -213,10 +213,11 @@ export function dipPins(type: DeviceType): readonly number[] {
 /** Masadaki parçaların yeri: sol sütun, arka sıra (cihazlar), ön sıra. */
 type Side = 'left' | 'back' | 'front';
 /**
- * Arkadaki cihazların ön yüzüyle tahtanın arka kenarı arası: tezgâhın arkasında dururlar (uzakta küçük
- * göründükleri için kamera yaklaşır, öndeki tahta büyür; kabloların masaya sarkacak yeri olur).
+ * Arkadaki cihazların en öndeki düğmesiyle tahtanın arka kenarı arası (birim, ≈ 2,5 mm): kabloların ön
+ * soketten çıkıp masaya sarkacağı kadar yer (leadRoute.socketCurve en çok 9 birim öne çıkar); daha uzağı
+ * kabloları uzatır.
  */
-const BACK_GAP = 30;
+const BACK_GAP = 14;
 
 /**
  * `slot`: kabloların tahtada hangi deliğe gideceği için kullanılan genişlik (cihazların eski, küçük

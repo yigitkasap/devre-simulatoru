@@ -5673,6 +5673,83 @@ try {
       layout.cards.length === 2 && !overlap && behind && layout.boardW >= 0.5 * layout.canvasW, `${layout.cards.length} kart · arkada ${behind} · tahta ${Math.round(layout.boardW)} / ${Math.round(layout.canvasW)} px`);
     await ctx.close();
   }
+  {
+    // Varsayılan (Serbest) kadraj, masa üstü cihaz varken: tahta masaüstünde kadraj genişliğinin en az %45'i,
+    // telefonda %70'i, alttaki 3B denetimlerinin ([data-fit-reserve]) üstünde; cihazların ön panelleri
+    // tahtanın arkasında (üstleri kırpılabilir); görünen etiketler üst üste binmiyor. Cihazlar: masaüstünde
+    // bütün cihazlar kadrajda, telefonda tek cihaz (önce osiloskop), yeniden seçince sıradaki.
+    const frame = (page) => page.evaluate(() => {
+      const t = window.__tezgah;
+      const c = document.querySelector('canvas').getBoundingClientRect();
+      const b = t.boardRect();
+      const reserve = [...document.querySelectorAll('[data-fit-reserve]')].map((e) => e.getBoundingClientRect()).filter((r) => r.height > 0)
+        .map((r) => ({ x0: r.left - c.left, y0: r.top - c.top, x1: r.right - c.left }));
+      const labels = [...document.querySelectorAll('[data-anchor="part"]')].filter((e) => getComputedStyle(e).opacity === '1')
+        .map((e) => { const r = e.getBoundingClientRect(); return { id: e.dataset.id, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom }; });
+      const devices = t.deviceRects().map((d) => ({ id: d.id, x0: d.x0, x1: d.x1, y0: d.y0, y1: d.y1, vis: Math.max(0, Math.min(d.x1, c.width) - Math.max(d.x0, 0)) / (d.x1 - d.x0) }));
+      return {
+        w: c.width,
+        share: b ? (b.x1 - b.x0) / c.width : 0,
+        under: b ? reserve.some((r) => b.x0 < r.x1 && r.x0 < b.x1 && b.y1 > r.y0) : true,
+        boardTop: b?.y0 ?? 0,
+        clash: labels.some((a, i) => labels.some((d, j) => i < j && a.x0 < d.x1 && d.x0 < a.x1 && a.y0 < d.y1 && d.y0 < a.y1)),
+        labels: labels.map((l) => l.id),
+        devices,
+      };
+    });
+    const open = async (page, id) => {
+      await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(800);
+    };
+    const pickCam = async (page, name, tapIt) => {
+      const button = page.getByRole('button', { name: /^Kamera:/ });
+      await (tapIt ? button.tap() : button.click()); await page.waitForTimeout(200);
+      const item = page.getByRole('menuitemradio', { name });
+      if (!(await item.count())) return false;
+      await (tapIt ? item.tap() : item.click()); await page.waitForTimeout(600);
+      return true;
+    };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    await open(page, 'diyot-dc');
+    await page.getByRole('button', { name: /^Oynat/ }).first().click(); await page.waitForTimeout(1200);
+    const dd = await frame(page);
+    const behind = dd.devices.length === 3 && dd.devices.every((d) => d.y1 <= dd.boardTop + 4 && d.y1 > 0) && dd.devices.some((d) => d.vis > 0.95);
+    check('3B kadraj (masaüstü, 1N4001 DC): tahta kadraj genişliğinin en az %45’i, alttaki 3B düğmelerinin üstünde; cihazların ön panelleri tahtanın arkasında; etiketler üst üste binmiyor',
+      dd.share >= 0.45 && !dd.under && behind && !dd.clash && dd.labels.length >= 2,
+      `tahta %${Math.round(dd.share * 100)} · altta ${dd.under} · arkada ${behind} · etiket ${dd.labels.length}, çakışma ${dd.clash}`);
+    await open(page, 'bjt-yukseltec');
+    const menu = await pickCam(page, 'Cihazlar', false);
+    const bench = await frame(page);
+    const span = bench.devices.length ? (Math.max(...bench.devices.map((d) => d.x1)) - Math.min(...bench.devices.map((d) => d.x0))) / bench.w : 0;
+    const onlyDevices = bench.labels.every((id) => bench.devices.some((d) => d.id === id));
+    check('3B kadraj (masaüstü, BC107 yükselteç): kamera menüsünde “Cihazlar”; üç cihaz da kadrajda, sıra kadraj genişliğinin en az %85’i; yalnızca cihazların etiketleri',
+      menu && bench.devices.length === 3 && bench.devices.every((d) => d.vis > 0.99) && span >= 0.85 && onlyDevices,
+      `${menu} · ${bench.devices.map((d) => Math.round(d.vis * 100)).join('/')} · %${Math.round(span * 100)} · ${bench.labels.length} etiket`);
+    await ctx.close();
+
+    const { page: ph } = await phone();
+    await ph.context().addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
+    await open(ph, 'diyot-dc');
+    const pd = await frame(ph);
+    check('3B kadraj (telefon, 1N4001 DC): tahta kadraj genişliğinin en az %70’i, alttaki 3B düğmelerinin üstünde; cihazlar tahtanın arkasında',
+      pd.share >= 0.7 && !pd.under && pd.devices.every((d) => d.y1 <= pd.boardTop + 4),
+      `tahta %${Math.round(pd.share * 100)} · altta ${pd.under}`);
+    await open(ph, 'bjt-yukseltec');
+    await pickCam(ph, 'Cihazlar', true);
+    const first = await frame(ph);
+    const scope = first.devices.find((d) => d.vis > 0.99 && d.x1 - d.x0 >= 0.8 * first.w);
+    await pickCam(ph, 'Cihazlar', true);
+    const second = await frame(ph);
+    const next = second.devices.find((d) => d.vis > 0.99 && d.x1 - d.x0 >= 0.6 * second.w);
+    check('3B kadraj (telefon, BC107 yükselteç): Cihazlar tek cihaza yaklaşıyor (osiloskop kadraj genişliğinin en az %80’i, tamamı görünür); yeniden seçince sıradaki cihaz',
+      scope !== undefined && next !== undefined && next.id !== scope.id,
+      `${scope?.id ?? '—'} → ${next?.id ?? '—'} · ${first.devices.map((d) => `${d.id}:${Math.round(d.vis * 100)}`).join(' ')}`);
+    await ph.context().close();
+  }
 } finally {
   await browser.close();
 }
