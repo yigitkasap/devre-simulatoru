@@ -5750,6 +5750,77 @@ try {
       `${scope?.id ?? '—'} → ${next?.id ?? '—'} · ${first.devices.map((d) => `${d.id}:${Math.round(d.vis * 100)}`).join(' ')}`);
     await ph.context().close();
   }
+  // --- 3B cihaz kabloları: timsah kıskaç, bir delikte tek tel, birleşme etiketi, ağ vurgusu ------------------
+  // Cihaz kabloları deliğe girmez: kıskaç eksenli parçanın bacağını ya da kısa dik telin ucunu tutar, aynı ağdakiler
+  // zincirlenir; tahtada hiçbir delikte iki şey yok; birleşme noktasında "GND · 3 kablo". Fare kablonun üstüne
+  // gelince (telefonda dokununca) o ağın kabloları ve bacakları parlar, öbürleri soluklaşır, küçük şemada düğüm.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const report = async (id) => {
+      await page.goto('about:blank');
+      await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(800);
+      return page.evaluate(() => {
+        const r = window.__tezgah.clipReport();
+        const labels = [...document.querySelectorAll('[data-anchor="junction"]')].map((e) => ({ net: e.dataset.net, text: e.textContent, shown: getComputedStyle(e).opacity === '1' }));
+        return { ...r, labels };
+      });
+    };
+    const jf = await report('jfet-karakteristik');
+    const yd = await report('yarim-dalga');
+    const kinds = (r) => r.clips.map((c) => c.kind[0]).join('');
+    const label = (r, net) => r.labels.find((l) => l.net === net);
+    const gnd = (r) => r.junctions.find((j) => /GND/.test(label(r, j.net)?.text ?? ''));
+    check('3B kıskaç (BF245A, yarım dalga): hiçbir delikte iki tel ya da bacak yok; bütün cihaz kabloları kıskaçla (bacak, kısa tel ya da zincir), deliğe takılı cihaz kablosu yok',
+      jf.doubled === 0 && yd.doubled === 0 && jf.plugged === 0 && yd.plugged === 0 && jf.clips.length === 8 && yd.clips.length === 5 && jf.clips.some((c) => c.kind === 'leg') && jf.clips.some((c) => c.kind === 'chain'),
+      `BF245A ${kinds(jf)} · iki şey ${jf.doubled} · fişli ${jf.plugged} | yarım dalga ${kinds(yd)} · iki şey ${yd.doubled} · fişli ${yd.plugged}`);
+    check('3B kıskaç: birleşme etiketi ağın adı ve kablo sayısı (BF245A: "GND · 3 kablo", "RD 2. uç · 2 kablo"; yarım dalga: GND iki kablo), etiketler görünür',
+      label(jf, gnd(jf)?.net)?.text === 'GND · 3 kablo' && jf.labels.some((l) => l.text === 'RD 2. uç · 2 kablo') && jf.labels.every((l) => l.shown) && jf.junctions.length === 2 &&
+        /^GND · 2 kablo$/.test(label(yd, gnd(yd)?.net)?.text ?? '') && yd.labels.length === yd.junctions.length,
+      `${jf.labels.map((l) => `${l.text}${l.shown ? '' : ' (gizli)'}`).join(' | ')} || ${yd.labels.map((l) => l.text).join(' | ')}`);
+    // Fare birleşme noktasının (ilk kıskacın ağzı) üstüne gelince GND ağı vurgulanır.
+    await page.goto(`${URL0}embed/?ornek=jfet-karakteristik`, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const net = jf.junctions.find((j) => j.count === 3)?.net;
+    const at = await page.evaluate((net) => {
+      const t = window.__tezgah; const p = t.junctionAt.get(net).clone().project(t.camera); const c = document.querySelector('canvas').getBoundingClientRect();
+      return { x: c.left + ((p.x + 1) / 2) * c.width, y: c.top + ((1 - p.y) / 2) * c.height };
+    }, net);
+    let lit = { net: null };
+    for (let dy = 0; dy < 40 && !lit.net; dy += 3) {
+      await page.mouse.move(at.x, at.y - dy); await page.waitForTimeout(120);
+      lit = await page.evaluate(() => window.__tezgah.netHighlight());
+    }
+    const mini = await page.locator('polyline[data-highlight]').count();
+    await page.mouse.move(5, 300); await page.waitForTimeout(300);
+    const off = await page.evaluate(() => window.__tezgah.netHighlight());
+    check('3B ağ vurgusu (masaüstü, BF245A): fare GND birleşme noktasının üstüne gelince GND kabloları parlıyor, öbürleri soluk, bacağı işaretli; küçük şemada düğümün kabloları vurgulu; fare çekilince kalkıyor',
+      lit.net === net && lit.lit >= 4 && lit.dim >= 4 && lit.legs >= 1 && mini >= 1 && off.net === null && off.lit === 0 && off.dim === 0,
+      `${lit.net} · parlak ${lit.lit} · soluk ${lit.dim} · bacak ${lit.legs} · küçük şema ${mini} · sonra ${off.net}`);
+    await ctx.close();
+    // Telefonda dokununca: kıskaca dokunmak vurgular, yeniden dokunmak kaldırır.
+    const { page: ph, cdp } = await phone();
+    await ph.context().addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
+    await ph.goto(`${URL0}embed/?ornek=jfet-karakteristik&gorunum=tam`, { waitUntil: 'networkidle' });
+    await ph.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+    await ph.waitForTimeout(800);
+    const pt = await ph.evaluate((net) => {
+      const t = window.__tezgah; const p = t.junctionAt.get(net).clone().project(t.camera); const c = document.querySelector('canvas').getBoundingClientRect();
+      return { x: c.left + ((p.x + 1) / 2) * c.width, y: c.top + ((1 - p.y) / 2) * c.height };
+    }, net);
+    let tapped = { net: null };
+    for (let dy = 0; dy < 30 && !tapped.net; dy += 3) {
+      await tap(ph, cdp, { x: pt.x, y: pt.y - dy }); await ph.waitForTimeout(150);
+      tapped = await ph.evaluate(() => window.__tezgah.netHighlight());
+    }
+    check('3B ağ vurgusu (telefon, BF245A): kıskaca dokununca o ağ vurgulanıyor (öbürleri soluk)', tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1, `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0}`);
+    await ph.context().close();
+  }
 } finally {
   await browser.close();
 }

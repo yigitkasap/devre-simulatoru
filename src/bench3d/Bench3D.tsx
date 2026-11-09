@@ -57,6 +57,7 @@ export default function Bench3D(props: Bench3DProps) {
       onPress: (id, down) => cb.current.onPress(id, down),
       onCamera: () => cb.current.onCamera?.(),
       onView: () => cb.current.onView?.(),
+      onNet: (net) => cb.current.onNet?.(net),
     });
     scene.current = s;
     onScene.current?.(s);

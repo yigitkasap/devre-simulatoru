@@ -2580,6 +2580,10 @@ export const tr = {
     miniLabel: 'Küçük şema: aynı devre, seçili parça vurgulu',
     hintPhone: 'Bir parmak: döndür · iki parmak: yakınlaştır ve kaydır',
     focus: '3B’de yaklaş',
+    /** Cihaz kablolarının birleşme noktası: ağın adı ve kablo sayısı ("GND · 3 kablo"). */
+    junction: (name: string, count: number) => `${name} · ${count} kablo`,
+    /** Toprak ağının birleşme etiketindeki adı. */
+    groundNet: 'GND',
   },
   /** Tahtada kur (T1–T6): şemadaki devre tepeden görünen breadboard'a kurulur. */
   tahta: {

@@ -36,6 +36,7 @@ import {
 } from 'three';
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { dotSpeed, type SimFrame } from '../editor/useSimulation';
+import { pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
@@ -61,6 +62,8 @@ export interface BenchCallbacks {
   onCamera?(): void;
   /** Tepeden görünüm (Tahtada kur) kaydırıldı, yakınlaştı ya da boyutu değişti. */
   onView?(): void;
+  /** Bir ağın kabloları vurgulandı (kablonun ya da kıskacın üstüne gelince, telefonda dokununca) ya da vurgu kalktı (null). */
+  onNet?(net: string | null): void;
 }
 
 /** Tepeden görünümde ekran = dünya · scale + (ox, oy) (piksel; x sağa, z aşağı). */
@@ -267,6 +270,11 @@ export class BenchScene {
   private flowPlan: BreadboardPlan | null = null;
   /** Birleşme noktaları (ağ → dünya noktası): HTML katmanındaki [data-anchor="junction"] etiketleri. */
   private junctionAt = new Map<string, Vector3>();
+  /** Vurgulanan ağ, bacaklarının işaretleri ve malzemelerin soluk / parlak kopyaları. */
+  private highlighted: string | null = null;
+  private readonly legGlow = new Group();
+  private readonly dimmed = new Map<Material, Material>();
+  private readonly lit = new Map<Material, Material>();
   private leadObstacles: Obstacle[][] = [];
   private cableAmps = new Float64Array(0);
   private cablePhases = new Float64Array(0);
@@ -304,7 +312,7 @@ export class BenchScene {
     this.ring.visible = false;
     this.dots.count = 0;
     this.dots.frustumCulled = false;
-    this.scene.add(this.ring, this.boards, this.partsGroup, this.cables, this.dots);
+    this.scene.add(this.ring, this.boards, this.partsGroup, this.cables, this.dots, this.legGlow);
 
     // Fare eşlemesi stage.ts'te (sol kaydırır, orta / sağ döndürür). Tıklama (sürüklemeden) seçer.
     this.controls = createControls(this.camera, canvas, { min: 8, max: 900 });
@@ -318,6 +326,7 @@ export class BenchScene {
     canvas.addEventListener('pointermove', this.onPointerMove);
     canvas.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('pointercancel', this.onPointerUp);
+    canvas.addEventListener('pointerleave', this.onPointerLeave);
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);
@@ -456,10 +465,12 @@ export class BenchScene {
       if (node.dataset.anchor === 'footprint') continue;
       const placed = this.parts.get(node.dataset.id ?? '');
       const pin = node.dataset.pin;
-      const world = placed ? (pin !== undefined ? placed.anchors[Number(pin)] : placed.top) : undefined;
+      // Birleşme noktasının etiketi (ağın adı ve kablo sayısı): ilk kıskacın ağzının biraz üstünde.
+      const junction = node.dataset.anchor === 'junction' ? this.junctionAt.get(node.dataset.net ?? '') : undefined;
+      const world = placed ? (pin !== undefined ? placed.anchors[Number(pin)] : placed.top) : junction?.clone().setY(junction.y + 1.5);
       let show = false;
       // Cihazlar görünümünde devre parçalarının etiketleri cihazların ön panellerini örterdi.
-      const hidden = this.benchLabels !== null && !this.userMoved && placed !== undefined && !this.benchLabels.has(placed.part.id);
+      const hidden = this.benchLabels !== null && !this.userMoved && (placed === undefined || !this.benchLabels.has(placed.part.id));
       if (world && !hidden) {
         const { x, y, z } = pinSpots.get(node) ?? toScreen(world);
         if (node.dataset.exact !== undefined) {
@@ -664,6 +675,7 @@ export class BenchScene {
 
   /** Breadboard'lar, parçalar, jumper'lar ve kablolar baştan kurulur. */
   private rebuild(doc: CircuitDoc, plan: BreadboardPlan): void {
+    if (this.highlighted !== null) this.highlightNet(null);
     for (const placed of this.parts.values()) this.removePart(placed);
     this.parts.clear();
     for (const child of [...this.boards.children, ...this.cables.children]) {
@@ -1425,12 +1437,18 @@ export class BenchScene {
   };
 
   private readonly onPointerMove = (e: PointerEvent) => {
+    // Fareyle bir kablonun ya da kıskacın üstüne gelince o ağ vurgulanır (dokunmatikte dokununca: onPointerUp).
+    if (!this.drag && e.pointerType === 'mouse' && e.buttons === 0 && !this.topView) this.highlightNet(this.pickNet(e));
     if (!this.drag) return;
     const position = Math.max(0, Math.min(100, this.drag.start + (e.clientX - this.drag.x) * 0.5));
     if (Math.abs(position - this.drag.position) >= 0.5) {
       this.drag.position = Math.round(position);
       this.cb.onKnob(this.drag.id, this.drag.position, false);
     }
+  };
+
+  private readonly onPointerLeave = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') this.highlightNet(null);
   };
 
   private readonly onPointerUp = (e: PointerEvent) => {
@@ -1455,9 +1473,107 @@ export class BenchScene {
     }
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || e.type === 'pointercancel') return;
     const hit = this.pick(e);
+    // Dokunmatikte parçanın dışında bir kabloya ya da kıskaca dokununca o ağ vurgulanır; yeniden dokununca kalkar.
+    const net = e.pointerType !== 'mouse' && !this.topView ? this.pickNet(e) : null;
+    if (net && !hit) {
+      this.highlightNet(this.highlighted === net ? null : net);
+      return;
+    }
+    if (e.pointerType !== 'mouse') this.highlightNet(null);
     if (hit && hit.model.interaction === 'toggle' && this.active) this.cb.onToggle(hit.part.id);
     else this.cb.onSelect(hit?.part.id ?? null);
   };
+
+  /** İşaretçinin altındaki kablonun (kıskaç, kısa tel, köprü dahil) ağı; önünde parça varsa null. */
+  private pickNet(e: PointerEvent): string | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    const ray = new Raycaster();
+    ray.setFromCamera(ndc, this.view);
+    const parts = ray.intersectObject(this.partsGroup, true)[0]?.distance ?? Infinity;
+    for (const hit of ray.intersectObject(this.cables, true)) {
+      if (hit.distance > parts) break;
+      let o: Object3D | null = hit.object;
+      while (o && o.userData.net === undefined) o = o.parent;
+      if (o) return o.userData.net as string;
+    }
+    return null;
+  }
+
+  /**
+   * Ağı vurgular: o ağın kabloları, kıskaçları, kısa telleri ve köprüleri parlar, tahtadaki bacaklarının üstünde
+   * mavi işaret (seçim halkasının rengi); öbür kablolar ve ağa dokunmayan parçalar soluklaşır. null: vurgu kalkar.
+   */
+  private highlightNet(net: string | null): void {
+    if (net === this.highlighted) return;
+    this.highlighted = net;
+    for (const g of this.legGlow.children) (g as Mesh).geometry.dispose();
+    this.legGlow.clear();
+    const swap = (root: Object3D, kind: 'dim' | 'lit' | null) => {
+      root.traverse((o) => {
+        if (!(o instanceof Mesh) || Array.isArray(o.material)) return;
+        const base = (o.userData.baseMaterial as Material | undefined) ?? o.material;
+        o.userData.baseMaterial = base;
+        o.material = kind ? this.tinted(base, kind) : base;
+      });
+    };
+    const plan = this.plan;
+    const touches = new Set<string>();
+    if (net && plan) for (const [key, n] of plan.netOf) if (n === net) touches.add(key.split('#')[0]!);
+    for (const child of this.cables.children) swap(child, net === null ? null : child.userData.net === net ? 'lit' : 'dim');
+    for (const placed of this.parts.values()) swap(placed.group, net === null || touches.has(placed.part.id) ? null : 'dim');
+    if (net && plan) {
+      for (const [id, at] of plan.onBoard) {
+        at.holes.forEach((h, pin) => {
+          if (plan.netOf.get(pinKey(id, pin)) !== net) return;
+          const foot = holeAt(h, plan.cols, BB.height);
+          this.legGlow.add(rod(foot, foot.clone().setY(BB.height + 1.3), 0.24, this.ringMaterial, 10));
+        });
+      }
+    }
+    this.cb.onNet?.(net);
+    this.dirty = true;
+  }
+
+  /** Malzemenin soluk (yarı saydam) ya da parlak (kendi renginde ışıyan) kopyası (önbellekte). */
+  private tinted(base: Material, kind: 'dim' | 'lit'): Material {
+    const cache = kind === 'dim' ? this.dimmed : this.lit;
+    let m = cache.get(base);
+    if (!m) {
+      m = base.clone();
+      if (kind === 'dim') {
+        m.transparent = true;
+        m.opacity = 0.18;
+        m.depthWrite = false;
+      } else if (m instanceof MeshStandardMaterial) {
+        m.emissive = m.color.clone();
+        m.emissiveIntensity = 0.55;
+      }
+      cache.set(base, m);
+    }
+    return m;
+  }
+
+  /** Denetim (ios-kontrol): vurgulanan ağ, parlayan ve soluklaşan kablo sayısı, işaretli bacak sayısı. */
+  netHighlight(): { net: string | null; lit: number; dim: number; legs: number } {
+    const state = (child: Object3D): 'lit' | 'dim' | null => {
+      let found: 'lit' | 'dim' | null = null;
+      child.traverse((o) => {
+        if (found || !(o instanceof Mesh)) return;
+        const base = o.userData.baseMaterial as Material | undefined;
+        if (base && o.material === this.lit.get(base)) found = 'lit';
+        else if (base && o.material === this.dimmed.get(base)) found = 'dim';
+      });
+      return found;
+    };
+    const states = this.cables.children.map(state);
+    return { net: this.highlighted, lit: states.filter((x) => x === 'lit').length, dim: states.filter((x) => x === 'dim').length, legs: this.legGlow.children.length };
+  }
+
+  /** Denetim (ios-kontrol): ağı vurgular (kablonun üstüne gelmek gibi); null kaldırır. */
+  highlight(net: string | null): void {
+    this.highlightNet(net);
+  }
 
   // --- Çizim döngüsü ----------------------------------------------------------------------------------
 
@@ -1500,6 +1616,8 @@ export class BenchScene {
     (this.table.material as Material).dispose();
     this.ring.geometry.dispose();
     this.ringMaterial.dispose();
+    for (const m of [...this.dimmed.values(), ...this.lit.values()]) m.dispose();
+    for (const g of this.legGlow.children) (g as Mesh).geometry.dispose();
     this.shadowTexture.dispose();
     this.scene.environment?.dispose();
     this.pmrem.dispose();

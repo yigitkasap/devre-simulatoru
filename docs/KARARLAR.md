@@ -1981,6 +1981,15 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   dar. Test (`tests/kiskac-3b.test.ts`, 81 örnek): her cihaz kablosu kıskaçla bağlı, ağ başına tek bağlantı noktası,
   3B'de bir delikte tek tel ya da bacak, çakışma 0 (önceden köprüler 65, kıskaçların ilk hâli 201 çakışma).
   Kablolar havada birbirinin üstünden geçebilir (masadan kıskaca giden uzun kısımlar sayılmaz).
+- **Kafa karıştırmasın** (10): birleşme noktasında (zincirin ilk kıskacının ağzı) küçük etiket: ağın adı ve kablo
+  sayısı ("GND · 3 kablo"; iki ya da daha çok cihaz kablosu buluşunca). Ağın adı analizdeki düğüm adı
+  (`nodeName`); toprak "GND"; ölçü aletleri ve osiloskop ad vermez ("V1" yerine "RD 2. uç"). Fare bir kablonun,
+  kıskacın, kısa telin ya da köprünün üstüne gelince (telefonda dokununca; yeniden dokununca kalkar) o ağın kabloları
+  kendi renginde parlar, tahtadaki bacaklarının üstünde mavi işaret (seçim halkasının rengi), öbür kablolar ve ağa
+  dokunmayan parçalar soluklaşır; köşedeki küçük şemada o düğümün kabloları vurgu renginde. Cihaz kablosu soketin
+  renginde: COM ve − soketleri siyah (toprak), +, VΩmA kırmızı, osiloskobun CH1 sarı, CH2 mavi (`anchorColors`).
+  **Gece kararı:** üretecin OUTPUT ve TTL soketleri renksiz (çelik) BNC: kablo ağın renginde kalır. Güç kaynağının
+  2. kanalının + ucu toprağa gidiyorsa da kablo kırmızı (soket rengi; kural "COM, − siyah").
 
 ### Performans ve hata taraması (2026-10-27)
 
