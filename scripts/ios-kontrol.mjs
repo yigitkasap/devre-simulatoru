@@ -6526,6 +6526,28 @@ try {
       `${full.count} düğme · tek sıra ${full.row} · alt boşluk ${full.gap} px · tahtada ${full.over} · tahta %${Math.round(full.share * 100)} · kesik ${full.cut} · yeniden sığdı ${refit} · çıkınca tek sıra ${back.row}, %${Math.round(back.share * 100)}`);
     await page.context().close();
   }
+  // --- Telefonda 3B (telefon-3b): kamera menüsü alt sayfa, 3B alanı ekranın %60'ı, ipucu tahtada değil, 3B tam ekran adı, Tahtada kur'da tahtanın tamamı ---
+  // iPhone 13 (390×844), iPhone SE (375×667) ve yatay iPhone (844×390); 1N4001 DC.
+  for (const [w, h, cihaz] of [[390, 844, 'iPhone 13'], [375, 667, 'iPhone SE'], [844, 390, 'yatay']]) {
+    const { page } = await phone(w, h);
+    await openExample(page, '1N4001: doğru akımda akım-gerilim ölçümü');
+    await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: '3B' }).tap();
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
+    // 1. Kamera menüsü telefonda alt sayfa: tamamı ekranda, seçenekler en az 44 px; seçince kapanır.
+    await page.getByRole('button', { name: /^Kamera:/ }).tap(); await page.waitForTimeout(300);
+    const menu = await page.evaluate(() => {
+      const m = document.querySelector('[role=menu][aria-label="Kamera"]'); if (!m) return null; const r = m.getBoundingClientRect();
+      const items = [...m.querySelectorAll('[role=menuitemradio]')].map((e) => e.getBoundingClientRect().height);
+      return { inside: r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 0.5 && r.bottom <= innerHeight + 0.5, bottom: Math.round(innerHeight - r.bottom), items: items.length, min: Math.min(...items) };
+    });
+    await page.getByRole('menuitemradio', { name: 'Cihazlar' }).tap(); await page.waitForTimeout(500);
+    const closed = (await page.locator('[role=menu][aria-label="Kamera"]').count()) === 0;
+    const label = await page.getByRole('button', { name: /^Kamera:/ }).getAttribute('aria-label');
+    check(`Telefon 3B (${cihaz}): kamera menüsü alt sayfa, tamamı ekranda, seçenekler en az 44 px; Cihazlar seçilince kapanıyor`,
+      menu !== null && menu.inside && menu.bottom <= 1 && menu.items >= 4 && menu.min >= 44 && closed && label === 'Kamera: Cihazlar',
+      menu ? `ekranda ${menu.inside} · alt ${menu.bottom} px · ${menu.items} seçenek, en kısa ${Math.round(menu.min)} px · kapandı ${closed} · ${label}` : 'menü yok');
+    await page.context().close();
+  }
 } finally {
   await browser.close();
 }

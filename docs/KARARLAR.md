@@ -2024,6 +2024,13 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   devre değişince hesaplanır: en ağır örnekte (yürüyen ışık, 30 köprü) ≈ 75 ms, kıskaçlı en ağır örnekte ≈ 70 ms
   (normal hızda, düğümde).
 
+### Telefonda 3B (2026-11-10)
+
+- **Kamera menüsü alt sayfa**: telefonda 3B'nin kamera menüsü düğmenin üstünde açılıyordu; kısa kutuda (iPhone SE) ve
+  yatayda ekranın üstünden taşıyordu. Artık sayfanın altında alt sayfa (body'de; arkası karartılı, dokununca kapanır;
+  seçenekler 44 px, 16 px yazı, güvenli alan kadar boşluk). ios-kontrol "Telefon 3B (…): kamera menüsü alt sayfa"
+  (iPhone 13, iPhone SE, yatay).
+
 ### Performans ve hata taraması (2026-10-27)
 
 - `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,

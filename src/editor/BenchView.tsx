@@ -7,6 +7,7 @@
 // açılışta bir kez tek satır.
 
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { CameraRequest } from '../bench3d/Bench3D';
 import { planBreadboard, type BreadboardPlan } from '../bench3d/breadboard';
 import { clipJunctions } from '../bench3d/clipPlan';
@@ -478,15 +479,19 @@ function CameraMenu({
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const sheet = useRef<HTMLDivElement>(null);
+  const wrap = (node: ReactNode) => (phone ? createPortal(node, document.body) : node);
   useEffect(() => {
     if (!open) return undefined;
     const close = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
+      // Dışına ya da telefonda alt sayfanın arkasındaki karartıya dokununca kapanır.
+      const target = e.target as Node;
+      if (!(root.current?.contains(target) || sheet.current?.contains(target))) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     window.addEventListener('pointerdown', close);
     window.addEventListener('keydown', onKey);
-    root.current?.querySelector<HTMLElement>('[aria-checked=true]')?.focus();
+    (sheet.current ?? root.current)?.querySelector<HTMLElement>('[aria-checked=true]')?.focus();
     return () => {
       window.removeEventListener('pointerdown', close);
       window.removeEventListener('keydown', onKey);
@@ -511,8 +516,19 @@ function CameraMenu({
           </span>
         )}
       </button>
-      {open && (
-        <div role="menu" aria-label={tr.bench.camera} className="absolute right-0 bottom-full mb-2 w-56 rounded-lg border border-line bg-panel p-1.5 shadow-lg">
+      {/* Telefonda menü 3B alanına sığmıyordu (kısa kutuda ve yatayda ekranın üstünden taşıyordu): sayfanın altında
+          alt sayfa (body'de: 3B alanının kırpmasından ve konumundan bağımsız). */}
+      {open && phone && createPortal(<div aria-hidden="true" className="fixed inset-0 z-40 bg-black/25" />, document.body)}
+      {open && wrap(
+        <div
+          ref={sheet}
+          role="menu"
+          aria-label={tr.bench.camera}
+          data-sheet={phone ? '' : undefined}
+          className={phone ? 'fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border-t border-line bg-panel px-3 pt-2 shadow-lg' : 'absolute right-0 bottom-full mb-2 w-56 rounded-lg border border-line bg-panel p-1.5 shadow-lg'}
+          style={phone ? { paddingBottom: 'max(12px, env(safe-area-inset-bottom))', paddingLeft: 'max(12px, env(safe-area-inset-left))', paddingRight: 'max(12px, env(safe-area-inset-right))' } : undefined}
+        >
+          {phone && <p className="m-0 px-3 pt-1 pb-1 text-label font-semibold text-ink-2">{tr.bench.camera}</p>}
           {CAMERA_CHOICES.filter((c) => c !== 'bench' || devices).map((c) => (
             <button
               key={c}
@@ -524,7 +540,7 @@ function CameraMenu({
                 onPick(c);
                 setOpen(false);
               }}
-              className={`flex w-full items-center gap-3 rounded-md px-3 text-left text-body outline-none hover:bg-accent-soft focus-visible:bg-accent-soft disabled:text-stopped disabled:hover:bg-transparent ${touch ? 'min-h-11' : 'min-h-9'}`}
+              className={`flex w-full items-center gap-3 rounded-md px-3 text-left text-body outline-none hover:bg-accent-soft focus-visible:bg-accent-soft disabled:text-stopped disabled:hover:bg-transparent ${touch ? 'min-h-11' : 'min-h-9'} ${phone ? 'text-[16px]' : ''}`}
             >
               <span className="flex-1">{tr.bench.cameras[c]}</span>
               <span className={`text-accent-ink ${choice === c ? '' : 'invisible'}`} aria-hidden="true">
@@ -532,7 +548,7 @@ function CameraMenu({
               </span>
             </button>
           ))}
-        </div>
+        </div>,
       )}
     </div>
   );
