@@ -1986,7 +1986,7 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   **kenar köprüsü** çekilir, tel oraya takılır (yalnızca 3B; akım noktaları köprüden de geçer). Her şerit için en
   kısa iki köprü denenir; eşit boydakilerden parça gövdelerinden uzak olanı önce (gövdenin önündeki delikten çıkan
   köprü onu örter). O da olmazsa **zincir**: kıskaç aynı ağdaki bir kıskacın metal çenesini tutar, en çok 2 kıskaç
-  (81 örnekte gerekmiyor; 15 kablo kenar köprüsüyle). Gövdesi deliğin üstünü örten parçanın altındaki delikte tel
+  (81 örnekte gerekmiyor; 7 kablo kenar köprüsüyle, 12 kısa tel eğik). Gövdesi deliğin üstünü örten parçanın altındaki delikte tel
   gövdenin altından yatay çıkıp dikilir (eğik tel).
 - **Delik seçimi**: parça gövdelerinden uzak, tahtanın cihazlara bakan (arka) kenarına yakın boş delik. Asıl ölçüt
   görünürlük: varsayılan kameranın üç yerinden (Serbest, masa üstü cihaz varken; ölçüldü: tahtanın ortasından
@@ -2055,6 +2055,22 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   renginde: COM ve − soketleri siyah (toprak), +, VΩmA kırmızı, osiloskobun CH1 sarı, CH2 mavi (`anchorColors`).
   **Gece kararı:** üretecin OUTPUT ve TTL soketleri renksiz (çelik) BNC: kablo ağın renginde kalır. Güç kaynağının
   2. kanalının + ucu toprağa gidiyorsa da kablo kırmızı (soket rengi; kural "COM, − siyah").
+- **Görünürlük ölçümü** (ios-kontrol "3B kıskaçlar parçaları örtmüyor", 2026-11-10): varsayılan kamerada (masaüstü
+  1440×900, iPhone 13 dikey 390×844 ve yatay 844×390) nesne kimliği renkli iki çizim: (A) kıskaçlar, kıskaçlı
+  kablolar, kısa teller ve kenar köprüleri gizli, her parçanın gövdesi (bacaksız kutusuyla kırpılmış) kendi
+  renginde: gövdenin görünen pikselleri; (B) onlar görünür ve sarı: bu piksellerden sarıya düşenler. Sınır: hiçbir
+  devre parçasının %20'sinden fazlası örtülmez; ağız ≥ 8 mm, eğim ≤ 25°. **Karar:** ölçü aletleri (güç kaynağı,
+  üreteç, osiloskop, multimetreler) sınıra girmez, yalnızca gösterilir: kendi kabloları ön soketlerinden çıkar,
+  yatay telefonda üstleri kırpılır ve görünen ince alt şeritleri kablolarla örtülür (trafo örneğinde V1 ≈ %70,
+  önce de %68). Örnekler: 1N4001 DC ve cihaz kablosu en çok olan beş örnek (transformator 8 kablo / 6 ağ,
+  jfet-karakteristik 8 / 5, fet-yukseltec-kuplajli 7 / 5, bjt-yukseltec-kuplajli 7 / 5, fet-yukseltec 7 / 4; 7
+  kablolu yedi örnekte eşitlik önce ağ sayısıyla, sonra tahtadaki parça sayısıyla, sonra örnek sırasıyla bozuldu).
+  Önce → sonra en kötü devre parçası (masaüstü / dikey / yatay): 1N4001 DC D1 %54 / %100 / %99 → %0; kuplajlı FET
+  RD %26 / %31, J1 %89 → %0; kuplajlı BJT C1 %49 / %64 / %60 → %0; FET yükselteci RD %10 / %9 / %8 → %0; trafo ve
+  BF245A önce de %0. Ağız en alçak 1,4 → 9,5 mm, eğim en çok 55–70° → 25°. Elle, 55 kıskaçlı örneğin hepsinde üç
+  görünümde: en kötü devre parçası %12,6 (opamp-evirmeyen yatay, R2); ara sürümde bu geniş ölçüm tahminin
+  kablonun yolunu ve kameranın gerçek yerini saymadığını gösterdi (mosfet-yukseltec-rs RS %56, opamp-evirmeyen U1
+  %37, frekans-bolucu U2 %27; düzeldi).
 - **Kare hızı** (iPhone 13 öykünmesi, işlemci 4× yavaş, örnek çalışırken, 10 örnek): kıskaçlar, kısa teller ve yeni
   cihaz boyutlarıyla 34,7–64,6 kare/s, uzun görev yok (öncesi aynı makinede 35,3–60,7). Kıskacın geometrileri bütün
   kıskaçlarda ortak, malzemeleri kablonun rengine göre paylaşılır. Yerleşim (kıskaçlar, köprülerin biçimi) yalnızca
