@@ -41,6 +41,7 @@ function ModalSheet({ label, onClose, children }: { label: string; onClose: () =
         role="dialog"
         aria-modal="true"
         aria-label={label}
+        data-sheet=""
         className="sheet-in absolute inset-x-0 bottom-0 flex flex-col rounded-t-xl bg-panel shadow-[0_-4px_18px_rgba(29,39,51,0.2)]"
         style={{ maxHeight: 'min(90%, calc(100% - 8px - env(safe-area-inset-top)))' }}
       >
@@ -373,6 +374,7 @@ export function StopToEditDialog({ onStop, onCancel }: { onStop: () => void; onC
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-sheet=""
         className="sheet-in absolute inset-x-0 bottom-0 flex flex-col gap-3 rounded-t-xl bg-panel px-4 pt-5 shadow-[0_-4px_18px_rgba(29,39,51,0.2)]"
         style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom))' }}
         onKeyDown={(e) => e.key === 'Escape' && onCancel()}

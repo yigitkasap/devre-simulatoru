@@ -2089,8 +2089,8 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   224 → 399 px; altta defterin en az 120 px'i kalır). İlk açılıştaki "Bir parmak: döndür…" ipucu altta tahtanın
   üstüne geliyordu: telefonda üstte, Şema | 3B düğmesinin altında. Varsayılan kadrajda cihazların üstü kırpılmaz:
   dikey telefonda biraz daha alçaktan (24°) bakılır, ön paneller dikeyde tamamen görünür, tahta yine kadraj
-  genişliğinin %72'si. **Gece kararı:** kısa alanda (iPhone SE) cihazlar tamamen görünürse tahta payı %59'a düşüyor:
-  tahta payı (≥ %70) öncelikli, cihazların üstü eskisi gibi kırpılır. Yatayda (T2'nin yerleşimi, 523 × 333) 3B alanı
+  genişliğinin %72'si. **Karar (kullanıcı, 2026-11-10; gece kararıydı):** kısa alanda (iPhone SE) cihazlar tamamen
+  görünürse tahta payı %59'a düşüyor: tahta en az %70 kalır, cihazların üstü kırpılabilir. Yatayda (T2'nin yerleşimi, 523 × 333) 3B alanı
   bozulmuyor, tahta %72. ios-kontrol "Telefon 3B (…): 3B alanı ekranın ≈ %60'ı …".
   ios-kontrol'deki "ipucu sahnenin altında, düğmelerin üstünde" maddesi buna göre değişti (üstte, tahtanın üstünde değil).
 - **3B tam ekran düğmesinin adı**: 3B görünümde telefonun tam ekran düğmesi "3B’yi tam ekran aç" / "3B’yi küçült"
@@ -2682,6 +2682,14 @@ iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon
   hemen üstünde akışta durur (`<Toast inline>`): görünürken defter kısalır, içerik kaymaz ve örtülmez.
   Şema kutusunun boyu değişmez (tuval yeniden sığdırılmaz). Tam ekran şemada, kablo bağlarken ve Parça
   ekle / Analiz açıkken bildirim eskisi gibi yüzer (orada altta defter yok).
+- Karar (kullanıcı, 2026-11-10): **alttan açılan sayfa açıkken bildirim sayfanın üst kenarının hemen üstünde.**
+  Daha fazla → Son devreler gibi bir sayfa açıkken "Örnek yüklendi · Geri al" bildirimi sayfanın yazısının
+  üstüne biniyordu (akıştaki bildirim de karartının arkasında kalıyordu). Alttan açılan sayfalar `data-sheet`
+  ile işaretli (BottomSheet: Parça ekle ve Tahtada kur; PhoneModals: Daha fazla, dosya, durum ve Ölç'te
+  düzenleme sayfası; 3B kamera menüsü; Analiz'in bilgi notu). Bildirim görünürken (`Toast` → `useSheetTop`, 100
+  ms'de bir; sayfa yokken yerleşim hesaplatılmaz) açık sayfa varsa bildirim sayfanın üst kenarının 12 px
+  üstünde, karartının ve sayfanın üstünde (z 60) yüzer; sayfa kayarak gelirken onunla yükselir. Sayfa yokken
+  eskisi gibi (akışta ya da alttan uzaklıkla). ios-kontrol "bildirim alt sayfanın üstünde" (375 × 667, 390 × 844).
 - Gece kararı: **okunur şema (madde 3).** Telefonda okunur yakınlık %90 (`PHONE_READABLE_SCALE`):
   parçaların ad ve değer yazıları (11 px) ekranda 9,9 px. Değerlerin gizlendiği eşik %100'den %90'a indi
   (yazılar okunurken değerler de görünsün; iki ayrı eşik olmasın). %100 seçilseydi küçük kutuda devreler
@@ -2942,8 +2950,11 @@ frekans bölücüde uygulamanın osiloskobu 968 / 484 Hz'i %0,5 içinde gösteri
 - **Fonksiyon üretecinin çıkışı:** OUT ucu COM ile aynı kablo ağındaysa ya da ikisi de topraktaysa (topraklı
   üretecin OUT'u bir toprak sembolüne bağlıysa) uyarı "FG1 çıkışı kısa devre": gerilim 50 Ω'luk iç dirence düşer,
   devreye sinyal ulaşmaz. Topraksız üretecin OUT'u toprağa bağlıysa kısa devre değildir.
-- Gece kararı: yalnızca OUT uyarı alır (kullanıcının istediği). TTL çıkışı aynı yapıda (50 Ω) ve aynı biçimde kısa
-  devre olabilir; kapsamı büyütmemek için eklenmedi, istenirse `findShortedGenerators`'a TTL ucu (1) eklenir.
+- Karar (kullanıcı, 2026-11-10; gece yalnızca OUT uyarı alıyordu): **TTL çıkışı da OUT gibi uyarı alır.** TTL
+  ucu COM ile aynı kablo ağındaysa ya da ikisi de topraktaysa "FG1 TTL çıkışı kısa devre": darbenin 5 V'u 50 Ω'luk
+  iç dirence düşer, TTL ucundan darbe alınamaz (`findShortedGenerators` her iki çıkışa bakar; `output: 'ttl'`,
+  anahtar `generator-shorted|FG1|ttl`). İkisi birden kısa devreyse iki ayrı uyarı. ios-kontrol "teşhis: … TTL’si
+  COM’a kısa devreyken …".
 - **Arıza bulmada** bu iki uyarı yok: gizli "kısa devre" arızasını ele verirdi.
 - **LED mesajı bağlama göre:** yanan LED'in kartı (ve 4. maddedeki aşırı akım uyarısı) önerisini devreden alır
   (`ledAdvice`): LED'e seri tek bir direnç varsa "R1 ön direnci bu gerilim için küçük: R1’i büyüt …" (düzeltme
@@ -3022,11 +3033,12 @@ ios-kontrol "Föy metinleri").
   `Device.elapse(x, dt)` eklendi (yalnızca LED kullanır); ardından `checkLimits` sorulur, LED yandıysa devre yeniden
   çözülür. Zamana bağlı devrede ısınma her kabul edilen adımda (`accept`). İki yolda yanma anı aynı (test).
 - Onarılan LED soğuktur (yeni LED); değer değişikliğinde (devre yeniden derlenince) sıcaklık korunur.
-- Gece kararı: ısıl zaman sabiti τ = 10 s (veri sayfalarında yok; varsayım). Tek zaman sabiti, gerçek bir 5 mm LED'in
+- **Varsayım:** ısıl zaman sabiti τ = 10 s, veri sayfalarında yok (gece kararıydı; kullanıcı 2026-11-10: 10 s kalır,
+  varsayım olarak işaretli durur). Tek zaman sabiti, gerçek bir 5 mm LED'in
   yongası, bacakları ve kılıfı ayrı hızlarla ısınır; 10 s, aşırı akımda yanmanın saniyeler içinde görünmesi için
-  seçildi. Gece kararı: sürekli sınırla eklem sınırı arasındaki akımlarda (kırmızıda ≈ 30–75 mA) LED hiç yanmaz,
-  yalnızca uyarı alır: veri sayfasının ısıl sınırı aşılmıyor; "uzun sürede yanma" istenirse süreye bağlı ek bir
-  kural (veri sayfasında dayanağı yok) gerekir. Gece kararı: kart üzerindeki LED balonu yanma nedenini ayırmıyor
+  seçildi. Karar (kullanıcı, 2026-11-10; gece kararıydı): sürekli sınırla eklem sınırı arasındaki akımlarda
+  (kırmızıda ≈ 30–75 mA) LED şimdiki gibi yalnızca uyarı verir, yanmaz: veri sayfasının ısıl sınırı aşılmıyor; süreye
+  bağlı ek bir yanma kuralı (veri sayfasında dayanağı yok) eklenmedi. Gece kararı: kart üzerindeki LED balonu yanma nedenini ayırmıyor
   ("Üzerinden ≈ … geçti; en fazla 30 mA’e dayanır."); ayrıntı hata kartında. 7 segment göstergenin segmentleri ve
   optokuplörün LED'i değişmedi (istek dışı): segment 30 mA'de hemen yanar.
 

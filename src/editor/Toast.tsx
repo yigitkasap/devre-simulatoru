@@ -38,20 +38,61 @@ export function useToast(): [ToastMessage | null, (text: string, tone?: ToastMes
   return [toast, show, hide];
 }
 
+/** Bildirimle alt sayfanın üst kenarı arasındaki boşluk (px). */
+const SHEET_GAP = 12;
+/** Açık alt sayfayı arama aralığı (ms): sayfa bildirim görünürken açılabilir, kapanabilir ya da kayarak gelir. */
+const SHEET_POLL_MS = 100;
+
+/**
+ * Telefonda açık alt sayfaların ([data-sheet]: alttan açılan sayfa, menü, not) en üstteki kenarı (px, görünümün
+ * üstünden); açık sayfa yoksa null. Yalnızca bildirim görünürken bakılır; sayfa yokken (masaüstü) yerleşim
+ * hesaplatılmaz.
+ */
+function useSheetTop(active: boolean): number | null {
+  const [top, setTop] = useState<number | null>(null);
+  useEffect(() => {
+    if (!active) {
+      setTop(null);
+      return undefined;
+    }
+    const measure = () => {
+      let edge: number | null = null;
+      for (const el of document.querySelectorAll<HTMLElement>('[data-sheet]')) {
+        const r = el.getBoundingClientRect();
+        if (r.height > 0 && r.top < window.innerHeight) edge = edge === null ? r.top : Math.min(edge, r.top);
+      }
+      const value = edge === null ? null : Math.round(edge);
+      setTop((old) => (old === value ? old : value));
+    };
+    measure();
+    const timer = window.setInterval(measure, SHEET_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  return top;
+}
+
 /**
  * `offset`: alttan uzaklık (px); telefonda alt çubuğun ve alt sayfanın üstünde. Genişlik içeriğe göre (w-max):
  * left: 50% ile kendiliğinden genişlik ekranın yarısında kalır, kısa bildirim de iki satıra bölünürdü.
  * `inline`: sayfanın akışında, bulunduğu sütunun altında (telefonda defterin altı, alttaki çubuğun hemen
  * üstü): içeriğin üstüne binmez, görünürken defter kısalır.
+ * Alttan açılan bir sayfa ([data-sheet]) açıkken bildirim (inline olsa da) o sayfanın üst kenarının hemen üstünde
+ * yüzer, sayfanın ve karartının üstünde: sayfanın yazısını örtmez, karartının arkasında da kalmaz.
  */
 export function Toast({ toast, offset = 112, inline = false, onDone }: { toast: ToastMessage | null; offset?: number; inline?: boolean; onDone?: () => void }) {
+  const sheetTop = useSheetTop(toast !== null);
   if (!toast) return null;
+  const aboveSheet = sheetTop !== null;
+  const floating = !inline || aboveSheet;
   const box = (
     <div
       key={toast.id}
       role={toast.tone === 'error' ? 'alert' : 'status'}
-      style={inline ? undefined : { bottom: `calc(${Math.round(offset)}px + env(safe-area-inset-bottom))` }}
-      className={`${inline ? '' : 'fixed left-1/2 z-50 -translate-x-1/2 '}flex w-max max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg pl-4 text-sm shadow-lg ${
+      data-toast=""
+      style={
+        aboveSheet ? { top: `${sheetTop - SHEET_GAP}px` } : floating ? { bottom: `calc(${Math.round(offset)}px + env(safe-area-inset-bottom))` } : undefined
+      }
+      className={`${aboveSheet ? 'fixed left-1/2 z-[60] -translate-x-1/2 -translate-y-full ' : floating ? 'fixed left-1/2 z-50 -translate-x-1/2 ' : ''}flex w-max max-w-[calc(100%-2rem)] items-center gap-3 rounded-lg pl-4 text-sm shadow-lg ${
         toast.action ? 'py-0.5 pr-1' : 'pointer-events-none py-2 pr-4'
       } ${toast.tone === 'error' ? 'bg-danger text-on-ink' : 'bg-ink text-on-ink'}`}
     >
@@ -70,7 +111,7 @@ export function Toast({ toast, offset = 112, inline = false, onDone }: { toast: 
       )}
     </div>
   );
-  return inline ? (
+  return !floating ? (
     <div data-toast-slot="" className="flex shrink-0 justify-center bg-panel px-4 pt-1.5 pb-2">
       {box}
     </div>

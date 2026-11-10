@@ -3424,6 +3424,11 @@ export const tr = {
     generatorShorted: (label: string, via: 'wire' | 'ground') =>
       `${label} fonksiyon üretecinin OUT ucu COM ucuyla aynı noktaya bağlı${via === 'ground' ? ' (ikisi de toprakta; topraklı üretecin COM ucu şebeke toprağıdır)' : ''}: çıkış kısa devre. ` +
       'Üretecin gerilimi 50 Ω’luk iç direncine düşer, devreye sinyal ulaşmaz. OUT’u devrenin girişine, COM’u ortak hatta bağla.',
+    /** Fonksiyon üretecinin TTL darbe çıkışı COM'a kısa devre. */
+    generatorTtlShortedTitle: (label: string) => `${label} TTL çıkışı kısa devre`,
+    generatorTtlShorted: (label: string, via: 'wire' | 'ground') =>
+      `${label} fonksiyon üretecinin TTL ucu COM ucuyla aynı noktaya bağlı${via === 'ground' ? ' (ikisi de toprakta; topraklı üretecin COM ucu şebeke toprağıdır)' : ''}: TTL çıkışı kısa devre. ` +
+      'Darbenin 5 V’u 50 Ω’luk iç dirence düşer, TTL ucundan darbe alınamaz. TTL’yi darbenin gideceği girişe, COM’u ortak hatta bağla.',
     repair: 'Onar',
     setResistor: (label: string, value: string) => `${ek(label, 'i')} ${value} yap`,
     severity: { error: 'Hata', warning: 'Uyarı', info: 'Bilgi' },

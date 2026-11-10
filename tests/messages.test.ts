@@ -165,6 +165,28 @@ describe('fonksiyon üretecinin OUT ucu COM’a kısa devre', () => {
     const n = circuit().add('funcgen', 'FG1', ['o', 'ttl', 'c'], {}).resistor('R1', 'o', 'c', 1000).build();
     expect(findShortedGenerators(net(n))).toEqual([]);
   });
+
+  it('TTL ile COM aynı kablo ağında: "FG1 TTL çıkışı kısa devre", OUT’un uyarısından ayrı', () => {
+    const n = circuit().add('funcgen', 'FG1', ['o', 'c', 'c'], {}).resistor('R1', 'o', 'c', 1000).build();
+    const found = findShortedGenerators(net(n));
+    expect(found.map((s) => [s.id, s.via, s.output])).toEqual([['FG1', 'wire', 'ttl']]);
+    const item = shortedGeneratorItem(found[0]!, fakeDoc(n));
+    expect(item.title).toBe('FG1 TTL çıkışı kısa devre');
+    expect(item.detail).toContain('TTL ucu COM ucuyla aynı noktaya bağlı');
+    expect(item.key).toBe('generator-shorted|FG1|ttl');
+    // İkisi birden kısa devre: iki uyarı, anahtarları ayrı.
+    const both = circuit().add('funcgen', 'FG1', ['c', 'c', 'c'], {}).resistor('R1', 'c', 'x', 1000).build();
+    const items = findShortedGenerators(net(both)).map((s) => shortedGeneratorItem(s, fakeDoc(both)));
+    expect(items.map((i) => i.title)).toEqual(['FG1 çıkışı kısa devre', 'FG1 TTL çıkışı kısa devre']);
+    expect(new Set(items.map((i) => i.key)).size).toBe(2);
+  });
+
+  it('topraklı üretecin TTL ucu toprak sembolünde: toprak üzerinden kısa devre; topraksız üreteçte değil', () => {
+    const earthed = circuit().add('funcgen', 'FG1', ['o', 't', 'c'], { earthed: true }).ground('G1', 't').resistor('R1', 'o', 'c', 100).build();
+    expect(findShortedGenerators(net(earthed)).map((s) => [s.via, s.output])).toEqual([['ground', 'ttl']]);
+    const floating = circuit().add('funcgen', 'FG1', ['o', 't', 'c'], { earthed: false }).ground('G1', 't').resistor('R1', 'o', 'c', 100).build();
+    expect(findShortedGenerators(net(floating))).toEqual([]);
+  });
 });
 
 describe('yanan LED: bağlama göre mesaj', () => {

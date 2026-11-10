@@ -143,6 +143,8 @@ const SHORTABLE_PARTS: ReadonlySet<DeviceType> = new Set<DeviceType>([
 export interface ShortedPart {
   readonly id: string;
   readonly via: 'wire' | 'ground';
+  /** Fonksiyon üretecinde kısa devre olan çıkış: OUT ya da TTL darbe çıkışı. */
+  readonly output?: 'out' | 'ttl';
   /** Kablo ağıyla kısa devrede ağın anahtarı (kabloları vurgulanır). */
   readonly net?: string;
 }
@@ -174,17 +176,22 @@ export function findShortedParts(compiled: CompiledCircuit): ShortedPart[] {
   return result;
 }
 
-/** OUT ucu COM'a kısa devre olan fonksiyon üreteçleri (kabloyla ya da ikisi de toprakta). */
+/**
+ * OUT ya da TTL ucu COM'a kısa devre olan fonksiyon üreteçleri (kabloyla ya da ikisi de toprakta). İki çıkış
+ * da iç kaynağın arkasında 50 Ω (funcgen.ts); ikisi birden kısa devreyse iki ayrı uyarı.
+ */
 export function findShortedGenerators(compiled: CompiledCircuit): ShortedPart[] {
   const { root, grounded } = groundedRoots(compiled);
   const result: ShortedPart[] = [];
   for (const el of compiled.netlist.elements) {
     if (el.type !== 'funcgen') continue;
     // Uçlar: [0] OUT, [1] TTL, [2] COM.
-    const out = root(el.pins[0]!);
     const com = root(el.pins[2]!);
-    if (out === com) result.push({ id: el.id, via: 'wire', net: out });
-    else if (grounded.has(out) && grounded.has(com)) result.push({ id: el.id, via: 'ground' });
+    for (const [output, pin] of [['out', 0], ['ttl', 1]] as const) {
+      const node = root(el.pins[pin]!);
+      if (node === com) result.push({ id: el.id, via: 'wire', net: node, output });
+      else if (grounded.has(node) && grounded.has(com)) result.push({ id: el.id, via: 'ground', output });
+    }
   }
   return result;
 }
@@ -206,13 +213,13 @@ export function shortedPartItem(s: ShortedPart, doc: CircuitDoc): MessageItem {
 export function shortedGeneratorItem(s: ShortedPart, doc: CircuitDoc): MessageItem {
   const label = doc.parts.find((p) => p.id === s.id)?.label ?? s.id;
   return {
-    key: `generator-shorted|${s.id}`,
+    key: s.output === 'ttl' ? `generator-shorted|${s.id}|ttl` : `generator-shorted|${s.id}`,
     severity: 'warning',
     code: 'generator-shorted',
     elementIds: [s.id],
     netKeys: s.net ? [s.net] : [],
-    title: tr.messages.generatorShortedTitle(label),
-    detail: tr.messages.generatorShorted(label, s.via),
+    title: s.output === 'ttl' ? tr.messages.generatorTtlShortedTitle(label) : tr.messages.generatorShortedTitle(label),
+    detail: s.output === 'ttl' ? tr.messages.generatorTtlShorted(label, s.via) : tr.messages.generatorShorted(label, s.via),
   };
 }
 

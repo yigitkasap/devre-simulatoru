@@ -5639,6 +5639,27 @@ try {
       `arada ${Math.round(gap)} px · defterin altı ${Math.round((list?.y ?? 0) + (list?.height ?? 0))}, bildirim ${Math.round(tb?.y ?? 0)}${covered.length ? ` · örttüğü: ${covered.join(', ')}` : ''}`);
     await page.context().close();
   }
+  for (const [w, h] of [[375, 667], [390, 844]]) {
+    // Karar (2026-11-10): alttan açılan sayfa açıkken bildirim sayfanın yazısının üstüne binmez, sayfanın üst
+    // kenarının hemen üstünde ve karartının üstünde durur. Örnek yüklenince bildirim çıkar, sonra Daha fazla →
+    // Son devreler açılır.
+    const { page } = await phone(w, h);
+    await openExample(page, 'LED ve ön direnç');
+    await page.getByRole('button', { name: /^Daha fazla/ }).tap(); await page.waitForTimeout(350);
+    await page.getByRole('dialog', { name: 'Daha fazla' }).getByRole('button', { name: 'Son devreler', exact: true }).tap(); await page.waitForTimeout(500);
+    const toast = page.getByRole('status').filter({ hasText: 'Örnek yüklendi.' });
+    const tb = await toast.boundingBox();
+    const sb = await page.locator('[data-sheet]').first().boundingBox();
+    const top = tb === null ? false : await page.evaluate((t) => {
+      const el = document.elementFromPoint(t.x + t.width / 2, t.y + t.height / 2);
+      return el !== null && el.closest('[data-toast]') !== null;
+    }, tb);
+    const gap = tb && sb ? sb.y - (tb.y + tb.height) : -1;
+    check(`bildirim alt sayfanın üstünde: Son devreler açıkken "Örnek yüklendi · Geri al" sayfanın üst kenarının hemen üstünde (arada 4–20 px), sayfaya binmiyor, karartının üstünde (${w}×${h})`,
+      tb !== null && sb !== null && (await toast.getByRole('button', { name: 'Geri al' }).count()) === 1 && gap >= 4 && gap <= 20 && top && tb.y >= 0,
+      `arada ${Math.round(gap)} px · bildirim ${Math.round(tb?.y ?? -1)}–${Math.round((tb?.y ?? 0) + (tb?.height ?? 0))}, sayfa ${Math.round(sb?.y ?? -1)} · en üstte ${top}`);
+    await page.context().close();
+  }
 
   // --- Kablo yolu (masaüstü): sıfırdan kurulan devrelerde beklenmeyen bağlantı yok -----------------------
   // Kullanıcı testinde L biçimli yolun köşesi başka bir kablonun köşesine ya da bir uca düşmüş, kablo başka
@@ -5926,6 +5947,25 @@ try {
       const text = ((await card.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
       check('teşhis: fonksiyon üretecinin OUT’u COM’a kısa devreyken uyarı kartı "FG1 çıkışı kısa devre" (OUT ucu COM ucuyla aynı noktaya bağlı), "FG1’i göster" var',
         (await card.count()) === 1 && text.includes('OUT ucu COM ucuyla aynı noktaya bağlı') && (await card.getByRole('button', { name: 'FG1’i göster' }).count()) === 1, text.slice(0, 140));
+      await ctx.close();
+    }
+    // Fonksiyon üretecinin TTL'si kabloyla COM'a bağlı, OUT bir dirençle (kısa devre değil).
+    {
+      const ttl = { version: 1, parts: [
+        { id: 'p1', type: 'funcgen', label: 'FG1', x: 0, y: 0, rotation: 0, props: {} },
+        { id: 'p2', type: 'resistor', label: 'R1', x: 16, y: 0, rotation: 90, props: { resistance: 1000 } },
+      ], wires: [
+        { id: 'w1', points: [[5, -2], [8, -2], [8, -6], [16, -6], [16, -4]] },
+        { id: 'w2', points: [[16, 4], [16, 6], [8, 6], [8, 2], [5, 2]] },
+        { id: 'w3', points: [[5, 0], [8, 0], [8, 2]] },
+      ] };
+      const { ctx, page } = await seeded(ttl);
+      await page.waitForTimeout(400);
+      const card = notebook(page).getByRole('region', { name: 'Uyarı · FG1 TTL çıkışı kısa devre' });
+      const text = ((await card.textContent().catch(() => '')) ?? '').replace(/\s+/g, ' ');
+      check('teşhis: fonksiyon üretecinin TTL’si COM’a kısa devreyken uyarı kartı "FG1 TTL çıkışı kısa devre" (TTL ucu COM ucuyla aynı noktaya bağlı), "FG1’i göster" var; OUT’un uyarısı yok',
+        (await card.count()) === 1 && text.includes('TTL ucu COM ucuyla aynı noktaya bağlı') && (await card.getByRole('button', { name: 'FG1’i göster' }).count()) === 1 &&
+          (await notebook(page).getByRole('region', { name: 'Uyarı · FG1 çıkışı kısa devre' }).count()) === 0, text.slice(0, 140));
       await ctx.close();
     }
   }

@@ -171,6 +171,7 @@ export function BottomSheet({
       ref={ref}
       role={role}
       aria-label={label}
+      data-sheet=""
       className={`sheet-in absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-xl shadow-[0_-4px_18px_rgba(29,39,51,0.14)] ${
         tone === 'rack' ? 'bg-rack' : 'bg-panel'
       } ${dimmed ? 'opacity-25' : ''}`}

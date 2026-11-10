@@ -93,6 +93,7 @@ export function InfoTip({
               id={id}
               role="note"
               aria-label={label}
+              data-sheet=""
               className="fixed inset-x-0 bottom-0 z-50 flex flex-col gap-1 rounded-t-xl border-t border-line bg-panel px-4 pt-1 pb-[max(16px,env(safe-area-inset-bottom))] text-small leading-snug whitespace-normal text-ink-2 shadow-[0_-4px_18px_rgba(29,39,51,0.14)]"
             >
               <span className="flex items-center gap-2">
