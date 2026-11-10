@@ -16,13 +16,14 @@
 //   - Kısa tel: 22 AWG tek damarlı (Alpha Wire 3051/1, yalıtım Ø 1,45 mm, iletken Ø 0,643 mm); soyuk uç 7 mm
 //     (Global Specialties WK-1 hazır tel takımı). Yalıtımın tahtanın üstünde kalan boyu 5 mm (onay bekliyor).
 
-import { Vector3 } from 'three';
+import { Box3, Vector3, type CurvePath } from 'three';
 import { pinKey } from '../model/connectivity';
 import type { CircuitDoc } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, type BreadboardPlan, type Hole } from './breadboard';
 import { JUMPER_RADIUS, jumperCurve, jumperLift, type JumperShape } from './breadboardModel';
 import { clipLeads } from './clipPlan';
 import { conductorOf, connectedHoles } from './holes';
+import { socketCurve } from './leadRoute';
 
 const MM = 1 / 2.54;
 
@@ -108,6 +109,14 @@ export interface ClipLayout {
   readonly stubs: readonly StubPlacement[];
   readonly bridges: readonly BridgePlacement[];
   readonly junctions: readonly Junction[];
+}
+
+/**
+ * Cihaz kablosunun yolu: soketten öne çıkar, masaya sarkar, kıskacın kuyruğuna onun ekseni boyunca girer
+ * (`leadRoute.socketCurve`; sahne aynı yolu çizer, görünürlük hesabı da bunu kullanır).
+ */
+export function clipCable(socket: Vector3, dir: Vector3, pose: ClipPose): CurvePath<Vector3> {
+  return socketCurve(socket.clone().addScaledVector(dir, 1.5), dir, clipTail(pose), new Box3(), pose.axis);
 }
 
 /** Kıskacın kuyruğu (kablonun girdiği uç). */
@@ -706,6 +715,8 @@ export interface ClipInput {
   readonly bodies: ReadonlyMap<string, BoardBody>;
   /** Cihaz kablosunun soketi (dünya): kıskacın kuyruğu kabloya, cihaza doğru bakar. */
   readonly socket: (lead: number) => Vector3 | undefined;
+  /** Soketin dışa baktığı yön: kablonun yolu (`clipCable`) görünürlük hesabına girer (verilmezse yalnızca başı). */
+  readonly socketDir?: (lead: number) => Vector3 | undefined;
   /** Jumper tellerinin biçimi (verilmezse hesaplanır: jumperShapes). */
   readonly shapes?: readonly JumperShape[];
 }
@@ -722,6 +733,8 @@ const PREFERRED_ELEVATION = 12;
 const OCCLUSION_LIMIT = 0.08;
 /** Kenar köprüsünün en çok boyu (birim, yatay): alt yarıdaki şeritten orta kanalın üstünden arka yarıya yeter. */
 const BRIDGE_REACH = 8;
+/** Bir kablo için denenen en çok kenar köprüsü adayı (payı en küçük olanlar). */
+const BRIDGE_TRIES = 48;
 /** Kenar köprüsünün kartın üstünden yükseklikleri (birim): alçak, sonra aradaki parçaların üstünden kemer. */
 const BRIDGE_LIFTS = [2.4, 3.4, 4.4];
 
@@ -837,7 +850,7 @@ export function layoutClips(input: ClipInput): ClipLayout {
     };
 
     /** Bir aday: kısa telin deliği, ağzın yeri ve duruşu; `cheap`: örtülme dışındaki payların toplamı. */
-    type Option = { c: Candidate | null; pose: ClipPose; cheap: number; occluded?: number };
+    type Option = { c: Candidate | null; pose: ClipPose; cheap: number; occluded?: number; cabled?: number };
     /** Ağızdaki duruşlar: cihaza dönük, tahtanın ortasından dışa, yataya yakın, parça alanının dışında. */
     const optionsAt = (jaw: Vector3, lead: number, from: Vector3, c: Candidate | null, base: number, elevations: readonly number[], out: Option[]) => {
       const s = input.socket(lead);
@@ -856,6 +869,21 @@ export function layoutClips(input: ClipInput): ClipLayout {
       }
     };
 
+    /**
+     * Kablonun (soketten kuyruğa) görüntüdeki örtme payı: kuyruğa yakın yarısı (masadaki kısmı tahtadaki parçaların
+     * arkasında kalır). Kıskaç cihazından yana bakmazsa kablo tahtanın üstünden dönüp kuyruğa girer, parçaları örter.
+     */
+    const cableOcclusion = (pose: ClipPose, lead: number) => {
+      const s = input.socket(lead);
+      const d = input.socketDir?.(lead);
+      if (!s || !d) return 0;
+      // Son parça (masadan kuyruğa giden Bézier) parametresiyle örneklenir: yay boyu hesabı her seçenekte pahalı.
+      const path = clipCable(s, d, pose);
+      const last = path.curves[path.curves.length - 1]!;
+      const pts = Array.from({ length: 9 }, (_, k) => last.getPoint(0.2 + k * 0.1));
+      return occlusion(pts.slice(1).map((b, k) => ({ kind: 'capsule' as const, a: pts[k]!, b, r: CABLE_RADIUS, owner: `clip:${lead}` })));
+    };
+
     /** Kıskacın ve kablosunun başının görüntüdeki örtme payı. */
     const clipOcclusion = (pose: ClipPose, lead: number) => {
       const tail = clipTail(pose);
@@ -864,11 +892,12 @@ export function layoutClips(input: ClipInput): ClipLayout {
     };
 
     /** Kısa telin (ve köprünün) ilkelleri, örtme payı ve çakışması: duruştan bağımsız, aday başına bir kez. */
-    const extras = new Map<Candidate, { prims: Prim[]; occluded: number; clash: boolean }>();
+    const extras = new Map<Candidate, { prims: Prim[]; bridge: Prim[]; occluded: number; clash: boolean }>();
     const extraOf = (c: Candidate, lead: number) => {
       let x = extras.get(c);
       if (!x) {
-        const prims = [...stubPrims(c.stub, `clip:${lead}`), ...(c.bridge ? jumperPrims(holeTopOf(c.bridge.a, plan.cols), holeTopOf(c.bridge.b, plan.cols), c.bridge.shape, `bridge:${lead}`) : [])];
+        const bridge = c.bridge ? jumperPrims(holeTopOf(c.bridge.a, plan.cols), holeTopOf(c.bridge.b, plan.cols), c.bridge.shape, `bridge:${lead}`) : [];
+        const prims = [...stubPrims(c.stub, `clip:${lead}`), ...bridge];
         // Görüntüde tel ince: yalıtımı yalnızca alttaki 5 mm, üstü soyuk iletken (çakışmada bütün tel yalıtım kalınlığında).
         const pts = stubPoints(c.stub);
         const bare = c.stub.top.clone().setY(c.stub.top.y - STUB.bare);
@@ -878,7 +907,9 @@ export function layoutClips(input: ClipInput): ClipLayout {
           { kind: 'capsule', a: bare, b: c.stub.top, r: STUB.core, owner: 'stub' },
           ...prims.slice(pts.length - 1),
         ];
-        x = { prims, occluded: occlusion(seen), clash: clashes(prims, lead, { kind: 'stub', onto: null }, true) > 0 };
+        // Köprü kendi kısa telinin içinden de geçmez (köprünün kemeri telin üstünden aşabilir).
+        const crossed = bridge.some((q) => stubPrims(c.stub, 'stub').some((p) => primsOverlap(p, q)));
+        x = { prims, bridge, occluded: occlusion(seen), clash: crossed || clashes(prims, lead, { kind: 'stub', onto: null }, true) > 0 };
         extras.set(c, x);
       }
       return x;
@@ -894,10 +925,12 @@ export function layoutClips(input: ClipInput): ClipLayout {
       for (const o of options) {
         if (found && o.cheap >= found.total) break;
         const occluded = clipOcclusion(o.pose, lead);
-        if (occluded > limit) continue;
-        const total = o.cheap + 40 * occluded;
-        if (found && total >= found.total) continue;
+        if (occluded > limit || (found && o.cheap + 40 * occluded >= found.total)) continue;
         if (clashes(clipPrims(o.pose, `clip:${lead}`), lead, me, true) > 0) continue;
+        const cabled = occluded + cableOcclusion(o.pose, lead);
+        if (cabled > limit) continue;
+        const total = o.cheap + 40 * cabled;
+        if (found && total >= found.total) continue;
         found = { o, total };
       }
       return found?.o ?? null;
@@ -909,8 +942,8 @@ export function layoutClips(input: ClipInput): ClipLayout {
      * duruşları bir kez üretilir (gevşek sınırla yeniden aranınca yeniden kullanılır).
      */
     const posesOf = new WeakMap<Candidate, Option[]>();
-    const pickFrom = (candidates: readonly Candidate[], lead: number, limit: number, elevations: readonly number[] = ELEVATIONS): { c: Candidate; pose: ClipPose } | null => {
-      const order = [...candidates].sort((a, b) => a.cost - b.cost);
+    const pickFrom = (candidates: readonly Candidate[], lead: number, limit: number, elevations: readonly number[] = ELEVATIONS, max = Infinity): { c: Candidate; pose: ClipPose } | null => {
+      const order = [...candidates].sort((a, b) => a.cost - b.cost).slice(0, max);
       const me: ClipInfo = { kind: 'stub', onto: null };
       let found: { o: Option; total: number } | null = null;
       for (const c of order) {
@@ -927,10 +960,16 @@ export function layoutClips(input: ClipInput): ClipLayout {
         for (const o of options) {
           if (found && o.cheap >= found.total) break;
           const occluded = (o.occluded ??= clipOcclusion(o.pose, lead) + extra.occluded);
-          if (occluded > limit) continue;
-          const total = o.cheap + 40 * occluded;
+          if (occluded > limit || (found && o.cheap + 40 * occluded >= found.total)) continue;
+          const mine = clipPrims(o.pose, `clip:${lead}`);
+          if (clashes([...mine, ...extra.prims], lead, me, true) > 0) continue;
+          // Kıskaç kendi kenar köprüsüne de değmez (kısa teliyle aynı nesne sayılır).
+          if (extra.bridge.length && mine.some((p) => extra.bridge.some((q) => primsOverlap(p, q)))) continue;
+          // Kablonun yolu en pahalısı: yalnızca çakışmayan ve öbür paylarla en iyiden iyi olabilecek seçenekte.
+          const cabled = (o.cabled ??= occluded + cableOcclusion(o.pose, lead));
+          if (cabled > limit) continue;
+          const total = o.cheap + 40 * cabled;
           if (found && total >= found.total) continue;
-          if (clashes([...clipPrims(o.pose, `clip:${lead}`), ...extra.prims], lead, me, true) > 0) continue;
           found = { o, total };
         }
       }
@@ -999,31 +1038,37 @@ export function layoutClips(input: ClipInput): ClipLayout {
     const bridgeCandidates = (net: string): Candidate[] => {
       const from = netCandidates(net).map((c) => ({ h: c.hole, at: holeTop(c.hole, plan.cols) }));
       const out: Candidate[] = [];
-      const strips: Array<{ a: Hole; b: Hole; d: number; at: Vector3; bt: Vector3; holes: Hole[] }> = [];
+      // Her boş şerit için en kısa iki köprü (eşit boyda olanlardan parça gövdelerinden uzak olanı: gövdenin
+      // önündeki delikten çıkan köprü onu örter).
+      type Pair = { a: Hole; b: Hole; d: number; at: Vector3; bt: Vector3; score: number };
+      const strips: Array<{ pairs: Pair[]; holes: Hole[] }> = [];
+      const clearance = (p: Vector3) => (bodyRects.length ? Math.min(2, ...bodyRects.map((r) => rectDistance(p.x, p.z, r))) : 2);
       for (let board = 0; board < plan.boards; board++) {
         for (let col = 1; col <= plan.cols; col++) {
           for (const half of [0, 1]) {
             if (owners.has(`s${board}:${col}:${half}`)) continue;
             const holes = connectedHoles({ kind: 'strip', board, col, row: half * 5 }, plan.cols).filter((h) => !used.has(holeKey(h)));
             if (holes.length < 2) continue;
-            let pair: { a: Hole; b: Hole; d: number; at: Vector3; bt: Vector3 } | null = null;
+            const pairs: Pair[] = [];
             for (const b of holes) {
               const bt = holeTop(b, plan.cols);
               for (const { h: a, at } of from) {
                 const d = Math.hypot(at.x - bt.x, at.z - bt.z);
-                if (d >= 1 && d <= BRIDGE_REACH && (!pair || d < pair.d)) pair = { a, b, d, at, bt };
+                if (d >= 1 && d <= BRIDGE_REACH) pairs.push({ a, b, d, at, bt, score: d - 0.75 * Math.min(clearance(at), clearance(bt)) });
               }
             }
-            if (pair) strips.push({ ...pair, holes });
+            if (pairs.length) strips.push({ pairs: pairs.sort((x, y) => x.score - y.score).slice(0, 2), holes });
           }
         }
       }
       // En yakın şeritler (köprü kısa olsun).
-      strips.sort((x, y) => x.d - y.d);
-      for (const { a, b, d, at, bt, holes } of strips.slice(0, 8)) {
-        const rest = holes.filter((h) => holeKey(h) !== holeKey(b)).sort((x, y) => holeCost(x) - holeCost(y)).slice(0, 2);
-        for (const lift of [jumperLift(at, bt), ...BRIDGE_LIFTS]) {
-          for (const s of rest) for (const x of stubsAt(s, holeCost(s) + 3 + 0.3 * d + 0.2 * lift)) out.push({ ...x, kind: 'bridge', bridge: { a, b, shape: { lift, bow: 0 } } });
+      strips.sort((x, y) => x.pairs[0]!.score - y.pairs[0]!.score);
+      for (const { pairs, holes } of strips.slice(0, 8)) {
+        for (const { a, b, d, at, bt } of pairs) {
+          const rest = holes.filter((h) => holeKey(h) !== holeKey(b)).sort((x, y) => holeCost(x) - holeCost(y)).slice(0, 3);
+          for (const lift of [jumperLift(at, bt), ...BRIDGE_LIFTS]) {
+            for (const s of rest) for (const x of stubsAt(s, holeCost(s) + 3 + 0.3 * d + 0.2 * lift)) out.push({ ...x, kind: 'bridge', bridge: { a, b, shape: { lift, bow: 0 } } });
+          }
         }
       }
       return out;
@@ -1090,7 +1135,12 @@ export function layoutClips(input: ClipInput): ClipLayout {
       let viaBridge: Candidate[] | null = null;
       const near = () => (viaNet ??= netCandidates(net));
       const far = () => (viaBridge ??= bridgeCandidates(net));
-      const pick = pickFrom(near(), lead, OCCLUSION_LIMIT) ?? pickFrom(far(), lead, OCCLUSION_LIMIT) ?? pickFrom(near(), lead, 2 * OCCLUSION_LIMIT) ?? pickFrom(far(), lead, 2 * OCCLUSION_LIMIT);
+      // Köprü adaylarından yalnızca payı en küçük olanlar (her biri 65 duruş; hepsini denemek yavaş).
+      const pick =
+        pickFrom(near(), lead, OCCLUSION_LIMIT) ??
+        pickFrom(far(), lead, OCCLUSION_LIMIT, ELEVATIONS, BRIDGE_TRIES) ??
+        pickFrom(near(), lead, 2 * OCCLUSION_LIMIT) ??
+        pickFrom(far(), lead, 2 * OCCLUSION_LIMIT, ELEVATIONS, BRIDGE_TRIES);
       if (pick) {
         trouble.set(lead, pick.c.kind === 'bridge' ? 1 : 0);
         commitStub(lead, net, pick.c, pick.pose);

@@ -44,7 +44,7 @@ import { collisions, leadCurve, socketCurve, type Obstacle } from './leadRoute';
 import { cableCurrents } from './cableFlow';
 import { CLIP_DEVICES, clipLeads } from './clipPlan';
 import { clipMesh, stubMesh } from './clipModel';
-import { CABLE_RADIUS, CLIP, PLUG, clipPose, clipTail, clippedPlan, holes3d, jumperShapes, layoutClips, type BoardBody, type ClipLayout } from './clips';
+import { CABLE_RADIUS, CLIP, PLUG, clipCable, clipPose, clipTail, clippedPlan, holes3d, jumperShapes, layoutClips, type BoardBody, type ClipLayout } from './clips';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
 import { holeAt, placeBoardPart, placeTablePart, type Placement } from './placement';
@@ -754,10 +754,14 @@ export class BenchScene {
     // Cihaz kabloları timsah kıskaçla biter (clips.ts): her kıskaç ağın şeridindeki ayrı bir boş deliğe takılı kendi
     // kısa telinin ucunu tutar (gerekirse kenar köprüsü). Tepeden görünümde (Tahtada kur) kablolar eskisi gibi
     // deliklere iner.
-    const layout = this.topView ? null : layoutClips({ doc, plan, schematic: this.lastOverride === null, bodies: this.boardBodies(plan), shapes, socket: (i) => {
+    const socketOf = (i: number) => {
       const lead = plan.leads[i]!;
-      return this.parts.get(lead.partId)?.anchors[lead.pin];
-    } });
+      const placed = this.parts.get(lead.partId);
+      return { at: placed?.anchors[lead.pin], dir: placed?.dirs[lead.pin] };
+    };
+    const layout = this.topView
+      ? null
+      : layoutClips({ doc, plan, schematic: this.lastOverride === null, bodies: this.boardBodies(plan), shapes, socket: (i) => socketOf(i).at, socketDir: (i) => socketOf(i).dir });
     this.clipLayout = layout;
     this.flowPlan = layout ? clippedPlan(plan, layout) : plan;
     this.junctionAt = new Map((layout?.junctions ?? []).map((j) => [j.net, j.at]));
@@ -784,7 +788,7 @@ export class BenchScene {
       this.leadObstacles.push(obstacles);
       // Ön paneldeki soket: kablo önce öne çıkar, masaya sarkar; öbür uçlar dik kalkan alçak kavis.
       const a1 = dir ? from.clone().addScaledVector(dir, 1.5) : from.clone().add(new Vector3(0, 1.4, 0));
-      const curve = dir ? socketCurve(a1, dir, b1, this.boardBox(plan), clip?.axis) : leadCurve(a1, b1, obstacles);
+      const curve = dir && clip ? clipCable(from, dir, clip) : dir ? socketCurve(a1, dir, b1, this.boardBox(plan)) : leadCurve(a1, b1, obstacles);
       this.leadCurves.push(curve);
       paths.push(cablePath(curve));
       const tube = this.netTag(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), CABLE_RADIUS, 8, false), mat(color, 0.55)), lead.net);

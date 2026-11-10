@@ -1983,14 +1983,16 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   tutar (ağız kartın 9,5 mm üstünde). Aynı ağa giden birden çok kablo varsa her biri aynı ağın iletkeninde ayrı bir
   boş deliğe kendi teliyle takılır (kıskaçlar birbirinden yana açılır). Uygun boş delik yoksa ağın boş bir
   deliğinden kimsenin kullanmadığı yakın bir şeride (en çok 8 birim; alçak ya da aradaki parçaların üstünden kemer)
-  **kenar köprüsü** çekilir, tel oraya takılır (yalnızca 3B; akım noktaları köprüden de geçer). O da olmazsa
-  **zincir**: kıskaç aynı ağdaki bir kıskacın metal çenesini tutar, en çok 2 kıskaç (81 örnekte bir kez:
-  opamp-evirmeyen, V1'in + kablosu). Gövdesi deliğin üstünü örten parçanın altındaki delikte tel gövdenin altından
-  yatay çıkıp dikilir (eğik tel).
+  **kenar köprüsü** çekilir, tel oraya takılır (yalnızca 3B; akım noktaları köprüden de geçer). Her şerit için en
+  kısa iki köprü denenir; eşit boydakilerden parça gövdelerinden uzak olanı önce (gövdenin önündeki delikten çıkan
+  köprü onu örter). O da olmazsa **zincir**: kıskaç aynı ağdaki bir kıskacın metal çenesini tutar, en çok 2 kıskaç
+  (81 örnekte gerekmiyor; 15 kablo kenar köprüsüyle). Gövdesi deliğin üstünü örten parçanın altındaki delikte tel
+  gövdenin altından yatay çıkıp dikilir (eğik tel).
 - **Delik seçimi**: parça gövdelerinden uzak, tahtanın cihazlara bakan (arka) kenarına yakın boş delik. Asıl ölçüt
   görünürlük: varsayılan kameranın üç bakışından (Serbest, masa üstü cihaz varken: telefon dikey 24°, yatay 30°
-  ve yakın, masaüstü 36°) kıskacın, kablosunun kuyruktan çıkan başının, kısa telin ve köprünün görüntüsü parça
-  gövdelerinin görüntüsüne düşmesin (yaklaşık perspektif izdüşüm; görüntüler kesişirse kesişimin ortasından geçen
+  ve yakın, masaüstü 36°) kıskacın, kablosunun (masadan kuyruğa giden son parçası; kıskaç cihazından yana bakmazsa
+  kablo tahtanın üstünden dönüp kuyruğa girer), kısa telin ve köprünün görüntüsü parça gövdelerinin görüntüsüne
+  düşmesin (yaklaşık perspektif izdüşüm; görüntüler kesişirse kesişimin ortasından geçen
   ışın hangisine önce giriyorsa o öndedir; `clips.viewModel`). Bir parçanın görüntüsünün en çok %8'i (bulunamazsa
   %16'sı) örtülebilir; gerçek kamerayla ölçülen sınır %20 (ios-kontrol). Önde (alçak kamerada) yükselen kıskaç
   arkadaki alçak parçaları da örter: kıskaçlar arka kenarda toplanır, alt yarıdaki şeritte kalan ağın kıskacı

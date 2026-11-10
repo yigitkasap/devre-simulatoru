@@ -36,15 +36,19 @@ const { placeBoardPart, placeTablePart } = await import('../src/bench3d/placemen
 /** Sahnedeki gibi: parçalar yerleşir, kıskaçlar soketlere bakar. */
 function bench(doc: CircuitDoc, plan: BreadboardPlan, schematic: boolean): { layout: ClipLayout; bodies: Map<string, BoardBody>; socket: (i: number) => Vector3 | undefined } {
   const bodies = new Map<string, BoardBody>();
-  const anchors = new Map<string, Vector3[]>();
+  const anchors = new Map<string, { at: Vector3[]; dirs: readonly (Vector3 | undefined)[] }>();
   for (const part of doc.parts) {
     const onBoard = plan.onBoard.get(part.id);
     const table = plan.table.get(part.id);
     if (onBoard) bodies.set(part.id, { body: placeBoardPart(part, onBoard, plan.cols).body });
-    else if (table) anchors.set(part.id, placeTablePart(part, table).anchors);
+    else if (table) {
+      const placed = placeTablePart(part, table);
+      anchors.set(part.id, { at: placed.anchors, dirs: placed.dirs });
+    }
   }
-  const socket = (i: number) => anchors.get(plan.leads[i]!.partId)?.[plan.leads[i]!.pin];
-  const layout = layoutClips({ doc, plan, schematic, bodies, socket });
+  const socket = (i: number) => anchors.get(plan.leads[i]!.partId)?.at[plan.leads[i]!.pin];
+  const socketDir = (i: number) => anchors.get(plan.leads[i]!.partId)?.dirs[plan.leads[i]!.pin];
+  const layout = layoutClips({ doc, plan, schematic, bodies, socket, socketDir });
   return { layout, bodies, socket };
 }
 
@@ -83,11 +87,13 @@ describe('3B: cihaz kabloları timsah kıskaçla', () => {
         ...plan.jumpers.flatMap((j) => [`${j.net}@${conductorOf(j.a)}`, `${j.net}@${conductorOf(j.b)}`]),
         ...plan.leads.map((l) => `${l.net}@${conductorOf(l.hole)}`),
       ]);
+      // Köprü ağın iletkeninden (ya da daha önce köprülenmiş şeritten) kimsenin kullanmadığı bir şeride.
+      const bridged = new Set<string>();
       for (const b of layout.bridges) {
-        expect(conductors.has(`${b.net}@${conductorOf(b.a)}`), `${id}: köprü ${key(b.a)}`).toBe(true);
-        expect(conductors.has(`${b.net}@${conductorOf(b.b)}`), `${id}: köprünün ucu boş şeritte ${key(b.b)}`).toBe(false);
+        expect(conductors.has(`${b.net}@${conductorOf(b.a)}`) || bridged.has(`${b.net}@${conductorOf(b.a)}`), `${id}: köprü ${key(b.a)}`).toBe(true);
+        expect([...conductors, ...bridged].some((c) => c.endsWith(`@${conductorOf(b.b)}`)), `${id}: köprünün ucu boş şeritte ${key(b.b)}`).toBe(false);
+        bridged.add(`${b.net}@${conductorOf(b.b)}`);
       }
-      const bridged = new Set(layout.bridges.map((b) => `${b.net}@${conductorOf(b.b)}`));
       for (const clip of layout.clips.values()) {
         expect(clip.net).toBe(plan.leads[clip.lead]!.net);
         // Kıskaç bacak tutmaz: ya kendi kısa telini ya da (zincirde) aynı ağdaki bir kıskacı tutar.
@@ -132,14 +138,13 @@ describe('3B: cihaz kabloları timsah kıskaçla', () => {
     });
   }
 
-  // Zincir son çare: 81 örnekte yalnızca opamp-evirmeyen'de bir kez (V1'in + kablosu: ağın tek şeridi işlemsel
-  // yükselticinin önünde, boş deliklerdeki tel ya da kıskaç onu örtüyor, kenar köprüleri planın köprülerine çarpıyor).
-  it('toplam: çakışma 0, cihaz kablosu olan örneklerde kıskaçlar; zincir en çok bir kez', () => {
+  // Zincir son çare: 81 örnekte hiç gerekmiyor (uygun delik bulunamayınca kenar köprüsü yetiyor).
+  it('toplam: çakışma 0, cihaz kablosu olan örneklerde kıskaçlar; zincir yok', () => {
     expect(total).toBe(0);
     expect(clipped).toBeGreaterThan(200);
     expect(lowest).toBeGreaterThanOrEqual(MIN_JAW_MM);
     expect(steepest).toBeLessThanOrEqual(MAX_ELEVATION + 1e-6);
-    expect(kinds.get('chain') ?? 0).toBeLessThanOrEqual(1);
+    expect(kinds.get('chain') ?? 0).toBe(0);
     expect(kinds.get('stub') ?? 0).toBeGreaterThan(200);
   });
 
