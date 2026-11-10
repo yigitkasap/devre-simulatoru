@@ -42,9 +42,9 @@ import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPa
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
 import { collisions, leadCurve, socketCurve, type Obstacle } from './leadRoute';
 import { cableCurrents } from './cableFlow';
-import { CLIP_DEVICES, clipGroups } from './clipPlan';
+import { CLIP_DEVICES, clipLeads } from './clipPlan';
 import { clipMesh, stubMesh } from './clipModel';
-import { CABLE_RADIUS, CLIP, PLUG, clipPose, clipTail, clippedPlan, jumperShapes, layoutClips, type BoardBody, type ClipLayout } from './clips';
+import { CABLE_RADIUS, CLIP, PLUG, clipPose, clipTail, clippedPlan, holes3d, jumperShapes, layoutClips, type BoardBody, type ClipLayout } from './clips';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
 import { holeAt, placeBoardPart, placeTablePart, type Placement } from './placement';
@@ -610,26 +610,36 @@ export class BenchScene {
   }
 
   /**
-   * Denetim (ios-kontrol): tahtadaki dolu delikler (bacaklar, köprüler, kıskaçsız kablolar, kısa teller) ve iki
-   * şey takılı delik sayısı; cihaz kablolarının kıskaçları (bacak, kısa tel, zincir) ve birleşme noktaları.
+   * Denetim (ios-kontrol): tahtadaki dolu delikler (bacaklar, köprüler, kıskaçsız kablolar, kısa teller, kenar
+   * köprüleri) ve iki şey takılı delik sayısı; cihaz kablolarının kıskaçları (kısa tel, köprülü kısa tel, zincir;
+   * ağzın kartın üstündeki yüksekliği mm, eğimi derece), kenar köprüsü sayısı ve birleşme etiketlerinin ağları.
    */
-  clipReport(): { holes: number; doubled: number; clips: Array<{ part: string; pin: number; kind: string; net: string }>; plugged: number; junctions: Array<{ net: string; count: number }> } {
+  clipReport(): {
+    holes: number;
+    doubled: number;
+    clips: Array<{ part: string; pin: number; kind: string; net: string; jawMm: number; deg: number }>;
+    plugged: number;
+    bridges: number;
+    junctions: Array<{ net: string; count: number }>;
+  } {
     const plan = this.plan;
     const layout = this.clipLayout;
-    if (!plan) return { holes: 0, doubled: 0, clips: [], plugged: 0, junctions: [] };
-    const key = (h: Hole) => (h.kind === 'strip' ? `${h.board}:s${h.col}:${h.row}` : `${h.board}:r${h.rail}:${h.k}`);
-    const all = [
-      ...[...plan.onBoard.values()].flatMap((p) => [...p.holes, ...(p.extraHoles ?? [])]),
-      ...plan.jumpers.flatMap((j) => [j.a, j.b]),
-      ...plan.leads.filter((_, i) => !layout?.clips.has(i)).map((l) => l.hole),
-      ...(layout?.stubs ?? []).map((s) => s.hole),
-    ].map(key);
+    if (!plan) return { holes: 0, doubled: 0, clips: [], plugged: 0, bridges: 0, junctions: [] };
+    const all = holes3d(plan, layout);
     const devices = plan.leads.flatMap((l, i) => (CLIP_DEVICES.has(this.parts.get(l.partId)?.part.type ?? 'ground') ? [i] : []));
     return {
       holes: new Set(all).size,
       doubled: all.length - new Set(all).size,
-      clips: [...(layout?.clips.values() ?? [])].map((c) => ({ part: plan.leads[c.lead]!.partId, pin: plan.leads[c.lead]!.pin, kind: c.kind, net: c.net })),
+      clips: [...(layout?.clips.values() ?? [])].map((c) => ({
+        part: plan.leads[c.lead]!.partId,
+        pin: plan.leads[c.lead]!.pin,
+        kind: c.kind,
+        net: c.net,
+        jawMm: (c.jaw.y - BB.height) * 2.54,
+        deg: (Math.asin(Math.min(1, Math.max(-1, c.axis.y))) * 180) / Math.PI,
+      })),
       plugged: devices.filter((i) => !layout?.clips.has(i)).length,
+      bridges: layout?.bridges.length ?? 0,
       junctions: [...this.junctionAt.keys()].map((net) => ({ net, count: layout?.junctions.find((j) => j.net === net)?.count ?? 0 })),
     };
   }
@@ -727,8 +737,8 @@ export class BenchScene {
     const holeTop = (h: Hole) => holeAt(h, plan.cols, BB.height);
     const jumperPaths: CablePath[] = [];
     // Kıskaçlı cihaz kablolarının fişi yok; jumper telleri birbirinin ve fişlerin içinden geçmez (clips.ts).
-    const clipLeads = new Set(this.topView ? [] : clipGroups(doc, plan, this.lastOverride === null).flatMap((g) => g.leads));
-    const shapes = jumperShapes(plan, clipLeads);
+    const clipped = new Set(this.topView ? [] : clipLeads(doc, plan));
+    const shapes = jumperShapes(plan, clipped);
     for (const [i, j] of plan.jumpers.entries()) {
       const jumper = jumperMesh(holeTop(j.a), holeTop(j.b), j.color ?? colorOf(j.net), shapes[i]);
       this.cables.add(this.netTag(jumper, j.net));
@@ -741,9 +751,10 @@ export class BenchScene {
       const placed = this.parts.get(id);
       return placed ? [{ id, box: new Box3().setFromObject(placed.model.root) }] : [];
     });
-    // Cihaz kabloları timsah kıskaçla biter (clips.ts): kıskaç bacağı ya da kısa dik telin ucunu tutar, aynı ağdakiler
-    // zincirlenir. Tepeden görünümde (Tahtada kur) kablolar eskisi gibi deliklere iner.
-    const layout = this.topView ? null : layoutClips({ doc, plan, chain: this.lastOverride === null, bodies: this.boardBodies(plan), shapes, socket: (i) => {
+    // Cihaz kabloları timsah kıskaçla biter (clips.ts): her kıskaç ağın şeridindeki ayrı bir boş deliğe takılı kendi
+    // kısa telinin ucunu tutar (gerekirse kenar köprüsü). Tepeden görünümde (Tahtada kur) kablolar eskisi gibi
+    // deliklere iner.
+    const layout = this.topView ? null : layoutClips({ doc, plan, schematic: this.lastOverride === null, bodies: this.boardBodies(plan), shapes, socket: (i) => {
       const lead = plan.leads[i]!;
       return this.parts.get(lead.partId)?.anchors[lead.pin];
     } });
@@ -776,7 +787,10 @@ export class BenchScene {
       const curve = dir ? socketCurve(a1, dir, b1, this.boardBox(plan), clip?.axis) : leadCurve(a1, b1, obstacles);
       this.leadCurves.push(curve);
       paths.push(cablePath(curve));
-      this.cables.add(this.netTag(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), CABLE_RADIUS, 8, false), mat(color, 0.55)), lead.net));
+      const tube = this.netTag(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), CABLE_RADIUS, 8, false), mat(color, 0.55)), lead.net);
+      // Denetim (ios-kontrol, parçaların örtülmesi): kıskaç, kıskaçlı kablo, kısa tel ve kenar köprüsü işaretli.
+      if (clip) tube.userData.clipPart = 'cable';
+      this.cables.add(tube);
       const tip = mesh(plug, plugMat, from.x, from.y + 0.75, from.z);
       if (dir) {
         tip.position.copy(from).addScaledVector(dir, 0.75);
@@ -784,14 +798,27 @@ export class BenchScene {
       }
       this.cables.add(tip);
       if (clip) {
-        this.cables.add(this.netTag(clipMesh(clip, color), lead.net));
+        const jaws = this.netTag(clipMesh(clip, color), lead.net);
+        jaws.userData.clipPart = 'clip';
+        this.cables.add(jaws);
         return;
       }
       this.cables.add(this.netTag(mesh(plug, plugMat, to.x, to.y + 0.75, to.z), lead.net));
       this.cables.add(rod(new Vector3(to.x, to.y - HOLE_DEPTH, to.z), to, 0.1, M.tin(), 6));
     });
-    // Kısa dik teller: onları tutan (zincirin ilk) kıskacın kablosunun renginde.
-    for (const stub of layout?.stubs ?? []) this.cables.add(this.netTag(stubMesh(stub, leadColor.get(stub.lead) ?? colorOf(stub.net)), stub.net));
+    // Kısa dik teller ve kenar köprüleri: onları tutan kıskacın kablosunun renginde. Köprülerin yolları planın
+    // köprülerinden sonra (akım noktaları: clippedPlan köprüleri aynı sırada ekler).
+    for (const stub of layout?.stubs ?? []) {
+      const wire = this.netTag(stubMesh(stub, leadColor.get(stub.lead) ?? colorOf(stub.net)), stub.net);
+      wire.userData.clipPart = 'stub';
+      this.cables.add(wire);
+    }
+    for (const bridge of layout?.bridges ?? []) {
+      const jumper = this.netTag(jumperMesh(holeTop(bridge.a), holeTop(bridge.b), leadColor.get(bridge.lead) ?? colorOf(bridge.net), bridge.shape), bridge.net);
+      jumper.userData.clipPart = 'bridge';
+      this.cables.add(jumper);
+      jumperPaths.push(cablePath(jumper.userData.curve as Curve<Vector3>));
+    }
     // Tahtada kur: takılmamış alet kabloları aletin önünde masaya sarkar (ucundaki kıskaç masada).
     for (const loose of plan.loose ?? []) {
       const placed = this.parts.get(loose.partId);

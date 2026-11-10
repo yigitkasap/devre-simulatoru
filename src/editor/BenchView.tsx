@@ -178,8 +178,9 @@ export function BenchView(props: BenchViewProps) {
   const slow = useSlowFrame(props.active ? (props.labelFrame === undefined ? frame : props.labelFrame) : null);
   const single = selection.length === 1 ? selection[0]! : null;
 
-  // Cihaz kablolarının birleşme noktaları ("GND · 3 kablo") ve üstüne gelinen ağ (küçük şemada vurgulanır). Tahtada
-  // kur kurulumunun 3B'sinde kablolar zincirlenmez: birleşme yok.
+  // Birden çok cihaz kablosunun gittiği ağların etiketi ("GND · 3 kablo"; kıskaçların ortasındakinin üstünde) ve
+  // üstüne gelinen ağ (küçük şemada vurgulanır). Tahtada kur kurulumunun 3B'sinde etiket yok: her kablo öğrencinin
+  // taktığı delikte.
   const schematicPlan = useMemo(() => (props.plan ? null : planBreadboard(doc)), [doc, props.plan]);
   const index = useMemo(() => netIndex(doc, props.connectivity), [doc, props.connectivity]);
   const junctions = useMemo(() => (schematicPlan ? clipJunctions(doc, schematicPlan).map((j) => ({ ...j, name: netName(j.net, schematicPlan, index) })) : []), [doc, schematicPlan, index]);
