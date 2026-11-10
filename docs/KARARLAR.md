@@ -2679,6 +2679,15 @@ iPhone 13 844 × 390, koyu tema) çıkan maddeler. Denetim: ios-kontrol "Telefon
 - ios-kontrol'ün "Yatay telefon" bölümündeki iki madde yeni düzene göre güncellendi: şema solda bütün
   yükseklikte, defter ve alttaki çubuk sağda; osiloskop ekranı sütunun genişliğinde (eskiden defter tam
   genişlikti, ekran > 600 px).
+- Gece kararı: **dalların birleşmesi.** telefon-arayuz'un 3B dışı maddeleri (3, 4, 5, 6, 7a, 7d, 7e)
+  önce main'in üstünde yapılıp push edildi. teshis-ve-3b'nin üstüne yeniden kurulan (rebase) hâli dalın
+  geçmişini değiştirdiği için zorla push edilemedi (otomatik kip izin vermedi). Bu yüzden teshis-ve-3b
+  dala bir birleştirme commit'iyle alındı (d8637d1); içeriği rebase edilmiş hâlle aynı. Tek çakışma
+  `Simulator.tsx`'teki şema düğmelerindeydi: ikisi birlikte kaldı (tam ekrana girip çıkarken yeniden
+  sığdırma ve alt kenar payı `phoneEdge`). Telefondaki 3B maddeleri (1, 2, 7b, 7c) ayrı bir çalışma
+  dalında yapıldı. O dal da push edilemediği için commit'leri aynı sırayla telefon-arayuz'a alındı
+  (cherry-pick); içerik o dalla aynı. Geçmiş düz değil ama main'e alma sırası değişmez: önce
+  teshis-ve-3b, sonra telefon-arayuz.
 
 ### Lojik entegreler (Dalga 2, 2026-11-05)
 
