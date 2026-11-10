@@ -1947,7 +1947,8 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
 - **Kablolar**: modelin `anchorDirs`'i soketin dışa baktığı yön; kablo soketten öne düz çıkar, yatay teğetle
   masaya sarkar, masada tahtaya gider ve deliğe yukarıdan iner (`leadRoute.socketCurve`; doğru + kübik
   Bézier'ler: masanın altına salınmaz). Fiş soketin ekseninde. 2026-11-09'dan beri kablo deliğe girmez, timsah
-  kıskaçla biter ve kıskacın kuyruğuna onun ekseni boyunca girer ("3B: cihaz kabloları, timsah kıskaç").
+  kıskaçla biter ve kıskacın kuyruğuna onun ekseni boyunca girer; 2026-11-10'dan beri kıskaç neredeyse yatay
+  (en çok 25°), kablo kuyruktan cihaza doğru çıkar ("3B: cihaz kabloları, timsah kıskaç").
 - **Tahtada kur (Tepeden)**: cihaz kartları soketlerin çevresi kadar ve tahtanın hemen arkasında yan yana
   sıkışık dizilir (uçlar kartla kayar); gerçek boyutlu sıra kartları çok yayıyor, tahtayı küçültüyordu. 3B'de
   uçlar gerçek yerinde.
@@ -1968,28 +1969,59 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
   (telefon-hizi'den önce) 4–8 kare/s. Dal telefon-hizi'nin üzerinde (2026-11-09): 10 örnek 32,1–53,3 kare/s,
   uzun görev yok (eski modellerle aynı ölçüm 33,1–53,6).
 
-### 3B: cihaz kabloları, timsah kıskaç (2026-11-09)
+### 3B: cihaz kabloları, timsah kıskaç (2026-11-09; yerleşim 2026-11-10)
 
 Laboratuvarda cihaz kabloları (güç kaynağı, osiloskop, fonksiyon üreteci, multimetre) muz fiş – kablo – timsah
 kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon değişmez; yalnızca 3B gösterim.
 - **Bir delik tek tel ya da tek bacak alır** (7): Tahtada kur'un yerleşiminde (planBreadboard → buildFromPlan:
   örnek yerleşim ipucu, görevlerin hazır kabloları ve beklenen delikleri) ve görevlerin başlangıç tahtalarında
-  hiçbir delikte iki uç yok; 81 örnekte birim testi (`tests/tahta-delik.test.ts`).
-- **Kıskaç** (8; `src/bench3d/clipPlan.ts` gruplar, `clips.ts` yerleşim, `clipModel.ts` model): cihaz kablosunun
-  ucu timsah kıskaç. Bir ağa cihaz kablosu gidiyorsa kıskaç önce ağdaki eksenli parçanın (direnç, diyot, Schottky,
-  zener) bacağını, gövdeyle kart arasındaki dik kısmından tutar; yoksa ağın şeridine ya da rayına kısa dik tel
-  takılır, kıskaç onun soyuk ucunu tutar. Aynı ağdaki öbür cihaz kabloları ayrı delik kullanmaz: her biri öncekinin
-  (yer yoksa ilkinin) metal çenesini tutar (zincir). Kıskaç kabloya, cihazın soketine doğru 55° kalkar; kablo
-  kıskacın kuyruğuna onun ekseni boyunca girer (`leadRoute.socketCurve`'ün `end`'i).
-- **Gece kararı:** "açıkta tutulabilecek bacak" yalnızca eksenli parçaların bacakları: öbür bacak en az 3 delik
-  ötede, kıskaç başka bacağa değmez. Dik (radyal) iki bacaklıların, TO-92'nin, entegrelerin bacakları bir delik
-  aralığında yan yana (kıskaç komşu bacağa değer), sayılmadı.
-- **Gece kararı:** planın (planBreadboard) delikleri değişmedi: Tahtada kur'un hazır kabloları ve görevlerin
-  beklenen delikleri aynı. Kısa tel planın o kablo için ayırdığı deliğe takılır; bacağı ya da başka kıskacı tutan
-  kabloların planlı delikleri 3B'de boş kalır. Akım noktaları için cihaz kablosunun deliği kıskacın bağlandığı
-  deliktir (`clippedPlan`). Tahtada kur kurulumunun 3B'sinde (öğrencinin taktığı delikler) her cihaz kablosu kendi
-  deliğindeki kısa teli tutar: zincir ve bacak yok, öğrencinin seçtiği delik görünür kalır. Tepeden görünümde
-  kablolar eskisi gibi deliğe iner (kıskaç yok). Takılmamış cihaz kablosunun kıskacı masada yatar.
+  hiçbir delikte iki uç yok; 81 örnekte birim testi (`tests/tahta-delik.test.ts`). 3B'de kısa teller ve kenar
+  köprüleri de bu kurala uyar (`tests/kiskac-3b.test.ts`).
+- **Kıskaç** (8; `src/bench3d/clipPlan.ts` hangi kablolar, `clips.ts` yerleşim, `clipModel.ts` model): cihaz
+  kablosunun ucu timsah kıskaç. **2026-11-10'dan beri kıskaç hiçbir zaman parça bacağını tutmaz**: her cihaz
+  kablosu için ağın şeridindeki ya da rayındaki ayrı bir boş deliğe kısa dik tel takılır, kıskaç telin soyuk ucunu
+  tutar (ağız kartın 9,5 mm üstünde). Aynı ağa giden birden çok kablo varsa her biri aynı ağın iletkeninde ayrı bir
+  boş deliğe kendi teliyle takılır (kıskaçlar birbirinden yana açılır). Uygun boş delik yoksa ağın boş bir
+  deliğinden kimsenin kullanmadığı yakın bir şeride (en çok 8 birim; alçak ya da aradaki parçaların üstünden kemer)
+  **kenar köprüsü** çekilir, tel oraya takılır (yalnızca 3B; akım noktaları köprüden de geçer). O da olmazsa
+  **zincir**: kıskaç aynı ağdaki bir kıskacın metal çenesini tutar, en çok 2 kıskaç (81 örnekte bir kez:
+  opamp-evirmeyen, V1'in + kablosu). Gövdesi deliğin üstünü örten parçanın altındaki delikte tel gövdenin altından
+  yatay çıkıp dikilir (eğik tel).
+- **Delik seçimi**: parça gövdelerinden uzak, tahtanın cihazlara bakan (arka) kenarına yakın boş delik. Asıl ölçüt
+  görünürlük: varsayılan kameranın üç bakışından (Serbest, masa üstü cihaz varken: telefon dikey 24°, yatay 30°
+  ve yakın, masaüstü 36°) kıskacın, kablosunun kuyruktan çıkan başının, kısa telin ve köprünün görüntüsü parça
+  gövdelerinin görüntüsüne düşmesin (yaklaşık perspektif izdüşüm; görüntüler kesişirse kesişimin ortasından geçen
+  ışın hangisine önce giriyorsa o öndedir; `clips.viewModel`). Bir parçanın görüntüsünün en çok %8'i (bulunamazsa
+  %16'sı) örtülebilir; gerçek kamerayla ölçülen sınır %20 (ios-kontrol). Önde (alçak kamerada) yükselen kıskaç
+  arkadaki alçak parçaları da örter: kıskaçlar arka kenarda toplanır, alt yarıdaki şeritte kalan ağın kıskacı
+  boş sütunun üstünden arkaya ya da yana uzanır.
+- **Duruş**: kıskaç neredeyse yatay (eğim en çok 25°, tercihen 12°: kablonun ağırlığıyla kuyruğu hafifçe
+  kalkık), kuyruğu kendi cihazının soketinden yana (en çok 85° sapma; kablo tahtanın üstünden geri dönmez) ve
+  tahtanın ortasından dışa; gövdesi mümkün olduğunca parça alanının (gövdelerin kapladığı dikdörtgen) dışında.
+  Kablo kuyruğa kıskacın ekseni boyunca girer (`leadRoute.socketCurve`'ün `end`'i). Kıskaç gerçek boyunda,
+  küçültülmez.
+- **Seçim** (`clips.layoutClips`): her kablo için adaylar (ağın boş delikleri, sonra kenar köprüleri) ve her adayda
+  13 yön × 5 eğim; payı (deliğin tercihi, cihazdan sapma, içe bakma, eğim, parça alanı, 40 × örtme payı) en küçük,
+  örtme sınırının altında kalan ve hiçbir şeyle çakışmayan duruş seçilir (dal-sınır: önce adaylar, sonra
+  duruşlar). Kablolar sırayla yerleşir (önce çok kablolu ağlar, ağ içinde soldan sağa); bir kablo iyi yer
+  bulamazsa (zincir, dik duruş, çakışma) o kablo öne alınarak en çok üç kez yeniden denenir.
+- **Neden değişti** (kullanıcı, 2026-11-10): kıskaçlar parçaları kapatıyor ve tahtaya saplanmış gibi görünüyordu
+  (1N4001 DC örneğinde R1 ve D1 görünmüyordu). Nedenleri: kıskaç direnç/diyot bacağını kartın 1,4 mm üstünden
+  tutuyordu, kıskaçlar 55° dik duruyordu, aynı ağdakiler tek noktada (bacakta) zincirleniyordu. Eski "bir ağda
+  tek bağlantı noktası, öbür kablolar zincirlenir" kararı ve "açıkta tutulabilecek bacak: eksenli parçalar" gece
+  kararı kaldırıldı (`CLIP_LEGS` yok).
+- **Karar:** "Şeritte boş delik yoksa köprü, o da yoksa zincir" kuralında boş delik "uygun boş delik" sayıldı:
+  planda her cihaz kablosunun kendi deliği olduğundan ağın iletkeninde her zaman yeterince boş delik var; köprü ve
+  zincir, boş deliklerin hepsinde kıskaç bir parçayı örttüğünde ya da çakıştığında kullanılır. Yoksa kural hiç
+  devreye girmez, parçalar örtülürdü.
+- **Gece kararı → değişti:** planın (planBreadboard) delikleri değişmez: Tahtada kur'un hazır kabloları ve
+  görevlerin beklenen delikleri aynı. Kısa tel ağın iletkenindeki en uygun boş deliğe takılır (planın o kablo için
+  ayırdığı delik de olabilir); kısa teller ve kenar köprüleri yalnızca şemanın 3B görünümüne eklenir. Akım
+  noktaları için cihaz kablosunun deliği kıskacın bağlandığı deliktir, kenar köprüleri planın köprülerinin
+  arkasına eklenir (`clippedPlan`). Tahtada kur kurulumunun 3B'sinde (öğrencinin taktığı delikler) her cihaz
+  kablosu kendi deliğindeki kısa teli tutar: zincir, köprü ve etiket yok, öğrencinin seçtiği delik görünür kalır;
+  duruş kuralları aynı. Tepeden görünümde kablolar eskisi gibi deliğe iner (kıskaç yok). Takılmamış cihaz
+  kablosunun kıskacı masada yatar.
 - **Ölçüler** (gerçek parçalardan): kıskaç Mueller BU-30C mini timsah kıskacı, 27,69 × 5,08 × 7,87 mm, ağız en çok
   4,8 mm (Mueller BU-30 veri sayfası; DigiKey, Farnell); kılıf kablonun renginde (Mueller BU-2030-A: muz fişten
   yalıtımlı timsah kıskaca test kablosu, kılıf kablo renginde). Kısa tel 22 AWG tek damarlı, yalıtım Ø 1,45 mm,
@@ -1997,20 +2029,22 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   **Gece kararı:** kısa telin yalıtımının tahtanın üstündeki boyu 5 mm (kaynak bulunamadı; telin ucu kıskaca
   yetecek kadar yukarıda, yaklaşık bir parmak boğumu). Muz fiş: pim Ø 4 mm (4 mm muz fiş standardı; Pomona 1325
   4,0–4,2 mm sokete uyar); fişin gövde ölçüsü bulunamadı, soketteki fiş modeli değişmedi.
-- **Çakışma yok** (9): kıskaçlar, kısa teller, kıskaçtan çıkan kabloların başı (2,5 birim), köprüler (jumper) ve
-  masadaki parçaların dupont fişleri birbirinin içine girmez; kıskaçlar ve kısa teller parçaların gövdelerine de
-  (bacaklar ince, sayılmaz). Her kıskaç için adaylar sırayla denenir: bacaklar, planın deliği, ağın şeridindeki ya
-  da rayındaki öbür boş delikler (bir delik boşluk bırakılır), sonra gövdesi deliğin üstünü örten parçanın altından
-  alçakta ya da kartın üstünde yatay çıkıp dikilen eğik tel; her adayda cihaza bakan yön, sonra yanlara açılan
-  16 yön ve 4 eğim. Köprüler: bir telin dik ucu başka bir telin altında kalıyorsa üstteki ondan yüksek geçer; aynı
-  sırada iç içe iki telden kısa olanın ortası yana açılır (ucundan ≈ 0,7 birim sonra), öbürü onun ucunun üstünden;
-  kalan çakışmada en yakın çakışmasız yükseklik ve yana açılma (`clips.jumperShapes`, delikler değişmez). Fiş
-  0,75 birim (1,9 mm), köprü Ø 1 mm, kısa tel Ø 1,45 mm, kablo Ø 1,4 mm: hepsi bir delik aralığından (2,54 mm)
-  dar. Test (`tests/kiskac-3b.test.ts`, 81 örnek): her cihaz kablosu kıskaçla bağlı, ağ başına tek bağlantı noktası,
-  3B'de bir delikte tek tel ya da bacak, çakışma 0 (önceden köprüler 65, kıskaçların ilk hâli 201 çakışma).
-  Kablolar havada birbirinin üstünden geçebilir (masadan kıskaca giden uzun kısımlar sayılmaz).
-- **Kafa karıştırmasın** (10): birleşme noktasında (zincirin ilk kıskacının ağzı) küçük etiket: ağın adı ve kablo
-  sayısı ("GND · 3 kablo"; iki ya da daha çok cihaz kablosu buluşunca). Ağın adı analizdeki düğüm adı
+- **Çakışma yok** (9): kıskaçlar, kısa teller, kenar köprüleri, kıskaçtan çıkan kabloların başı (2,5 birim),
+  köprüler (jumper) ve masadaki parçaların dupont fişleri birbirinin içine girmez; kıskaçlar, kısa teller ve kenar
+  köprüleri parçaların gövdelerine de (bacaklar ince, sayılmaz). Köprüler: bir telin dik ucu başka bir telin
+  altında kalıyorsa üstteki ondan yüksek geçer; aynı sırada iç içe iki telden kısa olanın ortası yana açılır
+  (ucundan ≈ 0,7 birim sonra), öbürü onun ucunun üstünden; kalan çakışmada en yakın çakışmasız yükseklik ve yana
+  açılma (`clips.jumperShapes`, delikler değişmez). Fiş 0,75 birim (1,9 mm), köprü Ø 1 mm, kısa tel Ø 1,45 mm,
+  kablo Ø 1,4 mm: hepsi bir delik aralığından (2,54 mm) dar. Test (`tests/kiskac-3b.test.ts`, 81 örnek): her cihaz
+  kablosu kıskaçla bağlı, bacak tutan kıskaç yok, zincir dışındaki her kıskacın kendi kısa teli, zincir en çok 2
+  kıskaç, ağız kartın en az 8 mm üstünde, eğim en çok 25°, kuyruk kendi cihazından yana, 3B'de bir delikte tek tel
+  ya da bacak, çakışma 0 (önceden köprüler 65, kıskaçların ilk hâli 201 çakışma). Kablolar havada birbirinin
+  üstünden geçebilir (masadan kıskaca giden uzun kısımlar sayılmaz).
+- **Kafa karıştırmasın** (10): iki ya da daha çok cihaz kablosu aynı ağa gidince küçük etiket: ağın adı ve kablo
+  sayısı ("GND · 3 kablo"). **Karar (2026-11-10):** kablolar artık ayrı deliklerde olduğundan etiket ağın
+  kıskaçlarının ortasındakinin gövdesinin (kılıfın) üstünde: kıskaçlar arka kenarda toplandığından etiket tahtadaki
+  parçalardan uzak kalır, üstüne gelince o ağ vurgulanır; kıskacın ağzı değil gövdesi, çünkü ağız tahtanın
+  üstünde, parçalara yakın. Ağın adı analizdeki düğüm adı
   (`nodeName`); toprak "GND"; ölçü aletleri ve osiloskop ad vermez ("V1" yerine "RD 2. uç"). Fare bir kablonun,
   kıskacın, kısa telin ya da köprünün üstüne gelince (telefonda dokununca; yeniden dokununca kalkar) o ağın kabloları
   kendi renginde parlar, tahtadaki bacaklarının üstünde mavi işaret (seçim halkasının rengi), öbür kablolar ve ağa
@@ -2022,7 +2056,9 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   cihaz boyutlarıyla 34,7–64,6 kare/s, uzun görev yok (öncesi aynı makinede 35,3–60,7). Kıskacın geometrileri bütün
   kıskaçlarda ortak, malzemeleri kablonun rengine göre paylaşılır. Yerleşim (kıskaçlar, köprülerin biçimi) yalnızca
   devre değişince hesaplanır: en ağır örnekte (yürüyen ışık, 30 köprü) ≈ 75 ms, kıskaçlı en ağır örnekte ≈ 70 ms
-  (normal hızda, düğümde).
+  (normal hızda, düğümde). 2026-11-10 yerleşimiyle (görünürlük hesabı, köprü adayları, yeniden deneme) kıskaçlı
+  örneklerin toplamı ≈ 3 kat (81 örnek ≈ 0,25 s → ≈ 0,75 s), en ağır örnek ≈ 80–140 ms (opamp-evirmeyen,
+  transformator; eski en ağır akim-kaynagi-ohm ≈ 70–130 ms, aynı makinede, yük altında).
 
 ### Telefonda 3B (2026-11-10)
 
