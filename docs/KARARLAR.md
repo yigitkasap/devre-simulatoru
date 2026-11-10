@@ -1989,8 +1989,9 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   (81 örnekte gerekmiyor; 15 kablo kenar köprüsüyle). Gövdesi deliğin üstünü örten parçanın altındaki delikte tel
   gövdenin altından yatay çıkıp dikilir (eğik tel).
 - **Delik seçimi**: parça gövdelerinden uzak, tahtanın cihazlara bakan (arka) kenarına yakın boş delik. Asıl ölçüt
-  görünürlük: varsayılan kameranın üç bakışından (Serbest, masa üstü cihaz varken: telefon dikey 24°, yatay 30°
-  ve yakın, masaüstü 36°) kıskacın, kablosunun (masadan kuyruğa giden son parçası; kıskaç cihazından yana bakmazsa
+  görünürlük: varsayılan kameranın üç yerinden (Serbest, masa üstü cihaz varken; ölçüldü: tahtanın ortasından
+  masaüstünde ≈ 42° / 109 birim, iPhone 13 dikeyde ≈ 31° / 114, yatayda ≈ 31° / 60; kameranın 36°, 24°, 30°'lik
+  bakışlarının hedefi tahtanın üstünde ve arkasında, tam boy tahtada uzaklık tahtayla büyür) kıskacın, kablosunun (masadan kuyruğa giden son parçası; kıskaç cihazından yana bakmazsa
   kablo tahtanın üstünden dönüp kuyruğa girer), kısa telin ve köprünün görüntüsü parça gövdelerinin görüntüsüne
   düşmesin (yaklaşık perspektif izdüşüm; görüntüler kesişirse kesişimin ortasından geçen
   ışın hangisine önce giriyorsa o öndedir; `clips.viewModel`). Bir parçanın görüntüsünün en çok %8'i (bulunamazsa
@@ -2058,9 +2059,9 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   cihaz boyutlarıyla 34,7–64,6 kare/s, uzun görev yok (öncesi aynı makinede 35,3–60,7). Kıskacın geometrileri bütün
   kıskaçlarda ortak, malzemeleri kablonun rengine göre paylaşılır. Yerleşim (kıskaçlar, köprülerin biçimi) yalnızca
   devre değişince hesaplanır: en ağır örnekte (yürüyen ışık, 30 köprü) ≈ 75 ms, kıskaçlı en ağır örnekte ≈ 70 ms
-  (normal hızda, düğümde). 2026-11-10 yerleşimiyle (görünürlük hesabı, köprü adayları, yeniden deneme) kıskaçlı
-  örneklerin toplamı ≈ 3 kat (81 örnek ≈ 0,25 s → ≈ 0,75 s), en ağır örnek ≈ 80–140 ms (opamp-evirmeyen,
-  transformator; eski en ağır akim-kaynagi-ohm ≈ 70–130 ms, aynı makinede, yük altında).
+  (normal hızda, düğümde). 2026-11-10 yerleşimiyle (görünürlük hesabı, kablonun yolu, köprü adayları, yeniden
+  deneme) 81 örneğin toplamı ≈ 2 kat (≈ 0,2–0,3 s → ≈ 0,4–0,6 s), en ağır örnek ≈ 45–60 ms (rl-devresi,
+  frekans-bolucu; eski en ağır akim-kaynagi-ohm ≈ 70–115 ms; aynı makinede, yük altında).
 
 ### Telefonda 3B (2026-11-10)
 

@@ -503,15 +503,20 @@ export function collisions(plan: BreadboardPlan, layout: ClipLayout, bodies: Rea
 // --- Görünüş: parçaların örtülmesi -------------------------------------------------------------------------------
 
 /**
- * Varsayılan kameranın (Serbest, masa üstü cihaz varken) yaklaşık bakışları: önden (azimut 0), yükseklik açısı ve
- * hedefe uzaklık (birim). Telefon dikeyde 24°, yatayda 30° (kısa alan: kamera yakın), masaüstünde 36° (scene.ts →
- * BENCH_FREE). Kıskacın görüntüsü bu bakışların hiçbirinde parça gövdelerinin görüntüsüne düşmesin.
+ * Varsayılan kameranın (Serbest, masa üstü cihaz varken) yaklaşık yerleri: önden (azimut 0), tahtanın ortasından
+ * yükseklik açısı ve uzaklık (birim; yarım boy tahtada, tam boyda uzaklık tahtanın genişliğiyle büyür). Ölçülen
+ * (2026-11-10, ios-kontrol'ün görünümleri): masaüstü 1440×900 ≈ 42° / 109 (kameranın 36°'lik bakışının hedefi
+ * tahtanın üstünde ve arkasında), iPhone 13 dikey ≈ 31° / 114, yatay ≈ 31° / 60 (kısa alan: kamera yakın).
+ * Örtülme yalnızca kameranın yerine bağlı (ışınlar); bakış yönü sayılmaz. Kıskacın görüntüsü bu yerlerin hiçbirinden
+ * parça gövdelerinin görüntüsüne düşmesin.
  */
 const VIEWS: ReadonlyArray<{ readonly elevation: number; readonly distance: number }> = [
-  { elevation: 24, distance: 100 },
-  { elevation: 30, distance: 55 },
-  { elevation: 36, distance: 100 },
+  { elevation: 42, distance: 109 },
+  { elevation: 31, distance: 114 },
+  { elevation: 31, distance: 60 },
 ];
+/** Kameranın uzaklığı bu genişlikteki (yarım boy) tahtaya göre. */
+const VIEW_BOARD = 33;
 
 interface Camera2D {
   readonly at: Vector3;
@@ -652,10 +657,11 @@ function viewModel(plan: BreadboardPlan, bodies: ReadonlyMap<string, BoardBody>)
   const full = plan.cols >= BB.cols && xs.length > 0;
   const cx = full ? (Math.max(-half, Math.min(...xs) - 4) + Math.min(half, Math.max(...xs) + 4)) / 2 : 0;
   const cz = boardZ(plan.boards - 1) / 2;
+  const scale = Math.max(1, (full ? Math.min(2 * half, Math.max(...xs) - Math.min(...xs) + 8) : 2 * half) / VIEW_BOARD);
   const views = VIEWS.map(({ elevation, distance }) => {
     const e = elevation * DEG;
     const back = new Vector3(0, Math.sin(e), Math.cos(e));
-    const cam: Camera2D = { at: new Vector3(cx, 0, cz).addScaledVector(back, distance), forward: back.clone().negate(), up: new Vector3(0, Math.cos(e), -Math.sin(e)) };
+    const cam: Camera2D = { at: new Vector3(cx, BB.height, cz).addScaledVector(back, distance * scale), forward: back.clone().negate(), up: new Vector3(0, Math.cos(e), -Math.sin(e)) };
     const shadows: BodyShadow[] = [];
     for (const [id, b] of bodies) {
       const min = b.body.min.clone().setY(Math.max(b.body.min.y, BB.height));
