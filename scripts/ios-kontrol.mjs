@@ -6423,9 +6423,11 @@ try {
     await ph.context().close();
   }
   // --- 3B cihaz kabloları: timsah kıskaç, bir delikte tek tel, birleşme etiketi, ağ vurgusu ------------------
-  // Cihaz kabloları deliğe girmez: kıskaç eksenli parçanın bacağını ya da kısa dik telin ucunu tutar, aynı ağdakiler
-  // zincirlenir; tahtada hiçbir delikte iki şey yok; birleşme noktasında "GND · 3 kablo". Fare kablonun üstüne
-  // gelince (telefonda dokununca) o ağın kabloları ve bacakları parlar, öbürleri soluklaşır, küçük şemada düğüm.
+  // Cihaz kabloları deliğe girmez; kıskaç hiçbir zaman parça bacağını tutmaz (2026-11-10): her kablo ağın şeridindeki
+  // ayrı bir boş deliğe takılı kendi kısa telinin ucunu tutar (gerekirse kenar köprüsüyle boş bir şeritte); kıskaç
+  // neredeyse yatay, ağzı kartın en az 8 mm üstünde; tahtada hiçbir delikte iki şey yok; aynı ağa birden çok kablo
+  // gidince kıskaçlarının üstünde "GND · 3 kablo". Fare kablonun üstüne gelince (telefonda dokununca) o ağın kabloları
+  // ve bacakları parlar, öbürleri soluklaşır, küçük şemada düğüm.
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
@@ -6447,14 +6449,19 @@ try {
     const kinds = (r) => r.clips.map((c) => c.kind[0]).join('');
     const label = (r, net) => r.labels.find((l) => l.net === net);
     const gnd = (r) => r.junctions.find((j) => /GND/.test(label(r, j.net)?.text ?? ''));
-    check('3B kıskaç (BF245A, yarım dalga): hiçbir delikte iki tel ya da bacak yok; bütün cihaz kabloları kıskaçla (bacak, kısa tel ya da zincir), deliğe takılı cihaz kablosu yok',
-      jf.doubled === 0 && yd.doubled === 0 && jf.plugged === 0 && yd.plugged === 0 && jf.clips.length === 8 && yd.clips.length === 5 && jf.clips.some((c) => c.kind === 'leg') && jf.clips.some((c) => c.kind === 'chain'),
-      `BF245A ${kinds(jf)} · iki şey ${jf.doubled} · fişli ${jf.plugged} | yarım dalga ${kinds(yd)} · iki şey ${yd.doubled} · fişli ${yd.plugged}`);
+    // Değişti (2026-11-10): eskiden "bacak, kısa tel ya da zincir" (BF245A'da en az bir bacak ve bir zincir bekleniyordu);
+    // artık bacak ve zincir yok, her kablo kendi kısa telinde (s: ağın şeridinde, b: kenar köprülü şeritte).
+    const own = (r) => r.clips.every((c) => c.kind === 'stub' || c.kind === 'bridge');
+    const posture = (r) => r.clips.every((c) => c.jawMm >= 8 && c.deg <= 25.01);
+    check('3B kıskaç (BF245A, yarım dalga): hiçbir delikte iki tel ya da bacak yok; bütün cihaz kabloları kendi kısa telinde (bacak ve zincir yok), deliğe takılı cihaz kablosu yok; kıskaçlar yatay (≤ 25°), ağız kartın en az 8 mm üstünde',
+      jf.doubled === 0 && yd.doubled === 0 && jf.plugged === 0 && yd.plugged === 0 && jf.clips.length === 8 && yd.clips.length === 5 && own(jf) && own(yd) && posture(jf) && posture(yd),
+      `BF245A ${kinds(jf)} · iki şey ${jf.doubled} · fişli ${jf.plugged} | yarım dalga ${kinds(yd)} · iki şey ${yd.doubled} · fişli ${yd.plugged} · ağız en alçak ${Math.min(...[...jf.clips, ...yd.clips].map((c) => c.jawMm)).toFixed(1)} mm · eğim en çok ${Math.max(...[...jf.clips, ...yd.clips].map((c) => c.deg)).toFixed(0)}°`);
+    // Etiket artık ağın kıskaçlarının ortasındakinin gövdesinin üstünde (kablolar ayrı deliklerde, birleşme noktası yok).
     check('3B kıskaç: birleşme etiketi ağın adı ve kablo sayısı (BF245A: "GND · 3 kablo", "RD 2. uç · 2 kablo"; yarım dalga: GND iki kablo), etiketler görünür',
       label(jf, gnd(jf)?.net)?.text === 'GND · 3 kablo' && jf.labels.some((l) => l.text === 'RD 2. uç · 2 kablo') && jf.labels.every((l) => l.shown) && jf.junctions.length === 2 &&
         /^GND · 2 kablo$/.test(label(yd, gnd(yd)?.net)?.text ?? '') && yd.labels.length === yd.junctions.length,
       `${jf.labels.map((l) => `${l.text}${l.shown ? '' : ' (gizli)'}`).join(' | ')} || ${yd.labels.map((l) => l.text).join(' | ')}`);
-    // Fare birleşme noktasının (ilk kıskacın ağzı) üstüne gelince GND ağı vurgulanır.
+    // Fare etiketin noktasının (ortadaki kıskacın gövdesi) üstüne gelince GND ağı vurgulanır.
     await page.goto(`${URL0}embed/?ornek=jfet-karakteristik`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(800);
@@ -6492,6 +6499,122 @@ try {
     }
     check('3B ağ vurgusu (telefon, BF245A): kıskaca dokununca o ağ vurgulanıyor (öbürleri soluk)', tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1, `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0}`);
     await ph.context().close();
+  }
+  // --- 3B kıskaçlar parçaları örtmez (gerçek kamera) ------------------------------------------------------------
+  // Varsayılan kamerada (masaüstü 1440×900, iPhone 13 dikey ve yatay) hiçbir devre parçasının gövdesinin ekrandaki
+  // alanının %20'sinden fazlası kıskaçla, kıskaçlı kabloyla, kısa telle ya da kenar köprüsüyle örtülmez. Ölçüm: nesne
+  // kimliği renkli iki çizim (her nesneye düz renk; gövde, bacaksız kutusuyla kırpılır): (A) kıskaçlar gizli, her
+  // gövdenin görünen pikselleri; (B) kıskaçlar görünür, bu piksellerden onlara düşenler. Ölçü aletleri (kendi
+  // kabloları ön soketten çıkar; varsayılan kadrajda üstleri kırpılır) sayılmaz, yalnızca gösterilir. Örnekler:
+  // 1N4001 DC ve cihaz kablosu en çok olan beş örnek (8: trafo, BF245A; 7 ve 5 ağ: kuplajlı FET ve BJT
+  // yükselteçleri; 7 ve 4 ağ: FET yükselteci). Kıskaçların ağzı kartın en az 8 mm üstünde, eğimi en çok 25°.
+  {
+    const clipCover = () => {
+      const t = window.__tezgah;
+      const renderer = t.renderer;
+      const scene = t.scene;
+      const gl = renderer.getContext();
+      const Basic = t.dotMaterial.constructor;
+      const V3 = t.camera.position.constructor;
+      const occluders = new Set();
+      for (const c of t.cables.children) if (c.userData.clipPart) c.traverse((o) => occluders.add(o));
+      const placed = [...t.parts.values()];
+      const partOf = new Map();
+      placed.forEach((p, k) => p.group.traverse((o) => partOf.set(o, k)));
+      const basic = (r, g, b, planes) => { const m = new Basic({ toneMapped: false }); m.color.setRGB(r / 255, g / 255, b / 255); if (planes) m.clippingPlanes = planes; return m; };
+      const P = (x, y, z, c) => ({ normal: new V3(x, y, z), constant: c });
+      const planesOf = (b) => [P(1, 0, 0, -(b.min.x - 0.03)), P(-1, 0, 0, b.max.x + 0.03), P(0, 1, 0, -(b.min.y - 0.03)), P(0, -1, 0, b.max.y + 0.03), P(0, 0, 1, -(b.min.z - 0.03)), P(0, 0, -1, b.max.z + 0.03)];
+      const partMats = placed.map((p, k) => basic(8 * (k + 1), 100, 250, planesOf(p.body)));
+      const black = basic(0, 0, 0);
+      const yellow = basic(250, 250, 0);
+      const saved = [];
+      const hide = [t.legGlow, t.ring, t.dots].filter((o) => o && o.visible);
+      scene.traverse((o) => {
+        if (o.isPoints || o.isLine || o.isSprite || o.isInstancedMesh) { if (o.visible) hide.push(o); return; }
+        if (!o.isMesh) return;
+        if (Array.isArray(o.material) || o.material.transparent || o.userData.shadow) { if (o.visible) hide.push(o); return; }
+        saved.push([o, o.material, o.visible]);
+      });
+      const prev = { bg: scene.background, fog: scene.fog, tone: renderer.toneMapping, cs: renderer.outputColorSpace, clip: renderer.localClippingEnabled, cc: renderer.getClearColor(scene.background.clone()), ca: renderer.getClearAlpha() };
+      const w = gl.drawingBufferWidth;
+      const h = gl.drawingBufferHeight;
+      const read = () => { const buf = new Uint8Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf); return buf; };
+      let A;
+      let B;
+      try {
+        for (const o of hide) o.visible = false;
+        scene.background = null;
+        scene.fog = null;
+        renderer.toneMapping = 0;
+        renderer.outputColorSpace = 'srgb-linear';
+        renderer.localClippingEnabled = true;
+        renderer.setClearColor(0x000000, 1);
+        renderer.setRenderTarget(null);
+        for (const [o] of saved) {
+          if (occluders.has(o)) { o.visible = false; continue; }
+          const k = partOf.get(o);
+          o.material = k !== undefined ? partMats[k] : black;
+        }
+        renderer.render(scene, t.view);
+        A = read();
+        for (const [o] of saved) if (occluders.has(o)) { o.visible = true; o.material = yellow; }
+        renderer.render(scene, t.view);
+        B = read();
+      } finally {
+        for (const [o, m, v] of saved) { o.material = m; o.visible = v; }
+        for (const o of hide) o.visible = true;
+        scene.background = prev.bg;
+        scene.fog = prev.fog;
+        renderer.toneMapping = prev.tone;
+        renderer.outputColorSpace = prev.cs;
+        renderer.localClippingEnabled = prev.clip;
+        renderer.setClearColor(prev.cc, prev.ca);
+        for (const m of [...partMats, black, yellow]) m.dispose();
+        t.dirty = true;
+      }
+      const vis = placed.map(() => 0);
+      const cov = placed.map(() => 0);
+      for (let i = 0; i < w * h; i++) {
+        if (Math.abs(A[4 * i + 1] - 100) > 2 || Math.abs(A[4 * i + 2] - 250) > 2) continue;
+        const k = Math.round(A[4 * i] / 8) - 1;
+        if (k < 0 || k >= placed.length || Math.abs(A[4 * i] - 8 * (k + 1)) > 2) continue;
+        vis[k]++;
+        if (B[4 * i] > 128 && B[4 * i + 1] > 128 && B[4 * i + 2] < 128) cov[k]++;
+      }
+      const instruments = ['dcsupply', 'funcgen', 'oscilloscope', 'voltmeter', 'ammeter', 'multimeter'];
+      return {
+        parts: placed.map((p, k) => ({ id: p.part.label ?? p.part.id, instrument: instruments.includes(p.part.type), vis: vis[k], share: vis[k] ? cov[k] / vis[k] : 0 })),
+        clips: t.clipReport().clips,
+        occluders: occluders.size,
+      };
+    };
+    const ids = ['diyot-dc', 'transformator', 'jfet-karakteristik', 'fet-yukseltec-kuplajli', 'bjt-yukseltec-kuplajli', 'fet-yukseltec'];
+    for (const [view, w, h] of [['masaüstü', 1440, 900], ['iPhone 13 dikey', 390, 844], ['iPhone 13 yatay', 844, 390]]) {
+      const mobile = view !== 'masaüstü';
+      const ctx = await browser.newContext({
+        viewport: { width: w, height: h }, locale: 'tr-TR',
+        ...(mobile ? { deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' } : {}),
+      });
+      await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      const rows = [];
+      for (const id of ids) {
+        await page.goto('about:blank');
+        await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+        await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(1000);
+        const r = await page.evaluate(clipCover).catch((e) => ({ error: String(e) }));
+        const circuit = (r.parts ?? []).filter((p) => !p.instrument && p.vis >= 40);
+        const worst = circuit.reduce((a, p) => (p.share > (a?.share ?? -1) ? p : a), null);
+        const meters = (r.parts ?? []).filter((p) => p.instrument && p.vis >= 40).reduce((a, p) => (p.share > (a?.share ?? -1) ? p : a), null);
+        rows.push({ id, ok: !r.error && r.occluders > 0 && circuit.length > 0 && circuit.every((p) => p.share <= 0.2) && r.clips.every((c) => c.jawMm >= 8 && c.deg <= 25.01), worst, meters, r });
+      }
+      check(`3B kıskaçlar parçaları örtmüyor (${view}): 1N4001 DC ve en çok cihaz kablolu beş örnekte hiçbir devre parçasının gövdesinin %20'sinden fazlası kıskaç, kablo, kısa tel ya da köprüyle örtülmüyor; ağız ≥ 8 mm, eğim ≤ 25°`,
+        rows.every((x) => x.ok),
+        rows.map((x) => `${x.id} ${x.r.error ?? `${x.worst?.id ?? '—'} %${Math.round((x.worst?.share ?? 0) * 100)}${x.meters ? ` (alet ${x.meters.id} %${Math.round(x.meters.share * 100)})` : ''}`}`).join(' · '));
+      await ctx.close();
+    }
   }
   // --- 3B tam ekran (telefon, dikey ve yatay): düğmeler alt kenarda tek sırada, kamera yeniden sığar ---------------
   // Tam ekranda Etiketler, Kamera, Karta aktar, Tahtada kur ve Şemayı küçült tek sıra, 3B alanının alt kenarında

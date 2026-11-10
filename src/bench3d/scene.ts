@@ -1556,9 +1556,10 @@ export class BenchScene {
     }
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || e.type === 'pointercancel') return;
     const hit = this.pick(e);
-    // Dokunmatikte parçanın dışında bir kabloya ya da kıskaca dokununca o ağ vurgulanır; yeniden dokununca kalkar.
+    // Dokunmatikte bir kabloya ya da kıskaca dokununca (önünde parça yoksa) o ağ vurgulanır; yeniden dokununca kalkar.
+    // Arkasında parça olabilir: kıskaçlar tahtanın arka kenarında, cihazların önünde (2026-11-10).
     const net = e.pointerType !== 'mouse' && !this.topView ? this.pickNet(e) : null;
-    if (net && !hit) {
+    if (net) {
       this.highlightNet(this.highlighted === net ? null : net);
       return;
     }
