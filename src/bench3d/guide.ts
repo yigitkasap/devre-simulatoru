@@ -2,6 +2,7 @@
 // için malzeme listesi ve adım adım takma sırası. Perma-Proto'nun delik düzeni breadboard'unkiyle
 // aynıdır: aynı sütun numaraları, aynı a–j satırları, aynı raylar.
 
+import { transistorPackage } from './dimensions';
 import { tr } from '../i18n/tr';
 import { partValueText } from '../editor/PartView';
 import type { CircuitDoc, Part } from '../model/types';
@@ -82,7 +83,9 @@ function describe(part: Part): { name: string; detail: string } {
     case 'nmos':
     case 'pmos': {
       const model = typeof p.model === 'string' && p.model !== 'genel' ? p.model : '';
-      return { name: `${tr.devices.names[part.type]} ${model}`.trim(), detail: 'TO-92' };
+      // Kılıf modele göre (dimensions.ts): BC107 metal TO-18, IRF510 TO-220, öbürleri TO-92.
+      const pack = transistorPackage(model);
+      return { name: `${tr.devices.names[part.type]} ${model}`.trim(), detail: pack === 'to18' ? 'TO-18 (metal kılıf; sekme emetörün yanında)' : pack === 'to220' ? 'TO-220' : 'TO-92' };
     }
     case 'opamp':
       return { name: 'İşlemsel yükselteç LM741', detail: 'DIP-8; 8 bacaklı soketle' };

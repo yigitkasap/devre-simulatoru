@@ -11,6 +11,7 @@ import {
   Mesh,
   MeshStandardMaterial,
   PlaneGeometry,
+  RingGeometry,
   Shape,
   SphereGeometry,
   TorusGeometry,
@@ -38,6 +39,7 @@ import {
   rod,
   wirePath,
 } from './kit';
+import { AA, BUZZER, CERAMIC_DISC, E10, FILM_BOX, MLCC, MOTOR, PP3, RELAY, SPEAKER, TO18, TO220, TO92, batteryPack, mm, nonPolarPackage, transistorPackage } from './dimensions';
 import { glowSprite, type LiveContext, type PartModel } from './model';
 
 const X_AXIS = Math.PI / 2;
@@ -46,6 +48,12 @@ const X_AXIS = Math.PI / 2;
 function axialCylinder(r: number, length: number, material: MeshStandardMaterial, x = 0, y = 0, z = 0, segments = 20): Mesh {
   const m = mesh(new CylinderGeometry(r, r, length, segments), material, x, y, z);
   m.rotation.z = X_AXIS;
+  return m;
+}
+
+/** Ölçüsü birim testinde denetlenen gövde parçası (tests/model-olcek.test.ts adıyla bulur). */
+function named<T extends Mesh>(name: string, m: T): T {
+  m.name = name;
   return m;
 }
 
@@ -112,11 +120,23 @@ export function capacitorModel(props: Props): PartModel {
     body.add(vent, mesh(new BoxGeometry(0.08, 0.02, r * 1.2), mat('#6b7178', 0.4, 1), 0, base + h + 0.06, 0));
     return radial('capacitor', body, Math.min(r, 1), base);
   }
-  // Seramik disk.
-  const disc = mesh(new CylinderGeometry(1.1, 1.1, 0.45, 26), mat('#d9862f', 0.6), 0, 2.4, 0);
-  disc.rotation.x = X_AXIS;
-  body.add(disc);
-  return radial('capacitor', body, 1, 1.4);
+  // Kutupsuz: kapasiteye göre seramik disk (≤ 10 nF), radyal çok katmanlı seramik (≤ 1 µF) ya da kutu film.
+  const legTop = 1.2;
+  const pack = nonPolarPackage(C);
+  if (pack === 'disc') {
+    const r = mm(CERAMIC_DISC.diameter) / 2;
+    const disc = named('kondansator', mesh(new CylinderGeometry(r, r, mm(CERAMIC_DISC.thickness), 22), mat('#c98a45', 0.6), 0, legTop + r - 0.1, 0));
+    disc.rotation.x = X_AXIS;
+    body.add(disc);
+  } else if (pack === 'mlcc') {
+    // Daldırma kaplı gövde: köşeleri yuvarlak (elipsoit), hardal sarısı.
+    const blob = named('kondansator', mesh(new SphereGeometry(0.5, 14, 10), mat('#d2a233', 0.5), 0, legTop + mm(MLCC.height) / 2 - 0.1, 0));
+    blob.scale.set(mm(MLCC.width), mm(MLCC.height), mm(MLCC.thickness));
+    body.add(blob);
+  } else {
+    body.add(named('kondansator', mesh(new BoxGeometry(mm(FILM_BOX.width), mm(FILM_BOX.height), mm(FILM_BOX.thickness)), mat('#b3261e', 0.5), 0, legTop + mm(FILM_BOX.height) / 2, 0)));
+  }
+  return radial('capacitor', body, 1, legTop);
 }
 
 // --- Bobin (radyal ferrit, Bourns RLB1314) --------------------------------------------------------------
@@ -334,29 +354,120 @@ export function ledModel(props: Props): PartModel {
   };
 }
 
-// --- Transistörler (TO-92) -----------------------------------------------------------------------------
+// --- Transistörler: TO-92 (plastik), TO-18 (metal kapak: BC107), TO-220 (IRF510) -------------------------------
+//
+// Ölçüler dimensions.ts'te (veri sayfaları: docs/KARARLAR.md → "3B modeller: gerçek ölçüler"). Yerel çerçeve:
+// bacaklar z boyunca dizili, öndeki (izleyiciye bakan) yüz −x'te (placement.ts, 'to92' takılışı).
 
 const TRANSISTOR_TEXT: Partial<Record<DeviceType, string>> = { npn: 'BC547', pnp: 'BC557', njfet: '2N5457', pjfet: '2N5460', nmos: '2N7000', pmos: 'BS250' };
 
-export function transistorModel(type: DeviceType, props: Props): PartModel {
+/** Gövdenin kartın üstündeki yüksekliği (bacakların açıkta kalan boyu ≈ 5 mm). */
+const STANDOFF = 2.0;
+
+let to92Shell: ExtrudeGeometry | null = null;
+
+/** TO-92 gövdesinin geometrisi (paylaşılır): D kesitli, düz yüz −x'te, taban y = 0. */
+function to92Geometry(): ExtrudeGeometry {
+  if (to92Shell) return to92Shell;
+  const r = mm(TO92.diameter) / 2;
+  const flat = mm(TO92.depth) - r;
+  const beta = Math.acos(flat / r);
+  const shape = new Shape();
+  shape.absarc(0, 0, r, -Math.PI + beta, Math.PI - beta, false);
+  shape.closePath();
+  to92Shell = new ExtrudeGeometry(shape, { depth: mm(TO92.height), bevelEnabled: false, curveSegments: 14 });
+  to92Shell.rotateX(-Math.PI / 2);
+  return to92Shell;
+}
+
+/** TO-92 gövdesi (yazısıyla): D kesit, düz yüzde model adı. Bacaklar ayrıca eklenir. */
+function to92Body(text: string, textHeight = 0.6): Group {
+  const body = new Group();
+  body.userData.body = true;
+  const r = mm(TO92.diameter) / 2;
+  const flat = mm(TO92.depth) - r;
+  const h = mm(TO92.height);
+  body.add(named('to92', mesh(to92Geometry(), mat('#1b1c1f', 0.45), 0, STANDOFF, 0)));
+  const chord = 2 * Math.sqrt(r * r - flat * flat);
+  const plate = labelPlate(text, chord * 0.92, textHeight, { fg: '#cfd3d8' });
+  plate.rotation.set(0, -X_AXIS, 0);
+  plate.position.set(-flat - 0.012, STANDOFF + h * 0.55, 0);
+  body.add(plate);
+  return body;
+}
+
+/** TO-92'nin bacağının gövdeden çıktığı yer (k = 0, 1, 2): gövdenin derinliğinin ortasında, 1,27 mm aralıkla. */
+function to92Leg(k: number, sign = 1): Vector3 {
+  const r = mm(TO92.diameter) / 2;
+  const middle = (r - (mm(TO92.depth) - r)) / 2;
+  return new Vector3(middle * sign, STANDOFF, (k - 1) * mm(TO92.pitch) * sign);
+}
+
+/**
+ * TO-18 metal kılıf (BC107: NXP/Philips SOT18/13): alt flanş, silindir kapak, flanşta emetörün yanında sekme;
+ * üç bacak 2,54 mm'lik daire üzerinde (E ve C karşılıklı, B aralarında, arkada). Yazı kapağın yanında.
+ * `emitter`: emetör ucunun sırası (BJT'de 2).
+ */
+export function to18Model(type: DeviceType, text: string, emitter = 2): PartModel {
   const root = new Group();
   const anchors = pinAnchors(type);
+  const rc = mm(TO18.can) / 2;
+  const rf = mm(TO18.flange) / 2;
+  const tf = mm(TO18.flangeThickness);
+  const H = mm(TO18.height);
+  const chamfer = 0.07;
+  const metal = mat('#c9ced3', 0.3, 1);
+  const body = new Group();
+  body.userData.body = true;
+  body.add(named('to18-flans', mesh(new CylinderGeometry(rf, rf, tf, 20), metal, 0, STANDOFF + tf / 2, 0)));
+  body.add(named('to18-kapak', mesh(new CylinderGeometry(rc, rc, H - tf - chamfer, 20, 1, true), metal, 0, STANDOFF + tf + (H - tf - chamfer) / 2, 0)));
+  body.add(named('to18-tepe', mesh(new CylinderGeometry(rc - chamfer, rc, chamfer, 20), metal, 0, STANDOFF + H - chamfer / 2, 0)));
+  // Bacakların sırası z'ye göre: uçtakiler E ve C (karşılıklı), ortadaki B (arkada, +x).
+  const order = anchors.map((a, i) => ({ a, i })).sort((p, q) => p.a.z - q.a.z);
+  const lc = mm(TO18.leadCircle) / 2;
+  const emitterSide = order[0]!.i === emitter ? -1 : 1;
+  // Sekme: emetörün yanında, B'den uzağa 45° (JEDEC TO-206AA); flanşın düzleminde, öne (−x) bakar.
+  const tabR = rf + mm(TO18.tabLength) / 2 - 0.05;
+  const tab = mesh(new BoxGeometry(mm(TO18.tabLength) + 0.1, tf, mm(TO18.tabWidth)), metal, -tabR * Math.SQRT1_2, STANDOFF + tf / 2, emitterSide * tabR * Math.SQRT1_2);
+  tab.rotation.y = emitterSide * (Math.PI / 4);
+  body.add(tab);
+  // Yazı: kapağın çevresinde iki kez (her yönden okunur).
+  const around = 2 * Math.PI * rc;
+  const band = H * 0.55;
+  const tex = canvasTexture(around, band, (c, W, Hh) => {
+    c.clearRect(0, 0, W, Hh);
+    c.fillStyle = '#2b2f35';
+    c.font = `600 ${Math.round(Hh * 0.44)}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    // Öndeki yüz (−x) silindirin u = 0,75'inde; yazı çevrenin ≈ üçte birine sığar (yandan da okunur).
+    for (const u of [0.25, 0.75]) c.fillText(text, W * u, Hh / 2, W * 0.3);
+  }, 72);
+  const print = new Mesh(new CylinderGeometry(rc + 0.006, rc + 0.006, band, 20, 1, true), new MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.6 }));
+  print.position.y = STANDOFF + tf + (H - tf) * 0.52;
+  print.userData.ownsMaterial = true;
+  body.add(print);
+  root.add(body);
+  const r = mm(TO18.lead) / 2;
+  order.forEach(({ a }, k) => {
+    const from = k === 1 ? new Vector3(lc, STANDOFF, 0) : new Vector3(0, STANDOFF, (k - 1) * lc);
+    root.add(legDown(from, a, r));
+  });
+  return { root, anchors };
+}
+
+export function transistorModel(type: DeviceType, props: Props): PartModel {
   const model = typeof props.model === 'string' ? props.model : '';
   const text = model && model !== 'genel' ? model.replace(/B$/, '') : (TRANSISTOR_TEXT[type] ?? '');
-  const h = 1.8;
-  const y0 = 2.0;
-  // Yarım silindirin eğri yüzü +x'te; düz (yazılı) yüz -x'e bakar.
-  const shell = mesh(new CylinderGeometry(0.95, 0.95, h, 24, 1, false, 0, Math.PI), mat('#1b1c1f', 0.45), 0, y0 + h / 2, 0);
-  root.add(shell);
-  const flat = mesh(new BoxGeometry(0.02, h, 1.9), mat('#1b1c1f', 0.45), 0, y0 + h / 2, 0);
-  root.add(flat);
-  const plate = labelPlate(text, 1.8, 0.6, { fg: '#cfd3d8' });
-  plate.rotation.set(0, -X_AXIS, 0);
-  plate.position.set(-0.02, y0 + h / 2, 0);
-  root.add(plate);
-  // Bacaklar Z boyunca sıralı (0,5 aralıkla); her biri en yakın pine.
+  const pack = transistorPackage(model);
+  if (pack === 'to18') return to18Model(type, text);
+  if (pack === 'to220') return to220Model(type, text, '100 V · 5,6 A', null, 'z');
+  const root = new Group();
+  const anchors = pinAnchors(type);
+  root.add(to92Body(text));
+  // Bacaklar z boyunca sıralı (1,27 mm aralıkla); her biri en yakın uca.
   const order = anchors.map((a, i) => ({ a, i })).sort((p, q) => p.a.z - q.a.z);
-  order.forEach(({ a }, k) => root.add(legDown(new Vector3(0.25, y0, (k - 1) * 0.5), a, 0.07)));
+  order.forEach(({ a }, k) => root.add(legDown(to92Leg(k), a, mm(TO92.lead) / 2)));
   return { root, anchors };
 }
 
@@ -484,15 +595,23 @@ function inlineLegs(root: Group, anchors: readonly Vector3[], legs: readonly num
 
 // --- TO-220 regülatörler (7805, LM317): siyah gövde, delikli metal tırnak, 3 bacak (newParts.ts) ----------
 
-export function to220Model(type: DeviceType, text: string, subtitle: string, legs: readonly number[]): PartModel {
+/**
+ * `legs`: soldan sağa bacakların pin sırası; null ise uçların dizilişine göre (transistörler). `along`: uçların
+ * dizildiği yerel eksen ('z': transistörlerin takılışı; gövde yazılı yüzü −x'e bakacak biçimde döner).
+ */
+export function to220Model(type: DeviceType, text: string, subtitle: string, legs: readonly number[] | null, along: 'x' | 'z' = 'x'): PartModel {
   const root = new Group();
   const anchors = pinAnchors(type);
-  const w = 3.94;
-  const h = 3.62;
-  const t = 1.77;
+  // Gövdenin çerçevesi: bacaklar x boyunca, yazılı yüz +z. 'z' dizilişinde gövde −90° döner: (X, Z) → (Z, −X).
+  const local = along === 'z' ? anchors.map((a) => new Vector3(a.z, a.y, -a.x)) : anchors;
+  const order = legs ?? local.map((a, i) => ({ a, i })).sort((p, q) => p.a.x - q.a.x).map((o) => o.i);
+  const w = mm(TO220.width);
+  const h = mm(TO220.body);
+  const t = mm(TO220.thickness);
+  const tabT = mm(TO220.tabThickness);
   const y0 = 2.6;
   const body = new Group();
-  const box = frontTexBox(w, h, t, mat('#18191c', 0.5), (c, W, H) => {
+  const box = frontTexBox(w, h, t - tabT, mat('#18191c', 0.5), (c, W, H) => {
     c.fillStyle = '#18191c';
     c.fillRect(0, 0, W, H);
     c.fillStyle = '#d6dade';
@@ -504,20 +623,21 @@ export function to220Model(type: DeviceType, text: string, subtitle: string, leg
     c.fillStyle = '#9aa1a9';
     c.fillText(subtitle, W / 2, H * 0.64);
   }, 96);
-  box.position.set(0, y0 + h / 2, 0.25);
-  body.add(box);
+  box.position.set(0, y0 + h / 2, tabT / 2);
+  body.add(named('to220-govde', box));
   // Metal tırnak (arkada, gövdenin üstüne uzanır), delikli.
   const tab = new Shape();
   tab.moveTo(-w / 2, 0);
   tab.lineTo(w / 2, 0);
-  tab.lineTo(w / 2, h + 2.48);
-  tab.lineTo(-w / 2, h + 2.48);
+  tab.lineTo(w / 2, mm(TO220.overall));
+  tab.lineTo(-w / 2, mm(TO220.overall));
   tab.lineTo(-w / 2, 0);
-  tab.holes.push(new Shape().absarc(0, h + 1.25, 0.72, 0, Math.PI * 2, true));
-  const tabGeo = new ExtrudeGeometry(tab, { depth: 0.51, bevelEnabled: false, curveSegments: 24 });
-  body.add(mesh(tabGeo, mat('#c9ced3', 0.32, 1), 0, y0, -t / 2 + 0.25 - 0.51 + 0.02));
+  tab.holes.push(new Shape().absarc(0, h + (mm(TO220.overall) - h) / 2, mm(TO220.hole) / 2, 0, Math.PI * 2, true));
+  const tabGeo = new ExtrudeGeometry(tab, { depth: tabT, bevelEnabled: false, curveSegments: 16 });
+  body.add(named('to220-tirnak', mesh(tabGeo, mat('#c9ced3', 0.32, 1), 0, y0, -t / 2)));
   // Bacaklar 1 birim aralıkla gövdeden aşağı, gerçek sırayla.
-  inlineLegs(body, anchors, legs, 1, y0, 0.25);
+  inlineLegs(body, local, order, mm(TO220.pitch), y0, tabT / 2);
+  if (along === 'z') body.rotation.y += -Math.PI / 2;
   root.add(body);
   return { root, anchors };
 }
@@ -529,15 +649,7 @@ export function scrModel(props: Props): PartModel {
   const root = new Group();
   const anchors = pinAnchors('scr');
   const text = typeof props.model === 'string' ? props.model : 'MCR100-6';
-  const h = 1.8;
-  const y0 = 2.0;
-  const body = new Group();
-  body.add(mesh(new CylinderGeometry(0.95, 0.95, h, 24, 1, false, 0, Math.PI), mat('#1b1c1f', 0.45), 0, y0 + h / 2, 0));
-  body.add(mesh(new BoxGeometry(0.02, h, 1.9), mat('#1b1c1f', 0.45), 0, y0 + h / 2, 0));
-  const plate = labelPlate(text, 1.8, 0.5, { fg: '#cfd3d8' });
-  plate.rotation.set(0, -X_AXIS, 0);
-  plate.position.set(-0.02, y0 + h / 2, 0);
-  body.add(plate);
+  const body = to92Body(text, 0.5);
   // Breadboard'da uçlar bir sütunda (yerel z boyunca); ters takıldıysa (K'nin deliği A'nınkinden sonra) gövde döner.
   const order = [1, 2, 0];
   const first = anchors[order[0]!]!;
@@ -545,7 +657,7 @@ export function scrModel(props: Props): PartModel {
   const flip = Math.abs(first.x - last.x) < 0.1 && first.z > last.z;
   if (flip) body.rotation.y = Math.PI;
   root.add(body);
-  order.forEach((pin, k) => root.add(legDown(new Vector3(0.25 * (flip ? -1 : 1), y0, (k - 1) * 0.5 * (flip ? -1 : 1)), anchors[pin]!, 0.07)));
+  order.forEach((pin, k) => root.add(legDown(to92Leg(k, flip ? -1 : 1), anchors[pin]!, mm(TO92.lead) / 2)));
   return { root, anchors };
 }
 
@@ -716,23 +828,40 @@ export function pushButtonModel(boardTwins: readonly Vector3[] = []): PartModel 
 export function lampModel(): PartModel {
   const root = new Group();
   const anchors = pinAnchors('lamp');
-  root.add(mesh(new CylinderGeometry(1.9, 2.1, 1.0, 26), mat('#1f2226', 0.55), 0, 0.5, 0));
-  root.add(mesh(new CylinderGeometry(1.1, 1.1, 1.6, 22), M.steel(), 0, 1.8, 0));
+  const rt = mm(E10.thread) / 2;
+  const rb = mm(E10.bulb) / 2;
+  // Duy: taban ve yuva; lambanın vida dişi yuvanın içinde, üstte ≈ 2 mm görünür.
+  const socketTop = 2.9;
+  const threadTop = socketTop + 0.8;
+  const lampBottom = threadTop - mm(E10.threadLength);
+  const lampTop = lampBottom + mm(E10.length);
+  root.add(mesh(new CylinderGeometry(3.3, 3.5, 0.7, 26), mat('#1f2226', 0.55), 0, 0.35, 0));
+  root.add(mesh(new CylinderGeometry(rt + 0.4, rt + 0.4, socketTop - 0.7, 24), mat('#1f2226', 0.55), 0, 0.7 + (socketTop - 0.7) / 2, 0));
+  root.add(named('lamba-dis', mesh(new CylinderGeometry(rt, rt, mm(E10.threadLength), 22), M.steel(), 0, lampBottom + mm(E10.threadLength) / 2, 0)));
   const glass = new MeshStandardMaterial({ color: '#f5f2e8', roughness: 0.05, transparent: true, opacity: 0.32, emissive: '#ffb347', emissiveIntensity: 0, depthWrite: false });
-  const bulb = mesh(new SphereGeometry(1.7, 26, 20), glass, 0, 4.1, 0);
+  // Balon: Ø 11 mm, vida dişine kısa bir boyunla bağlanır; tepesi lambanın toplam boyunda.
+  const stretch = 1.15;
+  const centerY = lampTop - rb * stretch;
+  const bulb = new Group();
   bulb.userData.live = true;
+  const globe = named('lamba-balon', mesh(new SphereGeometry(rb, 24, 16), glass, 0, centerY, 0));
+  globe.scale.y = stretch;
+  bulb.add(globe);
+  const neckTop = centerY - rb * stretch * 0.75;
+  if (neckTop > threadTop) bulb.add(mesh(new CylinderGeometry(rb * 0.68, rt * 0.92, neckTop - threadTop, 20, 1, true), glass, 0, (neckTop + threadTop) / 2, 0));
   root.add(bulb);
   const filamentMat = new MeshStandardMaterial({ color: '#6b5a48', roughness: 0.5, emissive: '#ffcf7a', emissiveIntensity: 0 });
   const filament = new Group();
   filament.userData.live = true;
-  filament.add(rod(new Vector3(-0.5, 2.6, 0), new Vector3(-0.5, 4.0, 0), 0.05, M.steel()), rod(new Vector3(0.5, 2.6, 0), new Vector3(0.5, 4.0, 0), 0.05, M.steel()));
-  const coil = mesh(new TorusGeometry(0.5, 0.06, 6, 20, Math.PI), filamentMat, 0, 4.0, 0);
+  const fy = centerY - 0.2;
+  filament.add(rod(new Vector3(-0.6, threadTop, 0), new Vector3(-0.6, fy, 0), 0.05, M.steel()), rod(new Vector3(0.6, threadTop, 0), new Vector3(0.6, fy, 0), 0.05, M.steel()));
+  const coil = mesh(new TorusGeometry(0.6, 0.06, 6, 16, Math.PI), filamentMat, 0, fy, 0);
   filament.add(coil);
   root.add(filament);
-  const glow = glowSprite('#ffc874', 11);
-  glow.position.y = 4.1;
+  const glow = glowSprite('#ffc874', 13);
+  glow.position.y = centerY;
   root.add(glow);
-  root.add(lead(new Vector3(-2.0, 0.5, 0), anchors[0]!), lead(new Vector3(2.0, 0.5, 0), anchors[1]!));
+  root.add(lead(new Vector3(-3.4, 0.5, 0), anchors[0]!), lead(new Vector3(3.4, 0.5, 0), anchors[1]!));
   return {
     root,
     anchors,
@@ -755,19 +884,39 @@ export function lampModel(): PartModel {
 
 // --- Hoparlör ve buzzer ----------------------------------------------------------------------------------------
 
+/** Visaton FRS 5: masada yüzü yukarı; altta mıknatıs, üstünde sepet ve konik zar; uçlar sepetin arkasındaki (tahtaya bakan) lehim kulaklarında. */
 export function speakerModel(): PartModel {
   const root = new Group();
-  const anchors = pinAnchors('speaker');
-  root.add(mesh(new CylinderGeometry(1.5, 1.5, 1.2, 22), mat('#2b2e33', 0.4, 0.4), 0, 0.6, 0));
-  root.add(mesh(new TorusGeometry(2.55, 0.18, 8, 36), mat('#3a3d42', 0.5), 0, 1.75, 0).rotateX(X_AXIS));
+  const R = mm(SPEAKER.basket) / 2;
+  const D = mm(SPEAKER.depth);
+  const rm = mm(SPEAKER.magnet) / 2;
+  const hm = mm(SPEAKER.magnetHeight);
+  const frame = mat('#3a3d42', 0.5, 0.5);
+  root.add(named('hoparlor-miknatis', mesh(new CylinderGeometry(rm, rm, hm, 24), mat('#2b2e33', 0.6), 0, hm / 2, 0)));
+  // Sepet: mıknatıstan çembere açılan koni; çemberin üstünde düz halka ve iki bağlama kulağı.
+  const coneH = D - hm - 0.3;
+  root.add(mesh(new CylinderGeometry(R - 0.3, rm * 0.8, coneH, 28, 1, true), mat('#3a3d42', 0.5, 0.5, { double: true }), 0, hm + coneH / 2, 0));
+  root.add(named('hoparlor-cember', mesh(new CylinderGeometry(R, R, 0.3, 28, 1, true), frame, 0, D - 0.15, 0)));
+  const ring = mesh(new RingGeometry(R - 1.2, R, 28), frame, 0, D, 0);
+  ring.rotation.x = -X_AXIS;
+  root.add(ring);
+  const lug = mm(SPEAKER.lugs) / 2 - R + 0.4;
+  for (const side of [-1, 1]) root.add(named('hoparlor-kulak', mesh(new BoxGeometry(lug, 0.25, 3.2), frame, side * (R - 0.4 + lug / 2), D - 0.13, 0)));
+  root.add(mesh(new TorusGeometry(R - 1.6, 0.42, 8, 28), mat('#1c1d20', 0.8), 0, D - 0.1, 0).rotateX(X_AXIS));
   const cone = new Group();
   cone.userData.live = true;
-  const profile = [new Vector2(0.55, 0), new Vector2(1.5, 0.35), new Vector2(2.45, 0.55)];
-  cone.add(mesh(new LatheGeometry(profile, 32), mat('#25272b', 0.85), 0, 0, 0));
-  cone.add(mesh(new SphereGeometry(0.6, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat('#202226', 0.6), 0, -0.05, 0));
-  cone.position.y = 1.2;
+  const profile = [new Vector2(2.2, -3.4), new Vector2(5.4, -1.7), new Vector2(R - 2.0, -0.25)];
+  cone.add(mesh(new LatheGeometry(profile, 28), mat('#25272b', 0.85, 0, { double: true }), 0, 0, 0));
+  cone.add(mesh(new SphereGeometry(2.3, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat('#202226', 0.6), 0, -3.6, 0));
+  const rest = D - 0.2;
+  cone.position.y = rest;
   root.add(cone);
-  root.add(lead(new Vector3(-1.2, 0.5, 1.0), anchors[0]!), lead(new Vector3(1.2, 0.5, 1.0), anchors[1]!));
+  // Lehim kulakları: sepetin arkasında (−z, tahtaya bakan yan), küçük bir yalıtkan levhada.
+  const ty = hm + 1.9;
+  const tz = -(rm * 0.8 + ((R - 0.3 - rm * 0.8) * 1.9) / coneH) - 0.3;
+  root.add(mesh(new BoxGeometry(3.4, 1.7, 0.3), mat('#8a5a2b', 0.7), 0, ty, tz));
+  const anchors = [-1, 1].map((side) => new Vector3(side * 0.95, ty, tz - 0.45));
+  for (const a of anchors) root.add(mesh(new BoxGeometry(0.7, 0.9, 0.5), M.tin(), a.x, a.y, a.z + 0.15));
   let phase = 0;
   return {
     root,
@@ -775,20 +924,24 @@ export function speakerModel(): PartModel {
     update(ctx) {
       const level = ctx.active ? (ctx.live?.loudness ?? 0) : 0;
       phase += ctx.dt * 60;
-      cone.position.y = 1.2 + level * 0.12 * Math.sin(phase);
+      cone.position.y = rest + level * 0.25 * Math.sin(phase);
       return level > 0.01;
     },
   };
 }
 
+/** Aktif buzzer (CMI-1295IC-0585T): Ø 12 × 9,5 mm siyah silindir, üstte ses deliği ve + işareti; karta oturur. */
 export function buzzerModel(): PartModel {
   const body = new Group();
-  body.add(mesh(new CylinderGeometry(1.2, 1.2, 1.0, 26), mat('#16171a', 0.45), 0, 1.5, 0));
-  body.add(mesh(new CylinderGeometry(0.25, 0.25, 0.02, 14), mat('#050505', 0.9), 0, 2.01, 0));
-  const plus = labelPlate('+', 0.6, 0.6, { fg: '#d4d7db' });
-  plus.position.set(-0.75, 2.02, 0);
+  const r = mm(BUZZER.diameter) / 2;
+  const h = mm(BUZZER.height);
+  const y0 = 0.12;
+  body.add(named('buzzer', mesh(new CylinderGeometry(r, r, h, 28), mat('#16171a', 0.45), 0, y0 + h / 2, 0)));
+  body.add(mesh(new CylinderGeometry(mm(2.2) / 2, mm(2.2) / 2, 0.02, 14), mat('#050505', 0.9), 0, y0 + h + 0.011, 0));
+  const plus = labelPlate('+', 0.9, 0.9, { fg: '#d4d7db' });
+  plus.position.set(-r * 0.58, y0 + h + 0.02, 0);
   body.add(plus);
-  const model = radial('buzzer', body, 1.2, 1.0);
+  const model = radial('buzzer', body, mm(BUZZER.pitch), y0);
   let phase = 0;
   return {
     ...model,
@@ -805,26 +958,35 @@ export function buzzerModel(): PartModel {
 
 export function motorModel(): PartModel {
   const root = new Group();
-  const anchors = pinAnchors('motor');
-  const can = axialCylinder(2.3, 6.0, mat('#b9bec4', 0.3, 1), 0, 2.4, 0, 30);
-  root.add(can);
-  root.add(axialCylinder(2.31, 1.0, mat('#2a2d31', 0.5), -2.6, 2.4, 0, 30));
-  root.add(axialCylinder(0.3, 1.6, M.steel(), 3.8, 2.4, 0, 12));
+  const r = mm(MOTOR.diameter) / 2;
+  const L = mm(MOTOR.length);
+  const rs = mm(MOTOR.shaft) / 2;
+  const ls = mm(MOTOR.shaftLength);
+  const yc = r + 1.0;
+  // Gövde: çelik kovan, arkada (−x) fırça kapağı; önde yatak çıkıntısı ve mil.
+  root.add(named('motor', axialCylinder(r, L * 0.8, mat('#b9bec4', 0.3, 1), L * 0.1, yc, 0, 28)));
+  root.add(named('motor', axialCylinder(r, L * 0.2, mat('#2a2d31', 0.5), -L * 0.4, yc, 0, 28)));
+  root.add(axialCylinder(mm(10) / 2, 0.5, M.steel(), L / 2 + 0.25, yc, 0, 16));
+  root.add(named('motor-mil', axialCylinder(rs, ls, M.steel(), L / 2 + ls / 2, yc, 0, 12)));
   const fan = new Group();
   fan.userData.live = true;
-  fan.position.set(4.6, 2.4, 0);
+  fan.position.set(L / 2 + ls - 0.7, yc, 0);
   for (let k = 0; k < 3; k++) {
-    const blade = mesh(new BoxGeometry(0.12, 3.6, 1.1), mat('#d6402e', 0.5), 0, 1.8, 0);
+    const blade = mesh(new BoxGeometry(0.14, 4.4, 1.7), mat('#d6402e', 0.5), 0, 2.9, 0);
     const holder = new Group();
     holder.rotation.x = (k * 2 * Math.PI) / 3;
     holder.add(blade);
     fan.add(holder);
   }
-  fan.add(axialCylinder(0.55, 0.6, mat('#d6402e', 0.5)));
+  fan.add(axialCylinder(1.2, 1.0, mat('#d6402e', 0.5), 0, 0, 0, 16));
   root.add(fan);
-  for (const z of [-0.8, 0.8]) root.add(mesh(new BoxGeometry(0.2, 0.9, 0.5), M.tin(), -3.2, 2.4, z));
-  root.add(lead(new Vector3(-3.3, 2.4, -0.8), anchors[0]!), lead(new Vector3(-3.3, 2.4, 0.8), anchors[1]!));
-  root.add(mesh(new BoxGeometry(5, 0.5, 3.6), mat('#3b3f45', 0.6), 0, 0.25, 0));
+  // Uçlar arka kapaktaki iki lehim kulağında.
+  const anchors = [-1, 1].map((side) => new Vector3(-L / 2 - 0.75, yc, side * mm(10) / 2));
+  for (const a of anchors) root.add(mesh(new BoxGeometry(0.9, 0.2, 0.8), M.tin(), a.x + 0.35, a.y, a.z));
+  // Yatak: taban ve gövdeyi tutan iki eyer.
+  root.add(mesh(new BoxGeometry(L * 0.75, 0.5, r * 1.7), mat('#3b3f45', 0.6), 0, 0.25, 0));
+  const saddle = yc - r * 0.55;
+  for (const x of [-L * 0.25, L * 0.25]) root.add(mesh(new BoxGeometry(1.4, saddle, r * 1.5), mat('#3b3f45', 0.6), x, saddle / 2, 0));
   return {
     root,
     anchors,
@@ -844,21 +1006,27 @@ function screwTerminal(at: Vector3): Group {
   return g;
 }
 
+/** Vida terminallerinin kartın ortasından uzaklığı (x): 29 mm'lik röle aralarına sığsın diye şema pinlerinden dışarıda. */
+const RELAY_TERMINAL_X = 7.3;
+
 export function relayModel(): PartModel {
   const root = new Group();
-  const pins = pinAnchors('relay');
-  root.add(mesh(new BoxGeometry(13, 0.3, 10.2), M.pcbBlue(), 0, 0.35, -1.2));
-  const cube = mesh(new BoxGeometry(7.2, 4.6, 5.4), mat('#1c1e22', 0.5), 0, 2.8, -1.5);
+  const pins = pinAnchors('relay').map((p) => new Vector3(Math.sign(p.x) * RELAY_TERMINAL_X, p.y, p.z));
+  const l = mm(RELAY.length);
+  const w = mm(RELAY.width);
+  const h = mm(RELAY.height);
+  root.add(mesh(new BoxGeometry(2 * RELAY_TERMINAL_X + 1.6, 0.3, 10.2), M.pcbBlue(), 0, 0.35, -1.2));
+  const cube = named('role', mesh(new BoxGeometry(l, h, w), mat('#1c1e22', 0.5), 0, 0.5 + h / 2, -1.2));
   root.add(cube);
-  const label = labelPlate('G2R-1  12 VDC', 6.6, 1.0, { fg: '#c9cdd3' });
-  label.position.set(0, 5.12, -1.5);
+  const label = labelPlate('G2R-1  12 VDC', l * 0.86, 1.3, { fg: '#c9cdd3' });
+  label.position.set(0, 0.5 + h + 0.02, -1.2);
   root.add(label);
   const ledMat = new MeshStandardMaterial({ color: '#7a1d17', roughness: 0.3, emissive: '#ff3b30', emissiveIntensity: 0 });
-  const led = mesh(new BoxGeometry(0.6, 0.35, 0.35), ledMat, -4.6, 0.68, 2.6);
+  const led = mesh(new BoxGeometry(0.6, 0.35, 0.35), ledMat, -4.6, 0.68, 3.0);
   led.userData.live = true;
   root.add(led);
   const glow = glowSprite('#ff5040', 3);
-  glow.position.set(-4.6, 1.0, 2.6);
+  glow.position.set(-4.6, 1.0, 3.0);
   root.add(glow);
   for (const p of pins) root.add(screwTerminal(p));
   const anchors = pins.map((p) => new Vector3(p.x, 2.0, p.z));
@@ -899,24 +1067,94 @@ export function transformerModel(): PartModel {
 
 // --- Pil ve AC kaynak --------------------------------------------------------------------------------------------
 
-export function batteryModel(props: Props): PartModel {
+/** Pilin uçlarından masaya inen kırmızı / siyah kablolar ve kabloların bittiği uçlar (+ önce). */
+function batteryWires(root: Group, from: readonly [Vector3, Vector3], endX: number): Vector3[] {
+  const anchors = [new Vector3(endX, LEAD_Y, -1.5), new Vector3(endX, LEAD_Y, 1.5)];
+  ['#c8312a', '#1c1c1c'].forEach((color, i) => {
+    const a = from[i]!;
+    const b = anchors[i]!;
+    root.add(wirePath([a, new Vector3((a.x + b.x) / 2 + 0.4, a.y, (a.z + b.z) / 2), new Vector3(b.x, Math.min(a.y, 0.9), b.z), b], 0.16, mat(color, 0.5)));
+  });
+  return anchors;
+}
+
+/** 9 V'luk blok pil (6LR61), geniş yüzü masada; uçta kopçalı bağlantı başlığı ve iki kablo. */
+function pp3Model(text: string): PartModel {
   const root = new Group();
-  const anchors = pinAnchors('battery');
-  const V = numProp(props, 'voltage', 9);
-  const length = 9.6;
-  root.add(axialCylinder(1.9, length, mat('#2a3d66', 0.4, 0.3), 0, 2.0, 0, 28));
-  root.add(axialCylinder(1.92, 2.6, mat('#c9a646', 0.35, 0.8), -3.4, 2.0, 0, 28));
-  root.add(axialCylinder(0.55, 0.5, M.steel(), -length / 2 - 0.2, 2.0, 0, 14));
-  const plate = labelPlate(`${String(V).replace('.', ',')} V`, 3.4, 1.6, { fg: '#f2f4f6' });
-  plate.position.set(1.2, 3.92, 0);
-  root.add(plate);
-  const plus = labelPlate('+', 1.0, 1.0, { fg: '#1d2733' });
-  plus.position.set(-3.4, 3.93, 0);
-  root.add(plus);
-  root.add(mesh(new BoxGeometry(length + 0.4, 0.4, 2.6), mat('#1e2125', 0.6), 0, 0.2, 0));
-  root.add(wirePath([new Vector3(-length / 2 - 0.45, 2.0, 0), new Vector3(anchors[0]!.x, 2.0, 0), new Vector3(anchors[0]!.x, LEAD_Y, anchors[0]!.z)], 0.16, mat('#c8312a', 0.5)));
-  root.add(wirePath([new Vector3(length / 2, 2.0, 0), new Vector3(anchors[1]!.x, 2.0, 0), new Vector3(anchors[1]!.x, LEAD_Y, anchors[1]!.z)], 0.16, mat('#1c1c1c', 0.5)));
+  const L = mm(PP3.length);
+  const W = mm(PP3.width);
+  const H = mm(PP3.height);
+  const tail = 4.4;
+  const x0 = -(L + tail) / 2;
+  const g = new Group();
+  g.position.x = x0 + L / 2;
+  g.add(named('pp3', mesh(new BoxGeometry(L * 0.76, H, W), mat('#2a3d66', 0.4, 0.3), -L * 0.12, H / 2, 0)));
+  g.add(named('pp3', mesh(new BoxGeometry(L * 0.24, H, W), mat('#c9a646', 0.35, 0.8), L * 0.38, H / 2, 0)));
+  // Kopçalar: + küçük ve yuvarlak, − büyük ve altıgen; merkezleri 12,7 mm.
+  const half = mm(PP3.snapPitch) / 2;
+  g.add(axialCylinder(mm(5.7) / 2, 0.7, M.steel(), L / 2 + 0.35, H / 2, -half, 14));
+  g.add(axialCylinder(mm(8) / 2, 0.7, M.steel(), L / 2 + 0.35, H / 2, half, 6));
+  // Bağlantı başlığı: kopçalara oturan siyah plaka.
+  g.add(mesh(new BoxGeometry(0.5, H * 0.7, W * 0.92), mat('#16171a', 0.6), L / 2 + 0.95, H / 2, 0));
+  const plate = labelPlate(text, 6.2, 2.6, { fg: '#f2f4f6' });
+  plate.position.set(-L * 0.12, H + 0.02, 0);
+  g.add(plate);
+  const plus = labelPlate('+', 1.6, 1.6, { fg: '#1d2733' });
+  plus.position.set(L * 0.38, H + 0.02, -half);
+  g.add(plus);
+  root.add(g);
+  const startX = g.position.x + L / 2 + 1.2;
+  const anchors = batteryWires(root, [new Vector3(startX, H / 2, -half), new Vector3(startX, H / 2, half)], (L + tail) / 2 - 0.3);
   return { root, anchors };
+}
+
+/** AA pil yatağı: 1,5 V'luk hücreler yan yana (4'ten çoksa iki katta), yönleri dönüşümlü; uçta iki kablo. */
+function aaHolderModel(text: string, cells: number, layers: number, perLayer: number): PartModel {
+  const root = new Group();
+  const r = mm(AA.diameter) / 2;
+  const len = mm(AA.length);
+  const nub = mm(1.5);
+  const pitch = mm(AA.holderPitch);
+  const HL = mm(AA.holderLength);
+  const HW = perLayer * pitch + mm(3);
+  const tail = 3.2;
+  const g = new Group();
+  g.position.x = -tail / 2;
+  const plastic = mat('#1e2125', 0.6);
+  const layerH = 2 * r + 0.5;
+  g.add(mesh(new BoxGeometry(HL, 0.5, HW), plastic, 0, 0.25, 0));
+  for (const side of [-1, 1]) g.add(mesh(new BoxGeometry(0.6, 0.5 + (layers - 1) * layerH + r * 1.35, HW), plastic, side * (HL / 2 - 0.3), (0.5 + (layers - 1) * layerH + r * 1.35) / 2, 0));
+  if (layers > 1) g.add(mesh(new BoxGeometry(HL, 0.4, HW), plastic, 0, 0.5 + layerH - 0.25, 0));
+  const blue = mat('#2a3d66', 0.4, 0.3);
+  const gold = mat('#c9a646', 0.35, 0.8);
+  for (let i = 0; i < cells; i++) {
+    const layer = Math.floor(i / perLayer);
+    const j = i % perLayer;
+    const count = Math.min(perLayer, cells - layer * perLayer);
+    const z = (j - (count - 1) / 2) * pitch;
+    const y = 0.5 + r + layer * layerH;
+    const dir = i % 2 === 0 ? -1 : 1;
+    g.add(named(`aa-${i}`, axialCylinder(r, len - nub, blue, -dir * (nub / 2), y, z, 18)));
+    g.add(axialCylinder(r + 0.012, len * 0.2, gold, dir * (len * 0.32), y, z, 18));
+    g.add(named(`aa-${i}`, axialCylinder(mm(5.5) / 2, nub, M.steel(), dir * (len / 2 - nub / 2), y, z, 12)));
+  }
+  const top = 0.5 + 2 * r + (layers - 1) * layerH;
+  const plate = labelPlate(text, 6.4, 2.0, { fg: '#f2f4f6' });
+  const firstCount = Math.min(perLayer, cells - (layers - 1) * perLayer);
+  plate.position.set(-1.2, top + 0.03, (0 - (firstCount - 1) / 2) * pitch);
+  g.add(plate);
+  root.add(g);
+  const startX = g.position.x + HL / 2;
+  const anchors = batteryWires(root, [new Vector3(startX, 0.7, -HW / 2 + 0.9), new Vector3(startX, 0.7, HW / 2 - 0.9)], (HL + tail) / 2 - 0.3);
+  return { root, anchors };
+}
+
+/** Pil: 9 V dolayında blok pil (6LR61), öbür gerilimlerde AA pil yatağı (dimensions.ts → batteryPack). */
+export function batteryModel(props: Props): PartModel {
+  const V = numProp(props, 'voltage', 9);
+  const text = `${String(V).replace('.', ',')} V`;
+  const pack = batteryPack(V);
+  return pack.kind === 'pp3' ? pp3Model(text) : aaHolderModel(text, pack.cells, pack.layers, pack.perLayer);
 }
 
 function bananaJack(at: Vector3, color: string): Group {

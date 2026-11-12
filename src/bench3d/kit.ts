@@ -8,6 +8,7 @@ import {
   CanvasTexture,
   Color,
   CylinderGeometry,
+  DoubleSide,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -33,8 +34,8 @@ export const LEAD_Y = 0.12;
 const cache = new Map<string, MeshStandardMaterial>();
 
 /** Paylaşılan malzeme (aynı renk ve yüzey özellikleri için tek örnek). */
-export function mat(color: string, roughness = 0.55, metalness = 0, extra: { emissive?: string; transparent?: boolean; opacity?: number } = {}): MeshStandardMaterial {
-  const key = `${color}|${roughness}|${metalness}|${extra.emissive ?? ''}|${extra.opacity ?? 1}`;
+export function mat(color: string, roughness = 0.55, metalness = 0, extra: { emissive?: string; transparent?: boolean; opacity?: number; double?: boolean } = {}): MeshStandardMaterial {
+  const key = `${color}|${roughness}|${metalness}|${extra.emissive ?? ''}|${extra.opacity ?? 1}|${extra.double ? 2 : 1}`;
   let m = cache.get(key);
   if (!m) {
     m = new MeshStandardMaterial({
@@ -43,6 +44,8 @@ export function mat(color: string, roughness = 0.55, metalness = 0, extra: { emi
       metalness,
       ...(extra.emissive ? { emissive: new Color(extra.emissive) } : {}),
       ...(extra.transparent ? { transparent: true, opacity: extra.opacity ?? 1, depthWrite: false } : {}),
+      // İnce kabuklar (hoparlör zarı): iki yüzü de görünür.
+      ...(extra.double ? { side: DoubleSide } : {}),
     });
     cache.set(key, m);
   }

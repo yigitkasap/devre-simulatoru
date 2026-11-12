@@ -20,7 +20,8 @@ import { CATALOG } from '../model/catalog';
 import { SEG7_LEGS } from '../model/logicChips';
 import { buildConnectivity, pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
-import type { DeviceType } from '../sim/netlist';
+import { numProp, type DeviceType } from '../sim/netlist';
+import { batteryFootprint } from './dimensions';
 
 export const BB = {
   /** Tam boy (830 delik) ve yarım boy (400 delik) breadboard'un sütun sayısı. */
@@ -238,13 +239,21 @@ const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rota
   voltmeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 11 },
   ammeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 11 },
   multimeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 12.5 },
-  lamp: { side: 'front', w: 9, d: 5, rotation: 0 },
-  motor: { side: 'front', w: 12, d: 6, rotation: 0 },
-  speaker: { side: 'front', w: 9, d: 6.5, rotation: 0 },
-  relay: { side: 'front', w: 13, d: 10.2, rotation: 0 },
+  // Öndeki parçalar gerçek ölçüsünde (dimensions.ts: motor Ø 26 × 44,7 mm, hoparlör Ø 50,5 mm, röle 29 mm); `slot`
+  // eski genişlik: kabloların delikleri değişmez.
+  lamp: { side: 'front', w: 9, d: 7, rotation: 0 },
+  motor: { side: 'front', w: 28, d: 11, rotation: 0, slot: 12 },
+  speaker: { side: 'front', w: 27.5, d: 21, rotation: 0, slot: 9 },
+  relay: { side: 'front', w: 16.2, d: 10.2, rotation: 0, slot: 13 },
   transformer: { side: 'front', w: 13.6, d: 10.8, rotation: 0 },
   tank: { side: 'front', w: 11.5, d: 11, rotation: 0 },
 };
+
+/** Masadaki parçanın yeri ve kapladığı alan; pilin alanı gerilimine göre (9 V'luk blok ya da AA pil yatağı). */
+function tableOf(part: Part): NonNullable<(typeof TABLE)[DeviceType]> {
+  const t = TABLE[part.type]!;
+  return part.type === 'battery' ? { ...t, ...batteryFootprint(numProp(part.props, 'voltage', 9)) } : t;
+}
 
 /** Kablo ve jumper renkleri (ağ başına): toprak siyah, besleme kırmızı, öbürleri sırayla. */
 const NET_COLORS = ['#f08a24', '#f2c230', '#2f9e5b', '#2f6fd6', '#8e5bd1', '#e9ecef', '#18a3a8', '#d64b8a'];
@@ -535,7 +544,7 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
   const leftEdge = -boardWidth(cols) / 2;
   // Sol sütun: yukarıdan aşağı, breadboard'ların ortasına göre.
   {
-    const items = sides.left.map((p) => ({ p, t: TABLE[p.type]! }));
+    const items = sides.left.map((p) => ({ p, t: tableOf(p) }));
     const total = items.reduce((s, i) => s + i.t.d, 0) + GAP * Math.max(0, items.length - 1);
     let z = (top + boardsDepth) / 2 - total / 2;
     for (const { p, t } of items) {
@@ -546,7 +555,7 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
   /** Kablonun tahtadaki deliği bu x'e göre seçilir (`slot`). */
   const leadX = new Map<string, number>();
   for (const side of ['back', 'front'] as const) {
-    const items = sides[side].map((p) => ({ p, t: TABLE[p.type]! }));
+    const items = sides[side].map((p) => ({ p, t: tableOf(p) }));
     const total = items.reduce((s, i) => s + i.t.w, 0) + GAP * Math.max(0, items.length - 1);
     const slots = items.reduce((s, i) => s + (i.t.slot ?? i.t.w), 0) + GAP * Math.max(0, items.length - 1);
     let x = -total / 2;
