@@ -1,10 +1,11 @@
 // Parça türü → 3B model. Breadboard'a takılan parçalarda bacaklar verilen deliklere (yerel) gider.
 
-import type { Vector3 } from 'three';
+import { Box3, Vector3 } from 'three';
 import type { Part } from '../model/types';
 import { dipChipModel, logicModuleModel, sevenSegmentBoardModel, sevenSegmentModuleModel } from './logicModels';
 import { isLogicChip } from '../model/logicChips';
 import { partProp } from '../model/catalog';
+import { SIDE_MAX, isSidePart } from './breadboard';
 import { withAnchors } from './kit';
 import { arduinoModel } from './arduinoModel';
 import { dcsupplyModel, dmmModel, funcgenModel, oscilloscopeModel, tankModel } from './instruments';
@@ -51,7 +52,22 @@ export function buildPartModel(part: Part, holes: readonly Vector3[] | null = nu
   if (holes && isLogicChip(part.type)) return dipChipModel(chipModel(part), holes, extra, holes[0]);
   if (holes && part.type === 'seg7') return sevenSegmentBoardModel(holes, extra);
   if (holes && part.type === 'pushbutton') return withAnchors(holes, () => pushButtonModel(extra));
-  return withAnchors(holes, () => build(part));
+  const model = withAnchors(holes, () => build(part));
+  return !holes && isSidePart(part.type) ? fitSide(model) : model;
+}
+
+/**
+ * Tahta dışı parça (pil, motor, hoparlör, lamba, röle…) sade ve küçük: biçimi gerçek parçanınki, en büyük boyutu
+ * SIDE_MAX birim ("3B: okunurluk önce": tahtanın yanında durur, tahtadan büyük görünmez). Uçlar da ölçeklenir.
+ */
+function fitSide(model: PartModel): PartModel {
+  model.root.updateMatrixWorld(true);
+  const size = new Box3().setFromObject(model.root).getSize(new Vector3());
+  const k = Math.min(1, SIDE_MAX / Math.max(size.x, size.y, size.z));
+  if (k === 1) return model;
+  model.root.scale.setScalar(k);
+  model.root.updateMatrixWorld(true);
+  return { ...model, anchors: model.anchors.map((a) => a.clone().multiplyScalar(k)) };
 }
 
 /** Lojik entegrenin model adı (74HC08, CD4017B…). */

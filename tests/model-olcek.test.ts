@@ -1,13 +1,15 @@
-// 3B modellerin ölçeği: her model gerçek ölçüsünde (1 birim = 2,54 mm, breadboard'un delik aralığı).
-// (1) dimensions.ts'teki sayılar veri sayfalarındaki aralıkların içinde; (2) kurulan gövdelerin kutuları bu
-// sayılarla aynı; (3) kılıf seçimi (BC107 TO-18, IRF510 TO-220, öbürleri TO-92; pil 9 V blok ya da AA yatağı;
-// kutupsuz kondansatör kapasiteye göre); (4) modellerin üçgen sayısı sınırlı (telefonda kare hızı düşmesin).
-// Kaynaklar: docs/KARARLAR.md → "3B modeller: gerçek ölçüler".
+// 3B modellerin kılıfları ("3B: okunurluk önce"): modeller gerçek ölçüde DEĞİL, sade ve küçük çizilir; ama kılıf
+// biçimi doğru kalır. (1) dimensions.ts'teki sayılar veri sayfalarındaki aralıkların içinde (biçim oranlarının
+// kaynağı); (2) kılıf seçimi (BC107 TO-18, IRF510 TO-220, öbürleri TO-92; pil 9 V blok ya da AA yatağı; kutupsuz
+// kondansatör kapasiteye göre); (3) tahta dışı parçalar tek katsayıyla SIDE_MAX birime küçültülür (oran korunur);
+// (4) modellerin üçgen sayısı sınırlı. Ayak izi ve çakışma kuralları: tests/tezgah-sade.test.ts.
+// Kaynaklar: docs/KARARLAR.md → "3B modeller: gerçek ölçüler" (kılıflar) ve "3B: okunurluk önce" (ölçek).
 
 import { describe, expect, it } from 'vitest';
 import { Box3, Mesh, Vector3, type Object3D } from 'three';
-import { holeXZ } from '../src/bench3d/breadboard';
-import { AA, BUZZER, CERAMIC_DISC, E10, FILM_BOX, MLCC, MOTOR, PP3, RELAY, SPEAKER, TO18, TO220, TO92, batteryFootprint, batteryPack, mm, nonPolarPackage, transistorPackage } from '../src/bench3d/dimensions';
+import { SIDE_MAX, holeXZ } from '../src/bench3d/breadboard';
+import { AA, BUZZER, E10, MOTOR, PP3, RELAY, SPEAKER, TO18, TO220, TO92, batteryFootprint, batteryPack, mm, nonPolarPackage, transistorPackage } from '../src/bench3d/dimensions';
+import { OVER } from '../src/bench3d/parts';
 import { CATALOG } from '../src/model/catalog';
 import type { Part } from '../src/model/types';
 import type { DeviceType, Props } from '../src/sim/netlist';
@@ -67,9 +69,8 @@ const within = (value: number, min: number, max: number, what: string) => {
   expect(value, what).toBeGreaterThanOrEqual(min);
   expect(value, what).toBeLessThanOrEqual(max);
 };
-const near = (value: number, target: number, what: string, tolerance = 0.15) => expect(Math.abs(value - target), `${what}: ${value.toFixed(2)} mm, beklenen ${target} mm`).toBeLessThanOrEqual(tolerance);
 
-describe('3B modeller: ölçek', () => {
+describe('3B modeller: kılıflar', () => {
   it('1 birim = 2,54 mm: breadboard’da komşu iki delik 1 birim arayla', () => {
     const a = holeXZ({ kind: 'strip', board: 0, col: 10, row: 2 }, 30);
     const b = holeXZ({ kind: 'strip', board: 0, col: 11, row: 2 }, 30);
@@ -128,83 +129,67 @@ describe('3B modeller: ölçek', () => {
     }
   });
 
-  it('TO-18 (BC107): kapak Ø 4,65, flanş Ø 5,4, yükseklik 5,0 mm; üç bacak 2,54 mm’lik dairede', () => {
+  it('TO-18 (BC107): metal kapak, flanş ve sekme durur; ayak izine sığacak kadar küçültülmüş', () => {
     const root = build('npn', { model: 'BC107' });
+    for (const name of ['to18-kapak', 'to18-flans', 'to18-tepe', 'to18-sekme']) expect(has(root, name), name).toBe(true);
     const can = sizeMm(root, 'to18-kapak');
-    near(can[0], TO18.can, 'kapak çapı (x)');
-    near(can[2], TO18.can, 'kapak çapı (z)');
     const flange = sizeMm(root, 'to18-flans');
-    near(flange[0], TO18.flange, 'flanş çapı');
-    near(flange[1], TO18.flangeThickness, 'flanş kalınlığı');
-    const box = new Box3();
-    root.traverse((o) => {
-      if (o.name.startsWith('to18-')) box.union(new Box3().setFromObject(o));
-    });
-    near(box.getSize(new Vector3()).y * 2.54, TO18.height, 'flanşın altından kapağın tepesine');
+    // Flanş kapaktan geniş (gerçek oran 5,4 / 4,65); ikisi de gerçek ölçüden küçük.
+    expect(flange[2] / can[2]).toBeCloseTo(TO18.flange / TO18.can, 1);
+    expect(Math.max(...flange)).toBeLessThan(TO18.flange);
   });
 
-  it('TO-92: Ø 4,8 × 4,8 mm, düz yüzden sırta 3,7 mm', () => {
+  it('TO-92: D kesitli (düz yüz), gerçeğinden ince', () => {
     const [depth, height, width] = sizeMm(build('njfet', { model: 'BF245A' }), 'to92');
-    near(depth, TO92.depth, 'derinlik');
-    near(height, TO92.height, 'yükseklik');
-    near(width, TO92.diameter, 'çap', 0.2);
+    expect(depth).toBeLessThan(width);
+    expect(depth).toBeLessThanOrEqual(2 * OVER * 2.54 + 0.01);
+    expect(height).toBeLessThanOrEqual(TO92.height + 0.01);
+    expect(width).toBeLessThanOrEqual(TO92.diameter + 0.2);
   });
 
-  it('TO-220 (IRF510, 7805, LM317): gövde 10 × 9,2 mm, tırnakla 15,4 mm, kalınlık 4,5 mm', () => {
+  it('TO-220 (IRF510, 7805, LM317): siyah gövde + delikli metal tırnak durur; ince ve kısa', () => {
     for (const [type, props] of [['nmos', { model: 'IRF510' }], ['reg7805', {}], ['lm317', {}]] as const) {
       const root = build(type, props);
       const body = sizeMm(root, 'to220-govde').sort((a, b) => a - b);
       const tab = sizeMm(root, 'to220-tirnak').sort((a, b) => a - b);
-      near(body[2]!, TO220.width, `${type} gövde genişliği`);
-      near(body[1]!, TO220.body, `${type} gövde boyu`);
-      near(body[0]! + tab[0]!, TO220.thickness, `${type} kalınlık (gövde + tırnak)`);
-      near(tab[2]!, TO220.overall, `${type} tırnağın tepesine`);
-      near(tab[1]!, TO220.width, `${type} tırnak genişliği`);
+      // Tırnak gövdeden uzun (üstünden taşar), aynı genişlikte.
+      expect(tab[2]!, type).toBeGreaterThan(body[1]!);
+      expect(Math.abs(tab[1]! - body[2]!), type).toBeLessThan(0.3);
+      expect(body[2]!, type).toBeLessThan(TO220.width);
+      expect(body[0]! + tab[0]!, type).toBeLessThanOrEqual(2 * OVER * 2.54 + 0.01);
     }
   });
 
-  it('buzzer Ø 12 × 9,5 mm; röle 29 × 13 × 25,5 mm; motor Ø 26 × 44,7 mm, mil Ø 4 mm', () => {
-    const buzzer = sizeMm(build('buzzer'), 'buzzer');
-    near(buzzer[0], BUZZER.diameter, 'buzzer çapı');
-    near(buzzer[1], BUZZER.height, 'buzzer yüksekliği');
+  it('tahta dışı parçalar (pil, motor, hoparlör, lamba, röle): biçim gerçek parçanınki, en büyük boyut SIDE_MAX birim', () => {
+    const max = (root: Object3D) => {
+      const s = new Box3().setFromObject(root).getSize(new Vector3());
+      return Math.max(s.x, s.y, s.z);
+    };
+    for (const [type, props] of [['motor', {}], ['speaker', {}], ['lamp', {}], ['relay', {}], ['battery', { voltage: 9 }], ['battery', { voltage: 5 }], ['battery', { voltage: 12 }], ['transformer', {}]] as const) {
+      expect(max(build(type, props)), type).toBeLessThanOrEqual(SIDE_MAX + 1e-6);
+    }
+    // Oranlar korunur (model tek katsayıyla küçültülür).
+    const motor = sizeMm(build('motor'), 'motor');
+    expect(motor[0] / motor[1]).toBeCloseTo(MOTOR.length / MOTOR.diameter, 1);
     const relay = sizeMm(build('relay'), 'role');
-    near(relay[0], RELAY.length, 'röle boyu');
-    near(relay[1], RELAY.height, 'röle yüksekliği');
-    near(relay[2], RELAY.width, 'röle eni');
-    const motor = build('motor');
-    const body = sizeMm(motor, 'motor');
-    near(body[0], MOTOR.length, 'motor boyu');
-    near(body[1], MOTOR.diameter, 'motor çapı');
-    near(body[2], MOTOR.diameter, 'motor çapı');
-    near(sizeMm(motor, 'motor-mil')[1], MOTOR.shaft, 'mil çapı');
+    expect(relay[0] / relay[2]).toBeCloseTo(RELAY.length / RELAY.width, 1);
+    expect(relay[1] / relay[2]).toBeCloseTo(RELAY.height / RELAY.width, 1);
+    const speaker = build('speaker');
+    expect(sizeMm(speaker, 'hoparlor-cember')[0] / sizeMm(speaker, 'hoparlor-miknatis')[0]).toBeCloseTo(SPEAKER.basket / SPEAKER.magnet, 1);
+    const lamp = build('lamp');
+    expect(sizeMm(lamp, 'lamba-balon')[0] / sizeMm(lamp, 'lamba-dis')[0]).toBeCloseTo(E10.bulb / E10.thread, 1);
+    const block = sizeMm(build('battery', { voltage: 9 }), 'pp3');
+    expect(block[0] / block[2]).toBeCloseTo(PP3.length / PP3.width, 1);
+    expect(block[0] / block[1]).toBeCloseTo(PP3.length / PP3.height, 1);
   });
 
-  it('hoparlör (FRS 5): sepet Ø 50,5 mm, kulaklarla 68 mm, derinlik 31,5 mm', () => {
-    const root = build('speaker');
-    near(sizeMm(root, 'hoparlor-cember')[0], SPEAKER.basket, 'sepet çapı');
-    near(sizeMm(root, 'hoparlor-kulak')[0], SPEAKER.lugs, 'kulaklarla genişlik');
-    near(sizeMm(root, 'hoparlor-miknatis')[0], SPEAKER.magnet, 'mıknatıs çapı');
-    const box = new Box3();
-    root.traverse((o) => {
-      if (o.name.startsWith('hoparlor-')) box.union(new Box3().setFromObject(o));
-    });
-    near(box.max.y * 2.54, SPEAKER.depth, 'masadan çemberin üstüne');
+  it('buzzer: tahtada alçak, oval bir disk (ayak izine sığar)', () => {
+    const buzzer = sizeMm(build('buzzer'), 'buzzer');
+    expect(buzzer[1]).toBeLessThan(BUZZER.height);
+    expect(Math.max(buzzer[0], buzzer[2])).toBeLessThan(BUZZER.diameter);
   });
 
-  it('lamba (E10): vida dişi Ø 10 mm, balon Ø 11 mm, toplam boy 24 mm', () => {
-    const root = build('lamp');
-    const thread = new Box3();
-    const globe = new Box3();
-    root.traverse((o) => {
-      if (o.name === 'lamba-dis') thread.union(new Box3().setFromObject(o));
-      if (o.name === 'lamba-balon') globe.union(new Box3().setFromObject(o));
-    });
-    near(sizeMm(root, 'lamba-dis')[0], E10.thread, 'vida dişi çapı');
-    near(sizeMm(root, 'lamba-balon')[0], E10.bulb, 'balon çapı');
-    near((globe.max.y - thread.min.y) * 2.54, E10.length, 'lambanın boyu');
-  });
-
-  it('pil: 7,5–10,5 V’ta 9 V’luk blok (48,5 × 26,5 × 17,5 mm), öbür gerilimlerde AA yatağı (hücre Ø 14,5 × 50,5 mm)', () => {
+  it('pil: 7,5–10,5 V arası 9 V blok, öbür gerilimlerde AA yatağı (hücre sayısı gerilime göre)', () => {
     expect(batteryPack(9)).toEqual({ kind: 'pp3' });
     expect(batteryPack(1.5)).toEqual({ kind: 'aa', cells: 1, layers: 1, perLayer: 1 });
     expect(batteryPack(3)).toEqual({ kind: 'aa', cells: 2, layers: 1, perLayer: 2 });
@@ -212,44 +197,33 @@ describe('3B modeller: ölçek', () => {
     expect(batteryPack(6)).toEqual({ kind: 'aa', cells: 4, layers: 1, perLayer: 4 });
     expect(batteryPack(12)).toEqual({ kind: 'aa', cells: 8, layers: 2, perLayer: 4 });
     expect(batteryPack(24)).toEqual({ kind: 'aa', cells: 8, layers: 2, perLayer: 4 });
-    const block = sizeMm(build('battery', { voltage: 9 }), 'pp3');
-    near(block[0], PP3.length, 'blok boyu');
-    near(block[1], PP3.height, 'blok yüksekliği');
-    near(block[2], PP3.width, 'blok eni');
-    for (const [volts, cells] of [[1.5, 1], [5, 3], [12, 8]] as const) {
+    expect(has(build('battery', { voltage: 9 }), 'pp3')).toBe(true);
+    for (const [volts, cells] of [[1.5, 1], [5, 3], [12, 8], [9, 0]] as const) {
       const root = build('battery', { voltage: volts });
       for (let i = 0; i < cells; i++) {
         const cell = sizeMm(root, `aa-${i}`);
-        near(cell[0], AA.length, `${volts} V, ${i + 1}. hücrenin boyu`);
-        // 18 kenarlı silindirin kutusu bir eksende köşeden köşeye (tam çap), öbüründe kenardan kenara.
-        near(Math.max(cell[1], cell[2]), AA.diameter, `${volts} V, ${i + 1}. hücrenin çapı`);
+        // Hücrenin oranı gerçek (boy / çap ≈ 3,5).
+        expect(cell[0] / Math.max(cell[1], cell[2]), `${volts} V, ${i + 1}. hücre`).toBeCloseTo(AA.length / AA.diameter, 1);
       }
       expect(has(root, `aa-${cells}`)).toBe(false);
-      // Masada kapladığı yer modelin kutusunu içerir.
+      // Masada kapladığı yer modelin kutusunu içerir ve SIDE_MAX birimi geçmez.
       const box = new Box3().setFromObject(root).getSize(new Vector3());
       const foot = batteryFootprint(volts);
-      expect(box.x).toBeLessThanOrEqual(foot.w + 0.01);
-      expect(box.z).toBeLessThanOrEqual(foot.d + 0.01);
+      expect(box.x, `${volts} V`).toBeLessThanOrEqual(foot.w + 0.05);
+      expect(box.z, `${volts} V`).toBeLessThanOrEqual(foot.d + 0.05);
+      expect(Math.max(foot.w, foot.d), `${volts} V`).toBeLessThanOrEqual(SIDE_MAX + 1e-6);
     }
-    const foot9 = batteryFootprint(9);
-    const box9 = new Box3().setFromObject(build('battery', { voltage: 9 })).getSize(new Vector3());
-    expect(box9.x).toBeLessThanOrEqual(foot9.w + 0.01);
-    expect(box9.z).toBeLessThanOrEqual(foot9.d + 0.01);
   });
 
-  it('kutupsuz kondansatör kapasiteye göre: ≤ 10 nF disk Ø 5 × 2,5; ≤ 1 µF çok katmanlı 4,2 × 3,8 × 2,5; üstü kutu film', () => {
+  it('kutupsuz kondansatör kapasiteye göre: ≤ 10 nF disk, ≤ 1 µF çok katmanlı (damla), üstü kutu film', () => {
     expect([nonPolarPackage(1e-9), nonPolarPackage(10e-9), nonPolarPackage(68e-9), nonPolarPackage(1e-6), nonPolarPackage(2.2e-6)]).toEqual(['disc', 'disc', 'mlcc', 'mlcc', 'film']);
     const disc = sizeMm(build('capacitor', { kind: 'film', capacitance: 10e-9 }), 'kondansator');
-    near(disc[0], CERAMIC_DISC.diameter, 'disk çapı');
-    near(disc[2], CERAMIC_DISC.thickness, 'disk kalınlığı');
     const mlcc = sizeMm(build('capacitor', { kind: 'film', capacitance: 100e-9 }), 'kondansator');
-    near(mlcc[0], MLCC.width, 'çok katmanlı genişlik');
-    near(mlcc[1], MLCC.height, 'çok katmanlı yükseklik');
-    near(mlcc[2], MLCC.thickness, 'çok katmanlı kalınlık');
     const film = sizeMm(build('capacitor', { kind: 'film', capacitance: 2.2e-6 }), 'kondansator');
-    near(film[0], FILM_BOX.width, 'film genişlik');
-    near(film[1], FILM_BOX.height, 'film yükseklik');
-    near(film[2], FILM_BOX.thickness, 'film kalınlık');
+    // Disk yassı (çap > kalınlık), film kutu en yüksek; üçü de 2,5 mm sınırından ince (yarım delik taşma kuralı).
+    expect(disc[0]).toBeGreaterThan(disc[2] * 1.5);
+    expect(film[1]).toBeGreaterThan(mlcc[1]);
+    for (const s of [disc, mlcc, film]) expect(s[2]).toBeLessThanOrEqual(2 * OVER * 2.54 + 0.01);
   });
 
   // Sınırlar ölçülen sayıların ≈ %15 üstü (bacakların eklem küreleri dahil: bacak başına ≈ 250 üçgen, eski modellerde de aynı).

@@ -39,10 +39,18 @@ import {
   rod,
   wirePath,
 } from './kit';
-import { AA, BUZZER, CERAMIC_DISC, E10, FILM_BOX, MLCC, MOTOR, PP3, RELAY, SPEAKER, TO18, TO220, TO92, batteryPack, mm, nonPolarPackage, transistorPackage } from './dimensions';
+import { AA, E10, MOTOR, PP3, RELAY, SPEAKER, TO18, TO92, batteryPack, mm, nonPolarPackage, transistorPackage } from './dimensions';
 import { glowSprite, type LiveContext, type PartModel } from './model';
 
 const X_AXIS = Math.PI / 2;
+
+// Ayak izi kuralı ("3B: okunurluk önce", docs/KARARLAR.md): tahtadaki parçanın gövdesi bacak deliklerinin her yönde
+// en çok yarım delik ötesine taşar, yüksekliği en çok 4 delik aralığı (kondansatörde 6). Gerçek parça daha büyükse
+// küçültülür ve sadeleştirilir; kılıfın biçimi (TO-18, TO-220, D kesitli TO-92…) kalır.
+/** Gövdenin bacak deliklerinden taşması (birim): yarım deliğin biraz altı, komşu sıradaki parçaya değmesin. */
+export const OVER = 0.45;
+/** Gövdenin altı kartın en az bu kadar üstünde (bacaklarının üstünde durur): yatık teller ve köprüler iki kat hâlinde altından geçer. */
+export const CLEAR = 1.0;
 
 /** Eksenli gövde (X ekseni boyunca) için döndürülmüş silindir. */
 function axialCylinder(r: number, length: number, material: MeshStandardMaterial, x = 0, y = 0, z = 0, segments = 20): Mesh {
@@ -88,95 +96,112 @@ export function resistorModel(props: Props): PartModel {
   const body = new Group();
   const L = 1.3;
   const profile = [
-    [0, -L], [0.28, -L], [0.46, -1.15], [0.5, -0.85], [0.42, -0.62], [0.42, 0.62], [0.5, 0.85], [0.46, 1.15], [0.28, L], [0, L],
+    [0, -L], [0.25, -L], [0.41, -1.15], [OVER, -0.85], [0.38, -0.62], [0.38, 0.62], [OVER, 0.85], [0.41, 1.15], [0.25, L], [0, L],
   ].map(([r, y]) => new Vector2(r!, y!));
-  const shell = mesh(new LatheGeometry(profile, 24), mat('#d9c49a', 0.6));
+  const shell = mesh(new LatheGeometry(profile, 20), mat('#d9c49a', 0.6));
   shell.rotation.z = X_AXIS;
   body.add(shell);
   const bands = resistorBands(ohms);
   [-0.8, -0.42, -0.08, 0.85].forEach((x, i) => {
-    const r = Math.abs(x) > 0.7 ? 0.505 : 0.43;
-    body.add(axialCylinder(r, 0.17, mat(bands[i]!, 0.5), x, 0, 0, 20));
+    const r = Math.abs(x) > 0.7 ? OVER + 0.004 : 0.388;
+    body.add(axialCylinder(r, 0.17, mat(bands[i]!, 0.5), x, 0, 0, 18));
   });
-  return axial('resistor', body, L, 1.0);
+  return axial('resistor', body, L, CLEAR + OVER);
 }
 
 // --- Kondansatör ---------------------------------------------------------------------------------------
+
+/**
+ * Elektrolitik kondansatörün gövde boyu (birim): kapasiteyle büyür (1 µF 1,7; 10 µF 2,0; 100 µF 2,3; 1000 µF 2,6).
+ * Ayak izi kuralı 6 deliğe kadar izin verir; ama uzun kutu arkasındaki parçayı örter (gerilim katlayıcıda C1,
+ * C2'nin %31'ini kapatıyordu), bu yüzden en çok 2,6 (kartın üstünden 3,6 delik).
+ */
+export function electrolyticHeight(farads: number): number {
+  return Math.min(2.6, Math.max(1.5, 2.0 + 0.3 * Math.log10(Math.max(farads, 1e-9) / 10e-6)));
+}
 
 export function capacitorModel(props: Props): PartModel {
   const kind = strProp(props, 'kind', ['electrolytic', 'film'], 'electrolytic');
   const C = numProp(props, 'capacitance', 1e-6);
   const body = new Group();
   if (kind === 'electrolytic') {
-    const r = Math.min(3, Math.max(0.8, 1.0 * (C / 10e-6) ** (1 / 6)));
-    const h = 2.1 * r + 2;
-    const base = 0.9;
-    body.add(mesh(new CylinderGeometry(r, r, h, 28), mat('#20325c', 0.45), 0, base + h / 2, 0));
+    // Yassı kutu: iki bacak deliğinin ayak izine sığar (2 × 1 delik); boyu kapasiteyle büyür.
+    const rx = 0.5 + OVER - 0.02;
+    const rz = OVER - 0.01;
+    const h = electrolyticHeight(C);
+    const can = mesh(new CylinderGeometry(1, 1, h, 20), mat('#20325c', 0.45), 0, CLEAR + h / 2, 0);
+    can.scale.set(rx, 1, rz);
+    body.add(can);
     // − ucunu gösteren açık şerit (sağdaki pin −).
-    body.add(mesh(new CylinderGeometry(r + 0.01, r + 0.01, h * 0.96, 10, 1, true, -0.35 + X_AXIS, 0.7), mat('#c9ced6', 0.5), 0, base + h / 2, 0));
-    const top = mesh(new CylinderGeometry(r * 0.92, r * 0.92, 0.06, 28), M.steel(), 0, base + h + 0.02, 0);
+    const stripe = mesh(new CylinderGeometry(1.012, 1.012, h * 0.96, 8, 1, true, -0.35 + X_AXIS, 0.7), mat('#c9ced6', 0.5), 0, CLEAR + h / 2, 0);
+    stripe.scale.set(rx, 1, rz);
+    body.add(stripe);
+    const top = mesh(new CylinderGeometry(0.92, 0.92, 0.05, 20), M.steel(), 0, CLEAR + h + 0.02, 0);
+    top.scale.set(rx, 1, rz);
     body.add(top);
-    const vent = mesh(new BoxGeometry(r * 1.2, 0.02, 0.08), mat('#6b7178', 0.4, 1), 0, base + h + 0.06, 0);
-    body.add(vent, mesh(new BoxGeometry(0.08, 0.02, r * 1.2), mat('#6b7178', 0.4, 1), 0, base + h + 0.06, 0));
-    return radial('capacitor', body, Math.min(r, 1), base);
+    return radial('capacitor', body, 1, CLEAR);
   }
   // Kutupsuz: kapasiteye göre seramik disk (≤ 10 nF), radyal çok katmanlı seramik (≤ 1 µF) ya da kutu film.
-  const legTop = 1.2;
   const pack = nonPolarPackage(C);
   if (pack === 'disc') {
-    const r = mm(CERAMIC_DISC.diameter) / 2;
-    const disc = named('kondansator', mesh(new CylinderGeometry(r, r, mm(CERAMIC_DISC.thickness), 22), mat('#c98a45', 0.6), 0, legTop + r - 0.1, 0));
+    const r = 0.5 + OVER - 0.03;
+    const disc = named('kondansator', mesh(new CylinderGeometry(r, r, 0.7, 20), mat('#c98a45', 0.6), 0, CLEAR + r, 0));
     disc.rotation.x = X_AXIS;
     body.add(disc);
   } else if (pack === 'mlcc') {
     // Daldırma kaplı gövde: köşeleri yuvarlak (elipsoit), hardal sarısı.
-    const blob = named('kondansator', mesh(new SphereGeometry(0.5, 14, 10), mat('#d2a233', 0.5), 0, legTop + mm(MLCC.height) / 2 - 0.1, 0));
-    blob.scale.set(mm(MLCC.width), mm(MLCC.height), mm(MLCC.thickness));
+    const blob = named('kondansator', mesh(new SphereGeometry(0.5, 14, 10), mat('#d2a233', 0.5), 0, CLEAR + 0.75, 0));
+    blob.scale.set(1.6, 1.5, 0.84);
     body.add(blob);
   } else {
-    body.add(named('kondansator', mesh(new BoxGeometry(mm(FILM_BOX.width), mm(FILM_BOX.height), mm(FILM_BOX.thickness)), mat('#b3261e', 0.5), 0, legTop + mm(FILM_BOX.height) / 2, 0)));
+    body.add(named('kondansator', mesh(new BoxGeometry(1.84, 2.2, 0.84), mat('#b3261e', 0.5), 0, CLEAR + 1.1, 0)));
   }
-  return radial('capacitor', body, 1, legTop);
+  return radial('capacitor', body, 1, CLEAR);
 }
 
-// --- Bobin (radyal ferrit, Bourns RLB1314) --------------------------------------------------------------
+// --- Bobin (ferrit çekirdeğe sarılı bakır tel; yatık) ---------------------------------------------------------
 
 export function inductorModel(): PartModel {
   const body = new Group();
   const ferrite = mat('#2f3236', 0.7);
-  body.add(mesh(new CylinderGeometry(2.4, 2.4, 0.5, 28), ferrite, 0, 1.05, 0));
-  body.add(mesh(new CylinderGeometry(2.15, 2.15, 3.6, 28), M.copper(), 0, 3.1, 0));
-  body.add(mesh(new CylinderGeometry(2.4, 2.4, 0.5, 28), ferrite, 0, 5.15, 0));
-  return radial('inductor', body, 2, 0.8);
+  const y = CLEAR + OVER - 0.01;
+  body.add(axialCylinder(OVER - 0.01, 0.34, ferrite, -1.2, y, 0, 18));
+  body.add(axialCylinder(OVER - 0.05, 2.06, M.copper(), 0, y, 0, 18));
+  body.add(axialCylinder(OVER - 0.01, 0.34, ferrite, 1.2, y, 0, 18));
+  return radial('inductor', body, 2, CLEAR);
 }
 
-// --- Potansiyometre (Bourns PTV09A, döner düğme) -----------------------------------------------------
+// --- Potansiyometre (ince gövde, öne bakan ayar çarkı) -------------------------------------------------------
 
 export function potentiometerModel(props: Props): PartModel {
   const root = new Group();
   const anchors = pinAnchors('potentiometer');
-  root.add(mesh(new BoxGeometry(4, 2, 4.4), mat('#2c5aa0', 0.5), 0, 1.4, 0));
-  root.add(mesh(new CylinderGeometry(0.9, 0.9, 0.6, 20), M.steel(), 0, 2.7, 0));
+  const body = new Group();
+  body.userData.body = true;
+  // Alçak gövde ve küçük çark: önündeki potansiyometre arkasındaki LED'i örtmesin.
+  const h = 0.8;
+  body.add(mesh(new BoxGeometry(2.9, h, 2 * OVER - 0.02), mat('#2c5aa0', 0.5), 0, CLEAR + h / 2, 0));
+  // Çark: ekseni öne bakar (gövde 1 delik derin); üstündeki çizgi sürgünün yerini gösterir.
   const knob = new Group();
   knob.userData.live = true;
-  const grip = mesh(new CylinderGeometry(1.45, 1.55, 1.6, 24), mat('#1f2328', 0.55), 0, 0, 0);
-  knob.add(grip);
-  const mark = mesh(new BoxGeometry(0.22, 0.05, 1.1), M.white(), 0, 0.82, -0.75);
-  knob.add(mark);
-  knob.position.y = 3.8;
-  root.add(knob);
-  // Bacaklar gövdenin önünden (üç bacak yan yana), sürgü bacağı arkaya.
-  root.add(legDown(new Vector3(-1.2, 0.5, 1.6), anchors[0]!));
-  root.add(legDown(new Vector3(0, 0.5, -1.6), anchors[1]!));
-  root.add(legDown(new Vector3(1.2, 0.5, 1.6), anchors[2]!));
+  const wheel = mesh(new CylinderGeometry(0.7, 0.7, 2 * OVER - 0.1, 22), mat('#1f2328', 0.55), 0, 0, 0);
+  wheel.rotation.x = X_AXIS;
+  knob.add(wheel);
+  for (const z of [-OVER + 0.04, OVER - 0.04]) knob.add(mesh(new BoxGeometry(0.18, 0.55, 0.03), M.white(), 0, 0.36, z));
+  knob.position.y = CLEAR + h + 0.5;
+  body.add(knob);
+  root.add(body);
+  // Üç bacak yan yana; her biri en yakın ucuna iner.
+  const order = anchors.map((a, i) => ({ a, i })).sort((p, q) => p.a.x - q.a.x);
+  order.forEach(({ a }, k) => root.add(legDown(new Vector3(k - 1, CLEAR, 0), a)));
   const angle = (position: number) => (0.5 - position / 100) * 1.5 * Math.PI;
-  knob.rotation.y = angle(numProp(props, 'position', 50));
+  knob.rotation.z = angle(numProp(props, 'position', 50));
   return {
     root,
     anchors,
     interaction: 'knob',
     update(ctx: LiveContext) {
-      knob.rotation.y = angle(numProp(ctx.props, 'position', 50));
+      knob.rotation.z = angle(numProp(ctx.props, 'position', 50));
       return false;
     },
   };
@@ -186,7 +211,8 @@ export function potentiometerModel(props: Props): PartModel {
 
 export function ldrModel(): PartModel {
   const body = new Group();
-  const face = canvasTexture(2.2, 2.2, (ctx, W, H) => {
+  const r = 0.5 + OVER - 0.05;
+  const face = canvasTexture(2 * r, 2 * r, (ctx, W, H) => {
     ctx.fillStyle = '#e9e3d6';
     ctx.beginPath();
     ctx.arc(W / 2, H / 2, W / 2, 0, Math.PI * 2);
@@ -202,44 +228,51 @@ export function ldrModel(): PartModel {
     }
     ctx.stroke();
   });
-  const disc = mesh(new CylinderGeometry(1.0, 1.0, 0.45, 26), mat('#efe9dd', 0.4), 0, 2.0, 0);
+  // Disk dik durur, ışığa duyarlı yüzü öne ve arkaya bakar (gövde 1 delik derin).
+  const y = CLEAR + r + 0.05;
+  const disc = mesh(new CylinderGeometry(r, r, 0.4, 22), mat('#efe9dd', 0.4), 0, y, 0);
+  disc.rotation.x = X_AXIS;
   body.add(disc);
-  const top = new Mesh(new PlaneGeometry(1.9, 1.9), new MeshStandardMaterial({ map: face, transparent: true, roughness: 0.35 }));
-  top.rotation.x = -X_AXIS;
-  top.position.y = 2.235;
-  top.userData.ownsMaterial = true;
-  body.add(top);
-  return radial('ldr', body, 1.4, 1.8);
+  const faceMat = new MeshStandardMaterial({ map: face, transparent: true, roughness: 0.35 });
+  for (const side of [-1, 1]) {
+    const plate = new Mesh(new PlaneGeometry(2 * r * 0.95, 2 * r * 0.95), faceMat);
+    plate.position.set(0, y, side * 0.205);
+    if (side < 0) plate.rotation.y = Math.PI;
+    plate.userData.ownsMaterial = true;
+    body.add(plate);
+  }
+  return radial('ldr', body, 1, CLEAR + 0.1);
 }
 
 export function ntcModel(): PartModel {
   const body = new Group();
-  const bead = mesh(new SphereGeometry(0.62, 18, 14), mat('#262a30', 0.35), 0, 2.2, 0);
-  bead.scale.set(1, 1.25, 0.8);
+  const bead = mesh(new SphereGeometry(0.5, 16, 12), mat('#262a30', 0.35), 0, CLEAR + 0.75, 0);
+  bead.scale.set(1.1, 1.3, 0.8);
   body.add(bead);
-  return radial('ntc', body, 0.6, 1.7);
+  return radial('ntc', body, 0.6, CLEAR + 0.2);
 }
 
-// --- Sigorta (5 × 20 mm cam, yuvada) -------------------------------------------------------------------
+// --- Sigorta (cam sigorta, yuvada) ---------------------------------------------------------------------
 
 export function fuseModel(): PartModel {
   const root = new Group();
   const anchors = pinAnchors('fuse');
-  root.add(mesh(new BoxGeometry(9.6, 0.6, 2.6), mat('#24272b', 0.6), 0, 0.3, 0));
-  for (const x of [-3.4, 3.4]) {
-    root.add(mesh(new BoxGeometry(1.0, 1.6, 2.0), M.tin(), x, 1.3, 0));
-  }
-  const glass = axialCylinder(0.95, 5.4, mat('#dfe9ef', 0.05, 0, { transparent: true, opacity: 0.35 }), 0, 1.9, 0, 22);
-  root.add(glass);
-  root.add(axialCylinder(1.0, 1.1, M.tin(), -3.4, 1.9, 0), axialCylinder(1.0, 1.1, M.tin(), 3.4, 1.9, 0));
-  const element = axialCylinder(0.06, 5.4, M.tin(), 0, 1.9, 0, 6);
+  const body = new Group();
+  body.userData.body = true;
+  const depth = 2 * OVER - 0.02;
+  const y = CLEAR + 0.3 + 0.44;
+  body.add(mesh(new BoxGeometry(9.6, 0.3, depth), mat('#24272b', 0.6), 0, CLEAR + 0.15, 0));
+  for (const x of [-3.4, 3.4]) body.add(mesh(new BoxGeometry(1.0, 0.9, depth), M.tin(), x, CLEAR + 0.3 + 0.45, 0));
+  body.add(axialCylinder(0.4, 5.4, mat('#dfe9ef', 0.05, 0, { transparent: true, opacity: 0.35 }), 0, y, 0, 18));
+  const element = axialCylinder(0.05, 5.4, M.tin(), 0, y, 0, 6);
   element.userData.live = true;
-  root.add(element);
-  const soot = axialCylinder(0.9, 2.2, ownMat('#2a2420', 0.9, 0, { transparent: true, opacity: 0.7 }), 0, 1.9, 0, 18);
+  body.add(element);
+  const soot = axialCylinder(0.37, 2.2, ownMat('#2a2420', 0.9, 0, { transparent: true, opacity: 0.7 }), 0, y, 0, 14);
   soot.userData.live = true;
   soot.visible = false;
-  root.add(soot);
-  root.add(legDown(new Vector3(-3.4, 0.4, 0), anchors[0]!), legDown(new Vector3(3.4, 0.4, 0), anchors[1]!));
+  body.add(soot);
+  root.add(body);
+  root.add(legDown(new Vector3(-4.2, CLEAR, 0), anchors[0]!), legDown(new Vector3(4.2, CLEAR, 0), anchors[1]!));
   return {
     root,
     anchors,
@@ -257,9 +290,9 @@ export function fuseModel(): PartModel {
 
 export function diodeModel(): PartModel {
   const body = new Group();
-  body.add(axialCylinder(0.53, 2.05, mat('#1c1d20', 0.4)));
-  body.add(axialCylinder(0.545, 0.3, mat('#c8ccd0', 0.4), 0.72, 0, 0));
-  return axial('diode', body, 1.03, 1.0);
+  body.add(axialCylinder(OVER - 0.012, 2.05, mat('#1c1d20', 0.4)));
+  body.add(axialCylinder(OVER, 0.3, mat('#c8ccd0', 0.4), 0.72, 0, 0));
+  return axial('diode', body, 1.03, CLEAR + OVER);
 }
 
 /**
@@ -269,7 +302,7 @@ export function diodeModel(): PartModel {
 export function schottkyModel(props: Props): PartModel {
   const text = typeof props.model === 'string' ? props.model : '1N5819';
   const L = 2.05;
-  const R = 0.53;
+  const R = OVER - 0.012;
   const C = 2 * Math.PI * R;
   const tex = canvasTexture(C, L, (c, W, H) => {
     c.fillStyle = '#1c1d20';
@@ -289,53 +322,52 @@ export function schottkyModel(props: Props): PartModel {
     }
   }, 120);
   const cap = mat('#1c1d20', 0.4);
-  const cyl = new Mesh(new CylinderGeometry(R, R, L, 28, 1, false), [new MeshStandardMaterial({ map: tex, roughness: 0.4 }), cap, cap]);
+  const cyl = new Mesh(new CylinderGeometry(R, R, L, 24, 1, false), [new MeshStandardMaterial({ map: tex, roughness: 0.4 }), cap, cap]);
   cyl.rotation.z = X_AXIS;
   cyl.userData.ownsMaterial = true;
   const body = new Group();
   body.add(cyl);
-  return axial('schottky', body, 1.03, 1.0);
+  return axial('schottky', body, 1.03, CLEAR + OVER);
 }
 
 export function zenerModel(): PartModel {
   const body = new Group();
   body.add(axialCylinder(0.36, 1.5, mat('#d9792b', 0.05, 0, { transparent: true, opacity: 0.8 })));
   body.add(axialCylinder(0.37, 0.22, mat('#151515', 0.4), 0.55, 0, 0));
-  return axial('zener', body, 0.75, 1.0);
+  return axial('zener', body, 0.75, CLEAR + OVER);
 }
 
-// --- LED (5 mm) --------------------------------------------------------------------------------------------
+// --- LED (oval mercek: iki bacak deliğinin ayak izine sığar) -------------------------------------------------------
+
+/** LED merceğinin silindir kısmının boyu (birim). */
+const LED_TUBE = 0.7;
 
 export function ledModel(props: Props): PartModel {
   const color = strProp(props, 'color', LED_COLORS, 'red');
   const light = LED_MODELS[color]?.lightColor ?? '#ff3b30';
   const body = new Group();
+  body.userData.body = true;
   const lens = new MeshStandardMaterial({ color: light, roughness: 0.15, transparent: true, opacity: 0.82, emissive: light, emissiveIntensity: 0 });
   const dome = new Group();
   dome.userData.live = true;
-  dome.add(mesh(new CylinderGeometry(1.0, 1.0, 1.7, 26), lens, 0, 2.95, 0));
-  dome.add(mesh(new SphereGeometry(1.0, 26, 14, 0, Math.PI * 2, 0, Math.PI / 2), lens, 0, 3.8, 0));
-  // Taban halkasının katot tarafı (+x, ikinci uç) düzdür: gerçek 5 mm LED'deki kutup işareti.
-  const flat = 0.95;
-  const cut = Math.acos(flat / 1.15);
-  const rim = new Shape();
-  rim.absarc(0, 0, 1.15, cut, Math.PI * 2 - cut, false);
-  rim.lineTo(flat, 1.15 * Math.sin(cut));
-  const flange = new ExtrudeGeometry(rim, { depth: 0.3, bevelEnabled: false, curveSegments: 26 });
-  flange.rotateX(-Math.PI / 2);
-  dome.add(mesh(flange, lens, 0, 2.0, 0));
+  const rx = 0.5 + OVER - 0.1;
+  const rz = OVER - 0.05;
+  const flange = mesh(new CylinderGeometry(1, 1, 0.22, 22), lens, 0, CLEAR + 0.11, 0);
+  flange.scale.set(rx + 0.07, 1, rz + 0.04);
+  // Kısa mercek (boyu 0,7): öndeki LED arkasındaki LED'i ya da kondansatörü örtmesin.
+  const tube = mesh(new CylinderGeometry(1, 1, LED_TUBE, 22), lens, 0, CLEAR + 0.22 + LED_TUBE / 2, 0);
+  tube.scale.set(rx, 1, rz);
+  const cap = mesh(new SphereGeometry(1, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2), lens, 0, CLEAR + 0.22 + LED_TUBE, 0);
+  cap.scale.set(rx, 0.7, rz);
+  dome.add(flange, tube, cap);
   body.add(dome);
-  const glow = glowSprite(light, 7);
-  glow.position.y = 3.5;
+  const glow = glowSprite(light, 6);
+  glow.position.y = CLEAR + 0.22 + LED_TUBE;
   body.add(glow);
-  // Anot bacağı daha uzundur: deliğe takılınca fazlası küçük bir kıvrım olarak görünür.
   const root = new Group();
   const anchors = pinAnchors('led');
   root.add(body);
-  const top = new Vector3(-0.5, 2.0, 0);
-  const bend = [top, new Vector3(-0.5, 1.75, 0), new Vector3(-0.78, 1.5, 0), new Vector3(-0.5, 1.25, 0)];
-  root.add(wirePath(bend, 0.14, M.tin(), 6), legDown(bend[3]!, anchors[0]!));
-  root.add(legDown(new Vector3(0.5, 2.0, 0), anchors[1]!));
+  root.add(legDown(new Vector3(-0.5, CLEAR, 0), anchors[0]!), legDown(new Vector3(0.5, CLEAR, 0), anchors[1]!));
   const model: PartModel = { root, anchors };
   return {
     ...model,
@@ -356,13 +388,16 @@ export function ledModel(props: Props): PartModel {
 
 // --- Transistörler: TO-92 (plastik), TO-18 (metal kapak: BC107), TO-220 (IRF510) -------------------------------
 //
-// Ölçüler dimensions.ts'te (veri sayfaları: docs/KARARLAR.md → "3B modeller: gerçek ölçüler"). Yerel çerçeve:
-// bacaklar z boyunca dizili, öndeki (izleyiciye bakan) yüz −x'te (placement.ts, 'to92' takılışı).
+// Kılıfın biçimi gerçek parçadan (dimensions.ts: veri sayfası ölçüleri oranlar için), boyu ayak izi kuralına göre:
+// üç bacak deliğinin ayak izi 3 × 1 delik. Yerel çerçeve: bacaklar z boyunca dizili, öndeki (izleyiciye bakan) yüz
+// −x'te (placement.ts, 'to92' takılışı).
 
 const TRANSISTOR_TEXT: Partial<Record<DeviceType, string>> = { npn: 'BC547', pnp: 'BC557', njfet: '2N5457', pjfet: '2N5460', nmos: '2N7000', pmos: 'BS250' };
 
-/** Gövdenin kartın üstündeki yüksekliği (bacakların açıkta kalan boyu ≈ 5 mm). */
-const STANDOFF = 2.0;
+/** Gövdenin kartın üstündeki yüksekliği (bacakların açıkta kalan boyu). */
+const STANDOFF = 1.3;
+/** TO-92'nin derinliği ayak izine sığsın diye gerçek D kesit bu oranda yassılır (genişlik gerçek: Ø 4,8 mm). */
+const TO92_SQUASH = (2 * OVER - 0.03) / mm(TO92.depth);
 
 let to92Shell: ExtrudeGeometry | null = null;
 
@@ -375,8 +410,10 @@ function to92Geometry(): ExtrudeGeometry {
   const shape = new Shape();
   shape.absarc(0, 0, r, -Math.PI + beta, Math.PI - beta, false);
   shape.closePath();
-  to92Shell = new ExtrudeGeometry(shape, { depth: mm(TO92.height), bevelEnabled: false, curveSegments: 14 });
+  to92Shell = new ExtrudeGeometry(shape, { depth: mm(TO92.height), bevelEnabled: false, curveSegments: 12 });
   to92Shell.rotateX(-Math.PI / 2);
+  // Derinliğin ortası bacakların sırasına gelsin (x = 0).
+  to92Shell.translate(-(r - flat) / 2, 0, 0);
   return to92Shell;
 }
 
@@ -387,26 +424,29 @@ function to92Body(text: string, textHeight = 0.6): Group {
   const r = mm(TO92.diameter) / 2;
   const flat = mm(TO92.depth) - r;
   const h = mm(TO92.height);
-  body.add(named('to92', mesh(to92Geometry(), mat('#1b1c1f', 0.45), 0, STANDOFF, 0)));
+  const shell = named('to92', mesh(to92Geometry(), mat('#1b1c1f', 0.45), 0, STANDOFF, 0));
+  shell.scale.x = TO92_SQUASH;
+  body.add(shell);
   const chord = 2 * Math.sqrt(r * r - flat * flat);
   const plate = labelPlate(text, chord * 0.92, textHeight, { fg: '#cfd3d8' });
   plate.rotation.set(0, -X_AXIS, 0);
-  plate.position.set(-flat - 0.012, STANDOFF + h * 0.55, 0);
+  plate.position.set(-(mm(TO92.depth) / 2) * TO92_SQUASH - 0.012, STANDOFF + h * 0.55, 0);
   body.add(plate);
   return body;
 }
 
-/** TO-92'nin bacağının gövdeden çıktığı yer (k = 0, 1, 2): gövdenin derinliğinin ortasında, 1,27 mm aralıkla. */
+/** TO-92'nin bacağının gövdeden çıktığı yer (k = 0, 1, 2): gövdenin ortasında, 1,27 mm aralıkla. */
 function to92Leg(k: number, sign = 1): Vector3 {
-  const r = mm(TO92.diameter) / 2;
-  const middle = (r - (mm(TO92.depth) - r)) / 2;
-  return new Vector3(middle * sign, STANDOFF, (k - 1) * mm(TO92.pitch) * sign);
+  return new Vector3(0, STANDOFF, (k - 1) * mm(TO92.pitch) * sign);
 }
+
+/** TO-18'in ölçeği: genişlik (bacak sırası boyunca), yükseklik ve derinlik; flanş ve sekme ayak izine sığar. */
+const TO18_SCALE = { along: 0.62, up: 0.8, deep: 0.42 } as const;
 
 /**
  * TO-18 metal kılıf (BC107: NXP/Philips SOT18/13): alt flanş, silindir kapak, flanşta emetörün yanında sekme;
- * üç bacak 2,54 mm'lik daire üzerinde (E ve C karşılıklı, B aralarında, arkada). Yazı kapağın yanında.
- * `emitter`: emetör ucunun sırası (BJT'de 2).
+ * üç bacak (E ve C karşılıklı, B aralarında, arkada). Yazı kapağın yanında. Ayak izine sığsın diye gerçek kılıf
+ * küçültülür ve derinliği yassılır (TO18_SCALE). `emitter`: emetör ucunun sırası (BJT'de 2).
  */
 export function to18Model(type: DeviceType, text: string, emitter = 2): PartModel {
   const root = new Group();
@@ -419,16 +459,18 @@ export function to18Model(type: DeviceType, text: string, emitter = 2): PartMode
   const metal = mat('#c9ced3', 0.3, 1);
   const body = new Group();
   body.userData.body = true;
-  body.add(named('to18-flans', mesh(new CylinderGeometry(rf, rf, tf, 20), metal, 0, STANDOFF + tf / 2, 0)));
-  body.add(named('to18-kapak', mesh(new CylinderGeometry(rc, rc, H - tf - chamfer, 20, 1, true), metal, 0, STANDOFF + tf + (H - tf - chamfer) / 2, 0)));
-  body.add(named('to18-tepe', mesh(new CylinderGeometry(rc - chamfer, rc, chamfer, 20), metal, 0, STANDOFF + H - chamfer / 2, 0)));
+  body.position.y = STANDOFF;
+  body.scale.set(TO18_SCALE.deep, TO18_SCALE.up, TO18_SCALE.along);
+  body.add(named('to18-flans', mesh(new CylinderGeometry(rf, rf, tf, 18), metal, 0, tf / 2, 0)));
+  body.add(named('to18-kapak', mesh(new CylinderGeometry(rc, rc, H - tf - chamfer, 18, 1, true), metal, 0, tf + (H - tf - chamfer) / 2, 0)));
+  body.add(named('to18-tepe', mesh(new CylinderGeometry(rc - chamfer, rc, chamfer, 18), metal, 0, H - chamfer / 2, 0)));
   // Bacakların sırası z'ye göre: uçtakiler E ve C (karşılıklı), ortadaki B (arkada, +x).
   const order = anchors.map((a, i) => ({ a, i })).sort((p, q) => p.a.z - q.a.z);
   const lc = mm(TO18.leadCircle) / 2;
   const emitterSide = order[0]!.i === emitter ? -1 : 1;
   // Sekme: emetörün yanında, B'den uzağa 45° (JEDEC TO-206AA); flanşın düzleminde, öne (−x) bakar.
   const tabR = rf + mm(TO18.tabLength) / 2 - 0.05;
-  const tab = mesh(new BoxGeometry(mm(TO18.tabLength) + 0.1, tf, mm(TO18.tabWidth)), metal, -tabR * Math.SQRT1_2, STANDOFF + tf / 2, emitterSide * tabR * Math.SQRT1_2);
+  const tab = named('to18-sekme', mesh(new BoxGeometry(mm(TO18.tabLength) + 0.1, tf, mm(TO18.tabWidth)), metal, -tabR * Math.SQRT1_2, tf / 2, emitterSide * tabR * Math.SQRT1_2));
   tab.rotation.y = emitterSide * (Math.PI / 4);
   body.add(tab);
   // Yazı: kapağın çevresinde iki kez (her yönden okunur).
@@ -443,14 +485,14 @@ export function to18Model(type: DeviceType, text: string, emitter = 2): PartMode
     // Öndeki yüz (−x) silindirin u = 0,75'inde; yazı çevrenin ≈ üçte birine sığar (yandan da okunur).
     for (const u of [0.25, 0.75]) c.fillText(text, W * u, Hh / 2, W * 0.3);
   }, 72);
-  const print = new Mesh(new CylinderGeometry(rc + 0.006, rc + 0.006, band, 20, 1, true), new MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.6 }));
-  print.position.y = STANDOFF + tf + (H - tf) * 0.52;
+  const print = new Mesh(new CylinderGeometry(rc + 0.006, rc + 0.006, band, 18, 1, true), new MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.6 }));
+  print.position.y = tf + (H - tf) * 0.52;
   print.userData.ownsMaterial = true;
   body.add(print);
   root.add(body);
   const r = mm(TO18.lead) / 2;
   order.forEach(({ a }, k) => {
-    const from = k === 1 ? new Vector3(lc, STANDOFF, 0) : new Vector3(0, STANDOFF, (k - 1) * lc);
+    const from = k === 1 ? new Vector3(lc * TO18_SCALE.deep, STANDOFF, 0) : new Vector3(0, STANDOFF, (k - 1) * lc * TO18_SCALE.along);
     root.add(legDown(from, a, r));
   });
   return { root, anchors };
@@ -461,7 +503,7 @@ export function transistorModel(type: DeviceType, props: Props): PartModel {
   const text = model && model !== 'genel' ? model.replace(/B$/, '') : (TRANSISTOR_TEXT[type] ?? '');
   const pack = transistorPackage(model);
   if (pack === 'to18') return to18Model(type, text);
-  if (pack === 'to220') return to220Model(type, text, '100 V · 5,6 A', null, 'z');
+  if (pack === 'to220') return to220Model(type, text, '', null, 'z');
   const root = new Group();
   const anchors = pinAnchors(type);
   root.add(to92Body(text));
@@ -544,19 +586,26 @@ export function icModuleModel(type: 'opamp' | 'timer555', labels: readonly strin
 
 // --- Anahtar (iki konumlu kollu anahtar) -------------------------------------------------------------------
 
+/** Kollu anahtarın (tek ve çift yollu) ölçüleri (birim): alçak gövde, kısa kol. */
+const SWITCH = { body: 0.62, collar: 0.2, lever: 0.7 } as const;
+
 export function switchModel(props: Props): PartModel {
   const root = new Group();
   const anchors = pinAnchors('switch');
-  root.add(mesh(new BoxGeometry(4.4, 1.6, 2.6), mat('#22252a', 0.5), 0, 1.0, 0));
-  root.add(mesh(new CylinderGeometry(0.7, 0.7, 0.9, 20), M.steel(), 0, 2.2, 0));
+  const body = new Group();
+  body.userData.body = true;
+  const depth = 2 * OVER - 0.02;
+  // Alçak gövde ve kısa kol: önündeki anahtar arkasındaki parçayı örtmesin (yarım dalgada S2, C2'nin %12'sini kapatıyordu).
+  body.add(mesh(new BoxGeometry(2.9, SWITCH.body, depth), mat('#22252a', 0.5), 0, CLEAR + SWITCH.body / 2, 0));
+  body.add(mesh(new CylinderGeometry(0.28, 0.28, SWITCH.collar, 14), M.steel(), 0, CLEAR + SWITCH.body + SWITCH.collar / 2, 0));
   const lever = new Group();
   lever.userData.live = true;
-  lever.add(mesh(new CylinderGeometry(0.25, 0.32, 2.6, 14), M.steel(), 0, 1.3, 0));
-  lever.add(mesh(new SphereGeometry(0.34, 14, 10), M.steel(), 0, 2.6, 0));
-  lever.position.y = 2.5;
-  root.add(lever);
-  for (const x of [-1.4, 0, 1.4]) root.add(mesh(new BoxGeometry(0.5, 0.6, 0.12), M.tin(), x, 0.1, 1.35));
-  root.add(lead(new Vector3(-1.4, 0.4, 1.35), anchors[0]!), lead(new Vector3(1.4, 0.4, 1.35), anchors[1]!));
+  lever.add(mesh(new CylinderGeometry(0.11, 0.15, SWITCH.lever, 10), M.steel(), 0, SWITCH.lever / 2, 0));
+  lever.add(mesh(new SphereGeometry(0.18, 10, 8), M.steel(), 0, SWITCH.lever, 0));
+  lever.position.y = CLEAR + SWITCH.body + SWITCH.collar - 0.05;
+  body.add(lever);
+  root.add(body);
+  root.add(legDown(new Vector3(-1, CLEAR, 0), anchors[0]!), legDown(new Vector3(1, CLEAR, 0), anchors[1]!));
   const set = (closed: boolean) => (lever.rotation.z = closed ? -0.45 : 0.45);
   set(boolProp(props, 'closed', false));
   return {
@@ -599,29 +648,39 @@ function inlineLegs(root: Group, anchors: readonly Vector3[], legs: readonly num
  * `legs`: soldan sağa bacakların pin sırası; null ise uçların dizilişine göre (transistörler). `along`: uçların
  * dizildiği yerel eksen ('z': transistörlerin takılışı; gövde yazılı yüzü −x'e bakacak biçimde döner).
  */
+/** TO-220'nin sade ölçüleri (birim): üç bacak deliğinin ayak izine (3 × 1) sığar; oranlar gerçek kılıftan. */
+const TO220_SADE = { width: 2.9, body: 1.7, thickness: 2 * OVER - 0.02, overall: 2.9, tab: 0.24, hole: 0.9, standoff: CLEAR + 0.1 } as const;
+
+/**
+ * `legs`: soldan sağa bacakların pin sırası; null ise uçların dizilişine göre (transistörler). `along`: uçların
+ * dizildiği yerel eksen ('z': transistörlerin takılışı; gövde yazılı yüzü −x'e bakacak biçimde döner).
+ */
 export function to220Model(type: DeviceType, text: string, subtitle: string, legs: readonly number[] | null, along: 'x' | 'z' = 'x'): PartModel {
   const root = new Group();
   const anchors = pinAnchors(type);
   // Gövdenin çerçevesi: bacaklar x boyunca, yazılı yüz +z. 'z' dizilişinde gövde −90° döner: (X, Z) → (Z, −X).
   const local = along === 'z' ? anchors.map((a) => new Vector3(a.z, a.y, -a.x)) : anchors;
   const order = legs ?? local.map((a, i) => ({ a, i })).sort((p, q) => p.a.x - q.a.x).map((o) => o.i);
-  const w = mm(TO220.width);
-  const h = mm(TO220.body);
-  const t = mm(TO220.thickness);
-  const tabT = mm(TO220.tabThickness);
-  const y0 = 2.6;
+  const w = TO220_SADE.width;
+  const h = TO220_SADE.body;
+  const t = TO220_SADE.thickness;
+  const tabT = TO220_SADE.tab;
+  const y0 = TO220_SADE.standoff;
   const body = new Group();
+  body.userData.body = true;
   const box = frontTexBox(w, h, t - tabT, mat('#18191c', 0.5), (c, W, H) => {
     c.fillStyle = '#18191c';
     c.fillRect(0, 0, W, H);
     c.fillStyle = '#d6dade';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.font = `600 ${Math.round(H * 0.17)}px "IBM Plex Sans", system-ui, sans-serif`;
-    c.fillText(text, W / 2, H * 0.42);
-    c.font = `500 ${Math.round(H * 0.11)}px "IBM Plex Sans", system-ui, sans-serif`;
-    c.fillStyle = '#9aa1a9';
-    c.fillText(subtitle, W / 2, H * 0.64);
+    c.font = `600 ${Math.round(H * (subtitle ? 0.24 : 0.28))}px "IBM Plex Sans", system-ui, sans-serif`;
+    c.fillText(text, W / 2, H * (subtitle ? 0.38 : 0.5), W * 0.92);
+    if (subtitle) {
+      c.font = `500 ${Math.round(H * 0.16)}px "IBM Plex Sans", system-ui, sans-serif`;
+      c.fillStyle = '#9aa1a9';
+      c.fillText(subtitle, W / 2, H * 0.7, W * 0.92);
+    }
   }, 96);
   box.position.set(0, y0 + h / 2, tabT / 2);
   body.add(named('to220-govde', box));
@@ -629,16 +688,19 @@ export function to220Model(type: DeviceType, text: string, subtitle: string, leg
   const tab = new Shape();
   tab.moveTo(-w / 2, 0);
   tab.lineTo(w / 2, 0);
-  tab.lineTo(w / 2, mm(TO220.overall));
-  tab.lineTo(-w / 2, mm(TO220.overall));
+  tab.lineTo(w / 2, TO220_SADE.overall);
+  tab.lineTo(-w / 2, TO220_SADE.overall);
   tab.lineTo(-w / 2, 0);
-  tab.holes.push(new Shape().absarc(0, h + (mm(TO220.overall) - h) / 2, mm(TO220.hole) / 2, 0, Math.PI * 2, true));
-  const tabGeo = new ExtrudeGeometry(tab, { depth: tabT, bevelEnabled: false, curveSegments: 16 });
+  tab.holes.push(new Shape().absarc(0, h + (TO220_SADE.overall - h) / 2, TO220_SADE.hole / 2, 0, Math.PI * 2, true));
+  const tabGeo = new ExtrudeGeometry(tab, { depth: tabT, bevelEnabled: false, curveSegments: 12 });
   body.add(named('to220-tirnak', mesh(tabGeo, mat('#c9ced3', 0.32, 1), 0, y0, -t / 2)));
-  // Bacaklar 1 birim aralıkla gövdeden aşağı, gerçek sırayla.
-  inlineLegs(body, local, order, mm(TO220.pitch), y0, tabT / 2);
-  if (along === 'z') body.rotation.y += -Math.PI / 2;
-  root.add(body);
+  // Bacaklar 1 birim aralıkla gövdeden aşağı, gerçek sırayla (gövdenin parçası sayılmaz).
+  const legGroup = new Group();
+  inlineLegs(legGroup, local, order, 1, y0, tabT / 2);
+  const turn = legGroup.rotation.y + (along === 'z' ? -Math.PI / 2 : 0);
+  body.rotation.y = turn;
+  legGroup.rotation.y = turn;
+  root.add(body, legGroup);
   return { root, anchors };
 }
 
@@ -674,12 +736,13 @@ export function optoModel(props: Props): PartModel {
   const center = [a, k, c, e].reduce((s, p) => s.add(p), new Vector3()).multiplyScalar(0.25);
   const across = c.clone().add(e).sub(a).sub(k).setY(0).normalize();
   const along = k.clone().sub(a).setY(0).normalize();
-  const bw = 2.56;
+  const bw = 1 + 2 * OVER - 0.05;
   const bd = 1.8;
   const bh = 1.4;
-  const y0 = 0.9;
+  const y0 = CLEAR + 0.05;
   const text = typeof props.model === 'string' ? props.model : 'PC817';
   const body = new Group();
+  body.userData.body = true;
   const chip = new Mesh(new BoxGeometry(bd, bh, bw), mat('#e9e4d6', 0.55));
   chip.position.y = y0 + bh / 2;
   body.add(chip);
@@ -691,8 +754,8 @@ export function optoModel(props: Props): PartModel {
   body.rotation.y = Math.atan2(-across.z, across.x);
   root.add(body);
   // 1. bacak noktası (A'nın köşesinde).
-  const dot = center.clone().addScaledVector(across, -bd / 2 + 0.3).addScaledVector(along, -bw / 2 + 0.35);
-  root.add(mesh(new CylinderGeometry(0.13, 0.13, 0.04, 14), mat('#26292e', 0.6), dot.x, y0 + bh + 0.02, dot.z));
+  const dot = center.clone().addScaledVector(across, -bd / 2 + 0.3).addScaledVector(along, -bw / 2 + 0.3);
+  root.add(mesh(new CylinderGeometry(0.13, 0.13, 0.04, 12), mat('#26292e', 0.6), dot.x, y0 + bh + 0.02, dot.z));
   // Bacaklar: gövdenin iki yanından, kendi uçlarına.
   for (const [pin, side, row] of [[a, -1, -0.5], [k, -1, 0.5], [c, 1, -0.5], [e, 1, 0.5]] as const) {
     const root0 = center.clone().addScaledVector(across, (side * bd) / 2).addScaledVector(along, row).setY(y0 + 0.4);
@@ -707,10 +770,11 @@ export function bridgeModel(props: Props): PartModel {
   const root = new Group();
   const anchors = pinAnchors('bridge');
   const text = typeof props.model === 'string' ? props.model : 'KBP307';
-  const w = 5.6;
-  const h = 4.4;
-  const t = 1.4;
-  const y0 = 1.8;
+  // Sade: dört bacak deliğinin ayak izi (4 × 1 delik), en çok 4 delik yüksek.
+  const w = 3 + 2 * OVER;
+  const h = 2.4;
+  const t = 2 * OVER - 0.02;
+  const y0 = CLEAR + 0.1;
   const box = frontTexBox(w, h, t, mat('#1b1c1f', 0.5), (c, W, H) => {
     c.fillStyle = '#1b1c1f';
     c.fillRect(0, 0, W, H);
@@ -724,10 +788,13 @@ export function bridgeModel(props: Props): PartModel {
   });
   box.position.set(0, y0 + h / 2, 0);
   const body = new Group();
+  body.userData.body = true;
   body.add(box);
   // Gerçek sıra soldan: +, ~, ~, − → şema pinleri 1, 0, 2, 3.
-  inlineLegs(body, anchors, [1, 0, 2, 3], 1.12, y0, 0);
-  root.add(body);
+  const legGroup = new Group();
+  inlineLegs(legGroup, anchors, [1, 0, 2, 3], 1, y0, 0);
+  body.rotation.y = legGroup.rotation.y;
+  root.add(body, legGroup);
   return { root, anchors };
 }
 
@@ -740,26 +807,27 @@ export function bridgeModel(props: Props): PartModel {
 export function spdtModel(props: Props): PartModel {
   const root = new Group();
   const anchors = pinAnchors('spdt');
-  root.add(mesh(new BoxGeometry(4.4, 1.6, 2.6), mat('#22252a', 0.5), 0, 1.0, 0));
-  root.add(mesh(new CylinderGeometry(0.7, 0.7, 0.9, 20), M.steel(), 0, 2.2, 0));
+  // Yerel çerçeve transistörlerinki: üç bacak z boyunca, gövde 1 delik derin (x).
+  const body = new Group();
+  body.userData.body = true;
+  const depth = 2 * OVER - 0.02;
+  body.add(mesh(new BoxGeometry(depth, SWITCH.body, 2.9), mat('#22252a', 0.5), 0, CLEAR + SWITCH.body / 2, 0));
+  body.add(mesh(new CylinderGeometry(0.28, 0.28, SWITCH.collar, 14), M.steel(), 0, CLEAR + SWITCH.body + SWITCH.collar / 2, 0));
   const lever = new Group();
   lever.userData.live = true;
-  lever.add(mesh(new CylinderGeometry(0.25, 0.32, 2.6, 14), M.steel(), 0, 1.3, 0));
-  lever.add(mesh(new SphereGeometry(0.34, 14, 10), M.steel(), 0, 2.6, 0));
-  lever.position.y = 2.5;
-  root.add(lever);
+  lever.add(mesh(new CylinderGeometry(0.11, 0.15, SWITCH.lever, 10), M.steel(), 0, SWITCH.lever / 2, 0));
+  lever.add(mesh(new SphereGeometry(0.18, 10, 8), M.steel(), 0, SWITCH.lever, 0));
+  lever.position.y = CLEAR + SWITCH.body + SWITCH.collar - 0.05;
+  body.add(lever);
   // A ve B'nin gövdedeki yanı: uçlarının z konumuna göre (C ortada).
   const sideA = Math.sign(anchors[1]!.z - anchors[0]!.z) || -1;
-  const plateA = labelPlate('A', 0.8, 0.8, { fg: '#cfd3d8' });
-  plateA.position.set(1.6, 1.82, 0.75 * sideA);
-  const plateB = labelPlate('B', 0.8, 0.8, { fg: '#cfd3d8' });
-  plateB.position.set(1.6, 1.82, -0.75 * sideA);
-  root.add(plateA, plateB);
-  for (const [pin, z] of [[0, 0], [1, 0.9 * sideA], [2, -0.9 * sideA]] as const) {
-    root.add(mesh(new BoxGeometry(0.12, 0.6, 0.5), M.tin(), 1.6, 0.1, z));
-    const end = anchors[pin]!;
-    root.add(wirePath([new Vector3(1.6, 0.35, z), new Vector3(end.x, 0.35, z), new Vector3(end.x, 0.35, end.z), end], 0.13, M.tin(), 6));
-  }
+  const plateA = labelPlate('A', 0.7, 0.7, { fg: '#cfd3d8' });
+  plateA.position.set(0, CLEAR + SWITCH.body + 0.01, 1.05 * sideA);
+  const plateB = labelPlate('B', 0.7, 0.7, { fg: '#cfd3d8' });
+  plateB.position.set(0, CLEAR + SWITCH.body + 0.01, -1.05 * sideA);
+  body.add(plateA, plateB);
+  root.add(body);
+  for (const [pin, z] of [[0, 0], [1, sideA], [2, -sideA]] as const) root.add(legDown(new Vector3(0, CLEAR, z), anchors[pin]!));
   // Kol, bağlı olduğu ucun TERSİNE yatar (gerçek kollu anahtardaki gibi).
   const set = (to: string) => (lever.rotation.x = (to === 'b' ? -1 : 1) * sideA * -0.45);
   set(spdtThrow(props));
@@ -791,25 +859,27 @@ export function pushButtonModel(boardTwins: readonly Vector3[] = []): PartModel 
   const n = new Vector3((-(b.z - a.z) / L) * side, 0, ((b.x - a.x) / L) * side);
   const twins = boardTwins.length === 2 ? boardTwins.map((p) => p.clone()) : anchors.map((p) => p.clone().addScaledVector(n, 2));
   const center = [a, b, ...twins].reduce((c, p) => c.add(p), new Vector3()).multiplyScalar(0.25);
-  const body = 4.72;
-  const bh = 1.45;
-  const y0 = 0.9;
-  root.add(mesh(new BoxGeometry(body, bh, body), mat('#1c1d20', 0.6), center.x, y0 + bh / 2, center.z));
-  root.add(mesh(new BoxGeometry(body + 0.05, 0.12, body + 0.05), M.steel(), center.x, y0 + bh + 0.06, center.z));
-  for (const [x, z] of [[-1.6, -1.6], [1.6, -1.6], [-1.6, 1.6], [1.6, 1.6]] as const) {
-    root.add(mesh(new CylinderGeometry(0.22, 0.22, 0.14, 10), mat('#0f1012', 0.7), center.x + x, y0 + bh + 0.13, center.z + z));
-  }
+  // Sade: gövde bacak deliklerinin ayak izinde (uçtan uca 2 delik + taşma), kare; renkli yuvarlak başlık.
+  const T = Math.hypot(twins[0]!.x - a.x, twins[0]!.z - a.z) || 2;
+  const body = Math.min(L, T) + 2 * OVER - 0.02;
+  const bh = 1.2;
+  const y0 = CLEAR;
+  const shell = new Group();
+  shell.userData.body = true;
+  shell.add(mesh(new BoxGeometry(body, bh, body), mat('#1c1d20', 0.6), center.x, y0 + bh / 2, center.z));
+  shell.add(mesh(new BoxGeometry(body + 0.02, 0.1, body + 0.02), M.steel(), center.x, y0 + bh + 0.05, center.z));
   const cap = new Group();
-  cap.add(mesh(new CylinderGeometry(1.5, 1.6, 0.9, 32), mat('#c8312a', 0.4), 0, 0.45, 0));
-  cap.add(mesh(new CylinderGeometry(0.75, 0.75, 0.6, 16), mat('#2b2d31', 0.5), 0, -0.2, 0));
+  cap.add(mesh(new CylinderGeometry(0.95, 1.02, 0.7, 22), mat('#c8312a', 0.4), 0, 0.35, 0));
+  cap.add(mesh(new CylinderGeometry(0.5, 0.5, 0.6, 12), mat('#2b2d31', 0.5), 0, -0.2, 0));
   cap.position.set(center.x, 0, center.z);
   cap.userData.live = true;
-  root.add(cap);
-  const press = (pressed: boolean) => (cap.position.y = y0 + bh + 0.12 + (pressed ? 0.2 : 0.55));
+  shell.add(cap);
+  root.add(shell);
+  const press = (pressed: boolean) => (cap.position.y = y0 + bh + 0.1 + (pressed ? 0.15 : 0.45));
   press(false);
   // Bacaklar gövdenin köşelerinden: uçların yanındakiler uçlara, öbürleri ikizlere.
   const u = new Vector3((b.x - a.x) / L, 0, (b.z - a.z) / L);
-  const corner = (along: number, side: number) => center.clone().addScaledVector(u, along * 2.26).addScaledVector(n, side * 0.98).setY(y0);
+  const corner = (along: number, side: number) => center.clone().addScaledVector(u, along * Math.min(L / 2, body / 2 - 0.15)).addScaledVector(n, side * Math.min(T / 2, body / 2 - 0.15)).setY(y0);
   root.add(legDown(corner(-1, -1), a, 0.12), legDown(corner(1, -1), b, 0.12));
   root.add(legDown(corner(-1, 1), twins[0]!, 0.12), legDown(corner(1, 1), twins[1]!, 0.12));
   return {
@@ -930,18 +1000,18 @@ export function speakerModel(): PartModel {
   };
 }
 
-/** Aktif buzzer (CMI-1295IC-0585T): Ø 12 × 9,5 mm siyah silindir, üstte ses deliği ve + işareti; karta oturur. */
+/** Aktif buzzer: siyah oval gövde (bacak deliklerinin ayak izinde: 4 × 1 delik), üstte ses deliği ve + işareti. */
 export function buzzerModel(): PartModel {
   const body = new Group();
-  const r = mm(BUZZER.diameter) / 2;
-  const h = mm(BUZZER.height);
-  const y0 = 0.12;
-  body.add(named('buzzer', mesh(new CylinderGeometry(r, r, h, 28), mat('#16171a', 0.45), 0, y0 + h / 2, 0)));
-  body.add(mesh(new CylinderGeometry(mm(2.2) / 2, mm(2.2) / 2, 0.02, 14), mat('#050505', 0.9), 0, y0 + h + 0.011, 0));
-  const plus = labelPlate('+', 0.9, 0.9, { fg: '#d4d7db' });
-  plus.position.set(-r * 0.58, y0 + h + 0.02, 0);
+  const h = 1.5;
+  const puck = named('buzzer', mesh(new CylinderGeometry(1, 1, h, 24), mat('#16171a', 0.45), 0, CLEAR + h / 2, 0));
+  puck.scale.set(1.5 + OVER - 0.02, 1, OVER - 0.01);
+  body.add(puck);
+  body.add(mesh(new CylinderGeometry(0.2, 0.2, 0.02, 12), mat('#050505', 0.9), 0, CLEAR + h + 0.011, 0));
+  const plus = labelPlate('+', 0.7, 0.7, { fg: '#d4d7db' });
+  plus.position.set(-1.2, CLEAR + h + 0.02, 0);
   body.add(plus);
-  const model = radial('buzzer', body, mm(BUZZER.pitch), y0);
+  const model = radial('buzzer', body, 3, CLEAR);
   let phase = 0;
   return {
     ...model,

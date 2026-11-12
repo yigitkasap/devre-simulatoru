@@ -89,11 +89,15 @@ export function batteryPack(volts: number): { kind: 'pp3' } | { kind: 'aa'; cell
   return { kind: 'aa', cells, layers, perLayer: Math.ceil(cells / layers) };
 }
 
-/** Pilin masada kapladığı yer (birim): boy (x; uçtaki kablolarla) ve en (z). */
+/**
+ * Pilin masada kapladığı yer (birim): boy (x; uçtaki kablolarla) ve en (z). Model tahta dışı parçaların sınırına
+ * (8 birim) küçültülür ("3B: okunurluk önce"); biçimi gerçek pilinki.
+ */
 export function batteryFootprint(volts: number): { w: number; d: number } {
   const pack = batteryPack(volts);
-  if (pack.kind === 'pp3') return { w: mm(PP3.length) + 5, d: mm(PP3.width) };
-  return { w: mm(AA.holderLength) + 3.5, d: mm(AA.holderPitch) * pack.perLayer + mm(3) };
+  const real = pack.kind === 'pp3' ? { w: mm(PP3.length) + 4.4, d: mm(PP3.width) } : { w: mm(AA.holderLength) + 3.2, d: mm(AA.holderPitch) * pack.perLayer + mm(3) };
+  const k = Math.min(1, 8 / Math.max(real.w, real.d));
+  return { w: real.w * k, d: real.d * k };
 }
 
 /** Transistörün kılıfı modele göre (föyün parçaları): BC107 metal TO-18, IRF510 TO-220, öbürleri TO-92. */

@@ -6462,12 +6462,14 @@ try {
       `${scope?.id ?? '—'} → ${next?.id ?? '—'} · ${first.devices.map((d) => `${d.id}:${Math.round(d.vis * 100)}`).join(' ')}`);
     await ph.context().close();
   }
-  // --- 3B cihaz kabloları: timsah kıskaç, bir delikte tek tel, birleşme etiketi, ağ vurgusu ------------------
-  // Cihaz kabloları deliğe girmez; kıskaç hiçbir zaman parça bacağını tutmaz (2026-11-10): her kablo ağın şeridindeki
-  // ayrı bir boş deliğe takılı kendi kısa telinin ucunu tutar (gerekirse kenar köprüsüyle boş bir şeritte); kıskaç
-  // neredeyse yatay, ağzı kartın en az 8 mm üstünde; tahtada hiçbir delikte iki şey yok; aynı ağa birden çok kablo
-  // gidince kıskaçlarının üstünde "GND · 3 kablo". Fare kablonun üstüne gelince (telefonda dokununca) o ağın kabloları
-  // ve bacakları parlar, öbürleri soluklaşır, küçük şemada düğüm.
+  // --- 3B bağlantı direkleri ("3B: okunurluk önce", 2026-11-12) -------------------------------------------------
+  // Tahtanın altında ince bir taban plakası, plakanın arka kenarında (cihazlara bakan yanda) bir sıra bağlantı direği.
+  // Cihaz bağlanan her ağa bir direk; ortak ağ (GND) tek direkte, muz fişler üst üste. Cihaz kabloları yalnızca
+  // direklere takılır: tahtanın üstünden ya da önünden geçmez, timsah kıskaç ve kısa test teli yok. Direkten ağın
+  // tahtadaki deliğine kablonun renginde kısa, yatık bir tel gider. Direğin üstünde kısa ağ adı (GND, +12 V, CH1,
+  // GİRİŞ…). Renkler: CH1 sarı, CH2 mavi, üreteç çıkışı kırmızı, güç kaynağı + kırmızı, bütün toprak kabloları siyah.
+  // Değişti (2026-11-12): eskiden bu bölüm timsah kıskaçları (kendi kısa telinde, yatay, ağız ≥ 8 mm) ve "GND · 3
+  // kablo" birleşme etiketini denetliyordu; kıskaçlar kaldırıldı.
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
@@ -6479,108 +6481,123 @@ try {
       await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(800);
       return page.evaluate(() => {
-        const r = window.__tezgah.clipReport();
-        const labels = [...document.querySelectorAll('[data-anchor="junction"]')].map((e) => ({ net: e.dataset.net, text: e.textContent, shown: getComputedStyle(e).opacity === '1' }));
-        return { ...r, labels };
+        const t = window.__tezgah;
+        const r = t.postReport();
+        const labels = [...document.querySelectorAll('[data-anchor="post"]')].map((e) => ({ net: e.dataset.net, text: e.textContent, shown: getComputedStyle(e).opacity === '1' }));
+        const cables = r.cables.map((c) => ({ ...c, type: t.parts.get(c.part)?.part.type ?? '' }));
+        const clips = t.cables.children.filter((c) => c.userData.clipPart || c.userData.clip).length;
+        return { ...r, cables, labels, clips };
       });
     };
     const jf = await report('jfet-karakteristik');
     const yd = await report('yarim-dalga');
-    const kinds = (r) => r.clips.map((c) => c.kind[0]).join('');
-    const label = (r, net) => r.labels.find((l) => l.net === net);
-    const gnd = (r) => r.junctions.find((j) => /GND/.test(label(r, j.net)?.text ?? ''));
-    // Değişti (2026-11-10): eskiden "bacak, kısa tel ya da zincir" (BF245A'da en az bir bacak ve bir zincir bekleniyordu);
-    // artık bacak ve zincir yok, her kablo kendi kısa telinde (s: ağın şeridinde, b: kenar köprülü şeritte).
-    const own = (r) => r.clips.every((c) => c.kind === 'stub' || c.kind === 'bridge');
-    const posture = (r) => r.clips.every((c) => c.jawMm >= 8 && c.deg <= 25.01);
-    check('3B kıskaç (BF245A, yarım dalga): hiçbir delikte iki tel ya da bacak yok; bütün cihaz kabloları kendi kısa telinde (bacak ve zincir yok), deliğe takılı cihaz kablosu yok; kıskaçlar yatay (≤ 25°), ağız kartın en az 8 mm üstünde',
-      jf.doubled === 0 && yd.doubled === 0 && jf.plugged === 0 && yd.plugged === 0 && jf.clips.length === 8 && yd.clips.length === 5 && own(jf) && own(yd) && posture(jf) && posture(yd),
-      `BF245A ${kinds(jf)} · iki şey ${jf.doubled} · fişli ${jf.plugged} | yarım dalga ${kinds(yd)} · iki şey ${yd.doubled} · fişli ${yd.plugged} · ağız en alçak ${Math.min(...[...jf.clips, ...yd.clips].map((c) => c.jawMm)).toFixed(1)} mm · eğim en çok ${Math.max(...[...jf.clips, ...yd.clips].map((c) => c.deg)).toFixed(0)}°`);
-    // Etiket artık ağın kıskaçlarının ortasındakinin gövdesinin üstünde (kablolar ayrı deliklerde, birleşme noktası yok).
-    check('3B kıskaç: birleşme etiketi ağın adı ve kablo sayısı (BF245A: "GND · 3 kablo", "RD 2. uç · 2 kablo"; yarım dalga: GND iki kablo), etiketler görünür',
-      label(jf, gnd(jf)?.net)?.text === 'GND · 3 kablo' && jf.labels.some((l) => l.text === 'RD 2. uç · 2 kablo') && jf.labels.every((l) => l.shown) && jf.junctions.length === 2 &&
-        /^GND · 2 kablo$/.test(label(yd, gnd(yd)?.net)?.text ?? '') && yd.labels.length === yd.junctions.length,
-      `${jf.labels.map((l) => `${l.text}${l.shown ? '' : ' (gizli)'}`).join(' | ')} || ${yd.labels.map((l) => l.text).join(' | ')}`);
-    // Fare etiketin noktasının (ortadaki kıskacın gövdesi) üstüne gelince GND ağı vurgulanır.
+    const bj = await report('bjt-yukseltec-kuplajli');
+    const all = [jf, yd, bj];
+    const names = (r) => r.posts.map((p) => p.name).join(', ');
+    const gnd = (r) => r.posts.find((p) => p.name === 'GND');
+    const tidy = (r) => r.doubled === 0 && r.overBoard === 0 && r.clips === 0 && r.hidden === 0 && r.wires.length === r.posts.length &&
+      r.cables.length === r.posts.reduce((n, p) => n + p.cables, 0) && r.posts.every((p) => p.visible && p.cables >= 1) && new Set(r.posts.map((p) => p.net)).size === r.posts.length;
+    check('3B direkler (BF245A, yarım dalga, BC107 kuplajlı): cihaz bağlanan her ağa bir direk (5, 3, 5), ortak toprak tek direkte üst üste (3, 2, 3 kablo); hiçbir delikte iki şey yok; cihaz kablosu tahtanın üstünden ya da önünden geçmiyor; kıskaç yok; direklerin hepsi varsayılan kamerada görünüyor',
+      all.every(tidy) && jf.posts.length === 5 && yd.posts.length === 3 && bj.posts.length === 5 && gnd(jf)?.cables === 3 && gnd(yd)?.cables === 2 && gnd(bj)?.cables === 3 && jf.cables.length === 8 && yd.cables.length === 5 && bj.cables.length === 7,
+      all.map((r) => `${r.posts.length} direk · ${r.cables.length} kablo · GND ${gnd(r)?.cables} · iki şey ${r.doubled} · tahta üstünde ${r.overBoard} · kıskaç ${r.clips} · görünmeyen ${r.posts.filter((p) => !p.visible).length}`).join(' | '));
+    check('3B direk adları: direğin üstünde kısa ağ adı (BF245A: +10 V, GND, PS1 −, A1 +, A1 −; yarım dalga: GİRİŞ, GND, CH2; BC107: GİRİŞ, +12 V, GND, CH1, CH2), etiketler görünür',
+      names(jf) === '+10 V, GND, PS1 −, A1 +, A1 −' && names(yd) === 'GİRİŞ, GND, CH2' && names(bj) === 'GİRİŞ, +12 V, GND, CH1, CH2' &&
+        all.every((r) => r.labels.length === r.posts.length && r.labels.every((l) => l.shown && r.posts.some((p) => p.net === l.net && p.name === l.text))),
+      all.map((r) => r.labels.map((l) => `${l.text}${l.shown ? '' : ' (gizli)'}`).join(', ')).join(' | '));
+    // Renkler: toprak direğine giden her kablo siyah; öbürleri cihazın ucuna göre.
+    const RED = '#d22f27'; const BLACK = '#1b1c1f'; const YELLOW = '#f2c230'; const BLUE = '#2f6fd6';
+    const colorOk = (r) => r.cables.every((c) => {
+      const ground = r.posts.find((p) => p.net === c.net)?.name === 'GND';
+      if (ground) return c.color === BLACK;
+      if (c.type === 'oscilloscope') return c.color === [YELLOW, BLUE, BLACK][c.pin];
+      if (c.type === 'funcgen') return c.pin === 0 ? c.color === RED : true;
+      if (c.type === 'dcsupply') return c.color === [RED, BLACK][c.pin % 2];
+      return c.color === [RED, BLACK][c.pin];
+    });
+    const wireOk = (r) => r.wires.every((w, k) => w.color === r.posts[k].color && w.mm <= 80);
+    const scope = (r, pin) => r.cables.find((c) => c.type === 'oscilloscope' && c.pin === pin)?.color;
+    check('3B kablo renkleri: osiloskop CH1 sarı, CH2 mavi; üreteç çıkışı ve güç kaynağı + kırmızı; bütün toprak kabloları siyah; direkten tahtaya tel direğin renginde ve kısa (≤ 80 mm)',
+      all.every((r) => colorOk(r) && wireOk(r)) && scope(bj, 0) === YELLOW && scope(bj, 1) === BLUE && scope(yd, 0) === YELLOW && scope(yd, 1) === BLUE &&
+        bj.cables.some((c) => c.type === 'funcgen' && c.pin === 0 && c.color === RED) && bj.cables.some((c) => c.type === 'dcsupply' && c.pin === 0 && c.color === RED) && gnd(bj)?.color === BLACK,
+      all.map((r) => `${r.cables.map((c) => `${c.type.slice(0, 4)}${c.pin}:${c.color}`).join(' ')} · en uzun tel ${Math.max(...r.wires.map((w) => w.mm)).toFixed(0)} mm`).join(' | '));
+    // Fare GND direğinin üstüne gelince GND ağı vurgulanır (direk, fişleri, kabloları, teli).
     await page.goto(`${URL0}embed/?ornek=jfet-karakteristik`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(800);
-    const net = jf.junctions.find((j) => j.count === 3)?.net;
-    const at = await page.evaluate((net) => {
-      const t = window.__tezgah; const p = t.junctionAt.get(net).clone().project(t.camera); const c = document.querySelector('canvas').getBoundingClientRect();
-      return { x: c.left + ((p.x + 1) / 2) * c.width, y: c.top + ((1 - p.y) / 2) * c.height };
-    }, net);
+    const postAt = (p, name) => p.evaluate((name) => {
+      const post = window.__tezgah.postReport().posts.find((x) => x.name === name);
+      const c = document.querySelector('canvas').getBoundingClientRect();
+      return post ? { net: post.net, x: c.left + post.x, y: c.top + post.y } : null;
+    }, name);
+    const at = await postAt(page, 'GND');
     let lit = { net: null };
-    for (let dy = 0; dy < 40 && !lit.net; dy += 3) {
-      await page.mouse.move(at.x, at.y - dy); await page.waitForTimeout(120);
+    for (let dy = 0; dy < 30 && !lit.net && at; dy += 3) {
+      await page.mouse.move(at.x, at.y + dy); await page.waitForTimeout(120);
       lit = await page.evaluate(() => window.__tezgah.netHighlight());
     }
     const mini = await page.locator('polyline[data-highlight]').count();
     await page.mouse.move(5, 300); await page.waitForTimeout(300);
     const off = await page.evaluate(() => window.__tezgah.netHighlight());
-    check('3B ağ vurgusu (masaüstü, BF245A): fare GND birleşme noktasının üstüne gelince GND kabloları parlıyor, öbürleri soluk, bacağı işaretli; küçük şemada düğümün kabloları vurgulu; fare çekilince kalkıyor',
-      lit.net === net && lit.lit >= 4 && lit.dim >= 4 && lit.legs >= 1 && mini >= 1 && off.net === null && off.lit === 0 && off.dim === 0,
+    check('3B ağ vurgusu (masaüstü, BF245A): fare GND direğinin üstüne gelince GND kabloları parlıyor, öbürleri soluk, bacağı işaretli; küçük şemada düğümün kabloları vurgulu; fare çekilince kalkıyor',
+      at !== null && lit.net === at.net && lit.lit >= 4 && lit.dim >= 4 && lit.legs >= 1 && mini >= 1 && off.net === null && off.lit === 0 && off.dim === 0,
       `${lit.net} · parlak ${lit.lit} · soluk ${lit.dim} · bacak ${lit.legs} · küçük şema ${mini} · sonra ${off.net}`);
     await ctx.close();
-    // Telefonda dokununca: kıskaca dokunmak vurgular, yeniden dokunmak kaldırır.
+    // Telefonda dokununca: direğe dokunmak vurgular.
     const { page: ph, cdp } = await phone();
     await ph.context().addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
     await ph.goto(`${URL0}embed/?ornek=jfet-karakteristik&gorunum=tam`, { waitUntil: 'networkidle' });
     await ph.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
     await ph.waitForTimeout(800);
-    const pt = await ph.evaluate((net) => {
-      const t = window.__tezgah; const p = t.junctionAt.get(net).clone().project(t.camera); const c = document.querySelector('canvas').getBoundingClientRect();
-      return { x: c.left + ((p.x + 1) / 2) * c.width, y: c.top + ((1 - p.y) / 2) * c.height };
-    }, net);
+    const pt = await postAt(ph, 'A1 −');
     let tapped = { net: null };
-    for (let dy = 0; dy < 30 && !tapped.net; dy += 3) {
-      await tap(ph, cdp, { x: pt.x, y: pt.y - dy }); await ph.waitForTimeout(150);
+    for (let dy = 0; dy < 24 && !tapped.net && pt; dy += 3) {
+      await tap(ph, cdp, { x: pt.x, y: pt.y + dy }); await ph.waitForTimeout(150);
       tapped = await ph.evaluate(() => window.__tezgah.netHighlight());
     }
-    check('3B ağ vurgusu (telefon, BF245A): kıskaca dokununca o ağ vurgulanıyor (öbürleri soluk)', tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1, `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0}`);
+    const phonePosts = await ph.evaluate(() => window.__tezgah.postReport().posts.map((p) => p.visible));
+    check('3B ağ vurgusu (telefon, BF245A): direğe dokununca o ağ vurgulanıyor (öbürleri soluk); beş direk de varsayılan kamerada görünüyor',
+      tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1 && phonePosts.length === 5 && phonePosts.every(Boolean), `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0} · görünen direk ${phonePosts.filter(Boolean).length}/${phonePosts.length}`);
     await ph.context().close();
   }
-  // --- 3B kıskaçlar parçaları örtmez (gerçek kamera) ------------------------------------------------------------
-  // Varsayılan kamerada (masaüstü 1440×900, iPhone 13 dikey ve yatay) hiçbir devre parçasının gövdesinin ekrandaki
-  // alanının %20'sinden fazlası kıskaçla, kıskaçlı kabloyla, kısa telle ya da kenar köprüsüyle örtülmez. Ölçüm: nesne
-  // kimliği renkli iki çizim (her nesneye düz renk; gövde, bacaksız kutusuyla kırpılır): (A) kıskaçlar gizli, her
-  // gövdenin görünen pikselleri; (B) kıskaçlar görünür, bu piksellerden onlara düşenler. Ölçü aletleri (kendi
-  // kabloları ön soketten çıkar; varsayılan kadrajda üstleri kırpılır) sayılmaz, yalnızca gösterilir. Örnekler:
-  // 1N4001 DC ve cihaz kablosu en çok olan beş örnek (8: trafo, BF245A; 7 ve 5 ağ: kuplajlı FET ve BJT
-  // yükselteçleri; 7 ve 4 ağ: FET yükselteci). Kıskaçların ağzı kartın en az 8 mm üstünde, eğimi en çok 25°.
+  // --- 3B: tahta parçaları örtülmez (gerçek kamera) --------------------------------------------------------------
+  // Varsayılan kamerada (masaüstü 1440×900, iPhone 13 dikey ve yatay) hiçbir tahta parçasının gövdesinin ekrandaki
+  // alanının %10'undan fazlası başka bir parça, kablo, direk, fiş, köprü ya da tel tarafından örtülmez. Ölçüm, her
+  // tahta parçası için iki çizim (gövde, bacaksız kutusuyla kırpılır): (A) parça tek başına, gövdenin kameraya bakan
+  // bütün pikselleri; (B) bütün sahne, bu piksellerden gövdenin hâlâ göründükleri. Örtülme payı 1 − B/A. Pay %5'i
+  // geçerse üçüncü çizim örtenin kim olduğunu söyler. Örnekler: 1N4001 DC, BC107 kuplajlı, IRF510, yarım dalga, DC
+  // motor, hoparlör ve cihaz kablosu en çok olan üç örnek (trafo ve BF245A 8, kuplajlı FET 7).
+  // Değişti (2026-11-12): eskiden yalnızca kıskaçların örtmesi ölçülüyordu (sınır %20); şimdi her şey sayılır (%10).
   {
-    const clipCover = () => {
+    const partCover = () => {
       const t = window.__tezgah;
       const renderer = t.renderer;
       const scene = t.scene;
       const gl = renderer.getContext();
       const Basic = t.dotMaterial.constructor;
       const V3 = t.camera.position.constructor;
-      const occluders = new Set();
-      for (const c of t.cables.children) if (c.userData.clipPart) c.traverse((o) => occluders.add(o));
       const placed = [...t.parts.values()];
+      const onBoard = placed.map((p) => t.plan.onBoard.has(p.part.id));
       const partOf = new Map();
       placed.forEach((p, k) => p.group.traverse((o) => partOf.set(o, k)));
-      const basic = (r, g, b, planes) => { const m = new Basic({ toneMapped: false }); m.color.setRGB(r / 255, g / 255, b / 255); if (planes) m.clippingPlanes = planes; return m; };
       const P = (x, y, z, c) => ({ normal: new V3(x, y, z), constant: c });
       const planesOf = (b) => [P(1, 0, 0, -(b.min.x - 0.03)), P(-1, 0, 0, b.max.x + 0.03), P(0, 1, 0, -(b.min.y - 0.03)), P(0, -1, 0, b.max.y + 0.03), P(0, 0, 1, -(b.min.z - 0.03)), P(0, 0, -1, b.max.z + 0.03)];
-      const partMats = placed.map((p, k) => basic(8 * (k + 1), 100, 250, planesOf(p.body)));
-      const black = basic(0, 0, 0);
-      const yellow = basic(250, 250, 0);
+      const white = new Basic({ toneMapped: false });
+      white.color.setRGB(1, 1, 1);
+      const black = new Basic({ toneMapped: false });
+      black.color.setRGB(0, 0, 0);
       const saved = [];
       const hide = [t.legGlow, t.ring, t.dots].filter((o) => o && o.visible);
       scene.traverse((o) => {
         if (o.isPoints || o.isLine || o.isSprite || o.isInstancedMesh) { if (o.visible) hide.push(o); return; }
         if (!o.isMesh) return;
-        if (Array.isArray(o.material) || o.material.transparent || o.userData.shadow) { if (o.visible) hide.push(o); return; }
+        // Gölge ve ışıma (yarı saydam hâle) örtmez; cam ve mercek gibi saydam gövdeler sayılır.
+        if (Array.isArray(o.material) || o.userData.shadow || (o.material.transparent && o.material.opacity < 0.3)) { if (o.visible) hide.push(o); return; }
         saved.push([o, o.material, o.visible]);
       });
       const prev = { bg: scene.background, fog: scene.fog, tone: renderer.toneMapping, cs: renderer.outputColorSpace, clip: renderer.localClippingEnabled, cc: renderer.getClearColor(scene.background.clone()), ca: renderer.getClearAlpha() };
       const w = gl.drawingBufferWidth;
       const h = gl.drawingBufferHeight;
-      const read = () => { const buf = new Uint8Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf); return buf; };
-      let A;
-      let B;
+      const rows = [];
       try {
         for (const o of hide) o.visible = false;
         scene.background = null;
@@ -6590,16 +6607,57 @@ try {
         renderer.localClippingEnabled = true;
         renderer.setClearColor(0x000000, 1);
         renderer.setRenderTarget(null);
-        for (const [o] of saved) {
-          if (occluders.has(o)) { o.visible = false; continue; }
-          const k = partOf.get(o);
-          o.material = k !== undefined ? partMats[k] : black;
-        }
-        renderer.render(scene, t.view);
-        A = read();
-        for (const [o] of saved) if (occluders.has(o)) { o.visible = true; o.material = yellow; }
-        renderer.render(scene, t.view);
-        B = read();
+        placed.forEach((p, k) => {
+          if (!onBoard[k]) return;
+          // Gövdenin (bacaksız kutusunun) ekrandaki dikdörtgeni: yalnızca orası okunur.
+          let x0 = w, y0 = h, x1 = 0, y1 = 0;
+          for (const x of [p.body.min.x, p.body.max.x]) for (const y of [p.body.min.y, p.body.max.y]) for (const z of [p.body.min.z, p.body.max.z]) {
+            const q = new V3(x, y, z).project(t.view);
+            const px = ((q.x + 1) / 2) * w;
+            const py = ((q.y + 1) / 2) * h;
+            x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py);
+          }
+          x0 = Math.max(0, Math.floor(x0) - 2); y0 = Math.max(0, Math.floor(y0) - 2); x1 = Math.min(w, Math.ceil(x1) + 2); y1 = Math.min(h, Math.ceil(y1) + 2);
+          const rw = x1 - x0;
+          const rh = y1 - y0;
+          if (rw <= 0 || rh <= 0) { rows.push({ id: p.part.label ?? p.part.id, type: p.part.type, vis: 0, share: 0 }); return; }
+          white.clippingPlanes = planesOf(p.body);
+          white.needsUpdate = true;
+          const read = () => { const buf = new Uint8Array(rw * rh * 4); gl.readPixels(x0, y0, rw, rh, gl.RGBA, gl.UNSIGNED_BYTE, buf); return buf; };
+          // (A) parça tek başına: gövdenin kamera önündeki bütün pikselleri.
+          for (const [o] of saved) { const mine = partOf.get(o) === k; o.visible = mine; if (mine) o.material = white; }
+          renderer.render(scene, t.view);
+          const A = read();
+          // (B) bütün sahne: öbür her şey siyah (parça, kablo, direk, fiş, köprü, tel).
+          for (const [o, , v] of saved) { const mine = partOf.get(o) === k; o.visible = v; o.material = mine ? white : black; }
+          renderer.render(scene, t.view);
+          const B = read();
+          let vis = 0;
+          let seen = 0;
+          for (let i = 0; i < rw * rh; i++) {
+            if (A[4 * i] < 128) continue;
+            vis++;
+            if (B[4 * i] >= 128) seen++;
+          }
+          // (C) pay %5'i geçtiyse: örten kim? Öbür parçalar kendi renginde, kablolar (direk, fiş, köprü, tel) mavi.
+          const by = {};
+          if (vis && 1 - seen / vis > 0.05) {
+            const mats = placed.map((_, j) => { const m = new Basic({ toneMapped: false }); m.color.setRGB(0, (8 * (j + 1)) / 255, 0); return m; });
+            const blue = new Basic({ toneMapped: false }); blue.color.setRGB(0, 0, 1);
+            const inCables = new Set(); t.cables.traverse((o) => inCables.add(o));
+            for (const [o] of saved) { const j = partOf.get(o); o.material = j === k ? white : j !== undefined ? mats[j] : inCables.has(o) ? blue : black; }
+            renderer.render(scene, t.view);
+            const C = read();
+            for (let i = 0; i < rw * rh; i++) {
+              if (A[4 * i] < 128 || C[4 * i] >= 128) continue;
+              const j = Math.round(C[4 * i + 1] / 8) - 1;
+              const name = C[4 * i + 2] > 128 ? 'kablo' : placed[j] ? (placed[j].part.label ?? placed[j].part.id) : 'öbür';
+              by[name] = (by[name] ?? 0) + 1;
+            }
+            for (const m of [...mats, blue]) m.dispose();
+          }
+          rows.push({ id: p.part.label ?? p.part.id, type: p.part.type, vis, share: vis ? 1 - seen / vis : 0, by });
+        });
       } finally {
         for (const [o, m, v] of saved) { o.material = m; o.visible = v; }
         for (const o of hide) o.visible = true;
@@ -6609,50 +6667,39 @@ try {
         renderer.outputColorSpace = prev.cs;
         renderer.localClippingEnabled = prev.clip;
         renderer.setClearColor(prev.cc, prev.ca);
-        for (const m of [...partMats, black, yellow]) m.dispose();
+        white.dispose();
+        black.dispose();
         t.dirty = true;
       }
-      const vis = placed.map(() => 0);
-      const cov = placed.map(() => 0);
-      for (let i = 0; i < w * h; i++) {
-        if (Math.abs(A[4 * i + 1] - 100) > 2 || Math.abs(A[4 * i + 2] - 250) > 2) continue;
-        const k = Math.round(A[4 * i] / 8) - 1;
-        if (k < 0 || k >= placed.length || Math.abs(A[4 * i] - 8 * (k + 1)) > 2) continue;
-        vis[k]++;
-        if (B[4 * i] > 128 && B[4 * i + 1] > 128 && B[4 * i + 2] < 128) cov[k]++;
-      }
-      const instruments = ['dcsupply', 'funcgen', 'oscilloscope', 'voltmeter', 'ammeter', 'multimeter'];
-      return {
-        parts: placed.map((p, k) => ({ id: p.part.label ?? p.part.id, instrument: instruments.includes(p.part.type), vis: vis[k], share: vis[k] ? cov[k] / vis[k] : 0 })),
-        clips: t.clipReport().clips,
-        occluders: occluders.size,
-      };
+      return { parts: rows };
     };
-    const ids = ['diyot-dc', 'transformator', 'jfet-karakteristik', 'fet-yukseltec-kuplajli', 'bjt-yukseltec-kuplajli', 'fet-yukseltec'];
+    const ids = ['diyot-dc', 'bjt-yukseltec-kuplajli', 'mosfet-yukseltec', 'yarim-dalga', 'dc-motor', 'hoparlor', 'transformator', 'jfet-karakteristik', 'fet-yukseltec-kuplajli'];
     for (const [view, w, h] of [['masaüstü', 1440, 900], ['iPhone 13 dikey', 390, 844], ['iPhone 13 yatay', 844, 390]]) {
       const mobile = view !== 'masaüstü';
       const ctx = await browser.newContext({
         viewport: { width: w, height: h }, locale: 'tr-TR',
         ...(mobile ? { deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' } : {}),
       });
-      await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
+      await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
       const page = await ctx.newPage();
       page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
       const rows = [];
+      let measured = 0;
       for (const id of ids) {
         await page.goto('about:blank');
         await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
         await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
         await page.waitForTimeout(1000);
-        const r = await page.evaluate(clipCover).catch((e) => ({ error: String(e) }));
-        const circuit = (r.parts ?? []).filter((p) => !p.instrument && p.vis >= 40);
-        const worst = circuit.reduce((a, p) => (p.share > (a?.share ?? -1) ? p : a), null);
-        const meters = (r.parts ?? []).filter((p) => p.instrument && p.vis >= 40).reduce((a, p) => (p.share > (a?.share ?? -1) ? p : a), null);
-        rows.push({ id, ok: !r.error && r.occluders > 0 && circuit.length > 0 && circuit.every((p) => p.share <= 0.2) && r.clips.every((c) => c.jawMm >= 8 && c.deg <= 25.01), worst, meters, r });
+        const r = await page.evaluate(partCover).catch((e) => ({ error: String(e) }));
+        const parts = (r.parts ?? []).filter((p) => p.vis >= 40);
+        measured += parts.length;
+        const worst = parts.reduce((a, p) => (p.share > (a?.share ?? -1) ? p : a), null);
+        // Hoparlör örneğinde tahtada parça yok (hoparlör tahtanın yanında): ölçülecek şey olmaması hata değil.
+        rows.push({ id, ok: !r.error && (r.parts ?? []).every((p) => p.vis >= 40) && parts.every((p) => p.share <= 0.1), worst, error: r.error });
       }
-      check(`3B kıskaçlar parçaları örtmüyor (${view}): 1N4001 DC ve en çok cihaz kablolu beş örnekte hiçbir devre parçasının gövdesinin %20'sinden fazlası kıskaç, kablo, kısa tel ya da köprüyle örtülmüyor; ağız ≥ 8 mm, eğim ≤ 25°`,
-        rows.every((x) => x.ok),
-        rows.map((x) => `${x.id} ${x.r.error ?? `${x.worst?.id ?? '—'} %${Math.round((x.worst?.share ?? 0) * 100)}${x.meters ? ` (alet ${x.meters.id} %${Math.round(x.meters.share * 100)})` : ''}`}`).join(' · '));
+      check(`3B tahta parçaları örtülmüyor (${view}): dokuz örnekte hiçbir tahta parçasının gövdesinin %10'undan fazlası başka bir parça, kablo, direk ya da tel tarafından örtülmüyor`,
+        rows.every((x) => x.ok) && measured >= 25,
+        rows.map((x) => `${x.id} ${x.error ?? (x.worst ? `${x.worst.id} %${(x.worst.share * 100).toFixed(1)}${x.worst.by && Object.keys(x.worst.by).length ? ` (${Object.keys(x.worst.by).join(', ')})` : ''}` : '—')}`).join(' · ') + ` · ${measured} parça`);
       await ctx.close();
     }
   }
@@ -6753,54 +6800,51 @@ try {
       fit ? `tahta x ${Math.round(fit.x0)}–${Math.round(fit.x1)} / ${fit.w}, y ${Math.round(fit.y0)}–${Math.round(fit.y1)} · sayfanın üstü ${Math.round(fit.sheetTop)}` : 'tahta yok');
     await page.context().close();
   }
-  // --- 3B modeller (3b-modeller): gerçek kılıf ve gerçek ölçü (1 birim = 2,54 mm); telefonda kare hızı -----------------
-  // BC107 metal TO-18 (siyah TO-92 değil), IRF510 TO-220, buzzer Ø 12 × 9,5 mm, röle 29 × 13 × 25,5 mm, motor Ø 26 ×
-  // 44,7 mm, hoparlör Ø 50,5 mm (kulaklarla 68), 9 V'luk pil blok (48,5 × 26,5 × 17,5 mm), 5 V'luk pil üç AA'lık
-  // yatak. Ölçüler sahnedeki kutulardan (mm). Telefonda (iPhone 13) 3B her karede yeniden çizilirken en az 30 kare/s.
+  // --- 3B modeller ("3B: okunurluk önce"): doğru kılıf, sade ve küçük gövde; telefonda kare hızı -------------------
+  // Kılıf biçimleri 3b-modeller'deki gibi (BC107 metal TO-18, IRF510 TO-220, BF245A D kesitli TO-92), ama gerçek
+  // ölçüye büyütme geri alındı. Ayak izi kuralı: tahtadaki her parçanın gövdesi kartın en çok 4 delik aralığı (10,2
+  // mm) üstünde, kondansatör en çok 6 (15,3 mm). Tahta dışı parçalar (pil, motor, hoparlör, lamba, röle, trafo)
+  // tahtanın solunda ya da sağında (önünde değil), en büyük boyutu yarım boy tahtanın genişliğinin dörtte biri (8
+  // delik = 20,3 mm). Telefonda (iPhone 13) 3B her karede yeniden çizilirken en az 30 kare/s.
+  // Değişti (2026-11-12): eskiden bu bölüm modellerin gerçek ölçüsünü (buzzer Ø 12 mm, röle 29 mm, motor 44,7 mm,
+  // hoparlör 68 mm, pil 48,5 mm…) denetliyordu; "gerçekçilik değil okunurluk" kararıyla ölçek kuralı değişti.
   {
-    const sizes = async (page, id, label) => {
+    const layout = async (page, id) => {
       await page.goto('about:blank');
       await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
       await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(700);
-      return page.evaluate((label) => {
-        const t = window.__tezgah;
-        const placed = t ? [...t.parts.values()].find((p) => p.part.label === label) : null;
-        if (!placed) return null;
-        const mmOf = (b) => [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z].map((v) => Math.round(v * 25.4) / 10);
-        return { box: mmOf(placed.box), body: mmOf(placed.body), info: t.info };
-      }, label);
+      return page.evaluate(() => window.__tezgah?.layoutReport() ?? []);
     };
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
     await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
-    const near = (v, target, tol = 0.3) => Math.abs(v - target) <= tol;
-    const flat = (m) => (m ? [m.body[0], m.body[2]].sort((a, b) => a - b) : [0, 0]);
-    const bc = await sizes(page, 'bjt-yukseltec-kuplajli', 'Q1');
-    check('3B model: BC107 metal TO-18 kılıfta: gövde (flanş ve sekmeyle) ≈ 5,4–6,4 mm çapında, 5,0 mm yüksek (TO-92 3,7 × 4,8 mm olurdu)',
-      bc !== null && near(bc.body[1], 5.0) && flat(bc)[0] >= 5.3 && flat(bc)[1] <= 6.5, JSON.stringify(bc?.body));
-    const irf = await sizes(page, 'mosfet-yukseltec', 'M1');
-    const irfFlat = irf ? [irf.box[0], irf.box[2]].sort((a, b) => a - b) : [0, 0];
-    check('3B model: IRF510 TO-220 kılıfta: 10 mm geniş, 4,5 mm kalın, bacaklardan tırnağın tepesine ≥ 20 mm',
-      irf !== null && near(irfFlat[1], 10.0) && near(irfFlat[0], 4.5) && irf.box[1] >= 20, JSON.stringify(irf?.box));
-    const jf = await sizes(page, 'fet-yukseltec', 'J1');
-    check('3B model: BF245A TO-92 kılıfta: Ø 4,8 × 4,8 mm, düz yüzden sırta 3,7 mm',
-      jf !== null && near(flat(jf)[0], 3.7) && near(flat(jf)[1], 4.8) && near(jf.body[1], 4.8), JSON.stringify(jf?.body));
-    const bz = await sizes(page, 'buzzer-sicaklik', 'BZ1');
-    check('3B model: buzzer gerçek ölçüsünde (Ø 12 × 9,5 mm)', bz !== null && near(bz.body[0], 12) && near(bz.body[2], 12) && near(bz.body[1], 9.5), JSON.stringify(bz?.body));
-    const k1 = await sizes(page, 'role', 'K1');
-    check('3B model: röle (G2R-1) 29 × 13 × 25,5 mm: kartıyla en az 25,5 mm yüksek, en az 29 mm uzun', k1 !== null && k1.box[1] >= 25.5 && k1.box[1] <= 27 && k1.box[0] >= 29, JSON.stringify(k1?.box));
-    const m1 = await sizes(page, 'dc-motor', 'M1');
-    check('3B model: motor (A-max 26) Ø 26 × 44,7 mm: 26 mm geniş, mil ve pervaneyle ≥ 44,7 mm uzun', m1 !== null && near(m1.box[2], 26, 0.5) && m1.box[0] >= 44.7 && m1.box[0] <= 62, JSON.stringify(m1?.box));
-    const hp = await sizes(page, 'hoparlor', 'HP1');
-    check('3B model: hoparlör (FRS 5) kulaklarla 68 mm, sepet Ø 50,5 mm, derinlik ≈ 31,5 mm', hp !== null && near(hp.box[0], 68, 0.5) && near(hp.box[2], 50.5, 1.5) && near(hp.box[1], 31.5, 1.2), JSON.stringify(hp?.box));
-    const b9 = await sizes(page, '555-ses', 'B1');
-    check('3B model: 9 V’luk pil blok pil (6LR61: 48,5 × 26,5 × 17,5 mm; kablolarıyla daha uzun)', b9 !== null && near(b9.box[2], 26.5) && near(b9.box[1], 17.5, 0.5) && b9.box[0] >= 48.5 && b9.box[0] <= 62, JSON.stringify(b9?.box));
-    const b5 = await sizes(page, 'led-on-direnc', 'B1');
-    check('3B model: 5 V’luk pil üç AA’lık yatak (yatak 58 mm; üç hücre 3 × 15,5 mm + kenarlar)', b5 !== null && b5.box[0] >= 58 && b5.box[0] <= 68 && near(b5.box[2], 49.5, 1) && near(b5.box[1], 15.9, 1), JSON.stringify(b5?.box));
+    const ids = ['bjt-yukseltec-kuplajli', 'mosfet-yukseltec', 'fet-yukseltec', 'buzzer-sicaklik', 'yarim-dalga', 'role', 'role-transistor', 'dc-motor', 'hoparlor', '555-ses', 'led-on-direnc', 'transformator', 'lamba-ani-akim'];
+    const reports = {};
+    for (const id of ids) reports[id] = await layout(page, id);
+    const find = (id, label) => reports[id].find((p) => p.label === label);
+    const q1 = find('bjt-yukseltec-kuplajli', 'Q1');
+    const m1 = find('mosfet-yukseltec', 'M1');
+    const j1 = find('fet-yukseltec', 'J1');
+    check('3B model: kılıflar doğru: BC107 metal TO-18 (kapak, flanş, sekme), IRF510 TO-220 (gövde + tırnak), BF245A D kesitli TO-92',
+      !!q1 && q1.names.includes('to18-kapak') && q1.names.includes('to18-flans') && q1.names.includes('to18-sekme') && !q1.names.includes('to92') &&
+        !!m1 && m1.names.includes('to220-govde') && m1.names.includes('to220-tirnak') && !!j1 && j1.names.includes('to92'),
+      `Q1 ${q1?.names.filter((n) => n.startsWith('to')).join(',')} · M1 ${m1?.names.filter((n) => n.startsWith('to')).join(',')} · J1 ${j1?.names.filter((n) => n.startsWith('to')).join(',')}`);
+    const board = ids.flatMap((id) => reports[id].filter((p) => p.where === 'board').map((p) => ({ id, ...p })));
+    const tall = board.filter((p) => p.height > (p.type === 'capacitor' ? 15.3 : 10.2));
+    const highest = board.slice().sort((a, b) => b.height - a.height)[0];
+    check('3B ayak izi: tahtadaki her parçanın gövdesi kartın en çok 4 delik aralığı (10,2 mm) üstünde, kondansatör en çok 6 (15,3 mm); buzzer, kollu anahtar, TO-220 ve LED dahil',
+      board.length >= 30 && tall.length === 0 && board.some((p) => p.type === 'buzzer') && board.some((p) => p.type === 'switch') && board.some((p) => p.type === 'nmos'),
+      `${board.length} parça · en yüksek ${highest?.id} ${highest?.label} ${highest?.height} mm${tall.length ? ' · aşan: ' + tall.map((p) => `${p.id} ${p.label} ${p.height} mm`).join(', ') : ''}`);
+    const side = ids.flatMap((id) => reports[id].filter((p) => p.where !== 'board' && p.where !== 'instrument').map((p) => ({ id, ...p })));
+    const wrong = side.filter((p) => (p.where !== 'left' && p.where !== 'right') || p.max > 20.4);
+    const types = new Set(side.map((p) => p.type));
+    check('3B tahta dışı parçalar (pil, motor, hoparlör, lamba, röle, trafo): tahtanın solunda ya da sağında (önünde ya da arkasında değil); en büyük boyut ≤ tahta genişliğinin dörtte biri (20,3 mm)',
+      wrong.length === 0 && ['battery', 'motor', 'speaker', 'lamp', 'relay', 'transformer'].every((t) => types.has(t)),
+      side.map((p) => `${p.label} ${p.where === 'left' ? 'sol' : p.where === 'right' ? 'sağ' : p.where} ${p.max} mm`).join(' · ') + (wrong.length ? ' · YANLIŞ: ' + wrong.map((p) => `${p.id} ${p.label}`).join(', ') : ''));
     await ctx.close();
-    // Telefon: 3B her karede yeniden çizilirken kare hızı (yeni modellerin en çok olduğu örnekler).
+    // Telefon: 3B her karede yeniden çizilirken kare hızı (tahta dışı parçaların ve direklerin en çok olduğu örnekler).
     const phoneCtx = await browser.newContext({
       viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR',
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
@@ -6809,7 +6853,7 @@ try {
     const phonePage = await phoneCtx.newPage();
     phonePage.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     const rows = [];
-    for (const id of ['role-transistor', 'buzzer-sicaklik', 'hoparlor', 'dc-motor', 'mosfet-yukseltec']) {
+    for (const id of ['role-transistor', 'buzzer-sicaklik', 'hoparlor', 'dc-motor', 'mosfet-yukseltec', 'transformator']) {
       await phonePage.goto('about:blank');
       await phonePage.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
       await phonePage.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
@@ -6831,7 +6875,7 @@ try {
     }
     const slowest = rows.slice().sort((a, b) => (a.fps ?? 0) - (b.fps ?? 0))[0];
     check('3B modeller (telefon, iPhone 13): 3B her karede yeniden çizilirken en az 30 kare/s; sahne en çok 40 000 üçgen',
-      rows.length === 5 && rows.every((r) => (r.fps ?? 0) >= 30 && (r.triangles ?? 1e9) <= 40000),
+      rows.length === 6 && rows.every((r) => (r.fps ?? 0) >= 30 && (r.triangles ?? 1e9) <= 40000),
       rows.map((r) => `${r.id} ${Math.round(r.fps ?? 0)} kare/s · ${r.triangles} üçgen · ${r.calls} çizim`).join('; ') + ` · en yavaş ${slowest?.id}`);
     await phoneCtx.close();
   }

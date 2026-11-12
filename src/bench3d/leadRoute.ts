@@ -47,16 +47,17 @@ export function collisions(curve: Curve<Vector3>, obstacles: readonly Obstacle[]
  * Ön paneldeki soketten çıkan kablo: soketten `dir` yönünde düz çıkar, öne doğru yatay teğetle masaya
  * sarkar, masada tahtaya doğru ilerler ve deliğin üstüne (`b`) yukarıdan iner. Parçalı (doğru + kübik
  * Bézier'ler): masadaki kısım masanın altına salınmaz. `board`: breadboard'ların kutusu. `end` verilirse
- * kablo `b`'ye o yönden girer (timsah kıskacının kuyruğu: kıskacın ekseni boyunca).
+ * kablo `b`'ye o yönden girer (bağlantı direğindeki muz fişin arkası). `maxReach`: soketin önünde masaya inişin
+ * en çok uzaklığı (direkler cihazlara tahtadan yakın).
  */
-export function socketCurve(from: Vector3, dir: Vector3, b: Vector3, board: Box3, end?: Vector3): CurvePath<Vector3> {
+export function socketCurve(from: Vector3, dir: Vector3, b: Vector3, board: Box3, end?: Vector3, maxReach = 9): CurvePath<Vector3> {
   const flat = new Vector3(dir.x, 0, dir.z);
   if (flat.lengthSq() < 1e-6) flat.set(0, 0, 1);
   flat.normalize();
   const table = 0.42;
   const out = from.clone().addScaledVector(dir, 1.2);
   // Soketin önünde masaya iniş: yüksek soketten çıkan kablo daha uzağa sarkar.
-  const reach = Math.min(9, 3 + 0.4 * Math.max(0, from.y - table));
+  const reach = Math.min(maxReach, 3 + 0.4 * Math.max(0, from.y - table));
   const down = out.clone().addScaledVector(flat, reach).setY(table);
   const path = new CurvePath<Vector3>();
   path.add(new LineCurve3(from.clone(), out));

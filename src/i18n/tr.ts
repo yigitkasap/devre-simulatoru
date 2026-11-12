@@ -2622,10 +2622,31 @@ export const tr = {
     miniLabel: 'Küçük şema: aynı devre, seçili parça vurgulu',
     hintPhone: 'Bir parmak: döndür · iki parmak: yakınlaştır ve kaydır',
     focus: '3B’de yaklaş',
-    /** Cihaz kablolarının birleşme noktası: ağın adı ve kablo sayısı ("GND · 3 kablo"). */
-    junction: (name: string, count: number) => `${name} · ${count} kablo`,
-    /** Toprak ağının birleşme etiketindeki adı. */
+    /** Toprak ağının bağlantı direğindeki adı. */
     groundNet: 'GND',
+    /** Bağlantı direklerinin kısa adları (taban plakasının arka kenarı; cihaz kabloları buraya takılır). */
+    posts: {
+      plus: (volts: string) => `+${volts} V`,
+      minus: (label: string) => `${label} −`,
+      input: 'GİRİŞ',
+      ttl: 'TTL',
+      com: 'COM',
+      channel: (n: number) => `CH${n}`,
+      meterPlus: (label: string) => `${label} +`,
+      meterMinus: (label: string) => `${label} −`,
+      /** Tahta dışı parçanın ucu: etiket + ucun kısa adı ("M1 +", "K1 NA", "T1 S1"). */
+      pin: (label: string, short: string) => `${label} ${short}`,
+      sideShort: {
+        acsource: ['~', '0'],
+        currentsource: ['1', '2'],
+        motor: ['+', '−'],
+        lamp: ['1', '2'],
+        speaker: ['1', '2'],
+        relay: ['S1', 'S2', 'C', 'NA', 'NK'],
+        transformer: ['P1', 'P2', 'S1', 'S2'],
+        tank: ['O', '1', '2', '3'],
+      } as Partial<Record<string, readonly string[]>>,
+    },
   },
   /** Tahtada kur (T1–T6): şemadaki devre tepeden görünen breadboard'a kurulur. */
   tahta: {

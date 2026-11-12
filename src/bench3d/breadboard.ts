@@ -211,8 +211,11 @@ export function dipPins(type: DeviceType): readonly number[] {
   return DIP_PINS[type] ?? Array.from({ length: CATALOG[type].pins.length }, (_, i) => i + 1);
 }
 
-/** Masadaki parçaların yeri: sol sütun, arka sıra (cihazlar), ön sıra. */
-type Side = 'left' | 'back' | 'front';
+/**
+ * Masadaki parçaların yeri: sol sütun (kaynaklar), arka sıra (cihazlar), sağ sütun (yükler). Tahtanın önüne parça
+ * konmaz ("3B: okunurluk önce": önündeki parça ve kabloları tahtayı örter).
+ */
+type Side = 'left' | 'back' | 'right';
 /**
  * Arkadaki cihazların en öndeki düğmesiyle tahtanın arka kenarı arası (birim, ≈ 2,5 mm): kabloların ön
  * soketten çıkıp masaya sarkacağı kadar yer (leadRoute.socketCurve en çok 9 birim öne çıkar); daha uzağı
@@ -226,10 +229,12 @@ const BACK_GAP = 14;
  * kabloları rayların uç deliklerine iterdi, rayları birleştiren köprüler kayardı (Tahtada kur değişirdi).
  */
 const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rotation: number; slot?: number }>> = {
+  // Tahta dışı parçalar sade ve küçük: en büyük boyutları yarım boy tahtanın genişliğinin dörtte birini (SIDE_MAX)
+  // geçmez (registry.ts → fitSide). Arduino kendi kartı: gerçek ölçüsünde kalır (uçları 2,54 mm aralıklı).
   arduino: { side: 'left', w: 21, d: 27, rotation: 0 },
-  battery: { side: 'left', w: 12, d: 5.4, rotation: 0 },
-  acsource: { side: 'left', w: 10, d: 5, rotation: 0 },
-  currentsource: { side: 'left', w: 10, d: 5, rotation: 0 },
+  battery: { side: 'left', w: 8, d: 5, rotation: 0 },
+  acsource: { side: 'left', w: 8, d: 4.2, rotation: 0 },
+  currentsource: { side: 'left', w: 8, d: 4.2, rotation: 0 },
   // Laboratuvar cihazları (instruments.ts; üreteç ve osiloskop gerçeğin %60'ı, güç kaynağı %50'si, el multimetresi
   // kılıflı 75 × 150 mm'nin %60'ı): dik, ön paneli öne bakar. d/2 gövdenin ortasından en öndeki düğmeye ya da kola
   // kadar (arkası tahtadan uzakta kalır). `slot` değişmedi: kabloların delikleri aynı.
@@ -239,20 +244,27 @@ const TABLE: Partial<Record<DeviceType, { side: Side; w: number; d: number; rota
   voltmeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 11 },
   ammeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 11 },
   multimeter: { side: 'back', w: 19, d: 28, rotation: 0, slot: 12.5 },
-  // Öndeki parçalar gerçek ölçüsünde (dimensions.ts: motor Ø 26 × 44,7 mm, hoparlör Ø 50,5 mm, röle 29 mm); `slot`
-  // eski genişlik: kabloların delikleri değişmez.
-  lamp: { side: 'front', w: 9, d: 7, rotation: 0 },
-  motor: { side: 'front', w: 28, d: 11, rotation: 0, slot: 12 },
-  speaker: { side: 'front', w: 27.5, d: 21, rotation: 0, slot: 9 },
-  relay: { side: 'front', w: 16.2, d: 10.2, rotation: 0, slot: 13 },
-  transformer: { side: 'front', w: 13.6, d: 10.8, rotation: 0 },
-  tank: { side: 'front', w: 11.5, d: 11, rotation: 0 },
+  lamp: { side: 'right', w: 8, d: 5, rotation: 0 },
+  motor: { side: 'right', w: 8, d: 5, rotation: 0 },
+  speaker: { side: 'right', w: 8, d: 6.5, rotation: 0 },
+  relay: { side: 'right', w: 8, d: 5.5, rotation: 0 },
+  transformer: { side: 'right', w: 8, d: 6.5, rotation: 0 },
+  tank: { side: 'right', w: 8, d: 8, rotation: 0 },
 };
+
+/** Tahta dışı parçanın (cihazlar ve Arduino dışında) en büyük boyutu (birim): yarım boy tahtanın (33 birim) dörtte biri. */
+export const SIDE_MAX = 8;
 
 /** Masadaki parçanın yeri ve kapladığı alan; pilin alanı gerilimine göre (9 V'luk blok ya da AA pil yatağı). */
 function tableOf(part: Part): NonNullable<(typeof TABLE)[DeviceType]> {
   const t = TABLE[part.type]!;
   return part.type === 'battery' ? { ...t, ...batteryFootprint(numProp(part.props, 'voltage', 9)) } : t;
+}
+
+/** Parça masada mı (tahtanın solunda ya da sağında; cihazlar ve Arduino dışında): modeli SIDE_MAX'e sığdırılır. */
+export function isSidePart(type: DeviceType): boolean {
+  const t = TABLE[type];
+  return t !== undefined && t.side !== 'back' && type !== 'arduino';
 }
 
 /** Kablo ve jumper renkleri (ağ başına): toprak siyah, besleme kırmızı, öbürleri sırayla. */
@@ -291,6 +303,8 @@ const LEG_CAPACITY = 3;
 const ROWS_TOP = [2, 3, 1, 4, 0];
 const ROWS_BOTTOM = [7, 6, 8, 5, 9];
 const GAP = 3;
+/** Sol ve sağ sütunda parçalar arası boşluk (birim). */
+const SIDE_GAP = 1.5;
 
 interface Strip {
   readonly board: number;
@@ -534,7 +548,7 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
 
   // --- Masadaki parçalar ---------------------------------------------------------------------------
   const table = new Map<string, TablePart>();
-  const sides: Record<Side, Part[]> = { left: [], back: [], front: [] };
+  const sides: Record<Side, Part[]> = { left: [], back: [], right: [] };
   for (const part of ordered) {
     const t = TABLE[part.type];
     if (t) sides[t.side].push(part);
@@ -542,27 +556,27 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
   const boardsDepth = boardZ(boards - 1) + BB.depth / 2;
   const top = -BB.depth / 2;
   const leftEdge = -boardWidth(cols) / 2;
-  // Sol sütun: yukarıdan aşağı, breadboard'ların ortasına göre.
-  {
-    const items = sides.left.map((p) => ({ p, t: tableOf(p) }));
-    const total = items.reduce((s, i) => s + i.t.d, 0) + GAP * Math.max(0, items.length - 1);
+  // Sol ve sağ sütun: yukarıdan aşağı, breadboard'ların ortasına göre; taban plakasının dışında.
+  for (const side of ['left', 'right'] as const) {
+    const items = sides[side].map((p) => ({ p, t: tableOf(p) }));
+    const total = items.reduce((s, i) => s + i.t.d, 0) + SIDE_GAP * Math.max(0, items.length - 1);
     let z = (top + boardsDepth) / 2 - total / 2;
     for (const { p, t } of items) {
-      table.set(p.id, { partId: p.id, x: leftEdge - 4 - t.w / 2, z: z + t.d / 2, rotation: t.rotation });
-      z += t.d + GAP;
+      table.set(p.id, { partId: p.id, x: (side === 'left' ? -1 : 1) * (-leftEdge + 4 + t.w / 2), z: z + t.d / 2, rotation: t.rotation });
+      z += t.d + SIDE_GAP;
     }
   }
   /** Kablonun tahtadaki deliği bu x'e göre seçilir (`slot`). */
   const leadX = new Map<string, number>();
-  for (const side of ['back', 'front'] as const) {
-    const items = sides[side].map((p) => ({ p, t: tableOf(p) }));
+  {
+    const items = sides.back.map((p) => ({ p, t: tableOf(p) }));
     const total = items.reduce((s, i) => s + i.t.w, 0) + GAP * Math.max(0, items.length - 1);
     const slots = items.reduce((s, i) => s + (i.t.slot ?? i.t.w), 0) + GAP * Math.max(0, items.length - 1);
     let x = -total / 2;
     let sx = -slots / 2;
     for (const { p, t } of items) {
       // Arkadaki cihazlarla tahta arasında ön panelden çıkan kabloların masaya sarkacağı kadar yer.
-      const z = side === 'back' ? top - BACK_GAP - t.d / 2 : boardsDepth + 5 + t.d / 2;
+      const z = top - BACK_GAP - t.d / 2;
       table.set(p.id, { partId: p.id, x: x + t.w / 2, z, rotation: t.rotation });
       leadX.set(p.id, sx + (t.slot ?? t.w) / 2);
       x += t.w + GAP;
@@ -621,7 +635,7 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
     const place = table.get(part.id);
     if (!place) continue;
     const side = TABLE[part.type]!.side;
-    const aim = side === 'left' ? leftEdge : leadX.get(part.id) ?? place.x;
+    const aim = side === 'left' ? leftEdge : side === 'right' ? -leftEdge : leadX.get(part.id) ?? place.x;
     const pinCount = netlist.elements.find((e) => e.id === part.id)!.pins.length;
     const led = new Set<string>();
     for (let pin = 0; pin < pinCount; pin++) {
@@ -631,8 +645,9 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
       if (part.type === 'arduino' && (pin === 2 || pin === 21) && led.has(n)) continue;
       led.add(n);
       const role = roles.get(n);
-      const topSide = side !== 'front';
-      const board = side === 'front' ? boards - 1 : 0;
+      // Kablolar tahtanın arka yarısına (üst raylar, a–e satırları) gelir: önden bakınca parçaların arkasında kalır.
+      const topSide = true;
+      const board = 0;
       if (role) {
         const rail = railFor(role, topSide);
         useRail(n, board, rail);

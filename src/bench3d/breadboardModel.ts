@@ -88,12 +88,15 @@ export function breadboardMesh(cols: number): Mesh {
   return board;
 }
 
-/** Jumper telinin yarıçapı (yalıtım; 22 AWG, Ø ≈ 1 mm). */
-export const JUMPER_RADIUS = 0.2;
+/** Jumper telinin yarıçapı: ince (görünümde Ø ≈ 0,6 mm), parçaları örtmesin ("3B: okunurluk önce"). */
+export const JUMPER_RADIUS = 0.12;
 
-/** Jumper telinin olağan yüksekliği (kartın üstünden): kısa tel alçakta, uzun tel biraz yukarıda. */
+/**
+ * Jumper telinin başlangıç yüksekliği (kartın üstünden): kısa tel tahtaya yatık, uzun tel biraz yukarıda (aynı
+ * sırada üst üste binen teller birbirinden ayrılır). Parça gövdesine çarpan tel gövdenin altına iner (jumpers.ts).
+ */
 export function jumperLift(a: Vector3, b: Vector3): number {
-  return 0.45 + Math.min(1.6, 0.05 * Math.hypot(b.x - a.x, b.z - a.z));
+  return 0.3 + Math.min(1.6, 0.05 * Math.hypot(b.x - a.x, b.z - a.z));
 }
 
 /** Jumper telinin biçimi: kartın üstünden yüksekliği ve ortasının yana açılması (birim; 0 düz). */
@@ -116,10 +119,14 @@ export function jumperPoints(a: Vector3, b: Vector3, shape: JumperShape = { lift
     const len = Math.hypot(dx, dz) || 1;
     return new Vector3(a.x + dx * t + (-dz / len) * side, top + dy, a.z + dz * t + (dx / len) * side);
   };
-  if (bow === 0) return [at(0, 0.05, 0), at(0, lift, 0), at(0.5, lift + 0.05, 0), at(1, lift, 0), at(1, 0.05, 0)];
+  // Tel uçlarından kısa bir kavisle kalkar, sonra tam `lift` yüksekliğinde düz gider (eğri bu yüksekliği aşmaz:
+  // gövdelerin altından geçen tel gövdeye değmez).
+  const len = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+  const e = Math.min(0.25, 0.35 / len);
+  if (bow === 0) return [at(0, 0.05, 0), at(0, lift * 0.55, 0), at(e, lift, 0), at(0.5, lift, 0), at(1 - e, lift, 0), at(1, lift * 0.55, 0), at(1, 0.05, 0)];
   // Yana açılan tel: dik ucundan hemen sonra (≈ 0,7 birim) yana çıkar, öbür ucuna yakın geri döner.
-  const d = Math.min(0.3, Math.max(0.08, 0.7 / (Math.hypot(b.x - a.x, b.z - a.z) || 1)));
-  return [at(0, 0.05, 0), at(0, lift, 0), at(d, lift + 0.05, bow), at(0.5, lift + 0.05, bow), at(1 - d, lift + 0.05, bow), at(1, lift, 0), at(1, 0.05, 0)];
+  const d = Math.min(0.3, Math.max(0.08, 0.7 / len));
+  return [at(0, 0.05, 0), at(0, lift * 0.55, 0), at(d, lift, bow), at(0.5, lift, bow), at(1 - d, lift, bow), at(1, lift * 0.55, 0), at(1, 0.05, 0)];
 }
 
 /** Breadboard üstünde iki delik arasında yatık jumper teli (uçları soyuk). */
@@ -136,6 +143,6 @@ export function jumperMesh(a: Vector3, b: Vector3, color: string, shape?: Jumper
   const curve = jumperCurve(a, b, shape);
   g.userData.curve = curve;
   g.add(new Mesh(new TubeGeometry(curve, Math.max(12, Math.round(dist * 2)), JUMPER_RADIUS, 8, false), mat(color, 0.5)));
-  for (const p of [a, b]) g.add(rod(new Vector3(p.x, top - HOLE_DEPTH, p.z), new Vector3(p.x, top + 0.1, p.z), 0.1, M.tin(), 6));
+  for (const p of [a, b]) g.add(rod(new Vector3(p.x, top - HOLE_DEPTH, p.z), new Vector3(p.x, top + 0.1, p.z), 0.07, M.tin(), 6));
   return g;
 }

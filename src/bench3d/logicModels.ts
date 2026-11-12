@@ -5,6 +5,7 @@
 import { BoxGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three';
 import { LOGIC_CHIPS, SEG7_PINS, chipPinNames, type LogicChipType } from '../model/logicChips';
 import { M, canvasTexture, labelPlate, mat, mesh, pinAnchors, rod } from './kit';
+import { CLEAR } from './parts';
 import type { PartModel } from './model';
 
 /**
@@ -18,21 +19,24 @@ export function dipChipModel(label: string, anchors: readonly Vector3[], extra: 
   const xs = all.map((a) => a.x);
   const length = Math.max(...xs) - Math.min(...xs) + 0.9;
   const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
-  const body = mesh(new BoxGeometry(length, 1.25, 2.3), mat('#17181b', 0.5), cx, 1.15, 0);
+  const top = CLEAR + 1.2;
+  const body = mesh(new BoxGeometry(length, 1.2, 2.3), mat('#17181b', 0.5), cx, CLEAR + 0.6, 0);
+  // Gövde (bacaklar hariç): köprüler ve direk telleri altından geçebilir (ayak izi kuralı: tezgah-sade testi).
+  body.userData.body = true;
   root.add(body);
   // Çentik ve nokta 1. bacağın ucunda (1. bacak alt sıranın en solunda; döndürülmüşse sağında).
   const left = !pinOne || pinOne.x <= cx;
   const end = cx + (left ? -1 : 1) * (length / 2 - 0.45);
-  root.add(mesh(new CylinderGeometry(0.3, 0.3, 0.05, 14), mat('#2a2c30', 0.6), end, 1.79, 0));
-  root.add(mesh(new CylinderGeometry(0.14, 0.14, 0.05, 12), mat('#c6cad0', 0.5), end + (left ? 0.55 : -0.55), 1.79, Math.sign(pinOne?.z ?? 1) * 0.75));
+  root.add(mesh(new CylinderGeometry(0.3, 0.3, 0.05, 14), mat('#2a2c30', 0.6), end, top + 0.01, 0));
+  root.add(mesh(new CylinderGeometry(0.14, 0.14, 0.05, 12), mat('#c6cad0', 0.5), end + (left ? 0.55 : -0.55), top + 0.01, Math.sign(pinOne?.z ?? 1) * 0.75));
   const plate = labelPlate(label, Math.min(length * 0.7, 6), 0.9, { fg: '#c6cad0' });
-  plate.position.set(cx, 1.78, 0);
+  plate.position.set(cx, top + 0.01, 0);
   if (!left) plate.rotation.z = Math.PI;
   root.add(plate);
   for (const a of all) {
     const side = Math.sign(a.z) || 1;
-    const shoulder = new Vector3(a.x, 0.95, side * 1.15);
-    const knee = new Vector3(a.x, 0.95, a.z);
+    const shoulder = new Vector3(a.x, CLEAR + 0.35, side * 1.15);
+    const knee = new Vector3(a.x, CLEAR + 0.35, a.z);
     root.add(rod(shoulder, knee, 0.09, M.tin(), 6), rod(knee, a, 0.09, M.tin(), 6));
   }
   return { root, anchors };
@@ -123,9 +127,11 @@ export function logicModuleModel(type: LogicChipType, model: string): PartModel 
  */
 function displayBody(): { group: Group; update: (brightness: readonly number[] | undefined, burned: readonly boolean[] | undefined, active: boolean) => void } {
   const group = new Group();
-  const h = 3.15;
-  group.add(mesh(new BoxGeometry(5, h, 7.5), mat('#141414', 0.6), 0, h / 2 + 0.2, 0));
-  group.add(mesh(new BoxGeometry(4.6, 0.04, 7.1), mat('#232323', 0.35), 0, h + 0.22, 0));
+  // Sade: bacak deliklerinin ayak izinde (5 × 7 delik), en çok 4 delik yüksek.
+  group.userData.body = true;
+  const h = 2.6;
+  group.add(mesh(new BoxGeometry(4.9, h, 6.9), mat('#141414', 0.6), 0, h / 2 + 0.2, 0));
+  group.add(mesh(new BoxGeometry(4.5, 0.04, 6.5), mat('#232323', 0.35), 0, h + 0.22, 0));
   const lit = '#ff3b30';
   const mats = SEG7_PINS.slice(0, 8).map(() => new MeshStandardMaterial({ color: '#3b1714', roughness: 0.4, emissive: lit, emissiveIntensity: 0 }));
   const y = h + 0.26;
@@ -173,9 +179,9 @@ export function sevenSegmentBoardModel(anchors: readonly Vector3[], extra: reado
   const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
   const cz = (Math.max(...zs) + Math.min(...zs)) / 2;
   const body = displayBody();
-  body.group.position.set(cx, 0.6, cz);
+  body.group.position.set(cx, CLEAR - 0.2, cz);
   root.add(body.group);
-  for (const p of all) root.add(rod(new Vector3(p.x, 0.9, p.z), p, 0.08, M.tin(), 6));
+  for (const p of all) root.add(rod(new Vector3(p.x, CLEAR + 0.1, p.z), p, 0.08, M.tin(), 6));
   return {
     root,
     anchors,

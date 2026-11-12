@@ -10,8 +10,8 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } 
 import { createPortal } from 'react-dom';
 import type { CameraRequest } from '../bench3d/Bench3D';
 import { planBreadboard, type BreadboardPlan } from '../bench3d/breadboard';
-import { clipJunctions } from '../bench3d/clipPlan';
-import { netIndex, nodeName, type NetIndex } from './analysis/traces';
+import { layoutPosts } from '../bench3d/posts';
+import { netIndex } from './analysis/traces';
 import { wireKey } from '../model/connectivity';
 import type { BenchCallbacks, BenchScene, CameraView, TopInsets } from '../bench3d/scene';
 import { tr } from '../i18n/tr';
@@ -178,12 +178,12 @@ export function BenchView(props: BenchViewProps) {
   const slow = useSlowFrame(props.active ? (props.labelFrame === undefined ? frame : props.labelFrame) : null);
   const single = selection.length === 1 ? selection[0]! : null;
 
-  // Birden çok cihaz kablosunun gittiği ağların etiketi ("GND · 3 kablo"; kıskaçların ortasındakinin üstünde) ve
-  // üstüne gelinen ağ (küçük şemada vurgulanır). Tahtada kur kurulumunun 3B'sinde etiket yok: her kablo öğrencinin
-  // taktığı delikte.
-  const schematicPlan = useMemo(() => (props.plan ? null : planBreadboard(doc)), [doc, props.plan]);
+  // Bağlantı direklerinin adları (taban plakasının arka kenarı; cihaz kabloları buraya takılır: posts.ts) ve üstüne
+  // gelinen ağ (küçük şemada vurgulanır). Direklerin yeri ve adı her zaman şemanın planından (Tahtada kur'da da).
+  const referencePlan = useMemo(() => planBreadboard(doc), [doc]);
+  const schematicPlan = props.plan ? null : referencePlan;
   const index = useMemo(() => netIndex(doc, props.connectivity), [doc, props.connectivity]);
-  const junctions = useMemo(() => (schematicPlan ? clipJunctions(doc, schematicPlan).map((j) => ({ ...j, name: netName(j.net, schematicPlan, index) })) : []), [doc, schematicPlan, index]);
+  const posts = useMemo(() => layoutPosts(doc, referencePlan).posts, [doc, referencePlan]);
   const [hoverNet, setHoverNet] = useState<string | null>(null);
   const highlightWires = useMemo(() => {
     if (!hoverNet || !schematicPlan) return null;
@@ -304,18 +304,17 @@ export function BenchView(props: BenchViewProps) {
         {labelled.map((part) => (
           <BenchLabel key={part.id} part={part} frame={slow && (!props.liveHidden || METERS.has(part.type)) ? slow : null} measured={props.measured} selected={selection.includes(part.id)} />
         ))}
-        {!top &&
-          labels &&
-          junctions.map((j) => (
+        {labels &&
+          posts.map((post) => (
             <span
-              key={`j-${j.net}`}
-              data-anchor="junction"
-              data-net={j.net}
-              data-priority={2}
+              key={`post-${post.net}`}
+              data-anchor="post"
+              data-net={post.net}
+              data-priority={3}
               aria-hidden="true"
-              className="absolute top-0 left-0 rounded-md bg-ink px-2 py-1 text-[12px] leading-tight font-semibold whitespace-nowrap text-on-ink opacity-0 shadow-md"
+              className="absolute top-0 left-0 rounded-md bg-ink px-1.5 py-0.5 text-[11px] leading-tight font-semibold whitespace-nowrap text-on-ink opacity-0 shadow-md"
             >
-              {tr.bench.junction(j.name, j.count)}
+              {post.name}
             </span>
           ))}
         {lettered &&
@@ -426,17 +425,6 @@ export function BenchView(props: BenchViewProps) {
 
     </div>
   );
-}
-
-/** Ölçü aletleri ve osiloskop düğüme ad vermez (ağın adı devrenin parçalarından; toprak "GND"). */
-const NAMELESS: ReadonlySet<DeviceType> = new Set(['voltmeter', 'ammeter', 'multimeter', 'oscilloscope']);
-
-function netName(net: string, plan: BreadboardPlan, index: NetIndex): string {
-  if (plan.roles.get(net) === 'ground') return tr.bench.groundNet;
-  const n = index.netOf(net);
-  if (n !== undefined && n === index.ground) return tr.bench.groundNet;
-  const named: NetIndex = { ...index, pins: (k) => index.pins(k).filter((p) => !NAMELESS.has(p.part.type)) };
-  return nodeName(net, named);
 }
 
 /** Kameraya dönük etiket: ad · değer; çalışırken ölçüm (ölçü aletinde büyük). Seçili parçanınki mavi. */

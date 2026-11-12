@@ -128,7 +128,7 @@ export function withAnchors<T>(anchors: readonly Vector3[] | null, build: () => 
  * Gövdeden çıkan bir bacak: gövdedeki çıkış noktasından yatay ilerler, uca yakın aşağı kıvrılır
  * ve masadaki pine değer.
  */
-export function lead(from: Vector3, anchor: Vector3, r = 0.14, material: Material = M.tin()): Group {
+export function lead(from: Vector3, anchor: Vector3, r = 0.1, material: Material = M.tin()): Group {
   const bend = new Vector3(anchor.x, from.y, anchor.z);
   const pts = [from];
   const toBend = new Vector3().subVectors(bend, from);
@@ -144,7 +144,7 @@ export function lead(from: Vector3, anchor: Vector3, r = 0.14, material: Materia
  * Dikey bacak: gövdenin altından iner, ucun biraz üstünde uca doğru kıvrılır (masada pine, breadboard'da
  * deliğe).
  */
-export function legDown(from: Vector3, anchor: Vector3, r = 0.14, material: Material = M.tin()): Group {
+export function legDown(from: Vector3, anchor: Vector3, r = 0.1, material: Material = M.tin()): Group {
   const offset = Math.hypot(anchor.x - from.x, anchor.z - from.z);
   if (offset <= 0.05) return wirePath([from, anchor], r, material, 6);
   const knee = Math.max(anchor.y + 0.25, Math.min(from.y, anchor.y + 0.6 + 0.3 * offset));
