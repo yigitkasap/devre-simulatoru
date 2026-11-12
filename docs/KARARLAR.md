@@ -2103,6 +2103,77 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
   aralık); takarken büyüteç zaten gösteriyor (T5'in öbür maddeleri geçiyor). ios-kontrol "Tahtada kur (telefon): …
   tahta yüksekliğine sığıyor (≥ 22 px, yatay kayar)" maddesi buna göre değişti.
 
+### 3B modeller: gerçek ölçüler (2026-11-12)
+
+Kural: her model gerçek ölçüsünde, 1 birim = 2,54 mm (breadboard'un delik aralığı). Ölçüler tek yerde:
+`src/bench3d/dimensions.ts` (mm). Modeller bu sayılardan kurulur; `tests/model-olcek.test.ts` hem sayıları veri
+sayfalarındaki aralıklarla hem de kurulan gövdelerin kutularını bu sayılarla karşılaştırır (±0,15 mm). ios-kontrol
+"3B model: …" maddeleri aynı ölçüleri sahnede denetler.
+
+**Denetim.** `src/bench3d`'deki bütün parça ve cihaz modelleri gerçek ürünlerle karşılaştırıldı (kılıf tipi, ölçü,
+renk, bacak aralığı). En gerçekçi olmayan on model, nedenleri ve yapılan:
+
+| # | Model | Önce | Gerçek ürün | Sonra |
+|---|---|---|---|---|
+| 1 | BC107 (npn) | Siyah plastik TO-92 | Metal TO-18 kapak (NXP/Philips BC107, SOT18/13) | TO-18: kapak Ø 4,65, flanş Ø 5,4, yükseklik 5,0 mm, emetörün yanında sekme, üç bacak 2,54 mm'lik dairede, yazı kapağın yanında |
+| 2 | IRF510 (nmos) | Siyah plastik TO-92 | TO-220AB (Vishay IRF510) | TO-220: 10 × 9,2 × 4,5 mm gövde, delikli metal tırnak (toplam 15,4 mm) |
+| 3 | Pil | Ø 9,7 × 24 mm silindir, üstünde "9 V" | 9 V = 6LR61 blok pil (48,5 × 26,5 × 17,5 mm); 1,5 V'luk hücre = AA (Ø 14,5 × 50,5 mm) | 7,5–10,5 V: kopçalı 9 V'luk blok; öbür gerilimler: AA pil yatağı, hücre sayısı gerilim / 1,5 V (en çok 8; 4'ten çoksa iki kat) |
+| 4 | Buzzer | Ø 6,1 × 2,5 mm | Same Sky CMI-1295IC-0585T: Ø 12 × 9,5 mm | Ø 12 × 9,5 mm, karta oturur, üstte ses deliği ve + |
+| 5 | Röle | 18,3 × 13,7 × 11,7 mm | Omron G2R-1: 29 × 13 × 25,5 mm | 29 × 13 × 25,5 mm; vida terminalleri röle aralarına sığsın diye 3,3 mm dışarıda |
+| 6 | Motor | Ø 11,7 × 15 mm | maxon A-max 26 (110937): Ø 26 × 44,7 mm, mil Ø 4 mm | Ø 26 × 44,7 mm; uçlar arka kapaktaki lehim kulaklarında |
+| 7 | Hoparlör | Ø 13 mm halka | Visaton FRS 5: sepet Ø 50,5 mm, kulaklarla 68 mm, derinlik 31,5 mm | Gerçek ölçüde: mıknatıs, sepet, zar, iki kulak; uçlar sepetin arkasındaki lehim kulaklarında |
+| 8 | Lamba | Vida dişi Ø 5,6 mm, balon Ø 8,6 mm | E10 minyatür lamba: diş Ø 10 mm, balon Ø 11 mm, boy ≈ 24 mm | Diş Ø 10, balon Ø 11, boy 24 mm; duy buna göre |
+| 9 | TO-92 gövdesi (BC547B, BF245A, 2N5457, 2N7000, MCR100…) | Yarım silindir: düz yüzden sırta 2,4 mm | D kesit: Ø 4,45–5,2, derinlik 3,18–4,19 mm (onsemi CASE 29) | D kesit: Ø 4,8 × 4,8 mm, derinlik 3,7 mm; bacak Ø 0,46 mm, 1,27 mm aralık; geometri paylaşılır |
+| 10 | Kutupsuz kondansatör | Her değerde Ø 5,6 × 1,1 mm turuncu disk | Değere göre farklı kılıf | ≤ 10 nF seramik disk Ø 5 × 2,5 mm; ≤ 1 µF radyal çok katmanlı seramik 4,2 × 3,8 × 2,5 mm; üstü kutu film 7,2 × 6,5 × 2,5 mm |
+
+**Kaynaklar.**
+
+- TO-18: NXP/Philips BC107/BC108/BC109 veri sayfası, kılıf çizimi SOT18/13 (mm, en çok / en az): A 5,31 / 4,74
+  (yükseklik), a 2,54 (bacak dairesi), b 0,47 / 0,41 (bacak çapı), D 5,45 / 5,30 (flanş), D1 4,70 / 4,55 (kapak),
+  j 1,03 / 0,94 ve k 1,1 / 0,9 (sekme), L 15,0 / 12,7 (bacak boyu), α 45° (sekmenin açısı). Flanşın kalınlığı
+  veri sayfasında yok (0,4 mm alındı). Kollektör kapağa bağlıdır.
+- TO-92: onsemi CASE 29-11 (JEDEC TO-226AA): çap 4,45–5,20, yükseklik 4,32–5,33, derinlik 3,18–4,19, bacak
+  0,407–0,533, aralık 1,27 mm.
+- TO-220AB: Vishay IRF510 veri sayfası: E 10,0–10,51, A 4,25–4,65, D 14,85–15,49, ØP 3,54–3,94, e 2,54 mm.
+- Buzzer: Same Sky (CUI) CMI-1295IC-0585T veri sayfası: Ø 12 × 9,5 mm. Bacak aralığı 6,5 mm alındı
+  (**doğrulanamadı**: veri sayfasının çizimine erişilemedi; tahtada bacaklar 3 delik arayla takılı).
+- Röle: Omron G2R veri sayfası, G2R-1: en çok 29 × 13 × 25,5 mm.
+- Motor: maxon A-max 26 (110937) katalog sayfası: Ø 26 mm, boy 44,7 mm. Mil Ø 4 mm ve mil boyu 12 mm
+  **doğrulanamadı** (katalog çizimine erişilemedi).
+- Hoparlör: Visaton FRS 5 (8 Ω, Art. 2231): Ø 50,5 mm (DigiKey), 68 × 31,5 mm (Bürklin: kulaklarla genişlik ve
+  derinlik). Mıknatıs ≈ Ø 30 × 11 mm **varsayım**.
+- Pil: IEC 60086-2: 6LR61 en çok 48,5 × 26,5 × 17,5 mm, kopça merkezleri 12,7 mm; LR6 (AA) en çok Ø 14,5 × 50,5 mm.
+- Lamba: E10 (IEC 60061; diş Ø 10 mm). Balon Ø 11 mm ve boy 24 mm tipik minyatür lamba ölçüsü (**varsayım**:
+  belirli bir ürün seçilmedi).
+- Kondansatörler: tipik ölçüler (**varsayım**: belirli bir ürün seçilmedi).
+
+**Kararlar.**
+
+- Karar: **pilin görünüşü gerilime göre.** 5 V bir pil gerilimi değil (örneklerde "5 V'luk pil" var): üç AA'lık
+  yatak (4,5 V) çizilir, etiketi devredeki değeri gösterir. 12 V ve üstü sekiz AA'lık iki katlı yatak. Etiket
+  her zaman devredeki gerilim.
+- Karar: **masadaki yer.** Pilin kapladığı alan gerilimine göre (`batteryFootprint`). Öndeki parçaların (motor,
+  hoparlör, röle) alanı büyüdü; kabloların tahtadaki delikleri değişmesin diye eski genişlik `slot` olarak kaldı
+  (cihazlardaki gibi): plan ve Tahtada kur aynı.
+- Karar: **laboratuvar cihazları bu turun dışında.** Fonksiyon üreteci ve osiloskop gerçeğin %60'ı, güç kaynağı
+  %50'si, multimetre %60'ı (önceki kararlar: kadrajda tahta en az %70). Gerçek ölçüye alınırlarsa tahta kadrajın
+  küçük bir parçası olur; kullanıcıya soruldu.
+- Karar: **bacak sırası değişmedi.** Transistörlerin tahtadaki bacak sırası uç sırası (BJT'de C-B-E, FET'te D-G-S).
+  BC107 (E-B-C üçgeni) ve BC547/2N7000 buna uyar; IRF510'un gerçek sırası G-D-S, BF245A ve 2N5457'ninki D-S-G.
+  Düzeltmek planın deliklerini ve KiCad izini değiştirir; kullanıcıya soruldu.
+- KiCad dışa aktarmada BC107 ve IRF510'un izi hâlâ düz sıralı TO-92 izi (delikler aynı); 3B model değişti.
+- Lehim rehberi kılıfı modele göre söyler ("TO-18 (metal kılıf; sekme emetörün yanında)", "TO-220").
+
+**Sıradaki adaylar** (bu turda dokunulmadı): PC817 krem rengi (gerçeği siyah), KBP307'nin bacak aralığı (2,84 mm;
+gerçeği 3,81 mm), kollu anahtarın gövdesi (4 mm yüksek; gerçek mini anahtar ≈ 9,5 mm), DIP gövde genişliği (5,84 mm;
+gerçeği 6,35 mm), transformatör (belirli bir ürün yok; ≈ 2/3 ölçek), direnç ve LED bacak çapı (0,71 mm; gerçeği
+0,5–0,6 mm), potansiyometrenin gövdesi (mavi kutu; PTV09A metal çerçeveli).
+
+**Performans.** Geometri paylaşılır (TO-92 gövdesi tek geometri), silindirler 20–28 kenarlı. Telefon öykünmesinde
+(iPhone 13, işlemci 4 kat yavaş, 3B her karede yeniden çizilirken) on örnekte önce / sonra kare hızı ölçüm
+gürültüsünün içinde; sahnenin üçgen sayısı ±%9 (ör. röle + BC107: 27 618 → 28 800; BC107 yükselteç: 25 524 →
+25 122). Birim testinde model başına üçgen sınırı var.
+
 ### Performans ve hata taraması (2026-10-27)
 
 - `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,

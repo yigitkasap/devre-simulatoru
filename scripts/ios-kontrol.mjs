@@ -6753,6 +6753,88 @@ try {
       fit ? `tahta x ${Math.round(fit.x0)}–${Math.round(fit.x1)} / ${fit.w}, y ${Math.round(fit.y0)}–${Math.round(fit.y1)} · sayfanın üstü ${Math.round(fit.sheetTop)}` : 'tahta yok');
     await page.context().close();
   }
+  // --- 3B modeller (3b-modeller): gerçek kılıf ve gerçek ölçü (1 birim = 2,54 mm); telefonda kare hızı -----------------
+  // BC107 metal TO-18 (siyah TO-92 değil), IRF510 TO-220, buzzer Ø 12 × 9,5 mm, röle 29 × 13 × 25,5 mm, motor Ø 26 ×
+  // 44,7 mm, hoparlör Ø 50,5 mm (kulaklarla 68), 9 V'luk pil blok (48,5 × 26,5 × 17,5 mm), 5 V'luk pil üç AA'lık
+  // yatak. Ölçüler sahnedeki kutulardan (mm). Telefonda (iPhone 13) 3B her karede yeniden çizilirken en az 30 kare/s.
+  {
+    const sizes = async (page, id, label) => {
+      await page.goto('about:blank');
+      await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+      await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(700);
+      return page.evaluate((label) => {
+        const t = window.__tezgah;
+        const placed = t ? [...t.parts.values()].find((p) => p.part.label === label) : null;
+        if (!placed) return null;
+        const mmOf = (b) => [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z].map((v) => Math.round(v * 25.4) / 10);
+        return { box: mmOf(placed.box), body: mmOf(placed.body), info: t.info };
+      }, label);
+    };
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const near = (v, target, tol = 0.3) => Math.abs(v - target) <= tol;
+    const flat = (m) => (m ? [m.body[0], m.body[2]].sort((a, b) => a - b) : [0, 0]);
+    const bc = await sizes(page, 'bjt-yukseltec-kuplajli', 'Q1');
+    check('3B model: BC107 metal TO-18 kılıfta: gövde (flanş ve sekmeyle) ≈ 5,4–6,4 mm çapında, 5,0 mm yüksek (TO-92 3,7 × 4,8 mm olurdu)',
+      bc !== null && near(bc.body[1], 5.0) && flat(bc)[0] >= 5.3 && flat(bc)[1] <= 6.5, JSON.stringify(bc?.body));
+    const irf = await sizes(page, 'mosfet-yukseltec', 'M1');
+    const irfFlat = irf ? [irf.box[0], irf.box[2]].sort((a, b) => a - b) : [0, 0];
+    check('3B model: IRF510 TO-220 kılıfta: 10 mm geniş, 4,5 mm kalın, bacaklardan tırnağın tepesine ≥ 20 mm',
+      irf !== null && near(irfFlat[1], 10.0) && near(irfFlat[0], 4.5) && irf.box[1] >= 20, JSON.stringify(irf?.box));
+    const jf = await sizes(page, 'fet-yukseltec', 'J1');
+    check('3B model: BF245A TO-92 kılıfta: Ø 4,8 × 4,8 mm, düz yüzden sırta 3,7 mm',
+      jf !== null && near(flat(jf)[0], 3.7) && near(flat(jf)[1], 4.8) && near(jf.body[1], 4.8), JSON.stringify(jf?.body));
+    const bz = await sizes(page, 'buzzer-sicaklik', 'BZ1');
+    check('3B model: buzzer gerçek ölçüsünde (Ø 12 × 9,5 mm)', bz !== null && near(bz.body[0], 12) && near(bz.body[2], 12) && near(bz.body[1], 9.5), JSON.stringify(bz?.body));
+    const k1 = await sizes(page, 'role', 'K1');
+    check('3B model: röle (G2R-1) 29 × 13 × 25,5 mm: kartıyla en az 25,5 mm yüksek, en az 29 mm uzun', k1 !== null && k1.box[1] >= 25.5 && k1.box[1] <= 27 && k1.box[0] >= 29, JSON.stringify(k1?.box));
+    const m1 = await sizes(page, 'dc-motor', 'M1');
+    check('3B model: motor (A-max 26) Ø 26 × 44,7 mm: 26 mm geniş, mil ve pervaneyle ≥ 44,7 mm uzun', m1 !== null && near(m1.box[2], 26, 0.5) && m1.box[0] >= 44.7 && m1.box[0] <= 62, JSON.stringify(m1?.box));
+    const hp = await sizes(page, 'hoparlor', 'HP1');
+    check('3B model: hoparlör (FRS 5) kulaklarla 68 mm, sepet Ø 50,5 mm, derinlik ≈ 31,5 mm', hp !== null && near(hp.box[0], 68, 0.5) && near(hp.box[2], 50.5, 1.5) && near(hp.box[1], 31.5, 1.2), JSON.stringify(hp?.box));
+    const b9 = await sizes(page, '555-ses', 'B1');
+    check('3B model: 9 V’luk pil blok pil (6LR61: 48,5 × 26,5 × 17,5 mm; kablolarıyla daha uzun)', b9 !== null && near(b9.box[2], 26.5) && near(b9.box[1], 17.5, 0.5) && b9.box[0] >= 48.5 && b9.box[0] <= 62, JSON.stringify(b9?.box));
+    const b5 = await sizes(page, 'led-on-direnc', 'B1');
+    check('3B model: 5 V’luk pil üç AA’lık yatak (yatak 58 mm; üç hücre 3 × 15,5 mm + kenarlar)', b5 !== null && b5.box[0] >= 58 && b5.box[0] <= 68 && near(b5.box[2], 49.5, 1) && near(b5.box[1], 15.9, 1), JSON.stringify(b5?.box));
+    await ctx.close();
+    // Telefon: 3B her karede yeniden çizilirken kare hızı (yeni modellerin en çok olduğu örnekler).
+    const phoneCtx = await browser.newContext({
+      viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR',
+      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+    });
+    await phoneCtx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
+    const phonePage = await phoneCtx.newPage();
+    phonePage.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    const rows = [];
+    for (const id of ['role-transistor', 'buzzer-sicaklik', 'hoparlor', 'dc-motor', 'mosfet-yukseltec']) {
+      await phonePage.goto('about:blank');
+      await phonePage.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+      await phonePage.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+      await phonePage.waitForTimeout(900);
+      const r = await phonePage.evaluate(() => new Promise((resolve) => {
+        const t = window.__tezgah;
+        if (!t) return resolve(null);
+        let n = 0;
+        const t0 = performance.now();
+        const tick = (now) => {
+          t.dirty = true;
+          n++;
+          if (now - t0 < 2000) requestAnimationFrame(tick);
+          else resolve({ fps: (n / (now - t0)) * 1000, ...t.info });
+        };
+        requestAnimationFrame(tick);
+      }));
+      rows.push({ id, ...r });
+    }
+    const slowest = rows.slice().sort((a, b) => (a.fps ?? 0) - (b.fps ?? 0))[0];
+    check('3B modeller (telefon, iPhone 13): 3B her karede yeniden çizilirken en az 30 kare/s; sahne en çok 40 000 üçgen',
+      rows.length === 5 && rows.every((r) => (r.fps ?? 0) >= 30 && (r.triangles ?? 1e9) <= 40000),
+      rows.map((r) => `${r.id} ${Math.round(r.fps ?? 0)} kare/s · ${r.triangles} üçgen · ${r.calls} çizim`).join('; ') + ` · en yavaş ${slowest?.id}`);
+    await phoneCtx.close();
+  }
 } finally {
   await browser.close();
 }
