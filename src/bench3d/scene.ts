@@ -637,10 +637,16 @@ export class BenchScene {
     const all = holesUsed(doc, plan, layout);
     const canvas = this.renderer.domElement;
     const back = -BB.depth / 2;
+    const front = boardZ(plan.boards - 1) + BB.depth / 2;
+    const half = boardWidth(plan.cols) / 2 + PLATE.margin;
     const p = new Vector3();
-    // Kablonun bir noktası tahtanın arka kenarının önündeyse (tahtanın üstü ya da önü) sayılır.
+    // Kablonun bir noktası plakanın üstündeyse (arka kenarın önünde, yan kenarların arasında) ya da tahtanın önündeyse
+    // sayılır. Tahta dışı parçanın kablosu plakanın yanından dolanır: sayılmaz.
     const overBoard = this.postCables.filter((curve) => {
-      for (let i = 0; i <= 40; i++) if (curve.getPoint(i / 40, p).z > back + 0.01) return true;
+      for (let i = 0; i <= 80; i++) {
+        curve.getPoint(i / 80, p);
+        if ((p.z > back + 0.01 && Math.abs(p.x) < half) || p.z > front + PLATE.margin) return true;
+      }
       return false;
     }).length;
     return {

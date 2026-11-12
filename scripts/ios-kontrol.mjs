@@ -6504,6 +6504,15 @@ try {
       names(jf) === '+10 V, GND, PS1 −, A1 +, A1 −' && names(yd) === 'GİRİŞ, GND, CH2' && names(bj) === 'GİRİŞ, +12 V, GND, CH1, CH2' &&
         all.every((r) => r.labels.length === r.posts.length && r.labels.every((l) => l.shown && r.posts.some((p) => p.net === l.net && p.name === l.text))),
       all.map((r) => r.labels.map((l) => `${l.text}${l.shown ? '' : ' (gizli)'}`).join(', ')).join(' | '));
+    // Tahta dışı parçalar (pil, röle, motor, hoparlör): kabloları da direklere gider, plakanın yanından dolanır.
+    const ro = await report('role');
+    const mo = await report('dc-motor');
+    const hp = await report('hoparlor');
+    const sideTypes = ['battery', 'relay', 'motor', 'speaker'];
+    const sideCables = (r) => r.cables.filter((c) => sideTypes.includes(c.type)).length;
+    check('3B tahta dışı parçaların kabloları da direklerde (röle, DC motor, hoparlör): pil 2, röle 5, motor 2, hoparlör 2 kablo direğe takılı; tahtanın üstünden ya da önünden kablo geçmiyor; adlar röle örneğinde +12 V, GND, A1 +, A1 −, K1 NK, K1 NA, B2 −, +9 V',
+      [ro, mo, hp].every(tidy) && sideCables(ro) === 9 && sideCables(mo) === 4 && sideCables(hp) === 2 && names(ro) === '+12 V, GND, A1 +, A1 −, K1 NK, K1 NA, B2 −, +9 V',
+      [ro, mo, hp].map((r) => `${r.posts.length} direk · ${r.cables.length} kablo (tahta dışı ${sideCables(r)}) · tahta üstünde ${r.overBoard} · ${names(r)}`).join(' | '));
     // Renkler: toprak direğine giden her kablo siyah; öbürleri cihazın ucuna göre.
     const RED = '#d22f27'; const BLACK = '#1b1c1f'; const YELLOW = '#f2c230'; const BLUE = '#2f6fd6';
     const colorOk = (r) => r.cables.every((c) => {
