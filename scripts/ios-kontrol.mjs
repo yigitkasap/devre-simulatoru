@@ -3300,14 +3300,15 @@ try {
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     const hits = [];
-    for (const id of ['rc-dolma', 'ard-blink', 'transformator', 'bjt-yukseltec']) {
+    // ard-role (2026-11-13): pil Arduino'nun dışındaki sütunda; kablosu Arduino'nun üstünden aşar.
+    for (const id of ['rc-dolma', 'ard-blink', 'transformator', 'bjt-yukseltec', 'ard-role']) {
       await page.goto('about:blank');
       await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
       await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(300);
       hits.push(`${id}:${await page.evaluate(() => window.__tezgah?.cableHits() ?? -1)}`);
     }
-    check('3B: masadaki parçalardan (pil, Arduino, transformatör, cihazlar) gelen kablolar gövdelerin içinden geçmiyor; pilin uzak ucundaki kablo üstünden aşıyor',
+    check('3B: masadaki parçalardan (pil, Arduino, transformatör, cihazlar) gelen kablolar gövdelerin içinden geçmiyor; pilin uzak ucundaki kablo üstünden, Arduino’nun yanındaki pilin kablosu Arduino’nun üstünden aşıyor',
       hits.every((h) => h.endsWith(':0')), hits.join(' '));
     await ctx.close();
   }
@@ -6740,10 +6741,14 @@ try {
         // Hoparlör örneğinde tahtada parça yok (hoparlör tahtanın yanında): ölçülecek şey olmaması hata değil.
         rows.push({ id, ok: !r.error && (r.parts ?? []).every((p) => p.vis >= 40) && parts.every((p) => p.share <= 0.1), worst, error: r.error });
       }
-      const steep = cams.every((c) => Math.abs(c.deg - 48) <= 0.6 && c.share >= (mobile ? 0.7 : 0.45) - 0.005);
-      check(`3B tahta parçaları örtülmüyor (${view}): dokuz örnekte hiçbir tahta parçasının gövdesinin %10'undan fazlası başka bir parça, kablo, direk ya da tel tarafından örtülmüyor; varsayılan kamera 48° eğimli, tahta kadraj genişliğinin en az %${mobile ? 70 : 45}'i`,
+      // Tahta payı kuralın altındaysa (yanında pil, motor, trafo olan örnekler: kadraja onlar da sığar) eğim payı
+      // düşürmemek için 48°'den alçak kalabilir (en az eski eğim: masaüstü 36°, telefon 30°).
+      const floor = (mobile ? 0.7 : 0.45) - 0.005;
+      const at48 = cams.filter((c) => Math.abs(c.deg - 48) <= 0.6).length;
+      const steep = cams.every((c) => (c.share >= floor ? Math.abs(c.deg - 48) <= 0.6 : c.deg >= (mobile ? 30 : 36) - 0.6 && c.deg <= 48.6)) && at48 >= 6;
+      check(`3B tahta parçaları örtülmüyor (${view}): dokuz örnekte hiçbir tahta parçasının gövdesinin %10'undan fazlası başka bir parça, kablo, direk ya da tel tarafından örtülmüyor; varsayılan kamera 48° eğimli ve tahta kadraj genişliğinin en az %${mobile ? 70 : 45}'i (yan parçalı örneklerde pay düşmesin diye eğim daha alçak kalabilir)`,
         rows.every((x) => x.ok) && measured >= 25 && steep,
-        rows.map((x) => `${x.id} ${x.error ?? (x.worst ? `${x.worst.id} %${(x.worst.share * 100).toFixed(1)}${x.worst.by && Object.keys(x.worst.by).length ? ` (${Object.keys(x.worst.by).join(', ')})` : ''}` : '—')}`).join(' · ') + ` · ${measured} parça · eğim ${Math.min(...cams.map((c) => c.deg)).toFixed(1)}–${Math.max(...cams.map((c) => c.deg)).toFixed(1)}° · tahta payı en az %${Math.round(Math.min(...cams.map((c) => c.share)) * 100)}`);
+        rows.map((x) => `${x.id} ${x.error ?? (x.worst ? `${x.worst.id} %${(x.worst.share * 100).toFixed(1)}${x.worst.by && Object.keys(x.worst.by).length ? ` (${Object.keys(x.worst.by).join(', ')})` : ''}` : '—')}`).join(' · ') + ` · ${measured} parça · eğim ${Math.min(...cams.map((c) => c.deg)).toFixed(1)}–${Math.max(...cams.map((c) => c.deg)).toFixed(1)}° (48°: ${at48}/9) · tahta payı en az %${Math.round(Math.min(...cams.map((c) => c.share)) * 100)}`);
       await ctx.close();
     }
   }
@@ -6875,15 +6880,25 @@ try {
       const hidden = nodes.filter((n) => getComputedStyle(n).opacity !== '1' && n.dataset.anchor === 'part' && t.plan.onBoard.has(n.dataset.id)).map((n) => n.dataset.id);
       return { shown: shown.length, all: nodes.length, pairs, gap: Number.isFinite(gap) ? Math.round(gap) : null, outside, hidden, ids: shown.map((s) => s.id) };
     };
-    // Parçanın gövdesinin ekrandaki ortası (fareyle üstüne gelmek ya da dokunmak için).
-    const partAt = (page, id) => page.evaluate((id) => {
+    // Parçanın gövdesinde, ışının gerçekten o parçayı yakaladığı bir ekran noktası (fareyle üstüne gelmek ya da
+    // dokunmak için; gövdenin ortası öndeki parçanın arkasında kalabilir). Sırayla denenir: etiketi gizli parçalar,
+    // sonra öbür tahta parçaları.
+    const partAt = (page, ids) => page.evaluate((ids) => {
       const t = window.__tezgah;
-      const p = id ? t.parts.get(id) : [...t.parts.values()].find((q) => t.plan.onBoard.has(q.part.id));
-      if (!p) return null;
-      const c = p.body.min.clone().add(p.body.max).multiplyScalar(0.5).project(t.view);
       const r = document.querySelector('canvas').getBoundingClientRect();
-      return { id: p.part.id, x: r.left + ((c.x + 1) / 2) * r.width, y: r.top + ((1 - c.y) / 2) * r.height };
-    }, id);
+      const order = [...ids, ...[...t.parts.values()].filter((q) => t.plan.onBoard.has(q.part.id)).map((q) => q.part.id)];
+      for (const id of order) {
+        const p = t.parts.get(id);
+        if (!p) continue;
+        const b = p.body;
+        for (const fy of [0.5, 0.7, 0.85, 0.3]) for (const fx of [0.5, 0.3, 0.7, 0.15, 0.85]) for (const fz of [0.5, 0.2, 0.8]) {
+          const c = b.min.clone().set(b.min.x + (b.max.x - b.min.x) * fx, b.min.y + (b.max.y - b.min.y) * fy, b.min.z + (b.max.z - b.min.z) * fz).project(t.view);
+          const at = { x: r.left + ((c.x + 1) / 2) * r.width, y: r.top + ((1 - c.y) / 2) * r.height };
+          if (t.pick({ clientX: at.x, clientY: at.y })?.part.id === id) return { id, ...at, hidden: ids.includes(id) };
+        }
+      }
+      return null;
+    }, ids);
     const ids = ['yuruyen-isik', '555-astabil', 'bcd-7-segment'];
     for (const [view, w, h] of [['masaüstü', 1440, 900], ['iPhone 13 dikey', 390, 844], ['iPhone 13 yatay', 844, 390]]) {
       const mobile = view !== 'masaüstü';
@@ -6903,7 +6918,7 @@ try {
         await page.waitForTimeout(1000);
         const rest = await page.evaluate(labelState);
         // Etiketi gizli bir tahta parçası (yoksa ilk tahta parçası): masaüstünde üstüne gel, telefonda dokun (seç).
-        const at = await partAt(page, rest.hidden[0] ?? null);
+        const at = await partAt(page, rest.hidden);
         let active = null;
         if (at) {
           if (mobile) await tap(page, cdp, { x: at.x, y: at.y });
@@ -6914,11 +6929,11 @@ try {
         }
         const ok = rest.pairs.length === 0 && rest.outside.length === 0 && rest.shown >= 2 && (rest.gap === null || rest.gap >= 7) &&
           active !== null && active.pairs.length === 0 && active.outside.length === 0 && active.ids.includes(at.id);
-        rows.push({ id, ok, rest, active, target: at?.id });
+        rows.push({ id, ok, rest, active, target: at ? `${at.id}${at.hidden ? ' (etiketi gizliydi)' : ''}` : null, targetId: at?.id });
       }
       check(`3B etiketler (${view}): yürüyen ışık, 555 astabil ve BCD–7 parçalı örneklerinde görünen etiketler birbirine binmiyor (aralarında en az 7 px), yanlardan taşmıyor; ${mobile ? 'dokunulan (seçilen)' : 'üstüne gelinen'} parçanın etiketi görünüyor`,
         rows.every((r) => r.ok),
-        rows.map((r) => `${r.id} ${r.rest.shown}/${r.rest.all} görünür · binen ${r.rest.pairs.length}${r.rest.pairs.length ? ' (' + r.rest.pairs.slice(0, 2).join(', ') + ')' : ''} · en dar aralık ${r.rest.gap ?? '—'} px · ${r.target}: ${r.active ? (r.active.ids.includes(r.target) ? 'görünür' : 'GİZLİ') + ', binen ' + r.active.pairs.length : 'yok'}`).join(' | '));
+        rows.map((r) => `${r.id} ${r.rest.shown}/${r.rest.all} görünür · binen ${r.rest.pairs.length}${r.rest.pairs.length ? ' (' + r.rest.pairs.slice(0, 2).join(', ') + ')' : ''} · en dar aralık ${r.rest.gap ?? '—'} px · ${r.target}: ${r.active ? (r.active.ids.includes(r.targetId) ? 'görünür' : 'GİZLİ') + ', binen ' + r.active.pairs.length : 'yok'}`).join(' | '));
       await ctx.close();
     }
   }

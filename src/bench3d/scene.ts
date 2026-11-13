@@ -389,7 +389,9 @@ export class BenchScene {
   setOverlay(el: HTMLElement | null): void {
     this.overlayObserver.disconnect();
     this.overlay = el;
-    if (el) this.overlayObserver.observe(el, { childList: true, subtree: true, characterData: true });
+    // Öncelik (seçili ya da üstüne gelinen parça, vurgulanan ağın direği) öznitelikle değişir: o da yeniden yerleştirir.
+    // Yerleşim yalnızca style yazar (izlenmez): döngü olmaz.
+    if (el) this.overlayObserver.observe(el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-priority', 'data-open'] });
     this.dirty = true;
   }
 
@@ -889,21 +891,26 @@ export class BenchScene {
       const order = sign < 0 ? sideLanes.left++ : sideLanes.right++;
       const lane = sign * (boardWidth(plan.cols) / 2 + PLATE.margin + 0.6 + 0.32 * (order % 6));
       const behind = entry.z - 2.6 - 0.3 * (order % 6);
-      const over = Math.max(from.y + 0.9, placed.box.max.y + 0.6);
-      const inner = sign > 0 ? placed.box.min.x : placed.box.max.x;
+      // Parça dış sütundaysa (Arduino'nun yanındaki pil) kablo aradaki parçaların da üstünden aşar ve en içtekinin
+      // tahtaya bakan yüzünün açığından iner.
+      const between = bodies.filter(
+        (o) => o.id !== placed.part.id && o.box.min.z < from.z + 1.5 && o.box.max.z > from.z - 1.5 && (sign > 0 ? o.box.min.x > lane && o.box.max.x < from.x + 0.5 : o.box.max.x < lane && o.box.min.x > from.x - 0.5),
+      );
+      const over = Math.max(from.y + 0.9, placed.box.max.y + 0.6, ...between.map((o) => o.box.max.y + 0.9));
+      const inner = sign > 0 ? Math.min(placed.box.min.x, ...between.map((o) => o.box.min.x)) : Math.max(placed.box.max.x, ...between.map((o) => o.box.max.x));
       const pts = [from.clone(), new Vector3(from.x, over, from.z)];
       // Kablo gövdenin üstünden aşar ve tahtaya bakan yüzünün bir delik açığından iner (gövdeye sürtünmez).
       const clear = inner - sign * 1.0;
       if (Math.abs(from.x) > Math.abs(clear) + 0.3) pts.push(new Vector3(clear, over, from.z - 0.3));
       const drop = sign * Math.min(Math.abs(lane), Math.abs(clear));
-      pts.push(
-        new Vector3(drop, table, Math.max(from.z - 1.2, behind + 2.4)),
-        new Vector3(lane, table, behind + 1.6),
-        new Vector3(lane - sign * 1.6, table, behind),
-        new Vector3(entry.x + sign * 1.4, table, behind),
-        new Vector3(entry.x, entry.y, entry.z - 1.5),
-        entry.clone(),
-      );
+      if (from.z - 1.2 > behind + 2.4) {
+        // Parça tahtanın yanında: şeritten arkaya, sonra direk sırasının gerisinden direğe.
+        pts.push(new Vector3(drop, table, from.z - 1.2), new Vector3(lane, table, behind + 1.6), new Vector3(lane - sign * 1.6, table, behind));
+      } else {
+        // Parça direk sırasının hizasında ya da gerisinde (uzun sütunun arkadaki parçası): öne dönmeden masaya iner.
+        pts.push(new Vector3(drop, table, Math.min(from.z - 1.2, behind)));
+      }
+      pts.push(new Vector3(entry.x + sign * 1.4, table, behind), new Vector3(entry.x, entry.y, entry.z - 1.5), entry.clone());
       return new CatmullRomCurve3(pts, false, 'centripetal');
     };
     /** Cihaz kablosu: soketten çıkar, masaya sarkar, tahtanın arka kenarının gerisinden direğindeki fişe girer. */
