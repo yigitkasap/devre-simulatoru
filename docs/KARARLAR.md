@@ -1971,6 +1971,9 @@ model adı yok, belirli bir ürünün kopyası değil; panel yazıları İngiliz
 
 ### 3B: cihaz kabloları, timsah kıskaç (2026-11-09; yerleşim 2026-11-10)
 
+> Güncelleme (2026-11-12): bu bölümün yerini "3B: okunurluk önce" aldı. Timsah kıskaçlar ve kısa test telleri
+> kaldırıldı; kablolar bağlantı direklerine takılır. Aşağısı tarihçe olarak duruyor.
+
 Laboratuvarda cihaz kabloları (güç kaynağı, osiloskop, fonksiyon üreteci, multimetre) muz fiş – kablo – timsah
 kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon değişmez; yalnızca 3B gösterim.
 - **Bir delik tek tel ya da tek bacak alır** (7): Tahtada kur'un yerleşiminde (planBreadboard → buildFromPlan:
@@ -2105,6 +2108,9 @@ kıskaçtır; breadboard deliğine doğrudan girmez. Şema ve simülasyon deği�
 
 ### 3B modeller: gerçek ölçüler (2026-11-12)
 
+> Güncelleme (2026-11-12): ölçek kuralının ("her model gerçek ölçüsünde") yerini "3B: okunurluk önce" aldı. Kılıf
+> seçimi, kılıf biçimleri ve veri sayfası kaynakları geçerli; gövdeler artık sade ve küçük çizilir.
+
 Kural: her model gerçek ölçüsünde, 1 birim = 2,54 mm (breadboard'un delik aralığı). Ölçüler tek yerde:
 `src/bench3d/dimensions.ts` (mm). Modeller bu sayılardan kurulur; `tests/model-olcek.test.ts` hem sayıları veri
 sayfalarındaki aralıklarla hem de kurulan gövdelerin kutularını bu sayılarla karşılaştırır (±0,15 mm). ios-kontrol
@@ -2173,6 +2179,154 @@ gerçeği 6,35 mm), transformatör (belirli bir ürün yok; ≈ 2/3 ölçek), di
 (iPhone 13, işlemci 4 kat yavaş, 3B her karede yeniden çizilirken) on örnekte önce / sonra kare hızı ölçüm
 gürültüsünün içinde; sahnenin üçgen sayısı ±%9 (ör. röle + BC107: 27 618 → 28 800; BC107 yükselteç: 25 524 →
 25 122). Birim testinde model başına üçgen sınırı var.
+
+### 3B: okunurluk önce (2026-11-12)
+
+İlke: **gerçekçilik değil okunurluk.** Gerçek bir breadboard'da parçalar sıkışıktır, kablolar üst üste biner; ders
+aracında ise her parçanın tek bakışta seçilmesi gerekir. Parçalar sade, tanınır ve birbirine değmeyen biçimde
+çizilir. Bu bölüm iki önceki kararın yerini alır: "3B modeller: gerçek ölçüler"in **ölçek kuralı** (kılıf biçimleri
+ve veri sayfası kaynakları geçerli kalır) ve "3B: cihaz kabloları, timsah kıskaç" bölümünün **tamamı** (kıskaç ve
+kısa test teli kodu silindi: `clips.ts`, `clipPlan.ts`, `clipModel.ts`, `tests/kiskac-3b.test.ts`).
+
+**Ayak izi kuralı.** Tahtadaki her parçanın gövdesi bacak deliklerinin çevresinden her yönde en çok yarım delik
+(1,27 mm) taşar; yüksekliği kartın üstünden en çok 4 delik aralığı (10,2 mm), kondansatörde en çok 6 (15,3 mm).
+Sabitler `src/bench3d/parts.ts`'te: `OVER = 0,45` (taşma; yarım delikten az, komşu delikteki gövdeye değmez),
+`CLEAR = 1,0` (gövdenin altı kartın 2,5 mm üstünde: köprü telleri gövdelerin altından geçer). Kılıf biçimleri
+3b-modeller'deki gibidir; ölçüler:
+
+| Parça | 3b-sade'de |
+|---|---|
+| Direnç, diyot, zener | Ø 2,3 mm; gövde kartın 2,5 mm üstünde |
+| Elektrolitik kondansatör | 2 × 1 delik oval kutu; boyu kapasiteyle 1,7–2,6 delik (1 µF–1000 µF), kartın üstünden en çok 3,6 delik |
+| Kutupsuz kondansatör | kapasiteye göre disk, damla ya da kutu film (3b-modeller'deki ayrım); hepsi 2,3 mm'den ince |
+| LED | 2 × 1 delik oval mercek, boyu 1,6 delik |
+| TO-92 (BC547B, BF245A, 2N7000…) | D kesit durur; düz yüzden sırta 2,3 mm |
+| TO-18 (BC107) | metal kapak, flanş ve sekme durur; boy × 0,8, en × 0,62, derinlik × 0,42 |
+| TO-220 (IRF510, 7805, LM317) | 7,4 mm geniş, 2,2 mm kalın, tırnağın tepesi kartın 4 delik üstünde; delikli metal tırnak durur |
+| Buzzer | alçak oval disk (2 × 1 delik) |
+| Kollu anahtar (tek ve çift yollu) | gövde 1,6 mm, kol 1,8 mm |
+| Potansiyometre | gövde 2 mm, çarkı öne bakar (Ø 3,6 mm) |
+| LDR, NTC, sigorta, optokuplör, köprü diyot, basmalı düğme | 1 delik derin gövde |
+| DIP entegre, 7 parçalı gösterge | gövde kartın 2,5 mm üstünde; gösterge 4,9 × 6,9 delik |
+
+- Karar: kural kondansatöre 6 delik yükseklik tanır, ama uzun kutu arkasındaki parçayı örttüğü için (gerilim
+  katlayıcıda C1, C2'nin %31'ini kapatıyordu) elektrolitik en çok 3,6 delik. Aynı nedenle kollu anahtar, LED ve
+  potansiyometre de alçaltıldı.
+
+**Çakışma yok.** Hiçbir iki parçanın gövde kutusu birbirine, direklere ya da plakaya değmez; bir delikte tek şey
+vardır; köprüler, direk telleri, fişler ve gövdeler birbirinin içinden geçmez. `tests/tezgah-sade.test.ts` bunu 81
+örneğin hepsinde denetler (9 test). Hiçbir örneğin tahta planını değiştirmek gerekmedi.
+
+**Tahta dışı parçalar.** Pil, AC kaynak, akım kaynağı, motor, hoparlör, lamba, röle, transformatör ve su haznesi
+tahtanın soluna (kaynaklar) ya da sağına (yükler) dizilir, önüne değil (`breadboard.ts` → `TABLE`, `isSidePart`).
+En büyük boyutları yarım boy tahtanın genişliğinin dörtte biri: `SIDE_MAX = 8` delik (20,3 mm). Model 3b-modeller'deki
+biçimiyle kurulur, sonra tek katsayıyla küçültülür (`registry.ts` → `fitSide`): oranlar korunur.
+
+- Karar: **röle tahta dışı parça olarak kaldı** (sağda, vida terminalli kartıyla).
+- Karar: **Arduino istisna.** Kendi kartıdır, uçları 2,54 mm aralıklıdır; gerçek ölçüsünde solda durur ve atlama
+  telleri doğrudan deliklere gider (gerçekte de öyle kurulur).
+- Karar: **laboratuvar cihazlarının ölçeği ve "tahta en az %70" kadrajı değişmedi.**
+
+**Bağlantı direkleri.** Tahtanın altında ince bir taban plakası (kalınlık 0,6 mm; yanlardan ve önden 3 mm, arkadan
+13,7 mm taşar), plakanın arka kenarında (cihazlara bakan yanda) bir sıra bağlantı direği (`posts.ts`, `postModel.ts`).
+
+- Cihaz bağlanan **her ağa bir direk**; ortak ağ (GND) tek direkte, muz fişler üst üste takılır.
+- Direğin üstünde **kısa ağ adı** (en çok 8 karakter, örnek içinde tekil): `GND`, `+12 V` (güç kaynağının ya da
+  pilin + ucu), `GİRİŞ` (üretecin çıkışı), `TTL`, `CH1`, `CH2`, `A1 +`, `A1 −`, `PS1 −`, `M1 +`, `K1 NA`, `T1 S1`.
+  Ada karar veren uç sırası: güç kaynağı ya da pil +, üreteç, osiloskop, ölçü aleti, kaynağın − ucu, tahta dışı parça.
+- Kablolar **yalnızca direklere** takılır: tahtanın üstünden ya da önünden geçmez (`postReport().overBoard` her
+  zaman 0). Cihaz kablosu soketten çıkar, masaya sarkar, tahtanın arka kenarının gerisinden düzgün bir kavisle fişe
+  arkadan girer; aynı cihazın kabloları soketlerinden masaya yan yana iner, direklerine oradan ayrılır. Timsah kıskaç ve
+  kısa test teli yok.
+- Karar (istekte yazmıyordu, ilkeden çıkarıldı): **tahta dışı parçaların kabloları da direklere gider.** Pil, motor,
+  röle gibi parçaların kalın kabloları tahtanın üstünden deliklere inince parçaları örtüyordu (röle örneğinde bir
+  direncin %40–68'i). Kablo parçanın tahtaya bakan yanından masaya iner, plakanın yanından arkaya dolanır, direğe
+  arkadan girer.
+- **Renkler.** Osiloskop CH1 sarı, CH2 mavi; üreteç çıkışı kırmızı (TTL turuncu); güç kaynağı ve pil + kırmızı;
+  toprak ağına giden her kablo siyah; ölçü aletinde + kırmızı, − siyah; rölenin ve transformatörün üçüncü ve sonraki
+  uçları yeşil, mor, beyaz. Direk ve tahtaya giden teli, direğe adını veren kablonun rengindedir.
+- **Direkten tahtaya tel.** Direkten ağın tahtadaki deliğine (ağın cihaz deliklerinden arka kenara en yakını:
+  ray ya da en arkadaki satır) ince (Ø 0,6 mm), kartın 0,8 mm üstünde yatık bir tel gider. Yol dik açılı ve
+  kesişmesizdir (baskı devre yolu gibi): tel direğin önünden çıkar, direk sırası ile tahtanın arka kenarı arasındaki
+  kanalda kendi izinde yana gider, deliğin sütununun yarım delik yanındaki şeritte (iki sütunun arasında, dolu bir
+  deliğin üstünden geçmeden) deliğin hizasına iner. Direkler tellerinin şerit sırasıyla dizildiği için şeritler
+  kesişmez; sola giden tellerde sağdaki, sağa gidenlerde soldaki tel tahtaya daha yakın izi alır.
+- Direkler tellerinin hizasına, aralarında en az 3 delik (çok direkte en az 2) bırakarak yerleşir (`spread`: hedeften
+  sapmaların kareleri toplamı en küçük).
+- Planın delikleri değişmez: tel, planın o ağın kablolarına ayırdığı deliklerden birine gider; öbür delikleri 3B'de
+  boş kalır (yalnızca onları ağa bağlayan köprüler de çizilmez). **Tahtada kur**'da direkler şemanın planındaki yerde
+  durur; öğrencinin deliğe taktığı her kablo için direkten o deliğe bir tel çizilir, takılmamış kablonun direği
+  telsizdir. Tepeden görünümde cihaz kartları direk sırasının gerisindedir.
+- **Köprü telleri** de inceldi (Ø 0,6 mm) ve alçaldı: kısa köprü kartın 1 mm üstünde, en uzunu (30 delik) 4,6 mm;
+  köprü düz gider (yay yalnızca uçlarda). Gövdeler ve direk telleri köprüler için engeldir (`jumpers.ts`).
+- Direkler, plaka ve teller **şemaya ve KiCad'e girmez** (yalnızca `src/bench3d` ve `BenchView`).
+
+**Örtülme ölçümü.** Varsayılan kamerada (masaüstü 1440 × 900, iPhone 13 dikey ve yatay) hiçbir tahta parçasının
+gövdesinin ekrandaki alanının %10'undan fazlası başka bir parça, kablo, direk, fiş, köprü ya da tel tarafından
+örtülmez. Ölçüm ios-kontrol'de ("3B tahta parçaları örtülmüyor"): her tahta parçası için iki çizim; (A) parça tek
+başına, (B) bütün sahne; pay = 1 − B/A; pay %5'i geçerse üçüncü çizim örteni söyler. En çok örtülen parça (masaüstü /
+dikey / yatay):
+
+| Örnek | 3b-modeller | 3b-sade |
+|---|---|---|
+| `diyot-dc` | %0 / %0 / %0 | %0 / %0 / %0 |
+| `bjt-yukseltec-kuplajli` | RC %8 / %5 / %3 (kablo) | %0 / %0 / %0 |
+| `mosfet-yukseltec` | RG %63 / %68 / %50 (IRF510 ve kablo) | %0 / %0 / %0 |
+| `yarim-dalga` | RL %55 / %78 / %73 (kondansatör ve kablo) | C2 %7 / %7 / %8 (önündeki anahtar) |
+| `dc-motor` | S1 %7 / %13 / %32 (motor kablosu) | %0 / %0 / %0 |
+| `hoparlor` | tahtada parça yok | tahtada parça yok |
+| `transformator` | %0 / %0 / %0 | %0 / %0 / %0 |
+| `jfet-karakteristik` | %0 / %0 / %0 | %0 / %0 / %0 |
+| `fet-yukseltec-kuplajli` | %0 / %0 / %1 | %0 / %0 / %1 |
+
+Aynı ölçüm 81 örneğin hepsinde, üç ekranda yapıldı: **68 örnekte** hiçbir tahta parçası %10'u aşmıyor. **13 örnekte**
+aşan parça var; örten kablo değil, bir satır önüne takılı komşu parçadır (tek istisna yürüyen ışıkta bir köprü teli):
+
+| Örnek | %10'u aşan parça (en kötü ekran) · örten |
+|---|---|
+| `yuruyen-isik` | LED1 %44 (köprü teli, LED2), LED5 %26, LED8 %18, LED4 %16 (yanındaki LED) |
+| `kopru-diyot` | S1 %31 (C1) |
+| `gerilim-katlayici` | C2 %30 (C1) |
+| `potansiyometre` | LED1 %28 (P1) |
+| `baraj-tek-isik` | C3 %28 (C2) |
+| `7805-besleme` | C1 %25 (C2) |
+| `opamp-karsilastirici` | LED2 %25 (LED1) |
+| `role` | LED1 %24 (LED2); 3b-modeller'de LED1 %57, R2 %40–68, D1 %24 (pil ve röle kabloları) |
+| `baraj-cubuk` | C2 %20 (C3) |
+| `ard-trafik-isigi` | LED2 %18 (LED1) |
+| `motor-h-koprusu` | S1 %18, S4 %14 (S3) |
+| `555-astabil` | CV %17 (LED1) |
+| `bcd-7-segment` | S2 %15 (S1, S3) |
+
+- Neden: varsayılan kamera 30–36° eğimle bakar; bir satır öndeki 2 delik yüksekliğindeki gövde arkadakinin alt
+  yarısını kapatır. Parçayı küçültmek payı az değiştirir (örten de örtülen de küçülür: LED, potansiyometre ve
+  elektrolitik alçaltılınca paylar 34 → 25, 36 → 28, 28 → 17 oldu).
+- Karar: **bu turda planın delikleri ve kamera değişmedi.** Çözüm ya bu parçaların arasına boş satır bırakan bir plan
+  ya da daha dik bir kamera; ikisi de Tahtada kur'u, KiCad izlerini ya da "tahta en az %70" kadrajını etkiler.
+  ios-kontrol maddesi istenen dokuz örneği denetler; 13 örnek kullanıcıya soruldu.
+
+**Değişmeyenler.** Simülasyon ve şema kodu değişmedi. KiCad dışa aktarma 81 örneğin hepsinde bayt bayt aynı
+(3b-modeller ile karşılaştırıldı); tahtadaki parçaların delikleri de aynı. Değişen plan verisi: tahta dışı parçalar
+öne değil yana geçtiği için 14 örnekte bu parçaların kablo delikleri (12'sinde onlara bağlı köprüler de) yer
+değiştirdi: `role`, `role-transistor`, `role-muhurleme`, `dc-motor`, `motor-jenerator`, `motor-h-koprusu`,
+`lamba-ani-akim`, `hoparlor`, `sigorta`, `555-ses`, `ard-melodi`, `ard-role`, `baraj-cubuk`, `baraj-tek-isik`.
+
+**Performans.** Telefon öykünmesinde (iPhone 13, 3B her karede yeniden çizilirken) on örnekte kare hızı değişmedi:
+işlemci 4 kat yavaşken ortalama 144,3 → 143,2 kare/s (ikişer ölçüm; tek ölçümler 136–150 → 138–152, bir ölçümde 112, yinelenince 139), normal hızda
+146–152 → 147–152. Sahnenin üçgen sayısı ortalama %14, çizim çağrısı %23 arttı (direkler, fişler, teller, plaka; ör.
+röle + BC107: 28 800 → 32 676 üçgen, 188 → 221 çizim). ios-kontrol sınırı: en az 30 kare/s, en çok 40 000 üçgen.
+
+**Denetim.** Birim testleri 2145 / 2145. Tam ios-kontrol normal hızda 508 maddeden 507'si geçti, konsol hatası yok;
+kalan madde bilinen kararsız "telefon hızı (4 kat yavaş işlemci)" (şema görünümü; 3B planı o görünümde hesaplanmaz).
+Tek başına yinelenince yeni derlemede 4 koşunun 3'ü geçti (en yavaş örnek 29,4 / 37,5 / 35,4 / 34,4 kare/s; sınır 30),
+3b-modeller derlemesinde 3 koşunun 3'ü (36,4 / 36,8 / 37,7).
+
+**Açık sorular** (kullanıcıya soruldu).
+
+- Tahta dışı parçaların kabloları da direklere gitsin mi (şimdiki), yoksa yalnızca cihazlarınki mi?
+- Art arda satırlardaki parçalar (yukarıdaki liste) için: kamera eğimi mi artsın, plan mı seyrekleşsin, böyle mi
+  kalsın?
+- Direk adlarında tahta dışı parçalar: "M1 +", "K1 NA", "T1 S1" yeterince açık mı?
 
 ### Performans ve hata taraması (2026-10-27)
 
