@@ -2634,6 +2634,43 @@ export const tr = {
       channel: (n: number) => `CH${n}`,
       meterPlus: (label: string) => `${label} +`,
       meterMinus: (label: string) => `${label} −`,
+      /** Açık adlar: direğe dokununca ya da üstüne gelince kısa adın yerine görünür. */
+      long: {
+        ground: 'GND · toprak (ortak uç)',
+        supplyPlus: (label: string, volts: string) => `${label} güç kaynağı · + çıkış (${volts} V)`,
+        supplyMinus: (label: string) => `${label} güç kaynağı · − çıkış`,
+        generator: (label: string, pin: string) => `${label} fonksiyon üreteci · ${pin}`,
+        generatorPins: ['çıkış (OUT)', 'TTL çıkışı', 'ortak uç (COM)'],
+        scopeChannel: (label: string, n: number) => `${label} osiloskop · ${n}. kanal (CH${n})`,
+        scopeGround: (label: string) => `${label} osiloskop · toprak ucu`,
+        batteryPlus: (label: string, volts: string) => `${label} pil · + uç (${volts} V)`,
+        meterPins: ['+ uç', '− uç'],
+        /** "K1 röle · normalde açık uç", "T1 trafo · sekonder 1", "A1 ampermetre · + uç". */
+        side: (label: string, word: string, pin: string) => `${label} ${word} · ${pin}`,
+        nth: (n: number) => `${n}. uç`,
+        sideWord: {
+          battery: 'pil',
+          acsource: 'AC kaynak',
+          currentsource: 'akım kaynağı',
+          motor: 'motor',
+          lamp: 'lamba',
+          speaker: 'hoparlör',
+          relay: 'röle',
+          transformer: 'trafo',
+          tank: 'su haznesi',
+        } as Partial<Record<string, string>>,
+        sidePins: {
+          battery: ['+ uç', '− uç'],
+          acsource: ['1. uç (~)', '2. uç (0)'],
+          currentsource: ['1. uç', '2. uç'],
+          motor: ['+ uç', '− uç'],
+          lamp: ['1. uç', '2. uç'],
+          speaker: ['1. uç', '2. uç'],
+          relay: ['sargı ucu 1', 'sargı ucu 2', 'ortak uç', 'normalde açık uç', 'normalde kapalı uç'],
+          transformer: ['primer 1', 'primer 2', 'sekonder 1', 'sekonder 2'],
+          tank: ['ortak prob', '1. seviye probu', '2. seviye probu', '3. seviye probu'],
+        } as Partial<Record<string, readonly string[]>>,
+      },
       /** Tahta dışı parçanın ucu: etiket + ucun kısa adı ("M1 +", "K1 NA", "T1 S1"). */
       pin: (label: string, short: string) => `${label} ${short}`,
       sideShort: {

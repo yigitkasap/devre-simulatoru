@@ -114,7 +114,7 @@ describe('3B: okunurluk önce', () => {
     expect(bad.slice(0, 40)).toEqual([]);
   });
 
-  it('tahta dışı parçalar tahtanın solunda ya da sağında (önünde değil); en büyük boyutları tahta genişliğinin dörtte birini geçmez', () => {
+  it('tahta dışı parçalar ve Arduino tahtanın solunda ya da sağında, ön kenarını geçmez (81 örnek); en büyük boyutları tahta genişliğinin dörtte birini geçmez', () => {
     expect(SIDE_MAX).toBeLessThanOrEqual(boardWidth(30) / 4);
     const bad: string[] = [];
     for (const { id, parts, plan } of docs) {
@@ -130,7 +130,9 @@ describe('3B: okunurluk önce', () => {
           continue;
         }
         if (Math.abs(center.x) < half) bad.push(`${id}: ${p.label} (${p.type}) tahtanın yanında değil`);
-        if (p.box.min.z > front) bad.push(`${id}: ${p.label} (${p.type}) tahtanın önünde`);
+        // Tahta dışı parçalar ve Arduino hiçbir zaman tahtanın önünde (kameraya bakan yanda) durmaz: gövdenin hiçbir
+        // noktası ön kenarı geçmez (yanda ya da arkada).
+        if (p.box.max.z > front + 0.05) bad.push(`${id}: ${p.label} (${p.type}) tahtanın ön kenarını ${(p.box.max.z - front).toFixed(2)} birim geçiyor`);
         if (isSidePart(p.type as never) && Math.max(size.x, size.y, size.z) > SIDE_MAX + 1e-3) bad.push(`${id}: ${p.label} (${p.type}) ${Math.max(size.x, size.y, size.z).toFixed(2)} birim`);
       }
     }
@@ -271,6 +273,27 @@ describe('3B: okunurluk önce', () => {
       }
     }
     expect(side).toBeGreaterThan(60);
+  });
+
+  it('direklerin açık adı: kısa adın yanında cihazın ya da parçanın etiketi, türü ve ucun açık adı (dokununca ya da üstüne gelince görünür)', () => {
+    const titles = new Map<string, string>();
+    for (const { id, posts } of docs) {
+      for (const p of posts.posts) {
+        expect(p.title.length, `${id} ${p.name}`).toBeGreaterThan(p.name.length);
+        expect(p.title, `${id} ${p.name}`).toContain(' · ');
+        titles.set(`${id}:${p.name}`, p.title);
+      }
+      // Açık adlar da örnek içinde tekil.
+      expect(new Set(posts.posts.map((p) => p.title)).size, id).toBe(posts.posts.length);
+    }
+    expect(titles.get('role:K1 NA')).toBe('K1 röle · normalde açık uç');
+    expect(titles.get('role:K1 NK')).toBe('K1 röle · normalde kapalı uç');
+    expect(titles.get('adaptor:T1 S1')).toBe('T1 trafo · sekonder 1');
+    expect(titles.get('led-on-direnc:GND')).toBe('GND · toprak (ortak uç)');
+    expect(titles.get('led-on-direnc:+5 V')).toBe('B1 pil · + uç (5 V)');
+    expect(titles.get('role-transistor:+12 V')).toBe('PS1 güç kaynağı · + çıkış (12 V)');
+    expect(titles.get('toprak-tuzagi:GİRİŞ')).toBe('FG1 fonksiyon üreteci · çıkış (OUT)');
+    expect(titles.get('rc-kare-dalga:CH1')).toBe('OSC1 osiloskop · 1. kanal (CH1)');
   });
 
   it('Tahtada kur kurulumu: direkler şemanın planındaki yerde; takılı her cihaz kablosu için direkten o deliğe bir tel', () => {

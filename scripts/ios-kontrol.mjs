@@ -6545,11 +6545,33 @@ try {
       lit = await page.evaluate(() => window.__tezgah.netHighlight());
     }
     const mini = await page.locator('polyline[data-highlight]').count();
+    const openLabel = (p) => p.evaluate(() => [...document.querySelectorAll('[data-anchor="post"][data-open]')].filter((e) => getComputedStyle(e).opacity === '1').map((e) => e.textContent).join(' | '));
+    const gndOpen = await openLabel(page);
     await page.mouse.move(5, 300); await page.waitForTimeout(300);
+    const gndClosed = await openLabel(page);
     const off = await page.evaluate(() => window.__tezgah.netHighlight());
     check('3B ağ vurgusu (masaüstü, BF245A): fare GND direğinin üstüne gelince GND kabloları parlıyor, öbürleri soluk, bacağı işaretli; küçük şemada düğümün kabloları vurgulu; fare çekilince kalkıyor',
       at !== null && lit.net === at.net && lit.lit >= 4 && lit.dim >= 4 && lit.legs >= 1 && mini >= 1 && off.net === null && off.lit === 0 && off.dim === 0,
       `${lit.net} · parlak ${lit.lit} · soluk ${lit.dim} · bacak ${lit.legs} · küçük şema ${mini} · sonra ${off.net}`);
+    // Açık ad: direğin üstüne gelince kısa adın yerine cihazın ya da parçanın adı, türü ve ucun açık adı.
+    await page.goto(`${URL0}embed/?ornek=role&gorunum=tam`, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const opened = {};
+    for (const name of ['K1 NA', 'B2 −', '+12 V']) {
+      const q = await postAt(page, name);
+      opened[name] = '';
+      for (let dy = 0; dy < 30 && !opened[name] && q; dy += 3) {
+        await page.mouse.move(q.x, q.y + dy); await page.waitForTimeout(150);
+        opened[name] = await openLabel(page);
+      }
+      await page.mouse.move(5, 300); await page.waitForTimeout(200);
+    }
+    const shortAgain = await page.evaluate(() => [...document.querySelectorAll('[data-anchor="post"]')].map((e) => e.textContent).join(', '));
+    check('3B direklerin açık adı (masaüstü): direğin üstüne gelince kısa adın yerine açık ad (GND → "GND · toprak (ortak uç)", K1 NA → "K1 röle · normalde açık uç", B2 − → "B2 pil · − uç", +12 V → "B1 pil · + uç (12 V)"); fare çekilince kısa ad geri geliyor',
+      gndOpen === 'GND · toprak (ortak uç)' && gndClosed === '' && opened['K1 NA'] === 'K1 röle · normalde açık uç' && opened['B2 −'] === 'B2 pil · − uç' && opened['+12 V'] === 'B1 pil · + uç (12 V)' &&
+        shortAgain === '+12 V, GND, A1 +, A1 −, K1 NK, K1 NA, B2 −, +9 V',
+      `${gndOpen} → "${gndClosed}" | ${Object.values(opened).join(' | ')} | ${shortAgain}`);
     await ctx.close();
     // Telefonda dokununca: direğe dokunmak vurgular.
     const { page: ph, cdp } = await phone();
@@ -6563,9 +6585,11 @@ try {
       await tap(ph, cdp, { x: pt.x, y: pt.y + dy }); await ph.waitForTimeout(150);
       tapped = await ph.evaluate(() => window.__tezgah.netHighlight());
     }
+    const phoneOpen = await ph.evaluate(() => [...document.querySelectorAll('[data-anchor="post"][data-open]')].filter((e) => getComputedStyle(e).opacity === '1').map((e) => e.textContent).join(' | '));
     const phonePosts = await ph.evaluate(() => window.__tezgah.postReport().posts.map((p) => p.visible));
-    check('3B ağ vurgusu (telefon, BF245A): direğe dokununca o ağ vurgulanıyor (öbürleri soluk); beş direk de varsayılan kamerada görünüyor',
-      tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1 && phonePosts.length === 5 && phonePosts.every(Boolean), `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0} · görünen direk ${phonePosts.filter(Boolean).length}/${phonePosts.length}`);
+    check('3B ağ vurgusu (telefon, BF245A): direğe dokununca o ağ vurgulanıyor (öbürleri soluk) ve direğin açık adı görünüyor ("A1 ampermetre · − uç"); beş direk de varsayılan kamerada görünüyor',
+      tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1 && phoneOpen === 'A1 ampermetre · − uç' && phonePosts.length === 5 && phonePosts.every(Boolean),
+      `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0} · açık ad "${phoneOpen}" · görünen direk ${phonePosts.filter(Boolean).length}/${phonePosts.length}`);
     await ph.context().close();
   }
   // --- 3B: tahta parçaları örtülmez (gerçek kamera) --------------------------------------------------------------
@@ -6693,6 +6717,7 @@ try {
       const page = await ctx.newPage();
       page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
       const rows = [];
+      const cams = [];
       let measured = 0;
       for (const id of ids) {
         await page.goto('about:blank');
@@ -6700,15 +6725,25 @@ try {
         await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
         await page.waitForTimeout(1000);
         const r = await page.evaluate(partCover).catch((e) => ({ error: String(e) }));
+        // Varsayılan kamera (2026-11-13): cihazlı örneklerde üç ekranda da 48° (eskiden 36°, 30° ve 24°); tahta payı aynı.
+        const cam = await page.evaluate(() => {
+          const t = window.__tezgah;
+          const d = t.camera.position.clone().sub(t.controls.target);
+          const c = document.querySelector('canvas').getBoundingClientRect();
+          const b = t.boardRect();
+          return { deg: (Math.atan2(d.y, Math.hypot(d.x, d.z)) * 180) / Math.PI, share: b ? (b.x1 - b.x0) / c.width : 0 };
+        });
+        cams.push(cam);
         const parts = (r.parts ?? []).filter((p) => p.vis >= 40);
         measured += parts.length;
         const worst = parts.reduce((a, p) => (p.share > (a?.share ?? -1) ? p : a), null);
         // Hoparlör örneğinde tahtada parça yok (hoparlör tahtanın yanında): ölçülecek şey olmaması hata değil.
         rows.push({ id, ok: !r.error && (r.parts ?? []).every((p) => p.vis >= 40) && parts.every((p) => p.share <= 0.1), worst, error: r.error });
       }
-      check(`3B tahta parçaları örtülmüyor (${view}): dokuz örnekte hiçbir tahta parçasının gövdesinin %10'undan fazlası başka bir parça, kablo, direk ya da tel tarafından örtülmüyor`,
-        rows.every((x) => x.ok) && measured >= 25,
-        rows.map((x) => `${x.id} ${x.error ?? (x.worst ? `${x.worst.id} %${(x.worst.share * 100).toFixed(1)}${x.worst.by && Object.keys(x.worst.by).length ? ` (${Object.keys(x.worst.by).join(', ')})` : ''}` : '—')}`).join(' · ') + ` · ${measured} parça`);
+      const steep = cams.every((c) => Math.abs(c.deg - 48) <= 0.6 && c.share >= (mobile ? 0.7 : 0.45) - 0.005);
+      check(`3B tahta parçaları örtülmüyor (${view}): dokuz örnekte hiçbir tahta parçasının gövdesinin %10'undan fazlası başka bir parça, kablo, direk ya da tel tarafından örtülmüyor; varsayılan kamera 48° eğimli, tahta kadraj genişliğinin en az %${mobile ? 70 : 45}'i`,
+        rows.every((x) => x.ok) && measured >= 25 && steep,
+        rows.map((x) => `${x.id} ${x.error ?? (x.worst ? `${x.worst.id} %${(x.worst.share * 100).toFixed(1)}${x.worst.by && Object.keys(x.worst.by).length ? ` (${Object.keys(x.worst.by).join(', ')})` : ''}` : '—')}`).join(' · ') + ` · ${measured} parça · eğim ${Math.min(...cams.map((c) => c.deg)).toFixed(1)}–${Math.max(...cams.map((c) => c.deg)).toFixed(1)}° · tahta payı en az %${Math.round(Math.min(...cams.map((c) => c.share)) * 100)}`);
       await ctx.close();
     }
   }
@@ -6759,7 +6794,9 @@ try {
     await page.getByRole('group', { name: 'Görünüm' }).getByRole('button', { name: '3B' }).tap();
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {}); await page.waitForTimeout(800);
     // 2. Dikeyde 3B alanı ekranın ≈ %60'ı; düğmeler ve ipucu (ilk açılışta) tahtanın üstünde değil; tahta en az %70;
-    // iPhone 13'te cihazların üstü kırpılmıyor (SE'de alan kısa: tahta payı için kırpılabilir); yatayda 3B alanı bozulmuyor.
+    // yatayda 3B alanı bozulmuyor. Değişti (2026-11-13): eskiden iPhone 13'te cihazların üstü kırpılmıyordu (24° eğim);
+    // varsayılan kamera 48° olunca cihazların üstü her telefonda kırpılır (tahta payı korunur; cihazların tamamı
+    // Kamera → Cihazlar'da).
     const area = await page.evaluate(() => {
       const t = window.__tezgah; const c = document.querySelector('main canvas').getBoundingClientRect(); const b = t.boardRect();
       const board = { x0: b.x0 + c.left, y0: b.y0 + c.top, x1: b.x1 + c.left, y1: b.y1 + c.top };
@@ -6769,8 +6806,8 @@ try {
       return { frac: c.height / innerHeight, w: Math.round(c.width), h: Math.round(c.height), share: (b.x1 - b.x0) / c.width, hint: hint ? over(hint) : null, buttons: buttons.some(over), top: Math.min(...t.deviceRects().map((d) => d.y0)) };
     });
     const portrait = h > w;
-    check(`Telefon 3B (${cihaz}): ${portrait ? '3B alanı ekranın ≈ %60’ı' : '3B alanı bozulmuyor'}; düğmeler ve ipucu tahtanın üstünde değil; tahta en az %70${cihaz === 'iPhone 13' ? '; cihazların üstü kırpılmıyor' : ''}`,
-      (portrait ? area.frac >= 0.55 && area.frac <= 0.65 : area.h >= 300) && area.hint === false && !area.buttons && area.share >= 0.7 && (cihaz !== 'iPhone 13' || area.top >= 0),
+    check(`Telefon 3B (${cihaz}): ${portrait ? '3B alanı ekranın ≈ %60’ı' : '3B alanı bozulmuyor'}; düğmeler ve ipucu tahtanın üstünde değil; tahta en az %70`,
+      (portrait ? area.frac >= 0.55 && area.frac <= 0.65 : area.h >= 300) && area.hint === false && !area.buttons && area.share >= 0.7,
       `${area.w}×${area.h} (%${Math.round(area.frac * 100)}) · ipucu tahtada ${area.hint} · düğme tahtada ${area.buttons} · tahta %${Math.round(area.share * 100)} · cihazların üstü ${Math.round(area.top)} px`);
     // 7b. Tam ekran düğmesinin adı 3B'de "3B’yi tam ekran aç" (erişilebilir ad ve ipucu); şemada "Şemayı tam ekran aç".
     const fullName = await page.locator('main button[aria-label$="tam ekran aç"]').evaluate((e) => `${e.getAttribute('aria-label')}|${e.getAttribute('title')}`).catch(() => '');
@@ -6808,6 +6845,82 @@ try {
       fit !== null && fit.x0 >= -1 && fit.x1 <= fit.w + 1 && fit.y0 >= 0 && fit.y1 <= fit.sheetTop + 1,
       fit ? `tahta x ${Math.round(fit.x0)}–${Math.round(fit.x1)} / ${fit.w}, y ${Math.round(fit.y0)}–${Math.round(fit.y1)} · sayfanın üstü ${Math.round(fit.sheetTop)}` : 'tahta yok');
     await page.context().close();
+  }
+  // --- 3B etiketler: ekranda birbirine binmez (3b-sade-2, 2026-11-13) ----------------------------------------------
+  // Parça etiketleri, direk adları ve uç harfleri ekranda birbirine binmez (aralarında en az 8 px). Yer yoksa etiket
+  // kaydırılır (sağ, sol, üst, alt, çaprazlar); yine yoksa gizlenir ve yalnızca parçası seçilince ya da (masaüstünde)
+  // üstüne gelinince görünür. Etiket başka bir parçanın ya da direğin noktasının üstüne de oturmaz. Kalabalık üç
+  // örnekte (yürüyen ışık, 555 astabil, BCD'den 7 parçalıya) ve üç ekranda ölçülür: görünen etiket kutularından
+  // kesişen çift yok; kutular tuvalin yanlarından taşmıyor; etiketi gizli bir parçanın üstüne gelince / seçince
+  // etiketi görünüyor ve yine kesişme yok.
+  {
+    const labelState = () => {
+      const canvas = document.querySelector('canvas').getBoundingClientRect();
+      const nodes = [...document.querySelectorAll('[data-anchor]')].filter((n) => n.dataset.anchor !== 'footprint' && n.offsetWidth > 0);
+      const shown = nodes.filter((n) => getComputedStyle(n).opacity === '1').map((n) => ({ id: n.dataset.id ?? n.dataset.net ?? '', text: (n.textContent ?? '').trim(), pin: n.dataset.pin !== undefined, r: n.getBoundingClientRect() }));
+      const pairs = [];
+      let gap = Infinity;
+      for (let i = 0; i < shown.length; i++) {
+        for (let k = i + 1; k < shown.length; k++) {
+          const a = shown[i].r;
+          const b = shown[k].r;
+          const dx = Math.max(a.left, b.left) - Math.min(a.right, b.right);
+          const dy = Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom);
+          if (dx < -0.5 && dy < -0.5) pairs.push(`${shown[i].text} × ${shown[k].text}`);
+          else if (!shown[i].pin && !shown[k].pin) gap = Math.min(gap, Math.max(dx, dy));
+        }
+      }
+      const outside = shown.filter((s) => !s.pin && (s.r.left < canvas.left - 0.5 || s.r.right > canvas.right + 0.5 || s.r.top < canvas.top - 0.5)).map((s) => s.text);
+      const t = window.__tezgah;
+      const hidden = nodes.filter((n) => getComputedStyle(n).opacity !== '1' && n.dataset.anchor === 'part' && t.plan.onBoard.has(n.dataset.id)).map((n) => n.dataset.id);
+      return { shown: shown.length, all: nodes.length, pairs, gap: Number.isFinite(gap) ? Math.round(gap) : null, outside, hidden, ids: shown.map((s) => s.id) };
+    };
+    // Parçanın gövdesinin ekrandaki ortası (fareyle üstüne gelmek ya da dokunmak için).
+    const partAt = (page, id) => page.evaluate((id) => {
+      const t = window.__tezgah;
+      const p = id ? t.parts.get(id) : [...t.parts.values()].find((q) => t.plan.onBoard.has(q.part.id));
+      if (!p) return null;
+      const c = p.body.min.clone().add(p.body.max).multiplyScalar(0.5).project(t.view);
+      const r = document.querySelector('canvas').getBoundingClientRect();
+      return { id: p.part.id, x: r.left + ((c.x + 1) / 2) * r.width, y: r.top + ((1 - c.y) / 2) * r.height };
+    }, id);
+    const ids = ['yuruyen-isik', '555-astabil', 'bcd-7-segment'];
+    for (const [view, w, h] of [['masaüstü', 1440, 900], ['iPhone 13 dikey', 390, 844], ['iPhone 13 yatay', 844, 390]]) {
+      const mobile = view !== 'masaüstü';
+      const ctx = await browser.newContext({
+        viewport: { width: w, height: h }, locale: 'tr-TR',
+        ...(mobile ? { deviceScaleFactor: 3, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' } : {}),
+      });
+      await ctx.addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); localStorage.setItem('devre-simulatoru:hosgeldin', '1'); } catch {} });
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      const cdp = mobile ? await ctx.newCDPSession(page) : null;
+      const rows = [];
+      for (const id of ids) {
+        await page.goto('about:blank');
+        await page.goto(`${URL0}embed/?ornek=${id}&gorunum=tam`, { waitUntil: 'networkidle' });
+        await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(1000);
+        const rest = await page.evaluate(labelState);
+        // Etiketi gizli bir tahta parçası (yoksa ilk tahta parçası): masaüstünde üstüne gel, telefonda dokun (seç).
+        const at = await partAt(page, rest.hidden[0] ?? null);
+        let active = null;
+        if (at) {
+          if (mobile) await tap(page, cdp, { x: at.x, y: at.y });
+          else await page.mouse.move(at.x, at.y);
+          await page.waitForTimeout(500);
+          active = await page.evaluate(labelState);
+          if (!mobile) { await page.mouse.move(5, 300); await page.waitForTimeout(200); }
+        }
+        const ok = rest.pairs.length === 0 && rest.outside.length === 0 && rest.shown >= 2 && (rest.gap === null || rest.gap >= 7) &&
+          active !== null && active.pairs.length === 0 && active.outside.length === 0 && active.ids.includes(at.id);
+        rows.push({ id, ok, rest, active, target: at?.id });
+      }
+      check(`3B etiketler (${view}): yürüyen ışık, 555 astabil ve BCD–7 parçalı örneklerinde görünen etiketler birbirine binmiyor (aralarında en az 7 px), yanlardan taşmıyor; ${mobile ? 'dokunulan (seçilen)' : 'üstüne gelinen'} parçanın etiketi görünüyor`,
+        rows.every((r) => r.ok),
+        rows.map((r) => `${r.id} ${r.rest.shown}/${r.rest.all} görünür · binen ${r.rest.pairs.length}${r.rest.pairs.length ? ' (' + r.rest.pairs.slice(0, 2).join(', ') + ')' : ''} · en dar aralık ${r.rest.gap ?? '—'} px · ${r.target}: ${r.active ? (r.active.ids.includes(r.target) ? 'görünür' : 'GİZLİ') + ', binen ' + r.active.pairs.length : 'yok'}`).join(' | '));
+      await ctx.close();
+    }
   }
   // --- 3B modeller ("3B: okunurluk önce"): doğru kılıf, sade ve küçük gövde; telefonda kare hızı -------------------
   // Kılıf biçimleri 3b-modeller'deki gibi (BC107 metal TO-18, IRF510 TO-220, BF245A D kesitli TO-92), ama gerçek

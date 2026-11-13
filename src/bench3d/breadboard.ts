@@ -556,14 +556,33 @@ function plan(doc: CircuitDoc, cols: number): BreadboardPlan {
   const boardsDepth = boardZ(boards - 1) + BB.depth / 2;
   const top = -BB.depth / 2;
   const leftEdge = -boardWidth(cols) / 2;
-  // Sol ve sağ sütun: yukarıdan aşağı, breadboard'ların ortasına göre; taban plakasının dışında.
+  // Sol ve sağ sütun: arkadan öne, taban plakasının dışında. Sütun breadboard'ların ortasına göre dizilir; ama hiçbir
+  // parça tahtanın ön kenarını (kameraya bakan yanı) geçmez: sütun tahtadan uzunsa ön kenara hizalanır ve arkaya
+  // uzar (Arduino + pil). Arkada cihazların önüne varacak kadar uzunsa kalan parçalar bir dış sütuna geçer.
+  const sideDepth = boardsDepth - top + BACK_GAP - 2;
   for (const side of ['left', 'right'] as const) {
-    const items = sides[side].map((p) => ({ p, t: tableOf(p) }));
-    const total = items.reduce((s, i) => s + i.t.d, 0) + SIDE_GAP * Math.max(0, items.length - 1);
-    let z = (top + boardsDepth) / 2 - total / 2;
-    for (const { p, t } of items) {
-      table.set(p.id, { partId: p.id, x: (side === 'left' ? -1 : 1) * (-leftEdge + 4 + t.w / 2), z: z + t.d / 2, rotation: t.rotation });
-      z += t.d + SIDE_GAP;
+    const columns: Array<Array<{ p: Part; t: ReturnType<typeof tableOf> }>> = [[]];
+    let used = 0;
+    for (const p of sides[side]) {
+      const t = tableOf(p);
+      const column = columns[columns.length - 1]!;
+      if (column.length > 0 && used + SIDE_GAP + t.d > sideDepth) {
+        columns.push([{ p, t }]);
+        used = t.d;
+      } else {
+        used += (column.length > 0 ? SIDE_GAP : 0) + t.d;
+        column.push({ p, t });
+      }
+    }
+    let inner = -leftEdge + 4;
+    for (const items of columns) {
+      const total = items.reduce((s, i) => s + i.t.d, 0) + SIDE_GAP * Math.max(0, items.length - 1);
+      let z = Math.min((top + boardsDepth) / 2 - total / 2, boardsDepth - total);
+      for (const { p, t } of items) {
+        table.set(p.id, { partId: p.id, x: (side === 'left' ? -1 : 1) * (inner + t.w / 2), z: z + t.d / 2, rotation: t.rotation });
+        z += t.d + SIDE_GAP;
+      }
+      inner += Math.max(0, ...items.map((i) => i.t.w)) + SIDE_GAP;
     }
   }
   /** Kablonun tahtadaki deliği bu x'e göre seçilir (`slot`). */

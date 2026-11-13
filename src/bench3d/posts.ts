@@ -48,6 +48,8 @@ export interface Post {
   readonly net: string;
   /** Direğin üstündeki kısa ad (GND, +12 V, CH1, GİRİŞ…). */
   readonly name: string;
+  /** Açık ad: direğe dokununca ya da üstüne gelince görünür ("K1 röle · normalde açık uç", "T1 trafo · sekonder 1"). */
+  readonly title: string;
   /** Direğin ve tahtaya giden telin rengi (adı veren kablonun rengi). */
   readonly color: string;
   /** Direğin ekseni (dünya): x ve z. */
@@ -142,22 +144,39 @@ export function cableColor(part: Part, pin: number, ground: boolean): string {
   }
 }
 
-/** Ağa ad verme önceliği (küçük olan kazanır): kaynaklar, sonra osiloskop, sonra ölçü aletleri. */
-function nameOf(part: Part, pin: number): { rank: number; name: string } {
+/**
+ * Ağa ad verme önceliği (küçük olan kazanır): kaynaklar, sonra osiloskop, sonra ölçü aletleri. `name`: direğin
+ * üstündeki kısa ad; `title`: açık ad (cihazın ya da parçanın etiketi, türü ve ucun açık adı).
+ */
+function nameOf(part: Part, pin: number): { rank: number; name: string; title: string } {
   const t = tr.bench.posts;
+  const long = t.long;
   switch (part.type) {
-    case 'dcsupply':
-      return pin % 2 === 0 ? { rank: 0, name: t.plus(volts(numProp(part.props, pin === 0 ? 'voltage1' : 'voltage2', 0))) } : { rank: 5, name: t.minus(part.label) };
+    case 'dcsupply': {
+      const v = volts(numProp(part.props, pin === 0 ? 'voltage1' : 'voltage2', 0));
+      return pin % 2 === 0 ? { rank: 0, name: t.plus(v), title: long.supplyPlus(part.label, v) } : { rank: 5, name: t.minus(part.label), title: long.supplyMinus(part.label) };
+    }
     case 'funcgen':
-      return pin === 0 ? { rank: 1, name: t.input } : pin === 1 ? { rank: 2, name: t.ttl } : { rank: 6, name: t.com };
+      return pin === 0
+        ? { rank: 1, name: t.input, title: long.generator(part.label, long.generatorPins[0]!) }
+        : pin === 1
+          ? { rank: 2, name: t.ttl, title: long.generator(part.label, long.generatorPins[1]!) }
+          : { rank: 6, name: t.com, title: long.generator(part.label, long.generatorPins[2]!) };
     case 'oscilloscope':
-      return pin < 2 ? { rank: 3, name: t.channel(pin + 1) } : { rank: 6, name: t.com };
-    case 'battery':
-      return pin === 0 ? { rank: 0, name: t.plus(volts(numProp(part.props, 'voltage', 9))) } : { rank: 5, name: t.minus(part.label) };
-    default:
+      return pin < 2 ? { rank: 3, name: t.channel(pin + 1), title: long.scopeChannel(part.label, pin + 1) } : { rank: 6, name: t.com, title: long.scopeGround(part.label) };
+    case 'battery': {
+      const v = volts(numProp(part.props, 'voltage', 9));
+      return pin === 0 ? { rank: 0, name: t.plus(v), title: long.batteryPlus(part.label, v) } : { rank: 5, name: t.minus(part.label), title: long.side(part.label, long.sideWord.battery!, long.sidePins.battery![1]!) };
+    }
+    default: {
       // Tahta dışı parça (motor, lamba, röle…): en düşük öncelik; ad parçanın etiketi ve ucun kısa adı.
-      if (isSidePart(part.type)) return { rank: 7, name: t.pin(part.label, t.sideShort[part.type]?.[pin] ?? String(pin + 1)) };
-      return { rank: 4, name: pin === 0 ? t.meterPlus(part.label) : t.meterMinus(part.label) };
+      if (isSidePart(part.type)) {
+        const word = long.sideWord[part.type] ?? tr.devices.names[part.type].toLocaleLowerCase('tr');
+        return { rank: 7, name: t.pin(part.label, t.sideShort[part.type]?.[pin] ?? String(pin + 1)), title: long.side(part.label, word, long.sidePins[part.type]?.[pin] ?? long.nth(pin + 1)) };
+      }
+      const word = tr.devices.names[part.type].toLocaleLowerCase('tr');
+      return { rank: 4, name: pin === 0 ? t.meterPlus(part.label) : t.meterMinus(part.label), title: long.side(part.label, word, pin === 0 ? long.meterPins[0]! : long.meterPins[1]!) };
+    }
   }
 }
 
@@ -190,11 +209,16 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
     const named = ranked[0]!;
     // Besleme ağı (pilin + ucu): ölçü aletinin adı yerine gerilim.
     const battery = doc.parts.find((p) => p.type === 'battery' && reference.netOf.get(pinKey(p.id, 0)) === net);
-    const first = ground(net) ? tr.bench.groundNet : named.rank >= 3 && battery ? tr.bench.posts.plus(volts(numProp(battery.props, 'voltage', 9))) : named.name;
-    let name = [first, ...ranked.map((r) => r.name)].find((n) => !used.has(n)) ?? first;
-    for (let k = 2; used.has(name); k++) name = `${first} ${k}`;
+    const head = ground(net)
+      ? { name: tr.bench.groundNet, title: tr.bench.posts.long.ground }
+      : named.rank >= 3 && battery
+        ? nameOf(battery, 0)
+        : named;
+    const picked = [head, ...ranked].find((n) => !used.has(n.name)) ?? head;
+    let name = picked.name;
+    for (let k = 2; used.has(name); k++) name = `${head.name} ${k}`;
     used.add(name);
-    return { net, items, target, name, color: cableColor(named.part, named.pin, ground(net)) };
+    return { net, items, target, name, title: picked.title, color: cableColor(named.part, named.pin, ground(net)) };
   });
   // Sıra: telin tercih ettiği şeridin x'i (ray deliğinde deliğin kendi hizası, satır deliğinde yarım delik solu).
   const laneX = (n: { target: { hole: Hole; at: { x: number } } }) => n.target.at.x - (n.target.hole.kind === 'strip' ? 0.5 : 0);
@@ -205,7 +229,7 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
   const gap = Math.max(2, Math.min(POST.spacing, nets.length > 1 ? (2 * half) / (nets.length - 1) : POST.spacing));
   const xs = spread(nets.map((n) => n.target.at.x), gap, -half, half);
   const z = -BB.depth / 2 - POST.behind;
-  const posts: Post[] = nets.map((n, i) => ({ net: n.net, name: n.name, color: n.color, x: xs[i]!, z }));
+  const posts: Post[] = nets.map((n, i) => ({ net: n.net, name: n.name, title: n.title, color: n.color, x: xs[i]!, z }));
   const postOf = new Map(nets.map((n, i) => [n.net, i]));
 
   // Kablolar: şemanın planındaki her cihaz ucu kendi ağının direğine; çizilen yerleşimde deliği varsa `lead`.

@@ -67,6 +67,8 @@ export interface BenchCallbacks {
   onView?(): void;
   /** Bir ağın kabloları vurgulandı (kablonun ya da direğin üstüne gelince, telefonda dokununca) ya da vurgu kalktı (null). */
   onNet?(net: string | null): void;
+  /** Fare bir parçanın üstüne geldi (yer bulamadığı için gizlenen etiketi gösterilir) ya da üstünden çıktı (null). */
+  onHoverPart?(partId: string | null): void;
 }
 
 /** Tepeden görünümde ekran = dünya · scale + (ox, oy) (piksel; x sağa, z aşağı). */
@@ -106,10 +108,21 @@ function boxCorners(b: Box3): Vector3[] {
 }
 
 /**
- * Masa üstü cihaz varken Serbest: yükseklik açısı (alçaldıkça tahta daha az yer kaplar, arkadaki ön paneller
- * daha çok görünür; telefonun 3B alanı kısa) ve tahtanın kadraj genişliğindeki payı.
+ * Masa üstü cihaz varken Serbest: yükseklik açısı ve tahtanın kadraj genişliğindeki payı. Açı üç ekranda da 48°
+ * (2026-11-13; eskiden masaüstü 36°, telefon 30°, dikey telefonda cihazların üstü görünsün diye 24°): dik bakınca
+ * öndeki parça arkasındakini daha az örter. 48°, 81 örnekte ve üç ekranda 50° ile aynı sonucu veren en küçük açı
+ * (docs/KARARLAR.md → "3B: dik kamera, açık adlar, etiketler"). Tahta payı değişmez: yalnızca uzaklık ayarlanır.
  */
-const BENCH_FREE = { desktop: { elevation: (36 * Math.PI) / 180, share: 0.47 }, phone: { elevation: (30 * Math.PI) / 180, share: 0.72 }, tall: (24 * Math.PI) / 180, floor: 0.7 };
+const FREE_ELEVATION = (48 * Math.PI) / 180;
+/** `low`: eski eğim; dik bakışta tahta payı tutmuyorsa (kısa, geniş kadraj) eğim en çok buraya kadar düşer. */
+const BENCH_FREE = {
+  desktop: { elevation: FREE_ELEVATION, share: 0.47, low: (36 * Math.PI) / 180 },
+  phone: { elevation: FREE_ELEVATION, share: 0.72, low: (30 * Math.PI) / 180 },
+  tall: FREE_ELEVATION,
+  floor: 0.7,
+};
+/** Etiketler arasındaki en az boşluk (px): etiketler ekranda birbirine binmez, yığın gibi de görünmez. */
+export const LABEL_GAP = 8;
 /** Bu genişlikten dar tuval telefon sayılır (px). */
 const PHONE_WIDTH = 640;
 /** Cihazlar görünümü (masaüstü): ön paneller kullanılabilir yüksekliğin en az bu kadarını doldurur. */
@@ -255,6 +268,10 @@ export class BenchScene {
   private animating = false;
   private lastTime = performance.now();
   private fitted = false;
+  /** Farenin altındaki parça (etiketi öncelik alır). */
+  private hoverPart: string | null = null;
+  /** Denetim (eğim taraması, ios-kontrol): Serbest kadrajın yükseklik açısını (radyan) geçici olarak değiştirir. */
+  freeElevation: number | null = null;
   private dark = false;
   /** Kullanıcı kamerayı elle oynattı mı (oynatmadıysa alan değişince yeniden sığdırılır). */
   private userMoved = false;
@@ -394,9 +411,12 @@ export class BenchScene {
     const canvas = this.renderer.domElement;
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
-    // Önce boyutlar okunur, sonra yazılır (düzen bir kez hesaplanır). Öncelik: uç harfleri, seçili
-    // parça, ölçü aletleri, öbürleri; çakışan etiketlerden önceliği düşük olan gizlenir. Katmandaki
-    // engellerle ([data-obstacle]: telefonda hareket ipucu) çakışan etiket de gizlenir.
+    // Önce boyutlar okunur, sonra yazılır (düzen bir kez hesaplanır). Öncelik: uç harfleri, seçili ya da üstüne
+    // gelinen parça (ve vurgulanan ağın direği), direkler, ölçü aletleri, öbürleri. Etiketler ekranda birbirine
+    // binmez (aralarında en az LABEL_GAP): yer yoksa etiket kaydırılır (sağ, sol, üst, alt, çaprazlar); yine yoksa
+    // gizlenir ve yalnızca parçası seçilince ya da üstüne gelinince görünür. Etiket başka bir parçanın ya da direğin
+    // noktasını da örtmez (hangi etiketin hangi parçaya ait olduğu karışmasın). Katmandaki engellerle
+    // ([data-obstacle]: telefonda hareket ipucu) çakışan etiket de gizlenir.
     const items = [...el.querySelectorAll<HTMLElement>('[data-anchor]')].map((node) => ({
       node,
       w: node.offsetWidth,
@@ -472,6 +492,17 @@ export class BenchScene {
       }
       nodes.forEach((n, k) => pinSpots.set(n, spots[k]!));
     }
+    // Her etiketli parçanın ve direğin ekrandaki noktası: başka bir etiket bu noktanın üstüne oturmaz.
+    const DOT = 7;
+    const dots: Array<{ node: HTMLElement; x: number; y: number }> = [];
+    for (const { node } of items) {
+      if (node.dataset.anchor === 'footprint' || node.dataset.pin !== undefined || node.dataset.exact !== undefined) continue;
+      const placed = this.parts.get(node.dataset.id ?? '');
+      const world = placed ? placed.top : node.dataset.anchor === 'post' ? this.postAt.get(node.dataset.net ?? '') : undefined;
+      if (!world) continue;
+      const q = toScreen(world);
+      if (q.z > -1 && q.z < 1) dots.push({ node, x: q.x, y: q.y });
+    }
     for (const item of items) {
       const { node } = item;
       if (node.dataset.anchor === 'footprint') continue;
@@ -490,6 +521,8 @@ export class BenchScene {
           node.style.opacity = z > -1 && z < 1 ? '1' : '0';
           continue;
         }
+        // Öncelikli etiket (seçili ya da üstüne gelinen parça, vurgulanan ağın direği) başka noktaları örtebilir.
+        const keen = item.priority >= 5;
         // Parça etiketi: önce ucun üstünde; başka bir etiketle (4 px aralı) çakışırsa sağında, solunda, bir
         // kat yukarıda ya da altında; hiçbiri olmazsa gizlenir. Uç harfi her zaman ucun üstünde.
         const spots =
@@ -501,6 +534,14 @@ export class BenchScene {
                 { x0: x - item.w - 6, y0: y - item.h - 4 },
                 { x0: x - item.w / 2, y0: y - 2 * item.h - 12 },
                 { x0: x - item.w / 2, y0: y + 8 },
+                // Çaprazlar ve bir kat daha uzak: kalabalık yerde etiket parçasından biraz uzağa kayar.
+                { x0: x + 10, y0: y - 2 * item.h - 12 },
+                { x0: x - item.w - 10, y0: y - 2 * item.h - 12 },
+                { x0: x + 12, y0: y - item.h / 2 },
+                { x0: x - item.w - 12, y0: y - item.h / 2 },
+                { x0: x + 6, y0: y + 8 },
+                { x0: x - item.w - 6, y0: y + 8 },
+                { x0: x - item.w / 2, y0: y - 3 * item.h - 20 },
               ];
         // Varsayılan kadrajda arkadaki cihazların üstü kırpılır: etiketin noktası görüntünün üstünde kalınca
         // etiket üst kenara, gövdenin görünen kısmının üstüne iner (iki sıra). Gövdenin görünen genişliği etiketin
@@ -517,15 +558,18 @@ export class BenchScene {
         }
         // Parça etiketi yanlardan kesilmez: noktası görüntüdeyse kenara dayanmış konum da denenir.
         if (pin === undefined && x >= 0 && x <= w) spots.splice(1, 0, { x0: Math.max(4, Math.min(w - item.w - 4, x - item.w / 2)), y0: y - item.h - 4 });
-        const GAP = 4;
+        const GAP = LABEL_GAP;
         for (const box of spots) {
           const rect = { ...box, x1: box.x0 + item.w, y1: box.y0 + item.h };
           const inside = pin === undefined ? rect.x0 >= 0 && rect.x1 <= w && rect.y0 >= 0 : rect.x1 > 0 && rect.x0 < w && rect.y1 > 0;
           const inView = z > -1 && z < 1 && inside && rect.y0 < h;
           const clash = pin === undefined && taken.some((r) => rect.x0 < r.x1 + GAP && rect.x1 > r.x0 - GAP && rect.y0 < r.y1 + GAP && rect.y1 > r.y0 - GAP);
-          if (!inView || clash) continue;
+          // Başka bir parçanın ya da direğin noktasının üstüne oturmaz (kendi noktası serbest).
+          const covers = pin === undefined && !keen && dots.some((d) => d.node !== node && d.x > rect.x0 - DOT && d.x < rect.x1 + DOT && d.y > rect.y0 - DOT && d.y < rect.y1 + DOT);
+          if (!inView || clash || covers) continue;
           show = true;
-          if (pin === undefined) taken.push(rect);
+          // Uç harfleri de yer tutar: parça etiketleri onların üstüne binmez.
+          taken.push(rect);
           node.style.transform = `translate(${Math.round(rect.x0)}px, ${Math.round(rect.y0)}px)`;
           break;
         }
@@ -1267,7 +1311,7 @@ export class BenchScene {
     if (box.isEmpty()) box.set(new Vector3(-20, 0, -20), new Vector3(20, 5, 20));
     const center = box.getCenter(new Vector3());
     const size = box.getSize(new Vector3());
-    const elevation = ELEVATION[view];
+    const elevation = view === 'free' && this.freeElevation !== null ? this.freeElevation : ELEVATION[view];
     // Masa üstü cihazlar (dik, uzun) varsa: kameranın açısıyla bütün nesnelerin köşeleri kadraja sığdırılır
     // (yükseklik dahil, ortalı); yoksa düz tezgâh için eski yarıçap kuralı.
     const tall = top ? null : this.tallFit(elevation, view);
@@ -1391,16 +1435,31 @@ export class BenchScene {
     // görünür (yanlardakiler yine kadrajın dışına taşabilir); biraz daha alçaktan (24°) bakılır, tahta payı korunsun.
     // Kısa alanda (iPhone SE) cihazlar tamamen görünürse tahta payı %70'in altına düşer: o zaman eskisi gibi üstleri kırpılır.
     const tops = this.isPhone() && !short && canvas.clientHeight >= canvas.clientWidth ? tall.flatMap((p) => boxCorners(new Box3().setFromObject(p.group))) : [];
-    const { elevation, share } = this.isPhone() ? BENCH_FREE.phone : BENCH_FREE.desktop;
+    const base = this.isPhone() ? BENCH_FREE.phone : BENCH_FREE.desktop;
+    const share = base.share;
+    const elevation = this.freeElevation ?? base.elevation;
     const reserve = this.bottomReserve(0.5 - share / 2, 0.5 + share / 2) / Math.max(1, canvas.clientHeight);
     // Telefonda masadaki alçak parçalar (pil) kenara daha çok yaklaşabilir: tahta payı küçülmesin.
     const wide = this.isPhone() ? 0.985 : 0.94;
     if (tops.length > 0) {
-      const whole = this.solveFrame(BENCH_FREE.tall, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.97, false, wide, tops);
-      if (whole.share >= BENCH_FREE.floor) return { target: whole.target, distance: whole.distance, elevation: BENCH_FREE.tall };
+      const tallElevation = this.freeElevation ?? BENCH_FREE.tall;
+      const whole = this.solveFrame(tallElevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.97, false, wide, tops);
+      if (whole.share >= BENCH_FREE.floor) return { target: whole.target, distance: whole.distance, elevation: tallElevation };
     }
-    const solved = this.solveFrame(elevation, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9, false, wide);
-    return { target: solved.target, distance: solved.distance, elevation };
+    const solve = (e: number) => this.solveFrame(e, boxCorners(this.boardView), keep, share, -1 + 2 * reserve, 0.9, false, wide);
+    let angle = elevation;
+    let solved = solve(angle);
+    // Tahta payı önce gelir ("tahta en az %70"; masaüstünde hedef pay): kısa ve geniş kadrajda (yatay telefonda tam
+    // ekran) dik bakınca tahtanın derinliği yüksekliğe sığmaz, uzaklık artar, pay düşer. O zaman eğim, pay eski
+    // eğimdeki değerine (en çok kuralın sınırına) dönene kadar 2°'lik adımlarla düşürülür.
+    if (this.freeElevation === null && angle > base.low) {
+      const floor = Math.min(this.isPhone() ? BENCH_FREE.floor : base.share - 0.02, solve(base.low).share) - 0.005;
+      while (solved.share < floor && angle > base.low + 1e-9) {
+        angle = Math.max(base.low, angle - (2 * Math.PI) / 180);
+        solved = solve(angle);
+      }
+    }
+    return { target: solved.target, distance: solved.distance, elevation: angle };
   }
 
   /**
@@ -1632,7 +1691,14 @@ export class BenchScene {
 
   private readonly onPointerMove = (e: PointerEvent) => {
     // Fareyle bir kablonun ya da kıskacın üstüne gelince o ağ vurgulanır (dokunmatikte dokununca: onPointerUp).
-    if (!this.drag && e.pointerType === 'mouse' && e.buttons === 0 && !this.topView) this.highlightNet(this.pickNet(e));
+    if (!this.drag && e.pointerType === 'mouse' && e.buttons === 0 && !this.topView) {
+      this.highlightNet(this.pickNet(e));
+      const hover = this.pick(e)?.part.id ?? null;
+      if (hover !== this.hoverPart) {
+        this.hoverPart = hover;
+        this.cb.onHoverPart?.(hover);
+      }
+    }
     if (!this.drag) return;
     const position = Math.max(0, Math.min(100, this.drag.start + (e.clientX - this.drag.x) * 0.5));
     if (Math.abs(position - this.drag.position) >= 0.5) {

@@ -185,6 +185,8 @@ export function BenchView(props: BenchViewProps) {
   const index = useMemo(() => netIndex(doc, props.connectivity), [doc, props.connectivity]);
   const posts = useMemo(() => layoutPosts(doc, referencePlan).posts, [doc, referencePlan]);
   const [hoverNet, setHoverNet] = useState<string | null>(null);
+  // Farenin altındaki parça: yer bulamadığı için gizlenen etiketi öncelik alır ve görünür.
+  const [hoverPart, setHoverPart] = useState<string | null>(null);
   const highlightWires = useMemo(() => {
     if (!hoverNet || !schematicPlan) return null;
     const nets = new Set<number>();
@@ -243,7 +245,7 @@ export function BenchView(props: BenchViewProps) {
     setCameraLabel(choice);
     setCamera((c) => (choice === 'part' ? (single ? { n: c.n + 1, view: 'part', partId: single } : c) : { n: c.n + 1, view: choice }));
   };
-  const callbacks: BenchCallbacks = { ...props.callbacks, onCamera: () => setCameraLabel('free'), onNet: setHoverNet };
+  const callbacks: BenchCallbacks = { ...props.callbacks, onCamera: () => setCameraLabel('free'), onNet: setHoverNet, onHoverPart: setHoverPart };
 
   // Etiketler: telefonda yalnızca seçili parça ve ölçü aletleri; toprak sembolü etiketsiz.
   const top = props.top ?? null;
@@ -302,7 +304,14 @@ export function BenchView(props: BenchViewProps) {
           bir engeldir: sahnenin altında, düğmelerin üstünde; çakışan etiket ipucu kalkana kadar gizlenir. */}
       <div ref={setOverlay} className="pointer-events-none absolute inset-0 overflow-hidden">
         {labelled.map((part) => (
-          <BenchLabel key={part.id} part={part} frame={slow && (!props.liveHidden || METERS.has(part.type)) ? slow : null} measured={props.measured} selected={selection.includes(part.id)} />
+          <BenchLabel
+            key={part.id}
+            part={part}
+            frame={slow && (!props.liveHidden || METERS.has(part.type)) ? slow : null}
+            measured={props.measured}
+            selected={selection.includes(part.id)}
+            hovered={hoverPart === part.id}
+          />
         ))}
         {labels &&
           posts.map((post) => (
@@ -310,11 +319,13 @@ export function BenchView(props: BenchViewProps) {
               key={`post-${post.net}`}
               data-anchor="post"
               data-net={post.net}
-              data-priority={3}
+              data-open={hoverNet === post.net ? '' : undefined}
+              data-priority={hoverNet === post.net ? 5 : 3}
               aria-hidden="true"
-              className="absolute top-0 left-0 rounded-md bg-ink px-1.5 py-0.5 text-[11px] leading-tight font-semibold whitespace-nowrap text-on-ink opacity-0 shadow-md"
+              className={`absolute top-0 left-0 rounded-md px-1.5 py-0.5 text-[11px] leading-tight font-semibold whitespace-nowrap opacity-0 shadow-md ${hoverNet === post.net ? 'z-10 bg-accent text-white' : 'bg-ink text-on-ink'}`}
             >
-              {post.name}
+              {/* Kısa ad; direğe dokununca ya da üstüne gelince (ağ vurgulanınca) açık ad. */}
+              {hoverNet === post.net ? post.title : post.name}
             </span>
           ))}
         {lettered &&
@@ -324,7 +335,7 @@ export function BenchView(props: BenchViewProps) {
               data-anchor="pin"
               data-id={lettered.id}
               data-pin={i}
-              data-priority={4}
+              data-priority={6}
               aria-hidden="true"
               className="absolute top-0 left-0 flex h-6 min-w-6 items-center justify-center rounded-full bg-accent px-1 font-mono text-[13px] font-semibold text-white opacity-0 shadow-sm"
             >
@@ -428,14 +439,14 @@ export function BenchView(props: BenchViewProps) {
 }
 
 /** Kameraya dönük etiket: ad · değer; çalışırken ölçüm (ölçü aletinde büyük). Seçili parçanınki mavi. */
-function BenchLabel({ part, frame, measured, selected }: { part: Part; frame: SimFrame | null; measured: ReadonlySet<string> | null; selected: boolean }) {
+function BenchLabel({ part, frame, measured, selected, hovered }: { part: Part; frame: SimFrame | null; measured: ReadonlySet<string> | null; selected: boolean; hovered: boolean }) {
   const reading = frame && (measured === null || measured.has(part.id)) ? cardReading(part, frame) : null;
   const meter = METERS.has(part.type);
   return (
     <div
       data-anchor="part"
       data-id={part.id}
-      data-priority={selected ? 3 : meter ? 2 : 1}
+      data-priority={selected || hovered ? 5 : meter ? 2 : 1}
       aria-hidden="true"
       className={`absolute top-0 left-0 flex flex-col rounded-lg px-2.5 py-1.5 leading-tight whitespace-nowrap opacity-0 shadow-md ${selected ? 'bg-accent text-white' : 'bg-ink text-on-ink'}`}
     >
