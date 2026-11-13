@@ -2321,12 +2321,118 @@ kalan madde bilinen kararsız "telefon hızı (4 kat yavaş işlemci)" (şema g�
 Tek başına yinelenince yeni derlemede 4 koşunun 3'ü geçti (en yavaş örnek 29,4 / 37,5 / 35,4 / 34,4 kare/s; sınır 30),
 3b-modeller derlemesinde 3 koşunun 3'ü (36,4 / 36,8 / 37,7).
 
-**Açık sorular** (kullanıcıya soruldu).
+**Açık sorular** (kullanıcıya soruldu; kararlar: "3B: dik kamera, açık adlar, etiketler").
 
 - Tahta dışı parçaların kabloları da direklere gitsin mi (şimdiki), yoksa yalnızca cihazlarınki mi?
 - Art arda satırlardaki parçalar (yukarıdaki liste) için: kamera eğimi mi artsın, plan mı seyrekleşsin, böyle mi
   kalsın?
 - Direk adlarında tahta dışı parçalar: "M1 +", "K1 NA", "T1 S1" yeterince açık mı?
+
+### 3B: dik kamera, açık adlar, etiketler (2026-11-13)
+
+"3B: okunurluk önce"nin açık sorularına kullanıcının kararları ve dört düzeltme (dal `3b-sade-2`).
+
+**Karar 1: tahta dışı parçaların kabloları direklerde kalır** (pil, motor, röle, lamba, hoparlör, transformatör…;
+Arduino'nun atlama telleri doğrudan deliklere).
+
+**Karar 2: varsayılan kamera dikleşti (48°).** İstek: 81 örneğin hepsinde, üç ekranda hiçbir tahta parçasının %10'dan
+fazla örtülmediği en küçük eğim, en çok 50°; "tahta en az %70" korunur, gerekirse yalnızca uzaklık ayarlanır; tahta
+planına, Tahtada kur'a ve KiCad'e dokunulmaz.
+
+- Tarama: masa üstü cihazı olan örneklerde varsayılan eğim masaüstünde 36°, yatay telefonda 30°, dikey telefonda 24°
+  (cihazların üstü sığıyorsa) ya da 30° idi; 36°'den 50°'ye 2°'lik adımlarla her örnek ve her ekranda yeniden
+  kadrajlanıp örtülme ölçüldü (`scene.freeElevation` denetim kancası).
+- Sonuç: **50°'ye kadar hiçbir eğimde 81 örneğin hepsi geçmiyor.** %10'u aşan örnek sayısı (masaüstü / dikey / yatay):
+
+  | Eğim | Masaüstü | Dikey telefon | Yatay telefon |
+  |---|---|---|---|
+  | eski varsayılan (36° / 24–30° / 30°) | 13 | 13 | 13 |
+  | 36°, 38° | 13 | 13 | 13 |
+  | 40° | 12 | 11 | 13 |
+  | 42° | 12 | 10 | 13 |
+  | 44°, 46° | 10 | 10 | 13 |
+  | 48°, 50° | 10 | 10 | 12 |
+
+  Sayılara masa üstü cihazı olmayan (zaten 52°'den bakılan) altı örnek dahildir; eğim onları etkilemez.
+
+- **48°**, üç ekranda da 50° ile aynı örnekleri geçiren en küçük eğim; 50°'de paylar 1–3 puan daha düşük, geçen örnek
+  aynı. Masa üstü cihazı olan örneklerde üç ekranın varsayılan eğimi 48° oldu (`FREE_ELEVATION`); tahta payı değişmedi
+  (masaüstü %47, telefon %72): yalnızca uzaklık ayarlanır.
+- Masa üstü cihazı olmayan örnekler zaten 52°'den bakılıyordu (`ELEVATION.free`); onlara dokunulmadı.
+- Sonuç olarak değişen: dikey telefonda arkadaki cihazların üstü artık kadraja sığmaz (24°'lik "cihazların üstü
+  kırpılmaz" kadrajı kalktı; kısa ekrandaki eski davranış: üstler kırpılır, tahta %72 kalır). Cihazların tamamı
+  Kamera → Cihazlar'da görünür.
+- 48°'de (ve 50°'de) hâlâ %10'u aşan örnekler (dokunulmadı; plan ve parça yerleşimi sabit):
+
+  | Örnek | En çok örtülen parça (masaüstü / dikey / yatay) |
+  |---|---|
+  | `yuruyen-isik` (cihazsız, 52°) | LED1 %43 / %43 / %44 (yanındaki LED ve bir köprü teli) |
+  | `kopru-diyot` | S1 %29 / %29 / %30 |
+  | `baraj-tek-isik` (cihazsız, 52°) | C3 %28 / %27 / %28 |
+  | `opamp-karsilastirici` (cihazsız, 52°) | LED2 %25 / %22 / %25 |
+  | `gerilim-katlayici` | C2 %21 / %21 / %23 |
+  | `baraj-cubuk` (cihazsız, 52°) | C2 %18 / %20 / %17 |
+  | `potansiyometre` | LED1 %18 / %16 / %22 |
+  | `ard-trafik-isigi` (cihazsız, 52°) | LED2 %17 / %16 / %17 |
+  | `bcd-7-segment` (cihazsız, 52°) | S2 %15 / %14 / %14 |
+  | `role` | LED1 %14 / %16 / %22 |
+  | `motor-h-koprusu` | geçti / geçti / S1 %18 |
+  | `7805-besleme` | geçti / geçti / C1 %13 |
+
+  Düzelenler: `555-astabil` (üç ekran), `7805-besleme` ve `motor-h-koprusu` (masaüstü ve dikey). Kalanlarda örten,
+  bir satır önüne takılı komşu parçadır; 50°'de de aşarlar (50°'de paylar: yürüyen ışık %44, köprü diyot %28,
+  karşılaştırıcı %26, gerilim katlayıcı %20, potansiyometre %15, röle %13).
+- **Tahta payı hiçbir örnekte düşmedi.** Kısa ve geniş kadrajda (yatay telefonda tam ekran: 48°'de pay %72'den %53'e
+  iniyordu) ve yanında pil, motor ya da trafo olan dokuz örnekte telefonda (pay zaten %59–64: kadraja yan parçalar da
+  sığar) eğim, pay eski değerine dönene kadar 2°'lik adımlarla düşer: dikeyde 38–42°, yatayda 34–36°
+  (`transformator`, `adaptor`, `transformator-dc`, `role`, `dc-motor`, `motor-jenerator`, `motor-h-koprusu`,
+  `lamba-ani-akim`, `sigorta`). Masaüstünde 55, telefonda 46 cihazlı örnek 48°'dedir.
+
+**Karar 3: direk adları kısa kalır, açık adı dokununca ya da üstüne gelince görünür.** `Post.title` (`posts.ts`,
+metinler `tr.bench.posts.long`): cihazın ya da parçanın etiketi, türü ve ucun açık adı.
+
+| Kısa ad | Açık ad |
+|---|---|
+| `GND` | GND · toprak (ortak uç) |
+| `+12 V` | PS1 güç kaynağı · + çıkış (12 V) ya da B1 pil · + uç (12 V) |
+| `PS1 −` | PS1 güç kaynağı · − çıkış |
+| `GİRİŞ`, `TTL`, `COM` | FG1 fonksiyon üreteci · çıkış (OUT) / TTL çıkışı / ortak uç (COM) |
+| `CH1`, `CH2` | OSC1 osiloskop · 1. kanal (CH1) / 2. kanal (CH2) |
+| `A1 +`, `V1 −` | A1 ampermetre · + uç, V1 voltmetre · − uç |
+| `K1 NA`, `K1 NK`, `K1 C`, `K1 S1` | K1 röle · normalde açık uç / normalde kapalı uç / ortak uç / sargı ucu 1 |
+| `T1 P1`, `T1 S1` | T1 trafo · primer 1, T1 trafo · sekonder 1 |
+| `M1 +`, `LP1 1`, `HP1 1`, `H1 3` | M1 motor · + uç, LP1 lamba · 1. uç, HP1 hoparlör · 1. uç, H1 su haznesi · 3. seviye probu |
+
+Masaüstünde fare direğin, fişlerinin, kablosunun ya da telinin üstüne gelince; telefonda dokununca ağ vurgulanır ve
+direğin etiketi açık adı gösterir (mavi, öncelikli: başka etiketler ona yer açar). Vurgu kalkınca kısa ad geri gelir.
+
+**Düzeltme 4: tahta dışı parçalar ve Arduino hiçbir zaman tahtanın önünde durmaz.** Yan sütun breadboard'ların
+ortasına göre diziliyordu; sütun tahtadan uzun olunca (Arduino 27 delik derin; Arduino + pil 33,5) öndeki parça
+tahtanın ön kenarını geçiyordu (`ard-role`'de B1 6 delik). Artık sütun ön kenara hizalanır ve arkaya uzar; arkada
+cihazların önüne varacak kadar uzunsa kalan parçalar bir dış sütuna geçer (`breadboard.ts`). Parçaların kablo delikleri
+değişmedi. `tests/tezgah-sade.test.ts` 81 örnekte hiçbir tahta dışı parçanın ve Arduino'nun gövdesinin ön kenarı
+geçmediğini denetler.
+
+**Düzeltme 5: etiketler.** Etiket kutuları zaten kesişmiyordu (çakışan etiket gizleniyordu); ama 4 px arayla yığılıp
+parçaların üstüne oturuyor, hangi etiketin hangi parçaya ait olduğu karışıyordu. Kurallar (`scene.ts` →
+`positionOverlay`):
+
+- Etiketler ekranda birbirine binmez; aralarında en az 8 px (`LABEL_GAP`). Uç harfleri de yer tutar.
+- Yer yoksa etiket kaydırılır: parçanın üstü, sağ üstü, sol üstü, iki kat üstü, altı, çaprazlar, yanlar, üç kat üstü.
+- Etiket başka bir parçanın ya da direğin noktasının üstüne oturmaz.
+- Hiçbir konum uymuyorsa etiket gizlenir; parçası **seçilince** ya da (masaüstünde) **üstüne gelinince** etiketi
+  öncelik alır ve görünür (öbür etiketler ona yer açar).
+- ios-kontrol "3B etiketler": yürüyen ışık, 555 astabil ve BCD–7 parçalı örneklerinde, üç ekranda görünen etiket
+  kutularından kesişen çift yok, en dar aralık en az 7 px, yanlardan taşan yok; etiketi gizli bir parçanın üstüne
+  gelince ya da dokununca etiketi görünüyor.
+
+**Denetim.** Birim testleri 2146 / 2146. Tahta parçalarının ve kabloların delikleri ile KiCad çıktısı 81
+örnekte main ile bayt bayt aynı. Tam ios-kontrol normal hızda 512 maddeden 511'i geçti, konsol hatası yok; kalan madde
+bilinen kararsız "telefon hızı (4 kat yavaş işlemci)" (şema görünümü; 3B planı o görünümde hesaplanmaz; önceki dalların
+tam koşularında da farklı örneklerle kalmıştı). Tek başına yinelenince 3 koşunun 2'si geçti (en yavaş örnek 32,7 /
+33,6 / 22,3 kare/s; sınır 30). Değişen ios-kontrol maddeleri: "Telefon 3B (iPhone 13)" artık cihazların üstünün
+kırpılmamasını istemez; "3B tahta parçaları örtülmüyor" varsayılan eğimi ve tahta payını da denetler; yeni maddeler
+"3B etiketler" (üç ekran), "3B direklerin açık adı", kablo maddesinde `ard-role`.
 
 ### Performans ve hata taraması (2026-10-27)
 
