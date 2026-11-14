@@ -1,8 +1,9 @@
 // Breadboard ve breadboard'a özgü parçalar: kart gövdesi (delikler, numaralar, raylar),
 // yatık jumper teli.
 
-import { BoxGeometry, CatmullRomCurve3, Group, Mesh, MeshStandardMaterial, TubeGeometry, Vector3 } from 'three';
+import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from 'three';
 import { BB, boardWidth, colX, railHoles, railX, railZ, stripRowZ } from './breadboard';
+import { PolyCurve, roundPath, tubeGeometry } from './cablePath';
 import { M, canvasTexture, mat, rod } from './kit';
 
 /** Deliğin breadboard yüzeyinden ne kadar içine girilir (bacak ve tel uçları). */
@@ -119,20 +120,28 @@ export function jumperPoints(a: Vector3, b: Vector3, shape: JumperShape = { lift
     const len = Math.hypot(dx, dz) || 1;
     return new Vector3(a.x + dx * t + (-dz / len) * side, top + dy, a.z + dz * t + (dx / len) * side);
   };
-  // Tel uçlarından kısa bir kavisle kalkar, sonra tam `lift` yüksekliğinde düz gider (eğri bu yüksekliği aşmaz:
-  // gövdelerin altından geçen tel gövdeye değmez).
+  // Tel uçlarından dik kalkar, tam `lift` yüksekliğinde düz gider (yol bu yüksekliği aşmaz: gövdelerin altından
+  // geçen tel gövdeye değmez), öbür deliğe dik iner; köşeler yuvarlatılır (jumperCurve). Yüksek tel (başka tellerin
+  // üstünden geçen) ucundan önce yarı yüksekliğe dik çıkar, sonra kısa bir eğimle tam yüksekliğe: ucu bir gövdenin
+  // (geniş göstergenin) altındaki tel gövdenin kenarından sıyırarak çıkar.
   const len = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+  const tall = lift > 0.9;
   const e = Math.min(0.25, 0.35 / len);
-  if (bow === 0) return [at(0, 0.05, 0), at(0, lift * 0.55, 0), at(e, lift, 0), at(0.5, lift, 0), at(1 - e, lift, 0), at(1, lift * 0.55, 0), at(1, 0.05, 0)];
   // Yana açılan tel: dik ucundan hemen sonra (≈ 0,7 birim) yana çıkar, öbür ucuna yakın geri döner.
   const d = Math.min(0.3, Math.max(0.08, 0.7 / len));
-  return [at(0, 0.05, 0), at(0, lift * 0.55, 0), at(d, lift, bow), at(0.5, lift, bow), at(1 - d, lift, bow), at(1, lift * 0.55, 0), at(1, 0.05, 0)];
+  if (bow === 0) return tall ? [at(0, 0, 0), at(0, lift * 0.55, 0), at(e, lift, 0), at(1 - e, lift, 0), at(1, lift * 0.55, 0), at(1, 0, 0)] : [at(0, 0, 0), at(0, lift, 0), at(1, lift, 0), at(1, 0, 0)];
+  return tall
+    ? [at(0, 0, 0), at(0, lift * 0.55, 0), at(d, lift, bow), at(1 - d, lift, bow), at(1, lift * 0.55, 0), at(1, 0, 0)]
+    : [at(0, 0, 0), at(0, lift, 0), at(d, lift, bow), at(1 - d, lift, bow), at(1, lift, 0), at(1, 0, 0)];
 }
 
+/** Köprü telinin köşe yarıçapı: hedef 4 tel çapı; alçak telde yüksekliği kadar (yay doğrulara sığacak kadar küçülür). */
+export const JUMPER_BEND = 8 * JUMPER_RADIUS;
+
 /** Breadboard üstünde iki delik arasında yatık jumper teli (uçları soyuk). */
-/** Jumper telinin eğrisi (dayanak noktalarından geçen yumuşak eğri). */
-export function jumperCurve(a: Vector3, b: Vector3, shape?: JumperShape): CatmullRomCurve3 {
-  return new CatmullRomCurve3(jumperPoints(a, b, shape), false, 'centripetal');
+/** Jumper telinin yolu: dayanak noktalarının köşeleri yuvarlatılmış (yolun sık noktaları `points`'te). */
+export function jumperCurve(a: Vector3, b: Vector3, shape?: JumperShape): PolyCurve {
+  return new PolyCurve(roundPath(jumperPoints(a, b, shape), JUMPER_BEND).points);
 }
 
 /** Breadboard üstünde iki delik arasında yatık jumper teli (uçları soyuk). */
@@ -142,7 +151,8 @@ export function jumperMesh(a: Vector3, b: Vector3, color: string, shape?: Jumper
   const dist = Math.hypot(b.x - a.x, b.z - a.z);
   const curve = jumperCurve(a, b, shape);
   g.userData.curve = curve;
-  g.add(new Mesh(new TubeGeometry(curve, Math.max(12, Math.round(dist * 2)), JUMPER_RADIUS, 8, false), mat(color, 0.5)));
+  void dist;
+  g.add(new Mesh(tubeGeometry(curve.points, JUMPER_RADIUS, 6), mat(color, 0.5)));
   for (const p of [a, b]) g.add(rod(new Vector3(p.x, top - HOLE_DEPTH, p.z), new Vector3(p.x, top + 0.1, p.z), 0.07, M.tin(), 6));
   return g;
 }

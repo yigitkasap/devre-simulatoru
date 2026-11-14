@@ -18,6 +18,7 @@ import { pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import { numProp, type DeviceType } from '../sim/netlist';
 import { BB, boardWidth, holeXZ, isSidePart, type BreadboardPlan, type Hole } from './breadboard';
+import { roundPath } from './cablePath';
 
 /** Kabloları bağlantı direğine giden laboratuvar cihazları (ön panelinde muz ya da BNC soketi olanlar). */
 export const INSTRUMENTS: ReadonlySet<DeviceType> = new Set(['dcsupply', 'funcgen', 'oscilloscope', 'voltmeter', 'ammeter', 'multimeter']);
@@ -41,6 +42,15 @@ export const POST = { radius: 0.55, top: BB.height + 1.1, behind: 3.6, spacing: 
 export const BANANA = { radius: 0.42, height: 1.25 } as const;
 /** Direkten tahtaya giden tel: yarıçap (Ø ≈ 0,6 mm) ve kartın üstünden yüksekliği. */
 export const POST_WIRE = { radius: 0.12, lift: 0.32 } as const;
+/**
+ * Telin köşelerinin yarıçapı ("kablolar yumuşak bükülür", 2026-11-14): hedef 4 tel çapı; komşu doğrular kısaysa yay
+ * onlara sığacak kadar küçülür. Tel kartın 0,32 birim üstünde yattığı için deliğe inen köşe en çok o kadar olabilir;
+ * hiçbir köşe WIRE_BEND_MIN'in (bir tel çapı; elle bükülen tek damarlı telin gerçek bükülmesi) altına inmez.
+ */
+export const WIRE_BEND = 8 * POST_WIRE.radius;
+export const WIRE_BEND_MIN = 0.25;
+/** Tel, şeridinden deliğe bu kadar önceden (z) çapraz ayrılır: yana dik basamak yerine yumuşak bir yaklaşma. */
+const APPROACH = 0.9;
 /** Taban plakası: kalınlık, tahtanın yanlarından ve önünden taşma, arkadan (direk sırası için) taşma. */
 export const PLATE = { thickness: 0.25, margin: 1.2, back: 5.4 } as const;
 /** Direk tellerinin kanaldaki izleri arasındaki aralık (tel çapının bir buçuk katı); kalabalık devrede izler sıkışır. */
@@ -88,7 +98,7 @@ export interface PostWire {
   readonly color: string;
   /** Bu telden akan cihaz kablosu (plan.leads sırası; tek eleman). */
   readonly leads: readonly number[];
-  /** Telin köşe noktaları (dünya): direğin önünden kartın hemen üstünde gider, deliğe iner. */
+  /** Telin yolu (dünya; köşeleri yuvarlatılmış sık noktalar): direğin önünden kartın hemen üstünde gider, deliğe iner. */
   readonly points: readonly Vector3[];
   /** Direk sırası ile tahtanın arka kenarı arasındaki kanalda telin izi (0: tahtaya en yakın). */
   readonly track: number;
@@ -262,6 +272,9 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
   // tel tahtaya daha yakın izi alır: hiçbir tel öbürünü kesmez.
   const y = BB.height + POST_WIRE.lift;
   const edge = -BB.depth / 2 - 0.45;
+  // Tahtadaki kalın fişler (Arduino'nun atlama kabloları): tel yanlarından geçerken değmemeli.
+  const direct = new Set(instrumentLeads(doc, plan));
+  const plugs = plan.leads.flatMap((l, i) => (direct.has(i) ? [] : [holeXZ(l.hole, plan.cols)]));
   // Şeritler: çizilen yerleşim şemanın planıysa direk sırasını veren şeritler; Tahtada kur kurulumunda tellerin
   // gittiği deliklere göre yeniden.
   const own = plan === reference ? null : lanesOf(doc, plan, targets.map((t) => t.hole));
@@ -279,8 +292,12 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
     const post = posts[t.post]!;
     const m = seen.get(t.post) ?? 0;
     seen.set(t.post, m + 1);
-    const startX = post.x + (m - ((perPost.get(t.post) ?? 1) - 1) / 2) * 0.32;
-    const dir = lane < startX - 0.15 ? -1 : lane > startX + 0.15 ? 1 : 0;
+    // Şeride küçük bir yan basamak (0,4'e kadar) iz açmaz: tel direkten şeridine hafif çapraz gider. Daha büyük ama
+    // iki köşe yayına yetmeyen basamak (0,6'dan kısa) 0,6'ya tamamlanır (telin direkteki ucu o kadar kayar).
+    const natural = post.x + (m - ((perPost.get(t.post) ?? 1) - 1) / 2) * 0.32;
+    const step = lane - natural;
+    const startX = Math.abs(step) > 0.4 && Math.abs(step) < 0.6 ? lane - Math.sign(step) * 0.6 : natural;
+    const dir = Math.abs(step) <= 0.4 ? 0 : step < 0 ? -1 : 1;
     return { t, index, at, post, startX, lane, dir, track: 0 };
   });
   // 2) İz: aynı yöne giden ve yatay aralıkları üst üste binen ardışık teller bir kümedir. Sola gidenlerde sağdaki
@@ -309,13 +326,24 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
   for (const w of routed) {
     const front = w.post.z + POST.radius * 0.6;
     const zTrack = edge - 0.3 - pitch * w.track;
+    // Şeritten deliğe: yana dik basamak yerine, deliğin biraz gerisinden başlayan çapraz (şeritte yer varsa).
+    const turn = w.dir === 0 ? edge : zTrack;
+    // Çapraz, Arduino'nun atlama kablosunun fişine (kalın) değecekse kısalır (en kısası: eski dik basamak).
+    const room = Math.abs(w.lane - w.at.x) < 1e-6 ? 0 : Math.max(0, Math.min(APPROACH, w.at.z - turn - 0.35));
+    const clear = (lead: number) =>
+      plugs.every((q) => {
+        const dx = w.at.x - w.lane;
+        const t = Math.max(0, Math.min(1, ((q.x - w.lane) * dx + (q.z - (w.at.z - lead)) * lead) / (dx * dx + lead * lead || 1)));
+        return Math.hypot(w.lane + dx * t - q.x, w.at.z - lead + lead * t - q.z) >= 0.47 + POST_WIRE.radius + 0.05 || (Math.abs(q.x - w.at.x) < 1e-6 && Math.abs(q.z - w.at.z) < 1e-6);
+      });
+    const lead = [room, room * 0.6, room * 0.3].find((l) => l > 0 && clear(l)) ?? 0;
     const raw =
       w.dir === 0
-        ? [new Vector3(w.startX, y, front), new Vector3(w.lane, y, edge), new Vector3(w.lane, y, w.at.z), new Vector3(w.at.x, y, w.at.z)]
-        : [new Vector3(w.startX, y, front), new Vector3(w.startX, y, zTrack), new Vector3(w.lane, y, zTrack), new Vector3(w.lane, y, w.at.z), new Vector3(w.at.x, y, w.at.z)];
-    const points = raw.filter((q, k) => k === 0 || q.distanceTo(raw[k - 1]!) > 1e-6);
-    points.push(new Vector3(w.at.x, BB.height, w.at.z));
-    wires[w.index] = { ...w.t, points, track: w.track, lane: w.lane };
+        ? [new Vector3(w.startX, y, front), new Vector3(w.lane, y, edge), new Vector3(w.lane, y, w.at.z - lead), new Vector3(w.at.x, y, w.at.z)]
+        : [new Vector3(w.startX, y, front), new Vector3(w.startX, y, zTrack), new Vector3(w.lane, y, zTrack), new Vector3(w.lane, y, w.at.z - lead), new Vector3(w.at.x, y, w.at.z)];
+    const corners = raw.filter((q, k) => k === 0 || q.distanceTo(raw[k - 1]!) > 1e-6);
+    corners.push(new Vector3(w.at.x, BB.height, w.at.z));
+    wires[w.index] = { ...w.t, points: roundPath(corners, WIRE_BEND).points, track: w.track, lane: w.lane };
   }
   return { posts, cables, wires };
 }

@@ -5,7 +5,8 @@ import { BoxGeometry, CylinderGeometry, Group, Mesh, Vector3 } from 'three';
 import { BB } from './breadboard';
 import { HOLE_DEPTH } from './breadboardModel';
 import { CABLE_RADIUS } from './jumpers';
-import { M, mat, mesh, rod, wirePath } from './kit';
+import { tubeGeometry } from './cablePath';
+import { M, mat, mesh, rod } from './kit';
 import { BANANA, PLATE, POST, POST_WIRE, plateRect, plugBase, plugEntry, type Post } from './posts';
 
 /** Taban plakası: tahtaların altında ince koyu levha; arkada direk sırası kadar geniş. */
@@ -38,7 +39,8 @@ export function bananaMesh(post: Post, level: number, color: string): Group {
 
 /** Direkten deliğe giden tel: ince, düz, kartın hemen üstünde; ucu deliğe girer. */
 export function postWireMesh(points: readonly Vector3[], color: string): Group {
-  const g = wirePath(points, POST_WIRE.radius, mat(color, 0.5), 6);
+  const g = new Group();
+  g.add(new Mesh(tubeGeometry(points, POST_WIRE.radius, 6), mat(color, 0.5)));
   const end = points[points.length - 1]!;
   g.add(rod(new Vector3(end.x, BB.height - HOLE_DEPTH, end.z), new Vector3(end.x, BB.height + 0.05, end.z), 0.07, M.tin(), 6));
   return g;

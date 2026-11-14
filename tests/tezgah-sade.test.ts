@@ -215,7 +215,8 @@ describe('3B: okunurluk önce', () => {
         expect(length, `${id} ${post.name}`).toBeLessThanOrEqual(POST.behind + BB.depth + boardWidth(plan.cols) / 2);
         // İz, direklerin tabanı ile tahtanın arka kenarı arasındaki kanalın içinde (kalabalık devrede izler arası
         // aralık daralır; tellerin üst üste binmediğini çakışma testi denetler).
-        expect(Math.min(...pts.slice(1).map((p) => p.z)), `${id} ${post.name}: iz ${w.track}`).toBeGreaterThanOrEqual(post.z + POST.radius + 0.45 - 1e-9);
+        // (Yol yuvarlak köşeli sık noktalardır: direğin önünden ize giden ilk düz kısım sayılmaz, yana açılan kısım sayılır.)
+        expect(Math.min(...pts.filter((p) => Math.abs(p.x - pts[0]!.x) > 0.3).map((p) => p.z), Number.POSITIVE_INFINITY), `${id} ${post.name}: iz ${w.track}`).toBeGreaterThanOrEqual(post.z + POST.radius + 0.45 - 1e-9);
         total++;
       });
     }

@@ -1,8 +1,9 @@
-// Masadaki parçadan breadboard'a giden kablonun yolu: uçtan dik kalkan, alçak bir kübik Bézier. Yol
-// masadaki parçaların gövdelerinin (kutularının) içinden geçerse kavis o uçta yükseltilir: pilin
-// uzak ucundaki (+) uçtan çıkan kablo pilin üstünden aşar (önceden gövdenin içinden geçiyordu).
+// Masadaki parçadan breadboard'a giden kablonun eski yolu: uçtan dik kalkan, alçak bir kübik Bézier; gövdeye çarpan
+// uçta kavis yükselir. Sahne artık cableRoutes.ts'in yollarını çizer (2026-11-14: şeritler, yuvarlak köşeler);
+// buradaki `collisions`, kabloların masadaki parçaların gövdesinden geçmediğini denetlemek için kullanılır
+// (scene.cableHits), `leadCurve` eski davranışın testinde.
 
-import { Box3, CubicBezierCurve3, CurvePath, LineCurve3, Vector3, type Curve } from 'three';
+import { Box3, CubicBezierCurve3, Vector3, type Curve } from 'three';
 
 export interface Obstacle {
   /** Gövdenin dünya kutusu. */
@@ -41,36 +42,6 @@ export function collisions(curve: Curve<Vector3>, obstacles: readonly Obstacle[]
     if (boxes.some((o) => o.box.containsPoint(p) && !(o.own && near))) hits.push(t);
   }
   return hits;
-}
-
-/**
- * Ön paneldeki soketten çıkan kablo: soketten `dir` yönünde düz çıkar, öne doğru yatay teğetle masaya
- * sarkar, masada tahtaya doğru ilerler ve deliğin üstüne (`b`) yukarıdan iner. Parçalı (doğru + kübik
- * Bézier'ler): masadaki kısım masanın altına salınmaz. `board`: breadboard'ların kutusu. `end` verilirse
- * kablo `b`'ye o yönden girer (bağlantı direğindeki muz fişin arkası). `maxReach`: soketin önünde masaya inişin
- * en çok uzaklığı (direkler cihazlara tahtadan yakın).
- */
-export function socketCurve(from: Vector3, dir: Vector3, b: Vector3, board: Box3, end?: Vector3, maxReach = 9): CurvePath<Vector3> {
-  const flat = new Vector3(dir.x, 0, dir.z);
-  if (flat.lengthSq() < 1e-6) flat.set(0, 0, 1);
-  flat.normalize();
-  const table = 0.42;
-  const out = from.clone().addScaledVector(dir, 1.2);
-  // Soketin önünde masaya iniş: yüksek soketten çıkan kablo daha uzağa sarkar.
-  const reach = Math.min(maxReach, 3 + 0.4 * Math.max(0, from.y - table));
-  const down = out.clone().addScaledVector(flat, reach).setY(table);
-  const path = new CurvePath<Vector3>();
-  path.add(new LineCurve3(from.clone(), out));
-  path.add(new CubicBezierCurve3(out, out.clone().addScaledVector(dir, reach * 0.45), down.clone().addScaledVector(flat, -reach * 0.4), down));
-  // Masadan deliğe: önce masada ilerler, tahtanın kenarını aşacak kadar yükselip deliğe dik iner.
-  const toHole = new Vector3(b.x - down.x, 0, b.z - down.z);
-  const run = toHole.length();
-  const heading = run > 1e-6 ? toHole.clone().divideScalar(run) : flat.clone();
-  const rise = Math.max(4, b.y - table + 2.5);
-  void board;
-  const last = end ? b.clone().addScaledVector(end, Math.min(rise, 4.5)) : b.clone().add(new Vector3(0, rise, 0));
-  path.add(new CubicBezierCurve3(down, down.clone().addScaledVector(heading, run * 0.5), last, b.clone()));
-  return path;
 }
 
 /**

@@ -300,6 +300,8 @@ export class BoardScene {
     this.scene.environment?.dispose();
     this.pmrem.dispose();
     this.renderer.dispose();
+    // WebGL bağlamı hemen bırakılır (tarayıcının bağlam sınırı dolmasın).
+    this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
   }
 

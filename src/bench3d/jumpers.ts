@@ -154,7 +154,7 @@ function plugPrims(at: Vector3, owner: string): Prim[] {
 
 /** Jumper telinin ilkelleri: eğrinin üstünde sık noktalar arası kapsüller. */
 function jumperPrims(a: Vector3, b: Vector3, shape: JumperShape, owner: string): Prim[] {
-  const pts = jumperCurve(a, b, shape).getPoints(Math.max(10, Math.round(a.distanceTo(b) * 1.5)));
+  const pts = jumperCurve(a, b, shape).points;
   const out: Prim[] = [];
   for (let k = 1; k < pts.length; k++) out.push({ kind: 'capsule', a: pts[k - 1]!, b: pts[k]!, r: JUMPER_RADIUS, owner });
   return out;
@@ -165,6 +165,10 @@ export function wirePrims(points: readonly Vector3[], owner: string): Prim[] {
   return points.slice(1).map((b, i) => ({ kind: 'capsule' as const, a: points[i]!, b, r: POST_WIRE.radius, owner }));
 }
 
+/** Köprü biçimi aranırken tellerin arasında bırakılan pay (primsOverlap'in `margin`'i; eksi: boşluk). */
+const CLEAR = -0.012;
+/** Tel ile tel arasında boşluk aranır; tel ile gövde ya da fiş arasında eski pay (tel gövdenin altından sıyırarak geçer). */
+const gap = (x: Prim, y: Prim): number | undefined => (x.kind === 'capsule' && y.kind === 'capsule' ? CLEAR : undefined);
 const NONE: ReadonlySet<number> = new Set();
 const NO_BODIES: ReadonlyMap<string, BoardBody> = new Map();
 
@@ -274,8 +278,9 @@ export function jumperShapes(
   let bounds = prims.map(boundsOf);
   const clashes = (i: number, mine: readonly Prim[], box: { min: Vector3; max: Vector3 }, skip: ReadonlySet<number> = NONE) => {
     let count = 0;
-    for (const q of plugs) if (boundsMeet(box, q.bounds) && mine.some((x) => q.prims.some((y) => primsOverlap(x, y)))) count++;
-    for (let k = 0; k < n; k++) if (k !== i && !skip.has(k) && boundsMeet(box, bounds[k]!) && mine.some((x) => prims[k]!.some((y) => primsOverlap(x, y)))) count++;
+    // Pay eksi: teller birbirine değmez de (merkez çizgileri arası, yarıçapların toplamından az değil; 2026-11-14).
+    for (const q of plugs) if (boundsMeet(box, q.bounds) && mine.some((x) => q.prims.some((y) => primsOverlap(x, y, gap(x, y))))) count++;
+    for (let k = 0; k < n; k++) if (k !== i && !skip.has(k) && boundsMeet(box, bounds[k]!) && mine.some((x) => prims[k]!.some((y) => primsOverlap(x, y, gap(x, y))))) count++;
     return count;
   };
   /** `i`'nin ucunun üstünden geçen teller (üstte geçme kısıtı): `i` yükselince onlar da yükselir. */

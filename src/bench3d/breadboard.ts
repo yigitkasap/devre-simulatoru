@@ -233,7 +233,7 @@ export function dipPins(type: DeviceType): readonly number[] {
 type Side = 'left' | 'back' | 'right';
 /**
  * Arkadaki cihazların en öndeki düğmesiyle tahtanın arka kenarı arası (birim, ≈ 2,5 mm): kabloların ön
- * soketten çıkıp masaya sarkacağı kadar yer (leadRoute.socketCurve en çok 9 birim öne çıkar); daha uzağı
+ * soketten çıkıp masaya sarkacağı kadar yer (cableRoutes: soketten sonra en çok ≈ 9 birim öne çıkar); daha uzağı
  * kabloları uzatır.
  */
 const BACK_GAP = 14;

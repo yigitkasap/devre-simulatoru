@@ -13,6 +13,9 @@ export const BACKGROUND = { light: '#dfe3e8', dark: '#161c22' } as const;
 export function createRenderer(container: HTMLElement): WebGLRenderer {
   const renderer = new WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // Yayında gölgelendirici günlüğü okunmaz: derleme hızlanır, sürücünün zararsız uyarıları (HLSL X4122) konsola
+  // düşmez (son kontrol, 2026-11-14). Geliştirmede açık kalır.
+  renderer.debug.checkShaderErrors = import.meta.env.DEV;
   renderer.toneMapping = ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   const canvas = renderer.domElement;

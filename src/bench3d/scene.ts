@@ -7,12 +7,9 @@
 import {
   Box3,
   CanvasTexture,
-  CatmullRomCurve3,
   Color,
   CubicBezierCurve3,
-  CurvePath,
   Group,
-  LineCurve3,
   Material,
   Mesh,
   MeshBasicMaterial,
@@ -44,10 +41,12 @@ import { Dwell, floatSpot, type FloatSpot } from './hover';
 import type { CircuitDoc, Part } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
-import { collisions, leadCurve, socketCurve, type Obstacle } from './leadRoute';
+import { collisions, type Obstacle } from './leadRoute';
+import { PolyCurve, tubeGeometry } from './cablePath';
+import { cableJobs, routeArches, routeCables } from './cableRoutes';
 import { cableCurrents } from './cableFlow';
 import { CABLE_RADIUS, PLUG, jumperShapes } from './jumpers';
-import { BANANA, INSTRUMENTS, PLATE, POST, holesUsed, instrumentLeads, layoutPosts, plugEntry, postKey, posted, type PostCable, type PostLayout } from './posts';
+import { BANANA, INSTRUMENTS, PLATE, POST, holesUsed, instrumentLeads, layoutPosts, postKey, posted, type PostCable, type PostLayout } from './posts';
 import { bananaMesh, plateMesh, postMesh, postWireMesh } from './postModel';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
@@ -914,69 +913,54 @@ export class BenchScene {
     this.leadObstacles = [];
     this.leadCurves = [];
     this.postCables = [];
-    const BACK = new Vector3(0, 0, -1);
-    /**
-     * Tahta dışı parçanın (pil, motor, röle…) kablosu: ucundan kalkar, parçanın tahtaya bakan yanından masaya iner,
-     * plakanın yanından arkaya dolanır ve direğindeki fişe arkadan girer. Tahtanın üstünden ya da önünden geçmez.
-     */
-    const sideLanes = { left: 0, right: 0 };
-    const sideCable = (placed: Placed, from: Vector3, entry: Vector3): Curve<Vector3> => {
-      const table = 0.42;
-      const sign = from.x < 0 ? -1 : 1;
-      const order = sign < 0 ? sideLanes.left++ : sideLanes.right++;
-      const lane = sign * (boardWidth(plan.cols) / 2 + PLATE.margin + 0.6 + 0.32 * (order % 6));
-      const behind = entry.z - 2.6 - 0.3 * (order % 6);
-      // Parça dış sütundaysa (Arduino'nun yanındaki pil) kablo aradaki parçaların da üstünden aşar ve en içtekinin
-      // tahtaya bakan yüzünün açığından iner.
-      const between = bodies.filter(
-        (o) => o.id !== placed.part.id && o.box.min.z < from.z + 1.5 && o.box.max.z > from.z - 1.5 && (sign > 0 ? o.box.min.x > lane && o.box.max.x < from.x + 0.5 : o.box.max.x < lane && o.box.min.x > from.x - 0.5),
-      );
-      const over = Math.max(from.y + 0.9, placed.box.max.y + 0.6, ...between.map((o) => o.box.max.y + 0.9));
-      const inner = sign > 0 ? Math.min(placed.box.min.x, ...between.map((o) => o.box.min.x)) : Math.max(placed.box.max.x, ...between.map((o) => o.box.max.x));
-      const pts = [from.clone(), new Vector3(from.x, over, from.z)];
-      // Kablo gövdenin üstünden aşar ve tahtaya bakan yüzünün bir delik açığından iner (gövdeye sürtünmez).
-      const clear = inner - sign * 1.0;
-      if (Math.abs(from.x) > Math.abs(clear) + 0.3) pts.push(new Vector3(clear, over, from.z - 0.3));
-      const drop = sign * Math.min(Math.abs(lane), Math.abs(clear));
-      if (from.z - 1.2 > behind + 2.4) {
-        // Parça tahtanın yanında: şeritten arkaya, sonra direk sırasının gerisinden direğe.
-        pts.push(new Vector3(drop, table, from.z - 1.2), new Vector3(lane, table, behind + 1.6), new Vector3(lane - sign * 1.6, table, behind));
-      } else {
-        // Parça direk sırasının hizasında ya da gerisinde (uzun sütunun arkadaki parçası): öne dönmeden masaya iner.
-        pts.push(new Vector3(drop, table, Math.min(from.z - 1.2, behind)));
-      }
-      pts.push(new Vector3(entry.x + sign * 1.4, table, behind), new Vector3(entry.x, entry.y, entry.z - 1.5), entry.clone());
-      return new CatmullRomCurve3(pts, false, 'centripetal');
-    };
-    /** Cihaz kablosu: soketten çıkar, masaya sarkar, tahtanın arka kenarının gerisinden direğindeki fişe girer. */
+    // Direk kablolarının yolları (cableRoutes.ts): cihazlarla direkler arasındaki koridorda şeritler, yuvarlak
+    // köşeler; kablolar birbirinin içinden geçmez. Tahta dışı parçanın kablosu parçanın yanındaki boşluktan arkaya
+    // dolanır (tahtanın üstünden ya da önünden geçmez).
+    const jobs = cableJobs(layout, (id) => {
+      const placed = this.parts.get(id);
+      return placed ? { anchors: placed.anchors, dirs: placed.dirs, box: bodies.find((o) => o.id === id)?.box ?? placed.box, instrument: INSTRUMENTS.has(placed.part.type) } : undefined;
+    });
+    const routed = routeCables(
+      jobs.flatMap((j) => (j ? [j] : [])),
+      { plateHalf: boardWidth(plan.cols) / 2 + PLATE.margin, plateBack: -BB.depth / 2 - PLATE.back, plateTop: PLATE.thickness, top: this.topView !== null },
+    );
+    let next = 0;
+    const routeOf = new Map(layout.cables.flatMap((c, k) => (jobs[k] ? [[c, routed.routes[next++]!] as const] : [])));
+    /** Cihaz ya da tahta dışı parça kablosu: ucundaki fişten çıkar, direğindeki muz fişe arkadan girer. */
     const postCable = (c: PostCable): Curve<Vector3> | null => {
       const placed = this.parts.get(c.partId);
       const from = placed?.anchors[c.pin];
-      if (!placed || !from) return null;
+      const route = routeOf.get(c);
+      if (!placed || !from || !route) return null;
       const post = layout.posts[c.post]!;
-      const entry = plugEntry(post, c.level);
-      const dir = placed.dirs[c.pin];
-      const a1 = dir ? from.clone().addScaledVector(dir, 1.5) : from.clone().add(new Vector3(0, 1.4, 0));
-      // Tepeden görünümde cihazların uçları tahtanın hemen arkasındaki kartlarda: kısa, alçak kavis.
-      const side = !INSTRUMENTS.has(placed.part.type);
-      // Tahta dışı parçanın kablosu tepeden görünümde de plakanın yanından dolanır (tahtanın köşesinin üstünden geçmez).
-      const curve = side ? sideCable(placed, from, entry) : dir && !this.topView ? socketCurve(a1, dir, entry, this.boardBox(plan), BACK, 5) : leadCurve(a1, entry, []);
+      const curve = new PolyCurve(route.points);
       this.postCables.push(curve);
-      if (side) {
+      if (!INSTRUMENTS.has(placed.part.type)) {
         // Denetim (cableHits): kablo masadaki öbür parçaların gövdesinden geçmez.
         this.leadCurves.push(curve);
-        this.leadObstacles.push(bodies.map((b) => ({ box: b.box, own: b.id === c.partId })));
+        this.leadObstacles.push(bodies.map((o) => ({ box: o.box, own: o.id === c.partId })));
       }
-      this.cables.add(this.netTag(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), CABLE_RADIUS, 8, false), mat(c.color, 0.55)), c.net, postKey(post)));
-      const tip = mesh(plug, plugMat, from.x, from.y + 0.75, from.z);
-      if (dir) {
-        tip.position.copy(from).addScaledVector(dir, 0.75);
-        tip.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), dir);
-      }
+      this.cables.add(this.netTag(new Mesh(tubeGeometry(route.points, CABLE_RADIUS, 8), mat(c.color, 0.55)), c.net, postKey(post)));
+      // Uçtaki fiş kablonun çıktığı yöne bakar (sokette soketin yönü; parçanın ucunda kablonun ilk yönü).
+      const out = placed.dirs[c.pin] ?? route.points[1]!.clone().sub(route.points[0]!).normalize();
+      const tip = mesh(plug, plugMat, from.x, from.y, from.z);
+      tip.position.copy(from).addScaledVector(out, placed.dirs[c.pin] ? 0.75 : 0.3);
+      tip.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), out);
       this.cables.add(tip);
       this.cables.add(this.netTag(bananaMesh(post, c.level, c.color), c.net, postKey(post)));
       return curve;
     };
+    // Masadaki parçadan (Arduino) doğrudan deliğe giden atlama kabloları: yuvarlak köşeli kemer; kesişenler farklı
+    // yükseklikte (öncekinin bir kablo çapı üstünden).
+    const direct = plan.leads.flatMap((lead, i) => {
+      const placed = this.parts.get(lead.partId);
+      const from = placed?.anchors[lead.pin];
+      if (!placed || !from || layout.cables.some((c) => c.lead === i)) return [];
+      const to = holeTop(lead.hole);
+      return [{ i, a: from.clone().add(new Vector3(0, 1.4, 0)), b: to.clone().add(new Vector3(0, 1.5, 0)) }];
+    });
+    const arches = routeArches(direct, routed.routes.map((r) => r.points));
+    const archOf = new Map(direct.map((d, k) => [d.i, arches[k]!] as const));
     const cableOf = new Map(layout.cables.flatMap((c) => (c.lead === null ? [] : [[c.lead, c] as const])));
     plan.leads.forEach((lead, i) => {
       const placed = this.parts.get(lead.partId);
@@ -995,15 +979,13 @@ export class BenchScene {
       const color = lead.color ?? colorOf(lead.net);
       const to = holeTop(lead.hole);
       const dir = placed.dirs[lead.pin];
-      const b1 = to.clone().add(new Vector3(0, 1.5, 0));
-      // Ön paneldeki soketten çıkan kablo kendi gövdesinden dışarı çıkar: kendi kutusu engel sayılmaz.
-      const obstacles: Obstacle[] = bodies.filter((b) => !(dir && b.id === lead.partId)).map((b) => ({ box: b.box, own: b.id === lead.partId }));
+      const obstacles: Obstacle[] = bodies.map((b) => ({ box: b.box, own: b.id === lead.partId }));
       this.leadObstacles.push(obstacles);
-      const a1 = dir ? from.clone().addScaledVector(dir, 1.5) : from.clone().add(new Vector3(0, 1.4, 0));
-      const curve = dir ? socketCurve(a1, dir, b1, this.boardBox(plan)) : leadCurve(a1, b1, obstacles);
+      const arch = archOf.get(i)!;
+      const curve = new PolyCurve(arch.points);
       this.leadCurves.push(curve);
       paths.push(cablePath(curve));
-      this.cables.add(this.netTag(new Mesh(new TubeGeometry(curve, Math.max(16, Math.round(curve.getLength() * 1.5)), CABLE_RADIUS, 8, false), mat(color, 0.55)), lead.net));
+      this.cables.add(this.netTag(new Mesh(tubeGeometry(arch.points, CABLE_RADIUS, 8), mat(color, 0.55)), lead.net));
       const tip = mesh(plug, plugMat, from.x, from.y + 0.75, from.z);
       if (dir) {
         tip.position.copy(from).addScaledVector(dir, 0.75);
@@ -1020,9 +1002,7 @@ export class BenchScene {
     layout.wires.forEach((w, k) => {
       const pts = wirePts[k]!;
       this.cables.add(this.netTag(postWireMesh(pts, w.color), w.net, postKey(layout.posts[w.post]!)));
-      const path = new CurvePath<Vector3>();
-      for (let n = 1; n < pts.length; n++) path.add(new LineCurve3(pts[n - 1]!, pts[n]!));
-      wirePaths.push(cablePath(path));
+      wirePaths.push(cablePath(new PolyCurve(pts)));
     });
     // Tahtada kur: takılmamış kablolar (pil, motor…) parçanın önünde masaya sarkar.
     for (const loose of plan.loose ?? []) {
@@ -1062,12 +1042,6 @@ export class BenchScene {
     o.userData.net = net;
     if (post !== undefined) o.userData.post = post;
     return o;
-  }
-
-  /** Breadboard'ların dünya kutusu (sokete takılı kablo masada sürünürken altına girmesin). */
-  private boardBox(plan: BreadboardPlan): Box3 {
-    const half = boardWidth(plan.cols) / 2;
-    return new Box3(new Vector3(-half, 0, -BB.depth / 2), new Vector3(half, BB.height, boardZ(plan.boards - 1) + BB.depth / 2));
   }
 
   private finishPlacement(part: Part, placement: Placement): Placed {
@@ -1980,6 +1954,9 @@ export class BenchScene {
     this.scene.environment?.dispose();
     this.pmrem.dispose();
     this.renderer.dispose();
+    // Tarayıcı aynı anda sınırlı sayıda WebGL bağlamı tutar (Chrome'da 16): bırakılmayan bağlam, 3B'ye her girişte
+    // birikir ve "Too many active WebGL contexts" uyarısıyla en eskisi düşürülürdü (son kontrol, 2026-11-14).
+    this.renderer.forceContextLoss();
     this.renderer.domElement.remove();
   }
 }
