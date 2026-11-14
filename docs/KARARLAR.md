@@ -2507,7 +2507,7 @@ yanındaki bacaklar arasında tam bir boş şerit; tahtadaki bağlantı (şerit,
 planın yerleşimi Tahtada kur'un Denetle'sinden sorunsuz geçer; KiCad çıktısının 81 örnekteki özeti değişmedi
 (`tests/veri/veri-kicad-ozet.json`; baskı devre bilerek değiştirilirse yenilenir). `tests/tezgah-sade.test.ts`:
 direk, renk, tel ve çakışma testleri alet ucu başına direğe göre güncellendi; direk tellerinin izleri kanala sığar.
-Sonuç: birim testleri 2154 / 2154; tip denetimi 0 hata; tam ios-kontrol normal hızda 513 maddenin hepsi geçti, konsol
+Sonuç: birim testleri 2153 / 2153 (92 dosya); tip denetimi 0 hata; tam ios-kontrol normal hızda 513 maddenin hepsi geçti, konsol
 hatası yok. Karta aktar'ın planı, KiCad çıktısı ve plaket rehberi 81 örnekte önceki sürümle bayt bayt aynı (doğrudan
 karşılaştırma). Değişen ios-kontrol maddeleri ("3B bağlantı direkleri"): her alet ucuna bir direk (BF245A 8, yarım dalga
 5, BC107 kuplajlı 7), adlar alet ucunun adı, açık ad yalnızca üstüne gelinen direkte, tel en çok 110 mm (ön yarıdaki
