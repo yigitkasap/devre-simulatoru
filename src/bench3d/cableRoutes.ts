@@ -57,13 +57,12 @@ export interface CableJob {
 }
 
 export interface RouteContext {
-  /** Taban plakasının yarı genişliği (x) ve arka kenarı (z). */
+  /** Taban plakasının yarı genişliği (x): tahta dışı kablolar plakanın dışından dolanır. */
   readonly plateHalf: number;
-  readonly plateBack: number;
-  /** Plakanın üst yüzü (y). */
-  readonly plateTop: number;
   /** Tepeden görünüm: cihazlar kart, koridor yok. */
   readonly top: boolean;
+  /** Masadaki bütün parçaların kutuları (kablosu direğe gitmeyen Arduino da): kablolar köşelerinden dolanırken değmez. */
+  readonly bodies?: readonly Box3[];
 }
 
 export type RouteKind = 'lane' | 'bridge' | 'side' | 'arc';
@@ -122,17 +121,32 @@ function socketExit(job: CableJob): { pre: Vector3[]; x: number; y: number; z: n
  * Tahta dışı parçanın kablosu koridora kadar: uçtan çapraz ayrılır (arkaya ve yan şeridine doğru), yan şeritte arkaya
  * gider. `slot`: yan şeridin x'i ve yüksekliği.
  */
-function sidePre(job: CableJob, slot: { x: number; y: number }, steep: boolean, ctx: RouteContext): Vector3[] {
+function sidePre(job: CableJob, slot: { x: number; y: number }, steepGroup: boolean): Vector3[] {
+  let steep = steepGroup;
   const from = job.from.clone();
-  const h = Math.hypot(slot.x - from.x, slot.y - from.y);
   const pre = [from];
-  if (h > 0.05) {
-    // Çaprazın arkaya uzanışı: 45° (uçlar sıksa 60°); kısa çaprazda köşe yayı sığsın diye biraz daha uzun.
-    const back = Math.max(steep ? h * 0.58 : h, Math.sqrt((R * h) / 2) + 0.05);
-    pre.push(new Vector3(slot.x, slot.y, from.z - back));
+  const lateral = Math.sign(slot.x - from.x) || 1;
+  // Uç gövdenin üstünde ve kenarından içerideyse (AC kaynağın vidaları) kablo önce kenarın üstünden dışarı çıkar,
+  // sonra şeridine iner: gövdenin köşesinin içinden geçmez.
+  const face = lateral > 0 ? job.box.max.x : job.box.min.x;
+  const inset = (face - from.x) * lateral;
+  let start = from;
+  if (inset > 0.15 && from.z - job.box.min.z < inset) {
+    // Uç gövdenin arka yüzündeyse (hoparlörün uçları) kablo önce düz arkaya, gövdenin dışına çıkar.
+    start = new Vector3(from.x + lateral * 0.08, from.y, job.box.min.z - 0.6);
+    pre.push(start);
+    steep = false;
+  } else if (inset > 0.15 && job.box.max.y - from.y < 0.6) {
+    start = new Vector3(from.x + lateral * (inset + 0.6), from.y + 0.6, from.z - 2);
+    pre.push(start);
   }
-  // Plakanın kenar payında yatan kablo arka kenardan sonra hafif bir eğimle masaya iner (koridordaki köşesine kadar).
-  if (slot.y > CABLE_TABLE + 0.01) pre.push(new Vector3(slot.x, slot.y, ctx.plateBack + 0.3));
+  const h = Math.hypot(slot.x - start.x, slot.y - start.y);
+  if (h > 0.05) {
+    // Çaprazın arkaya uzanışı: 45° (uçlar sıksa ya da içerideyse 60°); kısa çaprazda köşe yayı sığsın diye biraz daha
+    // uzun; kenarın üstünden aşan kabloda iki köşe yayına yetecek kadar.
+    const back = Math.max(steep ? h * 0.58 : h, Math.sqrt((R * h) / 2) + 0.05, start === from ? 0 : 2);
+    pre.push(new Vector3(slot.x, slot.y, start.z - back));
+  }
   return pre;
 }
 
@@ -142,8 +156,10 @@ function sideSlots(jobs: readonly CableJob[], ctx: RouteContext): Map<number, { 
   const side = jobs.map((job, index) => ({ job, index })).filter((j) => !j.job.instrument);
   for (const s of [-1, 1]) {
     const mine = side.filter((j) => (j.job.box.min.x + j.job.box.max.x) / 2 >= 0 === s > 0);
-    // Sütunlar: kutuları x'te üst üste binen parçalar aynı sütundadır.
-    const faces = [...new Set(mine.map((j) => `${Math.min(Math.abs(j.job.box.min.x), Math.abs(j.job.box.max.x)).toFixed(1)}:${Math.max(Math.abs(j.job.box.min.x), Math.abs(j.job.box.max.x)).toFixed(1)}`))]
+    // Sütunlar: o yandaki bütün parçaların (kablosu direğe gitmeyen Arduino da) kutularının yüzleri.
+    const refZ = Math.min(...jobs.map((j) => j.entry.z));
+    const boxes = [...mine.map((j) => j.job.box), ...(ctx.bodies ?? []).filter((b) => (b.min.x + b.max.x) / 2 >= 0 === s > 0 && Math.max(Math.abs(b.min.x), Math.abs(b.max.x)) > ctx.plateHalf && b.max.z > refZ)];
+    const faces = [...new Set(boxes.map((b) => `${Math.min(Math.abs(b.min.x), Math.abs(b.max.x)).toFixed(1)}:${Math.max(Math.abs(b.min.x), Math.abs(b.max.x)).toFixed(1)}`))]
       .map((k) => k.split(':').map(Number) as [number, number])
       .sort((p, q) => p[0] - q[0]);
     faces.forEach(([near, far], column) => {
@@ -152,32 +168,36 @@ function sideSlots(jobs: readonly CableJob[], ctx: RouteContext): Map<number, { 
       for (const inner of [true, false]) {
         const group = inColumn.filter((j) => isInner(j) === inner).sort((p, q) => q.job.from.z - p.job.from.z || Math.abs(p.job.from.x) - Math.abs(q.job.from.x));
         if (group.length === 0) continue;
-        // Uçlar birbirine yakınsa (rölenin kontakları) çapraz dikleşir: koşut çaprazlar birbirine değmesin.
-        const steep = group.some((j, k) => k > 0 && Math.abs(group[k - 1]!.job.from.z - j.job.from.z) < 0.85 && Math.abs(Math.abs(group[k - 1]!.job.from.x) - Math.abs(j.job.from.x)) < 0.5);
+        // Uçlar birbirine yakınsa (rölenin kontakları) ya da gövdenin kenarından içerideyse (transformatörün uçları)
+        // çapraz dikleşir: koşut çaprazlar birbirine değmesin, kablo gövdenin yanından çabuk açılsın.
+        const face = inner ? near : far;
+        const steep =
+          group.some((j) => Math.abs(Math.abs(j.job.from.x) - face) > 0.15) ||
+          group.some((j, k) => k > 0 && Math.abs(group[k - 1]!.job.from.z - j.job.from.z) < 0.85 && Math.abs(Math.abs(group[k - 1]!.job.from.x) - Math.abs(j.job.from.x)) < 0.5);
         const first = steep ? 1.25 : 0.6;
-        // Şeritler: yüzden uzaklaşarak. İçeride sınır plakanın kenarı (ya da öndeki sütunla aradaki boşluğun ortası);
-        // boşluk dolunca (bir yanda dörtten çok kablo) plakanın kenar payında, tahtanın yanında iki şerit daha var.
-        // Dışarıda sınır sonraki sütunla aradaki boşluğun ortası.
-        const slots: Array<{ x: number; y: number }> = [];
+        // Şeritler: yüzden uzaklaşarak. İçeride sınır plakanın kenarı (ya da öndeki sütunun yüzünden yarım birim açığı),
+        // dışarıda sonraki sütunun yüzünden yarım birim açığı.
+        const slots: number[] = [];
         if (inner) {
           const prev = column > 0 ? faces[column - 1]![1] : null;
-          const limit = prev === null ? ctx.plateHalf + CABLE_R : (prev + near) / 2 + CABLE_PITCH / 2;
-          for (let d = first; near - d >= limit - 1e-9; d += CABLE_PITCH) slots.push({ x: s * (near - d), y: CABLE_TABLE });
-          if (prev === null) {
-            slots.push({ x: s * (ctx.plateHalf - CABLE_R), y: ctx.plateTop + CABLE_TABLE });
-            slots.push({ x: s * (ctx.plateHalf - CABLE_R - CABLE_PITCH), y: ctx.plateTop + CABLE_TABLE });
-          }
+          const limit = prev === null ? ctx.plateHalf + CABLE_RADIUS : prev + 0.5;
+          for (let d = first; near - d >= limit - 1e-9; d += CABLE_PITCH) slots.push(s * (near - d));
+          // Dar boşluk (Arduino ile yanındaki pilin arası): tek şerit, boşluğun ortasında.
+          if (slots.length === 0) slots.push(s * (prev === null ? near - first : (prev + near) / 2));
         } else {
           const next = column + 1 < faces.length ? faces[column + 1]![0] : null;
-          const limit = next === null ? Number.POSITIVE_INFINITY : (far + next) / 2 - CABLE_PITCH / 2;
-          for (let d = first; far + d <= limit + 1e-9 && slots.length < 12; d += CABLE_PITCH) slots.push({ x: s * (far + d), y: CABLE_TABLE });
+          const limit = next === null ? Number.POSITIVE_INFINITY : next - 0.5;
+          for (let d = first; far + d <= limit + 1e-9 && slots.length < 12; d += CABLE_PITCH) slots.push(s * (far + d));
+          if (slots.length === 0) slots.push(s * (next === null ? far + first : (far + next) / 2));
         }
-        if (slots.length === 0) slots.push({ x: s * (inner ? near - first : far + first), y: CABLE_TABLE });
         // Öndeki uç yüzden en uzak şeridi alır (arkadaki uçların kabloları onun yolunu kesmeden katılır). Şerit
-        // yetmezse (bir yanda altıdan çok kablo) fazlası aynı aralıkla dizilmeyi sürdürür.
-        const last = slots[slots.length - 1]!;
-        while (slots.length < group.length) slots.push({ x: s * (Math.abs(slots[slots.length - 1]!.x) + (inner ? -1 : 1) * CABLE_PITCH), y: last.y });
-        group.forEach((j, k) => out.set(j.index, { ...slots[group.length - 1 - k]!, steep }));
+        // yetmezse (boşluğa sığmayan kablolar) öndeki uçların kabloları, sonradan katılan arkadakilerin üstüne yatar
+        // (bir kablo çapı yukarıda).
+        const cap = slots.length;
+        group.forEach((j, k) => {
+          const m = group.length - 1 - k;
+          out.set(j.index, { x: slots[m % cap]!, y: CABLE_TABLE + Math.floor(m / cap) * CABLE_PITCH, steep });
+        });
       }
     });
   }
@@ -225,9 +245,11 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
   jobs.forEach((job, index) => {
     if (!job.instrument) {
       const slot = slots.get(index)!;
-      // Plakadan inen kablonun koridordaki köşesi plakanın arka kenarının yeterince gerisinde olmalı.
-      const minLane = slot.y > CABLE_TABLE + 0.01 ? Math.max(0, Math.ceil((job.entry.z - R - BOOT - (ctx.plateBack + 0.3 - R - 0.4)) / CABLE_PITCH)) : 0;
-      items.push({ index, side: true, xa: slot.x, xp: job.entry.x, pre: sidePre(job, slot, slot.steep, ctx), yh: 0, exitZ: Number.NEGATIVE_INFINITY, minLane, capLane: 99, layer: 0, lane: -1 });
+      // Koridora dönerken, tahtayla arasındaki bir parçanın (Arduino) arka köşesinin açığından geçer: şeridi o
+      // parçanın arka yüzünün yeterince gerisinde olmalı.
+      const between = (ctx.bodies ?? []).filter((b) => b !== job.box && Math.abs((b.min.x + b.max.x) / 2) < Math.abs(slot.x) && (b.min.x + b.max.x) / 2 >= 0 === slot.x >= 0 && Math.max(Math.abs(b.min.x), Math.abs(b.max.x)) > ctx.plateHalf && b.max.z > job.entry.z);
+      const minLane = Math.max(0, ...between.map((b) => Math.ceil((job.entry.z - R - BOOT - (b.min.z - 1.2)) / CABLE_PITCH)));
+      items.push({ index, side: true, xa: slot.x, xp: job.entry.x, pre: sidePre(job, slot, slot.steep), yh: slot.y, exitZ: Number.NEGATIVE_INFINITY, minLane, capLane: 99, layer: 0, lane: -1 });
       return;
     }
     if (ctx.top) {
@@ -306,7 +328,8 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
   /** deeper.get(i): i'den önce (daha derine) yerleşmesi gerekenler. */
   const deeper = new Map<LaneItem, Set<LaneItem>>(items.map((i) => [i, new Set<LaneItem>()]));
   for (const s of [-1, 1]) {
-    const mine = items.filter((i) => i.side && i.xa >= 0 === s > 0).sort((p, q) => Math.abs(p.xa) - Math.abs(q.xa));
+    // Üstte yatan kablo, altındakinden hemen sonra (bir geri şeritte) döner.
+    const mine = items.filter((i) => i.side && i.xa >= 0 === s > 0).sort((p, q) => Math.abs(p.xa) - Math.abs(q.xa) || p.yh - q.yh);
     for (let k = 1; k < mine.length; k++) deeper.get(mine[k]!)!.add(mine[k - 1]!);
   }
   /** Yan şeridin üstünden geçen cihaz kablosu o tahta dışı kablodan geride kalır (atlamalı yerleştirmede kalkar). */
@@ -404,8 +427,16 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     }
     if (startY > y && hops.length > 0 && Math.abs(hops[0]!.x - item.xa) < R + 0.4) hops.shift();
     if (endY > y && hops.length > 0 && Math.abs(hops[hops.length - 1]!.x - item.xp) < R + 0.4) hops.pop();
-    if (item.side) way.push(new Vector3(item.xa, y, z));
-    else way.push(new Vector3(item.xa, item.yh, z - slant(item.yh - startY).lean), new Vector3(item.xa, startY, z));
+    if (item.side) {
+      // Üstte yatan yan kablo köşesini yüksekte döner; şeridinde hafif bir eğimle masaya iner (yer yoksa yüksekte kalır).
+      const lifted = item.yh > y + 0.01;
+      way.push(new Vector3(item.xa, lifted ? item.yh : y, z));
+      if (lifted) {
+        const from = item.xa + sgn * (R + 0.3);
+        if ((item.xp - (from + sgn * RAMP)) * sgn >= R + 0.4) way.push(new Vector3(from, item.yh, z), new Vector3(from + sgn * RAMP, y, z));
+        else endY = item.yh;
+      }
+    } else way.push(new Vector3(item.xa, item.yh, z - slant(item.yh - startY).lean), new Vector3(item.xa, startY, z));
     way.push(...hops);
     // Şeritte iki dönüşe yer yoksa (yan şerit direğe yakın) kablo şeritte yatmaz: köşeden fişin hizasına eğimle çıkar.
     if (!(item.side && Math.abs(item.xa - item.xp) < 2 * R + 0.05)) way.push(new Vector3(item.xp, endY, z));

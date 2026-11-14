@@ -14,8 +14,12 @@ export interface Obstacle {
 
 /** Kablonun yarıçapı ve gövdeyle arasında kalacak pay. */
 const CLEARANCE = 0.28 + 0.2;
-/** Kendi parçasında ucun bu yatay uzaklığı içindeki örnekler sayılmaz (kablo orada uçtan kalkar). */
-const OWN_RADIUS = 1.2;
+/**
+ * Kendi parçasında ucun bu yatay uzaklığı içindeki örnekler sayılmaz (kablo orada uçtan kalkar); ötesinde kablo
+ * gövdenin kutusuna girmemelidir, ama yanından sıyırarak geçebilir (pay yok): kablo parçanın yanındaki şeritte
+ * arkaya yatar (cableRoutes.ts, 2026-11-14). Başka parçaların gövdesiyle arasında CLEARANCE kalır.
+ */
+const OWN_RADIUS = 1.6;
 const SAMPLES = 64;
 const STEP = 0.8;
 const MAX_LIFT = 24;
@@ -33,7 +37,7 @@ function curveOf(a: Vector3, b: Vector3, liftA: number, liftB: number): CubicBez
 export function collisions(curve: Curve<Vector3>, obstacles: readonly Obstacle[]): number[] {
   const start = curve.getPoint(0);
   const hits: number[] = [];
-  const boxes = obstacles.map((o) => ({ box: o.box.clone().expandByScalar(CLEARANCE), own: o.own }));
+  const boxes = obstacles.map((o) => ({ box: o.own ? o.box : o.box.clone().expandByScalar(CLEARANCE), own: o.own }));
   const p = new Vector3();
   for (let i = 1; i < SAMPLES; i++) {
     const t = i / SAMPLES;

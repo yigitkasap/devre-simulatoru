@@ -922,7 +922,7 @@ export class BenchScene {
     });
     const routed = routeCables(
       jobs.flatMap((j) => (j ? [j] : [])),
-      { plateHalf: boardWidth(plan.cols) / 2 + PLATE.margin, plateBack: -BB.depth / 2 - PLATE.back, plateTop: PLATE.thickness, top: this.topView !== null },
+      { plateHalf: boardWidth(plan.cols) / 2 + PLATE.margin, top: this.topView !== null, bodies: bodies.map((o) => o.box) },
     );
     let next = 0;
     const routeOf = new Map(layout.cables.flatMap((c, k) => (jobs[k] ? [[c, routed.routes[next++]!] as const] : [])));

@@ -2648,6 +2648,82 @@ direncin boştaki ucunda, ray ve köprü yok, direkler sütun sırasında; eskid
 kur (telefon, T6 öğrenci)" (kilitli güç kaynağı kablosu seçiliyken Çıkar pasif; eskiden kilitli ray köprüsünde Sil).
 Gerçek iPhone'da denenmedi.
 
+### 3B: kablolar üst üste binmez, yumuşak bükülür (2026-11-14)
+
+Sorun (kullanıcı): 3B'de cihaz kabloları aynı yoldan geçince üst üste aynı yere çiziliyor, titreşiyordu (z-fighting;
+`diyot-dc`'de multimetrelerin kırmızı ve siyah kabloları); köşeler keskindi. Dal `son-kontrol`.
+
+**1. Kablo koridoru ve şeritler** (`src/bench3d/cableRoutes.ts`). Cihazlarla direk sırası arasındaki masa bir kablo
+koridorudur; koridorda x boyunca şeritler vardır (aralık 0,62 birim: kablo çapı 0,56 + pay). Aynı yöne giden kablolar
+şeritlerde yan yana, düz bir bant gibi yatar.
+
+- **Cihaz kablosu:** soketten düz çıkar, şeridinin üstüne kadar havada ilerler, masaya iner, şeridinde direğinin
+  hizasına gider, dikey yükselir ve fişine arkadan yatay girer. Başka bir şeridi kesen her kısım havadadır (iniş ve
+  çıkış): kesişen kablo ötekinin üstünden geçer.
+- **Doğrudan giden kablo:** soketi direğiyle neredeyse aynı hizadaysa (şeritte iki dönüşe yer yok) koridorun
+  üstünden, ortası hafifçe sarkarak gider; öbür kablolara değmeyen ilk sarkma seçilir.
+- **Tahta dışı parçanın kablosu** (pil, motor, röle…): ucundan çapraz ayrılır, parçanın yanındaki boşlukta arkaya
+  yatar (yan şeritler: plakaya bakan uçlar parçayla plaka arasında, öbür uçlar parçanın dış yanında), koridorda
+  kendi şeridine döner. Eskiden yan şeritlerin aralığı 0,32 birimdi (kablo çapından az) ve kablo gövdenin üstünden
+  aşıyordu. Parçayla plaka arasına dört şerit sığar; boşluk dolunca (üç pilli `opamp-eviren`: altı kablo; Arduino ile
+  yanındaki pilin arası: tek şerit) öndeki uçların kabloları, sonradan katılan arkadakilerin üstüne yatar (bir kablo
+  çapı yukarıda) ve koridorda hafif bir eğimle masaya iner. Ucu gövdenin üstünde ve kenarından içeride olan parçada
+  (AC kaynağın vidaları) kablo önce kenarın üstünden dışarı çıkar; ucu arka yüzde olanda (hoparlör) önce düz arkaya.
+- **Gövdeye değme denetimi** (`leadRoute.collisions`, `scene.cableHits`): kablo başka parçaların gövdesine 0,48
+  birimden yaklaşmaz (değişmedi). Kendi parçasının yanından ise sıyırarak geçebilir (pay yok; ucun çevresinde 1,6
+  birim sayılmaz): kablo artık gövdenin üstünden aşmıyor, yanındaki şeritte yatıyor.
+- **Şerit ataması:** kablolar direklere yakın şeritten başlayarak yerleşir; aynı şeritte x aralıkları üst üste
+  binmez. Aynı yandaki tahta dışı kablolar iç içe döner; yan şeridin üstünden geçen cihaz kablosu o kablodan geride
+  kalır. İnişi başka bir kablonun direğinin hizasına düşen kablonun inişi yana kayar.
+- **Koridor dolunca** (14 kablolu `transformator`): kablo, aynı şeritte kendisini bütünüyle kapsayan bir kablonun
+  üstüne yatar (kablo demeti; bir kablo çapı yukarıda). O da yetmezse cihaz kablosu yan şeritten gelen kablonun
+  önüne geçer ve kesiştiği yerde bir kablo çapı yükselip üstünden atlar (81 örnekte gerekmedi).
+- Tepeden görünümde cihazlar tahtanın arkasındaki kartlardır (koridor yok): kablo kısa bir kavistir; kavislerin
+  yükseklikleri farklıdır (kesişenler üst üste gelmez). Arduino'nun atlama kabloları yuvarlak köşeli kemerlerdir;
+  kısa kablo alçaktan, uzun kablo bir kablo çapı yukarıdan geçer.
+
+**2. Yumuşak bükülme** (`src/bench3d/cablePath.ts` → `roundPath`). Yol dayanak noktalarından kurulur; her köşe iki
+komşu doğruya teğet bir çember yayıyla yuvarlanır. Kablolarda yarıçap en az 4 kablo çapı (2,24 birim). Boru geometrisi
+yolun kendi noktalarından kurulur (düz kısımda iki halka, yayda her ≈ 12°'de bir): üçgen sayısı arttırmadan azaldı.
+
+- **Yorum (istek: "aynı şey köprü tellerine ve direk tellerine de"):** tahtadaki teller tek damarlı ince teldir ve
+  kartın 0,32 birim (≈ 0,8 mm) üstünde yatar. Köşelerinin hedefi yine 4 tel çapıdır (0,96 birim), ama deliğe inen
+  köşe telin yüksekliğinden büyük olamaz ve dar basamaklarda yay doğrulara sığacak kadar küçülür: hiçbir köşe bir
+  tel çapının (0,25 birim) altına inmez. Teli 4 çaplık yay için kartın 2,4 mm üstüne kaldırmak "köprüler ince ve
+  alçak" kararını bozardı.
+- Direk teli deliğe yana dik basamakla değil, 0,9 birim geriden çapraz yaklaşır (Arduino fişine değecekse kısalır).
+  Şeride 0,4 birime kadar yan basamak iz açmaz (tel direkten hafif çapraz gider); 0,6'dan kısa basamak 0,6'ya
+  tamamlanır.
+- Köprü teli yuvarlak köşeli U'dur; biçim aranırken teller arasında boşluk aranır (eskiden 0,02 birim iç içe
+  girebiliyordu).
+
+**Denetim.** `tests/kablo-3b-yollar.test.ts` (81 örnek): herhangi iki kablonun ya da telin merkez çizgileri arası
+uzaklık yarıçaplarının toplamından az değil (uçlar hariç; kablolar arasında en az 0,62); bükülme yarıçapı kablolarda
+≥ 4 çap, tellerde ≥ bir tel çapı; koridor taşmıyor; tahta dışı kablolar hiçbir gövdeden geçmiyor (eskiden yalnızca
+beş örnekte, ios-kontrol'de bakılıyordu). ios-kontrol'e canlı sahnede kablolar arası uzaklık maddesi eklendi. `tests/tezgah-sade.test.ts` iz denetimi yuvarlak yola göre.
+Üçgen sayısı: `diyot-dc` 16 856 → 14 048, `transformator` 29 708 → 22 764, `yarim-dalga` 19 912 → 16 248.
+
+### Son kontrol: sunum öncesi (2026-11-14)
+
+19 Kasım'daki sınıf sunumundan önce yeni özellik eklenmeden yapılan denetim (dal `son-kontrol`).
+
+- **81 örnek taraması** (şema ve 3B, 10 s oynatma): konsol hatası, boş ekran, takılma, NaN ya da "—" kalan ölçüm
+  yok.
+- **Bulunan ve düzeltilen hata: WebGL bağlamı bırakılmıyordu.** 3B'ye her girişte yeni bir bağlam açılıyor, sahne
+  bırakılırken bağlam bırakılmıyordu; 16. girişten sonra tarayıcı "Too many active WebGL contexts. Oldest context will
+  be lost" uyarısıyla en eski bağlamı düşürüyordu. Üç sahne de (tezgâh, Karta aktar, baraj) `dispose`'da
+  `forceContextLoss` çağırır.
+- Yayında gölgelendirici günlüğü okunmaz (`checkShaderErrors` yalnızca geliştirmede): sürücünün zararsız HLSL
+  uyarıları (X4122) konsola düşmez.
+- **Föy deneyleri:** `tests/son-kontrol-foy.test.ts`, 27 örnekte 88 ölçümü simülasyondan bağımsız aralıklarla
+  karşılaştırır (veri sayfası ya da elle hesap). Hepsi aralıkta. Not: 1N4001'in ileri gerilimi föydeki akımlarda
+  (0,5–4,4 mA) 0,45–0,56 V'tur; model Vishay veri sayfasının tipik eğrisine uydurulmuştur (10 mA'de 0,60 V, 100 mA'de
+  0,72 V). Ders kitabındaki "0,6–0,8 V" 10 mA ve üstü içindir; model değiştirilmedi (föy kartlarındaki bütün sayılar
+  bu modele bağlı).
+- **Çevrimdışı yedek:** `C:\dev\devre-sunum` (depoda değil): derleme, bağımlılıksız yerel sunucu (`sunucu.mjs`;
+  Node yoksa `sunucu.ps1`) ve çift tıklanan `Devre-Simulatoru.bat`. Derlemede dış kaynak çağrısı yok (yazı tipleri
+  ve wasm yerel).
+
 ### Performans ve hata taraması (2026-10-27)
 
 - `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,

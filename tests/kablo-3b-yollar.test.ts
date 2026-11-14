@@ -13,6 +13,7 @@ import { JUMPER_RADIUS, jumperCurve } from '../src/bench3d/breadboardModel';
 import { PolyCurve, pathDistance, roundPath, segmentDistance, trimPath, tubeGeometry } from '../src/bench3d/cablePath';
 import { CABLE_BEND_MIN, CABLE_PITCH, CABLE_TABLE, cableBody, cableJobs, routeArches, routeCables, type CableJob } from '../src/bench3d/cableRoutes';
 import { CABLE_RADIUS, jumperShapes, type BoardBody } from '../src/bench3d/jumpers';
+import { collisions } from '../src/bench3d/leadRoute';
 import { placeBoardPart, placeTablePart } from '../src/bench3d/placement';
 import { INSTRUMENTS, PLATE, POST_WIRE, WIRE_BEND_MIN, instrumentLeads, layoutPosts, plugEntry } from '../src/bench3d/posts';
 import { EXAMPLE_IDS, exampleDoc } from '../src/examples';
@@ -59,12 +60,13 @@ function linesOf(id: (typeof EXAMPLE_IDS)[number], top = false) {
   const plan = planBreadboard(doc);
   const layout = layoutPosts(doc, plan, plan);
   const table = new Map([...plan.table].map(([pid, at]) => [pid, placeTablePart(doc.parts.find((p) => p.id === pid)!, at)] as const));
+  const boxOf = new Map([...table].map(([pid, placed]) => [pid, new Box3().setFromObject(placed.model.root)] as const));
   const jobs = cableJobs(layout, (pid) => {
     const placed = table.get(pid);
-    return placed ? { anchors: placed.anchors, dirs: placed.dirs, box: new Box3().setFromObject(placed.model.root), instrument: INSTRUMENTS.has(doc.parts.find((p) => p.id === pid)!.type) } : undefined;
+    return placed ? { anchors: placed.anchors, dirs: placed.dirs, box: boxOf.get(pid)!, instrument: INSTRUMENTS.has(doc.parts.find((p) => p.id === pid)!.type) } : undefined;
   });
   const live = jobs.flatMap((j) => (j ? [j] : []));
-  const routed = routeCables(live, { plateHalf: boardWidth(plan.cols) / 2 + PLATE.margin, plateBack: -BB.depth / 2 - PLATE.back, plateTop: PLATE.thickness, top });
+  const routed = routeCables(live, { plateHalf: boardWidth(plan.cols) / 2 + PLATE.margin, top, bodies: [...boxOf.values()] });
   const lines: Line[] = routed.routes.map((r, i) => ({ name: `kablo ${i} (${r.kind})`, kind: 'cable', r: CABLE_RADIUS, points: r.points, skip: 0.3 }));
   const holeTop = (h: Parameters<typeof holeXZ>[0]) => {
     const { x, z } = holeXZ(h, plan.cols);
@@ -85,7 +87,15 @@ function linesOf(id: (typeof EXAMPLE_IDS)[number], top = false) {
   const shapes = jumperShapes(plan, new Set(instrumentLeads(doc, plan)), undefined, wires, bodies);
   plan.jumpers.forEach((j, i) => lines.push({ name: `köprü ${i}`, kind: 'wire', r: JUMPER_RADIUS, points: jumperCurve(holeTop(j.a), holeTop(j.b), shapes[i]).points, skip: 0.35 }));
   wires.forEach((points, i) => lines.push({ name: `direk teli ${i}`, kind: 'wire', r: POST_WIRE.radius, points, skip: 0.35 }));
-  return { lines, routed, live };
+  // Sahnenin denetimi (scene.cableHits): tahta dışı parçanın kablosu masadaki parçaların gövdesinden geçmez.
+  const boxes = [...boxOf].map(([pid, box]) => ({ pid, box }));
+  const sideJobs = layout.cables.filter((_, k) => jobs[k]);
+  const hits = routed.routes.flatMap((r, i) => {
+    const partId = sideJobs[i]!.partId;
+    if (r.kind !== 'side') return [];
+    return collisions(new PolyCurve(r.points), boxes.map((o) => ({ box: o.box, own: o.pid === partId }))).length > 0 ? [`kablo ${i}`] : [];
+  });
+  return { lines, routed, live, hits };
 }
 
 describe('Yol yuvarlatma (cablePath)', () => {
@@ -170,6 +180,11 @@ describe('3B kablo yolları (81 örnek)', () => {
         for (const p of cableBody(r.points)) expect(p.y, `${id} kablo ${i}`).toBeGreaterThan(r.kind === 'side' ? 0.03 : CABLE_TABLE - 0.06);
       });
     }
+  });
+
+  it('tahta dışı parçaların kabloları masadaki parçaların gövdesinden geçmez (sahnenin cableHits denetimi, 81 örnek)', () => {
+    const bad = all.flatMap(({ id, hits }) => hits.map((h) => `${id}: ${h}`));
+    expect(bad).toEqual([]);
   });
 
   it('diyot-dc: multimetrelerin kırmızı ve siyah kabloları ayrı şeritlerde yan yana; eskiden aynı yoldan üst üste geçiyordu', () => {
