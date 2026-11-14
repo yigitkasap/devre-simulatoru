@@ -8,6 +8,9 @@
 // seri bağlandığı tahtada görünür. Tel, planın (planBreadboard) o uca verdiği deliğe gider: şemada bağlı olduğu
 // bacağın şeridi. Tahtada kur kurulumunda tel, öğrencinin kabloyu taktığı deliğe gider; takılmamış kablonun direği
 // telsizdir. Direkler ve teller şemaya ve KiCad'e girmez.
+//
+// Direk sırası (2026-11-14): direkler, tellerinin tahtanın üstünde ilerlediği şeritlerin soldan sağa sırasıyla dizilir
+// (lanesOf); teller birbirini kesmez.
 
 import { Vector3 } from 'three';
 import { tr } from '../i18n/tr';
@@ -40,8 +43,15 @@ export const BANANA = { radius: 0.42, height: 1.25 } as const;
 export const POST_WIRE = { radius: 0.12, lift: 0.32 } as const;
 /** Taban plakası: kalınlık, tahtanın yanlarından ve önünden taşma, arkadan (direk sırası için) taşma. */
 export const PLATE = { thickness: 0.25, margin: 1.2, back: 5.4 } as const;
-/** Direk tellerinin kanaldaki izleri arasındaki aralık (tel çapının üç katı). */
+/** Direk tellerinin kanaldaki izleri arasındaki aralık (tel çapının bir buçuk katı); kalabalık devrede izler sıkışır. */
 const WIRE_TRACK = 0.36;
+/**
+ * Telin tahtanın üstünde ilerlediği şeritler: deliğin sütunundan bu kadar yanda (delik aralığı). İki sütunun arasında
+ * iki şerit var (üçte bir ve üçte iki); daha uzaktakiler komşu sütunun ötesinde (dolu deliğe değmeyen seçilir).
+ */
+const LANES = [1 / 3, 2 / 3, 4 / 3, 5 / 3, 7 / 3, 8 / 3, 10 / 3, 11 / 3] as const;
+/** İki telin şeritleri arasındaki en az aralık. */
+const LANE_GAP = 0.3;
 
 export interface Post {
   readonly net: string;
@@ -82,6 +92,8 @@ export interface PostWire {
   readonly points: readonly Vector3[];
   /** Direk sırası ile tahtanın arka kenarı arasındaki kanalda telin izi (0: tahtaya en yakın). */
   readonly track: number;
+  /** Telin tahtanın üstünde ilerlediği şeridin x'i (iki sütunun arası; ray deliğinde deliğin kendi hizası). */
+  readonly lane: number;
 }
 
 export interface PostLayout {
@@ -217,9 +229,11 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
     taken.add(name);
     return { ...e, name, title: base.title, color: cableColor(e.part, e.pin, ground(e.net)) };
   });
-  // Sıra: telin tercih ettiği şeridin x'i (ray deliğinde deliğin kendi hizası, satır deliğinde yarım delik solu).
-  const laneX = (e: { hole: Hole; at: { x: number } }) => e.at.x - (e.hole.kind === 'strip' ? 0.5 : 0);
-  named.sort((a, b) => laneX(a) - laneX(b) || a.at.z - b.at.z);
+  // Sıra: tellerin tahtanın üstünde ilerlediği şeritlerin soldan sağa sırası (aynı sırayla inen teller birbirini
+  // kesmez). Şeritler şemanın planına göre verilir (lanesOf).
+  const referenceLanes = lanesOf(doc, reference, named.map((e) => e.hole));
+  const lanes = new Map(named.map((e, i) => [pinKey(e.part.id, e.pin), referenceLanes[i]!]));
+  named.sort((a, b) => lanes.get(pinKey(a.part.id, a.pin))! - lanes.get(pinKey(b.part.id, b.pin))! || a.at.z - b.at.z);
   // Direkler tellerinin gittiği deliğin hizasında; aralarında en az POST.spacing, plakanın içinde.
   const half = boardWidth(reference.cols) / 2 - 1;
   // Aralık: hedef delikler dar bir alandaysa direkler de sıkışır (teller uzun yelpaze yapmaz), en az POST.tight;
@@ -227,7 +241,7 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
   const reach = named.length > 1 ? named[named.length - 1]!.at.x - named[0]!.at.x : 0;
   const count = Math.max(1, named.length - 1);
   const gap = Math.max(POST.tight, Math.min(POST.spacing, (reach + 2 * POST.spacing) / count, (2 * half) / count));
-  const xs = spread(named.map((e) => e.at.x), gap, -half, half);
+  const xs = spread(named.map((e) => lanes.get(pinKey(e.part.id, e.pin))!), gap, -half, half);
   const z = -BB.depth / 2 - POST.behind;
   const posts: Post[] = named.map((e, i) => ({ net: e.net, partId: e.part.id, pin: e.pin, name: e.name, title: e.title, color: e.color, x: xs[i]!, z }));
 
@@ -236,82 +250,38 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
   const cables: PostCable[] = named.map((e, post) => ({ partId: e.part.id, pin: e.pin, net: e.net, color: e.color, post, level: 0, lead: leadIndex.get(pinKey(e.part.id, e.pin)) ?? null }));
 
   // Teller: takılı her alet kablosu için direkten o kablonun deliğine bir tel.
-  const targets: Array<Omit<PostWire, 'points' | 'track'>> = [];
+  const targets: Array<Omit<PostWire, 'points' | 'track' | 'lane'>> = [];
   for (const c of cables) {
     if (c.lead === null) continue;
     targets.push({ post: c.post, net: c.net, hole: plan.leads[c.lead]!.hole, color: c.color, leads: [c.lead] });
   }
   // Telin yolu (tek katmanlı, kesişmesiz kanal yerleşimi; baskı devre yolu gibi dik açılı): tel direğin önünden
   // çıkar; direk sırası ile tahtanın arka kenarı arasındaki kanalda kendi izinde yana gider; hedef deliğin
-  // sütununun yarım delik yanındaki şeritte (iki sütunun arasında, hiçbir deliğin üstünden geçmeden) deliğin
-  // hizasına kadar ilerler ve deliğe girer. Teller hedef sırasıyla dizilir, şeritleri de aynı sıradadır; sola giden
-  // tellerde sağdaki, sağa gidenlerde soldaki tel tahtaya daha yakın izi alır: hiçbir tel öbürünü kesmez.
-  const instrumentSet = new Set(instrumentLeads(doc, plan));
-  const blocked: Array<{ x: number; z: number; r: number; key: string }> = [];
-  const block = (h: Hole, r: number) => blocked.push({ ...holeXZ(h, plan.cols), r, key: holeKey(h) });
-  // Delikteki bacak, köprü ucu ya da tel ucu ince (yarıçap ≈ 0,1): tel yanından çeyrek delik açıkla geçebilir;
-  // Arduino'nun atlama telinin fişi kalın.
-  for (const p of plan.onBoard.values()) for (const h of [...p.holes, ...(p.extraHoles ?? [])]) block(h, 0.12);
-  plan.leads.forEach((l, i) => {
-    if (!instrumentSet.has(i)) block(l.hole, 0.47);
-  });
-  for (const j of plan.jumpers) for (const h of [j.a, j.b]) block(h, 0.12);
-  for (const t of targets) block(t.hole, 0.12);
+  // sütununun yanındaki şeritte (iki sütunun arasında, hiçbir deliğin üstünden geçmeden) deliğin hizasına kadar
+  // ilerler ve deliğe girer. Direkler şerit sırasıyla dizilidir; sola giden tellerde sağdaki, sağa gidenlerde soldaki
+  // tel tahtaya daha yakın izi alır: hiçbir tel öbürünü kesmez.
   const y = BB.height + POST_WIRE.lift;
   const edge = -BB.depth / 2 - 0.45;
-  /** Noktanın (yatayda) doğru parçasına uzaklığı. */
-  const distance = (px: number, pz: number, ax: number, az: number, bx: number, bz: number) => {
-    const dx = bx - ax;
-    const dz = bz - az;
-    const len2 = dx * dx + dz * dz;
-    const t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2));
-    return Math.hypot(ax + dx * t - px, az + dz * t - pz);
+  // Şeritler: çizilen yerleşim şemanın planıysa direk sırasını veren şeritler; Tahtada kur kurulumunda tellerin
+  // gittiği deliklere göre yeniden.
+  const own = plan === reference ? null : lanesOf(doc, plan, targets.map((t) => t.hole));
+  const laneOf = (index: number) => {
+    const t = targets[index]!;
+    const lead = plan.leads[t.leads[0]!]!;
+    return own ? own[index]! : lanes.get(pinKey(lead.partId, lead.pin))!;
   };
-  /** Şeridin (ve deliğe son adımın) üstünden geçtiği dolu delik sayısı. */
-  const laneHits = (lane: number, at: { x: number; z: number }, own: string) => {
-    let hits = 0;
-    for (const q of blocked) {
-      if (q.key === own) continue;
-      const near = Math.min(distance(q.x, q.z, lane, edge, lane, at.z), distance(q.x, q.z, lane, at.z, at.x, at.z));
-      if (near < q.r + POST_WIRE.radius) hits++;
-    }
-    return hits;
-  };
-  // Sıra: direk sırası (hedefin x'i); aynı direkten çıkan teller (kurulumda kablo başına bir tel) deliğin x'ine göre.
-  const order = targets
-    .map((t, index) => ({ t, index, at: holeXZ(t.hole, plan.cols) }))
-    .sort((p, q) => p.t.post - q.t.post || p.at.x - (p.t.hole.kind === 'strip' ? 0.5 : 0) - (q.at.x - (q.t.hole.kind === 'strip' ? 0.5 : 0)) || p.at.z - q.at.z);
+  // Sıra: direk sırası; aynı direkten çıkan teller şeritlerinin sırasıyla.
+  const order = targets.map((t, index) => ({ t, index, at: holeXZ(t.hole, plan.cols), lane: laneOf(index) })).sort((p, q) => p.t.post - q.t.post || p.lane - q.lane || p.at.z - q.at.z);
   const perPost = new Map<number, number>();
   for (const o of order) perPost.set(o.t.post, (perPost.get(o.t.post) ?? 0) + 1);
   const seen = new Map<number, number>();
-  // 1) Şerit: deliğe en yakın yarım delik hizalarından, önceki tellerin şeridinin sağında kalan ve dolu deliğe
-  //    değmeyen ilki (ray deliğinde önce deliğin kendi hizası: önünde başka delik yoktur).
-  let lastLane = -Infinity;
-  const done: Array<{ lane: number; at: { x: number; z: number } }> = [];
-  const routed = order.map(({ t, index, at }) => {
+  const routed = order.map(({ t, index, at, lane }) => {
     const post = posts[t.post]!;
     const m = seen.get(t.post) ?? 0;
     seen.set(t.post, m + 1);
     const startX = post.x + (m - ((perPost.get(t.post) ?? 1) - 1) / 2) * 0.32;
-    // Deliğin hemen yanındaki şeritler önce (sol, sağ): deliğe son adım yarım delik, başka şeridi kesmez.
-    // Yarım delik hizası dolu bir ray deliğine denk gelirse çeyrek delik kaydırılır.
-    const sides = [-0.5, 0.5, -0.25, 0.25, -0.75, 0.75, 1, 1.25, 1.5, 2, 2.5, 3.5, -1.5].map((d) => at.x + d);
-    const candidates = t.hole.kind === 'rail' ? [at.x, ...sides] : sides;
-    const own = holeKey(t.hole);
-    /** Deliğe son adım önceki bir telin şeridini, şerit de önceki bir telin son adımını keser mi. */
-    const cuts = (lane: number) =>
-      done.filter((w) => {
-        const hop = w.lane > Math.min(lane, at.x) + 0.2 && w.lane < Math.max(lane, at.x) - 0.2 && w.at.z > at.z - 0.2;
-        const run = lane > Math.min(w.lane, w.at.x) + 0.2 && lane < Math.max(w.lane, w.at.x) - 0.2 && at.z > w.at.z - 0.2;
-        return hop || run;
-      }).length;
-    const scored = candidates.map((lane, rank) => ({ lane, score: laneHits(lane, at, own) * 10 + cuts(lane) * 300 + (lane < lastLane + 0.4 ? 1000 : 0) + rank * 0.01 }));
-    const lane = scored.sort((p, q) => p.score - q.score)[0]!.lane;
-    lastLane = Math.max(lastLane, lane);
     const dir = lane < startX - 0.15 ? -1 : lane > startX + 0.15 ? 1 : 0;
-    const wire = { t, index, at, post, startX, lane, dir, track: 0 };
-    done.push(wire);
-    return wire;
+    return { t, index, at, post, startX, lane, dir, track: 0 };
   });
   // 2) İz: aynı yöne giden ve yatay aralıkları üst üste binen ardışık teller bir kümedir. Sola gidenlerde sağdaki
   //    tel tahtaya daha yakın izi alır, sağa gidenlerde soldaki: tel, yatay aralığı kendisininkiyle üst üste binen
@@ -331,19 +301,108 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
     i = j;
   }
   const wires: PostWire[] = new Array<PostWire>(targets.length);
+  // İzler tahtanın arka kenarının hemen gerisinden direklerin tabanına kadar (taban halkasına değmeden). Kalabalık
+  // devrede (çok tel aynı yöne açılır) izler arasındaki aralık kanala sığacak kadar daralır.
+  const deepest = Math.max(0, ...routed.map((w) => w.track));
+  const room = edge - 0.3 - (-BB.depth / 2 - POST.behind + POST.radius + 0.45);
+  const pitch = deepest > 0 ? Math.min(WIRE_TRACK, room / deepest) : WIRE_TRACK;
   for (const w of routed) {
     const front = w.post.z + POST.radius * 0.6;
-    // İzler tahtanın arka kenarının hemen gerisinden direklerin tabanına kadar (taban halkasına değmeden).
-    const zTrack = Math.max(w.post.z + POST.radius + 0.45, edge - 0.3 - WIRE_TRACK * w.track);
+    const zTrack = edge - 0.3 - pitch * w.track;
     const raw =
       w.dir === 0
         ? [new Vector3(w.startX, y, front), new Vector3(w.lane, y, edge), new Vector3(w.lane, y, w.at.z), new Vector3(w.at.x, y, w.at.z)]
         : [new Vector3(w.startX, y, front), new Vector3(w.startX, y, zTrack), new Vector3(w.lane, y, zTrack), new Vector3(w.lane, y, w.at.z), new Vector3(w.at.x, y, w.at.z)];
     const points = raw.filter((q, k) => k === 0 || q.distanceTo(raw[k - 1]!) > 1e-6);
     points.push(new Vector3(w.at.x, BB.height, w.at.z));
-    wires[w.index] = { ...w.t, points, track: w.track };
+    wires[w.index] = { ...w.t, points, track: w.track, lane: w.lane };
   }
   return { posts, cables, wires };
+}
+
+/**
+ * Direk tellerinin tahtanın üstünde ilerlediği şeritler (`holes` sırasıyla, x). Tel tahtanın arka kenarından şeridi
+ * boyunca deliğin hizasına kadar gelir, oradan yana, deliğe girer. Delikler soldan sağa, aynı sütunda arkadan öne
+ * işlenir; her tel, deliğine en yakın boş şeridi alır: dolu deliğe değmeyen, önceki bir telin şeridini ya da son
+ * adımını kesmeyen. Aynı sütuna inen tellerde arkadaki delik içteki, öndeki delik dıştaki şeridi alır (dıştaki telin
+ * son adımı, içtekinin bittiği yerin ötesinden geçer).
+ */
+export function lanesOf(doc: CircuitDoc, plan: BreadboardPlan, holes: readonly Hole[]): number[] {
+  const instrument = new Set(instrumentLeads(doc, plan));
+  const blocked: Array<{ x: number; z: number; r: number; key: string }> = [];
+  const block = (h: Hole, r: number) => blocked.push({ ...holeXZ(h, plan.cols), r, key: holeKey(h) });
+  // Delikteki bacak, köprü ucu ya da tel ucu ince (yarıçap ≈ 0,1): tel yanından üçte bir delik açıkla geçebilir;
+  // Arduino'nun atlama telinin fişi kalın.
+  for (const p of plan.onBoard.values()) for (const h of [...p.holes, ...(p.extraHoles ?? [])]) block(h, 0.12);
+  plan.leads.forEach((l, i) => {
+    if (!instrument.has(i)) block(l.hole, 0.47);
+  });
+  for (const j of plan.jumpers) for (const h of [j.a, j.b]) block(h, 0.12);
+  for (const h of holes) block(h, 0.12);
+  const edge = -BB.depth / 2 - 0.45;
+  /** Noktanın (yatayda) doğru parçasına uzaklığı. */
+  const distance = (px: number, pz: number, ax: number, az: number, bx: number, bz: number) => {
+    const dx = bx - ax;
+    const dz = bz - az;
+    const len2 = dx * dx + dz * dz;
+    const t = len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2));
+    return Math.hypot(ax + dx * t - px, az + dz * t - pz);
+  };
+  /** Şeridin (ve deliğe son adımın) üstünden geçtiği dolu delik sayısı. */
+  const laneHits = (lane: number, at: { x: number; z: number }, own: string) => {
+    let hits = 0;
+    for (const q of blocked) {
+      if (q.key === own) continue;
+      const near = Math.min(distance(q.x, q.z, lane, edge, lane, at.z), distance(q.x, q.z, lane, at.z, at.x, at.z));
+      if (near < q.r + POST_WIRE.radius) hits++;
+    }
+    return hits;
+  };
+  const sides = LANES.flatMap((d) => [-d, d]);
+  type Item = { hole: Hole; index: number; at: { x: number; z: number } };
+  /** Delikler verilen sırayla işlenir; `cost`: kesişen, şeridi dolu ya da dolu deliğe değen tellerin cezası. */
+  const run = (order: readonly Item[]) => {
+    const done: Array<{ lane: number; at: { x: number; z: number } }> = [];
+    const out = new Array<number>(holes.length).fill(0);
+    let cost = 0;
+    let worst: Item | null = null;
+    for (const item of order) {
+      const { hole, index, at } = item;
+      const candidates = (hole.kind === 'rail' ? [0, ...sides] : sides).map((d) => at.x + d);
+      const own = holeKey(hole);
+      /** Deliğe son adım önceki bir telin şeridini ya da son adımını, şerit de önceki bir telin son adımını keser mi. */
+      const cuts = (lane: number) =>
+        done.filter((w) => {
+          const hop = w.lane > Math.min(lane, at.x) + 0.1 && w.lane < Math.max(lane, at.x) - 0.1 && w.at.z > at.z - 0.2;
+          const cross = lane > Math.min(w.lane, w.at.x) + 0.1 && lane < Math.max(w.lane, w.at.x) - 0.1 && at.z > w.at.z - 0.2;
+          const level = Math.abs(w.at.z - at.z) < 0.2 && Math.min(w.lane, w.at.x) < Math.max(lane, at.x) + 0.2 && Math.min(lane, at.x) < Math.max(w.lane, w.at.x) + 0.2;
+          return hop || cross || level;
+        }).length;
+      const taken = (lane: number) => done.some((w) => Math.abs(w.lane - lane) < LANE_GAP);
+      const scored = candidates.map((lane, rank) => ({ lane, penalty: (taken(lane) ? 5000 : 0) + cuts(lane) * 300 + laneHits(lane, at, own) * 10, rank }));
+      const best = scored.sort((p, q) => p.penalty - q.penalty || p.rank - q.rank)[0]!;
+      if (best.penalty > 0 && worst === null) worst = item;
+      cost += best.penalty;
+      done.push({ lane: best.lane, at });
+      out[index] = best.lane;
+    }
+    return { out, cost, worst };
+  };
+  let order: Item[] = holes.map((hole, index) => ({ hole, index, at: holeXZ(hole, plan.cols) })).sort((p, q) => p.at.x - q.at.x || p.at.z - q.at.z);
+  let best = run(order);
+  // Kalabalık şerit (aynı şeride dört tel): yer bulamayan tel, komşu sütunların tellerinden önce işlenir (şeridini
+  // önce o seçer); sonuç daha iyiyse tutulur.
+  for (let turn = 0; turn < 6 && best.cost > 0 && best.worst; turn++) {
+    const stuck = best.worst;
+    const rest = order.filter((o) => o !== stuck);
+    const before = rest.findIndex((o) => o.at.x >= stuck.at.x - 1.5);
+    const next = [...rest.slice(0, Math.max(0, before)), stuck, ...rest.slice(Math.max(0, before))];
+    const tried = run(next);
+    if (tried.cost >= best.cost) break;
+    order = next;
+    best = tried;
+  }
+  return best.out;
 }
 
 /** Direğin tepesindeki `level`. fişin altı (dünya). */

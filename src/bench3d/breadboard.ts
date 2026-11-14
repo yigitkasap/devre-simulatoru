@@ -20,6 +20,10 @@
 // (seri zincirler aynı yarıda soldan sağa, alet uçları bağlı oldukları bacağın şeridinde; yukarıdaki son iki kuralın
 // yerine zincir ve bacak kuralları geçer). planCard Karta aktar içindir (delikli plaket, baskı devre, KiCad):
 // yukarıdaki kurallarla önceki yerleşim, değişmez.
+//
+// Tezgâh planında ray yalnızca kalabalık ağda (2026-11-14): toprak ya da besleme ağına tahtada RAIL_FROM (3) ya da
+// daha çok parça bacağı bağlıysa ağ raya alınır. Az bacaklı ağda ray yok: bacaklar aynı şeritte buluşur (ya da
+// şeritleri tek köprüyle bağlanır), kaynakların teli de ölçü aletleri gibi bağlı olduğu bacağın şeridine iner.
 
 import { CATALOG } from '../model/catalog';
 import { SEG7_LEGS } from '../model/logicChips';
@@ -391,6 +395,8 @@ function lastColumn(p: BreadboardPlan): number {
 
 /** Devrenin tahtada ortalandığı en az alet ucu sayısı (direk sayısı). */
 const CENTER_FROM = 6;
+/** Tezgâh planında toprak ya da besleme ağı, tahtada en az bu kadar parça bacağı varsa raya alınır. */
+export const RAIL_FROM = 3;
 /** Yerleşimin başladığı sütun (1. sütun boş kalır). */
 const FIRST_COLUMN = 2;
 
@@ -459,6 +465,18 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
   ].filter((n) => n !== ground && (members.get(n) ?? 0) > 1);
   const supply = supplies.sort((a, b) => members.get(b)! - members.get(a)!)[0];
   if (supply) roles.set(supply, 'supply');
+  // Raya alınan ağlar. Kart planında (Karta aktar) toprak ve besleme her zaman rayda. Tezgâh planında ray yalnızca
+  // kalabalık ağda: toprak ya da besleme ağına tahtada RAIL_FROM ya da daha çok parça bacağı bağlıysa. Az bacaklı
+  // ağda ray yok: bacaklar aynı şeritte buluşur, kaynağın teli doğrudan o şeride iner (labda böyle bağlanır).
+  const legCount = new Map<string, number>();
+  for (const el of netlist.elements) {
+    if (MOUNTS[el.type] === undefined) continue;
+    for (const pin of el.pins) {
+      const n = netOf.get(pin);
+      if (n !== undefined) legCount.set(n, (legCount.get(n) ?? 0) + 1);
+    }
+  }
+  const railed = new Set([...roles.keys()].filter((n) => !series || (legCount.get(n) ?? 0) >= RAIL_FROM));
 
   // --- Breadboard şeritleri ---------------------------------------------------------------------------
   const strips = new Map<string, Strip>();
@@ -537,10 +555,43 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
       });
     }
     const link = (p: Part) => MOUNTS[p.type]?.span !== undefined || through(p);
-    const joint = (n: string) => {
-      const c = carriers.get(n);
-      return !roles.has(n) && n !== groundNet && c !== undefined && c.length === 2 && c[0]!.part.id !== c[1]!.part.id && link(c[0]!.part) && link(c[1]!.part);
+    // Düğüm: raya gitmeyen ağda tam iki zincir elemanının (iki bacaklı tahta parçası, ampermetre) buluştuğu yer.
+    // Ağda ayrıca kaynak ya da tahta dışı parça ucu olabilir (toprağı iki parçanın paylaştığı devre): iki bacak yine
+    // aynı şeritte buluşur, kaynağın teli o şeride iner. Ampermetrenin düğümünde başka uç olamaz (seri kalır).
+    /** Ağın tahtadaki bacakları ve ampermetre uçları (kaynak ve tahta dışı parça uçları dışında). */
+    const ends = (n: string) => (carriers.get(n) ?? []).filter((x) => MOUNTS[x.part.type] !== undefined || through(x.part));
+    const meets = (n: string) => {
+      if (railed.has(n)) return false;
+      const all = carriers.get(n) ?? [];
+      const c = ends(n);
+      if (c.length !== 2 || c[0]!.part.id === c[1]!.part.id || !link(c[0]!.part) || !link(c[1]!.part)) return false;
+      return all.length === 2 || !c.some((x) => through(x.part));
     };
+    // Halka (kaynağın iki ucu arasında iki paralel kol: her düğümde iki bacak): baştan sona tek sıra olamaz. Halka,
+    // kaynağın bağlı olduğu düğümlerden kırılır; her kol kendi zinciri olur (kaynak yanından toprak yanına), o
+    // düğümlerin şeritleri köprüyle birleşir.
+    const broken = new Set<string>();
+    for (const start of ordered) {
+      if (!link(start) || !meets(net(start, 0)) || !meets(net(start, 1))) continue;
+      const ring: string[] = [];
+      let cur = start;
+      let inPin = 0;
+      let closed = false;
+      for (let guard = 0; guard <= doc.parts.length; guard++) {
+        const n = net(cur, 1 - inPin);
+        if (!meets(n)) break;
+        ring.push(n);
+        const next = ends(n).find((c) => c.part.id !== cur.id)!;
+        if (next.part.id === start.id) {
+          closed = true;
+          break;
+        }
+        cur = next.part;
+        inPin = next.pin;
+      }
+      if (closed) for (const n of ring) if ((carriers.get(n) ?? []).length > 2) broken.add(n);
+    }
+    const joint = (n: string) => !broken.has(n) && meets(n);
     /** Zincirin ucundaki ağ: 0 besleme yanı (kaynağın + ucu), 2 toprak yanı, 1 belirsiz. */
     const rank = (n: string) => {
       const c = carriers.get(n) ?? [];
@@ -561,7 +612,7 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
         links.push({ part: cur, inPin });
         const n = net(cur, 1 - inPin);
         if (!joint(n)) break;
-        const next = carriers.get(n)!.find((c) => c.part.id !== cur.id)!;
+        const next = ends(n).find((c) => c.part.id !== cur.id)!;
         if (walked.has(next.part.id)) break;
         cur = next.part;
         inPin = next.pin;
@@ -596,7 +647,7 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
       const after = i < n ? board[i]! : null;
       if (before === true || after === true) return true;
       if (before === false && after === false) return true;
-      return !roles.has(name) && name !== groundNet && !hasLeg(name);
+      return !railed.has(name) && !hasLeg(name);
     });
     const from = stripped.indexOf(true);
     const to = stripped.lastIndexOf(true);
@@ -823,13 +874,15 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
   // --- Tezgâh planı: alet ucu, şemada bağlı olduğu bacağın şeridine ---------------------------------------------
   const jumpers: Jumper[] = [];
   const joined = new Map<string, number>();
+  /** Ağ → deliği henüz verilmemiş alet ucu sayısı (tezgâh planı). */
+  const pending = new Map<string, number>();
   /** Bir ağın şeritlerini birleştiren köprüler (toprak ve besleme: her şerit kendi yarısının rayına). */
   const joinStrips = () => {
     for (const [n, list] of netStrips) {
       const done = joined.get(n) ?? 0;
       if (done >= list.length) continue;
       joined.set(n, list.length);
-      const role = roles.get(n);
+      const role = railed.has(n) ? roles.get(n) : undefined;
       if (role) {
         // Her şerit kendi yarısının rayına.
         for (const s of list.slice(done)) {
@@ -845,9 +898,11 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
       for (let i = Math.max(1, done); i < sorted.length; i++) {
         const a = sorted[i - 1]!;
         const b = sorted[i]!;
-        // Aynı yarıda: ortak boş satır; yarılar farklıysa kanala yakın satırlar.
-        const pa = a.half === 0 ? [0, 4, 1, 3, 2] : [9, 5, 8, 6, 7];
-        const pb = b.half === 0 ? [0, 4, 1, 3, 2] : [9, 5, 8, 6, 7];
+        // Aynı yarıda: ortak boş satır; yarılar farklıysa kanala yakın satırlar. Tezgâh planında yarılar farklıysa
+        // köprü kanalın iki yanındaki en yakın satırlara (e–f) takılır: kısa kalır, tahtayı boydan geçmez.
+        const cross = series && a.half !== b.half;
+        const pa = cross ? (a.half === 0 ? [4, 3, 2, 1, 0] : [5, 6, 7, 8, 9]) : a.half === 0 ? [0, 4, 1, 3, 2] : [9, 5, 8, 6, 7];
+        const pb = cross ? (b.half === 0 ? [4, 3, 2, 1, 0] : [5, 6, 7, 8, 9]) : b.half === 0 ? [0, 4, 1, 3, 2] : [9, 5, 8, 6, 7];
         const same = a.half === b.half ? pa.find((r) => !a.rows.has(r) && !b.rows.has(r)) : undefined;
         jumpers.push({ net: n, a: stripHole(a, same ?? freeRow(a, pa) ?? pa[0]!), b: stripHole(b, same ?? freeRow(b, pb) ?? pb[0]!) });
       }
@@ -882,12 +937,16 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
   const nearRow = (s: Strip, row: number) =>
     (s.half === 0 ? [0, 1, 2, 3, 4] : [5, 6, 7, 8, 9]).filter((r) => !s.rows.has(r)).sort((p, q) => Math.abs(p - row) - Math.abs(q - row) || p - q)[0];
   /**
-   * Alet ucunun (cihaz ya da tahta dışı parça) deliği. Ölçen uçlar (voltmetre, ampermetre, multimetre, osiloskop
-   * kanalı): ağın bacağı varsa o bacağın şeridi. Öbür uçlar (kaynaklar, üreteç, osiloskop toprağı, motor, röle…):
-   * toprak ve besleme ağında ray; yoksa bağlı olduğu bacağın şeridi. Ağın tahtada bacağı yoksa: ray ya da boş şerit.
+   * Alet ucunun (cihaz ya da tahta dışı parça) deliği: şemada bağlı olduğu bacağın şeridi, o bacağa en yakın boş
+   * delik (ölçü aletleri de, kaynaklar da: güç kaynağı, pil, üreteç). Ağ raya alınmışsa (kalabalık toprak ya da
+   * besleme) ölçmeyen uçlar (kaynaklar, osiloskop toprağı, motor, röle…) raya gider; ölçen uçlar (voltmetre,
+   * ampermetre, multimetre, osiloskop kanalı) yine bacağın yanına. Ağın tahtada bacağı yoksa uçlar boş bir şeritte
+   * buluşur.
    */
   const seriesHole = (part: Part, pin: number, n: string, aim: number): Hole => {
-    const role = roles.get(n);
+    const later = (pending.get(n) ?? 1) - 1;
+    pending.set(n, later);
+    const role = railed.has(n) ? roles.get(n) : undefined;
     const list = legs.get(n) ?? [];
     const measures = part.type === 'voltmeter' || part.type === 'ammeter' || part.type === 'multimeter' || (part.type === 'oscilloscope' && pin < 2);
     if (role && (!measures || list.length === 0)) {
@@ -895,7 +954,14 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
       useRail(n, 0, rail);
       return railHole(0, rail, aim);
     }
-    if (list.length > 0) {
+    const mine = netStrips.get(n) ?? [];
+    const room = (st: Strip) => 5 - st.rows.size;
+    const total = mine.reduce((sum, st) => sum + room(st), 0);
+    const prefer = (st: Strip) => (st.half === 0 ? [0, 1, 4, 3, 2] : [5, 6, 9, 8, 7]);
+    // Ağın şeritlerinde bu uçtan sonrakilere yer kalmayacaksa son boş delik, taşan uçların şeridine giden köprüye
+    // ayrılır (bir şeritte beş delik var).
+    const spill = mine.length > 0 && total <= 1 && later > total - 1;
+    if (!spill) {
       const from = pinAt(part, pin);
       const mate = across(part);
       const first = (l: { part: Part }) => (mate && l.part.id === mate.id ? 0 : 1);
@@ -906,14 +972,52 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
         leg.strip.legs++;
         return stripHole(leg.strip, row);
       }
+      // Bacakların şeritleri dolu: ağın boş deliği olan başka şeridi (önce açılmış taşma şeridi).
+      const other = mine.filter((st) => room(st) > 0).sort((p, q) => Math.abs(colX(p.col, cols) - aim) - Math.abs(colX(q.col, cols) - aim))[0];
+      if (other && list.length > 0) {
+        other.legs++;
+        return stripHole(other, freeRow(other, prefer(other)) ?? prefer(other)[0]!);
+      }
     }
-    const s = stripFor(n, aim, 0, 0);
-    s.legs++;
-    const prefer = s.half === 0 ? [0, 1, 4, 3, 2] : [5, 6, 9, 8, 7];
-    return stripHole(s, freeRow(s, prefer) ?? prefer[0]!);
+    if (mine.length === 0 || list.length === 0) {
+      // Ağın tahtada bacağı yok: uçlar boş bir şeritte buluşur.
+      const st = stripFor(n, aim, 0, 0);
+      st.legs++;
+      return stripHole(st, freeRow(st, prefer(st)) ?? prefer(st)[0]!);
+    }
+    // Taşma şeridi: boş deliği kalan şeridin yanında yeni bir şerit, o şeride köprüyle bağlı.
+    const anchor = mine.filter((st) => room(st) > 0).sort((p, q) => Math.abs(colX(p.col, cols) - aim) - Math.abs(colX(q.col, cols) - aim))[0];
+    const base = anchor ?? mine[mine.length - 1]!;
+    const pair = slotsOf(base.board);
+    let slot = pair[base.half]!;
+    if (slot.cursor > cols - 1) slot = pair[1 - base.half]!;
+    if (slot.cursor > cols - 1) {
+      boards++;
+      slot = slotsOf(boards - 1)[base.half]!;
+    }
+    const fresh = takeStrip(slot.board, slot.half, slot.cursor, n);
+    slot.frontier = 0;
+    slot.cursor += 2;
+    if (anchor) {
+      const same = anchor.half === fresh.half && anchor.board === fresh.board;
+      const pa = same ? (anchor.half === 0 ? [0, 4, 1, 3, 2] : [9, 5, 8, 6, 7]) : anchor.half === 0 ? [4, 3, 2, 1, 0] : [5, 6, 7, 8, 9];
+      const pb = same ? pa : fresh.half === 0 ? [4, 3, 2, 1, 0] : [5, 6, 7, 8, 9];
+      const common = same ? pa.find((r) => !anchor.rows.has(r) && !fresh.rows.has(r)) : undefined;
+      jumpers.push({ net: n, a: stripHole(anchor, common ?? freeRow(anchor, pa) ?? pa[0]!), b: stripHole(fresh, common ?? freeRow(fresh, pb) ?? pb[0]!) });
+      joined.set(n, netStrips.get(n)!.length);
+    }
+    fresh.legs++;
+    return stripHole(fresh, freeRow(fresh, prefer(fresh)) ?? prefer(fresh)[0]!);
   };
 
   const leads: Lead[] = [];
+  if (series) {
+    for (const part of ordered) {
+      if (!table.has(part.id) || part.type === 'arduino') continue;
+      const pinCount = netlist.elements.find((e) => e.id === part.id)!.pins.length;
+      for (let pin = 0; pin < pinCount; pin++) if (connected(part, pin)) pending.set(net(part, pin), (pending.get(net(part, pin)) ?? 0) + 1);
+    }
+  }
   for (const part of ordered) {
     const place = table.get(part.id);
     if (!place) continue;
@@ -931,7 +1035,7 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
         leads.push({ net: n, partId: part.id, pin, hole: seriesHole(part, pin, n, aim) });
         continue;
       }
-      const role = roles.get(n);
+      const role = railed.has(n) ? roles.get(n) : undefined;
       // Kablolar tahtanın arka yarısına (üst raylar, a–e satırları) gelir: önden bakınca parçaların arkasında kalır.
       const topSide = true;
       const board = 0;

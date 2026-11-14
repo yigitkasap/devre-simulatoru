@@ -34,12 +34,23 @@ describe('3B kablo akımları', () => {
     });
   }
 
-  it('LED ve ön direnç: masadaki pilin kabloları devre akımını taşır, jumper\'lardan da aynı akım geçer', () => {
+  it('LED ve ön direnç: masadaki pilin kabloları devre akımını taşır; köprü yok (pil doğrudan bacakların şeridinde)', () => {
     const { doc, plan, pinFlows, currents } = solve('led-on-direnc');
     const led = doc.parts.find((p) => p.type === 'led')!;
     const i = Math.abs(pinFlows.get(led.id)![0]!);
     expect(i).toBeGreaterThan(1e-3);
     plan.leads.forEach((lead, k) => expect(currents.leads[k]).toBeCloseTo(pinFlows.get(lead.partId)![lead.pin]!, 12));
+    // "Ray yalnızca kalabalık ağda" (2026-11-14): eskiden pil raylara, raylardan köprülerle parçalara gidiyordu.
+    expect(plan.jumpers).toEqual([]);
+    expect(plan.leads.every((lead) => lead.hole.kind === 'strip')).toBe(true);
+  });
+
+  it('Schottky ile 1N4001: iki kolun şeritlerini birleştiren köprüden o kolun akımı geçer', () => {
+    const { doc, plan, pinFlows, currents } = solve('schottky-1n4001');
+    const r2 = doc.parts.find((p) => p.label === 'R2')!;
+    const i = Math.abs(pinFlows.get(r2.id)![0]!);
+    expect(i).toBeGreaterThan(1e-4);
+    expect(plan.jumpers.length).toBeGreaterThan(0);
     const carrying = [...currents.jumpers].filter((c) => Math.abs(Math.abs(c) - i) < i * 1e-6).length;
     expect(carrying).toBeGreaterThan(0);
   });

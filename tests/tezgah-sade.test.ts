@@ -213,8 +213,9 @@ describe('3B: okunurluk önce', () => {
         expect(Math.max(...pts.map((p) => p.y)) - BB.height, id).toBeLessThanOrEqual(0.4);
         const length = pts.slice(1).reduce((sum, b, i) => sum + b.distanceTo(pts[i]!), 0);
         expect(length, `${id} ${post.name}`).toBeLessThanOrEqual(POST.behind + BB.depth + boardWidth(plan.cols) / 2);
-        // İz, direklerin tabanı ile tahtanın arka kenarı arasındaki kanalın içinde (sıkışıp üst üste binmez).
-        expect(-BB.depth / 2 - 0.75 - 0.36 * w.track, `${id} ${post.name}: iz ${w.track}`).toBeGreaterThanOrEqual(post.z + POST.radius + 0.45 - 1e-9);
+        // İz, direklerin tabanı ile tahtanın arka kenarı arasındaki kanalın içinde (kalabalık devrede izler arası
+        // aralık daralır; tellerin üst üste binmediğini çakışma testi denetler).
+        expect(Math.min(...pts.slice(1).map((p) => p.z)), `${id} ${post.name}: iz ${w.track}`).toBeGreaterThanOrEqual(post.z + POST.radius + 0.45 - 1e-9);
         total++;
       });
     }

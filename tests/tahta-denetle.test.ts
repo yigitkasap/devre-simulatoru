@@ -93,7 +93,8 @@ describe('Sorun türleri (Deney 9, transistör anahtar)', () => {
   });
 
   it('eksik kablo: baza giden kablo yoksa tek sorun (bağlı değil)', () => {
-    const missing: Build = { ...right, wires: right.wires.filter((w) => !(w.a === '6a' && w.b === '3j')) };
+    const missing: Build = { ...right, wires: right.wires.filter((w) => !(w.a === '6e' && w.b === '3f')) };
+    expect(missing.wires.length).toBe(right.wires.length - 1);
     expect(checkBuild(doc, missing, plan).problems.map((p) => p.kind)).toEqual(['notConnected']);
   });
 

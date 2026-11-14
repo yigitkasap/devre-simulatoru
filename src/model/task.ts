@@ -72,7 +72,7 @@ export interface FaultTask {
  * ipuçları ve süre.
  */
 export interface BoardTask {
-  /** Başlangıçta tahtada: boş, güç rayları bağlı, seçili parçalar takılı (güç raylarıyla). */
+  /** Başlangıçta tahtada: boş, güç kaynağı bağlı ('rails': kaynağın kabloları ve raylar arası kablolar), seçili parçalar takılı (güç kaynağıyla). */
   readonly start: 'empty' | 'rails' | 'parts';
   /** Hazır takılı parçalar (start = 'parts'). */
   readonly parts: readonly string[];

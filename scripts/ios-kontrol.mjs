@@ -4767,15 +4767,23 @@ try {
     const text = (await tsheet.textContent()) ?? '';
     const rules = (await tsheet.getByRole('button', { name: 'Denetle', exact: true }).count()) === 0 && (await tsheet.getByRole('button', { name: 'Teslim et' }).count()) === 1 && text.includes('Bu görevde Denetle yok')
       && (await sp.getByRole('button', { name: /Tahtada kur’dan çık/ }).count()) === 0 && (await tsheet.getByRole('button', { name: 'Bağlı delikler' }).count()) === 0;
-    // Kilitli (hazır gelen) + ray köprüsüne dokununca seçim çubuğundaki Sil pasif. Dokunulan yer üst − rayı ile
-    // a satırı arası (z = −6,5): tahtanın ortası alttaki sayfanın altında kalır.
+    // Kilitli (hazır gelen) güç kaynağı kablosunun deliğine dokununca seçim çubuğundaki Çıkar pasif.
+    // Değişti (2026-11-14, "ray yalnızca kalabalık ağda"): eskiden hazır gelen + ray köprüsüne dokunuluyordu; Deney
+    // 9'da artık ray kullanılmıyor, güç kaynağının kabloları bağlı olduğu bacağın şeridinde hazır geliyor (PS1 +: 7g).
     const bridge = await sp.evaluate(() => {
-      const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
-      return { x: rect.left - 14 * t.scale + t.ox, y: rect.top - 6.5 * t.scale + t.oy };
+      const top = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
+      const plan = window.__tezgah.plan;
+      const ps = [...window.__tezgah.parts.values()].find((p) => p.part.label === 'PS1');
+      const lead = plan.leads.find((l) => l.partId === ps?.part.id && l.pin === 0);
+      if (!lead || lead.hole.kind !== 'strip') return null;
+      const x = lead.hole.col - (plan.cols + 1) / 2; const z = lead.hole.row < 5 ? -5.5 + lead.hole.row : 1.5 + (lead.hole.row - 5);
+      const sheet = document.querySelector('[role=region][aria-label="Tahtada kur"]')?.getBoundingClientRect();
+      return { x: rect.left + x * top.scale + top.ox, y: rect.top + z * top.scale + top.oy, hole: `${lead.hole.col}${'abcdefghij'[lead.hole.row]}`, sheetTop: sheet ? Math.round(sheet.top) : null };
     });
-    await tap(sp, scdp, bridge); await sp.waitForTimeout(300);
-    const lockedDelete = await sp.locator('[role=region][aria-label^="Breadboard"] > div.z-10').getByRole('button', { name: 'Sil', exact: true }).isDisabled({ timeout: 3000 }).catch(() => false);
-    check('Tahtada kur (telefon, T6 öğrenci): kilitli (hazır gelen) ray köprüsü seçiliyken seçim çubuğundaki Sil pasif', lockedDelete);
+    if (bridge) { await tap(sp, scdp, bridge); await sp.waitForTimeout(300); }
+    const lockedDelete = await sp.locator('[role=region][aria-label^="Breadboard"] > div.z-10').getByRole('button', { name: 'Çıkar', exact: true }).isDisabled({ timeout: 3000 }).catch(() => false);
+    check('Tahtada kur (telefon, T6 öğrenci): kilitli (hazır gelen) güç kaynağı kablosu seçiliyken seçim çubuğundaki Çıkar pasif', bridge !== null && lockedDelete,
+      bridge ? `PS1 + → ${bridge.hole} (${Math.round(bridge.x)}, ${Math.round(bridge.y)}) · sayfanın üstü ${bridge.sheetTop}` : 'kablo yok');
     await tsheet.getByRole('button', { name: 'R1: tahtaya tak' }).tap(); await sp.waitForTimeout(300);
     const at = await sp.evaluate(() => {
       const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
@@ -6530,15 +6538,23 @@ try {
         d1: [leg('D1', 0), leg('D1', 1)], r1: [leg('R1', 0), leg('R1', 1)],
         wires: Object.fromEntries(['PS1 +', 'PS1 −', 'A1 +', 'A1 −', 'V1 +', 'V1 −'].map((name) => [name, wire(name)])),
         doubled: r.doubled,
+        jumpers: plan.jumpers.length,
+        rails: plan.leads.filter((l) => l.hole.kind === 'rail').length,
+        // Direkler soldan sağa (ekranda) ve tellerinin indiği sütunlar.
+        order: [...r.posts].sort((a, b) => a.x - b.x).map((p) => ({ name: p.name, col: wire(p.name)?.col ?? -1 })),
       };
     });
     const half = (h) => (h.kind === 'strip' ? (h.row < 5 ? 0 : 1) : -1);
     const sameStrip = (a, b) => a && b && a.kind === 'strip' && b.kind === 'strip' && a.col === b.col && half(a) === half(b);
     const dw = duzen.wires;
-    check('3B tahta düzeni (1N4001 DC): D1 ve R1 aynı yarıda soldan sağa, aralarında ampermetre için bir şerit boş; A1 + diyodun çıkış şeridinde, A1 − direncin giriş şeridinde; V1 + ve V1 − direncin iki bacağının şeridinde; PS1 + rayda (+), PS1 − rayda (−)',
+    // Değişti (2026-11-14, "ray yalnızca kalabalık ağda"): eskiden PS1 + ve PS1 − raylara, raylardan iki köprüyle
+    // diyoda ve dirence gidiyordu. Şimdi kaynak da ölçü aleti gibi bacağın şeridine iner: ray ve köprü yok. Direkler
+    // tellerinin indiği sütunların soldan sağa sırasında.
+    const ordered = duzen.order.every((o, k) => k === 0 || o.col >= duzen.order[k - 1].col);
+    check('3B tahta düzeni (1N4001 DC): D1 ve R1 aynı yarıda soldan sağa, aralarında ampermetre için bir şerit boş; A1 + diyodun çıkış şeridinde, A1 − direncin giriş şeridinde; V1 + ve V1 − direncin iki bacağının şeridinde; PS1 + diyodun anot şeridinde, PS1 − direncin boştaki ucunun şeridinde; ray ve köprü yok; direkler tellerinin indiği sütunların sırasında',
       new Set([...duzen.d1, ...duzen.r1].map(half)).size === 1 && duzen.d1[0].col < duzen.d1[1].col && duzen.r1[0].col === duzen.d1[1].col + 2 && duzen.r1[0].col < duzen.r1[1].col &&
         sameStrip(dw['A1 +'], duzen.d1[1]) && sameStrip(dw['A1 −'], duzen.r1[0]) && sameStrip(dw['V1 +'], duzen.r1[0]) && sameStrip(dw['V1 −'], duzen.r1[1]) &&
-        dw['PS1 +']?.kind === 'rail' && dw['PS1 +'].rail === 0 && dw['PS1 −']?.kind === 'rail' && dw['PS1 −'].rail === 1 && duzen.doubled === 0,
+        sameStrip(dw['PS1 +'], duzen.d1[0]) && sameStrip(dw['PS1 −'], duzen.r1[1]) && duzen.jumpers === 0 && duzen.rails === 0 && ordered && duzen.doubled === 0,
       `D1 sütun ${duzen.d1.map((h) => h.col).join('–')} · R1 sütun ${duzen.r1.map((h) => h.col).join('–')} · ${Object.entries(dw).map(([k, h]) => `${k}: ${h ? (h.kind === 'strip' ? `${h.col}${'abcdefghij'[h.row]}` : `ray ${h.rail}`) : 'yok'}`).join(' · ')}`);
     // Tahta dışı parçalar (pil, röle, motor, hoparlör): kabloları da direklere gider, plakanın yanından dolanır.
     const ro = await report('role');

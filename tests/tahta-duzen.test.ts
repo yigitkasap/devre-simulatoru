@@ -1,13 +1,15 @@
 // 3B tezgâh, "tahta düzeni" (2026-11-14): tahta şema gibi okunur. Bütün örnekler (81).
 //   1. Her alet ucunun kendi direği: direkler ağa göre değil, alet ucuna göre; adı alet ucunun adı.
-//   2. Her alet ucunun teli, şemada bağlı olduğu bacağın şeridinde, o bacağa en yakın boş delikte. Voltmetrenin iki
-//      teli ölçtüğü parçanın iki bacağının yanında. Kaynakların toprak ve besleme uçları raylarda.
+//   2. Her alet ucunun teli, şemada bağlı olduğu bacağın şeridinde, o bacağa en yakın boş delikte (ölçü aletleri
+//      de, kaynaklar da). Voltmetrenin iki teli ölçtüğü parçanın iki bacağının yanında. Ray yalnızca kalabalık
+//      toprak ya da besleme ağında (tahtada 3+ bacak; "ray yalnızca kalabalık ağda", tahta-ray.test.ts): orada
+//      ölçmeyen uçlar raya gider.
 //   3. Seri bağlı komşu parçalar aynı yarıda, şemadaki sırayla soldan sağa; ampermetrenin girdiği yerde bir şerit boş.
 //   4. Tahtadaki elektriksel bağlantı (delikler, şeritler, raylar, köprüler) şemanın ağlarıyla bire bir aynı.
 //   5. Tahtada kur yeni planla çalışır; Karta aktar (plaket, baskı devre, KiCad) eski planında kalır, çıktısı değişmez.
 
 import { describe, expect, it } from 'vitest';
-import { isOnBoard, planBreadboard, planCard, planSpan, type BreadboardPlan, type Hole } from '../src/bench3d/breadboard';
+import { RAIL_FROM, isOnBoard, planBreadboard, planCard, planSpan, type BreadboardPlan, type Hole } from '../src/bench3d/breadboard';
 import { conductorOf } from '../src/bench3d/holes';
 import { DMM_FIT, DMM_SHRINK, INSTRUMENT_SCALE } from '../src/bench3d/instruments';
 import { designPcb, kicadPcb } from '../src/bench3d/kicad';
@@ -30,7 +32,7 @@ const docs = EXAMPLE_IDS.map((id) => {
 const sensing = (p: Part) => p.type === 'voltmeter' || p.type === 'oscilloscope' || (p.type === 'multimeter' && p.props.mode !== 'a');
 /** Seri bağlanan ölçü aleti. */
 const through = (p: Part) => p.type === 'ammeter' || (p.type === 'multimeter' && p.props.mode === 'a');
-/** Ölçen uç: bağlı olduğu bacağın yanına gelir (kaynakların ve yüklerin toprak, besleme uçları raya gider). */
+/** Ölçen uç: ağ raya alınmış olsa da bağlı olduğu bacağın yanına gelir (ölçmeyen uçlar raya gider). */
 const measures = (p: Part, pin: number) => p.type === 'voltmeter' || p.type === 'ammeter' || p.type === 'multimeter' || (p.type === 'oscilloscope' && pin < 2);
 /** İki bacaklı tahta parçası (direnç, diyot, kondansatör, LED, anahtar…). */
 const twoLeg = (p: Part) => planSpan(p.type) !== undefined;
@@ -80,6 +82,8 @@ function usedHoles(plan: BreadboardPlan): Set<string> {
 }
 
 const halfOf = (h: Hole & { kind: 'strip' }) => (h.row < 5 ? 0 : 1);
+/** Bacağının şeridi dolduğu için köprüyle bağlı komşu şeride inen alet ucu sayısının üst sınırı (81 örnekte). */
+const SPILL_MAX = 2;
 const rowsOf = (half: number) => (half === 0 ? [0, 1, 2, 3, 4] : [5, 6, 7, 8, 9]);
 const at = (h: Hole) => (h.kind === 'strip' ? `${h.col}${'abcdefghij'[h.row]}` : `ray ${h.rail}:${h.k}`);
 
@@ -120,11 +124,12 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
     expect(names('jfet-karakteristik')).toEqual(['A1 +', 'A1 −', 'PS1 1+', 'PS1 1−', 'PS1 2+', 'PS1 2−', 'V1 +', 'V1 −']);
   });
 
-  it('her alet ucunun teli şemada bağlı olduğu bacağın şeridinde, o bacağa en yakın boş delikte; kaynakların toprak ve besleme uçları rayda', () => {
+  it('her alet ucunun teli şemada bağlı olduğu bacağın şeridinde, o bacağa en yakın boş delikte; kalabalık toprak ve besleme ağında ölçmeyen uçlar rayda', () => {
     const bad: string[] = [];
     let beside = 0;
     let rails = 0;
     let bare = 0;
+    let spilled = 0;
     for (const { id, doc, plan, posts, byId } of docs) {
       const legs = legsOf(plan, byId);
       const used = usedHoles(plan);
@@ -135,9 +140,10 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
         // Direğin teli planın bu uca verdiği deliğe gider.
         const wire = posts.wires.find((w) => w.leads[0] === i)!;
         expect(wire.hole, name).toEqual(lead.hole);
-        const role = plan.roles.get(lead.net);
         const netLegs = legs.get(lead.net) ?? [];
-        if (role && (!measures(part, lead.pin) || netLegs.length === 0)) {
+        // Raya alınan ağ: toprak ya da besleme ve tahtada en az RAIL_FROM bacağı var.
+        const role = netLegs.length >= RAIL_FROM ? plan.roles.get(lead.net) : undefined;
+        if (role && !measures(part, lead.pin)) {
           // Toprak − rayına, besleme + rayına (üst raylar: 0 +, 1 −).
           rails++;
           if (!(lead.hole.kind === 'rail' && lead.hole.rail === (role === 'supply' ? 0 : 1))) bad.push(`${name}: ${role === 'supply' ? '+' : '−'} rayında değil`);
@@ -157,7 +163,11 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
         }
         const sameStrip = netLegs.filter((l) => conductorOf(l.hole) === conductorOf(hole));
         if (sameStrip.length === 0) {
-          bad.push(`${name}: ağın hiçbir bacağıyla aynı şeritte değil (bacaklar: ${netLegs.map((l) => `${l.part.label} ${at(l.hole)}`).join(', ')})`);
+          // Tek istisna: ağın bütün bacaklarının şeritleri dolu (bir şeritte beş delik); uç, köprüyle bağlı komşu
+          // şeride iner (bağlantıyı netlist testi denetler).
+          const full = netLegs.every((l) => rowsOf(halfOf(l.hole)).every((r) => used.has(`${l.hole.board}:${l.hole.col}:${r}`)));
+          if (full) spilled++;
+          else bad.push(`${name}: ağın hiçbir bacağıyla aynı şeritte değil (bacaklar: ${netLegs.map((l) => `${l.part.label} ${at(l.hole)}`).join(', ')})`);
           continue;
         }
         // En yakın boş delik: şeritte, bacağa bundan daha yakın boş delik yok.
@@ -167,9 +177,10 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
       }
     }
     expect(bad.slice(0, 40)).toEqual([]);
-    expect(beside).toBeGreaterThan(150);
-    expect(rails).toBeGreaterThan(100);
+    expect(beside).toBeGreaterThan(280);
+    expect(rails).toBeGreaterThan(15);
     expect(bare).toBeGreaterThan(5);
+    expect(spilled).toBeLessThanOrEqual(SPILL_MAX);
   });
 
   it('voltmetrenin iki teli ölçtüğü parçanın iki bacağının yanında (paralel bağlantı tahtada görünür)', () => {
@@ -216,9 +227,11 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
       expect(Math.abs(hole(label, pin).row - leg.row), `${label} uç ${pin}`).toBeLessThanOrEqual(2);
       expect(halfOf(hole(label, pin))).toBe(halfOf(leg));
     }
-    // Besleme + rayına, toprak − rayına.
-    const ps = [...byId.values()].find((p) => p.label === 'PS1')!;
-    expect(plan.leads.filter((l) => l.partId === ps.id).map((l) => (l.hole.kind === 'rail' ? l.hole.rail : -1))).toEqual([0, 1]);
+    // Kaynak da bacağın yanında: PS1 + diyodun anot şeridinde, PS1 − direncin boştaki ucunun şeridinde; ray ve
+    // köprü yok ("ray yalnızca kalabalık ağda").
+    expect([col('PS1', 0), col('PS1', 1)]).toEqual([col('D1', 0), col('R1', 1)]);
+    expect(plan.leads.every((l) => l.hole.kind === 'strip')).toBe(true);
+    expect(plan.jumpers).toEqual([]);
   });
 
   it('seri zincir: komşu parçalar aynı yarıda ve şemadaki sırayla soldan sağa; ampermetrenin girdiği yerde bir şerit boş', () => {

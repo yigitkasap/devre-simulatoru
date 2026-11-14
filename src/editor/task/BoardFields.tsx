@@ -1,4 +1,4 @@
-// Görev oluştur → Tahtada kur (T6): başlangıç tahtası (boş, güç rayları bağlı, seçili parçalar takılı),
+// Görev oluştur → Tahtada kur (T6): başlangıç tahtası (boş, güç kaynağı bağlı, seçili parçalar takılı),
 // Denetle hakkı (sınırsız, 3 kez, teslimde), ipucu sınırı, Bağlı delikleri göster, Oynat izni. Tahtanın
 // boyu devreye göre seçilir (planBreadboard). Seçili parçalar çiplerle seçilir (değiştirilebilir parçalar
 // gibi); seçilenler penceredeki şemada vurgulu.

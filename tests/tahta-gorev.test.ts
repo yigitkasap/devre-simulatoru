@@ -27,14 +27,21 @@ describe('Tahtada kur görevi (T6)', () => {
     expect(parseTask({ name: 'a' })!.board).toBeUndefined();
   });
 
-  it('başlangıç: boş tahta; güç rayları bağlı (raylar arası kablolar ve kaynağın ray kabloları); seçili parçalar takılı', () => {
+  it('başlangıç: boş tahta; güç kaynağı bağlı (kaynağın kabloları planın deliğinde, varsa raylar arası kablolar); seçili parçalar takılı', () => {
     const empty = startBuild(doc, plan, { ...DEFAULT_BOARD_TASK, start: 'empty' });
     expect([Object.keys(empty.parts).length, empty.wires.length, empty.leads.length]).toEqual([0, 0, 0]);
     const rails = startBuild(doc, plan, { ...DEFAULT_BOARD_TASK, start: 'rails' });
     expect(Object.keys(rails.parts)).toEqual([]);
     expect(rails.wires.every((w) => w.a.includes('rayı') && w.b.includes('rayı'))).toBe(true);
-    expect(rails.wires.length).toBe(2);
-    expect(rails.leads.map((l) => `${labelOf(doc, l.part)}#${l.pin}`)).toEqual(['PS1#0', 'PS1#1']);
+    // Deney 9'da toprak ve besleme az bacaklı: ray kullanılmaz; güç kaynağının kabloları bağlı olduğu bacağın
+    // şeridinde hazır gelir ("ray yalnızca kalabalık ağda", 2026-11-14; eskiden raylarda ve iki ray kablosuyla).
+    expect(rails.wires.length).toBe(0);
+    expect(rails.leads.map((l) => `${labelOf(doc, l.part)}#${l.pin} ${l.hole}`)).toEqual(['PS1#0 7g', 'PS1#1 4g']);
+    // Kalabalık toprak ağı olan devrede (yarım dalga: dört bacak) raylar arası kablolar da hazır gelir.
+    const crowded = exampleDoc('yarim-dalga')!;
+    const crowdedStart = startBuild(crowded, planBreadboard(crowded), { ...DEFAULT_BOARD_TASK, start: 'rails' });
+    expect(crowdedStart.wires.length).toBeGreaterThan(0);
+    expect(crowdedStart.wires.every((w) => w.a.includes('rayı') && w.b.includes('rayı'))).toBe(true);
     const parts = startBuild(doc, plan, { ...DEFAULT_BOARD_TASK, start: 'parts', parts: [idOf(doc, 'Q1')] });
     expect(Object.keys(parts.parts).map((id) => labelOf(doc, id))).toEqual(['Q1']);
     expect(parts.wires).toEqual(rails.wires);
@@ -46,7 +53,7 @@ describe('Tahtada kur görevi (T6)', () => {
     const start = startBuild(doc, plan, { ...DEFAULT_BOARD_TASK, start: 'parts', parts: [idOf(doc, 'Q1')] });
     const locks = locksOf(start)!;
     expect([...locks.parts].map((id) => labelOf(doc, id))).toEqual(['Q1']);
-    expect(locks.wires.size).toBe(2);
+    expect(locks.wires.size).toBe(0);
     expect([...locks.leads]).toEqual(start.leads.map((l) => leadKey(l.part, l.pin)));
     // Öğrenci R1'i taktı, bir kablo ve FG1'in kablosunu ekledi.
     const fg = idOf(doc, 'FG1');
@@ -57,12 +64,15 @@ describe('Tahtada kur görevi (T6)', () => {
       leads: [...start.leads, { part: fg, pin: 1, hole: '2a' }],
     };
     expect(keepLocked(student, locks)).toEqual(start);
-    expect(student.wires.filter((w) => locks.wires.has(wireKey(w))).length).toBe(2);
-    // Seçili öğe kilitli mi (Döndür ve Sil pasif): hazır gelen Q1, köprü ve PS1 kablosu evet; öğrencinin taktıkları hayır.
+    expect(student.wires.filter((w) => locks.wires.has(wireKey(w))).length).toBe(0);
+    // Seçili öğe kilitli mi (Döndür ve Sil pasif): hazır gelen Q1 ve PS1 kablosu evet; öğrencinin taktıkları hayır.
     expect(isLocked(locks, { kind: 'part', id: idOf(doc, 'Q1') })).toBe(true);
     expect(isLocked(locks, { kind: 'part', id: idOf(doc, 'R1') })).toBe(false);
-    expect(isLocked(locks, { kind: 'wire', ...start.wires[0]! })).toBe(true);
     expect(isLocked(locks, { kind: 'wire', a: '6a', b: '3j' })).toBe(false);
+    // Hazır gelen raylar arası kablo kilitli (kalabalık toprak ağı olan devre).
+    const railed = exampleDoc('yarim-dalga')!;
+    const railedStart = startBuild(railed, planBreadboard(railed), { ...DEFAULT_BOARD_TASK, start: 'rails' });
+    expect(isLocked(locksOf(railedStart), { kind: 'wire', ...railedStart.wires[0]! })).toBe(true);
     expect(isLocked(locks, { kind: 'lead', part: start.leads[0]!.part, pin: start.leads[0]!.pin })).toBe(true);
     expect(isLocked(locks, { kind: 'lead', part: fg, pin: 1 })).toBe(false);
     expect(isLocked(null, { kind: 'part', id: idOf(doc, 'Q1') })).toBe(false);
