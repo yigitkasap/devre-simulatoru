@@ -2568,6 +2568,86 @@ Sonuç: birim testleri 2168 / 2168 (93 dosya); tip denetimi 0 hata; ilgili ios-k
 direkleri", telefondaki ipucu maddeleri, "Telefonda 3B") normal hızda 97 / 97, konsol hatası yok. Gerçek iPhone'da
 denenmedi.
 
+### 3B: ray yalnızca kalabalık ağda (2026-11-14)
+
+Sorun (kullanıcı): `diyot-dc`'de PS1 + ve PS1 − önce + ve − raylarına gidiyor, oradan iki ayrı köprü teliyle diyoda
+ve dirence iniyordu. Gereksiz bir dolambaç: labda kimse böyle bağlamaz. Dal `hover-vurgu` (aynı dalda, "üstüne
+gelince vurgu yok"un üstünde). "Tahta düzeni"nin (2026-11-14) "kaynaklar raylarda" kuralının yerini alır.
+
+**1. Kaynak uçları da ölçü aleti uçları gibi bağlanır** (`breadboard.ts` → `seriesHole`). Güç kaynağı, pil ve üreteç
+uçlarının teli (ve osiloskobun toprak ucu, tahta dışı parçaların uçları), şemada bağlı olduğu bacağın şeridine, o
+bacağa en yakın boş deliğe iner. `diyot-dc`: PS1 + diyodun anot şeridinde, PS1 − direncin boştaki ucunun şeridinde;
+ray ve köprü yok.
+
+**2. Ray yalnızca kalabalık ağda** (`RAIL_FROM = 3`). Toprak ya da besleme ağına tahtada 3 ya da daha çok parça
+bacağı bağlıysa ağ raya alınır: bacakların şeritleri raya kısa köprülerle bağlanır, ölçmeyen uçlar (kaynaklar,
+osiloskop toprağı, tahta dışı parçalar) raya gider; ölçen uçlar (voltmetre, ampermetre, multimetre, osiloskop
+kanalı) yine bacağın yanına. 2 ya da daha az bacaklı hiçbir ağ raya gitmez.
+
+- **Yorum (istek: "bir ağa 3 ya da daha fazla bacak bağlıysa o ağ raya alınsın"):** ray yalnızca toprak ve besleme
+  ağı için. Kalabalık bir sinyal düğümü (ör. kollektörde üç bacak) raya alınmaz: tahtada iki çift ray var, + ve −
+  işaretli; oraya sinyal koymak okumayı zorlaştırır. Sinyal düğümünün bacakları eskisi gibi şeritlerde, gerekirse
+  köprüyle birleşir.
+- **İki bacaklı ağ:** iki bacak da iki uçlu parçadaysa aynı şeritte buluşur (zincir düğümü; ağda ayrıca kaynak ucu
+  olabilir, kaynağın teli o şeride iner). Bacaklardan biri transistör ya da entegredeyse yan yana gelebildiğinde
+  aynı şerit, gelemediğinde iki şerit arasında tek köprü. 81 örnekte iki bacaklı 26 toprak ve besleme ağının 18'i
+  aynı şeritte, 8'i tek köprüyle.
+- **Halka (iki paralel kol: R1→D1 ve R2→D2, Schottky ile 1N4001):** her düğümde iki bacak olunca devre baştan sona
+  tek sıra dizilemez. Halka, kaynağın bağlı olduğu düğümlerden kırılır: her kol kendi zinciri olur (kaynak yanından
+  toprak yanına, biri üst yarıda biri alt yarıda), ortak düğümlerin şeritleri kanalın üstünden kısa birer köprüyle
+  birleşir.
+- **Köprü kanalın iki yanında:** iki yarıdaki şeritleri birleştiren köprü kanala en yakın satırlara (e ve f)
+  takılır; eskiden a ve j satırlarına takılıp tahtayı boydan geçiyordu.
+- **Dolu şerit:** bir şeritte beş delik var. Ağın şeritlerinde sıradaki uçlara yer kalmayacaksa son boş delik bir
+  köprüye ayrılır; taşan uçlar o köprüyle bağlı yeni bir şeride iner. 81 örnekte yalnızca `opamp-evirmeyen`'de
+  (toprakta tek bacak, beş alet ucu) iki uç (V1 −, V2 −) taşıyor.
+- Karta aktar (baskı devre, KiCad, delikli plaket rehberi) değişmedi: orada toprak ve besleme eskisi gibi her zaman
+  rayda (`planCard`).
+
+Sonuç: 81 örneğin 17'sinde ray kullanılıyor (kalabalık toprak ya da besleme); 30 örnekte hiç köprü yok.
+
+**3. Direk sırası tellerin indiği şeritlerin sırası; teller kesişmez** (`posts.ts` → `lanesOf`). Tel, tahtanın arka
+kenarından iki sütunun arasındaki bir şeritte deliğin hizasına kadar ilerler, oradan yana, deliğe girer. İki sütunun
+arasında iki şerit var (delikten üçte bir ve üçte iki delik ötede). Aynı sütuna inen tellerde arkadaki delik içteki,
+öndeki delik dıştaki şeridi alır: dıştaki telin son adımı, içtekinin bittiği yerin ötesinden geçer. Direkler
+şeritlerin soldan sağa sırasıyla dizilir; kanalda sola giden tellerde sağdaki, sağa gidenlerde soldaki tel tahtaya
+daha yakın izi alır.
+
+- Eskiden direkler deliklerin sırasındaydı ve tel deliğin yarım delik yanındaki tek şeridi arıyordu; aynı şeride üç
+  ya da dört tel inince (artık kaynak uçları da bacağın şeridinde) teller birbirini kesiyor ya da üst üste
+  biniyordu (3 örnek).
+- Kalabalık şerit (aynı şeride dört tel, `opamp-eviren`): yer bulamayan tel komşu sütunun ötesindeki şeritten gelir
+  ve komşularından önce yerleştirilir. 81 örnekte 3 tel böyle; onların direği, deliğinin sütun sırasının bir yanında
+  durabilir.
+- Kanaldaki izler arası aralık 0,36 delik; çok tel aynı yöne açılınca (transformatör: 14 uç, 8 iz) izler kanala
+  sığacak kadar sıkışır (en az 0,26; teller birbirine değmez).
+
+**Tahtada kur** yeni planı kullanır (örnek yerleşim, hazır parçalar, direklerin yeri). Görevin başlangıç tahtası
+seçeneği "Güç rayları bağlı", "Güç kaynağı bağlı" oldu: güç kaynağının kabloları planın verdiği delikte hazır gelir
+(kalabalık ağda ray, yoksa bağlı olduğu bacağın şeridi); varsa raylar arası kablolar da. Deney 9'da (transistör
+anahtar) eskiden PS1 raylarda ve iki ray kablosu hazır geliyordu; şimdi PS1 + 7g'de, PS1 − 4g'de hazır gelir, ray
+kablosu yok. Görev bağlantılarındaki ayar adı (`rails`) aynı kaldı. Eski görev bağlantıları içlerindeki eski
+başlangıç tahtasıyla açılır (PS1 raylarda, kilitli); oradaki iki ray kablosu artık kilitli sayılmaz ("Tahtayı
+boşalt" onları da kaldırır).
+
+**Denetim.** `tests/tahta-ray.test.ts` (81 örnek, 5 test): 2 ya da daha az bacaklı hiçbir ağ rayda değil, raya giden
+her ağ toprak ya da besleme ve en az 3 bacaklı, kalabalık ağın her şeridi raya köprülü; iki bacaklı ağda bacaklar
+aynı şeritte ya da doğrudan köprüyle bağlı; kaynak uçları bacağın şeridinde (`diyot-dc`'de ray ve köprü yok); direk
+sırası şerit sırası ve hiçbir iki direk teli kesişmiyor (yatayda tel çapından yakın geçmiyor); Tahtada kur planın
+yerleşimini sorunsuz denetliyor. `tests/tahta-duzen.test.ts`: netlist şemayla bire bir aynı (değişmedi), alet ucu
+testi yeni kurala göre (kalabalık ağda ölçmeyen uç rayda, öbür her uç bacağın şeridinde; taşan uç en çok 2),
+KiCad özeti aynı. `tests/tezgah-sade.test.ts`: izler kanalın içinde (aralık artık sabit değil). `tests/cableFlow`,
+`tests/tahta-gorev`, `tests/tahta-denetle`: raysız yerleşime göre güncellendi.
+
+Sonuç: birim testleri 2174 / 2174 (94 dosya); tip denetimi 0 hata; tam ios-kontrol normal hızda 516 maddenin hepsi
+geçti, konsol hatası yok. Bu sonuç üçüncü tam çalıştırmanın: ilkinde Tahtada kur'un kilitli ray köprüsü maddesi
+(yeni plana göre güncellendi) ile telefon hızı maddesi, ikincisinde barajın "İçini göster" maddesi kaldı; son ikisi
+tek başına yeniden çalıştırılınca geçti (zamanlamaya duyarlı, bu değişiklikle ilgisiz). Karta aktar'ın KiCad özeti 81
+örnekte aynı. Değişen ios-kontrol maddeleri: "3B tahta düzeni (1N4001 DC)" (PS1 + diyodun anot şeridinde, PS1 −
+direncin boştaki ucunda, ray ve köprü yok, direkler sütun sırasında; eskiden PS1 raylarda bekleniyordu) ve "Tahtada
+kur (telefon, T6 öğrenci)" (kilitli güç kaynağı kablosu seçiliyken Çıkar pasif; eskiden kilitli ray köprüsünde Sil).
+Gerçek iPhone'da denenmedi.
+
 ### Performans ve hata taraması (2026-10-27)
 
 - `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,
