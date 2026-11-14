@@ -4,7 +4,8 @@
 // küçük şema (seçili parça vurgulu, tıklayınca Şema'ya döner). Etiketler kameraya dönük HTML
 // katmanında (ad · değer, çalışırken ölçüm; seçili mavi); telefonda yalnızca seçili parçanın ve ölçü
 // aletlerinin etiketi. Seçili transistörde uçların harfleri. Hareket ipucu Yardım'da; telefonda 3B ilk
-// açılışta bir kez tek satır.
+// açılışta bir kez tek satır (hiçbir etiketi örtmez, ilk dokunuşta kalkar). Ağ vurgusu yalnızca tıklayınca ya da
+// dokununca; fareyle üstüne gelince yalnızca gizli etiket ve direğin açık adı açılır (200 ms durunca).
 
 import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
@@ -178,23 +179,25 @@ export function BenchView(props: BenchViewProps) {
   const slow = useSlowFrame(props.active ? (props.labelFrame === undefined ? frame : props.labelFrame) : null);
   const single = selection.length === 1 ? selection[0]! : null;
 
-  // Bağlantı direklerinin adları (taban plakasının arka kenarı; her alet ucunun kendi direği: posts.ts) ve üstüne
-  // gelinen ağ (küçük şemada vurgulanır). Direklerin yeri ve adı her zaman şemanın planından (Tahtada kur'da da).
+  // Bağlantı direklerinin adları (taban plakasının arka kenarı; her alet ucunun kendi direği: posts.ts) ve tıklanan
+  // ağ (küçük şemada vurgulanır). Direklerin yeri ve adı her zaman şemanın planından (Tahtada kur'da da).
   const referencePlan = useMemo(() => planBreadboard(doc), [doc]);
   const schematicPlan = props.plan ? null : referencePlan;
   const index = useMemo(() => netIndex(doc, props.connectivity), [doc, props.connectivity]);
   const posts = useMemo(() => layoutPosts(doc, referencePlan).posts, [doc, referencePlan]);
-  const [hoverNet, setHoverNet] = useState<string | null>(null);
-  // Üstüne gelinen ya da dokunulan direk (alet ucu): yalnızca onun açık adı görünür.
+  // Vurgulanan ağ ve tıklanan (dokunulan) direk: ağ vurgusu yalnızca tıklayınca ya da dokununca (scene.ts).
+  const [litNet, setLitNet] = useState<string | null>(null);
+  const [litPost, setLitPost] = useState<string | null>(null);
+  // Farenin üstünde durduğu direk (alet ucu): açık adı görünür. Üstüne gelmek başka hiçbir şeyi vurgulamaz.
   const [hoverPost, setHoverPost] = useState<string | null>(null);
-  // Farenin altındaki parça: yer bulamadığı için gizlenen etiketi öncelik alır ve görünür.
+  // Farenin üstünde durduğu parça: yer bulamadığı için gizlenen etiketi öncelik alır ve görünür.
   const [hoverPart, setHoverPart] = useState<string | null>(null);
   const highlightWires = useMemo(() => {
-    if (!hoverNet || !schematicPlan) return null;
+    if (!litNet || !schematicPlan) return null;
     const nets = new Set<number>();
-    for (const [key, net] of schematicPlan.netOf) if (net === hoverNet) nets.add(index.netOf(key) ?? -1);
+    for (const [key, net] of schematicPlan.netOf) if (net === litNet) nets.add(index.netOf(key) ?? -1);
     return new Set(doc.wires.filter((w) => nets.has(index.netOf(wireKey(w.id)) ?? -2)).map((w) => w.id));
-  }, [hoverNet, schematicPlan, index, doc.wires]);
+  }, [litNet, schematicPlan, index, doc.wires]);
 
   // Küçük şema yalnızca yer varken (sağ alttaki denetimlerle çakışmasın).
   const host = useRef<HTMLDivElement>(null);
@@ -228,7 +231,8 @@ export function BenchView(props: BenchViewProps) {
     onFocusDone();
   }, [focusRequest, onFocusDone]);
 
-  // Telefon: hareket ipucu yalnızca 3B ilk açıldığında, birkaç saniye (Yardım'da her zaman var).
+  // Telefon: hareket ipucu yalnızca 3B ilk açıldığında; ilk dokunuşta ya da birkaç saniye sonra kalkar (Yardım'da
+  // her zaman var).
   const [hint, setHint] = useState(() => phone && !readStored(HINT_KEY, false));
   useEffect(() => {
     if (!hint) return undefined;
@@ -237,22 +241,24 @@ export function BenchView(props: BenchViewProps) {
     return () => window.clearTimeout(timer);
   }, [hint]);
 
-  // İpucu sağ alttaki düğmelerin (44 px) hemen üstünde.
-  const controlsBottom = props.controlsInset?.bottom ?? 16;
-  const hintBottom = typeof controlsBottom === 'number' ? controlsBottom + 52 : `calc(${controlsBottom} + 52px)`;
-  // Telefonda ipucu üstte, Şema | 3B düğmesinin altında: altta tahtanın üstüne geliyordu (cihazların önüne biner,
-  // etiketler ondan kaçar; birkaç saniye sonra kalkar).
+  // İpucunun yerini sahne verir (scene.ts → positionOverlay, [data-float]): Şema | 3B düğmesinin altından başlayarak
+  // görünen hiçbir etikete değmeyen ilk satır (tercihen tahtanın üstünde). Etiketler ipucuna göre gizlenmez.
 
   const pickCamera = (choice: CameraChoice) => {
     setCameraLabel(choice);
     setCamera((c) => (choice === 'part' ? (single ? { n: c.n + 1, view: 'part', partId: single } : c) : { n: c.n + 1, view: choice }));
   };
   const callbacks: BenchCallbacks = { ...props.callbacks, onCamera: () => setCameraLabel('free'), onNet: (net, post) => {
-      setHoverNet(net);
+      setLitNet(net);
+      setLitPost(post);
+    },
+    onHover: (part, post) => {
+      setHoverPart(part);
       setHoverPost(post);
     },
-    onHoverPart: setHoverPart,
   };
+  /** Açık adı görünen direk: farenin üstünde durduğu ya da tıklanan (dokunulan). */
+  const openPost = (key: string) => hoverPost === key || litPost === key;
 
   // Etiketler: telefonda yalnızca seçili parça ve ölçü aletleri; toprak sembolü etiketsiz.
   const top = props.top ?? null;
@@ -277,7 +283,7 @@ export function BenchView(props: BenchViewProps) {
   );
 
   return (
-    <div ref={host} className="absolute inset-0 overflow-hidden bg-bench">
+    <div ref={host} className="absolute inset-0 overflow-hidden bg-bench" onPointerDownCapture={hint ? () => setHint(false) : undefined}>
       <Suspense
         fallback={
           <div className="absolute inset-0 flex items-center justify-center text-small text-muted" role="status">
@@ -307,8 +313,8 @@ export function BenchView(props: BenchViewProps) {
         />
       </Suspense>
 
-      {/* Etiketler ve uç harfleri: konumlarını sahne verir (scene.ts → positionOverlay). İpucu katmanda
-          bir engeldir: sahnenin altında, düğmelerin üstünde; çakışan etiket ipucu kalkana kadar gizlenir. */}
+      {/* Etiketler ve uç harfleri: konumlarını sahne verir (scene.ts → positionOverlay). İpucu etiketlerden sonra,
+          hiçbirini örtmeyen bir yere konur ([data-float]: aranacak ilk üst kenar, px). */}
       <div ref={setOverlay} className="pointer-events-none absolute inset-0 overflow-hidden">
         {labelled.map((part) => (
           <BenchLabel
@@ -327,13 +333,14 @@ export function BenchView(props: BenchViewProps) {
               data-anchor="post"
               data-net={post.net}
               data-post={postKey(post)}
-              data-open={hoverPost === postKey(post) ? '' : undefined}
-              data-priority={hoverPost === postKey(post) ? 6 : hoverNet === post.net ? 5 : 3}
+              data-open={openPost(postKey(post)) ? '' : undefined}
+              data-priority={openPost(postKey(post)) ? 6 : litNet === post.net ? 5 : 3}
               aria-hidden="true"
-              className={`absolute top-0 left-0 rounded-md px-1.5 py-0.5 text-[11px] leading-tight font-semibold whitespace-nowrap opacity-0 shadow-md ${hoverPost === postKey(post) ? 'z-10 bg-accent text-white' : hoverNet === post.net ? 'z-10 bg-ink text-on-ink ring-2 ring-accent' : 'bg-ink text-on-ink'}`}
+              className={`absolute top-0 left-0 rounded-md px-1.5 py-0.5 text-[11px] leading-tight font-semibold whitespace-nowrap opacity-0 shadow-md ${openPost(postKey(post)) ? 'z-10 bg-accent text-white' : litNet === post.net ? 'z-10 bg-ink text-on-ink ring-2 ring-accent' : 'bg-ink text-on-ink'}`}
             >
-              {/* Kısa ad (alet ucu); direğe, fişine, kablosuna ya da teline dokununca ya da üstüne gelince açık ad. */}
-              {hoverPost === postKey(post) ? post.title : post.name}
+              {/* Kısa ad (alet ucu); direğe, fişine, kablosuna ya da teline tıklayınca (dokununca) ya da fare üstünde
+                  durunca açık ad. Tıklanan ağın öbür direkleri halkayla işaretlenir. */}
+              {openPost(postKey(post)) ? post.title : post.name}
             </span>
           ))}
         {lettered &&
@@ -352,7 +359,7 @@ export function BenchView(props: BenchViewProps) {
           ))}
         {props.overlayExtra}
         {hint && (
-          <p data-obstacle className="absolute left-3 m-0 max-w-[calc(100%-24px)] rounded-md bg-panel/90 px-2 py-1 text-label text-ink-2 shadow-sm" style={phone ? { top: 56 } : { bottom: hintBottom }}>
+          <p data-float={56} className="absolute top-14 left-3 m-0 max-w-[calc(100%-24px)] rounded-md bg-panel/90 px-2 py-1 text-label text-ink-2 opacity-0 shadow-sm">
             {tr.bench.hintPhone}
           </p>
         )}

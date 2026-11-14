@@ -40,6 +40,7 @@ import {
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { dotSpeed, type SimFrame } from '../editor/useSimulation';
 import { pinKey } from '../model/connectivity';
+import { Dwell, floatSpot, type FloatSpot } from './hover';
 import type { CircuitDoc, Part } from '../model/types';
 import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
@@ -65,11 +66,16 @@ export interface BenchCallbacks {
   onCamera?(): void;
   /** Tepeden görünüm (Tahtada kur) kaydırıldı, yakınlaştı ya da boyutu değişti. */
   onView?(): void;
-  /** Bir ağın kabloları vurgulandı (kablonun ya da direğin üstüne gelince, telefonda dokununca) ya da vurgu kalktı (null). */
-  /** Vurgulanan ağ; `post`: işaretçinin altındaki direk, fişi, kablosu ya da teli (alet ucu: postKey), yoksa null. */
+  /**
+   * Bir ağ vurgulandı (kabloya, direğe ya da parçaya tıklayınca; telefonda kabloya ya da direğe dokununca) ya da vurgu
+   * kalktı (null). `post`: tıklanan direk, fişi, kablosu ya da teli (alet ucu: postKey), yoksa null.
+   */
   onNet?(net: string | null, post: string | null): void;
-  /** Fare bir parçanın üstüne geldi (yer bulamadığı için gizlenen etiketi gösterilir) ya da üstünden çıktı (null). */
-  onHoverPart?(partId: string | null): void;
+  /**
+   * Fare aynı nesnenin üstünde HOVER_DELAY kadar durdu: parçanın gizli etiketi ya da direğin (fişinin, kablosunun,
+   * telinin) açık adı açılır. İmleç ayrılınca hemen (null, null). Üstüne gelmek hiçbir şeyi vurgulamaz.
+   */
+  onHover?(partId: string | null, post: string | null): void;
 }
 
 /** Tepeden görünümde ekran = dünya · scale + (ox, oy) (piksel; x sağa, z aşağı). */
@@ -124,6 +130,10 @@ const BENCH_FREE = {
 };
 /** Etiketler arasındaki en az boşluk (px): etiketler ekranda birbirine binmez, yığın gibi de görünmez. */
 export const LABEL_GAP = 8;
+/** Hareket ipucu ile etiketler (ve tuvalin üstündeki denetimler) arasındaki en az aralık (px). */
+const FLOAT_GAP = 4;
+/** Dar yerde ipucunun en çok genişliği (iki satıra bölünür). */
+const FLOAT_NARROW = '190px';
 /** Bu genişlikten dar tuval telefon sayılır (px). */
 const PHONE_WIDTH = 640;
 /** Cihazlar görünümü (masaüstü): ön paneller kullanılabilir yüksekliğin en az bu kadarını doldurur. */
@@ -269,8 +279,13 @@ export class BenchScene {
   private animating = false;
   private lastTime = performance.now();
   private fitted = false;
-  /** Farenin altındaki parça (etiketi öncelik alır). */
-  private hoverPart: string | null = null;
+  /** Farenin altındaki parça ya da direk: aynı nesnenin üstünde durunca etiketi açılır (hover.ts). */
+  private readonly dwell = new Dwell<{ part: string | null; post: string | null }>((over) => this.cb.onHover?.(over?.part ?? null, over?.post ?? null));
+  /** Vurgulanan ağı veren tıklama (aynı yere yeniden tıklayınca vurgu kalkar). */
+  private highlightedFrom: string | null = null;
+  /** Yüzen ipucunun ([data-float]) şimdiki yeri ve ölçülmüş boyutları (tek satır, iki satır). */
+  private floatAt: FloatSpot | null = null;
+  private floatShapes: { key: string; shapes: Array<{ w: number; h: number }> } | null = null;
   /** Denetim (eğim taraması, ios-kontrol): Serbest kadrajın yükseklik açısını (radyan) geçici olarak değiştirir. */
   freeElevation: number | null = null;
   private dark = false;
@@ -357,6 +372,7 @@ export class BenchScene {
     canvas.addEventListener('pointerup', this.onPointerUp);
     canvas.addEventListener('pointercancel', this.onPointerUp);
     canvas.addEventListener('pointerleave', this.onPointerLeave);
+    window.addEventListener('keydown', this.onKeyDown);
 
     this.observer = new ResizeObserver(() => this.resize());
     this.observer.observe(container);
@@ -418,8 +434,9 @@ export class BenchScene {
     // gelinen parça (ve vurgulanan ağın direği), direkler, ölçü aletleri, öbürleri. Etiketler ekranda birbirine
     // binmez (aralarında en az LABEL_GAP): yer yoksa etiket kaydırılır (sağ, sol, üst, alt, çaprazlar); yine yoksa
     // gizlenir ve yalnızca parçası seçilince ya da üstüne gelinince görünür. Etiket başka bir parçanın ya da direğin
-    // noktasını da örtmez (hangi etiketin hangi parçaya ait olduğu karışmasın). Katmandaki engellerle
-    // ([data-obstacle]: telefonda hareket ipucu) çakışan etiket de gizlenir.
+    // noktasını da örtmez (hangi etiketin hangi parçaya ait olduğu karışmasın). Telefondaki hareket ipucu
+    // ([data-float]) etiketlerden sonra, hiçbir etiketi örtmeyen bir yere konur (placeFloat); etiketler ona göre
+    // gizlenmez ya da kaymaz.
     const items = [...el.querySelectorAll<HTMLElement>('[data-anchor]')].map((node) => ({
       node,
       w: node.offsetWidth,
@@ -427,12 +444,18 @@ export class BenchScene {
       priority: Number(node.dataset.priority ?? 0),
     }));
     items.sort((a, b) => b.priority - a.priority);
-    const taken: Array<{ x0: number; y0: number; x1: number; y1: number }> = [...el.querySelectorAll<HTMLElement>('[data-obstacle]')].map((o) => ({
-      x0: o.offsetLeft,
-      y0: o.offsetTop,
-      x1: o.offsetLeft + o.offsetWidth,
-      y1: o.offsetTop + o.offsetHeight,
-    }));
+    const taken: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
+    const float = el.querySelector<HTMLElement>('[data-float]');
+    // İpucunun boyutları bir kez ölçülür (yazı ya da tuval genişliği değişince yeniden): tek satır ve iki satır.
+    if (float && this.floatShapes?.key !== `${float.textContent}|${w}`) {
+      const before = float.style.maxWidth;
+      const shapes = ['', FLOAT_NARROW].map((max) => {
+        float.style.maxWidth = max;
+        return { w: float.offsetWidth, h: float.offsetHeight };
+      });
+      float.style.maxWidth = before;
+      this.floatShapes = { key: `${float.textContent}|${w}`, shapes };
+    }
     // Tuvalin üstüne binen denetimler ([data-label-obstacle]: telefonda sol üstteki Şema | 3B): üst kenara inen
     // etiket bunların altına girmez.
     const c = canvas.getBoundingClientRect();
@@ -579,6 +602,25 @@ export class BenchScene {
       }
       node.style.opacity = show ? '1' : '0';
     }
+    // Hareket ipucu: Şema | 3B düğmesinin altından başlayarak görünen hiçbir etikete ve alttaki düğmelere değmeyen
+    // ilk satır; tercihen tahtanın üstünde, orada yer yoksa (yatay telefon: direk adları üstte) tahtanın altında,
+    // gerekirse iki satır hâlinde. Yer yoksa gösterilmez.
+    if (float && this.floatShapes) {
+      const board = this.boardRect();
+      const top = Number(float.dataset.float ?? 0);
+      for (const o of el.parentElement?.querySelectorAll<HTMLElement>('[data-fit-reserve]') ?? []) {
+        const r = o.getBoundingClientRect();
+        if (r.width > 0) taken.push({ x0: r.left - c.left, y0: r.top - c.top, x1: r.right - c.left, y1: r.bottom - c.top });
+      }
+      const range = { top, boardTop: board ? board.y0 : h, boardBottom: board ? board.y1 : h, bottom: h - 8 };
+      const spot = floatSpot(float.offsetLeft, this.floatShapes.shapes, taken, range, this.floatAt, FLOAT_GAP);
+      this.floatAt = spot;
+      if (spot) {
+        float.style.top = `${Math.round(spot.y)}px`;
+        float.style.maxWidth = spot.shape === 0 ? '' : FLOAT_NARROW;
+      }
+      float.style.opacity = spot ? '1' : '0';
+    } else this.floatAt = null;
   }
 
   /** Noktaları akım yönünde ilerletir ve yerleştirir; hareket eden nokta varsa true. */
@@ -1658,6 +1700,11 @@ export class BenchScene {
   // --- İşaretçi ---------------------------------------------------------------------------------------
 
   private pick(e: PointerEvent): Placed | null {
+    return this.pickPoint(e)?.placed ?? null;
+  }
+
+  /** İşaretçinin altındaki parça ve ışının gövdeye değdiği nokta. */
+  private pickPoint(e: PointerEvent): { placed: Placed; point: Vector3 } | null {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     const ray = new Raycaster();
@@ -1666,13 +1713,32 @@ export class BenchScene {
     for (const hit of hits) {
       let o: Object3D | null = hit.object;
       while (o && o.userData.partId === undefined) o = o.parent;
-      if (o) return this.parts.get(o.userData.partId as string) ?? null;
+      const placed = o ? this.parts.get(o.userData.partId as string) : undefined;
+      if (placed) return { placed, point: hit.point };
     }
     return null;
   }
 
+  /** Parçanın tıklanan noktaya en yakın ucunun ağı (bağlı ucu yoksa null). */
+  private partNet(placed: Placed, point: Vector3): string | null {
+    const plan = this.plan;
+    if (!plan) return null;
+    let best: string | null = null;
+    let nearest = Infinity;
+    placed.anchors.forEach((a, pin) => {
+      const net = plan.netOf.get(pinKey(placed.part.id, pin));
+      const d = a.distanceToSquared(point);
+      if (net !== undefined && d < nearest) {
+        nearest = d;
+        best = net;
+      }
+    });
+    return best;
+  }
+
   private readonly onPointerDown = (e: PointerEvent) => {
     if (!e.isPrimary) return;
+    this.dwell.clear();
     this.down = { x: e.clientX, y: e.clientY, t: performance.now() };
     const hit = this.pick(e);
     if (hit?.model.interaction === 'press' && this.active) {
@@ -1691,15 +1757,15 @@ export class BenchScene {
   };
 
   private readonly onPointerMove = (e: PointerEvent) => {
-    // Fareyle bir kablonun ya da kıskacın üstüne gelince o ağ vurgulanır (dokunmatikte dokununca: onPointerUp).
+    // Fareyle üstüne gelmek hiçbir şeyi vurgulamaz ve soluklaştırmaz (ağ vurgusu tıklayınca: onPointerUp). İmleç aynı
+    // parçanın ya da direğin (fişinin, kablosunun, telinin) üstünde HOVER_DELAY kadar durunca yalnızca gizli etiket
+    // ve direğin açık adı açılır; ayrılınca hemen kapanır.
     if (!this.drag && e.pointerType === 'mouse' && e.buttons === 0 && !this.topView) {
       const over = this.pickNet(e);
-      this.highlightNet(over?.net ?? null, over?.post ?? null);
-      const hover = this.pick(e)?.part.id ?? null;
-      if (hover !== this.hoverPart) {
-        this.hoverPart = hover;
-        this.cb.onHoverPart?.(hover);
-      }
+      const post = over?.post ?? null;
+      // Önünde kablo olan parça sayılmaz (köprünün arkasındaki parça).
+      const part = over ? null : (this.pick(e)?.part.id ?? null);
+      this.dwell.over(post !== null ? `post ${post}` : part !== null ? `part ${part}` : null, { part, post });
     }
     if (!this.drag) return;
     const position = Math.max(0, Math.min(100, this.drag.start + (e.clientX - this.drag.x) * 0.5));
@@ -1710,7 +1776,12 @@ export class BenchScene {
   };
 
   private readonly onPointerLeave = (e: PointerEvent) => {
-    if (e.pointerType === 'mouse') this.highlightNet(null);
+    if (e.pointerType === 'mouse') this.dwell.clear();
+  };
+
+  /** Esc: ağ vurgusu kalkar. */
+  private readonly onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && this.highlighted !== null) this.highlightNet(null);
   };
 
   private readonly onPointerUp = (e: PointerEvent) => {
@@ -1734,18 +1805,30 @@ export class BenchScene {
       }
     }
     if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6 || e.type === 'pointercancel') return;
-    const hit = this.pick(e);
-    // Dokunmatikte bir kabloya ya da kıskaca dokununca (önünde parça yoksa) o ağ vurgulanır; yeniden dokununca kalkar.
-    // Arkasında parça olabilir: kıskaçlar tahtanın arka kenarında, cihazların önünde (2026-11-10).
-    const over = e.pointerType !== 'mouse' && !this.topView ? this.pickNet(e) : null;
+    const picked = this.pickPoint(e);
+    const hit = picked?.placed ?? null;
+    // Ağ vurgusu yalnızca tıklayınca ya da dokununca. Bir kabloya, direğe, fişe, tele ya da köprüye tıklayınca
+    // (önünde parça yoksa) o ağ vurgulanır; aynı yere yeniden tıklayınca kalkar. Arkasında parça olabilir: direkler
+    // tahtanın arka kenarında, cihazların önünde (2026-11-10).
+    const over = this.topView ? null : this.pickNet(e);
     if (over) {
-      // Aynı yere yeniden dokununca vurgu kalkar; aynı ağın başka bir direğine dokununca o direğin açık adı görünür.
-      const same = this.highlighted === over.net && this.highlightedPost === over.post;
+      // Aynı ağın başka bir direğine tıklayınca o direğin açık adı görünür.
+      const from = `cable ${over.net} ${over.post ?? ''}`;
+      const same = this.highlighted === over.net && this.highlightedFrom === from;
       this.highlightNet(same ? null : over.net, same ? null : over.post);
+      this.highlightedFrom = same ? null : from;
       return;
     }
-    if (e.pointerType !== 'mouse') this.highlightNet(null);
-    if (hit && hit.model.interaction === 'toggle' && this.active) this.cb.onToggle(hit.part.id);
+    const toggles = hit !== null && hit.model.interaction === 'toggle' && this.active;
+    // Fareyle bir parçaya tıklayınca tıklanan noktaya en yakın ucunun ağı vurgulanır (parça seçilir de); çalışırken
+    // anahtara tıklamak yalnızca anahtarı çevirir. Boş yere tıklayınca vurgu kalkar. Dokunmatikte parçaya dokunmak
+    // yalnızca seçer (vurgu kalkar).
+    const net = e.pointerType === 'mouse' && !this.topView && picked && !toggles ? this.partNet(picked.placed, picked.point) : null;
+    const from = net === null ? null : `part ${picked!.placed.part.id} ${net}`;
+    const same = net !== null && this.highlighted === net && this.highlightedFrom === from;
+    this.highlightNet(same ? null : net);
+    this.highlightedFrom = same ? null : from;
+    if (toggles) this.cb.onToggle(hit.part.id);
     else this.cb.onSelect(hit?.part.id ?? null);
   };
 
@@ -1826,8 +1909,8 @@ export class BenchScene {
     return m;
   }
 
-  /** Denetim (ios-kontrol): vurgulanan ağ, parlayan ve soluklaşan kablo sayısı, işaretli bacak sayısı. */
-  netHighlight(): { net: string | null; lit: number; dim: number; legs: number } {
+  /** Denetim (ios-kontrol): vurgulanan ağ, parlayan ve soluklaşan kablo sayısı, işaretli bacak ve soluk parça sayısı. */
+  netHighlight(): { net: string | null; lit: number; dim: number; legs: number; faded: number } {
     const state = (child: Object3D): 'lit' | 'dim' | null => {
       let found: 'lit' | 'dim' | null = null;
       child.traverse((o) => {
@@ -1839,10 +1922,11 @@ export class BenchScene {
       return found;
     };
     const states = this.cables.children.map(state);
-    return { net: this.highlighted, lit: states.filter((x) => x === 'lit').length, dim: states.filter((x) => x === 'dim').length, legs: this.legGlow.children.length };
+    const faded = [...this.parts.values()].filter((p) => state(p.group) === 'dim').length;
+    return { net: this.highlighted, lit: states.filter((x) => x === 'lit').length, dim: states.filter((x) => x === 'dim').length, legs: this.legGlow.children.length, faded };
   }
 
-  /** Denetim (ios-kontrol): ağı vurgular (kablonun üstüne gelmek gibi); null kaldırır. */
+  /** Denetim (ios-kontrol): ağı vurgular (kabloya tıklamak gibi); null kaldırır. */
   highlight(net: string | null): void {
     this.highlightNet(net);
   }
@@ -1873,6 +1957,8 @@ export class BenchScene {
   }
 
   dispose(): void {
+    this.dwell.clear();
+    window.removeEventListener('keydown', this.onKeyDown);
     this.renderer.setAnimationLoop(null);
     this.observer.disconnect();
     this.overlayObserver.disconnect();

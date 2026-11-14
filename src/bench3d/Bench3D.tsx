@@ -60,7 +60,7 @@ export default function Bench3D(props: Bench3DProps) {
       onCamera: () => cb.current.onCamera?.(),
       onView: () => cb.current.onView?.(),
       onNet: (net, post) => cb.current.onNet?.(net, post),
-      onHoverPart: (id) => cb.current.onHoverPart?.(id),
+      onHover: (part, post) => cb.current.onHover?.(part, post),
     });
     scene.current = s;
     onScene.current?.(s);

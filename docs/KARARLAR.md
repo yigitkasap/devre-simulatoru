@@ -2514,6 +2514,60 @@ karşılaştırma). Değişen ios-kontrol maddeleri ("3B bağlantı direkleri"):
 bacağa inen tel tahtayı boydan geçer; eskiden 80 mm); yeni madde "3B tahta düzeni (1N4001 DC)". Gerçek iPhone'da
 denenmedi.
 
+### 3B: üstüne gelince vurgu yok (2026-11-14)
+
+Sorun (kullanıcı): 3B'de fare bir kablonun ya da direğin üstüne gelince ağ vurgulanıyor, geri kalan her şey
+soluklaşıyordu. Fare hızlı hareket edince vurgu yanıp sönüyor, hata varmış gibi görünüyordu. Dal `hover-vurgu` (main
+d6e8eec'in üstünde).
+
+**1. Üstüne gelmek hiçbir şeyi vurgulamaz ve soluklaştırmaz** (`scene.ts` → `onPointerMove`). Ağ vurgusu
+(`highlightNet`) fare hareketinden ve farenin tuvalden çıkmasından kaldırıldı. Aynı ağın öbür direklerinin halkayla
+işaretlenmesi de üstüne gelince değil, tıklayınca.
+
+**2. Ağ vurgusu yalnızca tıklayınca ya da dokununca.** Masaüstünde bir kabloya, direğe, fişe, tele ya da köprüye
+tıklayınca o ağ vurgulanır (kabloları parlar, öbür kablolar ve ağa dokunmayan parçalar soluklaşır, bacakları
+işaretlenir, küçük şemada düğümün kabloları vurgulanır); aynı yere yeniden tıklayınca, boş yere tıklayınca ya da
+Esc'e basınca kalkar. Fare çekilince vurgu durur. Telefonda davranış aynı kaldı (kabloya ya da direğe dokununca).
+
+- **Yorum (istek: "parçaya tıklayınca o ağ vurgulansın"; parçanın birden çok ağı var):** fareyle bir parçaya
+  tıklayınca tıklanan noktaya en yakın ucunun ağı vurgulanır; parça eskisi gibi seçilir de. Çalışırken anahtara
+  tıklamak yalnızca anahtarı çevirir, basmalı düğme ve potansiyometre de vurgulamaz. Telefonda parçaya dokunmak
+  yalnızca seçer (bugünkü gibi).
+- Tepeden görünümde (Tahtada kur) vurgu yok (eskisi gibi).
+
+**3. Etiket 200 ms durunca açılır** (`hover.ts` → `Dwell`, `HOVER_DELAY = 200`). Fare aynı parçanın ya da direğin
+(fişinin, kablosunun, telinin) üstünde 200 ms durunca parçanın gizli etiketi öncelik alır, direğin kısa adının yerine
+açık adı görünür. İmleç ayrılınca (başka nesneye geçince, tuvalden çıkınca ya da düğmeye basınca) hemen kapanır; aynı
+nesnenin üstünde gezinmek süreyi yeniden başlatmaz. Hızlı geçişte hiçbir şey açılmaz. Tıklanan direğin açık adı vurgu
+kalkana kadar görünür.
+
+**4. Telefondaki hareket ipucu hiçbir etiketi örtmez** (`hover.ts` → `floatSpot`; `scene.ts` → `positionOverlay`,
+`[data-float]`). Eskiden ipucu sabit bir yerdeydi ve etiketler için bir engeldi: çakışan etiket kaydırılıyor ya da ipucu
+kalkana kadar gizleniyordu (yatay telefonda ipucu, 1N4001 DC'nin direk adlarının durduğu yerdeydi). Şimdi etiketler ipucu yokmuş gibi yerleşir;
+ipucu onlardan sonra, Şema | 3B düğmesinin altından başlayarak görünen hiçbir etikete ve alttaki düğmelere 4
+pikselden fazla yaklaşmayan ilk satıra konur. Sıra: tahtanın üstü (tek satır, sığmazsa iki satır), orada yer yoksa
+tahtanın altı (yatay telefonda sol alt köşe, iki satır), o da yoksa tahtanın üstüne biner; hiç yer yoksa
+gösterilmez. İlk dokunuşta kalkar (3B alanının herhangi bir yerine; 7 saniyelik süre de duruyor).
+
+**Denetim.** `tests/hover-vurgu.test.ts` (15 test): bekleme (200 ms'den önce açılmaz, hızlı geçişte hiçbir şey
+açılmaz, ayrılınca hemen kapanır, aynı nesnede süre yeniden başlamaz) ve ipucunun yeri (etiketlere değmez, dar yerde iki satır,
+yatay telefonda tahtanın altı, yer yoksa gösterilmez, rastgele 81 düzen). ios-kontrol ("3B bağlantı direkleri"):
+
+- Değişti: "3B ağ vurgusu (masaüstü, BF245A)": eskiden direğin üstüne gelince vurgu bekleniyordu; şimdi üstünde
+  durunca vurgu yok, tıklayınca var, fare çekilince duruyor, boş yere tıklayınca ve Esc ile kalkıyor.
+- Değişti: "3B direklerin açık adı (masaüstü)": açık ad 200 ms durunca.
+- Yeni: "3B üstüne gelme (masaüstü, 1N4001 DC)": imleç direklerin ve parçaların üstünden üç tur hızla geçerken her
+  adımda ölçülür: soluk ya da parlak malzeme, vurgulu ağ, açık ad, öne çıkan etiket yok; parçanın üstünde durunca
+  etiketi 200 ms sonra öne çıkar.
+- Yeni: "3B ağ vurgusu tıklayınca (masaüstü, 1N4001 DC)": parçaya ve direğe tıklayınca ağ vurgulanır, boş yere
+  tıklayınca kalkar.
+- Yeni: "3B (telefon): ilk açılıştaki ipucu": dört kadrajda (1N4001 DC kutuda ve tam ekranda, BC107 kuplajlı,
+  transformatör) ipucu görünür, hiçbir etikete değmez, ipucu kalkınca görünen etiketler aynıdır, ilk dokunuşta kalkar.
+
+Sonuç: birim testleri 2168 / 2168 (93 dosya); tip denetimi 0 hata; ilgili ios-kontrol bölümleri ("3B bağlantı
+direkleri", telefondaki ipucu maddeleri, "Telefonda 3B") normal hızda 97 / 97, konsol hatası yok. Gerçek iPhone'da
+denenmedi.
+
 ### Performans ve hata taraması (2026-10-27)
 
 - `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,

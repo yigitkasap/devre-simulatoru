@@ -28,7 +28,7 @@ export interface CircuitViewProps {
   readonly overlay?: ReactNode;
   /** Vurgulanan (seçili) parçalar: 3B'nin köşesindeki küçük şema. */
   readonly selected?: readonly string[];
-  /** Vurgulanan düğümün kabloları (3B'de üstüne gelinen ağ): vurgu renginde, kalın; öbür kablolar soluk. */
+  /** Vurgulanan düğümün kabloları (3B'de tıklanan ağ): vurgu renginde, kalın; öbür kablolar soluk. */
   readonly highlightWires?: ReadonlySet<string> | null;
   /** Çizimin sınıfı (varsayılan: tuvalle aynı "schematic"). */
   readonly className?: string;

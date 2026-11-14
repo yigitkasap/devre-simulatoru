@@ -3362,11 +3362,12 @@ try {
     check('3B (telefon): etiket yalnızca ölçü aletinde (seçim yokken); Etiketler, Kamera ve Karta aktar sağ altta, 44 px',
       labels.length === 1 && labels[0].startsWith('A1') && tag !== null && tag.height >= 43.5 && full !== null && Math.abs(tag.y - full.y) < 2 && tag.x < full.x, labels.join(' | '));
     // İlk açılıştaki hareket ipucu (2026-11-10): üstte, Şema | 3B düğmesinin altında (altta tahtanın üstüne geliyordu);
-    // tahtanın üstünde değil, görünen hiçbir etiketin üstüne binmiyor.
+    // tahtanın üstünde değil, görünen hiçbir etiketin üstüne binmiyor. Değişti (2026-11-14): ipucu artık etiketleri
+    // gizleyen bir engel ([data-obstacle]) değil; yerini etiketlerden sonra alıyor ([data-float]).
     const hint = await page.getByText(/^Bir parmak: döndür/).boundingBox();
     const area = await page.locator('main').boundingBox();
     const hintClash = await page.evaluate(() => {
-      const h = [...document.querySelectorAll('[data-obstacle]')][0]?.getBoundingClientRect();
+      const h = [...document.querySelectorAll('[data-float]')][0]?.getBoundingClientRect();
       if (!h) return ['ipucu yok'];
       return [...document.querySelectorAll('[data-anchor]')].filter((e) => getComputedStyle(e).opacity === '1').filter((e) => {
         const b = e.getBoundingClientRect();
@@ -6566,7 +6567,10 @@ try {
         bj.cables.some((c) => c.type === 'funcgen' && c.pin === 0 && c.color === RED) && bj.cables.some((c) => c.type === 'dcsupply' && c.pin === 0 && c.color === RED) &&
         all.every((r) => r.posts.some((p) => p.ground) && r.posts.filter((p) => p.ground).every((p) => p.color === BLACK)),
       all.map((r) => `${r.cables.map((c) => `${c.type.slice(0, 4)}${c.pin}:${c.color}`).join(' ')} · en uzun tel ${Math.max(...r.wires.map((w) => w.mm)).toFixed(0)} mm`).join(' | '));
-    // Fare bir toprak direğinin (PS1 1−) üstüne gelince toprak ağı vurgulanır (o ağın bütün direkleri, fişleri, kabloları, telleri); yalnızca üstüne gelinen direğin açık adı görünür.
+    // Değişti (2026-11-14, "üstüne gelince vurgu yok"): eskiden fare bir direğin üstüne gelince ağ vurgulanıyordu.
+    // Şimdi üstüne gelmek hiçbir şeyi vurgulamaz; fare direğin üstünde 200 ms durunca yalnızca açık adı görünür.
+    // Toprak direğine (PS1 1−) tıklayınca toprak ağı vurgulanır (o ağın bütün direkleri, fişleri, kabloları, telleri);
+    // boş yere tıklayınca ya da Esc'e basınca kalkar.
     await page.goto(`${URL0}embed/?ornek=jfet-karakteristik`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(800);
@@ -6576,20 +6580,127 @@ try {
       return post ? { net: post.net, x: c.left + post.x, y: c.top + post.y } : null;
     }, name);
     const at = await postAt(page, 'PS1 1−');
-    let lit = { net: null };
-    for (let dy = 0; dy < 30 && !lit.net && at; dy += 3) {
-      await page.mouse.move(at.x, at.y + dy); await page.waitForTimeout(120);
-      lit = await page.evaluate(() => window.__tezgah.netHighlight());
-    }
-    const mini = await page.locator('polyline[data-highlight]').count();
     const openLabel = (p) => p.evaluate(() => [...document.querySelectorAll('[data-anchor="post"][data-open]')].filter((e) => getComputedStyle(e).opacity === '1').map((e) => e.textContent).join(' | '));
-    const gndOpen = await openLabel(page);
+    const highlight = (p) => p.evaluate(() => window.__tezgah.netHighlight());
+    // Direğin üstünde durunca: açık ad görünür, hiçbir şey vurgulanmaz.
+    let gndOpen = ''; let spot = at;
+    for (let dy = 0; dy < 30 && !gndOpen && at; dy += 3) {
+      spot = { x: at.x, y: at.y + dy };
+      await page.mouse.move(spot.x, spot.y); await page.waitForTimeout(320);
+      gndOpen = await openLabel(page);
+    }
+    const hovered = await highlight(page);
+    // Tıklayınca: ağ vurgulanır.
+    if (spot) await page.mouse.click(spot.x, spot.y);
+    await page.waitForTimeout(200);
+    const lit = await highlight(page);
+    const mini = await page.locator('polyline[data-highlight]').count();
+    // Fare çekilince vurgu kalmaz kalkmaz: yalnızca açık ad (tıklanan direğinki) kalır.
     await page.mouse.move(5, 300); await page.waitForTimeout(300);
+    const away = await highlight(page);
+    // Boş yere (masanın sol alt köşesi) tıklayınca kalkar.
+    const emptySpot = (p) => p.evaluate(() => {
+      const t = window.__tezgah; const c = document.querySelector('canvas').getBoundingClientRect();
+      for (const fy of [0.6, 0.5, 0.7, 0.4, 0.8]) for (const fx of [0.03, 0.97, 0.08, 0.92]) {
+        const e = { clientX: c.left + c.width * fx, clientY: c.top + c.height * fy };
+        if (document.elementFromPoint(e.clientX, e.clientY)?.tagName === 'CANVAS' && !t.pick(e) && !t.pickNet(e)) return { x: e.clientX, y: e.clientY };
+      }
+      return { x: c.left + 12, y: c.top + c.height * 0.55 };
+    });
+    const empty = await emptySpot(page);
+    await page.mouse.click(empty.x, empty.y); await page.waitForTimeout(200);
+    const off = await highlight(page);
     const gndClosed = await openLabel(page);
-    const off = await page.evaluate(() => window.__tezgah.netHighlight());
-    check('3B ağ vurgusu (masaüstü, BF245A): fare PS1 1− direğinin üstüne gelince toprak ağının kabloları parlıyor, öbürleri soluk, bacağı işaretli; küçük şemada düğümün kabloları vurgulu; fare çekilince kalkıyor',
-      at !== null && lit.net === at.net && lit.lit >= 4 && lit.dim >= 4 && lit.legs >= 1 && mini >= 1 && off.net === null && off.lit === 0 && off.dim === 0,
-      `${lit.net} · parlak ${lit.lit} · soluk ${lit.dim} · bacak ${lit.legs} · küçük şema ${mini} · sonra ${off.net}`);
+    // Yeniden tıklayınca vurgulanır, Esc kaldırır.
+    if (spot) await page.mouse.click(spot.x, spot.y);
+    await page.waitForTimeout(200);
+    const again = await highlight(page);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+    const escaped = await highlight(page);
+    await page.mouse.move(5, 300); await page.waitForTimeout(300);
+    check('3B ağ vurgusu (masaüstü, BF245A): fare PS1 1− direğinin üstünde durunca hiçbir şey vurgulanmıyor; tıklayınca toprak ağının kabloları parlıyor, öbürleri soluk, bacağı işaretli, küçük şemada düğümün kabloları vurgulu; fare çekilince vurgu duruyor; boş yere tıklayınca ve Esc ile kalkıyor',
+      at !== null && hovered.net === null && hovered.lit === 0 && hovered.dim === 0 && hovered.faded === 0 && lit.net === at.net && lit.lit >= 4 && lit.dim >= 4 && lit.legs >= 1 && mini >= 1 &&
+        away.net === at.net && off.net === null && off.lit === 0 && off.dim === 0 && off.faded === 0 && again.net === at.net && escaped.net === null && escaped.dim === 0,
+      `üstünde ${hovered.net} · tıklayınca ${lit.net} · parlak ${lit.lit} · soluk ${lit.dim} · bacak ${lit.legs} · küçük şema ${mini} · fare çekilince ${away.net} · boş yere ${off.net} · yeniden ${again.net} · Esc ${escaped.net}`);
+    // Hızlı geçiş: imleç tahtanın ve direklerin üstünden hızla geçerken hiçbir malzeme soluklaşmıyor, hiçbir etiket
+    // açılmıyor (her adımda ölçülür). Parçanın üstünde 200 ms durunca gizli etiketi öncelik alıyor.
+    await page.goto(`${URL0}embed/?ornek=diyot-dc&gorunum=tam`, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    // Parçanın gövdesinin ekrandaki noktası (ışın gerçekten o parçaya değiyor, önünde kablo yok).
+    const partAt = (p, id) => p.evaluate((id) => {
+      const t = window.__tezgah; const placed = [...t.parts.values()].find((p) => p.part.label === id); if (!placed) return null;
+      const c = document.querySelector('canvas').getBoundingClientRect();
+      const q = placed.body.getCenter(placed.top.clone()).project(t.view);
+      const x = c.left + ((q.x + 1) / 2) * c.width; const y = c.top + ((1 - q.y) / 2) * c.height;
+      for (const [dx, dy] of [[0, 0], [0, -4], [0, 4], [-6, 0], [6, 0], [0, -8], [0, 8], [-12, 0], [12, 0]]) {
+        const e = { clientX: x + dx, clientY: y + dy };
+        if (t.pick(e)?.part.label === id && !t.pickNet(e)) return { x: e.clientX, y: e.clientY };
+      }
+      return null;
+    }, id);
+    const sweepFrom = await postAt(page, 'PS1 +');
+    const sweepTo = await postAt(page, 'V1 −');
+    const d1 = await partAt(page, 'D1');
+    const r1 = await partAt(page, 'R1');
+    const hot = (p) => p.evaluate(() => {
+      const h = window.__tezgah.netHighlight();
+      return { net: h.net, dim: h.dim + h.faded, lit: h.lit, open: document.querySelectorAll('[data-anchor="post"][data-open]').length, keen: [...document.querySelectorAll('[data-anchor="part"]')].filter((e) => e.dataset.priority === '5').length };
+    });
+    const seen = { dim: 0, lit: 0, open: 0, keen: 0, net: 0, steps: 0 };
+    const sweep = async (a, b, n) => {
+      for (let k = 0; k <= n; k++) {
+        await page.mouse.move(a.x + ((b.x - a.x) * k) / n, a.y + ((b.y - a.y) * k) / n);
+        const s = await hot(page);
+        seen.dim += s.dim; seen.lit += s.lit; seen.open += s.open; seen.keen += s.keen; seen.net += s.net === null ? 0 : 1; seen.steps += 1;
+      }
+    };
+    if (sweepFrom && sweepTo && d1 && r1) {
+      // Direklerin üstünden soldan sağa, sonra tahtadaki parçaların üstünden geri (üç tur).
+      for (let turn = 0; turn < 3; turn++) {
+        await sweep({ x: sweepFrom.x - 30, y: sweepFrom.y + 8 }, { x: sweepTo.x + 30, y: sweepTo.y + 8 }, 24);
+        await sweep({ x: r1.x + 60, y: r1.y }, { x: d1.x - 60, y: d1.y }, 24);
+      }
+    }
+    const park = await emptySpot(page);
+    await page.mouse.move(park.x, park.y); await page.waitForTimeout(300);
+    const afterSweep = await hot(page);
+    // Parçanın üstünde durunca etiketi öncelik alır (200 ms sonra); imleç ayrılınca hemen bırakır.
+    let dwellEarly = null; let dwellLate = null;
+    if (d1) {
+      await page.mouse.move(d1.x, d1.y);
+      dwellEarly = await hot(page);
+      await page.waitForTimeout(350);
+      dwellLate = await hot(page);
+      await page.mouse.move(park.x, park.y);
+    }
+    const dwellGone = await hot(page);
+    check('3B üstüne gelme (masaüstü, 1N4001 DC): imleç direklerin ve parçaların üstünden hızla geçerken hiçbir malzeme soluklaşmıyor, hiçbir ağ vurgulanmıyor, hiçbir etiket açılmıyor; parçanın üstünde 200 ms durunca etiketi öne çıkıyor, imleç ayrılınca hemen bırakıyor',
+      seen.steps >= 150 && seen.dim === 0 && seen.lit === 0 && seen.net === 0 && seen.open === 0 && seen.keen === 0 && afterSweep.dim === 0 && afterSweep.open === 0 &&
+        dwellEarly !== null && dwellEarly.keen === 0 && dwellLate !== null && dwellLate.keen === 1 && dwellLate.dim === 0 && dwellLate.net === null && dwellGone.keen === 0,
+      `${seen.steps} adım · soluk ${seen.dim} · parlak ${seen.lit} · ağ ${seen.net} · açık ad ${seen.open} · öne çıkan ${seen.keen} | durunca hemen ${dwellEarly?.keen} → 350 ms ${dwellLate?.keen} → ayrılınca ${dwellGone.keen}`);
+    // Tıklayınca: parçaya (R1) tıklayınca tıklanan uca en yakın ağ, kabloya (direkten inen tel) tıklayınca o ağ
+    // vurgulanır; boş yere tıklayınca kalkar.
+    let partLit = { net: null }; let partOff = { net: null }; let wireLit = { net: null }; let wireOff = { net: null };
+    if (r1 && sweepFrom) {
+      await page.mouse.click(r1.x, r1.y); await page.waitForTimeout(200);
+      partLit = await highlight(page);
+      const selected = await page.evaluate(() => [...document.querySelectorAll('[data-anchor="part"]')].filter((e) => e.className.includes('bg-accent')).map((e) => (e.textContent ?? '').slice(0, 2)).join(','));
+      partLit.selected = selected;
+      const empty2 = await emptySpot(page);
+      await page.mouse.click(empty2.x, empty2.y); await page.waitForTimeout(200);
+      partOff = await highlight(page);
+      for (let dy = 0; dy < 30 && !wireLit.net; dy += 3) {
+        await page.mouse.click(sweepFrom.x, sweepFrom.y + dy); await page.waitForTimeout(150);
+        wireLit = await highlight(page);
+      }
+      await page.mouse.click(empty2.x, empty2.y); await page.waitForTimeout(200);
+      wireOff = await highlight(page);
+    }
+    check('3B ağ vurgusu tıklayınca (masaüstü, 1N4001 DC): parçaya (R1) tıklayınca ucunun ağı vurgulanıyor (öbür parçalar ve kablolar soluk, parça seçili), boş yere tıklayınca kalkıyor; direğe tıklayınca o ağ vurgulanıyor, boş yere tıklayınca kalkıyor',
+      partLit.net !== null && partLit.lit >= 1 && partLit.dim >= 1 && partLit.faded >= 1 && partLit.selected === 'R1' && partOff.net === null && partOff.dim === 0 && partOff.faded === 0 &&
+        wireLit.net === sweepFrom?.net && wireLit.lit >= 1 && wireLit.dim >= 1 && wireOff.net === null && wireOff.dim === 0,
+      `R1: ${partLit.net} · parlak ${partLit.lit} · soluk kablo ${partLit.dim} · soluk parça ${partLit.faded} · seçili ${partLit.selected} → ${partOff.net} | PS1 +: ${wireLit.net} · parlak ${wireLit.lit} · soluk ${wireLit.dim} → ${wireOff.net}`);
     // Açık ad: direğin üstüne gelince kısa adın yerine cihazın ya da parçanın adı, türü ve ucun açık adı.
     await page.goto(`${URL0}embed/?ornek=role&gorunum=tam`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
@@ -6599,13 +6710,13 @@ try {
       const q = await postAt(page, name);
       opened[name] = '';
       for (let dy = 0; dy < 30 && !opened[name] && q; dy += 3) {
-        await page.mouse.move(q.x, q.y + dy); await page.waitForTimeout(150);
+        await page.mouse.move(q.x, q.y + dy); await page.waitForTimeout(320);
         opened[name] = await openLabel(page);
       }
       await page.mouse.move(5, 300); await page.waitForTimeout(200);
     }
     const shortAgain = await page.evaluate(() => [...document.querySelectorAll('[data-anchor="post"]')].map((e) => e.textContent).sort().join(', '));
-    check('3B direklerin açık adı (masaüstü): direğin üstüne gelince kısa adın yerine açık ad, yalnızca o direkte (PS1 1− → "PS1 güç kaynağı · 1. çıkış −", K1 NA → "K1 röle · normalde açık uç", B2 − → "B2 pil · − uç", B1 + → "B1 pil · + uç (12 V)"); fare çekilince kısa ad geri geliyor',
+    check('3B direklerin açık adı (masaüstü): fare direğin üstünde 200 ms durunca kısa adın yerine açık ad, yalnızca o direkte (PS1 1− → "PS1 güç kaynağı · 1. çıkış −", K1 NA → "K1 röle · normalde açık uç", B2 − → "B2 pil · − uç", B1 + → "B1 pil · + uç (12 V)"); fare çekilince kısa ad geri geliyor',
       gndOpen === 'PS1 güç kaynağı · 1. çıkış −' && gndClosed === '' && opened['K1 NA'] === 'K1 röle · normalde açık uç' && opened['B2 −'] === 'B2 pil · − uç' && opened['B1 +'] === 'B1 pil · + uç (12 V)' &&
         shortAgain === 'A1 +, A1 −, B1 +, B1 −, B2 +, B2 −, K1 C, K1 NA, K1 NK, K1 S1, K1 S2',
       `${gndOpen} → "${gndClosed}" | ${Object.values(opened).join(' | ')} | ${shortAgain}`);
@@ -6628,6 +6739,44 @@ try {
       tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1 && phoneOpen === 'A1 ampermetre · − uç' && phonePosts.length === 8 && phonePosts.every(Boolean),
       `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0} · açık ad "${phoneOpen}" · görünen direk ${phonePosts.filter(Boolean).length}/${phonePosts.length}`);
     await ph.context().close();
+    // Telefonda ilk açılıştaki "Bir parmak: döndür…" ipucu hiçbir etiketi örtmüyor: görünen etiketlere değmiyor,
+    // ipucu yüzünden gizlenen etiket yok (ipucu kalkınca görünen etiketler aynı), ilk dokunuşta kalkıyor.
+    // 1N4001 DC (şema kutusunda ve tam ekranda), BC107 kuplajlı ve transformatör (tam ekran).
+    {
+      const rows = [];
+      for (const [id, full] of [['diyot-dc', false], ['diyot-dc', true], ['bjt-yukseltec-kuplajli', true], ['transformator', true]]) {
+        const { page: hp, cdp: hc } = await phone();
+        await hp.context().addInitScript(() => { try { localStorage.setItem('devre-simulatoru:gorunum', 'bench'); } catch {} });
+        await hp.goto(`${URL0}embed/?ornek=${id}${full ? '&gorunum=tam' : ''}`, { waitUntil: 'networkidle' });
+        await hp.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+        await hp.waitForTimeout(1200);
+        const state = () => hp.evaluate(() => {
+          const hint = document.querySelector('[data-float]');
+          const h = hint && getComputedStyle(hint).opacity === '1' ? hint.getBoundingClientRect() : null;
+          const shown = [...document.querySelectorAll('[data-anchor]')].filter((e) => getComputedStyle(e).opacity === '1');
+          const clash = h ? shown.filter((e) => { const b = e.getBoundingClientRect(); return b.left < h.right && b.right > h.left && b.top < h.bottom && b.bottom > h.top; }).map((e) => e.textContent) : [];
+          const c = document.querySelector('canvas').getBoundingClientRect();
+          return { hint: h ? { y0: Math.round(h.top - c.top), y1: Math.round(h.bottom - c.top) } : null, there: hint !== null, clash, labels: shown.map((e) => e.textContent).sort().join(' | '), w: c.width, h: c.height };
+        });
+        const before = await state();
+        // İlk dokunuş: tuvalin sol alt köşesi (boş masa).
+        const c = await hp.evaluate(() => {
+          const t = window.__tezgah; const r = document.querySelector('canvas').getBoundingClientRect();
+          for (const fy of [0.6, 0.5, 0.7, 0.4, 0.8]) for (const fx of [0.04, 0.96, 0.1, 0.9]) {
+            const e = { clientX: r.left + r.width * fx, clientY: r.top + r.height * fy };
+            if (document.elementFromPoint(e.clientX, e.clientY)?.tagName === 'CANVAS' && !t.pick(e) && !t.pickNet(e)) return { x: e.clientX, y: e.clientY };
+          }
+          return { x: r.left + 14, y: r.top + r.height * 0.6 };
+        });
+        await tap(hp, hc, c); await hp.waitForTimeout(300);
+        const after = await state();
+        rows.push({ id, full, before, after });
+        await hp.context().close();
+      }
+      check('3B (telefon): ilk açılıştaki "Bir parmak: döndür…" ipucu görünüyor, görünen hiçbir etikete değmiyor ve hiçbir etiketi gizlemiyor (ipucu kalkınca görünen etiketler aynı); ilk dokunuşta kalkıyor (1N4001 DC kutuda ve tam ekranda, BC107 kuplajlı, transformatör)',
+        rows.every((r) => r.before.hint !== null && r.before.clash.length === 0 && r.before.labels === r.after.labels && !r.after.there && r.before.labels.split(' | ').length >= 5),
+        rows.map((r) => `${r.id}${r.full ? ' tam' : ''}: ipucu ${r.before.hint ? `${r.before.hint.y0}–${r.before.hint.y1}` : 'yok'} · çakışan ${r.before.clash.join(', ') || 'yok'} · etiket ${r.before.labels.split(' | ').length} → ${r.after.labels.split(' | ').length} · dokununca ${r.after.there ? 'duruyor' : 'kalktı'}`).join(' | '));
+    }
   }
   // --- 3B: tahta parçaları örtülmez (gerçek kamera) --------------------------------------------------------------
   // Varsayılan kamerada (masaüstü 1440×900, iPhone 13 dikey ve yatay) hiçbir tahta parçasının gövdesinin ekrandaki
@@ -6842,7 +6991,7 @@ try {
       const t = window.__tezgah; const c = document.querySelector('main canvas').getBoundingClientRect(); const b = t.boardRect();
       const board = { x0: b.x0 + c.left, y0: b.y0 + c.top, x1: b.x1 + c.left, y1: b.y1 + c.top };
       const over = (r) => r.left < board.x1 && r.right > board.x0 && r.top < board.y1 && r.bottom > board.y0;
-      const hint = document.querySelector('[data-obstacle]')?.getBoundingClientRect();
+      const hint = document.querySelector('[data-float]')?.getBoundingClientRect();
       const buttons = [...document.querySelectorAll('[data-fit-reserve] button, main button[aria-label$="tam ekran aç"]')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0);
       return { frac: c.height / innerHeight, w: Math.round(c.width), h: Math.round(c.height), share: (b.x1 - b.x0) / c.width, hint: hint ? over(hint) : null, buttons: buttons.some(over), top: Math.min(...t.deviceRects().map((d) => d.y0)) };
     });

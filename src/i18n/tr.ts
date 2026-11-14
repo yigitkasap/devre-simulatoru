@@ -2634,7 +2634,7 @@ export const tr = {
       scopeGround: 'CH toprak',
       meterPlus: (label: string) => `${label} +`,
       meterMinus: (label: string) => `${label} −`,
-      /** Açık adlar: direğe dokununca ya da üstüne gelince kısa adın yerine görünür. */
+      /** Açık adlar: direğe tıklayınca (dokununca) ya da fare üstünde durunca kısa adın yerine görünür. */
       long: {
         supplyPlus: (label: string, volts: string) => `${label} güç kaynağı · + çıkış (${volts} V)`,
         supplyMinus: (label: string) => `${label} güç kaynağı · − çıkış`,
