@@ -15,6 +15,11 @@
 //   - Parçalar şemadaki soldan sağa sırasıyla yerleşir; ardışık iki parçanın ortak ağı varsa aynı
 //     şeridi paylaşır (direnç → LED zinciri jumper'sız olur).
 //   - Bir şeride en çok 3 bacak ya da kablo takılır; 2 delik şeritleri birleştiren jumper'lara kalır.
+//
+// İki plan var (2026-11-14, "tahta düzeni"): planBreadboard 3B tezgâh ve Tahtada kur içindir, tahta şema gibi okunur
+// (seri zincirler aynı yarıda soldan sağa, alet uçları bağlı oldukları bacağın şeridinde; yukarıdaki son iki kuralın
+// yerine zincir ve bacak kuralları geçer). planCard Karta aktar içindir (delikli plaket, baskı devre, KiCad):
+// yukarıdaki kurallarla önceki yerleşim, değişmez.
 
 import { CATALOG } from '../model/catalog';
 import { SEG7_LEGS } from '../model/logicChips';

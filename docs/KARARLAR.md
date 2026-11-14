@@ -2434,6 +2434,86 @@ tam koşularında da farklı örneklerle kalmıştı). Tek başına yinelenince 
 kırpılmamasını istemez; "3B tahta parçaları örtülmüyor" varsayılan eğimi ve tahta payını da denetler; yeni maddeler
 "3B etiketler" (üç ekran), "3B direklerin açık adı", kablo maddesinde `ard-role`.
 
+### 3B: tahta düzeni (tahta şema gibi okunur) (2026-11-14)
+
+Sorun (kullanıcı): 3B tezgâhta devreler elektrik olarak doğruydu ama okunmuyordu. Örnek `diyot-dc`: şemada
+PS1+ → D1 → A1 → R1 → GND, V1 dirence paralel. Tahtada D1 üst yarıda, R1 alt yarıdaydı; ampermetre ile voltmetre aynı
+direği paylaşıyordu (V1 + "A1 −" direğinde, V1 − GND direğinde): voltmetrenin dirence paralel olduğu görünmüyordu.
+Dal `tahta-duzen` (main d2d134c'nin üstünde; istekte adı geçen `hover-vurgu` dalı ne yerelde ne origin'de vardı, üstüne
+gelince çıkan açık adlar zaten main'deydi).
+
+**1. Her alet ucunun kendi direği** (`posts.ts`). Direkler ağa göre değil, alet ucuna göre açılır: bağlı her alet ucunun
+(laboratuvar cihazları ve tahta dışı parçalar: pil, motor, röle, lamba, hoparlör, transformatör…) kendi direği, kendi
+kablosu ve direkten tahtaya kendi teli var. Aynı ağa giden iki alet ucu ayrı direklerde durur; direkte üst üste fiş
+yok. Direğin adı alet ucunun adı:
+
+| Alet | Adlar |
+|---|---|
+| Güç kaynağı | `PS1 +`, `PS1 −`; iki çıkış da bağlıysa `PS1 1+`, `PS1 1−`, `PS1 2+`, `PS1 2−` |
+| Pil | `B1 +`, `B1 −` |
+| Ampermetre, voltmetre, multimetre | `A1 +`, `A1 −`, `V1 +`, `V1 −`, `MM1 +`, `MM1 −` |
+| Fonksiyon üreteci | `FG1 OUT`, `FG1 TTL`, `FG1 COM` (ön paneldeki yazılar) |
+| Osiloskop | `CH1`, `CH2`; toprak ucu tek kanal bağlıysa `CH1 toprak`, iki kanal da bağlıysa `CH toprak` (cihazın tek toprak ucu var) |
+| Tahta dışı parçalar | öncesi gibi: `K1 NA`, `T1 S1`, `M1 +` … |
+
+Eski adlar (`GND`, `+12 V`, `GİRİŞ`) kalktı. Açık ad (direğe, fişine, kablosuna ya da teline dokununca ya da üstüne
+gelince) yalnızca o direkte görünür; aynı ağın öbür direkleri vurgulanır ama kısa adlarıyla kalır. Direkler arası
+aralık 3 delik; hedef delikler dar bir alandaysa direkler de sıkışır (en az 2 delik), etiketler iki sıraya dizilir.
+
+**2. Teller ölçülen parçanın yanına iner** (`breadboard.ts` → `seriesHole`). Ölçen uçlar (voltmetre, ampermetre,
+multimetre, osiloskop kanalı) şemada bağlı oldukları bacağın şeridine, o bacağa en yakın boş deliğe takılır. İki uçlu
+gerilim ölçerin iki ucu, ikisinin ağında da bacağı olan (paralel bağlı olduğu) parçanın iki bacağının yanına gelir;
+birden çok aday varsa şemada en yakın olanı. Öbür durumda bacak, şemada uca en yakın olanıdır (uçların şemadaki
+konumları arasındaki uzaklık). Köprüler önce yerleşir, alet uçları kalan deliklerden bacağa en yakınını alır.
+
+- **Yorum (istekte iki kural çakışıyordu):** "her alet ucunun teli bacağın şeridine" ile "toprak − rayına, besleme +
+  rayına". Uygulanan: kaynakların ve yüklerin uçları (güç kaynağı, pil, üreteç, osiloskobun toprak ucu, motor, röle…)
+  toprak ya da besleme ağındaysa raya gider; ölçen uçlar her zaman bacağın yanına (V1 − toprak ağında olsa da direncin
+  bacağının şeridine).
+- Ağın tahtada hiç bacağı yoksa (iki alet ya da bir aletle bir tahta dışı parça arasında, ör. AC kaynak → ampermetre →
+  transformatör): toprak ya da beslemeyse ray, değilse uçların buluştuğu boş bir şerit.
+- Arduino'nun atlama telleri eskisi gibi (kendi yanındaki en yakın şeride).
+
+**3. Seri yol şemayı izler** (`breadboard.ts` → zincirler). Zincir: akım taşıyan tam iki ucun buluştuğu ağlarla art
+arda bağlı iki bacaklı tahta parçaları ve ampermetreler (voltmetre ve osiloskop uçları sayılmaz; toprak ve besleme
+ağları raya gider, zinciri böler). Zincirin parçaları şemadaki sırayla aynı yarıda soldan sağa, ortak bacakları aynı
+şeritte dizilir. Yön: kaynağın + yanından toprak yanına; belli değilse şemadaki konum (soldan sağa, yukarıdan aşağıya).
+Ampermetrenin girdiği yerde iki parça arasında bir şerit boş kalır: A1 + önceki parçanın çıkış şeridine, A1 − sonraki
+parçanın giriş şeridine. Zincirin ucundaki ampermetrenin dış ağının tahtada bacağı yoksa ampermetre ile komşusu boş bir
+şeritte buluşur. 81 örneğin 48'inde toplam 64 zincir var.
+
+- **Ortalama:** alet ucu sayısı 6 ve üstü olan devre tahtada ortalanır (Arduino'lu devreler dışında). Solda yığılı
+  devrede direklerin telleri tek yönden yelpaze yapıyor, direklerle tahtanın arka kenarı arasındaki kanala sığmıyordu
+  (transformatör örneğinde 11 iz; kanal 6 iz alır). Ortalanınca teller iki yana eşit açılır: en çok 5 iz. Az uçlu
+  devreler yerinde kalır (Tahtada kur'un Deney 9 kurulumu ve testlerindeki delik adları değişmedi).
+- Üç bacaklı parçalar (transistör, potansiyometre) ve entegreler zincire girmez; onların çevresi eski kuralla yerleşir.
+
+**4. Multimetreler %30 küçüldü** (`instruments.ts` → `DMM_SHRINK = 0,7`): ampermetre, voltmetre ve multimetre. Güç
+kaynağı, üreteç ve osiloskop aynı.
+
+**Karta aktar eski planında kaldı.** İstek: simülasyon, şema ve KiCad değişmesin. Baskı devre (KiCad, Gerber) ve
+delikli plaket rehberi tahta planından üretiliyor; plan değişince onlar da değişirdi. Bu yüzden iki plan var:
+`planBreadboard` (3B tezgâh ve Tahtada kur: yeni düzen) ve `planCard` (Karta aktar: önceki yerleşim, değişmedi).
+Sonuç: delikli plaket rehberinin yerleşimi 3B tezgâhtakiyle artık aynı değil.
+
+**Tahtada kur** yeni planı kullanır (örnek yerleşim ipucu, görevlerin hazır parçaları, direklerin yeri). Öğrencinin
+kayıtlı kurulumları delik adlarıyla saklandığı için etkilenmez; görev bağlantılarındaki "seçili parçalar takılı"
+başlangıcı parçaları yeni planın yerine koyar.
+
+**Denetim.** `tests/tahta-duzen.test.ts` (81 örnek): her alet ucuna bir direk ve adları; her alet ucunun teli
+bağlı olduğu bacağın şeridinde ve o bacağa en yakın boş delikte (kaynak uçları rayda); voltmetrenin iki teli paralel
+bağlı olduğu parçanın iki bacağının yanında; seri komşular ortak şeritte, aynı yarıda, sırayla; ampermetrenin iki
+yanındaki bacaklar arasında tam bir boş şerit; tahtadaki bağlantı (şerit, ray, köprü) şemanın ağlarıyla bire bir aynı;
+planın yerleşimi Tahtada kur'un Denetle'sinden sorunsuz geçer; KiCad çıktısının 81 örnekteki özeti değişmedi
+(`tests/veri/veri-kicad-ozet.json`; baskı devre bilerek değiştirilirse yenilenir). `tests/tezgah-sade.test.ts`:
+direk, renk, tel ve çakışma testleri alet ucu başına direğe göre güncellendi; direk tellerinin izleri kanala sığar.
+Sonuç: birim testleri 2154 / 2154; tip denetimi 0 hata; tam ios-kontrol normal hızda 513 maddenin hepsi geçti, konsol
+hatası yok. Karta aktar'ın planı, KiCad çıktısı ve plaket rehberi 81 örnekte önceki sürümle bayt bayt aynı (doğrudan
+karşılaştırma). Değişen ios-kontrol maddeleri ("3B bağlantı direkleri"): her alet ucuna bir direk (BF245A 8, yarım dalga
+5, BC107 kuplajlı 7), adlar alet ucunun adı, açık ad yalnızca üstüne gelinen direkte, tel en çok 110 mm (ön yarıdaki
+bacağa inen tel tahtayı boydan geçer; eskiden 80 mm); yeni madde "3B tahta düzeni (1N4001 DC)". Gerçek iPhone'da
+denenmedi.
+
 ### Performans ve hata taraması (2026-10-27)
 
 - `npm run tarama:performans:motor` (`scripts/tarama/performans-motor.tarama.ts`): her örnek,
