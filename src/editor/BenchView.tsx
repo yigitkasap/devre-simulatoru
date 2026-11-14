@@ -10,7 +10,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } 
 import { createPortal } from 'react-dom';
 import type { CameraRequest } from '../bench3d/Bench3D';
 import { planBreadboard, type BreadboardPlan } from '../bench3d/breadboard';
-import { layoutPosts } from '../bench3d/posts';
+import { layoutPosts, postKey } from '../bench3d/posts';
 import { netIndex } from './analysis/traces';
 import { wireKey } from '../model/connectivity';
 import type { BenchCallbacks, BenchScene, CameraView, TopInsets } from '../bench3d/scene';
@@ -178,13 +178,15 @@ export function BenchView(props: BenchViewProps) {
   const slow = useSlowFrame(props.active ? (props.labelFrame === undefined ? frame : props.labelFrame) : null);
   const single = selection.length === 1 ? selection[0]! : null;
 
-  // Bağlantı direklerinin adları (taban plakasının arka kenarı; cihaz kabloları buraya takılır: posts.ts) ve üstüne
+  // Bağlantı direklerinin adları (taban plakasının arka kenarı; her alet ucunun kendi direği: posts.ts) ve üstüne
   // gelinen ağ (küçük şemada vurgulanır). Direklerin yeri ve adı her zaman şemanın planından (Tahtada kur'da da).
   const referencePlan = useMemo(() => planBreadboard(doc), [doc]);
   const schematicPlan = props.plan ? null : referencePlan;
   const index = useMemo(() => netIndex(doc, props.connectivity), [doc, props.connectivity]);
   const posts = useMemo(() => layoutPosts(doc, referencePlan).posts, [doc, referencePlan]);
   const [hoverNet, setHoverNet] = useState<string | null>(null);
+  // Üstüne gelinen ya da dokunulan direk (alet ucu): yalnızca onun açık adı görünür.
+  const [hoverPost, setHoverPost] = useState<string | null>(null);
   // Farenin altındaki parça: yer bulamadığı için gizlenen etiketi öncelik alır ve görünür.
   const [hoverPart, setHoverPart] = useState<string | null>(null);
   const highlightWires = useMemo(() => {
@@ -245,7 +247,12 @@ export function BenchView(props: BenchViewProps) {
     setCameraLabel(choice);
     setCamera((c) => (choice === 'part' ? (single ? { n: c.n + 1, view: 'part', partId: single } : c) : { n: c.n + 1, view: choice }));
   };
-  const callbacks: BenchCallbacks = { ...props.callbacks, onCamera: () => setCameraLabel('free'), onNet: setHoverNet, onHoverPart: setHoverPart };
+  const callbacks: BenchCallbacks = { ...props.callbacks, onCamera: () => setCameraLabel('free'), onNet: (net, post) => {
+      setHoverNet(net);
+      setHoverPost(post);
+    },
+    onHoverPart: setHoverPart,
+  };
 
   // Etiketler: telefonda yalnızca seçili parça ve ölçü aletleri; toprak sembolü etiketsiz.
   const top = props.top ?? null;
@@ -316,16 +323,17 @@ export function BenchView(props: BenchViewProps) {
         {labels &&
           posts.map((post) => (
             <span
-              key={`post-${post.net}`}
+              key={`post-${postKey(post)}`}
               data-anchor="post"
               data-net={post.net}
-              data-open={hoverNet === post.net ? '' : undefined}
-              data-priority={hoverNet === post.net ? 5 : 3}
+              data-post={postKey(post)}
+              data-open={hoverPost === postKey(post) ? '' : undefined}
+              data-priority={hoverPost === postKey(post) ? 6 : hoverNet === post.net ? 5 : 3}
               aria-hidden="true"
-              className={`absolute top-0 left-0 rounded-md px-1.5 py-0.5 text-[11px] leading-tight font-semibold whitespace-nowrap opacity-0 shadow-md ${hoverNet === post.net ? 'z-10 bg-accent text-white' : 'bg-ink text-on-ink'}`}
+              className={`absolute top-0 left-0 rounded-md px-1.5 py-0.5 text-[11px] leading-tight font-semibold whitespace-nowrap opacity-0 shadow-md ${hoverPost === postKey(post) ? 'z-10 bg-accent text-white' : hoverNet === post.net ? 'z-10 bg-ink text-on-ink ring-2 ring-accent' : 'bg-ink text-on-ink'}`}
             >
-              {/* Kısa ad; direğe dokununca ya da üstüne gelince (ağ vurgulanınca) açık ad. */}
-              {hoverNet === post.net ? post.title : post.name}
+              {/* Kısa ad (alet ucu); direğe, fişine, kablosuna ya da teline dokununca ya da üstüne gelince açık ad. */}
+              {hoverPost === postKey(post) ? post.title : post.name}
             </span>
           ))}
         {lettered &&

@@ -1,7 +1,7 @@
 // Lehim rehberi: her örnekte breadboard yerleşiminin bütün parçaları, jumper'ları ve telleri adım olarak.
 
 import { describe, expect, it } from 'vitest';
-import { planBreadboard } from '../src/bench3d/breadboard';
+import { planCard } from '../src/bench3d/breadboard';
 import { buildSolderGuide, holeName, resistorColorCode } from '../src/bench3d/guide';
 import { EXAMPLE_IDS, exampleDoc } from '../src/examples';
 
@@ -17,7 +17,7 @@ describe('Lehim rehberi', () => {
   for (const id of EXAMPLE_IDS) {
     it(`${id}: her parça, jumper ve tel bir adım; delik adları geçerli`, () => {
       const doc = exampleDoc(id)!;
-      const plan = planBreadboard(doc);
+      const plan = planCard(doc);
       const guide = buildSolderGuide(doc, plan);
       expect(guide.steps.length).toBe(plan.jumpers.length + plan.onBoard.size + plan.leads.length);
       for (const [partId] of plan.onBoard) {
@@ -36,7 +36,7 @@ describe('Lehim rehberi', () => {
 
   it('Blink: LED\'in anot ve katot delikleri, direnç renk kodu, Arduino telleri', () => {
     const doc = exampleDoc('ard-blink')!;
-    const guide = buildSolderGuide(doc, planBreadboard(doc));
+    const guide = buildSolderGuide(doc, planCard(doc));
     const led = guide.steps.find((s) => s.title.startsWith('LED1'))!;
     expect(led.note).toMatch(/Uzun bacak \(anot, \+\) \d+[a-j]/);
     expect(guide.materials.find((m) => m.name.startsWith('Direnç 220'))!.detail).toContain('kırmızı–kırmızı–kahverengi–altın');

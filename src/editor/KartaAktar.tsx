@@ -2,7 +2,7 @@
 // Baskı devre (PCB); ikisinde de kart 3B (src/bench3d/boardScene.ts, ışık ve kamera tezgâhla aynı).
 // Masaüstünde ekranın neredeyse tamamı: solda sahne (üstünde bilgi çipi ve araç hapı), sağda 368 px
 // panel. Telefonda tam ekran sayfa: sekmeler, 340 px sahne, altında durum ya da "Şimdi tak" kartı,
-// en altta sabit birincil düğme. Son seçilen sekme hatırlanır. Hesap kodu (planBreadboard,
+// en altta sabit birincil düğme. Son seçilen sekme hatırlanır. Hesap kodu (planCard,
 // buildSolderGuide, designPcb, routePcb, checkPcb, fabricationZip, kicadZip) değişmez; Yazdır bugünkü
 // yazdırılabilir rehberi açık temada basar (SolderGuide.tsx).
 
@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent a
 import { addedParts, footprintTip, holeLabels, missingConnections, perfboardInfo, stepGroups, stepRef, stepTargets, stepWarning, type MissingConnection, type StepTarget } from '../bench3d/boardData';
 import { buildPcbBoard, buildPcbSurface, buildPerfboard, type BoardModel } from '../bench3d/boardModels';
 import { BoardScene, type BoardSide } from '../bench3d/boardScene';
-import { planBreadboard } from '../bench3d/breadboard';
+import { planCard } from '../bench3d/breadboard';
 import { fabricationZip } from '../bench3d/gerber';
 import { buildSolderGuide, type SolderGuide } from '../bench3d/guide';
 import { boardSize, designPcb, kicadZip, slug, type PcbDesign } from '../bench3d/kicad';
@@ -656,7 +656,7 @@ function ChecksList() {
 }
 
 function PerfTab({ doc, phone, dark, sceneClass, fullscreen, onFullscreen }: { doc: CircuitDoc; phone: boolean; dark: boolean; sceneClass: string; fullscreen: boolean; onFullscreen: () => void }) {
-  const plan = useMemo(() => planBreadboard(doc), [doc]);
+  const plan = useMemo(() => planCard(doc), [doc]);
   const guide = useMemo(() => buildSolderGuide(doc, plan), [doc, plan]);
   const targets = useMemo(() => stepTargets(doc, plan, guide), [doc, plan, guide]);
   const total = guide.steps.length;

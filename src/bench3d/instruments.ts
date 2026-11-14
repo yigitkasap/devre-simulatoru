@@ -51,6 +51,8 @@ export const SUPPLY_SCALE = 0.5;
  * 75 × 150 mm (PM8233D+: 148 × 74 × 42 mm): bütün model 150 / 182 oranında küçülür (75,8 × 150 × 41,2 mm).
  */
 export const DMM_FIT = 150 / 182;
+/** El multimetreleri öbür cihazlara göre %30 küçük çizilir (yanlarındaki güç kaynağı, üreteç ve osiloskoba göre çok büyük duruyordu; 2026-11-14). */
+export const DMM_SHRINK = 0.7;
 
 /** Modeli kökünden `k` oranında küçültür (uçlar da; yönler aynı). */
 function resized(model: PartModel, k: number): PartModel {
@@ -623,7 +625,7 @@ export function dmmModel(kind: DmmKind): PartModel {
       return lcd.redraw(`${text}|${at}|${ctx.active}|${mark}`, ctx.now, () => draw(text, at, ctx.active || ohm, mark));
     },
     dispose: lcd.dispose,
-  }, DMM_FIT);
+  }, DMM_FIT * DMM_SHRINK);
 }
 
 // --- DC güç kaynağı ------------------------------------------------------------------------------------------

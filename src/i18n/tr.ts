@@ -2626,19 +2626,20 @@ export const tr = {
     groundNet: 'GND',
     /** Bağlantı direklerinin kısa adları (taban plakasının arka kenarı; cihaz kabloları buraya takılır). */
     posts: {
-      plus: (volts: string) => `+${volts} V`,
-      minus: (label: string) => `${label} −`,
-      input: 'GİRİŞ',
-      ttl: 'TTL',
-      com: 'COM',
+      /** Fonksiyon üretecinin uçları (ön paneldeki yazılar). */
+      generatorShort: ['OUT', 'TTL', 'COM'] as readonly string[],
       channel: (n: number) => `CH${n}`,
+      /** Osiloskobun toprak ucu: tek kanal bağlıysa o kanalın toprağı. */
+      channelGround: (n: number) => `CH${n} toprak`,
+      scopeGround: 'CH toprak',
       meterPlus: (label: string) => `${label} +`,
       meterMinus: (label: string) => `${label} −`,
       /** Açık adlar: direğe dokununca ya da üstüne gelince kısa adın yerine görünür. */
       long: {
-        ground: 'GND · toprak (ortak uç)',
         supplyPlus: (label: string, volts: string) => `${label} güç kaynağı · + çıkış (${volts} V)`,
         supplyMinus: (label: string) => `${label} güç kaynağı · − çıkış`,
+        supplyPlusOf: (label: string, out: number, volts: string) => `${label} güç kaynağı · ${out}. çıkış + (${volts} V)`,
+        supplyMinusOf: (label: string, out: number) => `${label} güç kaynağı · ${out}. çıkış −`,
         generator: (label: string, pin: string) => `${label} fonksiyon üreteci · ${pin}`,
         generatorPins: ['çıkış (OUT)', 'TTL çıkışı', 'ortak uç (COM)'],
         scopeChannel: (label: string, n: number) => `${label} osiloskop · ${n}. kanal (CH${n})`,

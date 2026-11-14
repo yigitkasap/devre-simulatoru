@@ -4,17 +4,16 @@
 //   2. Çakışma yok: hiçbir iki parçanın gövde kutusu birbirine değmez (tahtadakiler, masadakiler, direkler).
 //   3. Tahta dışı parçalar tahtanın solunda ya da sağında (önünde değil); en büyük boyutları yarım boy tahtanın
 //      genişliğinin dörtte birini geçmez (cihazlar ve Arduino dışında).
-//   4. Bağlantı direkleri: cihaz bağlantısı olan her ağa bir direk, plakanın arka kenarında; cihaz kabloları yalnızca
-//      direklere gider; direkten ağın deliğine bir tel; bir delikte tek şey; teller ve köprüler hiçbir şeyin içinden
-//      geçmez.
+//   4. Bağlantı direkleri: bağlı her alet ucuna bir direk ("tahta düzeni", 2026-11-14; ayrıntısı tahta-duzen.test.ts),
+//      plakanın arka kenarında; cihaz kabloları yalnızca direklere gider; direkten o ucun deliğine bir tel; bir
+//      delikte tek şey; teller ve köprüler hiçbir şeyin içinden geçmez.
 
 import { describe, expect, it } from 'vitest';
 import { Box3, Vector3 } from 'three';
 import { BB, SIDE_MAX, boardWidth, boardZ, holeXZ, isSidePart, planBreadboard, type BreadboardPlan, type Hole } from '../src/bench3d/breadboard';
 import { JUMPER_RADIUS, jumperLift } from '../src/bench3d/breadboardModel';
-import { conductorOf } from '../src/bench3d/holes';
 import { boardPrims, primsOverlap, type BoardBody, type Prim } from '../src/bench3d/jumpers';
-import { CABLE, INSTRUMENTS, POST, POST_WIRE, flowPlan, holesUsed, instrumentLeads, layoutPosts, plateRect } from '../src/bench3d/posts';
+import { CABLE, INSTRUMENTS, POST, POST_WIRE, holesUsed, instrumentLeads, layoutPosts, plateRect, postKey } from '../src/bench3d/posts';
 import { EXAMPLE_IDS, exampleDoc } from '../src/examples';
 import { buildFromPlan } from '../src/model/build';
 import type { CircuitDoc } from '../src/model/types';
@@ -139,21 +138,19 @@ describe('3B: okunurluk önce', () => {
     expect(bad.slice(0, 40)).toEqual([]);
   });
 
-  it('bağlantı direkleri: cihaz bağlantısı olan her ağa bir direk, plakanın arka kenarında bir sırada; kablolar yalnızca direklere', () => {
+  it('bağlantı direkleri: bağlı her alet ucuna bir direk, plakanın arka kenarında bir sırada; kablolar yalnızca direklere', () => {
     let total = 0;
     for (const { id, doc, plan, posts } of docs) {
       const leads = instrumentLeads(doc, plan);
-      const nets = new Set(leads.map((i) => plan.leads[i]!.net));
-      expect(posts.posts.map((p) => p.net).sort(), id).toEqual([...nets].sort());
+      // Her alet ucunun kendi direği ve kendi kablosu (direkte tek fiş).
+      expect(posts.posts.map((p) => postKey(p)).sort(), id).toEqual(leads.map((i) => `${plan.leads[i]!.partId}#${plan.leads[i]!.pin}`).sort());
       total += posts.posts.length;
-      // Her cihaz kablosu kendi ağının direğinde; aynı direkte katlar 0, 1, 2…
       expect(posts.cables.length, id).toBe(leads.length);
-      for (const c of posts.cables) expect(posts.posts[c.post]!.net, id).toBe(c.net);
-      posts.posts.forEach((_, k) => {
-        const levels = posts.cables.filter((c) => c.post === k).map((c) => c.level).sort((a, b) => a - b);
-        expect(levels, id).toEqual(levels.map((_, i) => i));
+      posts.cables.forEach((c, k) => {
+        const post = posts.posts[c.post]!;
+        expect([post.partId, post.pin, post.net, c.level, c.post], id).toEqual([c.partId, c.pin, c.net, 0, k]);
       });
-      // Bir sırada, arka kenarın gerisinde, plakanın içinde, aralarında en az POST.spacing; soldan sağa tellerinin sırasıyla.
+      // Bir sırada, arka kenarın gerisinde, plakanın içinde; soldan sağa tellerinin sırasıyla; aralık en az POST.tight.
       const plate = plateRect(plan.cols, boardZ(plan.boards - 1) + BB.depth / 2);
       for (const p of posts.posts) {
         expect(p.z, id).toBeCloseTo(-BB.depth / 2 - POST.behind, 6);
@@ -161,13 +158,13 @@ describe('3B: okunurluk önce', () => {
         expect(p.x + POST.radius, id).toBeLessThan(plate.x1);
         expect(p.z - POST.radius, id).toBeGreaterThan(plate.z0);
         expect(p.name.length, `${id} ${p.name}`).toBeGreaterThan(0);
-        expect(p.name.length, `${id} ${p.name}`).toBeLessThanOrEqual(8);
+        expect(p.name.length, `${id} ${p.name}`).toBeLessThanOrEqual(10);
       }
-      for (let k = 1; k < posts.posts.length; k++) expect(posts.posts[k]!.x - posts.posts[k - 1]!.x, id).toBeGreaterThanOrEqual(POST.spacing - 1e-9);
+      for (let k = 1; k < posts.posts.length; k++) expect(posts.posts[k]!.x - posts.posts[k - 1]!.x, id).toBeGreaterThanOrEqual(POST.tight - 1e-9);
       // Adlar örnek içinde tekil.
       expect(new Set(posts.posts.map((p) => p.name)).size, `${id}: ${posts.posts.map((p) => p.name).join(', ')}`).toBe(posts.posts.length);
     }
-    expect(total).toBeGreaterThan(150);
+    expect(total).toBeGreaterThan(380);
   });
 
   it('renkler: toprak kabloları siyah; güç kaynağı + ve üreteç çıkışı kırmızı; osiloskop CH1 sarı, CH2 mavi; tel direğinin renginde', () => {
@@ -190,47 +187,38 @@ describe('3B: okunurluk önce', () => {
         checked++;
       }
       for (const w of posts.wires) expect(w.color, id).toBe(posts.posts[w.post]!.color);
-      for (const p of posts.posts) if (plan.roles.get(p.net) === 'ground') expect([p.name, p.color], id).toEqual(['GND', CABLE.black]);
+      for (const p of posts.posts) if (plan.roles.get(p.net) === 'ground') expect(p.color, id).toBe(CABLE.black);
     }
     expect(checked).toBeGreaterThan(200);
   });
 
-  it('direkten tahtaya tel: şemada direk başına bir tel, ağın kendi iletkenine, kısa ve kartın hemen üstünde; köprüler ince ve alçak', () => {
+  it('direkten tahtaya tel: direk başına bir tel, o ucun deliğine, kartın hemen üstünde; izler arka kanala sığar; köprüler ince ve alçak', () => {
     expect(POST_WIRE.radius * 2 * 2.54).toBeLessThanOrEqual(0.65);
     expect(JUMPER_RADIUS * 2 * 2.54).toBeLessThanOrEqual(0.65);
     // En uzun köprü (30 delik) bile kartın 5 mm üstünü geçmez; kısa köprü 1 mm.
     expect(jumperLift(new Vector3(0, 0, 0), new Vector3(30, 0, 0)) * 2.54).toBeLessThanOrEqual(5);
     expect(jumperLift(new Vector3(0, 0, 0), new Vector3(2, 0, 0)) * 2.54).toBeLessThanOrEqual(1.1);
     let total = 0;
-    let front = 0;
-    for (const { id, doc, plan, posts } of docs) {
+    for (const { id, plan, posts } of docs) {
       expect(posts.wires.length, id).toBe(posts.posts.length);
-      const netOfConductor = new Map<string, string>();
-      for (const p of plan.onBoard.values()) p.holes.forEach((h, i) => netOfConductor.set(conductorOf(h), plan.netOf.get(`${p.partId}#${i}`) ?? ''));
-      for (const l of plan.leads) netOfConductor.set(conductorOf(l.hole), l.net);
       posts.wires.forEach((w, k) => {
+        const post = posts.posts[k]!;
         expect(w.post, id).toBe(k);
-        expect(netOfConductor.get(conductorOf(w.hole)), `${id} ${posts.posts[k]!.name}`).toBe(w.net);
+        // Tel, planın o alet ucuna verdiği deliğe gider.
+        const lead = plan.leads[w.leads[0]!]!;
+        expect([lead.partId, lead.pin], `${id} ${post.name}`).toEqual([post.partId, post.pin]);
+        expect(w.hole, `${id} ${post.name}`).toEqual(lead.hole);
         const pts = w.points;
-        // Yatık: kartın en çok 1 mm üstünde; tahtanın arka yarısına (ray ya da a–e satırları) iner.
+        // Yatık: kartın en çok 1 mm üstünde.
         expect(Math.max(...pts.map((p) => p.y)) - BB.height, id).toBeLessThanOrEqual(0.4);
         const length = pts.slice(1).reduce((sum, b, i) => sum + b.distanceTo(pts[i]!), 0);
-        expect(length, `${id} ${posts.posts[k]!.name}`).toBeLessThanOrEqual(POST.behind + BB.depth / 2 + boardWidth(plan.cols) / 2);
-        // Ağın arka yarıda (ray ya da a–e) deliği yoksa tel ön yarıya (f–j) iner: nadir, sütunların arasından gider.
+        expect(length, `${id} ${post.name}`).toBeLessThanOrEqual(POST.behind + BB.depth + boardWidth(plan.cols) / 2);
+        // İz, direklerin tabanı ile tahtanın arka kenarı arasındaki kanalın içinde (sıkışıp üst üste binmez).
+        expect(-BB.depth / 2 - 0.75 - 0.36 * w.track, `${id} ${post.name}: iz ${w.track}`).toBeGreaterThanOrEqual(post.z + POST.radius + 0.45 - 1e-9);
         total++;
-        if (pts[pts.length - 1]!.z >= boardZ(0)) {
-          front++;
-          // Ön yarıya inen tel orta kanalın hemen ötesinde biter (ilk breadboard'un f ya da g satırı).
-          expect(w.hole.kind === 'strip' && w.hole.board === 0 && w.hole.row <= 6, `${id} ${posts.posts[k]!.name}`).toBe(true);
-        }
       });
-      // Akım noktaları: cihaz kablolarının akımı telin deliğinden girer.
-      const flow = flowPlan(plan, posts);
-      for (const w of posts.wires) for (const i of w.leads) expect(flow.leads[i]!.hole, id).toEqual(w.hole);
-      void doc;
     }
-    expect(total).toBeGreaterThan(150);
-    expect(front / total).toBeLessThan(0.15);
+    expect(total).toBeGreaterThan(380);
   });
 
   it('bir delikte tek şey; teller, köprüler, fişler ve parça gövdeleri birbirinin içine girmez (81 örnek)', () => {
@@ -240,7 +228,7 @@ describe('3B: okunurluk önce', () => {
       if (new Set(used).size !== used.length) bad.push(`${id}: bir delikte iki şey`);
       const bodies = new Map<string, BoardBody>(parts.filter((p) => p.onBoard).map((p) => [p.id, { body: p.body }]));
       const wires = posts.wires.map((w) => w.points);
-      const prims = boardPrims(plan, bodies, new Set(instrumentLeads(doc, plan)), posts.hidden, wires);
+      const prims = boardPrims(plan, bodies, new Set(instrumentLeads(doc, plan)), undefined, wires);
       const hits = new Set<string>();
       for (let i = 0; i < prims.length; i++) {
         for (let k = i + 1; k < prims.length; k++) {
@@ -289,11 +277,13 @@ describe('3B: okunurluk önce', () => {
     expect(titles.get('role:K1 NA')).toBe('K1 röle · normalde açık uç');
     expect(titles.get('role:K1 NK')).toBe('K1 röle · normalde kapalı uç');
     expect(titles.get('adaptor:T1 S1')).toBe('T1 trafo · sekonder 1');
-    expect(titles.get('led-on-direnc:GND')).toBe('GND · toprak (ortak uç)');
-    expect(titles.get('led-on-direnc:+5 V')).toBe('B1 pil · + uç (5 V)');
-    expect(titles.get('role-transistor:+12 V')).toBe('PS1 güç kaynağı · + çıkış (12 V)');
-    expect(titles.get('toprak-tuzagi:GİRİŞ')).toBe('FG1 fonksiyon üreteci · çıkış (OUT)');
+    expect(titles.get('led-on-direnc:B1 −')).toBe('B1 pil · − uç');
+    expect(titles.get('led-on-direnc:B1 +')).toBe('B1 pil · + uç (5 V)');
+    expect(titles.get('role-transistor:PS1 +')).toBe('PS1 güç kaynağı · + çıkış (12 V)');
+    expect(titles.get('toprak-tuzagi:FG1 OUT')).toBe('FG1 fonksiyon üreteci · çıkış (OUT)');
     expect(titles.get('rc-kare-dalga:CH1')).toBe('OSC1 osiloskop · 1. kanal (CH1)');
+    expect(titles.get('diyot-dc:V1 +')).toBe('V1 voltmetre · + uç');
+    expect(titles.get('diyot-dc:A1 −')).toBe('A1 ampermetre · − uç');
   });
 
   it('Tahtada kur kurulumu: direkler şemanın planındaki yerde; takılı her cihaz kablosu için direkten o deliğe bir tel', () => {
@@ -301,21 +291,20 @@ describe('3B: okunurluk önce', () => {
     for (const { id, doc, plan, posts } of docs) {
       const build = buildFromPlan(plan);
       const built = planFromBuild(doc, build, plan);
-      const layout = layoutPosts(doc, built, plan, false);
+      const layout = layoutPosts(doc, built, plan);
       expect(layout.posts, id).toEqual(posts.posts);
       const leads = instrumentLeads(doc, built);
       expect(layout.wires.length, id).toBe(leads.length);
       for (const w of layout.wires) expect(built.leads[w.leads[0]!]!.hole, id).toEqual(w.hole);
-      expect(layout.hidden.size, id).toBe(0);
       wires += layout.wires.length;
       // Boş kurulum: bütün cihaz kabloları direğinde, tel yok.
       const empty = planFromBuild(doc, { ...build, parts: {}, wires: [], leads: [] }, plan);
-      const loose = layoutPosts(doc, empty, plan, false);
+      const loose = layoutPosts(doc, empty, plan);
       expect(loose.wires.length, id).toBe(0);
       expect(loose.cables.length, id).toBe(posts.cables.length);
       expect(loose.cables.every((c) => c.lead === null), id).toBe(true);
     }
-    expect(wires).toBeGreaterThan(200);
+    expect(wires).toBeGreaterThan(380);
   });
 });
 

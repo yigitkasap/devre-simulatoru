@@ -2,7 +2,7 @@
 // aynı, dışarı giden her tel bir klemens pedi, pedler kartın içinde ve birbirine değmiyor.
 
 import { describe, expect, it } from 'vitest';
-import { planBreadboard } from '../src/bench3d/breadboard';
+import { planCard } from '../src/bench3d/breadboard';
 import { boardSize, boxOf, designPcb, kicadPcb, kicadProject, kicadZip, padNumber, slug } from '../src/bench3d/kicad';
 import { crc32 } from '../src/bench3d/zip';
 import { EXAMPLE_IDS, exampleDoc } from '../src/examples';
@@ -102,7 +102,7 @@ describe('PCB aktarımı (KiCad)', () => {
   for (const id of EXAMPLE_IDS) {
     it(`${id}: KiCad dosyası geçerli, ağlar yerleşimle aynı, pedler kartta ve ayrık`, () => {
       const doc = exampleDoc(id)!;
-      const plan = planBreadboard(doc);
+      const plan = planCard(doc);
       const result = designPcb(doc, plan);
       if (doc.parts.some((p) => p.type === 'transformer')) {
         expect(result.ok).toBe(false);

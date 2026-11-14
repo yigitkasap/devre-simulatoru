@@ -1,4 +1,4 @@
-// Karta aktar penceresinin verisi (saf fonksiyonlar). Hesap kodu (planBreadboard, buildSolderGuide,
+// Karta aktar penceresinin verisi (saf fonksiyonlar). Hesap kodu (planCard, buildSolderGuide,
 // designPcb, routePcb, checkPcb) değişmez; burada onların çıktısı pencerenin göstereceği biçime çevrilir:
 // - Delikli plaket: rehberin her adımının plandaki karşılığı (jumper, parça, dış tel ve delikleri),
 //   adımın deliklerinin kısa adları ve kutup işaretleri ("+ 10c", "− 11c"), takma sırasının grupları.

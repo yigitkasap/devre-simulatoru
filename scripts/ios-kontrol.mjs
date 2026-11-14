@@ -6465,10 +6465,13 @@ try {
   }
   // --- 3B bağlantı direkleri ("3B: okunurluk önce", 2026-11-12) -------------------------------------------------
   // Tahtanın altında ince bir taban plakası, plakanın arka kenarında (cihazlara bakan yanda) bir sıra bağlantı direği.
-  // Cihaz bağlanan her ağa bir direk; ortak ağ (GND) tek direkte, muz fişler üst üste. Cihaz kabloları yalnızca
-  // direklere takılır: tahtanın üstünden ya da önünden geçmez, timsah kıskaç ve kısa test teli yok. Direkten ağın
-  // tahtadaki deliğine kablonun renginde kısa, yatık bir tel gider. Direğin üstünde kısa ağ adı (GND, +12 V, CH1,
-  // GİRİŞ…). Renkler: CH1 sarı, CH2 mavi, üreteç çıkışı kırmızı, güç kaynağı + kırmızı, bütün toprak kabloları siyah.
+  // "Tahta düzeni" (2026-11-14): direkler ağa göre değil, alet ucuna göre. Bağlı her alet ucunun kendi direği, kendi
+  // kablosu ve tahtaya kendi teli var (aynı ağa giden iki alet ucu ayrı direklerde); direğin adı alet ucunun adı
+  // (PS1 +, A1 −, V1 +, CH1, CH toprak, FG1 OUT…). Tel, şemada bağlı olduğu bacağın şeridine iner. Cihaz kabloları
+  // yalnızca direklere takılır: tahtanın üstünden ya da önünden geçmez. Renkler: CH1 sarı, CH2 mavi, üreteç çıkışı
+  // kırmızı, güç kaynağı + kırmızı, bütün toprak kabloları siyah.
+  // Değişti (2026-11-14): eskiden her ağa bir direk vardı (ortak toprak tek direkte üst üste fişler, adlar GND,
+  // +12 V, GİRİŞ); şimdi her alet ucuna bir direk.
   // Değişti (2026-11-12): eskiden bu bölüm timsah kıskaçları (kendi kısa telinde, yatay, ağız ≥ 8 mm) ve "GND · 3
   // kablo" birleşme etiketini denetliyordu; kıskaçlar kaldırıldı.
   {
@@ -6484,7 +6487,7 @@ try {
       return page.evaluate(() => {
         const t = window.__tezgah;
         const r = t.postReport();
-        const labels = [...document.querySelectorAll('[data-anchor="post"]')].map((e) => ({ net: e.dataset.net, text: e.textContent, shown: getComputedStyle(e).opacity === '1' }));
+        const labels = [...document.querySelectorAll('[data-anchor="post"]')].map((e) => ({ net: e.dataset.net, post: e.dataset.post, text: e.textContent, shown: getComputedStyle(e).opacity === '1' }));
         const cables = r.cables.map((c) => ({ ...c, type: t.parts.get(c.part)?.part.type ?? '' }));
         const clips = t.cables.children.filter((c) => c.userData.clipPart || c.userData.clip).length;
         return { ...r, cables, labels, clips };
@@ -6494,43 +6497,76 @@ try {
     const yd = await report('yarim-dalga');
     const bj = await report('bjt-yukseltec-kuplajli');
     const all = [jf, yd, bj];
-    const names = (r) => r.posts.map((p) => p.name).join(', ');
-    const gnd = (r) => r.posts.find((p) => p.name === 'GND');
-    const tidy = (r) => r.doubled === 0 && r.overBoard === 0 && r.clips === 0 && r.hidden === 0 && r.wires.length === r.posts.length &&
-      r.cables.length === r.posts.reduce((n, p) => n + p.cables, 0) && r.posts.every((p) => p.visible && p.cables >= 1) && new Set(r.posts.map((p) => p.net)).size === r.posts.length;
-    check('3B direkler (BF245A, yarım dalga, BC107 kuplajlı): cihaz bağlanan her ağa bir direk (5, 3, 5), ortak toprak tek direkte üst üste (3, 2, 3 kablo); hiçbir delikte iki şey yok; cihaz kablosu tahtanın üstünden ya da önünden geçmiyor; kıskaç yok; direklerin hepsi varsayılan kamerada görünüyor',
-      all.every(tidy) && jf.posts.length === 5 && yd.posts.length === 3 && bj.posts.length === 5 && gnd(jf)?.cables === 3 && gnd(yd)?.cables === 2 && gnd(bj)?.cables === 3 && jf.cables.length === 8 && yd.cables.length === 5 && bj.cables.length === 7,
-      all.map((r) => `${r.posts.length} direk · ${r.cables.length} kablo · GND ${gnd(r)?.cables} · iki şey ${r.doubled} · tahta üstünde ${r.overBoard} · kıskaç ${r.clips} · görünmeyen ${r.posts.filter((p) => !p.visible).length}`).join(' | '));
-    check('3B direk adları: direğin üstünde kısa ağ adı (BF245A: +10 V, GND, PS1 −, A1 +, A1 −; yarım dalga: GİRİŞ, GND, CH2; BC107: GİRİŞ, +12 V, GND, CH1, CH2), etiketler görünür',
-      names(jf) === '+10 V, GND, PS1 −, A1 +, A1 −' && names(yd) === 'GİRİŞ, GND, CH2' && names(bj) === 'GİRİŞ, +12 V, GND, CH1, CH2' &&
-        all.every((r) => r.labels.length === r.posts.length && r.labels.every((l) => l.shown && r.posts.some((p) => p.net === l.net && p.name === l.text))),
+    const names = (r) => r.posts.map((p) => p.name).sort().join(', ');
+    const tidy = (r) => r.doubled === 0 && r.overBoard === 0 && r.clips === 0 && r.wires.length === r.posts.length && r.cables.length === r.posts.length &&
+      r.posts.every((p) => p.visible && p.cables === 1) && new Set(r.posts.map((p) => p.key)).size === r.posts.length;
+    /** Aynı ağa giden alet uçları ayrı direklerde: en kalabalık ağdaki direk sayısı. */
+    const shared = (r) => Math.max(0, ...[...new Set(r.posts.map((p) => p.net))].map((net) => r.posts.filter((p) => p.net === net).length));
+    check('3B direkler (BF245A, yarım dalga, BC107 kuplajlı): bağlı her alet ucuna bir direk (8, 5, 7), her direkte tek fiş ve tahtaya tek tel; aynı ağa giden uçlar ayrı direklerde; hiçbir delikte iki şey yok; cihaz kablosu tahtanın üstünden ya da önünden geçmiyor; kıskaç yok; direklerin hepsi varsayılan kamerada görünüyor',
+      all.every(tidy) && jf.posts.length === 8 && yd.posts.length === 5 && bj.posts.length === 7 && all.every((r) => shared(r) >= 2),
+      all.map((r) => `${r.posts.length} direk · ${r.cables.length} kablo · ${r.wires.length} tel · aynı ağda en çok ${shared(r)} direk · iki şey ${r.doubled} · tahta üstünde ${r.overBoard} · kıskaç ${r.clips} · görünmeyen ${r.posts.filter((p) => !p.visible).length}`).join(' | '));
+    check('3B direk adları: direğin üstünde alet ucunun adı (BF245A: A1 +, A1 −, PS1 1+, PS1 1−, PS1 2+, PS1 2−, V1 +, V1 −; yarım dalga: CH toprak, CH1, CH2, FG1 COM, FG1 OUT; BC107: CH toprak, CH1, CH2, FG1 COM, FG1 OUT, PS1 +, PS1 −), etiketler görünür',
+      names(jf) === 'A1 +, A1 −, PS1 1+, PS1 1−, PS1 2+, PS1 2−, V1 +, V1 −' && names(yd) === 'CH toprak, CH1, CH2, FG1 COM, FG1 OUT' && names(bj) === 'CH toprak, CH1, CH2, FG1 COM, FG1 OUT, PS1 +, PS1 −' &&
+        all.every((r) => r.labels.length === r.posts.length && r.labels.every((l) => l.shown && r.posts.some((p) => p.key === l.post && p.name === l.text))),
       all.map((r) => r.labels.map((l) => `${l.text}${l.shown ? '' : ' (gizli)'}`).join(', ')).join(' | '));
+    // Tahta düzeni (1N4001 DC: PS1+ → D1 → A1 → R1 → GND, V1 dirence paralel): seri yol aynı yarıda soldan sağa,
+    // ampermetrenin girdiği yerde bir şerit boş; A1'in telleri iki yanındaki bacakların, V1'in telleri direncin iki
+    // bacağının şeridinde; PS1 + rayda (+), PS1 − rayda (−).
+    await page.goto('about:blank');
+    await page.goto(`${URL0}embed/?ornek=diyot-dc&gorunum=tam`, { waitUntil: 'networkidle' });
+    await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    const duzen = await page.evaluate(() => {
+      const t = window.__tezgah;
+      const plan = t.plan;
+      const r = t.postReport();
+      const leg = (label, pin) => {
+        const placed = [...t.parts.values()].find((p) => p.part.label === label);
+        return plan.onBoard.get(placed.part.id).holes[pin];
+      };
+      const wire = (name) => r.wires.find((w) => w.post === r.posts.find((p) => p.name === name)?.key)?.hole ?? null;
+      return {
+        d1: [leg('D1', 0), leg('D1', 1)], r1: [leg('R1', 0), leg('R1', 1)],
+        wires: Object.fromEntries(['PS1 +', 'PS1 −', 'A1 +', 'A1 −', 'V1 +', 'V1 −'].map((name) => [name, wire(name)])),
+        doubled: r.doubled,
+      };
+    });
+    const half = (h) => (h.kind === 'strip' ? (h.row < 5 ? 0 : 1) : -1);
+    const sameStrip = (a, b) => a && b && a.kind === 'strip' && b.kind === 'strip' && a.col === b.col && half(a) === half(b);
+    const dw = duzen.wires;
+    check('3B tahta düzeni (1N4001 DC): D1 ve R1 aynı yarıda soldan sağa, aralarında ampermetre için bir şerit boş; A1 + diyodun çıkış şeridinde, A1 − direncin giriş şeridinde; V1 + ve V1 − direncin iki bacağının şeridinde; PS1 + rayda (+), PS1 − rayda (−)',
+      new Set([...duzen.d1, ...duzen.r1].map(half)).size === 1 && duzen.d1[0].col < duzen.d1[1].col && duzen.r1[0].col === duzen.d1[1].col + 2 && duzen.r1[0].col < duzen.r1[1].col &&
+        sameStrip(dw['A1 +'], duzen.d1[1]) && sameStrip(dw['A1 −'], duzen.r1[0]) && sameStrip(dw['V1 +'], duzen.r1[0]) && sameStrip(dw['V1 −'], duzen.r1[1]) &&
+        dw['PS1 +']?.kind === 'rail' && dw['PS1 +'].rail === 0 && dw['PS1 −']?.kind === 'rail' && dw['PS1 −'].rail === 1 && duzen.doubled === 0,
+      `D1 sütun ${duzen.d1.map((h) => h.col).join('–')} · R1 sütun ${duzen.r1.map((h) => h.col).join('–')} · ${Object.entries(dw).map(([k, h]) => `${k}: ${h ? (h.kind === 'strip' ? `${h.col}${'abcdefghij'[h.row]}` : `ray ${h.rail}`) : 'yok'}`).join(' · ')}`);
     // Tahta dışı parçalar (pil, röle, motor, hoparlör): kabloları da direklere gider, plakanın yanından dolanır.
     const ro = await report('role');
     const mo = await report('dc-motor');
     const hp = await report('hoparlor');
     const sideTypes = ['battery', 'relay', 'motor', 'speaker'];
     const sideCables = (r) => r.cables.filter((c) => sideTypes.includes(c.type)).length;
-    check('3B tahta dışı parçaların kabloları da direklerde (röle, DC motor, hoparlör): pil 2, röle 5, motor 2, hoparlör 2 kablo direğe takılı; tahtanın üstünden ya da önünden kablo geçmiyor; adlar röle örneğinde +12 V, GND, A1 +, A1 −, K1 NK, K1 NA, B2 −, +9 V',
-      [ro, mo, hp].every(tidy) && sideCables(ro) === 9 && sideCables(mo) === 4 && sideCables(hp) === 2 && names(ro) === '+12 V, GND, A1 +, A1 −, K1 NK, K1 NA, B2 −, +9 V',
+    check('3B tahta dışı parçaların kabloları da direklerde (röle, DC motor, hoparlör): pil 2, röle 5, motor 2, hoparlör 2 kablo direğe takılı; tahtanın üstünden ya da önünden kablo geçmiyor; adlar röle örneğinde A1 +, A1 −, B1 +, B1 −, B2 +, B2 −, K1 C, K1 NA, K1 NK, K1 S1, K1 S2',
+      [ro, mo, hp].every(tidy) && sideCables(ro) === 9 && sideCables(mo) === 4 && sideCables(hp) === 2 && names(ro) === 'A1 +, A1 −, B1 +, B1 −, B2 +, B2 −, K1 C, K1 NA, K1 NK, K1 S1, K1 S2',
       [ro, mo, hp].map((r) => `${r.posts.length} direk · ${r.cables.length} kablo (tahta dışı ${sideCables(r)}) · tahta üstünde ${r.overBoard} · ${names(r)}`).join(' | '));
     // Renkler: toprak direğine giden her kablo siyah; öbürleri cihazın ucuna göre.
     const RED = '#d22f27'; const BLACK = '#1b1c1f'; const YELLOW = '#f2c230'; const BLUE = '#2f6fd6';
     const colorOk = (r) => r.cables.every((c) => {
-      const ground = r.posts.find((p) => p.net === c.net)?.name === 'GND';
+      const ground = r.posts.find((p) => p.key === `${c.part}#${c.pin}`)?.ground;
       if (ground) return c.color === BLACK;
       if (c.type === 'oscilloscope') return c.color === [YELLOW, BLUE, BLACK][c.pin];
       if (c.type === 'funcgen') return c.pin === 0 ? c.color === RED : true;
       if (c.type === 'dcsupply') return c.color === [RED, BLACK][c.pin % 2];
       return c.color === [RED, BLACK][c.pin];
     });
-    const wireOk = (r) => r.wires.every((w, k) => w.color === r.posts[k].color && w.mm <= 80);
+    // Tel direğinin renginde; ön yarıdaki bacağa inen tel tahtayı boydan geçer (en çok 110 mm).
+    const wireOk = (r) => r.wires.every((w) => w.color === r.posts.find((p) => p.key === w.post)?.color && w.mm <= 110);
     const scope = (r, pin) => r.cables.find((c) => c.type === 'oscilloscope' && c.pin === pin)?.color;
-    check('3B kablo renkleri: osiloskop CH1 sarı, CH2 mavi; üreteç çıkışı ve güç kaynağı + kırmızı; bütün toprak kabloları siyah; direkten tahtaya tel direğin renginde ve kısa (≤ 80 mm)',
+    check('3B kablo renkleri: osiloskop CH1 sarı, CH2 mavi; üreteç çıkışı ve güç kaynağı + kırmızı; bütün toprak kabloları ve direkleri siyah; direkten tahtaya tel direğin renginde (≤ 110 mm)',
       all.every((r) => colorOk(r) && wireOk(r)) && scope(bj, 0) === YELLOW && scope(bj, 1) === BLUE && scope(yd, 0) === YELLOW && scope(yd, 1) === BLUE &&
-        bj.cables.some((c) => c.type === 'funcgen' && c.pin === 0 && c.color === RED) && bj.cables.some((c) => c.type === 'dcsupply' && c.pin === 0 && c.color === RED) && gnd(bj)?.color === BLACK,
+        bj.cables.some((c) => c.type === 'funcgen' && c.pin === 0 && c.color === RED) && bj.cables.some((c) => c.type === 'dcsupply' && c.pin === 0 && c.color === RED) &&
+        all.every((r) => r.posts.some((p) => p.ground) && r.posts.filter((p) => p.ground).every((p) => p.color === BLACK)),
       all.map((r) => `${r.cables.map((c) => `${c.type.slice(0, 4)}${c.pin}:${c.color}`).join(' ')} · en uzun tel ${Math.max(...r.wires.map((w) => w.mm)).toFixed(0)} mm`).join(' | '));
-    // Fare GND direğinin üstüne gelince GND ağı vurgulanır (direk, fişleri, kabloları, teli).
+    // Fare bir toprak direğinin (PS1 1−) üstüne gelince toprak ağı vurgulanır (o ağın bütün direkleri, fişleri, kabloları, telleri); yalnızca üstüne gelinen direğin açık adı görünür.
     await page.goto(`${URL0}embed/?ornek=jfet-karakteristik`, { waitUntil: 'networkidle' });
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(800);
@@ -6539,7 +6575,7 @@ try {
       const c = document.querySelector('canvas').getBoundingClientRect();
       return post ? { net: post.net, x: c.left + post.x, y: c.top + post.y } : null;
     }, name);
-    const at = await postAt(page, 'GND');
+    const at = await postAt(page, 'PS1 1−');
     let lit = { net: null };
     for (let dy = 0; dy < 30 && !lit.net && at; dy += 3) {
       await page.mouse.move(at.x, at.y + dy); await page.waitForTimeout(120);
@@ -6551,7 +6587,7 @@ try {
     await page.mouse.move(5, 300); await page.waitForTimeout(300);
     const gndClosed = await openLabel(page);
     const off = await page.evaluate(() => window.__tezgah.netHighlight());
-    check('3B ağ vurgusu (masaüstü, BF245A): fare GND direğinin üstüne gelince GND kabloları parlıyor, öbürleri soluk, bacağı işaretli; küçük şemada düğümün kabloları vurgulu; fare çekilince kalkıyor',
+    check('3B ağ vurgusu (masaüstü, BF245A): fare PS1 1− direğinin üstüne gelince toprak ağının kabloları parlıyor, öbürleri soluk, bacağı işaretli; küçük şemada düğümün kabloları vurgulu; fare çekilince kalkıyor',
       at !== null && lit.net === at.net && lit.lit >= 4 && lit.dim >= 4 && lit.legs >= 1 && mini >= 1 && off.net === null && off.lit === 0 && off.dim === 0,
       `${lit.net} · parlak ${lit.lit} · soluk ${lit.dim} · bacak ${lit.legs} · küçük şema ${mini} · sonra ${off.net}`);
     // Açık ad: direğin üstüne gelince kısa adın yerine cihazın ya da parçanın adı, türü ve ucun açık adı.
@@ -6559,7 +6595,7 @@ try {
     await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(800);
     const opened = {};
-    for (const name of ['K1 NA', 'B2 −', '+12 V']) {
+    for (const name of ['K1 NA', 'B2 −', 'B1 +']) {
       const q = await postAt(page, name);
       opened[name] = '';
       for (let dy = 0; dy < 30 && !opened[name] && q; dy += 3) {
@@ -6568,10 +6604,10 @@ try {
       }
       await page.mouse.move(5, 300); await page.waitForTimeout(200);
     }
-    const shortAgain = await page.evaluate(() => [...document.querySelectorAll('[data-anchor="post"]')].map((e) => e.textContent).join(', '));
-    check('3B direklerin açık adı (masaüstü): direğin üstüne gelince kısa adın yerine açık ad (GND → "GND · toprak (ortak uç)", K1 NA → "K1 röle · normalde açık uç", B2 − → "B2 pil · − uç", +12 V → "B1 pil · + uç (12 V)"); fare çekilince kısa ad geri geliyor',
-      gndOpen === 'GND · toprak (ortak uç)' && gndClosed === '' && opened['K1 NA'] === 'K1 röle · normalde açık uç' && opened['B2 −'] === 'B2 pil · − uç' && opened['+12 V'] === 'B1 pil · + uç (12 V)' &&
-        shortAgain === '+12 V, GND, A1 +, A1 −, K1 NK, K1 NA, B2 −, +9 V',
+    const shortAgain = await page.evaluate(() => [...document.querySelectorAll('[data-anchor="post"]')].map((e) => e.textContent).sort().join(', '));
+    check('3B direklerin açık adı (masaüstü): direğin üstüne gelince kısa adın yerine açık ad, yalnızca o direkte (PS1 1− → "PS1 güç kaynağı · 1. çıkış −", K1 NA → "K1 röle · normalde açık uç", B2 − → "B2 pil · − uç", B1 + → "B1 pil · + uç (12 V)"); fare çekilince kısa ad geri geliyor',
+      gndOpen === 'PS1 güç kaynağı · 1. çıkış −' && gndClosed === '' && opened['K1 NA'] === 'K1 röle · normalde açık uç' && opened['B2 −'] === 'B2 pil · − uç' && opened['B1 +'] === 'B1 pil · + uç (12 V)' &&
+        shortAgain === 'A1 +, A1 −, B1 +, B1 −, B2 +, B2 −, K1 C, K1 NA, K1 NK, K1 S1, K1 S2',
       `${gndOpen} → "${gndClosed}" | ${Object.values(opened).join(' | ')} | ${shortAgain}`);
     await ctx.close();
     // Telefonda dokununca: direğe dokunmak vurgular.
@@ -6588,8 +6624,8 @@ try {
     }
     const phoneOpen = await ph.evaluate(() => [...document.querySelectorAll('[data-anchor="post"][data-open]')].filter((e) => getComputedStyle(e).opacity === '1').map((e) => e.textContent).join(' | '));
     const phonePosts = await ph.evaluate(() => window.__tezgah.postReport().posts.map((p) => p.visible));
-    check('3B ağ vurgusu (telefon, BF245A): direğe dokununca o ağ vurgulanıyor (öbürleri soluk) ve direğin açık adı görünüyor ("A1 ampermetre · − uç"); beş direk de varsayılan kamerada görünüyor',
-      tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1 && phoneOpen === 'A1 ampermetre · − uç' && phonePosts.length === 5 && phonePosts.every(Boolean),
+    check('3B ağ vurgusu (telefon, BF245A): direğe dokununca o ağ vurgulanıyor (öbürleri soluk) ve direğin açık adı görünüyor ("A1 ampermetre · − uç"); sekiz direk de varsayılan kamerada görünüyor',
+      tapped.net !== null && tapped.lit >= 1 && tapped.dim >= 1 && phoneOpen === 'A1 ampermetre · − uç' && phonePosts.length === 8 && phonePosts.every(Boolean),
       `${tapped.net} · parlak ${tapped.lit ?? 0} · soluk ${tapped.dim ?? 0} · açık ad "${phoneOpen}" · görünen direk ${phonePosts.filter(Boolean).length}/${phonePosts.length}`);
     await ph.context().close();
   }

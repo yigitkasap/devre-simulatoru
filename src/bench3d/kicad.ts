@@ -16,7 +16,7 @@ import { tr } from '../i18n/tr';
 import { pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import { strProp, type DeviceType } from '../sim/netlist';
-import { dipPins, dipShape, holeXZ, planBreadboard, type BreadboardPlan, type Hole } from './breadboard';
+import { dipPins, dipShape, holeXZ, planCard, type BreadboardPlan, type Hole } from './breadboard';
 import { LOGIC_CHIPS, isLogicChip } from '../model/logicChips';
 import { RULES, routePcb, type Routing } from './router';
 import { makeZip } from './zip';
@@ -211,7 +211,7 @@ function rectSilk(x0: number, y0: number, x1: number, y1: number): Array<readonl
   ];
 }
 
-export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planBreadboard(doc)): PcbResult {
+export function designPcb(doc: CircuitDoc, plan: BreadboardPlan = planCard(doc)): PcbResult {
   if (doc.parts.some((p) => p.type === 'transformer')) return { ok: false, reason: tr.pcb.mains };
   const at = (h: Hole) => {
     const { x, z } = holeXZ(h, plan.cols);

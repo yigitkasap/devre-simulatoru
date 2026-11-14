@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { addedParts, footprintTip, holeLabels, missingConnections, perfboardInfo, shortHole, stepGroups, stepRef, stepTargets, stepWarning } from '../src/bench3d/boardData';
 import { nearestEdge } from '../src/bench3d/boardModels';
-import { planBreadboard } from '../src/bench3d/breadboard';
+import { planCard } from '../src/bench3d/breadboard';
 import { buildSolderGuide } from '../src/bench3d/guide';
 import { designPcb } from '../src/bench3d/kicad';
 import { routePcb } from '../src/bench3d/router';
@@ -12,7 +12,7 @@ import { EXAMPLE_IDS, exampleDoc } from '../src/examples';
 
 const perf = (id: (typeof EXAMPLE_IDS)[number]) => {
   const doc = exampleDoc(id)!;
-  const plan = planBreadboard(doc);
+  const plan = planCard(doc);
   const guide = buildSolderGuide(doc, plan);
   return { doc, plan, guide, targets: stepTargets(doc, plan, guide) };
 };

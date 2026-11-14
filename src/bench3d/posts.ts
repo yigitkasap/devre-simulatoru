@@ -1,13 +1,13 @@
 // Bağlantı direkleri (three'nin yalnızca matematik sınıfları, DOM yok). "3B: okunurluk önce" (2026-11-12):
-// laboratuvar cihazlarının kabloları tahtaya gelmez. Tahta ince bir taban plakasına oturur; plakanın arka
-// kenarında (cihazlara bakan yanda) bir sıra bağlantı direği vardır. Cihaz bağlantısı gereken her ağa bir direk;
-// aynı ağa giden kablolar (ör. GND) aynı direğe üst üste takılır (muz fişler). Direkten ağın deliğine kısa, düz,
-// tahtaya yatık bir köprü teli gider.
+// laboratuvar cihazlarının ve tahta dışı parçaların kabloları tahtaya gelmez. Tahta ince bir taban plakasına oturur;
+// plakanın arka kenarında (cihazlara bakan yanda) bir sıra bağlantı direği vardır.
 //
-// Planın (planBreadboard) delikleri değişmez: tel, planın o ağın cihaz kablolarına ayırdığı deliklerden arka kenara
-// en yakın olanına gider; öbür cihaz kablolarının delikleri 3B'de boş kalır (yalnızca onları ağa bağlayan köprüler
-// de çizilmez). Tahtada kur kurulumunda (öğrencinin taktığı delikler) takılı her cihaz kablosu için direkten o
-// deliğe bir tel çizilir; takılmamış kablonun direği telsizdir. Direkler ve teller şemaya ve KiCad'e girmez.
+// "Tahta düzeni" (2026-11-14): direkler ağa göre değil, alet ucuna göre açılır. Bağlı her alet ucunun kendi direği,
+// kendi kablosu ve direkten tahtaya kendi teli vardır; direğin adı alet ucunun adıdır (PS1 +, A1 −, V1 +, CH1,
+// CH1 toprak…). Aynı ağa giden iki alet ucu ayrı direklerde durur: voltmetrenin dirence paralel, ampermetrenin
+// seri bağlandığı tahtada görünür. Tel, planın (planBreadboard) o uca verdiği deliğe gider: şemada bağlı olduğu
+// bacağın şeridi. Tahtada kur kurulumunda tel, öğrencinin kabloyu taktığı deliğe gider; takılmamış kablonun direği
+// telsizdir. Direkler ve teller şemaya ve KiCad'e girmez.
 
 import { Vector3 } from 'three';
 import { tr } from '../i18n/tr';
@@ -15,7 +15,6 @@ import { pinKey } from '../model/connectivity';
 import type { CircuitDoc, Part } from '../model/types';
 import { numProp, type DeviceType } from '../sim/netlist';
 import { BB, boardWidth, holeXZ, isSidePart, type BreadboardPlan, type Hole } from './breadboard';
-import { holeGroup } from './cableFlow';
 
 /** Kabloları bağlantı direğine giden laboratuvar cihazları (ön panelinde muz ya da BNC soketi olanlar). */
 export const INSTRUMENTS: ReadonlySet<DeviceType> = new Set(['dcsupply', 'funcgen', 'oscilloscope', 'voltmeter', 'ammeter', 'multimeter']);
@@ -33,8 +32,8 @@ export const posted = (type: DeviceType): boolean => INSTRUMENTS.has(type) || is
  */
 export const CABLE = { black: '#1b1c1f', red: '#d22f27', yellow: '#f2c230', blue: '#2f6fd6', orange: '#f08a24', green: '#2f9e5b', purple: '#8e5bd1', white: '#e9ecef' } as const;
 
-/** Direk (birim; 1 = 2,54 mm): yarıçap, tepesinin yüksekliği, tahtanın arka kenarından uzaklığı, direkler arası en az aralık. */
-export const POST = { radius: 0.55, top: BB.height + 1.1, behind: 3.6, spacing: 3 } as const;
+/** Direk (birim; 1 = 2,54 mm): yarıçap, tepesinin yüksekliği, tahtanın arka kenarından uzaklığı, direkler arası aralık (rahat ve en dar). */
+export const POST = { radius: 0.55, top: BB.height + 1.1, behind: 3.6, spacing: 3, tight: 2 } as const;
 /** Üst üste takılan muz fiş: yarıçap ve boy (bir sonraki fiş bunun üstüne takılır). */
 export const BANANA = { radius: 0.42, height: 1.25 } as const;
 /** Direkten tahtaya giden tel: yarıçap (Ø ≈ 0,6 mm) ve kartın üstünden yüksekliği. */
@@ -46,11 +45,14 @@ const WIRE_TRACK = 0.36;
 
 export interface Post {
   readonly net: string;
-  /** Direğin üstündeki kısa ad (GND, +12 V, CH1, GİRİŞ…). */
+  /** Direğe takılan alet ucu. */
+  readonly partId: string;
+  readonly pin: number;
+  /** Direğin üstündeki kısa ad: alet ucunun adı (PS1 +, A1 −, V1 +, CH1, CH1 toprak, FG1 OUT…). */
   readonly name: string;
   /** Açık ad: direğe dokununca ya da üstüne gelince görünür ("K1 röle · normalde açık uç", "T1 trafo · sekonder 1"). */
   readonly title: string;
-  /** Direğin ve tahtaya giden telin rengi (adı veren kablonun rengi). */
+  /** Direğin ve tahtaya giden telin rengi (kablosunun rengi). */
   readonly color: string;
   /** Direğin ekseni (dünya): x ve z. */
   readonly x: number;
@@ -62,7 +64,7 @@ export interface PostCable {
   readonly pin: number;
   readonly net: string;
   readonly color: string;
-  /** `posts` sırası ve fişin direkteki katı (0: direğe takılı, 1: onun üstünde…). */
+  /** `posts` sırası; fişin direkteki katı (her direkte tek fiş: 0). */
   readonly post: number;
   readonly level: number;
   /** plan.leads sırası (akım noktaları); Tahtada kur'da takılmamış kabloda null. */
@@ -74,19 +76,22 @@ export interface PostWire {
   readonly net: string;
   readonly hole: Hole;
   readonly color: string;
-  /** Bu telden akan cihaz kabloları (plan.leads sırası). */
+  /** Bu telden akan cihaz kablosu (plan.leads sırası; tek eleman). */
   readonly leads: readonly number[];
   /** Telin köşe noktaları (dünya): direğin önünden kartın hemen üstünde gider, deliğe iner. */
   readonly points: readonly Vector3[];
+  /** Direk sırası ile tahtanın arka kenarı arasındaki kanalda telin izi (0: tahtaya en yakın). */
+  readonly track: number;
 }
 
 export interface PostLayout {
   readonly posts: readonly Post[];
   readonly cables: readonly PostCable[];
   readonly wires: readonly PostWire[];
-  /** 3B'de çizilmeyen köprüler (plan.jumpers sırası): yalnızca boş kalan cihaz deliklerine giden teller. */
-  readonly hidden: ReadonlySet<number>;
 }
+
+/** Direğin anahtarı (etiket ve vurgu için): alet ucu. */
+export const postKey = (post: { readonly partId: string; readonly pin: number }): string => `${post.partId}#${post.pin}`;
 
 const holeKey = (h: Hole) => (h.kind === 'strip' ? `${h.board}:s${h.col}:${h.row}` : `${h.board}:r${h.rail}:${h.k}`);
 
@@ -145,37 +150,44 @@ export function cableColor(part: Part, pin: number, ground: boolean): string {
 }
 
 /**
- * Ağa ad verme önceliği (küçük olan kazanır): kaynaklar, sonra osiloskop, sonra ölçü aletleri. `name`: direğin
- * üstündeki kısa ad; `title`: açık ad (cihazın ya da parçanın etiketi, türü ve ucun açık adı).
+ * Alet ucunun adı. `name`: direğin üstündeki kısa ad; `title`: açık ad (cihazın ya da parçanın etiketi, türü ve
+ * ucun açık adı). `used`: aletin bağlı uçları (güç kaynağının ikinci çıkışı, osiloskobun kanalları ada girer).
  */
-function nameOf(part: Part, pin: number): { rank: number; name: string; title: string } {
+function nameOf(part: Part, pin: number, used: ReadonlySet<number>): { name: string; title: string } {
   const t = tr.bench.posts;
   const long = t.long;
   switch (part.type) {
     case 'dcsupply': {
-      const v = volts(numProp(part.props, pin === 0 ? 'voltage1' : 'voltage2', 0));
-      return pin % 2 === 0 ? { rank: 0, name: t.plus(v), title: long.supplyPlus(part.label, v) } : { rank: 5, name: t.minus(part.label), title: long.supplyMinus(part.label) };
+      // Tek çıkış kullanılıyorsa "PS1 +" ve "PS1 −"; iki çıkış da bağlıysa "PS1 1+", "PS1 2−".
+      const out = pin < 2 ? 1 : 2;
+      const both = (used.has(0) || used.has(1)) && (used.has(2) || used.has(3));
+      const v = volts(numProp(part.props, out === 1 ? 'voltage1' : 'voltage2', 0));
+      const sign = pin % 2 === 0 ? '+' : '−';
+      return {
+        name: t.pin(part.label, both ? `${out}${sign}` : sign),
+        title: pin % 2 === 0 ? (both ? long.supplyPlusOf(part.label, out, v) : long.supplyPlus(part.label, v)) : both ? long.supplyMinusOf(part.label, out) : long.supplyMinus(part.label),
+      };
     }
     case 'funcgen':
-      return pin === 0
-        ? { rank: 1, name: t.input, title: long.generator(part.label, long.generatorPins[0]!) }
-        : pin === 1
-          ? { rank: 2, name: t.ttl, title: long.generator(part.label, long.generatorPins[1]!) }
-          : { rank: 6, name: t.com, title: long.generator(part.label, long.generatorPins[2]!) };
-    case 'oscilloscope':
-      return pin < 2 ? { rank: 3, name: t.channel(pin + 1), title: long.scopeChannel(part.label, pin + 1) } : { rank: 6, name: t.com, title: long.scopeGround(part.label) };
+      return { name: t.pin(part.label, t.generatorShort[pin]!), title: long.generator(part.label, long.generatorPins[pin]!) };
+    case 'oscilloscope': {
+      if (pin < 2) return { name: t.channel(pin + 1), title: long.scopeChannel(part.label, pin + 1) };
+      // Toprak ucu: tek kanal bağlıysa o kanalın toprağı ("CH1 toprak").
+      const channels = [0, 1].filter((k) => used.has(k));
+      return { name: channels.length === 1 ? t.channelGround(channels[0]! + 1) : t.scopeGround, title: long.scopeGround(part.label) };
+    }
     case 'battery': {
       const v = volts(numProp(part.props, 'voltage', 9));
-      return pin === 0 ? { rank: 0, name: t.plus(v), title: long.batteryPlus(part.label, v) } : { rank: 5, name: t.minus(part.label), title: long.side(part.label, long.sideWord.battery!, long.sidePins.battery![1]!) };
+      return pin === 0 ? { name: t.meterPlus(part.label), title: long.batteryPlus(part.label, v) } : { name: t.meterMinus(part.label), title: long.side(part.label, long.sideWord.battery!, long.sidePins.battery![1]!) };
     }
     default: {
-      // Tahta dışı parça (motor, lamba, röle…): en düşük öncelik; ad parçanın etiketi ve ucun kısa adı.
+      // Tahta dışı parça (motor, lamba, röle…): parçanın etiketi ve ucun kısa adı.
       if (isSidePart(part.type)) {
         const word = long.sideWord[part.type] ?? tr.devices.names[part.type].toLocaleLowerCase('tr');
-        return { rank: 7, name: t.pin(part.label, t.sideShort[part.type]?.[pin] ?? String(pin + 1)), title: long.side(part.label, word, long.sidePins[part.type]?.[pin] ?? long.nth(pin + 1)) };
+        return { name: t.pin(part.label, t.sideShort[part.type]?.[pin] ?? String(pin + 1)), title: long.side(part.label, word, long.sidePins[part.type]?.[pin] ?? long.nth(pin + 1)) };
       }
       const word = tr.devices.names[part.type].toLocaleLowerCase('tr');
-      return { rank: 4, name: pin === 0 ? t.meterPlus(part.label) : t.meterMinus(part.label), title: long.side(part.label, word, pin === 0 ? long.meterPins[0]! : long.meterPins[1]!) };
+      return { name: pin === 0 ? t.meterPlus(part.label) : t.meterMinus(part.label), title: long.side(part.label, word, pin === 0 ? long.meterPins[0]! : long.meterPins[1]!) };
     }
   }
 }
@@ -183,75 +195,51 @@ function nameOf(part: Part, pin: number): { rank: number; name: string; title: s
 /**
  * Direklerin, cihaz kablolarının ve direkten tahtaya giden tellerin yerleşimi. `plan`: çizilen yerleşim;
  * `reference`: şemanın planı (direklerin yeri ve adları her zaman buradan: Tahtada kur'da öğrencinin kurulumu
- * direkleri oynatmaz). `schematic`: çizilen yerleşim şemanın planı mı (tek tel) yoksa kurulum mu (kablo başına tel).
+ * direkleri oynatmaz).
  */
-export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: BreadboardPlan = plan, schematic = plan === reference): PostLayout {
+export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: BreadboardPlan = plan): PostLayout {
   const parts = new Map(doc.parts.map((p) => [p.id, p]));
   const ground = (net: string) => reference.roles.get(net) === 'ground';
-  // Ağ başına cihaz kabloları (şemanın planındaki sırayla).
-  const byNet = new Map<string, Array<{ part: Part; pin: number; hole: Hole }>>();
-  for (const i of instrumentLeads(doc, reference)) {
+  // Alet uçları (şemanın planındaki sırayla): her biri bir direk.
+  const ends = instrumentLeads(doc, reference).map((i) => {
     const lead = reference.leads[i]!;
-    const part = parts.get(lead.partId)!;
-    (byNet.get(lead.net) ?? byNet.set(lead.net, []).get(lead.net)!).push({ part, pin: lead.pin, hole: lead.hole });
-  }
-  // Telin gittiği delik: ağın cihaz deliklerinden arka kenara en yakını (ray ya da en arkadaki satır).
-  const targetOf = (items: ReadonlyArray<{ hole: Hole }>) =>
-    items
-      .map((it) => ({ hole: it.hole, at: holeXZ(it.hole, reference.cols) }))
-      .sort((a, b) => a.at.z - b.at.z || a.at.x - b.at.x)[0]!;
-  // Adlar örnek içinde tekil: ad başka bir direkte kullanıldıysa ağın sıradaki ucunun adı (ör. seri iki pilin
-  // ortak ucu "+9 V" yerine "B1 −").
-  const used = new Set<string>();
-  const nets = [...byNet].map(([net, items]) => {
-    const target = targetOf(items);
-    const ranked = items.map((it) => ({ ...it, ...nameOf(it.part, it.pin) })).sort((a, b) => a.rank - b.rank);
-    const named = ranked[0]!;
-    // Besleme ağı (pilin + ucu): ölçü aletinin adı yerine gerilim.
-    const battery = doc.parts.find((p) => p.type === 'battery' && reference.netOf.get(pinKey(p.id, 0)) === net);
-    const head = ground(net)
-      ? { name: tr.bench.groundNet, title: tr.bench.posts.long.ground }
-      : named.rank >= 3 && battery
-        ? nameOf(battery, 0)
-        : named;
-    const picked = [head, ...ranked].find((n) => !used.has(n.name)) ?? head;
-    let name = picked.name;
-    for (let k = 2; used.has(name); k++) name = `${head.name} ${k}`;
-    used.add(name);
-    return { net, items, target, name, title: picked.title, color: cableColor(named.part, named.pin, ground(net)) };
+    return { part: parts.get(lead.partId)!, pin: lead.pin, net: lead.net, hole: lead.hole, at: holeXZ(lead.hole, reference.cols) };
+  });
+  const usedPins = new Map<string, Set<number>>();
+  for (const e of ends) (usedPins.get(e.part.id) ?? usedPins.set(e.part.id, new Set()).get(e.part.id)!).add(e.pin);
+  // Adlar örnek içinde tekil: aynı ad ikinci kez gelirse (iki osiloskop) başına aletin etiketi.
+  const taken = new Set<string>();
+  const named = ends.map((e) => {
+    const base = nameOf(e.part, e.pin, usedPins.get(e.part.id)!);
+    let name = base.name;
+    if (taken.has(name)) name = tr.bench.posts.pin(e.part.label, base.name);
+    for (let k = 2; taken.has(name); k++) name = `${base.name} ${k}`;
+    taken.add(name);
+    return { ...e, name, title: base.title, color: cableColor(e.part, e.pin, ground(e.net)) };
   });
   // Sıra: telin tercih ettiği şeridin x'i (ray deliğinde deliğin kendi hizası, satır deliğinde yarım delik solu).
-  const laneX = (n: { target: { hole: Hole; at: { x: number } } }) => n.target.at.x - (n.target.hole.kind === 'strip' ? 0.5 : 0);
-  nets.sort((a, b) => laneX(a) - laneX(b) || a.target.at.z - b.target.at.z);
+  const laneX = (e: { hole: Hole; at: { x: number } }) => e.at.x - (e.hole.kind === 'strip' ? 0.5 : 0);
+  named.sort((a, b) => laneX(a) - laneX(b) || a.at.z - b.at.z);
   // Direkler tellerinin gittiği deliğin hizasında; aralarında en az POST.spacing, plakanın içinde.
   const half = boardWidth(reference.cols) / 2 - 1;
-  // Çok direkte (tahta dışı parçalı kalabalık devreler) aralık plakaya sığacak kadar daralır (en az 2 delik).
-  const gap = Math.max(2, Math.min(POST.spacing, nets.length > 1 ? (2 * half) / (nets.length - 1) : POST.spacing));
-  const xs = spread(nets.map((n) => n.target.at.x), gap, -half, half);
+  // Aralık: hedef delikler dar bir alandaysa direkler de sıkışır (teller uzun yelpaze yapmaz), en az POST.tight;
+  // çok direkte plakaya sığacak kadar.
+  const reach = named.length > 1 ? named[named.length - 1]!.at.x - named[0]!.at.x : 0;
+  const count = Math.max(1, named.length - 1);
+  const gap = Math.max(POST.tight, Math.min(POST.spacing, (reach + 2 * POST.spacing) / count, (2 * half) / count));
+  const xs = spread(named.map((e) => e.at.x), gap, -half, half);
   const z = -BB.depth / 2 - POST.behind;
-  const posts: Post[] = nets.map((n, i) => ({ net: n.net, name: n.name, title: n.title, color: n.color, x: xs[i]!, z }));
-  const postOf = new Map(nets.map((n, i) => [n.net, i]));
+  const posts: Post[] = named.map((e, i) => ({ net: e.net, partId: e.part.id, pin: e.pin, name: e.name, title: e.title, color: e.color, x: xs[i]!, z }));
 
-  // Kablolar: şemanın planındaki her cihaz ucu kendi ağının direğine; çizilen yerleşimde deliği varsa `lead`.
+  // Kablolar: her alet ucu kendi direğine; çizilen yerleşimde deliği varsa `lead`.
   const leadIndex = new Map(plan.leads.map((l, i) => [pinKey(l.partId, l.pin), i]));
-  const cables: PostCable[] = [];
-  nets.forEach((n, post) => {
-    n.items.forEach((it, level) => {
-      cables.push({ partId: it.part.id, pin: it.pin, net: n.net, color: cableColor(it.part, it.pin, ground(n.net)), post, level, lead: leadIndex.get(pinKey(it.part.id, it.pin)) ?? null });
-    });
-  });
+  const cables: PostCable[] = named.map((e, post) => ({ partId: e.part.id, pin: e.pin, net: e.net, color: e.color, post, level: 0, lead: leadIndex.get(pinKey(e.part.id, e.pin)) ?? null }));
 
-  // Teller: şemada direk başına bir tel; kurulumda takılı her cihaz kablosu için bir tel.
-  const targets: Array<Omit<PostWire, 'points'>> = [];
-  if (schematic) {
-    nets.forEach((n, post) => {
-      targets.push({ post, net: n.net, hole: n.target.hole, color: n.color, leads: cables.filter((c) => c.post === post && c.lead !== null).map((c) => c.lead!) });
-    });
-  } else {
-    for (const c of cables) {
-      if (c.lead === null) continue;
-      targets.push({ post: c.post, net: c.net, hole: plan.leads[c.lead]!.hole, color: c.color, leads: [c.lead] });
-    }
+  // Teller: takılı her alet kablosu için direkten o kablonun deliğine bir tel.
+  const targets: Array<Omit<PostWire, 'points' | 'track'>> = [];
+  for (const c of cables) {
+    if (c.lead === null) continue;
+    targets.push({ post: c.post, net: c.net, hole: plan.leads[c.lead]!.hole, color: c.color, leads: [c.lead] });
   }
   // Telin yolu (tek katmanlı, kesişmesiz kanal yerleşimi; baskı devre yolu gibi dik açılı): tel direğin önünden
   // çıkar; direk sırası ile tahtanın arka kenarı arasındaki kanalda kendi izinde yana gider; hedef deliğin
@@ -325,16 +313,21 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
     done.push(wire);
     return wire;
   });
-  // 2) İz: aynı yöne giden ve yatay aralıkları üst üste binen ardışık teller bir kümedir; sola gidenlerde izler
-  //    soldan sağa tahtaya yaklaşır, sağa gidenlerde soldan sağa tahtadan uzaklaşır.
+  // 2) İz: aynı yöne giden ve yatay aralıkları üst üste binen ardışık teller bir kümedir. Sola gidenlerde sağdaki
+  //    tel tahtaya daha yakın izi alır, sağa gidenlerde soldaki: tel, yatay aralığı kendisininkiyle üst üste binen
+  //    ve kendisinden önce gelmesi gereken tellerin en uzağının bir ötesindeki ize oturur (aralıkları ayrık teller
+  //    aynı izi paylaşır: kanal dar kalır).
+  const span = (w: (typeof routed)[number]) => [Math.min(w.startX, w.lane), Math.max(w.startX, w.lane)] as const;
+  const overlap = (p: (typeof routed)[number], q: (typeof routed)[number]) => span(p)[0] < span(q)[1] + 0.4 && span(q)[0] < span(p)[1] + 0.4;
   for (let i = 0; i < routed.length; ) {
     let j = i + 1;
     const dir = routed[i]!.dir;
-    const span = (w: (typeof routed)[number]) => [Math.min(w.startX, w.lane), Math.max(w.startX, w.lane)] as const;
     if (dir !== 0) while (j < routed.length && routed[j]!.dir === dir && span(routed[j]!)[0] < span(routed[j - 1]!)[1] + 0.4) j++;
-    const count = j - i;
-    for (let k = i; k < j; k++) routed[k]!.track = dir < 0 ? j - 1 - k : dir > 0 ? k - i : 0;
-    void count;
+    const group = routed.slice(i, j);
+    if (dir < 0) group.reverse();
+    group.forEach((w, k) => {
+      w.track = dir === 0 ? 0 : Math.max(-1, ...group.slice(0, k).filter((q) => overlap(q, w)).map((q) => q.track)) + 1;
+    });
     i = j;
   }
   const wires: PostWire[] = new Array<PostWire>(targets.length);
@@ -348,39 +341,9 @@ export function layoutPosts(doc: CircuitDoc, plan: BreadboardPlan, reference: Br
         : [new Vector3(w.startX, y, front), new Vector3(w.startX, y, zTrack), new Vector3(w.lane, y, zTrack), new Vector3(w.lane, y, w.at.z), new Vector3(w.at.x, y, w.at.z)];
     const points = raw.filter((q, k) => k === 0 || q.distanceTo(raw[k - 1]!) > 1e-6);
     points.push(new Vector3(w.at.x, BB.height, w.at.z));
-    wires[w.index] = { ...w.t, points };
+    wires[w.index] = { ...w.t, points, track: w.track };
   }
-  void postOf;
-
-  // Boş kalan cihaz deliklerine giden köprüler çizilmez: ucu, başka hiçbir şeyin takılı olmadığı bir iletkende biten
-  // ve o iletkenin tek teli olan köprü (yinelemeli).
-  const hidden = new Set<number>();
-  if (schematic) {
-    const instrument = new Set(instrumentLeads(doc, plan));
-    const occupied = new Map<string, number>();
-    const add = (h: Hole) => occupied.set(holeGroup(h), (occupied.get(holeGroup(h)) ?? 0) + 1);
-    for (const p of plan.onBoard.values()) [...p.holes, ...(p.extraHoles ?? [])].forEach(add);
-    plan.leads.forEach((l, i) => {
-      if (!instrument.has(i)) add(l.hole);
-    });
-    targets.forEach((w) => add(w.hole));
-    for (let changed = true; changed; ) {
-      changed = false;
-      const degree = new Map<string, number>();
-      plan.jumpers.forEach((j, i) => {
-        if (hidden.has(i)) return;
-        for (const g of [holeGroup(j.a), holeGroup(j.b)]) degree.set(g, (degree.get(g) ?? 0) + 1);
-      });
-      plan.jumpers.forEach((j, i) => {
-        if (hidden.has(i)) return;
-        if ([holeGroup(j.a), holeGroup(j.b)].some((g) => (occupied.get(g) ?? 0) === 0 && degree.get(g) === 1)) {
-          hidden.add(i);
-          changed = true;
-        }
-      });
-    }
-  }
-  return { posts, cables, wires, hidden };
+  return { posts, cables, wires };
 }
 
 /** Direğin tepesindeki `level`. fişin altı (dünya). */
@@ -400,16 +363,6 @@ export function plateRect(cols: number, boardsDepth: number): { x0: number; x1: 
 }
 
 /**
- * Akım noktaları için plan: şemanın 3B'sinde cihaz kablolarının akımı direğin telinden tahtaya girer (delik: telin
- * deliği). Kurulumda her kablo kendi deliğinde: plan aynen kalır.
- */
-export function flowPlan(plan: BreadboardPlan, layout: PostLayout): BreadboardPlan {
-  const holeOf = new Map<number, Hole>();
-  for (const w of layout.wires) for (const i of w.leads) holeOf.set(i, w.hole);
-  return { ...plan, leads: plan.leads.map((l, i) => (holeOf.has(i) ? { ...l, hole: holeOf.get(i)! } : l)), jumpers: plan.jumpers.map((j, i) => (layout.hidden.has(i) ? { ...j, b: j.a } : j)) };
-}
-
-/**
  * Tahtada 3B'de dolu delikler (anahtarlar; aynı delik iki kez geçerse orada iki şey var): parçaların bacakları,
  * çizilen köprülerin uçları, masadaki parçaların kabloları ve direklerden gelen teller.
  */
@@ -417,9 +370,7 @@ export function holesUsed(doc: CircuitDoc, plan: BreadboardPlan, layout: PostLay
   const instrument = new Set(instrumentLeads(doc, plan));
   const out: string[] = [];
   for (const p of plan.onBoard.values()) for (const h of [...p.holes, ...(p.extraHoles ?? [])]) out.push(holeKey(h));
-  plan.jumpers.forEach((j, i) => {
-    if (!layout.hidden.has(i)) out.push(holeKey(j.a), holeKey(j.b));
-  });
+  for (const j of plan.jumpers) out.push(holeKey(j.a), holeKey(j.b));
   plan.leads.forEach((l, i) => {
     if (!instrument.has(i)) out.push(holeKey(l.hole));
   });
