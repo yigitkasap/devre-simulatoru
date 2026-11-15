@@ -43,7 +43,7 @@ import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPa
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
 import { collisions, type Obstacle } from './leadRoute';
 import { PolyCurve, tubeGeometry } from './cablePath';
-import { cableJobs, routeArches, routeCables } from './cableRoutes';
+import { cableJobs, compactSockets, routeArches, routeCables } from './cableRoutes';
 import { cableCurrents } from './cableFlow';
 import { CABLE_RADIUS, PLUG, jumperShapes } from './jumpers';
 import { BANANA, INSTRUMENTS, PLATE, POST, holesUsed, instrumentLeads, layoutPosts, postKey, posted, type PostCable, type PostLayout } from './posts';
@@ -313,6 +313,11 @@ export class BenchScene {
   private postAt = new Map<string, Vector3>();
   /** Cihaz kablolarının eğrileri (denetim: tahtanın üstünden ya da önünden geçmez). */
   private postCables: Curve<Vector3>[] = [];
+  /**
+   * Kablo koridorunun durumu (denetim betikleri): dikey inen cihaz kablosu sayısı (çapraz inişe yer bulunamadıysa),
+   * şeridine yer kalmayan kablo sayısı, yerleşim kipi.
+   */
+  cableStats: { steep: number; overflow: number; mode: string; joined: boolean } = { steep: 0, overflow: 0, mode: 'flat', joined: true };
   /** Vurgulanan ağ, bacaklarının işaretleri ve malzemelerin soluk / parlak kopyaları. */
   private highlighted: string | null = null;
   private highlightedPost: string | null = null;
@@ -924,6 +929,7 @@ export class BenchScene {
       jobs.flatMap((j) => (j ? [j] : [])),
       { plateHalf: boardWidth(plan.cols) / 2 + PLATE.margin, top: this.topView !== null, bodies: bodies.map((o) => o.box) },
     );
+    this.cableStats = { steep: routed.steep, overflow: routed.overflow, mode: routed.mode, joined: routed.joined };
     let next = 0;
     const routeOf = new Map(layout.cables.flatMap((c, k) => (jobs[k] ? [[c, routed.routes[next++]!] as const] : [])));
     /** Cihaz ya da tahta dışı parça kablosu: ucundaki fişten çıkar, direğindeki muz fişe arkadan girer. */
@@ -1359,22 +1365,8 @@ export class BenchScene {
       const placed = this.parts.get(id);
       return placed && placed.dirs.some(Boolean) && placed.real.length > 0 ? [placed] : [];
     });
-    // Kartta uçlar soldan sağa gerçek sırasıyla, kısa sabit aralıkla (gerçek aralık kartı gereksiz genişletir).
-    const GAP = 4;
-    const PITCH = 5;
-    const PAD = 6;
-    const cards = devices.map((p) => ({ p, width: (p.real.length - 1) * PITCH + 2 * PAD }));
-    const total = cards.reduce((sum, c) => sum + c.width, 0) + GAP * Math.max(0, cards.length - 1);
-    let x = -total / 2;
-    // Kartlar direk sırasının ve adlarının gerisinde (plakanın arka kenarının 5 birim ötesi).
-    const z = -BB.depth / 2 - PLATE.back - 5;
-    for (const c of cards) {
-      const order = c.p.real.map((a, i) => ({ a, i })).sort((u, v) => u.a.x - v.a.x);
-      const compact: Vector3[] = new Array(c.p.real.length);
-      order.forEach(({ a, i }, k) => (compact[i] = new Vector3(x + PAD + k * PITCH, a.y, z)));
-      c.p.compact = compact;
-      x += c.width + GAP;
-    }
+    // Kartta uçlar soldan sağa gerçek sırasıyla, kısa sabit aralıkla (cableRoutes.ts → compactSockets).
+    compactSockets(devices.map((p) => p.real)).forEach((compact, i) => (devices[i]!.compact = compact));
     const top = this.topView !== null;
     for (const p of this.parts.values()) p.anchors = top && p.compact ? p.compact : p.real;
   }

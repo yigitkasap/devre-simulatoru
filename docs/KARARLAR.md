@@ -2648,7 +2648,75 @@ direncin boştaki ucunda, ray ve köprü yok, direkler sütun sırasında; eskid
 kur (telefon, T6 öğrenci)" (kilitli güç kaynağı kablosu seçiliyken Çıkar pasif; eskiden kilitli ray köprüsünde Sil).
 Gerçek iPhone'da denenmedi.
 
+### 3B: kablo uçları — soketten çapraz iniş, şeride sırayla katılma (2026-11-15)
+
+Sorun (kullanıcı): `diyot-dc`'de multimetrelerin önünde kablolar hâlâ bozuktu. Kablo soketten masaya inip şeride
+döndüğü yerde dik açıyla kırılıyor; aynı şeride giren kablolar (A1 ve V1'inkiler) birleşme yerinde üst üste biniyor
+görünüyordu. Önceki denetim "uçlar hariç" dediği için cihazın önü ölçülmemişti. Dal `kablo-uc`.
+
+**Ne bulundu.** Yolun tamamı ölçülünce (uç kırpmadan) 81 örnekte merkez çizgileri hiçbir yerde kablo çapından yakın
+değildi: gövdeler çakışmıyordu. Bozuk görünen, biçimdi:
+
+- İniş dikeydi: kablo şeridinin üstüne kadar havada gidip çekül gibi iniyor, sonra şeride dönüyordu. Köşe yayları
+  4 çaptı ama düşey düzlemdeydi; üstten (olağan kamera) bakınca iki yay da doğruya iniyor, kablo dik köşe yapıyordu.
+- Sıra tersti: aynı cihazın iç soketinin kablosu öndeki şeritteydi. Dış soketin kablosu, onun üstünden aşıp arkadaki
+  şeride iniyordu; A1'in kabloları da V1'in şeritlerinin arkasına dikey iniyor, bakışta üstüne biniyordu.
+
+**1. Çapraz iniş** (`cableRoutes.ts` → `build`). Kablo fişin ucundan sonra (cihazın ön yüzünün önüne çıkınca) hem
+aşağıya hem şeridinin yönüne döner, masaya çapraz iner ve şeridine teğet yatar. İki köşe de çember yayıdır; yarıçap
+yer oldukça büyür (5,2 → 4,2 → 3,3 → 2,7 → 2,3 birim; en az 4 kablo çapı = 2,24). İnişin şerit boyunca uzanışı
+şeridin derinliğine göre seçilir (≈ 3,5–8 birim); kablo kısaysa (soketi direğine yakın) kısalır. 81 örnekteki 201
+şerit kablosunun tamamı çapraz iner; dikey iniş yalnızca yedek olarak durur (`RouteResult.steep`: kaç kablo dikey
+indi; 81 örnekte 0). Geniş yaylarda nokta aralığı en çok 0,7 birim (`cablePath.ts` → `ARC_CHORD`): yakından kırık
+görünmez. Üçgen sayısı değişmedi (`diyot-dc` 14 048 → 14 080, `transformator` 23 084 → 22 796, `yarim-dalga`
+16 580 → 16 532).
+
+**2. Şeride katılma sırası** (`joins`). Bir kablonun inişinin altında masada yatan kablo ondan önde (direklere yakın
+şeritte) olur. Sonuç: şeride sonradan katılan kablo şeridin cihazlara bakan kenarına, öbür kabloların yanına
+(bir şerit aralığı, 0,62 birim) yerleşir; iniş hiçbir kablonun üstünden geçmez. Aynı cihazın iki soketinden aynı yöne
+giden kablolar iç içe döner (dıştaki önde). `diyot-dc`: V1'in kabloları şerit 1–2'de, önünden geçtikleri A1'in
+kabloları 3–4'te.
+
+- Kesişmesi kaçınılmaz kablolar (soket sırası direk sırasının tersi) direğin önünde kesişir: kablo şeridinden dikey
+  yükselip ötekilerin üstünden fişine gider (değişmedi).
+- Koridor bu sırayla dolmuyorsa sırasız yerleşime dönülür (`RouteResult.joined = false`; 81 örnekte yalnızca 14
+  kablolu, çapraz bağlantılı `transformator`). Orada da her kablo çapraz iner: kurulmuş kablolara ve gövdelere
+  değmeyen ilk iniş seçilir (uzun çapraz → kısa çapraz → fişten biraz düz gidip sonra dönen).
+- Yerleşim sırası: katılma sırasıyla düz → katılma sırasıyla üst üste → sırasız düz → sırasız üst üste → atlamalı.
+  `role` ve `jfet-karakteristik` katılma sırasıyla üst üste yerleşir (kablo, kendisini kapsayan kablonun üstüne
+  yatar).
+- Yollar geriden öne (cihazlara yakın şeritten başlayarak) kurulur; öndeki kablonun inişi gerisindekilerin üstünden
+  geçerken onlara değmeyen biçimi seçer. İniş, kendi cihazı dışındaki gövdelerin içinden de geçmez (`hitsBody`).
+
+**3. Tepeden görünüm (Tahtada kur).** Cihaz kabloları kartın soketinden direğe Bézier kavisiydi; kesişen kavisler
+kesiştikleri yerde aynı yükseklikte buluşabiliyor, gövdeler birbirine giriyordu (canlı sahnede en yakın 0,03–0,24
+birim). Artık her kablo bir kemerdir (`slantArch`): soketin üstünden öne yatık kalkar, düz gider, fişe yatık iner;
+her kemer öncekilere değmeyen en alçak yükseklikten geçer (`routeArches`, 24 kat). Kalkış ve iniş dik olsaydı, komşu
+direğe (2 birim ötede) alçak açıyla gelen kablo bu kablonun inişinin yarım birim yakınından geçerdi ve hangi
+yükseklik seçilirse seçilsin ikisi birbirine girerdi. Kartların yeri saf bir işleve alındı (`compactSockets`; sahne
+ve testler aynı işlevi kullanır).
+
+**Denetim.** `tests/kablo-3b-yollar.test.ts` (12 test, 81 örnek):
+
+- Kabloda yolun tamamı ölçülür (`wholeCable`): yol soketteki fişin ucunda başlar; yalnızca direkteki muz fişin içine
+  giren son 0,05 birim sayılmaz. Herhangi iki kablonun merkez çizgileri arası ≥ kablo çapı (en yakın 0,60); her köşe
+  ≥ 4 kablo çapı. Eski `cableBody` (iki uçtan 0,3 birim kırpan) kaldırıldı; yol bulucu da tam gövdeyi kullanır.
+- Hiçbir cihaz kablosu dikey inmez; iniş boyunca kablo hiçbir yerde çekül doğrultusunda değil (|dy| / boy < 0,97).
+- `diyot-dc`: katılma sırası (dış soket önde, A1 V1'in arkasında), iniş üstten bakınca yatan hiçbir kablonun
+  üstünden geçmiyor.
+- Tepeden görünüm: 81 örnekte kemerler arası ≥ kablo çapı, köşeler ≥ 4 çap (eskiden tepeden görünümde ölçülmüyordu).
+
+ios-kontrol: canlı sahnede bütün yol ölçülür (eskiden iki uçtan %2 atlanıyordu); iki yeni madde: "cihaz kabloları
+soketten çapraz, kavisle iniyor" (`scene.cableStats`) ve "tepeden görünümde kablolar üst üste binmiyor".
+
+**Yorum.** Tahtanın üstündeki köprü ve direk tellerinde uç payı (delik, 0,35 birim) değişmedi: istek cihaz
+kablolarıyla ilgiliydi; tellerin deliğe girdiği yer fiş sayılır. Kısa kablolarda (soketi direğine 5–9 birim) iniş
+dikleşir (şeritte yatacak yer azdır); üstten bakınca kavis daralır ama dik köşe olmaz.
+
 ### 3B: kablolar üst üste binmez, yumuşak bükülür (2026-11-14)
+
+> 2026-11-15: cihaz kablosunun inişi (dikey → çapraz), şerit sırası, tepeden görünüm ve "uçlar hariç" denetimi
+> değişti; bkz. bir üstteki "3B: kablo uçları" bölümü.
 
 Sorun (kullanıcı): 3B'de cihaz kabloları aynı yoldan geçince üst üste aynı yere çiziliyor, titreşiyordu (z-fighting;
 `diyot-dc`'de multimetrelerin kırmızı ve siyah kabloları); köşeler keskindi. Dal `son-kontrol`.

@@ -4,22 +4,30 @@
 //
 // Düzen (serbest kamera): cihazlarla direk sırası arasındaki masa bir kablo koridorudur. Koridorda x boyunca uzanan
 // şeritler vardır (aralık: kablo çapı + pay); aynı yöne giden kablolar şeritlerde yan yana, düz bir bant gibi yatar.
-//   - Cihaz kablosu: soketten düz çıkar, kendi şeridinin üstüne kadar havada ilerler, masaya iner, şeridinde direğinin
-//     hizasına kadar gider, orada dikey yükselir ve fişine arkadan girer. Başka bir şeridi kesen her kısım havadadır
-//     (iniş ve çıkış): kesişen kablo ötekinin üstünden geçer, gövdeler birbirine girmez.
+//   - Cihaz kablosu: fişin ucundan sonra hem aşağıya hem şeridinin yönüne döner, çapraz iner ve şeridine teğet yatar
+//     ("kablo uçları", 2026-11-15; eskiden şeridinin üstüne kadar havada gidip dikey iniyordu: üstten bakınca dik
+//     köşe). Şeridinde direğinin hizasına kadar gider, orada dikey yükselir ve fişine arkadan girer.
+//   - Şeride katılma sırası: bir kablonun inişinin altında masada yatan kablo ondan önde (direklere yakın şeritte)
+//     olur. Şeride sonradan katılan kablo şeridin cihazlara bakan kenarına, öbür kabloların yanına yerleşir; iniş
+//     hiçbir kablonun üstünden geçmez. Aynı cihazın yan yana iki soketinden aynı yöne giden kablolar iç içe döner
+//     (dıştaki önde). Kesişmesi kaçınılmaz kablolar (soket sırası direk sırasının tersi) direğin önünde, dikey
+//     çıkışta kesişir: çıkan kablo ötekilerin üstünden geçer.
+//   - Koridor bu sırayla dolmuyorsa (14 kablolu, çapraz bağlantılı `transformator`) sırasız yerleşime dönülür; her
+//     kablo yine öbürlerine değmeyen bir çapraz inişi seçer (kısa çapraz, ya da biraz düz gidip sonra dönen).
 //   - Soketi direğiyle neredeyse aynı hizada olan kablo (şeritte iki dönüşe yer yok) koridorun üstünden, hafifçe
 //     sarkarak doğrudan gider.
 //   - Tahta dışı parçanın (pil, motor, röle…) kablosu: ucundan çapraz ayrılır, parçanın yanındaki boşlukta arkaya
 //     doğru yatar (yan şeritler), koridorda kendi şeridine döner.
 // Her köşe en az CABLE_BEND yarıçaplı bir yayla yuvarlanır (cablePath.ts → roundPath).
 //
-// Tepeden görünümde cihazlar tahtanın hemen arkasındaki kartlardır (koridor yok): kablo kısa bir kavistir; kavislerin
-// yükseklikleri farklıdır (kesişen kablolar üst üste gelmez).
+// Tepeden görünümde cihazlar tahtanın hemen arkasındaki kartlardır (koridor yok): kablo kartın soketinden direğe bir
+// kemerdir; her kemer öncekilere değmeyen en alçak yükseklikten geçer (kesişen kablolar farklı yükseklikte).
 
-import { Box3, CubicBezierCurve3, Vector3 } from 'three';
-import { pathDistance, roundPath, trimPath } from './cablePath';
+import { Box3, Vector3 } from 'three';
+import { pathDistance, roundPath, trimPath, type RoundedPath } from './cablePath';
 import { CABLE_RADIUS } from './jumpers';
-import { plugEntry, type PostLayout } from './posts';
+import { BB } from './breadboard';
+import { PLATE, plugEntry, type PostLayout } from './posts';
 
 const CABLE_R = CABLE_RADIUS;
 /** En küçük bükülme yarıçapı: 4 kablo çapı. */
@@ -34,6 +42,8 @@ export const CABLE_PITCH = 2 * CABLE_R + 0.06;
 const BOOT = 0.5;
 /** Soketteki fişin boyu: kablo fişin ucundan başlar. */
 const PLUG_LENGTH = 1.5;
+/** Direkteki muz fişin içine giren son parça (gövde denetiminde sayılmaz). */
+const PLUG_ENTRY = 0.05;
 /** Tahta dışı kabloların koridorda en geride olabileceği şerit (cihazların ön yüzüne değmeden). */
 const SIDE_LANES = 10;
 /** Atlamanın (masadaki bir kablonun üstünden geçiş) rampasının boyu. */
@@ -42,6 +52,15 @@ const RAMP = 3;
 const SHIFT = 0.95;
 /** İki kablonun merkez çizgileri arasında aranan en küçük uzaklık. */
 const CLEAR = 2 * CABLE_R + 0.02;
+/** Şeride katılma sırası hesabında inişin şerit boyunca uzanışı (sayılan) ve soketin iki yanındaki pay. */
+const DROP_NOMINAL = 6;
+const JOIN_MARGIN = 0.8;
+/** Tepeden görünümdeki kemerin kalkışının ve inişinin öne yatıklığı. */
+const TOP_SLANT = 1.2;
+/** Çapraz inişin şerit boyunca uzanışı için denenen boylar (şeridin derinliğine göre seçilen ikisinden sonra). */
+const DROP_LENGTHS = [7, 5, 4.2, 3.5, 3, 2.4, 1.9, 1.5, 1.1, 0.7, 0.4];
+/** Çapraz inişin köşelerinde denenen yarıçaplar (büyükten küçüğe; yer oldukça geniş kavis). */
+const DROP_RADII = [5.2, 4.2, 3.3, 2.7, R];
 
 export interface CableJob {
   /** Kablonun çıktığı uç (soket ya da parçanın ucu; dünya). */
@@ -82,6 +101,10 @@ export interface RouteResult {
   readonly overflow: number;
   /** Koridorun yerleşimi: düz, üst üste yatan kablolu ya da atlamalı. */
   readonly mode: 'flat' | 'stacked' | 'hops';
+  /** Çapraz inişe yer bulamayıp dikey inen cihaz kablosu sayısı. */
+  readonly steep: number;
+  /** Şeritler katılma sırasıyla mı dolduruldu (koridor o sırayla dolmayınca sırasız yerleşime dönülür). */
+  readonly joined: boolean;
 }
 
 interface LaneItem {
@@ -95,6 +118,9 @@ interface LaneItem {
   /** Cihaz kablosu: soketten çıkışın bittiği z ve yükseklik (iniş buradan başlar). */
   readonly yh: number;
   readonly exitZ: number;
+  /** Cihaz kablosu: soketin x'i (iniş yana kaydırılmışsa `xa`'dan farklı) ve soketten çıkış. */
+  readonly sx: number;
+  readonly exit: SocketExit | null;
   /** En derin olabileceği şerit (plakanın kenarından inen kablo dönüşe yer ister). */
   minLane: number;
   /** Doğrudan giden bir kablo bu kablonun direğinin hizasından geçiyorsa: en geride olabileceği şerit. */
@@ -106,8 +132,16 @@ interface LaneItem {
 
 const Z = new Vector3(0, 0, 1);
 
+interface SocketExit {
+  readonly pre: Vector3[];
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+  readonly lead: number;
+}
+
 /** Soketten çıkış: fişin ucu ve (soket yukarı bakıyorsa) yataya dönüş köşesi. */
-function socketExit(job: CableJob): { pre: Vector3[]; x: number; y: number; z: number; lead: number } {
+function socketExit(job: CableJob): SocketExit {
   const dir = (job.dir ?? Z).clone().normalize();
   const a1 = job.from.clone().addScaledVector(dir, PLUG_LENGTH);
   const tilt = dir.angleTo(Z);
@@ -204,14 +238,6 @@ function sideSlots(jobs: readonly CableJob[], ctx: RouteContext): Map<number, { 
   return out;
 }
 
-/** Tepeden görünümdeki kısa kavis: yükseklik `lift` (kesişen kavisler farklı yükseklikte). */
-function arc(job: CableJob, lift: number): CableRoute {
-  const a = job.from.clone().add(new Vector3(0, 1.4, 0));
-  const b = job.entry.clone();
-  const curve = new CubicBezierCurve3(a, a.clone().add(new Vector3(0, lift, 0)), b.clone().add(new Vector3(0, lift, 0)), b);
-  return { points: curve.getPoints(28), kind: 'arc', minRadius: Number.POSITIVE_INFINITY, lane: -1 };
-}
-
 /** Soketi direğiyle aynı hizadaki kablo: koridorun üstünden, ortası `sag` kadar sarkarak. */
 function bridge(job: CableJob, sag: number): CableRoute {
   const exit = socketExit(job);
@@ -225,23 +251,27 @@ function bridge(job: CableJob, sag: number): CableRoute {
   return { points: path.points, kind: 'bridge', minRadius: path.minRadius, lane: -1 };
 }
 
-/** Kablonun, uçlarındaki fişlerin dışındaki kısmı (uzaklık ölçümünde). */
-export const cableBody = (points: readonly Vector3[]): Vector3[] => trimPath(points, 0.3, 0.3);
+/**
+ * Kablonun bütün gövdesi: yol fişin ucunda başlar (soketten çıkan fiş yolun dışındadır); yalnızca direkteki muz fişin
+ * içine giren son parça sayılmaz. Denetimler bunu kullanır: soketten iniş ve şeride dönüş dahil.
+ */
+export const wholeCable = (points: readonly Vector3[]): Vector3[] => trimPath(points, 0, PLUG_ENTRY);
 
 /**
  * Bütün direk kablolarının yolları (`jobs` sırasıyla). Şerit ataması: kablolar derinden (direklere yakın şeritten)
  * başlayarak yerleşir; aynı şeritte x aralıkları üst üste binmez. Kısıtlar:
  *   - aynı yandaki tahta dışı kablolar iç içe döner (plakaya yakın yan şerit, direklere yakın koridor şeridi);
- *   - yan şeridin üstünden geçen cihaz kablosu o tahta dışı kablodan geride (cihazlara yakın) kalır.
- * Soketi başka bir kablonun direğiyle aynı hizadaki cihaz kablosunun inişi yana kayar (öbürünün fişe giden üst
- * kısmının içinden geçmesin).
+ *   - yan şeridin üstünden geçen cihaz kablosu o tahta dışı kablodan geride (cihazlara yakın) kalır;
+ *   - şeride katılma sırası: bir cihaz kablosunun inişinin altında yatan kablo ondan önde kalır (`joins`).
+ * Yollar kurulurken her cihaz kablosu, kurulmuş kablolara ve gövdelere değmeyen ilk çapraz inişi seçer (`build`).
  */
 export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): RouteResult {
   const routes: Array<CableRoute | null> = jobs.map(() => null);
   const slots = sideSlots(jobs, ctx);
   const items: LaneItem[] = [];
   const bridges: number[] = [];
-  let arcs = 0;
+  /** Tepeden görünümdeki cihaz kabloları (kartın soketinden direğe kemer). */
+  const tops: number[] = [];
   jobs.forEach((job, index) => {
     if (!job.instrument) {
       const slot = slots.get(index)!;
@@ -249,13 +279,11 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
       // parçanın arka yüzünün yeterince gerisinde olmalı.
       const between = (ctx.bodies ?? []).filter((b) => b !== job.box && Math.abs((b.min.x + b.max.x) / 2) < Math.abs(slot.x) && (b.min.x + b.max.x) / 2 >= 0 === slot.x >= 0 && Math.max(Math.abs(b.min.x), Math.abs(b.max.x)) > ctx.plateHalf && b.max.z > job.entry.z);
       const minLane = Math.max(0, ...between.map((b) => Math.ceil((job.entry.z - R - BOOT - (b.min.z - 1.2)) / CABLE_PITCH)));
-      items.push({ index, side: true, xa: slot.x, xp: job.entry.x, pre: sidePre(job, slot, slot.steep), yh: slot.y, exitZ: Number.NEGATIVE_INFINITY, minLane, capLane: 99, layer: 0, lane: -1 });
+      items.push({ index, side: true, xa: slot.x, xp: job.entry.x, pre: sidePre(job, slot, slot.steep), yh: slot.y, exitZ: Number.NEGATIVE_INFINITY, sx: slot.x, exit: null, minLane, capLane: 99, layer: 0, lane: -1 });
       return;
     }
     if (ctx.top) {
-      // Kavis yükseklikleri sırayla artar: iki kavis kesişse de aynı yükseklikte buluşmaz.
-      const dist = job.from.distanceTo(job.entry);
-      routes[index] = arc(job, Math.min(6, 1.2 + 0.08 * dist) + CABLE_PITCH * 1.2 * arcs++);
+      tops.push(index);
       return;
     }
     const exit = socketExit(job);
@@ -276,7 +304,7 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     // Çapraz, soketten (ve varsa yataya dönüş köşesinden) sonraki kısa bir düz parçadan başlar.
     const shifted = xd !== exit.x;
     const pre = shifted ? [...exit.pre, new Vector3(exit.x, exit.y, exit.z + exit.lead + 1)] : exit.pre;
-    items.push({ index, side: false, xa: xd, xp: job.entry.x, pre, yh: exit.y, exitZ: exit.z + exit.lead + (shifted ? 1.6 : 0), minLane: 0, capLane: 99, layer: 0, lane: -1 });
+    items.push({ index, side: false, xa: xd, xp: job.entry.x, pre, yh: exit.y, exitZ: exit.z + exit.lead + (shifted ? 1.6 : 0), sx: exit.x, exit, minLane: 0, capLane: 99, layer: 0, lane: -1 });
   });
 
   // --- Şerit ataması ---
@@ -332,6 +360,26 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     const mine = items.filter((i) => i.side && i.xa >= 0 === s > 0).sort((p, q) => Math.abs(p.xa) - Math.abs(q.xa) || p.yh - q.yh);
     for (let k = 1; k < mine.length; k++) deeper.get(mine[k]!)!.add(mine[k - 1]!);
   }
+  // Şeride katılma sırası: bir cihaz kablosunun inişinin (soketinin önü ve çaprazı) altında masada yatan kablo ondan
+  // önde (direklere yakın şeritte) olmalı. Böylece şeride sonradan katılan kablo, şeridin cihazlara bakan kenarına,
+  // öbür kabloların yanına yerleşir; iniş hiçbir kablonun üstünden geçmez (aynı cihazın yan yana iki soketinden aynı
+  // yöne giden kablolar iç içe döner: dıştaki önde).
+  /** joins.get(a): a'nın inişinin altında masada yatan kablolar (a ile aynı şeritte olabilir: a onun üstüne yatar). */
+  const joins = new Map<LaneItem, Set<LaneItem>>(items.map((i) => [i, new Set<LaneItem>()]));
+  for (const a of items) {
+    if (a.side) continue;
+    const sa = Math.sign(a.xp - a.sx) || 1;
+    const reach = Math.min(DROP_NOMINAL, Math.abs(a.xp - a.sx));
+    const a0 = Math.min(a.sx - sa * JOIN_MARGIN, a.sx + sa * (reach + JOIN_MARGIN));
+    const a1 = Math.max(a.sx - sa * JOIN_MARGIN, a.sx + sa * (reach + JOIN_MARGIN));
+    for (const b of items) {
+      if (b === a) continue;
+      // b'nin masada yattığı aralık: inişinin bittiği yerden direğine (iniş boyu iki kabloda da aynı sayılır).
+      const sb = Math.sign(b.xp - b.sx) || 1;
+      const from = b.side ? b.xa : b.sx + sb * Math.min(DROP_NOMINAL, Math.abs(b.xp - b.sx));
+      if (Math.max(from, b.xp) > a0 && Math.min(from, b.xp) < a1) joins.get(a)!.add(b);
+    }
+  }
   /** Yan şeridin üstünden geçen cihaz kablosu o tahta dışı kablodan geride kalır (atlamalı yerleştirmede kalkar). */
   const behindSide = new Map<LaneItem, Set<LaneItem>>(items.map((i) => [i, new Set<LaneItem>()]));
   const crosses = (b: LaneItem, side: LaneItem) => side.xa > lo(b) - SHIFT && side.xa < hi(b) + SHIFT;
@@ -345,8 +393,10 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
    * yetmezse cihaz kablosu yan şeritten gelen kablodan öne (direklere yakın şeride) geçebilir; kesiştiği yerde bir
    * kablo çapı yükselip onun üstünden atlar.
    */
-  const assign = (stack: boolean, hop: boolean): number => {
-    const before = (i: LaneItem) => (hop ? [...deeper.get(i)!] : [...deeper.get(i)!, ...behindSide.get(i)!]);
+  const assign = (stack: boolean, hop: boolean, join: boolean): number => {
+    const strict = (i: LaneItem) => (hop ? [...deeper.get(i)!] : [...deeper.get(i)!, ...behindSide.get(i)!]);
+    const joined = (i: LaneItem) => (join ? [...joins.get(i)!] : []);
+    const before = (i: LaneItem) => [...strict(i), ...joined(i)];
     const placed: LaneItem[] = [];
     let overflow = 0;
     const pending = new Set(items);
@@ -356,8 +406,12 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
       if (candidates.length === 0) candidates = [...pending];
       const item = candidates.sort((p, q) => Math.min(maxLane(p), p.capLane) - Math.min(maxLane(q), q.capLane) || hi(q) - lo(q) - (hi(p) - lo(p)) || p.index - q.index)[0]!;
       pending.delete(item);
-      const after = before(item).filter((d) => d.lane >= 0);
-      const start = Math.max(item.minLane, ...after.map((d) => d.lane + 1));
+      // Önde olması gerekenler: yan kablolar kesin önde; inişinin altında yatan kablo önde ya da aynı şeritte (altında).
+      const start = Math.max(
+        item.minLane,
+        ...strict(item).filter((d) => d.lane >= 0).map((d) => d.lane + 1),
+        ...joined(item).filter((d) => d.lane >= 0).map((d) => (d.side ? d.lane + 1 : d.lane)),
+      );
       const apart = (q: LaneItem) => lo(q) > hi(item) + CABLE_PITCH || hi(q) < lo(item) - CABLE_PITCH;
       const inside = (q: LaneItem) => lo(q) + 2 * CABLE_PITCH <= lo(item) && hi(item) <= hi(q) - 2 * CABLE_PITCH;
       const fits = (lane: number, layer: number) => {
@@ -386,29 +440,60 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     }
     return overflow;
   };
-  // Sırayla: düz, üst üste yatan, atlamalı. İlk taşmasız (ya da en az taşan) yerleşim tutulur.
-  let overflow = assign(false, false);
+  // Sırayla: düz, üst üste yatan, atlamalı; önce şeride katılma sırasıyla, koridor o sırayla dolmuyorsa (çok kablolu,
+  // çapraz bağlantılı devre) sırasız (her kablo yine öbürlerine değmeyen bir çapraz iniş arar). İlk taşmasız (ya da en
+  // az taşan) yerleşim tutulur.
+  let overflow = assign(false, false, true);
   let kept = items.map((i) => ({ lane: i.lane, layer: i.layer }));
   let mode: RouteResult['mode'] = 'flat';
-  for (const [stack, hop] of [[true, false], [true, true]] as const) {
+  let joined = true;
+  for (const [stack, hop, join] of [[true, false, true], [false, false, false], [true, false, false], [true, true, false]] as const) {
     if (overflow === 0) break;
-    const tried = assign(stack, hop);
+    const tried = assign(stack, hop, join);
     if (tried < overflow) {
       overflow = tried;
       kept = items.map((i) => ({ lane: i.lane, layer: i.layer }));
-      mode = hop ? 'hops' : 'stacked';
+      mode = hop ? 'hops' : stack ? 'stacked' : 'flat';
+      joined = join;
     }
   }
   items.forEach((i, k) => Object.assign(i, kept[k]));
-  for (const item of items) {
+  /**
+   * Kablonun yolu. `drop` verilmişse soketten çapraz iniş: kablo fişin ucundan sonra hem aşağıya hem şeridinin yönüne
+   * döner, çapraz iner ve şeridine teğet yatar (üstten bakınca dik köşe yok, yumuşak bir kavis). `drop` yoksa eski
+   * dikey iniş (yedek; tahta dışı kablolar ve atlamalı yerleşim hep böyle). Çapraz iniş kurulamıyorsa null.
+   */
+  const build = (item: LaneItem, drop: { d: number; r: number; ahead: number } | null): RoundedPath | null => {
     const job = jobs[item.index]!;
     const z = laneZ(item);
     const y = layerY(item.layer);
-    const way = [...item.pre];
     // Atlama: bu şeridin gerisine dönen yan kabloların masadaki kısmı bu kablonun altından geçer; kablo oralarda bir
     // kablo çapı yükselir. Rampaya yer yoksa (iniş ya da çıkış yakın) kablo o uçta yüksekte başlar ya da biter.
     const sgn = Math.sign(item.xp - item.xa) || 1;
     const under = item.side ? [] : items.filter((q) => q.side && q.lane > item.lane && crosses(item, q)).map((q) => q.xa).sort((p, q) => (p - q) * sgn);
+    if (drop) {
+      const exit = item.exit;
+      if (!exit || under.length > 0 || (Math.sign(item.xp - exit.x) || 1) !== sgn) return null;
+      const land = new Vector3(exit.x + sgn * drop.d, y, z);
+      // İniş şeridin kendi aralığında biter (yana kaydırılmış inişte de).
+      if ((land.x - item.xa) * sgn < 0) return null;
+      const base = exit.pre[exit.pre.length - 1]!;
+      // Bükülme, kablo cihazın ön yüzünün (düğmeler, ayaklar) önüne çıktıktan sonra başlar.
+      const straight = Math.max(exit.pre.length > 1 ? exit.lead : 0, job.box.max.z + CABLE_R + 0.15 - base.z) + drop.ahead;
+      let t = drop.r;
+      let top = base;
+      for (let k = 0; k < 4; k++) {
+        top = base.clone().addScaledVector(Z, straight + t);
+        const phi = Z.angleTo(land.clone().sub(top));
+        if (phi > 1.75) return null;
+        t = drop.r * Math.tan(phi / 2) + 0.02;
+      }
+      const up = slant(job.entry.y - y);
+      const way = [...exit.pre, top, land, new Vector3(item.xp, y, z), new Vector3(item.xp, job.entry.y, z + Math.min(up.lean, Math.max(0, job.entry.z - BOOT - up.top - z))), job.entry.clone()];
+      const first = exit.pre.length;
+      return roundPath(way, (corner) => (corner === first || corner === first + 1 ? drop.r : R));
+    }
+    const way = [...item.pre];
     const high = y + CABLE_PITCH;
     let startY = y;
     let endY = y;
@@ -443,18 +528,79 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     // Çıkışın öne yatıklığı: gerektiği kadar, fişe kalan yeri geçmeden.
     const up = slant(job.entry.y - endY);
     way.push(new Vector3(item.xp, job.entry.y, z + Math.min(up.lean, Math.max(0, job.entry.z - BOOT - up.top - z))), job.entry.clone());
-    const path = roundPath(way, R);
+    return roundPath(way, R);
+  };
+  /** Kurulan yolların gövdeleri (fişe giren son parça dışında tamamı): sonraki kablolar bunlara değmeyen inişi seçer. */
+  const built: Vector3[][] = [];
+  const keep = (item: LaneItem, path: RoundedPath) => {
     routes[item.index] = { points: path.points, kind: item.side ? 'side' : 'lane', minRadius: path.minRadius, lane: item.lane };
+    built.push(wholeCable(path.points));
+  };
+  /** Yol, kendi cihazı dışındaki bir gövdenin içinden (ya da kablo yarıçapı kadar yakınından) geçiyor mu. */
+  const hitsBody = (points: readonly Vector3[], own: Box3): boolean => {
+    const pad = CABLE_R + 0.1;
+    const boxes = (ctx.bodies ?? []).filter((box) => box !== own);
+    if (boxes.length === 0) return false;
+    const p = new Vector3();
+    for (let i = 1; i < points.length; i++) {
+      const n = Math.max(1, Math.ceil(points[i]!.distanceTo(points[i - 1]!) / 0.4));
+      for (let k = 0; k <= n; k++) {
+        p.copy(points[i - 1]!).lerp(points[i]!, k / n);
+        for (const box of boxes) if (p.x > box.min.x - pad && p.x < box.max.x + pad && p.y < box.max.y + pad && p.z > box.min.z - pad && p.z < box.max.z + pad) return true;
+      }
+    }
+    return false;
+  };
+  for (const item of items) if (item.side) keep(item, build(item, null)!);
+  // Cihaz kabloları geriden öne (cihazlara yakın şeritten başlayarak) kurulur: öndeki kablonun inişi, gerisinde yatan
+  // kabloların üstünden geçer; onlara değmeyen ilk iniş seçilir. Önce geniş kavisli uzun çapraz, olmazsa kısası, o da
+  // olmazsa dikey iniş.
+  let steep = 0;
+  for (const item of items.filter((i) => !i.side).sort((p, q) => q.lane - p.lane || q.layer - p.layer || p.index - q.index)) {
+    const job = jobs[item.index]!;
+    const exit = item.exit!;
+    const run = laneZ(item) - Math.max(exit.z + exit.lead, job.box.max.z + CABLE_R + 0.15);
+    const reach = Math.abs(item.xp - exit.x) - R - 0.6;
+    const lengths = [...new Set([Math.min(8, Math.max(3.6, 1.1 * run)), Math.min(6, Math.max(3, 0.8 * run)), ...DROP_LENGTHS].map((d) => Math.min(d, reach)).filter((d) => d >= 0.3))];
+    let chosen: RoundedPath | null = null;
+    // Önce fişin hemen önünde dönen iniş; olmazsa kablo biraz daha düz gidip sonra döner (önündeki bir direğin
+    // kablosunun üstünden aşar).
+    search: for (const ahead of [0, 1.2, 2.4]) {
+      if (ahead > 0 && ahead > run - 2.5) break;
+      for (const d of lengths) {
+        for (const r of DROP_RADII) {
+          const path = build(item, { d, r, ahead });
+          if (!path || path.minRadius < CABLE_BEND_MIN || hitsBody(path.points, job.box)) continue;
+          const body = wholeCable(path.points);
+          if (built.every((o) => pathDistance(body, o, CLEAR) >= CLEAR)) {
+            chosen = path;
+            break search;
+          }
+        }
+      }
+    }
+    if (!chosen) steep++;
+    keep(item, chosen ?? build(item, null)!);
+  }
+  // --- Tepeden görünüm: cihaz kabloları kartın soketinden direğe kemer ---
+  // Kemer soketin üstünden öne yatık kalkar, düz gider, fişe yatık iner (köşeler yuvarlak). Her kemer, öncekilere ve
+  // tahta dışı kablolara değmeyen en alçak yükseklikten geçer: tepeden bakınca kesişen kablolar farklı yükseklikte,
+  // gövdeleri birbirine girmez (eskiden kavisler kesiştikleri yerde aynı yükseklikte buluşabiliyordu).
+  if (tops.length > 0) {
+    const ends = tops.map((index) => ({ a: jobs[index]!.from.clone().add(new Vector3(0, 1.4, 0)), b: jobs[index]!.entry.clone() }));
+    routeArches(ends, built, 24, slantArch).forEach((arch, k) => {
+      routes[tops[k]!] = { points: arch.points, kind: 'arc', minRadius: arch.minRadius, lane: -1 };
+    });
   }
   // --- Doğrudan giden kablolar: öbür kablolara değmeyen ilk sarkma ---
   const SAGS = [1.2, 0.5, 2.0, 0, 2.8, -0.8, 3.6, -1.6, 4.4];
   for (const index of bridges) {
     const job = jobs[index]!;
-    const others = routes.flatMap((r) => (r ? [cableBody(r.points)] : []));
+    const others = routes.flatMap((r) => (r ? [wholeCable(r.points)] : []));
     let best: { route: CableRoute; score: number } | null = null;
     for (const sag of SAGS) {
       const route = bridge(job, sag);
-      const body = cableBody(route.points);
+      const body = wholeCable(route.points);
       const clear = Math.min(CLEAR * 2, ...others.map((o) => pathDistance(body, o, CLEAR)));
       const score = (route.minRadius >= CABLE_BEND_MIN ? 0 : -10) + Math.min(clear, CLEAR);
       if (!best || score > best.score + 1e-9) best = { route, score };
@@ -462,7 +608,7 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     }
     routes[index] = best!.route;
   }
-  return { routes: routes.map((r) => r!), overflow, mode };
+  return { routes: routes.map((r) => r!), overflow, mode, steep, joined };
 }
 
 /**
@@ -475,12 +621,23 @@ export function archPath(a: Vector3, b: Vector3, height: number): { points: Vect
 }
 
 /**
- * Atlama kablolarının yolları: her kablo, öncekilere ve `others`'a (direk kabloları) değmeyen en alçak yükseklikten
- * geçer (kesişen kablo ötekinin üstünden, bir kablo çapı yukarıdan).
+ * Tepeden görünümde kartın soketinden direğe giden kemer: kalkış ve iniş dik değil, öne yatık (`TOP_SLANT`). Dik
+ * olsaydı, komşu direğe (2 birim ötede) alçak açıyla gelen bir kablonun düz kısmı bu kablonun dik inişinin yarım birim
+ * yakınından geçerdi ve hangi yükseklik seçilirse seçilsin ikisi birbirine girerdi; yatık inişte yüksekliği farklı
+ * kablolar inişin farklı yerinden geçer.
  */
-export function routeArches(ends: ReadonlyArray<{ a: Vector3; b: Vector3 }>, others: ReadonlyArray<readonly Vector3[]>): Array<{ points: Vector3[]; minRadius: number }> {
+function slantArch(a: Vector3, b: Vector3, height: number): { points: Vector3[]; minRadius: number } {
+  const path = roundPath([a.clone(), new Vector3(a.x, height, a.z + TOP_SLANT), new Vector3(b.x, height, b.z - TOP_SLANT), b.clone()], R);
+  return { points: path.points, minRadius: path.minRadius };
+}
+
+/**
+ * Atlama kablolarının yolları: her kablo, öncekilere ve `others`'a (direk kabloları) değmeyen en alçak yükseklikten
+ * geçer (kesişen kablo ötekinin üstünden, bir kablo çapı yukarıdan). `shape`: kemerin biçimi.
+ */
+export function routeArches(ends: ReadonlyArray<{ a: Vector3; b: Vector3 }>, others: ReadonlyArray<readonly Vector3[]>, levels = 10, shape: typeof archPath = archPath): Array<{ points: Vector3[]; minRadius: number }> {
   const span = (e: { a: Vector3; b: Vector3 }) => Math.hypot(e.b.x - e.a.x, e.b.z - e.a.z);
-  const done: Vector3[][] = others.map((o) => cableBody(o));
+  const done: Vector3[][] = others.map((o) => wholeCable(o));
   // Kısa kablo alçaktan, uzun kablo yüksekten geçer: bir kablonun dik kalkışı ya da inişi, üstünden geçen daha uzun
   // kablonun düz kısmının altında kalır.
   const order = ends.map((_, i) => i).sort((p, q) => span(ends[p]!) - span(ends[q]!) || p - q);
@@ -490,9 +647,9 @@ export function routeArches(ends: ReadonlyArray<{ a: Vector3; b: Vector3 }>, oth
     const base = Math.max(a.y, b.y) + R + 0.05;
     let best: { points: Vector3[]; minRadius: number } | null = null;
     let bestClear = -1;
-    for (let k = 0; k < 10; k++) {
-      const path = archPath(a, b, base + k * CABLE_PITCH);
-      const body = cableBody(path.points);
+    for (let k = 0; k < levels; k++) {
+      const path = shape(a, b, base + k * CABLE_PITCH);
+      const body = wholeCable(path.points);
       const clear = Math.min(CLEAR, ...done.map((o) => pathDistance(body, o, CLEAR)));
       if (clear > bestClear + 1e-9) {
         best = path;
@@ -500,10 +657,33 @@ export function routeArches(ends: ReadonlyArray<{ a: Vector3; b: Vector3 }>, oth
       }
       if (clear >= CLEAR) break;
     }
-    done.push(cableBody(best!.points));
+    done.push(wholeCable(best!.points));
     out[i] = best!;
   }
   return out;
+}
+
+/**
+ * Tepeden görünümde ön paneli soketli cihazların uçları: gerçek boyutlu cihazlar tahtadan çok geniş bir sıra kurar,
+ * kartlar tahtayı küçültürdü. Kartlar (soketlerin çevresi) tahtanın hemen arkasında yan yana dizilir; uçlar kartta
+ * soldan sağa gerçek sırasıyla, kısa sabit aralıkla durur. `devices`: her cihazın gerçek uçları (masadaki sırayla).
+ */
+export function compactSockets(devices: ReadonlyArray<readonly Vector3[]>): Vector3[][] {
+  const GAP = 4;
+  const PITCH = 5;
+  const PAD = 6;
+  const widths = devices.map((real) => (real.length - 1) * PITCH + 2 * PAD);
+  const total = widths.reduce((sum, w) => sum + w, 0) + GAP * Math.max(0, devices.length - 1);
+  let x = -total / 2;
+  // Kartlar direk sırasının ve adlarının gerisinde (plakanın arka kenarının 5 birim ötesi).
+  const z = -BB.depth / 2 - PLATE.back - 5;
+  return devices.map((real, d) => {
+    const order = real.map((a, i) => ({ a, i })).sort((u, v) => u.a.x - v.a.x);
+    const compact: Vector3[] = new Array<Vector3>(real.length);
+    order.forEach(({ a, i }, k) => (compact[i] = new Vector3(x + PAD + k * PITCH, a.y, z)));
+    x += widths[d]! + GAP;
+    return compact;
+  });
 }
 
 /** Direk kablolarının işleri (`layout.cables` sırasıyla; parçası sahnede olmayan kablo için null). */

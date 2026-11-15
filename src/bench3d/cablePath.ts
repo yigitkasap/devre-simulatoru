@@ -16,6 +16,8 @@ export interface RoundedPath {
 
 /** Yaydaki ardışık noktalar arasındaki en büyük açı (radyan): "bükülmede yeterli segment". */
 const ARC_STEP = (12 * Math.PI) / 180;
+/** Geniş yayda (soketten çapraz inişin kavisleri) ardışık noktalar arasındaki en büyük boy: yakından kırık görünmesin. */
+const ARC_CHORD = 0.7;
 
 /**
  * Köşeli çizgiyi yuvarlatır. `radius`: her iç köşe için istenen yarıçap (sayı ya da köşe sırasına göre işlev; 0 ya
@@ -87,7 +89,7 @@ export function roundPath(way: readonly Vector3[], radius: number | ((corner: nu
     const bis = v.clone().sub(u).normalize();
     const center = corner.clone().addScaledVector(bis, r / Math.cos(phi / 2));
     const e1 = start.clone().sub(center).divideScalar(r);
-    const steps = Math.max(2, Math.ceil(phi / ARC_STEP));
+    const steps = Math.max(2, Math.ceil(phi / ARC_STEP), Math.ceil((r * phi) / ARC_CHORD));
     push(start);
     for (let k = 1; k <= steps; k++) {
       const a = (phi * k) / steps;

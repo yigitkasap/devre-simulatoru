@@ -3301,6 +3301,22 @@ try {
     page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
     const hits = [];
     const gaps = [];
+    const topGaps = [];
+    const steep = [];
+    // Kablonun bütün yolu (2026-11-15, "kablo uçları"): yol soketteki fişin ucunda başlar; soketten masaya iniş ve
+    // şeride dönüş dahil, yalnızca direkteki muz fişin içine giren son 0,05 birim sayılmaz. Eskiden iki uçtan yolun
+    // %2'si ölçülmüyordu (cihazın önü denetlenmiyordu).
+    const closest = () => page.evaluate(() => {
+      const lines = (window.__tezgah?.postCables ?? []).map((c) => {
+        const out = [];
+        const len = c.getLength();
+        for (let i = 0; i <= 600; i++) out.push(c.getPoint(((1 - 0.05 / len) * i) / 600));
+        return out;
+      });
+      let min = Infinity;
+      for (let a = 0; a < lines.length; a++) for (let b = a + 1; b < lines.length; b++) for (const p of lines[a]) for (const q of lines[b]) { const d = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z); if (d < min) min = d; }
+      return lines.length < 2 ? 'tek' : (Math.round(min * 100) / 100).toFixed(2);
+    });
     // ard-role: pil Arduino'nun dışındaki sütunda; kablosu Arduino ile pilin arasındaki boşluktan arkaya dolanır
     // (2026-11-14; eskiden Arduino'nun üstünden aşıyordu).
     for (const id of ['rc-dolma', 'ard-blink', 'transformator', 'bjt-yukseltec', 'ard-role', 'diyot-dc', 'yarim-dalga']) {
@@ -3309,21 +3325,22 @@ try {
       await page.waitForFunction(() => window.__tezgah !== undefined, null, { timeout: 15000 }).catch(() => {});
       await page.waitForTimeout(300);
       hits.push(`${id}:${await page.evaluate(() => window.__tezgah?.cableHits() ?? -1)}`);
-      // Kablolar üst üste binmez (2026-11-14): direk kablolarının merkez çizgileri arasındaki en kısa uzaklık (uçlardaki
-      // fişler hariç; yolun noktalarından) kablo çapından (0,56 birim) az değil.
-      gaps.push(`${id}:${await page.evaluate(() => {
-        const lines = (window.__tezgah?.postCables ?? []).map((c) => {
-          const out = [];
-          for (let i = 0; i <= 400; i++) { const t = 0.02 + (0.96 * i) / 400; out.push(c.getPoint(t)); }
-          return out;
-        });
-        let min = Infinity;
-        for (let a = 0; a < lines.length; a++) for (let b = a + 1; b < lines.length; b++) for (const p of lines[a]) for (const q of lines[b]) { const d = Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z); if (d < min) min = d; }
-        return lines.length < 2 ? 'tek' : (Math.round(min * 100) / 100).toFixed(2);
-      })}`);
+      // Kablolar üst üste binmez (2026-11-14): direk kablolarının merkez çizgileri arasındaki en kısa uzaklık (yolun
+      // noktalarından) kablo çapından (0,56 birim) az değil.
+      gaps.push(`${id}:${await closest()}`);
+      // Soketten iniş çapraz ve kavisli: dikey inen cihaz kablosu yok, koridor taşmıyor.
+      steep.push(`${id}:${await page.evaluate(() => { const s = window.__tezgah?.cableStats; return s ? `${s.steep}/${s.overflow}` : 'yok'; })}`);
+      // Tepeden görünüm (Tahtada kur): kablolar kartın soketinden direğe kemer; kesişenler farklı yükseklikte.
+      await page.evaluate(() => window.__tezgah?.setTop(true));
+      await page.waitForTimeout(250);
+      topGaps.push(`${id}:${await closest()}`);
     }
-    check('3B: cihaz ve tahta dışı parça kabloları üst üste binmiyor (merkez çizgileri arası en kısa uzaklık ≥ kablo çapı 0,56; eskiden aynı yoldan geçen kablolar üst üste çiziliyordu)',
+    check('3B: cihaz ve tahta dışı parça kabloları üst üste binmiyor: fiş hariç bütün yol boyunca (soketten iniş ve şeride dönüş dahil) merkez çizgileri arası en kısa uzaklık ≥ kablo çapı 0,56',
       gaps.every((g) => g.endsWith(':tek') || Number(g.split(':')[1]) >= 0.56), gaps.join(' '));
+    check('3B: cihaz kabloları soketten çapraz, kavisle iniyor (dikey inen kablo yok, koridor taşmıyor: dikey/taşan = 0/0)',
+      steep.every((g) => g.endsWith(':0/0')), steep.join(' '));
+    check('3B tepeden görünüm (Tahtada kur): kablolar üst üste binmiyor (bütün yol boyunca merkez çizgileri arası ≥ 0,56; eskiden kesişen kavisler aynı yükseklikte buluşabiliyordu)',
+      topGaps.every((g) => g.endsWith(':tek') || Number(g.split(':')[1]) >= 0.56), topGaps.join(' '));
     check('3B: masadaki parçalardan (pil, Arduino, transformatör, cihazlar) gelen kablolar gövdelerin içinden geçmiyor; tahta dışı parçanın kablosu parçanın yanındaki boşluktan arkaya dolanıyor',
       hits.every((h) => h.endsWith(':0')), hits.join(' '));
     await ctx.close();
