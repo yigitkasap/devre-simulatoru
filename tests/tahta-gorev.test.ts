@@ -36,7 +36,7 @@ describe('Tahtada kur görevi (T6)', () => {
     // Deney 9'da toprak ve besleme az bacaklı: ray kullanılmaz; güç kaynağının kabloları bağlı olduğu bacağın
     // şeridinde hazır gelir ("ray yalnızca kalabalık ağda", 2026-11-14; eskiden raylarda ve iki ray kablosuyla).
     expect(rails.wires.length).toBe(0);
-    expect(rails.leads.map((l) => `${labelOf(doc, l.part)}#${l.pin} ${l.hole}`)).toEqual(['PS1#0 5d', 'PS1#1 4b']);
+    expect(rails.leads.map((l) => `${labelOf(doc, l.part)}#${l.pin} ${l.hole}`)).toEqual(['PS1#0 2g', 'PS1#1 4b']);
     // Raylar arası kablosu olan devrede (555 astabil: toprak ve besleme iki yarıda) o kablolar da hazır gelir.
     const crowded = exampleDoc('555-astabil')!;
     const crowdedStart = startBuild(crowded, planBreadboard(crowded), { ...DEFAULT_BOARD_TASK, start: 'rails' });
@@ -59,9 +59,9 @@ describe('Tahtada kur görevi (T6)', () => {
     const fg = idOf(doc, 'FG1');
     const student = {
       ...start,
-      parts: { ...start.parts, [idOf(doc, 'R1')]: { holes: ['6b', '3b'] } },
+      parts: { ...start.parts, [idOf(doc, 'R1')]: { holes: ['6a', '3a'] } },
       wires: [...start.wires, { a: '7a', b: '3j', color: 'orange' as const }],
-      leads: [...start.leads, { part: fg, pin: 1, hole: '6a' }],
+      leads: [...start.leads, { part: fg, pin: 1, hole: '6b' }],
     };
     expect(keepLocked(student, locks)).toEqual(start);
     expect(student.wires.filter((w) => locks.wires.has(wireKey(w))).length).toBe(0);

@@ -72,6 +72,31 @@ function footprint(part: Part, holes: readonly Strip[]): string[] {
   return out;
 }
 
+/** Yüksek parçanın gölgesi (kamera önden bakar): arkasındaki satırlar; elektrolitikte iki, transistörde bir. */
+function shadeOf(part: Part, holes: readonly Strip[]): string[] {
+  if (holes.length === 0) return [];
+  const kind = part.props.kind;
+  const behind = part.type === 'capacitor' ? (kind === undefined || kind === 'electrolytic' ? 2 : 1) : ['to92', 'inline', 'pot'].includes(mountOf(part.type) ?? '') ? 1 : 0;
+  const row = Math.min(...holes.map((h) => h.row));
+  const out: string[] = [];
+  for (let r = row - behind; r < row; r++) {
+    if (r < 0 || (r >= 5) !== (row >= 5)) continue;
+    for (let c = Math.min(...holes.map((h) => h.col)); c <= Math.max(...holes.map((h) => h.col)); c++) out.push(cellKey(holes[0]!.board, r, c));
+  }
+  return out;
+}
+
+/** Gövdenin ortası: eksenli parçada bacakların arası, öbürlerinde bütün kapsam (gölgeye yalnızca bacak ucu girer). */
+function middleOf(part: Part, holes: readonly Strip[]): string[] {
+  if (holes.length === 0) return [];
+  if (mountOf(part.type) !== 'axial') return footprint(part, holes);
+  const out: string[] = [];
+  const lo = Math.min(...holes.map((h) => h.col));
+  const hi = Math.max(...holes.map((h) => h.col));
+  for (let c = lo + 1; c < hi; c++) out.push(cellKey(holes[0]!.board, holes[0]!.row, c));
+  return out;
+}
+
 interface Board {
   /** Şerit → ağ. */
   readonly net: Map<string, string>;
@@ -83,6 +108,9 @@ interface Board {
   readonly cells: Map<string, string>;
   /** Ampermetrenin girdiği yerdeki boş şerit. */
   readonly gaps: Set<string>;
+  /** Yüksek parçaların gölgeleri ve gövdelerin ortaları ([delik, parça]). */
+  readonly shade: Array<[string, string]>;
+  readonly middle: Array<[string, string]>;
 }
 
 function boardOf(doc: CircuitDoc, plan: BreadboardPlan): Board {
@@ -90,6 +118,8 @@ function boardOf(doc: CircuitDoc, plan: BreadboardPlan): Board {
   const legs = new Map<string, number>();
   const used = new Set<string>();
   const cells = new Map<string, string>();
+  const shade: Array<[string, string]> = [];
+  const middle: Array<[string, string]> = [];
   const strip = (h: Hole, n: string | null) => {
     if (h.kind !== 'strip') return;
     used.add(cellKey(h.board, h.row, h.col));
@@ -104,6 +134,9 @@ function boardOf(doc: CircuitDoc, plan: BreadboardPlan): Board {
     });
     for (const h of at.extraHoles ?? []) strip(h, null);
     for (const k of footprint(part, [...at.holes, ...(at.extraHoles ?? [])].filter((h): h is Strip => h.kind === 'strip'))) cells.set(k, part.id);
+    const own = at.holes.filter((h): h is Strip => h.kind === 'strip');
+    for (const k of shadeOf(part, own)) shade.push([k, part.id]);
+    for (const k of middleOf(part, own)) middle.push([k, part.id]);
   }
   for (const l of plan.leads) strip(l.hole, l.net);
   for (const j of plan.jumpers) {
@@ -119,7 +152,7 @@ function boardOf(doc: CircuitDoc, plan: BreadboardPlan): Board {
       gaps.add(stripKey(ends[0]!.board, halfOf(ends[0]!), (ends[0]!.col + ends[1]!.col) / 2));
     }
   }
-  return { net, legs, used, cells, gaps };
+  return { net, legs, used, cells, gaps, shade, middle };
 }
 
 /** Şeritlerde buluşan bacak sayısı: her şeritte parça bacağı − 1 (köprüsüz kurulan bağlantılar). */
@@ -164,6 +197,10 @@ function betterSpot(plan: BreadboardPlan, board: Board, part: Part, reserve: (ne
         for (let r = half * 5; r < half * 5 + 5; r++) {
           const trial = cols.map((c) => ({ kind: 'strip' as const, board: b, col: c, row: r }));
           if (footprint(part, trial).some((k) => (board.cells.has(k) && board.cells.get(k) !== part.id) || (used.has(k) && !trial.some((t) => cellKey(t.board, t.row, t.col) === k)))) continue;
+          // Yüksek parçanın gölgesine gövdenin ortası girmez; kendi gölgesi başka bir gövdenin ortasına düşmez.
+          const shaded = new Set(board.shade.filter(([, id]) => id !== part.id).map(([k]) => k));
+          const middles = new Set(board.middle.filter(([, id]) => id !== part.id).map(([k]) => k));
+          if (middleOf(part, trial).some((k) => shaded.has(k)) || shadeOf(part, trial).some((k) => middles.has(k))) continue;
           let ok = true;
           const next = new Map(legs);
           cols.forEach((c, k) => {

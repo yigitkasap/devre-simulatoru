@@ -128,7 +128,7 @@ describe('Döndürme ve taşıma', () => {
 
   it('R: LED’in bacakları yer değiştirir, transistörün sırası ters döner, DIP aynı deliklerde döner', () => {
     const led = rotatePlaced(build, 'led', id('LED1'));
-    expect(led.ok && led.build.parts[id('LED1')]!.holes).toEqual(['4a', '2a']);
+    expect(led.ok && led.build.parts[id('LED1')]!.holes).toEqual(['4e', '2e']);
     const q = rotatePlaced(build, 'npn', id('Q1'));
     expect(q.ok && q.build.parts[id('Q1')]!.holes).toEqual(['4c', '3c', '2c']);
     const op = exampleDoc('opamp-evirmeyen')!;
@@ -143,13 +143,13 @@ describe('Döndürme ve taşıma', () => {
   });
 
   it('gövdeden sürükleme bütün bacakları kaydırır; bacağın ucundan sürükleme yalnızca o bacağı', () => {
-    // R2 5e–2e'de. Yukarı (d) taşınamaz: 5d güç kaynağının + kablosunun deliği. Aşağı (f) taşınabilir.
+    // R2 2h–6h'de. Yukarı (g) taşınamaz: 2g güç kaynağının + kablosunun deliği. Aşağı (i) taşınabilir.
     expect(movePlaced(build, 'resistor', id('R2'), 0, -1)).toEqual({ ok: false, reason: 'occupied' });
     const down = movePlaced(build, 'resistor', id('R2'), 0, 1);
-    expect(down.ok && down.build.parts[id('R2')]!.holes).toEqual(['5f', '2f']);
+    expect(down.ok && down.build.parts[id('R2')]!.holes).toEqual(['2i', '6i']);
     expect(movePlaced(build, 'resistor', id('R2'), 30, 0)).toEqual({ ok: false, reason: 'board' });
-    const leg = moveLeg(build, 'resistor', id('R2'), 1, h('9e'));
-    expect(leg.ok && leg.build.parts[id('R2')]!.holes).toEqual(['5e', '9e']);
-    expect(moveLeg(build, 'resistor', id('R2'), 1, h('4e'))).toEqual({ ok: false, reason: 'reach' });
+    const leg = moveLeg(build, 'resistor', id('R2'), 1, h('10h'));
+    expect(leg.ok && leg.build.parts[id('R2')]!.holes).toEqual(['2h', '10h']);
+    expect(moveLeg(build, 'resistor', id('R2'), 1, h('4h'))).toEqual({ ok: false, reason: 'reach' });
   });
 });

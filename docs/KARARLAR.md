@@ -2662,7 +2662,8 @@ entegre dahil). Köprü teli yalnızca şeritte yer kalmayınca ya da iki bacak 
 **Yerleşim** (`src/bench3d/breadboard.ts`, yalnızca tezgâh planı):
 
 1. Önce şekli sabit çok bacaklılar (entegre, düğme, gösterge), sonra sıralı bacaklılar (transistör, trimpot, köprü
-   diyot, TO-220), en sonda iki bacaklılar; her grup şemadaki soldan sağa sırayla.
+   diyot, TO-220), sonra dik duran iki bacaklılar (LED, kondansatör: bacak aralığı 1–3, seçenekleri az), en sonda
+   eksenliler (direnç, diyot); her grup şemadaki soldan sağa sırayla.
 2. Her parça, bacaklarından biri ya da birkaçı aynı ağın var olan bir şeridine gelecek en iyi yere takılır
    (`bestSpot`); iki bacaklıda bacak aralığı Tahtada kur'un sınırları içinde denenir (direnç ve diyot 3–8, LED ve
    kondansatör 1–3; önce olağan aralık). Eşitlikte sinyal ağı yeğlenir (RG'nin bacağı gate şeridinde, toprakta değil).
@@ -2672,16 +2673,24 @@ entegre dahil). Köprü teli yalnızca şeritte yer kalmayınca ya da iki bacak 
 4. Gövdeler: parça satırında ilk bacağından son bacağına kadar delikleri kaplar; buzzer iki komşu satırı, TO-18
    (sekmesi öne bakar) öndeki komşu satırı da; orta kanalın iki yanında bacağı olan parça (entegre, gösterge) aradaki
    satırları. Yeni parça bu deliklere takılmaz. Ampermetrenin girdiği yerdeki boş şerit ayrılır.
+   Yüksek parçanın gölgesi: kamera önden ve yukarıdan (48°) baktığı için arkasındaki satırlara (elektrolitikte iki,
+   transistör, TO-220, trimpot ve öbür kondansatörlerde bir) başka parçanın gövdesinin ortası giremez, bacak ucu girer
+   ("3B tahta parçaları örtülmüyor"; sıkılaşan yerleşimde yarım dalgada D1'in %41'i C2'nin ardında kalıyordu).
 5. Şeritte parça bacaklarına en çok 4 delik; ağın alet kabloları için 1 (ağda iki ya da daha çok alet kablosu ya da
-   raya inen köprü varsa 2) delik kalır.
+   raya inen köprü varsa 2) delik kalır. Bütün yollar (eski "önceki parçanın son sütunu" paylaşımı dahil) aynı sınırı
+   kullanır. Bir ağın şeritleri dolu olduğunda köprü ağacı boş deliği çok olan şeritten kurulur (bir şeritten iki
+   köprü çıkabilir; eskiden zincirdi ve ortadaki dolu şeritte köprü ucu bir bacağın deliğine düşüyordu).
 6. Eski yolda "bir önceki parçanın son sütununu paylaş" seçeneği artık sütunların gerçekten boş olduğuna bakar (parçalar
    araya da yerleştiği için; bakmadığında baraj-çubuk'ta iki ağ kısa devre oluyordu).
-7. Arduino'nun kalın fişi, önündeki bir deliğe direk teli iniyorsa şeridin en öndeki boş deliğine kayar (sıkışık
-   şeritte tel fişin yanından geçmesin).
+7. Arduino'nun kalın fişi alet uçlarından sonra takılır: şeridinde gövde altında olmayan ve önünde (direklerden uzak
+   yanında) hiçbir direk telinin inmediği bir deliğe (sıkışık şeritte tel fişin yanından geçmesin); yoksa aynı ağın başka
+   bir şeridine, o da yoksa köprüyle bağlanan yeni bir şeride. Köprü uçları da gövde altındaki deliklerden kaçınır.
 
-**Sonuç (81 örnek).** Köprü teli 361 → 221 (şerit–şerit 190 → 81, şerit–ray 144 → 116, ray–ray 27 → 24); 17 örnekte
-sıfıra indi, 45'inde azaldı, hiçbirinde artmadı. FET, BJT ve MOSFET yükselteçlerinde köprü yok (kuplajlı FET'te
-yukarıdaki zorunlu tek köprü). Deney 9 (T1) planı: Q1 2c-3c-4c, R1 6b–3b, R2 5e–2e, LED1 2a–4a; köprü yok (eskiden üç).
+**Sonuç (81 örnek).** Köprü teli 361 → 225 (şerit–şerit 190 → 87, şerit–ray 144 → 114, ray–ray 27 → 24); 13 örnekte
+sıfıra indi, 43'ünde azaldı, hiçbirinde artmadı. FET, BJT ve MOSFET yükselteçlerinde köprü yok (kuplajlı FET'te
+yukarıdaki zorunlu tek köprü). Deney 9 (T1) planı: Q1 2c-3c-4c, R1 6a–3a, LED1 2e–4e, R2 2h–6h; tek köprü 2b → 6f
+(eskiden üç). R2 üst yarıya sığmaz: arka satır Q1'in gölgesinde, ön satır TO-18'in sekmesine ayrılı, a ve e satırları
+R1 ile LED1'de.
 
 **Yan etkiler ve gevşeyen kurallar.**
 
@@ -2695,12 +2704,16 @@ yukarıdaki zorunlu tek köprü). Deney 9 (T1) planı: Q1 2c-3c-4c, R1 6b–3b, 
   çapraz; atlama, yan kablonun şeridi gerçekte kestiği aralığa göre (köşesi yay). (c) Çapraz inişe yer bulamayan
   (şeridi cihazın önüne çok yakın) kablo bir şerit öne alınıp şeritler yeniden atanır; dikliği 0,97'yi aşan iniş
   aday sayılmaz.
-- Tahtada kur fikstürleri (T1, T3, T4, T6) yeni planın delik adlarıyla; senaryolar aynı. "Eksik kablo" senaryosu
-  (planda baza giden köprü kalmadı) R1'i köprüyle baza bağlanan bir kurulumla kurulur.
+- Tahtada kur fikstürleri (T1, T3, T4, T6) yeni planın delik adlarıyla; senaryolar aynı. "Eksik kablo" artık
+  kollektörden R2'ye giden köprü (planda baza giden köprü kalmadı); "başka ağın şeridindeki bacak" R1'in baz ucunun
+  emetör şeridinde olması.
+- tahta-gorev testinin raylar arası kablo örneği yarım dalga yerine 555 astabil (yarım dalganın toprak bacakları artık
+  aynı şeritte buluşuyor, raylar arası kablosu kalmadı).
 
 **Denetim.** `tests/tahta-sutun.test.ts`: 81 örnekte köprü sayısı önce/sonra (hiçbiri artmaz, toplam %30'dan çok
 azalır); "aynı şeride takılabilecekken köprüyle bağlanmış bacak yok": planlayıcıdan bağımsız kaba kuvvet arama, her
-parçayı tek başına bütün uygun yerlere taşır, şeritlerde buluşan bacak sayısı artan yer bulursa hata; FET
+parçayı tek başına bütün uygun yerlere (gövde, gölge ve şerit sınırlarına uyarak) taşır, şeritlerde buluşan bacak
+sayısı artan yer bulursa hata; FET
 yükselteçlerinde RG gate, RD drain, RS source şeridinde. Netlistin şemayla aynı olduğu, gövdelerin çakışmadığı ve
 Tahtada kur'un planı kabul ettiği kendi testlerinde (tahta-duzen, tezgah-sade, yuvarlak-govde, tahta-denetle).
 

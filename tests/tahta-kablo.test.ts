@@ -48,9 +48,9 @@ describe('Ara kablolar (K)', () => {
     const doc = exampleDoc('bjt-anahtar')!;
     const plan = buildFromPlan(planBreadboard(doc));
     expect(addWire(plan, h('20a'), h('20a'))).toEqual({ ok: false, reason: 'same' });
-    // Q1 2c-3c-4c'de; LED1 2a–4a'da.
+    // Q1 2c-3c-4c'de; LED1 2e–4e'de.
     expect(addWire(plan, h('2c'), h('20a'))).toEqual({ ok: false, reason: 'occupied' });
-    expect(addWire(plan, h('20a'), h('2a'))).toEqual({ ok: false, reason: 'occupied' });
+    expect(addWire(plan, h('20a'), h('2e'))).toEqual({ ok: false, reason: 'occupied' });
     const withWire = ok(addWire(plan, h('20a'), h('22a')));
     expect(addWire(withWire, h('22a'), h('25a'))).toEqual({ ok: false, reason: 'occupied' });
     const lead = withWire.leads[0]!;
