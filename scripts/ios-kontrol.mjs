@@ -4662,10 +4662,11 @@ try {
     const noPlay = ((await sp.getByRole('alert').allTextContents()).join(' ')).includes('Bu görevde Oynat kapalı');
     check('Tahtada kur (T6, öğrenci): bağlantı doğrudan bu kipte açılıyor; Çık ve Bağlı delikler gizli; Q1 hazır takılı (1 / 4 takılı); Oynat kapalı; “Denetle hakkı: 3”',
       text.includes('1 / 4 takılı') && text.includes('Deney 9 · tahtada kur') && locked && noPlay && text.includes('Denetle hakkı: 3'), `${locked} ${noPlay} ${text.slice(0, 80)}`);
-    // Kilitli (hazır gelen) Q1 seçiliyken araç çubuğundaki ve seçim çubuğundaki Döndür ve Sil pasif.
+    // Kilitli (hazır gelen) Q1 seçiliyken araç çubuğundaki ve seçim çubuğundaki Döndür ve Sil pasif. Q1 planda 2c-3c-4c'de
+    // ("tahta sütunu", 2026-11-16; eskiden 2h-3h-4h): orta bacağının deliği 3c (üst yarının c satırı, z = −3,5).
     const q1At = await sp.evaluate(() => {
       const t = window.__tezgah.topTransform(); const rect = document.querySelector('[role=region][aria-label^="Breadboard"]').getBoundingClientRect();
-      return { x: rect.left + (3 - 15.5) * t.scale + t.ox, y: rect.top + (1.5 + 2) * t.scale + t.oy };
+      return { x: rect.left + (3 - 15.5) * t.scale + t.ox, y: rect.top + (-5.5 + 2) * t.scale + t.oy };
     });
     await sp.mouse.click(q1At.x, q1At.y); await sp.waitForTimeout(300);
     const toolbar = sp.getByRole('toolbar', { name: 'Tahta araçları' });

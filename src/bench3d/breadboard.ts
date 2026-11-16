@@ -31,7 +31,7 @@ import { buildConnectivity, pinKey } from '../model/connectivity';
 import { pinPositions } from '../model/geometry';
 import type { CircuitDoc, Part } from '../model/types';
 import { numProp, type DeviceType } from '../sim/netlist';
-import { batteryFootprint, transistorPackage } from './dimensions';
+import { batteryFootprint, nonPolarPackage, transistorPackage } from './dimensions';
 
 export const BB = {
   /** Tam boy (830 delik) ve yarım boy (400 delik) breadboard'un sütun sayısı. */
@@ -323,6 +323,23 @@ const LEG_CAPACITY = 3;
 const SHARE_LEGS = 4;
 
 /**
+ * Yüksek parçanın gölgesinin satır sayısı (kamera 48° önden ve yukarıdan bakar; tepesi kartın ≈ 2,5 birim ve daha
+ * üstünde olan parça arkasındaki iki satırı örter): elektrolitik ve film kondansatör, transistör, TO-220, trimpot iki;
+ * disk ve çok katmanlı seramik kondansatör, LED bir; öbürleri (direnç, diyot, anahtar) alçak.
+ */
+export function shadeRows(part: Pick<Part, 'type' | 'props'>): number {
+  const mount = MOUNTS[part.type]?.mount;
+  if (part.type === 'capacitor') {
+    const kind = part.props.kind;
+    if (kind === undefined || kind === 'electrolytic') return 2;
+    return nonPolarPackage(typeof part.props.capacitance === 'number' ? part.props.capacitance : 1e-6) === 'film' ? 2 : 1;
+  }
+  if (mount === 'to92' || mount === 'inline' || mount === 'pot') return 2;
+  if (part.type === 'led') return 1;
+  return 0;
+}
+
+/**
  * İki bacaklı parçanın planda denenen bacak aralıkları (önce olağan aralık): direnç ve diyot 3–8, LED ve kondansatör
  * 1–3 (Tahtada kur'un sınırları, tahta/rules.ts → legRange); öbürlerinde yalnızca olağan aralık (modelleri sabit).
  */
@@ -567,19 +584,21 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
     return out;
   };
   /**
-   * Yüksek parçanın gölgesi: kamera önden ve yukarıdan (48°) bakar; arkadaki satırlarda (elektrolitik kondansatörde
-   * iki, transistör, TO-220, trimpot ve öbür kondansatörlerde bir) alçak bir parçanın gövdesi onun ardında kalır
-   * ("3B tahta parçaları örtülmüyor"). Gölgeye başka parçanın yalnızca bacak ucu girebilir, gövdesinin ortası giremez.
+   * Yüksek parçanın gölgesi: kamera önden ve yukarıdan (48°) bakar; arkadaki satırlarda alçak bir parçanın gövdesi
+   * onun ardında kalır ("3B tahta parçaları örtülmüyor"; satır sayısı shadeRows). Gölgeye başka parçanın yalnızca bacak
+   * ucu girebilir, gövdesinin ortası giremez.
    */
   const shadeOf = (at: BoardPart): string[] => {
     const part = doc.parts.find((p) => p.id === at.partId);
     const holes = at.holes.filter((h): h is Hole & { kind: 'strip' } => h.kind === 'strip');
     if (!part || holes.length === 0) return [];
-    const kind = part.props.kind;
-    const behind = part.type === 'capacitor' ? (kind === undefined || kind === 'electrolytic' ? 2 : 1) : ['to92', 'inline', 'pot'].includes(MOUNTS[part.type]?.mount ?? '') ? 1 : 0;
+    const behind = shadeRows(part);
     const row = Math.min(...holes.map((h) => h.row));
     const out: string[] = [];
-    for (let r = row - behind; r < row; r++) {
+    // Kollu anahtarın geniş, kısa gövdesi önündeki satırda yatan gövdenin ardında kalır: o satır da gölge sayılır.
+    const front = part.type === 'switch' ? 1 : 0;
+    for (let r = row - behind; r <= row + front; r++) {
+      if (r === row) continue;
       if (r < 0 || (r >= 5) !== (row >= 5)) continue;
       for (let c = Math.min(...holes.map((h) => h.col)); c <= Math.max(...holes.map((h) => h.col)); c++) out.push(cellKey(holes[0]!.board, r, c));
     }
@@ -589,10 +608,11 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
   const middleOf = (at: BoardPart): string[] => {
     const holes = at.holes.filter((h): h is Hole & { kind: 'strip' } => h.kind === 'strip');
     if (holes.length === 0) return [];
-    if (at.mount !== 'axial') return footprint(at);
     const row = holes[0]!.row;
     const lo = Math.min(...holes.map((h) => h.col));
     const hi = Math.max(...holes.map((h) => h.col));
+    // Kısa açıklıklı eksenli parçanın (anahtar: 2 delik) gövdesi bacaklarına kadar uzanır.
+    if (at.mount !== 'axial' || hi - lo <= 2) return footprint(at);
     const out: string[] = [];
     for (let c = lo + 1; c < hi; c++) out.push(cellKey(holes[0]!.board, row, c));
     return out;
@@ -790,16 +810,22 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
       const rows: number[] = new Array<number>(n).fill(-1);
       // Zincirin kendi parçalarının satırları ve gövdeleri de sayılır (ortak şeritte iki bacak aynı deliğe düşmesin).
       const mine = new Set<string>();
+      const mineShade = new Set<string>();
+      const mineMiddle = new Set<string>();
       for (let i = 0; i < n; i++) {
         if (!board[i]) continue;
         const a = colOf(i);
         const c = colOf(i + 1);
         const used = (col: number, r: number) => (strips.get(stripKey(b, h, col))?.rows.has(r) ?? false) || mine.has(cellKey(b, r, col));
         const trial = (r: number): BoardPart => ({ partId: links[i]!.part.id, mount: MOUNTS[links[i]!.part.type]!.mount, holes: [a, c].map((col) => ({ kind: 'strip', board: b, col, row: r })) });
-        const row = rowsOf(h).find((r) => !used(a, r) && !used(c, r) && footprint(trial(r)).every((k) => !cells.has(k) && !mine.has(k)) && unshaded(trial(r)));
+        // Gölge: zincirin daha önce yerleşen parçalarınınki de sayılır.
+        const clear = (t: BoardPart) => unshaded(t) && middleOf(t).every((k) => !mineShade.has(k)) && shadeOf(t).every((k) => !mineMiddle.has(k));
+        const row = rowsOf(h).find((r) => !used(a, r) && !used(c, r) && footprint(trial(r)).every((k) => !cells.has(k) && !mine.has(k)) && clear(trial(r)));
         if (row === undefined) return null;
         rows[i] = row;
         for (const k of footprint(trial(row))) mine.add(k);
+        for (const k of shadeOf(trial(row))) mineShade.add(k);
+        for (const k of middleOf(trial(row))) mineMiddle.add(k);
       }
       return { rows, gain };
     };

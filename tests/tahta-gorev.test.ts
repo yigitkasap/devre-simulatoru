@@ -36,7 +36,7 @@ describe('Tahtada kur görevi (T6)', () => {
     // Deney 9'da toprak ve besleme az bacaklı: ray kullanılmaz; güç kaynağının kabloları bağlı olduğu bacağın
     // şeridinde hazır gelir ("ray yalnızca kalabalık ağda", 2026-11-14; eskiden raylarda ve iki ray kablosuyla).
     expect(rails.wires.length).toBe(0);
-    expect(rails.leads.map((l) => `${labelOf(doc, l.part)}#${l.pin} ${l.hole}`)).toEqual(['PS1#0 2g', 'PS1#1 4b']);
+    expect(rails.leads.map((l) => `${labelOf(doc, l.part)}#${l.pin} ${l.hole}`)).toEqual(['PS1#0 9b', 'PS1#1 4b']);
     // Raylar arası kablosu olan devrede (555 astabil: toprak ve besleme iki yarıda) o kablolar da hazır gelir.
     const crowded = exampleDoc('555-astabil')!;
     const crowdedStart = startBuild(crowded, planBreadboard(crowded), { ...DEFAULT_BOARD_TASK, start: 'rails' });
@@ -59,16 +59,16 @@ describe('Tahtada kur görevi (T6)', () => {
     const fg = idOf(doc, 'FG1');
     const student = {
       ...start,
-      parts: { ...start.parts, [idOf(doc, 'R1')]: { holes: ['6a', '3a'] } },
-      wires: [...start.wires, { a: '7a', b: '3j', color: 'orange' as const }],
-      leads: [...start.leads, { part: fg, pin: 1, hole: '6b' }],
+      parts: { ...start.parts, [idOf(doc, 'R1')]: { holes: ['7e', '3e'] } },
+      wires: [...start.wires, { a: '11a', b: '3j', color: 'orange' as const }],
+      leads: [...start.leads, { part: fg, pin: 1, hole: '7d' }],
     };
     expect(keepLocked(student, locks)).toEqual(start);
     expect(student.wires.filter((w) => locks.wires.has(wireKey(w))).length).toBe(0);
     // Seçili öğe kilitli mi (Döndür ve Sil pasif): hazır gelen Q1 ve PS1 kablosu evet; öğrencinin taktıkları hayır.
     expect(isLocked(locks, { kind: 'part', id: idOf(doc, 'Q1') })).toBe(true);
     expect(isLocked(locks, { kind: 'part', id: idOf(doc, 'R1') })).toBe(false);
-    expect(isLocked(locks, { kind: 'wire', a: '7a', b: '3j' })).toBe(false);
+    expect(isLocked(locks, { kind: 'wire', a: '11a', b: '3j' })).toBe(false);
     // Hazır gelen raylar arası kablo kilitli (raylar arası kablosu olan devre).
     const railed = exampleDoc('555-astabil')!;
     const railedStart = startBuild(railed, planBreadboard(railed), { ...DEFAULT_BOARD_TASK, start: 'rails' });

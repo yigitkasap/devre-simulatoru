@@ -40,17 +40,18 @@ describe('Delik adları', () => {
 });
 
 describe('Kurulum verisi', () => {
-  it('T1 örneği (Deney 9): planBreadboard yerleşimi Q1 2c-3c-4c; R1 6a–3a (bazın şeridinde), LED1 2e–4e (kollektör ve emetörün şeridinde), R2 2h–6h; tek köprü (eskiden üç)', () => {
+  it('T1 örneği (Deney 9): planBreadboard yerleşimi Q1 2c-3c-4c; R1 7e–3e (bazın şeridinde), LED1 5d–4d (emetörün şeridinde), R2 9c–5c; tek köprü (eskiden üç)', () => {
     const doc = load('bjt-anahtar');
     const build = buildFromPlan(planBreadboard(doc));
     const holes = (label: string) => build.parts[doc.parts.find((p) => p.label === label)!.id]!.holes;
     expect(build.cols).toBe(30);
-    expect(holes('R1')).toEqual(['6a', '3a']);
+    expect(holes('R1')).toEqual(['7e', '3e']);
     expect(holes('Q1')).toEqual(['2c', '3c', '4c']);
-    expect(holes('R2')).toEqual(['2h', '6h']);
-    expect(holes('LED1')).toEqual(['2e', '4e']);
-    // R2 üst yarıya sığmaz: arka satır Q1'in gölgesinde, ön satır TO-18'in sekmesine ayrılı, a ve e satırları dolu.
-    expect(build.wires.map((w) => `${w.a}–${w.b}`)).toEqual(['2b–6f']);
+    expect(holes('R2')).toEqual(['9c', '5c']);
+    expect(holes('LED1')).toEqual(['5d', '4d']);
+    // Kollektörün şeridinde (2) yer yok: arka satırlar Q1'in gölgesinde, ön satır TO-18'in sekmesine ayrılı; R2 ile
+    // LED1 5. şeritte buluşur, o şerit kollektöre tek köprüyle bağlanır.
+    expect(build.wires.map((w) => `${w.a}–${w.b}`)).toEqual(['2a–5a']);
   });
 
   it('bütün örneklerde plan → kurulum → dosya → kurulum aynı; bir delikte tek uç', () => {

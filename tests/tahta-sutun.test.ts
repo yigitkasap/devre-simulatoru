@@ -9,7 +9,7 @@
 // FOY_KOPRU ortam değişkeni verilirse örnek başına önce/sonra sayılar o dosyaya yazılır (rapor için).
 
 import { describe, expect, it } from 'vitest';
-import { LEG_ORDER, dipShape, mountOf, planBreadboard, planSpan, type BreadboardPlan, type Hole } from '../src/bench3d/breadboard';
+import { LEG_ORDER, dipShape, mountOf, planBreadboard, planSpan, shadeRows, type BreadboardPlan, type Hole } from '../src/bench3d/breadboard';
 import { transistorPackage } from '../src/bench3d/dimensions';
 import { EXAMPLE_IDS, exampleDoc } from '../src/examples';
 import { pinKey } from '../src/model/connectivity';
@@ -72,14 +72,16 @@ function footprint(part: Part, holes: readonly Strip[]): string[] {
   return out;
 }
 
-/** Yüksek parçanın gölgesi (kamera önden bakar): arkasındaki satırlar; elektrolitikte iki, transistörde bir. */
+/** Yüksek parçanın gölgesi (kamera önden bakar): arkasındaki satırlar (shadeRows: yüksekliğe göre 0–2). */
 function shadeOf(part: Part, holes: readonly Strip[]): string[] {
   if (holes.length === 0) return [];
-  const kind = part.props.kind;
-  const behind = part.type === 'capacitor' ? (kind === undefined || kind === 'electrolytic' ? 2 : 1) : ['to92', 'inline', 'pot'].includes(mountOf(part.type) ?? '') ? 1 : 0;
+  const behind = shadeRows(part);
   const row = Math.min(...holes.map((h) => h.row));
   const out: string[] = [];
-  for (let r = row - behind; r < row; r++) {
+  // Kollu anahtarın önündeki satır da (gövdesi geniş ve kısa).
+  const front = part.type === 'switch' ? 1 : 0;
+  for (let r = row - behind; r <= row + front; r++) {
+    if (r === row) continue;
     if (r < 0 || (r >= 5) !== (row >= 5)) continue;
     for (let c = Math.min(...holes.map((h) => h.col)); c <= Math.max(...holes.map((h) => h.col)); c++) out.push(cellKey(holes[0]!.board, r, c));
   }
@@ -89,10 +91,11 @@ function shadeOf(part: Part, holes: readonly Strip[]): string[] {
 /** Gövdenin ortası: eksenli parçada bacakların arası, öbürlerinde bütün kapsam (gölgeye yalnızca bacak ucu girer). */
 function middleOf(part: Part, holes: readonly Strip[]): string[] {
   if (holes.length === 0) return [];
-  if (mountOf(part.type) !== 'axial') return footprint(part, holes);
-  const out: string[] = [];
   const lo = Math.min(...holes.map((h) => h.col));
   const hi = Math.max(...holes.map((h) => h.col));
+  // Kısa açıklıklı eksenli parçanın (anahtar) gövdesi bacaklarına kadar uzanır.
+  if (mountOf(part.type) !== 'axial' || hi - lo <= 2) return footprint(part, holes);
+  const out: string[] = [];
   for (let c = lo + 1; c < hi; c++) out.push(cellKey(holes[0]!.board, holes[0]!.row, c));
   return out;
 }

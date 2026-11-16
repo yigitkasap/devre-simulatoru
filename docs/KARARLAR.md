@@ -2673,9 +2673,12 @@ entegre dahil). Köprü teli yalnızca şeritte yer kalmayınca ya da iki bacak 
 4. Gövdeler: parça satırında ilk bacağından son bacağına kadar delikleri kaplar; buzzer iki komşu satırı, TO-18
    (sekmesi öne bakar) öndeki komşu satırı da; orta kanalın iki yanında bacağı olan parça (entegre, gösterge) aradaki
    satırları. Yeni parça bu deliklere takılmaz. Ampermetrenin girdiği yerdeki boş şerit ayrılır.
-   Yüksek parçanın gölgesi: kamera önden ve yukarıdan (48°) baktığı için arkasındaki satırlara (elektrolitikte iki,
-   transistör, TO-220, trimpot ve öbür kondansatörlerde bir) başka parçanın gövdesinin ortası giremez, bacak ucu girer
-   ("3B tahta parçaları örtülmüyor"; sıkılaşan yerleşimde yarım dalgada D1'in %41'i C2'nin ardında kalıyordu).
+   Yüksek parçanın gölgesi (`shadeRows`): kamera önden ve yukarıdan (48°) baktığı için arkasındaki satırlara
+   (elektrolitik ve film kondansatör, transistör, TO-220, trimpot iki; disk ve çok katmanlı seramik, LED bir) başka
+   parçanın gövdesinin ortası giremez, bacak ucu girer; kollu anahtarın geniş, kısa gövdesi için önündeki satır da
+   gölgedir. Kısa açıklıklı eksenli parçada (2 delik) gövdenin tamamı sayılır. Zincirin kendi parçaları da birbirine
+   gölge düşürür ("3B tahta parçaları örtülmüyor"; sıkılaşan yerleşimde yarım dalgada D1'in %41'i C2'nin ardında
+   kalıyordu, son durumda en çok %9).
 5. Şeritte parça bacaklarına en çok 4 delik; ağın alet kabloları için 1 (ağda iki ya da daha çok alet kablosu ya da
    raya inen köprü varsa 2) delik kalır. Bütün yollar (eski "önceki parçanın son sütunu" paylaşımı dahil) aynı sınırı
    kullanır. Bir ağın şeritleri dolu olduğunda köprü ağacı boş deliği çok olan şeritten kurulur (bir şeritten iki
@@ -2686,11 +2689,11 @@ entegre dahil). Köprü teli yalnızca şeritte yer kalmayınca ya da iki bacak 
    yanında) hiçbir direk telinin inmediği bir deliğe (sıkışık şeritte tel fişin yanından geçmesin); yoksa aynı ağın başka
    bir şeridine, o da yoksa köprüyle bağlanan yeni bir şeride. Köprü uçları da gövde altındaki deliklerden kaçınır.
 
-**Sonuç (81 örnek).** Köprü teli 361 → 225 (şerit–şerit 190 → 87, şerit–ray 144 → 114, ray–ray 27 → 24); 13 örnekte
-sıfıra indi, 43'ünde azaldı, hiçbirinde artmadı. FET, BJT ve MOSFET yükselteçlerinde köprü yok (kuplajlı FET'te
-yukarıdaki zorunlu tek köprü). Deney 9 (T1) planı: Q1 2c-3c-4c, R1 6a–3a, LED1 2e–4e, R2 2h–6h; tek köprü 2b → 6f
-(eskiden üç). R2 üst yarıya sığmaz: arka satır Q1'in gölgesinde, ön satır TO-18'in sekmesine ayrılı, a ve e satırları
-R1 ile LED1'de.
+**Sonuç (81 örnek).** Köprü teli 361 → 238 (şerit–şerit 190 → 97, şerit–ray 144 → 116, ray–ray 27 → 25); 11 örnekte
+sıfıra indi, 43'ünde azaldı, hiçbirinde artmadı. FET ve MOSFET yükselteçlerinde ve BJT yükseltecinde köprü yok;
+kuplajlı FET'te yukarıdaki zorunlu tek köprü, kuplajlı BJT'de bir. Deney 9 (T1) planı: Q1 2c-3c-4c, R1 7e–3e (bazın
+şeridinde), LED1 5d–4d, R2 9c–5c; tek köprü 2a → 5a (eskiden üç): kollektörün şeridinde yer yok (arka satırlar Q1'in
+gölgesinde, ön satır TO-18'in sekmesine ayrılı), R2 ile LED1 5. şeritte buluşur.
 
 **Yan etkiler ve gevşeyen kurallar.**
 
