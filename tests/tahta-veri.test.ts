@@ -40,15 +40,16 @@ describe('Delik adları', () => {
 });
 
 describe('Kurulum verisi', () => {
-  it('T1 örneği (Deney 9): planBreadboard yerleşimi R1 2c–6c, Q1 2h-3h-4h, R2 7h–11h, LED1 11g–12g', () => {
+  it('T1 örneği (Deney 9): planBreadboard yerleşimi Q1 2c-3c-4c; R1 6b–3b (bazın şeridinde), R2 5e–2e ve LED1 2a–4a (kollektörün şeridinde); köprü yok', () => {
     const doc = load('bjt-anahtar');
     const build = buildFromPlan(planBreadboard(doc));
     const holes = (label: string) => build.parts[doc.parts.find((p) => p.label === label)!.id]!.holes;
     expect(build.cols).toBe(30);
-    expect(holes('R1')).toEqual(['2c', '6c']);
-    expect(holes('Q1')).toEqual(['2h', '3h', '4h']);
-    expect(holes('R2')).toEqual(['7h', '11h']);
-    expect(holes('LED1')).toEqual(['11g', '12g']);
+    expect(holes('R1')).toEqual(['6b', '3b']);
+    expect(holes('Q1')).toEqual(['2c', '3c', '4c']);
+    expect(holes('R2')).toEqual(['5e', '2e']);
+    expect(holes('LED1')).toEqual(['2a', '4a']);
+    expect(build.wires).toEqual([]);
   });
 
   it('bütün örneklerde plan → kurulum → dosya → kurulum aynı; bir delikte tek uç', () => {

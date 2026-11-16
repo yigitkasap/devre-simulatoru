@@ -128,9 +128,9 @@ describe('Döndürme ve taşıma', () => {
 
   it('R: LED’in bacakları yer değiştirir, transistörün sırası ters döner, DIP aynı deliklerde döner', () => {
     const led = rotatePlaced(build, 'led', id('LED1'));
-    expect(led.ok && led.build.parts[id('LED1')]!.holes).toEqual(['12g', '11g']);
+    expect(led.ok && led.build.parts[id('LED1')]!.holes).toEqual(['4a', '2a']);
     const q = rotatePlaced(build, 'npn', id('Q1'));
-    expect(q.ok && q.build.parts[id('Q1')]!.holes).toEqual(['4h', '3h', '2h']);
+    expect(q.ok && q.build.parts[id('Q1')]!.holes).toEqual(['4c', '3c', '2c']);
     const op = exampleDoc('opamp-evirmeyen')!;
     const opBuild = buildFromPlan(planBreadboard(op));
     const u = op.parts.find((p) => p.type === 'opamp')!.id;
@@ -143,13 +143,13 @@ describe('Döndürme ve taşıma', () => {
   });
 
   it('gövdeden sürükleme bütün bacakları kaydırır; bacağın ucundan sürükleme yalnızca o bacağı', () => {
-    // Yukarı (g) taşınamaz: 11g LED1'in deliği. Aşağı (i) taşınabilir.
+    // R2 5e–2e'de. Yukarı (d) taşınamaz: 5d güç kaynağının + kablosunun deliği. Aşağı (f) taşınabilir.
     expect(movePlaced(build, 'resistor', id('R2'), 0, -1)).toEqual({ ok: false, reason: 'occupied' });
     const down = movePlaced(build, 'resistor', id('R2'), 0, 1);
-    expect(down.ok && down.build.parts[id('R2')]!.holes).toEqual(['7i', '11i']);
+    expect(down.ok && down.build.parts[id('R2')]!.holes).toEqual(['5f', '2f']);
     expect(movePlaced(build, 'resistor', id('R2'), 30, 0)).toEqual({ ok: false, reason: 'board' });
-    const leg = moveLeg(build, 'resistor', id('R2'), 1, h('13h'));
-    expect(leg.ok && leg.build.parts[id('R2')]!.holes).toEqual(['7h', '13h']);
-    expect(moveLeg(build, 'resistor', id('R2'), 1, h('8h'))).toEqual({ ok: false, reason: 'reach' });
+    const leg = moveLeg(build, 'resistor', id('R2'), 1, h('9e'));
+    expect(leg.ok && leg.build.parts[id('R2')]!.holes).toEqual(['5e', '9e']);
+    expect(moveLeg(build, 'resistor', id('R2'), 1, h('4e'))).toEqual({ ok: false, reason: 'reach' });
   });
 });

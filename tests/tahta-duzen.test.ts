@@ -234,11 +234,14 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
     expect(plan.jumpers).toEqual([]);
   });
 
-  it('seri zincir: komşu parçalar aynı yarıda ve şemadaki sırayla soldan sağa; ampermetrenin girdiği yerde bir şerit boş', () => {
+  it('seri zincir: komşu parçalar ortak şeritte ve aynı yarıda; çoğu zincir şemadaki sırayla tek yönde (çoğu soldan sağa); ampermetrenin girdiği yerde bir şerit boş', () => {
     const bad: string[] = [];
     let pairs = 0;
     let gaps = 0;
     let chains = 0;
+    let reversed = 0;
+    let folded = 0;
+    const unordered = new Set<string>();
     for (const { id, plan, byId } of docs) {
       const carriers = carriersOf(plan, byId);
       const used = usedHoles(plan);
@@ -256,7 +259,9 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
           if (conductorOf(a) !== conductorOf(b)) bad.push(`${id}: ${p.part.label} ve ${q.part.label} seri ama ortak şeritte değil (${at(a)}, ${at(b)})`);
           const far = [leg(p.part, 1 - p.pin), leg(q.part, 1 - q.pin)];
           if (far.some((h) => halfOf(h) !== halfOf(a) || h.board !== a.board)) bad.push(`${id}: ${p.part.label} ve ${q.part.label} aynı yarıda değil`);
-          if ((far[0]!.col - a.col) * (far[1]!.col - a.col) >= 0) bad.push(`${id}: ${p.part.label} ve ${q.part.label} yan yana dizilmemiş (geri katlanıyor)`);
+          // Katlanma ("tahta sütunu", 2026-11-16): öbür bacaklar ortak şeridin aynı yanına düşebilir (öbür bacak başka
+          // bir parçanın şeridine doğrudan takıldığında); çoğu seri çift yine yan yana.
+          if ((far[0]!.col - a.col) * (far[1]!.col - a.col) >= 0) folded++;
         }
       }
       // Ampermetre iki parçanın arasında: bacaklar aynı yarıda, aralarında tam bir boş şerit.
@@ -279,6 +284,11 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
       for (const chain of plan.chains ?? []) {
         chains++;
         const boardParts = chain.filter((l) => plan.onBoard.has(l.partId));
+        // Yön: soldan sağa; zincir bir transistörün ya da entegrenin bacak şeridinden başlıyorsa sağdan sola da olabilir
+        // ("tahta sütunu", 2026-11-16: zincir o şeride doğrudan takılır). Her durumda katlanmadan tek yönde.
+        const firstPart = byId.get(boardParts[0]!.partId)!;
+        const dir = Math.sign(leg(firstPart, 1 - boardParts[0]!.inPin).col - leg(firstPart, boardParts[0]!.inPin).col) || 1;
+        if (dir < 0) reversed++;
         let last = -Infinity;
         const halves = new Set<string>();
         for (const l of boardParts) {
@@ -286,8 +296,8 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
           const inHole = leg(part, l.inPin);
           const outHole = leg(part, 1 - l.inPin);
           halves.add(`${inHole.board}:${halfOf(inHole)}`).add(`${outHole.board}:${halfOf(outHole)}`);
-          if (!(inHole.col >= last && inHole.col < outHole.col)) bad.push(`${id}: ${part.label} zincirde sırayla değil (${at(inHole)} → ${at(outHole)})`);
-          last = outHole.col;
+          if (!(dir * inHole.col >= last && dir * inHole.col < dir * outHole.col)) unordered.add(`${id}:${chain.map((x) => x.partId).join(',')}`);
+          last = dir * outHole.col;
         }
         if (halves.size > 1) bad.push(`${id}: zincir ${chain.map((l) => byId.get(l.partId)!.label).join('→')} tek yarıda değil`);
         const first = chain[0]!;
@@ -305,6 +315,11 @@ describe('3B: tahta düzeni (tahta şema gibi okunur)', () => {
     expect(pairs).toBeGreaterThan(40);
     expect(gaps).toBeGreaterThanOrEqual(3);
     expect(chains).toBeGreaterThan(50);
+    // Çoğu zincir yine soldan sağa ve sırayla (katlanan zincir, bir parçası başka bir parçanın şeridine doğrudan
+    // takıldığı için sırayı bozar); çoğu seri çift yan yana.
+    expect(reversed).toBeLessThan(chains / 2);
+    expect(unordered.size).toBeLessThan(chains * 0.25);
+    expect(folded).toBeLessThan(pairs * 0.2);
   });
 
   it('elektriksel bağlantı şemayla bire bir aynı: şeritler, raylar ve köprülerle birleşen uçlar şemanın ağları', () => {

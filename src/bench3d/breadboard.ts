@@ -31,7 +31,7 @@ import { buildConnectivity, pinKey } from '../model/connectivity';
 import { pinPositions } from '../model/geometry';
 import type { CircuitDoc, Part } from '../model/types';
 import { numProp, type DeviceType } from '../sim/netlist';
-import { batteryFootprint } from './dimensions';
+import { batteryFootprint, transistorPackage } from './dimensions';
 
 export const BB = {
   /** Tam boy (830 delik) ve yarım boy (400 delik) breadboard'un sütun sayısı. */
@@ -316,6 +316,27 @@ export function planSpan(type: DeviceType): number | undefined {
 
 /** Şeridin parçalara ayrılan delik sayısı (kalanlar jumper'lara). */
 const LEG_CAPACITY = 3;
+/**
+ * Tezgâh planında bir şeride takılabilecek en çok parça bacağı: şeritte 5 delik var, biri köprüye ya da alet kablosuna
+ * kalır ("tahta sütunu", 2026-11-16).
+ */
+const SHARE_LEGS = 4;
+
+/**
+ * İki bacaklı parçanın planda denenen bacak aralıkları (önce olağan aralık): direnç ve diyot 3–8, LED ve kondansatör
+ * 1–3 (Tahtada kur'un sınırları, tahta/rules.ts → legRange); öbürlerinde yalnızca olağan aralık (modelleri sabit).
+ */
+function spanChoices(type: DeviceType, span: number): number[] {
+  const range =
+    type === 'resistor' || type === 'diode' || type === 'schottky' || type === 'zener'
+      ? [3, 8]
+      : type === 'led' || type === 'capacitor' || type === 'ldr' || type === 'ntc'
+        ? [1, 3]
+        : [span, span];
+  const out: number[] = [];
+  for (let x = range[0]!; x <= range[1]!; x++) out.push(x);
+  return out.sort((a, b) => Math.abs(a - span) - Math.abs(b - span) || a - b);
+}
 const ROWS_TOP = [2, 3, 1, 4, 0];
 const ROWS_BOTTOM = [7, 6, 8, 5, 9];
 const GAP = 3;
@@ -511,6 +532,41 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
   };
   const capacityLeft = (s: Strip) => LEG_CAPACITY + (s.net !== null && roles.has(s.net) ? 1 : 0) - s.legs;
 
+  /**
+   * Tezgâh planında gövdelerin kapladığı delikler (`board:satır:sütun`): parçanın satır(lar)ında ilk bacağından son
+   * bacağına kadar (bacakların arasındaki delikler gövdenin altında kalır). Parçalar birbirinin sütununa girdiği için
+   * yeni parça bu deliklere takılmaz.
+   */
+  const cells = new Set<string>();
+  const cellKey = (board: number, row: number, col: number) => `${board}:${row}:${col}`;
+  /** Ampermetrenin iki yanındaki parçaların arasındaki boş şerit: başka parça kullanmaz. */
+  const reserved = new Set<string>();
+  const footprint = (at: BoardPart): string[] => {
+    const holes = [...at.holes, ...(at.extraHoles ?? [])].filter((h): h is Hole & { kind: 'strip' } => h.kind === 'strip');
+    if (holes.length === 0) return [];
+    const out: string[] = [];
+    const board = holes[0]!.board;
+    // Gövdesi bacaklarının satırlarından taşan parçalar: buzzer'ın diski (iki komşu satır), TO-18'in flanş sekmesi
+    // (öne, izleyiciye bakar: öndeki komşu satır).
+    const part = doc.parts.find((p) => p.id === at.partId);
+    const buzzer = part?.type === 'buzzer';
+    const to18 = part !== undefined && MOUNTS[part.type]?.mount === 'to92' && transistorPackage(typeof part.props.model === 'string' ? part.props.model : '') === 'to18';
+    const rows = holes.map((h) => h.row);
+    const columns = holes.map((h) => h.col);
+    // Orta kanalın iki yanında bacağı olan parçanın (entegre, gösterge, düğme) gövdesi aradaki satırları da kaplar.
+    const r0 = Math.max(0, Math.min(...rows) - (buzzer ? 1 : 0));
+    const r1 = Math.min(9, Math.max(...rows) + (buzzer || to18 ? 1 : 0));
+    for (let r = r0; r <= r1; r++) {
+      // Satır kanalın öbür yanındaysa (genişleyen gövde kanalı aşmaz).
+      if ((buzzer || to18) && (r >= 5) !== (rows[0]! >= 5)) continue;
+      for (let c = Math.min(...columns); c <= Math.max(...columns); c++) out.push(cellKey(board, r, c));
+    }
+    return out;
+  };
+  const occupy = (at: BoardPart) => {
+    if (series) for (const k of footprint(at)) cells.add(k);
+  };
+
   /** `width` sütunluk yer: tercihen zincir paylaşımıyla; yoksa en boş yarıda; sığmazsa yeni breadboard. */
   const findSlot = (width: number, shareNets: readonly string[]): { slot: Slot; start: number; shared: string | null } => {
     for (let board = 0; ; board++) {
@@ -518,14 +574,20 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
         boards = board + 1;
       }
       const pair = slotsOf(board);
+      // Tezgâh planında parçalar araya da yerleşir (bacak paylaşımı): sütunlar gerçekten boş olmalı.
+      const clear = (slot: Slot, from: number) => {
+        for (let c = from; c <= from + width - 1; c++) if (strips.has(stripKey(slot.board, slot.half, c)) || reserved.has(stripKey(slot.board, slot.half, c))) return false;
+        return true;
+      };
       for (const slot of pair) {
         if (slot.frontier > 0) {
           const s = strips.get(stripKey(slot.board, slot.half, slot.frontier));
-          if (s && s.net !== null && shareNets.includes(s.net) && capacityLeft(s) > 0 && slot.frontier + width - 1 <= cols - 1) {
+          if (s && s.net !== null && shareNets.includes(s.net) && capacityLeft(s) > 0 && slot.frontier + width - 1 <= cols - 1 && clear(slot, slot.frontier + 1)) {
             return { slot, start: slot.frontier, shared: s.net };
           }
         }
       }
+      for (const slot of pair) while (slot.cursor + width - 1 <= cols - 1 && !clear(slot, slot.cursor)) slot.cursor++;
       const open = pair.filter((s) => s.cursor + width - 1 <= cols - 1).sort((a, b) => a.cursor - b.cursor);
       if (open[0]) return { slot: open[0], start: open[0].cursor, shared: null };
     }
@@ -655,33 +717,109 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
     for (let i = from + 1; i <= to; i++) offset[i] = offset[i - 1]! + (board[i - 1]! ? MOUNTS[links[i - 1]!.part.type]!.span! : 2);
     const width = offset[to]! + 1;
     if (width > cols - 2) return false;
-    const { slot, start } = findSlot(width, from === 0 && board[0]! ? [nets[0]!] : []);
-    const column = nets.map((name, i) => (stripped[i] ? takeStrip(slot.board, slot.half, start + offset[i]!, name) : null));
-    const pref = rowsOf(slot.half);
+    /**
+     * Zincirin `b` kartında `h` yarısında, düğüm sütunları `colOf` ile yerleşimi: her parçanın satırı (iki şeridinde
+     * boş, gövdesinin altı boş) ve paylaşılan şerit sayısı; olmuyorsa null.
+     */
+    const layout = (b: number, h: 0 | 1, colOf: (i: number) => number): { rows: number[]; gain: number } | null => {
+      let gain = 0;
+      for (let i = from; i <= to; i++) {
+        if (!stripped[i]) continue;
+        const col = colOf(i);
+        if (col < FIRST_COLUMN || col > cols - 1 || reserved.has(stripKey(b, h, col))) return null;
+        const st = strips.get(stripKey(b, h, col));
+        if (st) {
+          if (st.net !== nets[i] || st.legs >= Math.min(SHARE_LEGS, roomFor(nets[i]!))) return null;
+          gain++;
+        }
+      }
+      // Ampermetrenin girdiği yer: iki yanındaki şeritlerin arasındaki sütun boş kalır.
+      for (let i = 0; i < n; i++) {
+        if (board[i] || !stripped[i] || !stripped[i + 1]) continue;
+        const mid = (colOf(i) + colOf(i + 1)) / 2;
+        if (strips.has(stripKey(b, h, mid))) return null;
+      }
+      const rows: number[] = new Array<number>(n).fill(-1);
+      // Zincirin kendi parçalarının satırları ve gövdeleri de sayılır (ortak şeritte iki bacak aynı deliğe düşmesin).
+      const mine = new Set<string>();
+      for (let i = 0; i < n; i++) {
+        if (!board[i]) continue;
+        const a = colOf(i);
+        const c = colOf(i + 1);
+        const used = (col: number, r: number) => (strips.get(stripKey(b, h, col))?.rows.has(r) ?? false) || mine.has(cellKey(b, r, col));
+        const trial = (r: number): BoardPart => ({ partId: links[i]!.part.id, mount: MOUNTS[links[i]!.part.type]!.mount, holes: [a, c].map((col) => ({ kind: 'strip', board: b, col, row: r })) });
+        const row = rowsOf(h).find((r) => !used(a, r) && !used(c, r) && footprint(trial(r)).every((k) => !cells.has(k) && !mine.has(k)));
+        if (row === undefined) return null;
+        rows[i] = row;
+        for (const k of footprint(trial(row))) mine.add(k);
+      }
+      return { rows, gain };
+    };
+    let place: { b: number; h: 0 | 1; colOf: (i: number) => number; rows: number[] } | null = null;
+    if (series) {
+      // Zincirin ucu, önceden yerleşmiş bir parçanın (transistör, entegre…) aynı ağdaki şeridinde başlar ya da biter:
+      // önce soldan sağa (şemadaki sıra), olmazsa ters yönde.
+      let best: { b: number; h: 0 | 1; colOf: (i: number) => number; rows: number[]; gain: number; cost: number } | null = null;
+      for (const end of [from, to]) {
+        for (const anchor of netStrips.get(nets[end]!) ?? []) {
+          for (const dir of [1, -1]) {
+            const colOf = (i: number) => anchor.col + dir * (offset[i]! - offset[end]!);
+            const got = layout(anchor.board, anchor.half, colOf);
+            if (!got || got.gain === 0) continue;
+            const slot = slotsOf(anchor.board)[anchor.half]!;
+            const hi = Math.max(colOf(from), colOf(to));
+            const cost = (dir < 0 ? 5 : 0) + (hi >= slot.cursor ? 2 : 0) + Math.min(colOf(from), colOf(to)) * 0.001;
+            if (!best || got.gain > best.gain || (got.gain === best.gain && cost < best.cost)) best = { b: anchor.board, h: anchor.half, colOf, rows: got.rows, gain: got.gain, cost };
+          }
+        }
+      }
+      if (best) place = best;
+    }
+    if (!place) {
+      const { slot, start } = findSlot(width, from === 0 && board[0]! ? [nets[0]!] : []);
+      const colOf = (i: number) => start + offset[i]!;
+      const got = layout(slot.board, slot.half, colOf);
+      const pref = rowsOf(slot.half);
+      place = { b: slot.board, h: slot.half, colOf, rows: got?.rows ?? links.map(() => pref[0]!) };
+      if (!got) {
+        // Eski yol (kart planı ya da hücre bilgisi olmadan): ortak boş satır.
+        const column = nets.map((name, i) => (stripped[i] ? takeStrip(slot.board, slot.half, colOf(i), name) : null));
+        place.rows = links.map((_, i) => (board[i] ? (pref.find((r) => !column[i]!.rows.has(r) && !column[i + 1]!.rows.has(r)) ?? pref[0]!) : -1));
+      }
+    }
+    const { b, h, colOf, rows } = place;
+    const column = nets.map((name, i) => (stripped[i] ? takeStrip(b, h, colOf(i), name) : null));
     links.forEach((l, i) => {
-      if (!board[i]) return;
+      if (!board[i]) {
+        if (series && stripped[i] && stripped[i + 1]) reserved.add(stripKey(b, h, (colOf(i) + colOf(i + 1)) / 2));
+        return;
+      }
       const pair = [column[i]!, column[i + 1]!];
-      const common = pref.find((r) => pair.every((s) => !s.rows.has(r)));
       const holes: Hole[] = new Array<Hole>(2);
       pair.forEach((s, k) => {
         s.legs++;
-        holes[k === 0 ? l.inPin : 1 - l.inPin] = stripHole(s, common ?? freeRow(s, pref) ?? pref[0]!);
+        holes[k === 0 ? l.inPin : 1 - l.inPin] = stripHole(s, rows[i]!);
       });
       onBoard.set(l.part.id, { partId: l.part.id, mount: MOUNTS[l.part.type]!.mount, holes });
+      occupy(onBoard.get(l.part.id)!);
     });
-    const end = start + offset[to]!;
-    slot.frontier = to > 0 && board[to - 1]! ? end : 0;
-    slot.cursor = end + GAP;
+    const slot = slotsOf(b)[h]!;
+    const lo = Math.min(colOf(from), colOf(to));
+    const hi = Math.max(colOf(from), colOf(to));
+    const end = colOf(to);
+    if (hi >= slot.cursor || lo >= slot.cursor - GAP) {
+      slot.frontier = to > 0 && board[to - 1]! && end === hi ? end : 0;
+      slot.cursor = Math.max(slot.cursor, hi + GAP);
+    }
     for (const l of links) inChain.add(l.part.id);
     return true;
   };
 
-  for (const part of ordered) {
-    const spec = MOUNTS[part.type];
-    if (!spec) continue;
-    if (inChain.has(part.id)) continue;
+  /** Eski yerleşim: parça yeni sütunlara (zincir paylaşımı yalnızca bir önceki parçanın son sütunuyla). */
+  const placeFresh = (part: Part, spec: { mount: Mount; span?: number }): void => {
+    if (inChain.has(part.id)) return;
     const chain = chainOf.get(part.id);
-    if (chain && placeChain(chain)) continue;
+    if (chain && placeChain(chain)) return;
     const shape = dipShape(spec.mount);
     if (shape) {
       // Orta kanalın üstünde: iki yarının aynı `half` sütunu.
@@ -717,7 +855,8 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
         slot.cursor = start + half - 1 + GAP;
       }
       onBoard.set(part.id, { partId: part.id, mount: spec.mount, holes, extraHoles });
-      continue;
+      occupy(onBoard.get(part.id)!);
+      return;
     }
     if (spec.mount === 'button') {
       // 12 mm basmalı düğme orta kanalın iki yanında: uçlar d (üst yarı) ve g (alt yarı) satırında, aynı
@@ -740,7 +879,8 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
         slot.cursor = start + 2 + GAP;
       }
       onBoard.set(part.id, { partId: part.id, mount: 'button', holes, extraHoles });
-      continue;
+      occupy(onBoard.get(part.id)!);
+      return;
     }
     // Sıralı bacaklar (TO-92, trimpot, köprü diyot, TO-220): aynı satırda ardışık delikler.
     const pins = spec.mount === 'inline' ? part.type === 'bridge' ? 4 : 3 : spec.mount === 'to92' || spec.mount === 'pot' ? 3 : 2;
@@ -766,6 +906,203 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
     slot.frontier = columns[columns.length - 1]!;
     slot.cursor = slot.frontier + GAP;
     onBoard.set(part.id, { partId: part.id, mount: spec.mount, holes });
+    occupy(onBoard.get(part.id)!);
+  };
+
+  // --- Tezgâh planı: bacaklar aynı ağın şeridine ("tahta sütunu", 2026-11-16) -----------------------------------
+  // Bir parçanın bacağı başka bir parçanın aynı ağdaki bacağıyla aynı şeride takılır; köprü teli yalnızca şeritte yer
+  // kalmayınca ya da bacak o şeride fiziksel olarak gelemeyince. Önce çok bacaklı parçalar (entegre, düğme, transistör,
+  // potansiyometre…), sonra iki bacaklılar bacak şeritlerinden çıkacak biçimde yerleşir; en sonda her parça, daha çok
+  // bacağın paylaşıldığı bir yere taşınabiliyorsa taşınır (eskiden paylaşım yalnızca iki bacaklıların seri zincirinde
+  // ve bir önceki parçanın son sütununda vardı: BF245A'nın gate'i ortadaki bacak olduğu için RG'ye hep köprü gidiyordu).
+  const fits = (spec: { mount: Mount; span?: number }) => spec.span !== undefined || spec.mount === 'to92' || spec.mount === 'inline' || spec.mount === 'pot';
+  /** Parçanın sütun dizilişleri: her pinin ilk bacağa göre sütunu (iki bacaklıda bacak aralığının seçenekleri). */
+  const shapesOf = (part: Part, spec: { mount: Mount; span?: number }): Array<{ offsets: number[]; span: number }> => {
+    if (spec.span !== undefined) {
+      const out: Array<{ offsets: number[]; span: number }> = [];
+      for (const span of spanChoices(part.type, spec.span)) out.push({ offsets: [0, span], span }, { offsets: [span, 0], span });
+      return out;
+    }
+    const pins = spec.mount === 'inline' ? (part.type === 'bridge' ? 4 : 3) : 3;
+    const physical = LEG_ORDER[part.type] ?? Array.from({ length: pins }, (_, i) => i);
+    const forward: number[] = new Array<number>(pins);
+    const backward: number[] = new Array<number>(pins);
+    physical.forEach((pin, k) => {
+      forward[pin] = k;
+      backward[pin] = pins - 1 - k;
+    });
+    return [{ offsets: forward, span: 0 }, { offsets: backward, span: 0 }];
+  };
+  interface Spot {
+    readonly board: number;
+    readonly half: 0 | 1;
+    readonly row: number;
+    readonly cols: number[];
+    readonly gain: number;
+    readonly cost: number;
+  }
+  /**
+   * Şeritte alet uçlarına ve köprüye ayrılan delik: ağa bağlı alet ve tahta dışı parça uçları (en az 1, en çok 2;
+   * raya giden ağda raya inen köprü de sayılır). Kalan delikler (en çok SHARE_LEGS) parça bacaklarına.
+   */
+  const leadNeed = new Map<string, number>();
+  for (const part of doc.parts) {
+    if (!TABLE[part.type] || part.type === 'arduino') continue;
+    const count = netlist.elements.find((e) => e.id === part.id)?.pins.length ?? 0;
+    for (let pin = 0; pin < count; pin++) if (connected(part, pin)) leadNeed.set(net(part, pin), (leadNeed.get(net(part, pin)) ?? 0) + 1);
+  }
+  const roomFor = (n: string) => 5 - Math.min(2, Math.max(1, (leadNeed.get(n) ?? 0) + (railed.has(n) ? 1 : 0)));
+  /**
+   * Şeritlerde buluşan bacak sayısı: her şeritte bacak sayısı − 1 (bir şeride sonradan katılan her bacak, o bacak için
+   * gerekecek bir köprüyü kaldırır).
+   */
+  const sharedLegs = () => {
+    let n = 0;
+    for (const st of strips.values()) if (st.legs >= 1) n += st.legs - 1;
+    return n;
+  };
+  /** Parçanın, aynı ağın var olan bir şeridine en az bir bacağıyla takılabileceği en iyi yer (yoksa null). */
+  const bestSpot = (part: Part, spec: { mount: Mount; span?: number }): Spot | null => {
+    const pins = shapesOf(part, spec)[0]!.offsets.length;
+    const nets = Array.from({ length: pins }, (_, i) => net(part, i));
+    let best: Spot | null = null;
+    const tried = new Set<string>();
+    for (const shape of shapesOf(part, spec)) {
+      for (let pin = 0; pin < pins; pin++) {
+        for (const anchor of netStrips.get(nets[pin]!) ?? []) {
+          const c0 = anchor.col - shape.offsets[pin]!;
+          const columns = shape.offsets.map((o) => c0 + o);
+          const lo = Math.min(...columns);
+          const hi = Math.max(...columns);
+          if (lo < FIRST_COLUMN || hi > cols - 1) continue;
+          for (const row of rowsOf(anchor.half)) {
+            const key = `${anchor.board}:${row}:${columns.join(',')}`;
+            if (tried.has(key)) continue;
+            tried.add(key);
+            // Gövdenin kapsamı (bacakların arası; buzzer ve TO-18'de komşu satırlar da) boş olmalı.
+            const trial: BoardPart = { partId: part.id, mount: spec.mount, holes: columns.map((col) => ({ kind: 'strip', board: anchor.board, col, row })) };
+            let ok = footprint(trial).every((k) => !cells.has(k));
+            if (!ok) continue;
+            let gain = 0;
+            let fresh = 0;
+            let roleShares = 0;
+            columns.forEach((col, k) => {
+              if (!ok) return;
+              const key2 = stripKey(anchor.board, anchor.half, col);
+              if (reserved.has(key2)) {
+                ok = false;
+                return;
+              }
+              const st = strips.get(key2);
+              if (!st) {
+                fresh++;
+                return;
+              }
+              if (st.net !== nets[k] || st.rows.has(row) || st.legs >= Math.min(SHARE_LEGS, roomFor(nets[k]!))) {
+                ok = false;
+                return;
+              }
+              gain++;
+              // Eşitlikte sinyal ağı yeğlenir (toprak ve besleme şeridine sonra; ör. RG'nin bacağı gate şeridinde).
+              if (roles.has(nets[k]!)) roleShares++;
+            });
+            if (!ok || gain === 0) continue;
+            const slot = slotsOf(anchor.board)[anchor.half]!;
+            const cost = roleShares * 8 + (shape.span ? Math.abs(shape.span - spec.span!) * 2 : 0) + (hi >= slot.cursor ? 4 : 0) + rowsOf(anchor.half).indexOf(row) * 0.1 + fresh * 0.5 + lo * 0.001;
+            if (!best || gain > best.gain || (gain === best.gain && cost < best.cost)) best = { board: anchor.board, half: anchor.half, row, cols: columns, gain, cost };
+          }
+        }
+      }
+    }
+    return best;
+  };
+  /** Parçayı yerine takar. */
+  const put = (part: Part, spec: { mount: Mount; span?: number }, spot: Spot): void => {
+    const holes: Hole[] = spot.cols.map((col, pin) => {
+      const st = takeStrip(spot.board, spot.half, col, net(part, pin));
+      st.legs++;
+      return stripHole(st, spot.row);
+    });
+    onBoard.set(part.id, { partId: part.id, mount: spec.mount, holes });
+    occupy(onBoard.get(part.id)!);
+    const slot = slotsOf(spot.board)[spot.half]!;
+    const hi = Math.max(...spot.cols);
+    if (hi >= slot.cursor) {
+      slot.cursor = hi + GAP;
+      slot.frontier = 0;
+    }
+  };
+  /** Parçayı tahtadan çıkarır (iyileştirme turunda yeniden yerleşir). */
+  const lift = (part: Part): BoardPart => {
+    const at = onBoard.get(part.id)!;
+    onBoard.delete(part.id);
+    for (const k of footprint(at)) cells.delete(k);
+    for (const h of at.holes) {
+      if (h.kind !== 'strip') continue;
+      const key = stripKey(h.board, h.row >= 5 ? 1 : 0, h.col);
+      const st = strips.get(key)!;
+      st.rows.delete(h.row);
+      st.legs--;
+      if (st.rows.size === 0) {
+        strips.delete(key);
+        if (st.net !== null) netStrips.set(st.net, (netStrips.get(st.net) ?? []).filter((x) => x !== st));
+      }
+    }
+    return at;
+  };
+  /** Çıkarılan parçayı eski yerine geri takar. */
+  const restore = (part: Part, at: BoardPart): void => {
+    at.holes.forEach((h, pin) => {
+      if (h.kind !== 'strip') return;
+      const st = takeStrip(h.board, h.row >= 5 ? 1 : 0, h.col, net(part, pin));
+      st.legs++;
+      st.rows.add(h.row);
+    });
+    onBoard.set(part.id, at);
+    occupy(at);
+  };
+
+  if (!series) {
+    for (const part of ordered) {
+      const spec = MOUNTS[part.type];
+      if (spec) placeFresh(part, spec);
+    }
+  } else {
+    const mounted = ordered.flatMap((part) => {
+      const spec = MOUNTS[part.type];
+      return spec ? [{ part, spec }] : [];
+    });
+    // Önce şekli sabit çok bacaklılar (entegre, düğme, gösterge), sonra sıralı bacaklılar (transistör, trimpot,
+    // köprü diyot, TO-220), en sonda iki bacaklılar; her grup şemadaki soldan sağa sırayla.
+    const group = (spec: { mount: Mount; span?: number }) => (spec.span !== undefined ? 2 : fits(spec) ? 1 : 0);
+    for (const g of [0, 1, 2]) {
+      for (const { part, spec } of mounted) {
+        if (group(spec) !== g || onBoard.has(part.id) || inChain.has(part.id)) continue;
+        if (g > 0 && !chainOf.has(part.id)) {
+          const spot = bestSpot(part, spec);
+          if (spot) {
+            put(part, spec, spot);
+            continue;
+          }
+        }
+        placeFresh(part, spec);
+      }
+    }
+    // İyileştirme: daha çok bacağın aynı şeritte buluştuğu bir yere taşınabilen parça taşınır.
+    for (let round = 0; round < 4; round++) {
+      let moved = false;
+      for (const { part, spec } of mounted) {
+        if (!fits(spec) || !onBoard.has(part.id)) continue;
+        const before = sharedLegs();
+        const at = lift(part);
+        const spot = bestSpot(part, spec);
+        if (spot && sharedLegs() + spot.gain > before) {
+          put(part, spec, spot);
+          moved = true;
+        } else restore(part, at);
+      }
+      if (!moved) break;
+    }
   }
 
   // --- Masadaki parçalar ---------------------------------------------------------------------------
@@ -1055,6 +1392,27 @@ function plan(doc: CircuitDoc, cols: number, series: boolean, first: number = FI
 
   // --- Jumper'lar ------------------------------------------------------------------------------------
   joinStrips();
+  // Tezgâh planı: Arduino'nun kalın fişinin önündeki (direklerden uzak) bir deliğe direk teli iniyorsa fiş şeridin en
+  // öndeki boş deliğine kayar: tel şeritte fişin yanından geçmez (bacaklar aynı şeritte buluştuğu için şeritler
+  // kalabalık; "tahta sütunu", 2026-11-16).
+  if (series) {
+    const posted = new Set(leads.flatMap((l, i) => (byId.get(l.partId)?.type === 'arduino' ? [] : [i])));
+    leads.forEach((lead, i) => {
+      if (posted.has(i) || lead.hole.kind !== 'strip') return;
+      const hole = lead.hole;
+      const half = hole.row >= 5 ? 1 : 0;
+      const st = strips.get(stripKey(hole.board, half, hole.col));
+      if (!st) return;
+      const behind = leads.some((l, k) => posted.has(k) && l.hole.kind === 'strip' && l.hole.board === hole.board && l.hole.col === hole.col && (l.hole.row >= 5 ? 1 : 0) === half && l.hole.row > hole.row);
+      if (!behind) return;
+      const front = (half === 0 ? [4, 3, 2, 1, 0] : [9, 8, 7, 6, 5]).find((r) => !st.rows.has(r));
+      const deepest = Math.max(...leads.flatMap((l, k) => (posted.has(k) && l.hole.kind === 'strip' && l.hole.board === hole.board && l.hole.col === hole.col ? [l.hole.row] : [])));
+      if (front === undefined || front < deepest) return;
+      st.rows.delete(hole.row);
+      st.rows.add(front);
+      leads[i] = { ...lead, hole: { ...hole, row: front } };
+    });
+  }
   // Aynı ağın kullandığı raylar (üst/alt, breadboard'lar arası) birleştirilir: besleme (+) sol uçta, öbürleri
   // (toprak, −) sağ uçta. Aynı uçta olsalar iki köprü aynı sütunda üst üste biner (tepeden görünümde biri
   // öbürünü ve 1. sütunun deliklerini örter).

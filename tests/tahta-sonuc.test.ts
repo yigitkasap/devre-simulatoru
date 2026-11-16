@@ -19,8 +19,8 @@ describe('Sonuç (T4): T3’ün kurulumu üç denemede düzeltilir', () => {
   const doc = exampleDoc('bjt-anahtar')!;
   const plan = planBreadboard(doc);
   const right = buildFromPlan(plan);
-  const t3 = withHoles(withHoles(right, idOf(doc, 'R1'), ['6b', '6e']), idOf(doc, 'LED1'), ['12g', '11g']);
-  const half = withHoles(t3, idOf(doc, 'R1'), ['2c', '6c']);
+  const t3 = withHoles(withHoles(right, idOf(doc, 'R1'), ['6b', '6e']), idOf(doc, 'LED1'), ['4a', '2a']);
+  const half = withHoles(t3, idOf(doc, 'R1'), ['6b', '3b']);
   const t0 = 1_000_000;
   let s = startSession(t0);
   const first = checkBuild(doc, t3, plan);
@@ -67,11 +67,11 @@ describe('Sonuç (T4): T3’ün kurulumu üç denemede düzeltilir', () => {
   });
 
   it('kısa adlar ve süre biçimi', () => {
-    const q = checkBuild(doc, withHoles(right, idOf(doc, 'Q1'), ['4h', '3h', '2h']), plan).problems[0]!;
-    const wire = checkBuild(doc, { ...right, wires: [...right.wires, { a: '2d', b: '7i', color: 'blue' }] }, plan).problems[0]!;
+    const q = checkBuild(doc, withHoles(right, idOf(doc, 'Q1'), ['4c', '3c', '2c']), plan).problems[0]!;
+    const wire = checkBuild(doc, { ...right, wires: [...right.wires, { a: '6c', b: '5a', color: 'blue' }] }, plan).problems[0]!;
     const rec = (p: typeof q) => ({ id: p.id, kind: p.kind, part: p.part, wire: p.wire, onRail: p.onRail });
     expect(problemShort(doc, rec(q))).toBe('Q1 bacak sırası');
-    expect(problemShort(doc, rec(wire))).toBe('2d – 7i kablosu fazla');
+    expect(problemShort(doc, rec(wire))).toBe('6c – 5a kablosu fazla');
     expect([0, 40_400, 61_000, 3_725_000].map(formatDuration)).toEqual(['0 s', '40 s', '1 dk 1 s', '1 sa 2 dk']);
   });
 });

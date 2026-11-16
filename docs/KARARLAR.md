@@ -2648,6 +2648,62 @@ direncin boştaki ucunda, ray ve köprü yok, direkler sütun sırasında; eskid
 kur (telefon, T6 öğrenci)" (kilitli güç kaynağı kablosu seçiliyken Çıkar pasif; eskiden kilitli ray köprüsünde Sil).
 Gerçek iPhone'da denenmedi.
 
+### Tahta: bacaklar aynı ağın şeridine doğrudan ("tahta sütunu", 2026-11-16)
+
+Hata düzeltmesi (kod dondurma sırasında). Sorun (kullanıcı): FET yükseltecinde RG ve RD transistörün bacak sütununa
+doğrudan takılabilecekken köprüyle bağlanıyordu. Neden: tezgâh planında bacak paylaşımı yalnızca iki bacaklıların seri
+zincirinde ve bir önceki parçanın son sütununda vardı ("tahta düzeni" sınırı); BF245A'nın gate'i ortadaki bacak
+olduğu için RG'ye hep köprü gidiyordu. Dal `tahta-sutun`. Kart planı (Karta aktar, KiCad) değişmedi.
+
+**Kural.** Bir parçanın bacağı başka bir parçanın aynı ağdaki bacağıyla aynı şeride takılır (transistör, trimpot,
+entegre dahil). Köprü teli yalnızca şeritte yer kalmayınca ya da iki bacak fiziksel olarak aynı şeride gelemeyince
+(ör. kuplajlı FET'te RG gate ile toprak arasında: gate ve source yan yana, direnç en az 3 delik açılır).
+
+**Yerleşim** (`src/bench3d/breadboard.ts`, yalnızca tezgâh planı):
+
+1. Önce şekli sabit çok bacaklılar (entegre, düğme, gösterge), sonra sıralı bacaklılar (transistör, trimpot, köprü
+   diyot, TO-220), en sonda iki bacaklılar; her grup şemadaki soldan sağa sırayla.
+2. Her parça, bacaklarından biri ya da birkaçı aynı ağın var olan bir şeridine gelecek en iyi yere takılır
+   (`bestSpot`); iki bacaklıda bacak aralığı Tahtada kur'un sınırları içinde denenir (direnç ve diyot 3–8, LED ve
+   kondansatör 1–3; önce olağan aralık). Eşitlikte sinyal ağı yeğlenir (RG'nin bacağı gate şeridinde, toprakta değil).
+   Seri zincir de ucundaki ağın şeridinden başlar (`placeChain`; önce soldan sağa).
+3. İyileştirme turu: her parça (zincirdekiler dahil), şeritlerde buluşan bacak sayısı (şerit başına bacak − 1)
+   artacak bir yere taşınabiliyorsa taşınır.
+4. Gövdeler: parça satırında ilk bacağından son bacağına kadar delikleri kaplar; buzzer iki komşu satırı, TO-18
+   (sekmesi öne bakar) öndeki komşu satırı da; orta kanalın iki yanında bacağı olan parça (entegre, gösterge) aradaki
+   satırları. Yeni parça bu deliklere takılmaz. Ampermetrenin girdiği yerdeki boş şerit ayrılır.
+5. Şeritte parça bacaklarına en çok 4 delik; ağın alet kabloları için 1 (ağda iki ya da daha çok alet kablosu ya da
+   raya inen köprü varsa 2) delik kalır.
+6. Eski yolda "bir önceki parçanın son sütununu paylaş" seçeneği artık sütunların gerçekten boş olduğuna bakar (parçalar
+   araya da yerleştiği için; bakmadığında baraj-çubuk'ta iki ağ kısa devre oluyordu).
+7. Arduino'nun kalın fişi, önündeki bir deliğe direk teli iniyorsa şeridin en öndeki boş deliğine kayar (sıkışık
+   şeritte tel fişin yanından geçmesin).
+
+**Sonuç (81 örnek).** Köprü teli 361 → 221 (şerit–şerit 190 → 81, şerit–ray 144 → 116, ray–ray 27 → 24); 17 örnekte
+sıfıra indi, 45'inde azaldı, hiçbirinde artmadı. FET, BJT ve MOSFET yükselteçlerinde köprü yok (kuplajlı FET'te
+yukarıdaki zorunlu tek köprü). Deney 9 (T1) planı: Q1 2c-3c-4c, R1 6b–3b, R2 5e–2e, LED1 2a–4a; köprü yok (eskiden üç).
+
+**Yan etkiler ve gevşeyen kurallar.**
+
+- Seri zincir katlanabilir (öbür bacak başka bir parçanın şeridine doğrudan takıldığında ortak şeridin aynı yanına
+  düşer) ya da sağdan sola dizilebilir (zincir bir transistörün şeridinden başlıyorsa). tahta-duzen testi: seri
+  komşular yine ortak şeritte ve aynı yarıda; zincirlerin çoğu (%75'ten çoğu) sırayla, seri çiftlerin %80'inden çoğu
+  yan yana.
+- Kalabalık şerit biraz daha sık: komşu sütunun ötesinden gelen direk teli 81 örnekte 5 (sınır 4 → 6).
+- Kablo koridoru (`cableRoutes.ts`): yeni direk sıraları üç durum ortaya çıkardı; düzeltildi. (a) İniş seçilirken
+  öndeki şeritte yatan, henüz kurulmamış kabloların direğe çıkışı da engel sayılır. (b) Atlamalı yerleşimde de iniş
+  çapraz; atlama, yan kablonun şeridi gerçekte kestiği aralığa göre (köşesi yay). (c) Çapraz inişe yer bulamayan
+  (şeridi cihazın önüne çok yakın) kablo bir şerit öne alınıp şeritler yeniden atanır; dikliği 0,97'yi aşan iniş
+  aday sayılmaz.
+- Tahtada kur fikstürleri (T1, T3, T4, T6) yeni planın delik adlarıyla; senaryolar aynı. "Eksik kablo" senaryosu
+  (planda baza giden köprü kalmadı) R1'i köprüyle baza bağlanan bir kurulumla kurulur.
+
+**Denetim.** `tests/tahta-sutun.test.ts`: 81 örnekte köprü sayısı önce/sonra (hiçbiri artmaz, toplam %30'dan çok
+azalır); "aynı şeride takılabilecekken köprüyle bağlanmış bacak yok": planlayıcıdan bağımsız kaba kuvvet arama, her
+parçayı tek başına bütün uygun yerlere taşır, şeritlerde buluşan bacak sayısı artan yer bulursa hata; FET
+yükselteçlerinde RG gate, RD drain, RS source şeridinde. Netlistin şemayla aynı olduğu, gövdelerin çakışmadığı ve
+Tahtada kur'un planı kabul ettiği kendi testlerinde (tahta-duzen, tezgah-sade, yuvarlak-govde, tahta-denetle).
+
 ### 3B: yuvarlak gövdeler ezilmez (2026-11-16)
 
 Hata düzeltmesi (kod dondurma sırasında). Sorun (kullanıcı): LED'ler, elektrolitik kondansatörler ve öbür yuvarlak

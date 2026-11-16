@@ -21,7 +21,7 @@ describe('Tahtada kur görevi (T6)', () => {
     const withBuild = { ...doc, build: startBuild(doc, plan, board) };
     const back = taskFromHash(new URL(taskUrl(task, withBuild, 'https://x.test/devre/')).hash)!;
     expect(back.task.board).toEqual(board);
-    expect(back.doc.build?.parts[idOf(doc, 'Q1')]?.holes).toEqual(['2h', '3h', '4h']);
+    expect(back.doc.build?.parts[idOf(doc, 'Q1')]?.holes).toEqual(['2c', '3c', '4c']);
     expect(parseTask({ name: 'a', board: {} })!.board).toEqual(DEFAULT_BOARD_TASK);
     expect(parseTask({ name: 'a', board: { start: 'x', checks: 'y', maxHint: 9, parts: [1, 'p2'] } })!.board).toEqual({ ...DEFAULT_BOARD_TASK, parts: ['p2'] });
     expect(parseTask({ name: 'a' })!.board).toBeUndefined();
@@ -36,9 +36,9 @@ describe('Tahtada kur görevi (T6)', () => {
     // Deney 9'da toprak ve besleme az bacaklı: ray kullanılmaz; güç kaynağının kabloları bağlı olduğu bacağın
     // şeridinde hazır gelir ("ray yalnızca kalabalık ağda", 2026-11-14; eskiden raylarda ve iki ray kablosuyla).
     expect(rails.wires.length).toBe(0);
-    expect(rails.leads.map((l) => `${labelOf(doc, l.part)}#${l.pin} ${l.hole}`)).toEqual(['PS1#0 7g', 'PS1#1 4g']);
-    // Kalabalık toprak ağı olan devrede (yarım dalga: dört bacak) raylar arası kablolar da hazır gelir.
-    const crowded = exampleDoc('yarim-dalga')!;
+    expect(rails.leads.map((l) => `${labelOf(doc, l.part)}#${l.pin} ${l.hole}`)).toEqual(['PS1#0 5d', 'PS1#1 4b']);
+    // Raylar arası kablosu olan devrede (555 astabil: toprak ve besleme iki yarıda) o kablolar da hazır gelir.
+    const crowded = exampleDoc('555-astabil')!;
     const crowdedStart = startBuild(crowded, planBreadboard(crowded), { ...DEFAULT_BOARD_TASK, start: 'rails' });
     expect(crowdedStart.wires.length).toBeGreaterThan(0);
     expect(crowdedStart.wires.every((w) => w.a.includes('rayı') && w.b.includes('rayı'))).toBe(true);
@@ -46,7 +46,7 @@ describe('Tahtada kur görevi (T6)', () => {
     expect(Object.keys(parts.parts).map((id) => labelOf(doc, id))).toEqual(['Q1']);
     expect(parts.wires).toEqual(rails.wires);
     // Hazır parçalar planBreadboard'un yerinde.
-    expect(parts.parts[idOf(doc, 'Q1')]!.holes).toEqual(['2h', '3h', '4h']);
+    expect(parts.parts[idOf(doc, 'Q1')]!.holes).toEqual(['2c', '3c', '4c']);
   });
 
   it('hazır gelenler kilitli; Tahtayı boşalt yalnızca öğrencinin taktıklarını kaldırır', () => {
@@ -59,18 +59,18 @@ describe('Tahtada kur görevi (T6)', () => {
     const fg = idOf(doc, 'FG1');
     const student = {
       ...start,
-      parts: { ...start.parts, [idOf(doc, 'R1')]: { holes: ['2c', '6c'] } },
-      wires: [...start.wires, { a: '6a', b: '3j', color: 'orange' as const }],
-      leads: [...start.leads, { part: fg, pin: 1, hole: '2a' }],
+      parts: { ...start.parts, [idOf(doc, 'R1')]: { holes: ['6b', '3b'] } },
+      wires: [...start.wires, { a: '7a', b: '3j', color: 'orange' as const }],
+      leads: [...start.leads, { part: fg, pin: 1, hole: '6a' }],
     };
     expect(keepLocked(student, locks)).toEqual(start);
     expect(student.wires.filter((w) => locks.wires.has(wireKey(w))).length).toBe(0);
     // Seçili öğe kilitli mi (Döndür ve Sil pasif): hazır gelen Q1 ve PS1 kablosu evet; öğrencinin taktıkları hayır.
     expect(isLocked(locks, { kind: 'part', id: idOf(doc, 'Q1') })).toBe(true);
     expect(isLocked(locks, { kind: 'part', id: idOf(doc, 'R1') })).toBe(false);
-    expect(isLocked(locks, { kind: 'wire', a: '6a', b: '3j' })).toBe(false);
-    // Hazır gelen raylar arası kablo kilitli (kalabalık toprak ağı olan devre).
-    const railed = exampleDoc('yarim-dalga')!;
+    expect(isLocked(locks, { kind: 'wire', a: '7a', b: '3j' })).toBe(false);
+    // Hazır gelen raylar arası kablo kilitli (raylar arası kablosu olan devre).
+    const railed = exampleDoc('555-astabil')!;
     const railedStart = startBuild(railed, planBreadboard(railed), { ...DEFAULT_BOARD_TASK, start: 'rails' });
     expect(isLocked(locksOf(railedStart), { kind: 'wire', ...railedStart.wires[0]! })).toBe(true);
     expect(isLocked(locks, { kind: 'lead', part: start.leads[0]!.part, pin: start.leads[0]!.pin })).toBe(true);

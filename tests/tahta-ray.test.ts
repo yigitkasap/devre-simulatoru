@@ -192,7 +192,8 @@ describe('3B: ray yalnızca kalabalık ağda', () => {
     }
     expect(bad.slice(0, 40)).toEqual([]);
     expect(wires).toBeGreaterThan(380);
-    expect(far).toBeLessThanOrEqual(4);
+    // Bacaklar aynı şeritte buluştuğu için ("tahta sütunu", 2026-11-16) kalabalık şerit biraz daha sık: 81 örnekte 5 tel.
+    expect(far).toBeLessThanOrEqual(6);
   });
 
   it('Tahtada kur yeni planla çalışır: planın yerleşimi Denetle’den sorunsuz geçer, alet telleri direklerinden aynı deliklere', () => {

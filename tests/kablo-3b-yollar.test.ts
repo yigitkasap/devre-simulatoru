@@ -13,7 +13,7 @@ import { Box3, Vector3 } from 'three';
 import { BB, boardWidth, holeXZ, planBreadboard } from '../src/bench3d/breadboard';
 import { JUMPER_RADIUS, jumperCurve } from '../src/bench3d/breadboardModel';
 import { PolyCurve, pathDistance, roundPath, segmentDistance, trimPath, tubeGeometry } from '../src/bench3d/cablePath';
-import { CABLE_BEND_MIN, CABLE_PITCH, CABLE_TABLE, cableJobs, compactSockets, routeArches, routeCables, wholeCable, type CableJob } from '../src/bench3d/cableRoutes';
+import { CABLE_BEND_MIN, CABLE_PITCH, CABLE_TABLE, DROP_PLUMB, cableJobs, compactSockets, routeArches, routeCables, wholeCable, type CableJob } from '../src/bench3d/cableRoutes';
 import { CABLE_RADIUS, jumperShapes, type BoardBody } from '../src/bench3d/jumpers';
 import { collisions } from '../src/bench3d/leadRoute';
 import { placeBoardParts, placeTablePart } from '../src/bench3d/placement';
@@ -30,9 +30,6 @@ const ctx2d: unknown = new Proxy(
   },
 );
 (globalThis as { document?: unknown }).document ??= { createElement: () => ({ width: 0, height: 0, style: {}, getContext: () => ctx2d }) };
-
-/** İnişte kablonun çekül doğrultusuna en çok yaklaşabileceği oran (|dy| / boy): 1 dikey iniş demektir. */
-const DROP_PLUMB = 0.97;
 
 /** Kırık çizgide, yön değiştiren ardışık üç noktadan geçen çemberlerin en küçük yarıçapı (düz kısımlar sayılmaz). */
 function bendRadius(points: readonly Vector3[]): number {

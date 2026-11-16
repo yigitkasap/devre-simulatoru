@@ -59,6 +59,8 @@ const JOIN_MARGIN = 0.8;
 const TOP_SLANT = 1.2;
 /** Çapraz inişin şerit boyunca uzanışı için denenen boylar (şeridin derinliğine göre seçilen ikisinden sonra). */
 const DROP_LENGTHS = [7, 5, 4.2, 3.5, 3, 2.4, 1.9, 1.5, 1.1, 0.7, 0.4];
+/** Çapraz inişte kablonun çekül doğrultusuna en çok yaklaşabileceği oran (|dy| / boy; 1: dikey). */
+export const DROP_PLUMB = 0.97;
 /** Çapraz inişin köşelerinde denenen yarıçaplar (büyükten küçüğe; yer oldukça geniş kavis). */
 const DROP_RADII = [5.2, 4.2, 3.3, 2.7, R];
 
@@ -125,6 +127,8 @@ interface LaneItem {
   minLane: number;
   /** Doğrudan giden bir kablo bu kablonun direğinin hizasından geçiyorsa: en geride olabileceği şerit. */
   capLane: number;
+  /** Çapraz inişe yer bulamayan kablo için en geride olabileceği şerit (yeniden atamada bir öne alınır). */
+  limit: number;
   /** Aynı şeritte üst üste yatan kablolarda kat (0: masada). */
   layer: number;
   lane: number;
@@ -279,7 +283,7 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
       // parçanın arka yüzünün yeterince gerisinde olmalı.
       const between = (ctx.bodies ?? []).filter((b) => b !== job.box && Math.abs((b.min.x + b.max.x) / 2) < Math.abs(slot.x) && (b.min.x + b.max.x) / 2 >= 0 === slot.x >= 0 && Math.max(Math.abs(b.min.x), Math.abs(b.max.x)) > ctx.plateHalf && b.max.z > job.entry.z);
       const minLane = Math.max(0, ...between.map((b) => Math.ceil((job.entry.z - R - BOOT - (b.min.z - 1.2)) / CABLE_PITCH)));
-      items.push({ index, side: true, xa: slot.x, xp: job.entry.x, pre: sidePre(job, slot, slot.steep), yh: slot.y, exitZ: Number.NEGATIVE_INFINITY, sx: slot.x, exit: null, minLane, capLane: 99, layer: 0, lane: -1 });
+      items.push({ index, side: true, xa: slot.x, xp: job.entry.x, pre: sidePre(job, slot, slot.steep), yh: slot.y, exitZ: Number.NEGATIVE_INFINITY, sx: slot.x, exit: null, minLane, capLane: 99, limit: 99, layer: 0, lane: -1 });
       return;
     }
     if (ctx.top) {
@@ -304,7 +308,7 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     // Çapraz, soketten (ve varsa yataya dönüş köşesinden) sonraki kısa bir düz parçadan başlar.
     const shifted = xd !== exit.x;
     const pre = shifted ? [...exit.pre, new Vector3(exit.x, exit.y, exit.z + exit.lead + 1)] : exit.pre;
-    items.push({ index, side: false, xa: xd, xp: job.entry.x, pre, yh: exit.y, exitZ: exit.z + exit.lead + (shifted ? 1.6 : 0), sx: exit.x, exit, minLane: 0, capLane: 99, layer: 0, lane: -1 });
+    items.push({ index, side: false, xa: xd, xp: job.entry.x, pre, yh: exit.y, exitZ: exit.z + exit.lead + (shifted ? 1.6 : 0), sx: exit.x, exit, minLane: 0, capLane: 99, limit: 99, layer: 0, lane: -1 });
   });
 
   // --- Şerit ataması ---
@@ -334,7 +338,7 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
   const maxLane = (item: LaneItem, layer = 0) => {
     if (item.side) return SIDE_LANES;
     const d = descent(item, layer);
-    return Math.floor((z0(jobs[item.index]!) - (item.exitZ + d.top + 0.03 + d.lean)) / CABLE_PITCH + 1e-9);
+    return Math.min(item.limit, Math.floor((z0(jobs[item.index]!) - (item.exitZ + d.top + 0.03 + d.lean)) / CABLE_PITCH + 1e-9));
   };
   const lo = (item: LaneItem) => Math.min(item.xa, item.xp);
   const hi = (item: LaneItem) => Math.max(item.xa, item.xp);
@@ -443,10 +447,14 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
   // Sırayla: düz, üst üste yatan, atlamalı; önce şeride katılma sırasıyla, koridor o sırayla dolmuyorsa (çok kablolu,
   // çapraz bağlantılı devre) sırasız (her kablo yine öbürlerine değmeyen bir çapraz iniş arar). İlk taşmasız (ya da en
   // az taşan) yerleşim tutulur.
-  let overflow = assign(false, false, true);
-  let kept = items.map((i) => ({ lane: i.lane, layer: i.layer }));
+  let overflow = 0;
   let mode: RouteResult['mode'] = 'flat';
   let joined = true;
+  const chooseLanes = () => {
+  overflow = assign(false, false, true);
+  let kept = items.map((i) => ({ lane: i.lane, layer: i.layer }));
+  mode = 'flat';
+  joined = true;
   for (const [stack, hop, join] of [[true, false, true], [false, false, false], [true, false, false], [true, true, false]] as const) {
     if (overflow === 0) break;
     const tried = assign(stack, hop, join);
@@ -458,6 +466,7 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     }
   }
   items.forEach((i, k) => Object.assign(i, kept[k]));
+  };
   /**
    * Kablonun yolu. `drop` verilmişse soketten çapraz iniş: kablo fişin ucundan sonra hem aşağıya hem şeridinin yönüne
    * döner, çapraz iner ve şeridine teğet yatar (üstten bakınca dik köşe yok, yumuşak bir kavis). `drop` yoksa eski
@@ -473,10 +482,37 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     const under = item.side ? [] : items.filter((q) => q.side && q.lane > item.lane && crosses(item, q)).map((q) => q.xa).sort((p, q) => (p - q) * sgn);
     if (drop) {
       const exit = item.exit;
-      if (!exit || under.length > 0 || (Math.sign(item.xp - exit.x) || 1) !== sgn) return null;
+      if (!exit || (Math.sign(item.xp - exit.x) || 1) !== sgn) return null;
       const land = new Vector3(exit.x + sgn * drop.d, y, z);
       // İniş şeridin kendi aralığında biter (yana kaydırılmış inişte de).
       if ((land.x - item.xa) * sgn < 0) return null;
+      // Atlama: masada yattığı kısmın altından geçen yan kablolar (inişin üstünden geçtikleri havada kalır; uzaklığı
+      // aday denetimi ölçer). Kablo oralarda bir kablo çapı yükselir; rampaya yer yoksa bu iniş olmaz.
+      const high = y + CABLE_PITCH;
+      // Yan kablonun bu şeridi kestiği aralık (kurulmuş yolundan; köşesi yay olduğu için köşe noktasından sapar).
+      const spans = items
+        .filter((q) => q.side && q.lane > item.lane && crosses(item, q) && routes[q.index])
+        .map((q) => {
+          const xs = routes[q.index]!.points.filter((p) => Math.abs(p.z - z) < CABLE_PITCH && p.y < high + CABLE_PITCH).map((p) => p.x);
+          return xs.length > 0 ? ([Math.min(...xs), Math.max(...xs)] as const) : ([q.xa, q.xa] as const);
+        })
+        .map(([a, b]) => (sgn > 0 ? ([a, b] as const) : ([b, a] as const)))
+        .filter(([a, b]) => (a - land.x) * sgn > 0.6 && (item.xp - b) * sgn > -0.6)
+        .sort((p, q) => (p[0] - q[0]) * sgn);
+      const hopPts: Vector3[] = [];
+      let endY = y;
+      for (let k = 0; k < spans.length; ) {
+        let m = k;
+        while (m + 1 < spans.length && (spans[m + 1]![0] - spans[m]![1]) * sgn < 2 * RAMP + 1.5) m++;
+        const u1 = spans[k]![0] - sgn * 0.6;
+        const u2 = spans[m]![1] + sgn * 0.6;
+        if ((u1 - sgn * RAMP - land.x) * sgn < R + 0.4) return null;
+        hopPts.push(new Vector3(u1 - sgn * RAMP, y, z), new Vector3(u1, high, z), new Vector3(u2, high, z));
+        if ((item.xp - (u2 + sgn * RAMP)) * sgn < R + 0.4) endY = high;
+        else hopPts.push(new Vector3(u2 + sgn * RAMP, y, z));
+        k = m + 1;
+      }
+      if (endY > y && hopPts.length > 0 && Math.abs(hopPts[hopPts.length - 1]!.x - item.xp) < R + 0.4) hopPts.pop();
       const base = exit.pre[exit.pre.length - 1]!;
       // Bükülme, kablo cihazın ön yüzünün (düğmeler, ayaklar) önüne çıktıktan sonra başlar.
       const straight = Math.max(exit.pre.length > 1 ? exit.lead : 0, job.box.max.z + CABLE_R + 0.15 - base.z) + drop.ahead;
@@ -488,8 +524,8 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
         if (phi > 1.75) return null;
         t = drop.r * Math.tan(phi / 2) + 0.02;
       }
-      const up = slant(job.entry.y - y);
-      const way = [...exit.pre, top, land, new Vector3(item.xp, y, z), new Vector3(item.xp, job.entry.y, z + Math.min(up.lean, Math.max(0, job.entry.z - BOOT - up.top - z))), job.entry.clone()];
+      const up = slant(job.entry.y - endY);
+      const way = [...exit.pre, top, land, ...hopPts, new Vector3(item.xp, endY, z), new Vector3(item.xp, job.entry.y, z + Math.min(up.lean, Math.max(0, job.entry.z - BOOT - up.top - z))), job.entry.clone()];
       const first = exit.pre.length;
       return roundPath(way, (corner) => (corner === first || corner === first + 1 ? drop.r : R));
     }
@@ -536,6 +572,16 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     routes[item.index] = { points: path.points, kind: item.side ? 'side' : 'lane', minRadius: path.minRadius, lane: item.lane };
     built.push(wholeCable(path.points));
   };
+  /** İniş (masaya ya da altındaki kabloya değene kadar) bir yerde çekül doğrultusuna DROP_PLUMB'dan yakın mı. */
+  const tooSteep = (points: readonly Vector3[], y: number): boolean => {
+    for (let k = 1; k < points.length; k++) {
+      if (points[k - 1]!.y < y + 2 * CABLE_PITCH + 0.05) break;
+      const step = points[k]!.clone().sub(points[k - 1]!);
+      const len = step.length();
+      if (len > 1e-6 && Math.abs(step.y) / len > DROP_PLUMB) return true;
+    }
+    return false;
+  };
   /** Yol, kendi cihazı dışındaki bir gövdenin içinden (ya da kablo yarıçapı kadar yakınından) geçiyor mu. */
   const hitsBody = (points: readonly Vector3[], own: Box3): boolean => {
     const pad = CABLE_R + 0.1;
@@ -551,12 +597,32 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
     }
     return false;
   };
+  /** Kabloların yolları (şeritler atanmış); çapraz inişe yer bulamayan cihaz kabloları döner. */
+  const buildAll = (): LaneItem[] => {
+    built.length = 0;
+    for (const item of items) routes[item.index] = null;
+    const steep: LaneItem[] = [];
   for (const item of items) if (item.side) keep(item, build(item, null)!);
+  // Henüz kurulmamış kabloların direğe çıkan kısmı (şeritten dikey yükselip fişe giren): öndeki şeritte yatan
+  // kablonun çıkışı, arkadaki kablonun inişinin önünde kalabilir; iniş seçilirken o da engel sayılır.
+  const riserOf = new Map<LaneItem, Vector3[]>();
+  for (const item of items) {
+    if (item.side) continue;
+    const pts = build(item, null)!.points;
+    const y = layerY(item.layer) + 0.02;
+    let last = 0;
+    pts.forEach((p, k) => {
+      if (p.y <= y) last = k;
+    });
+    riserOf.set(item, wholeCable(pts.slice(last)));
+  }
   // Cihaz kabloları geriden öne (cihazlara yakın şeritten başlayarak) kurulur: öndeki kablonun inişi, gerisinde yatan
   // kabloların üstünden geçer; onlara değmeyen ilk iniş seçilir. Önce geniş kavisli uzun çapraz, olmazsa kısası, o da
   // olmazsa dikey iniş.
-  let steep = 0;
+  const pendingLane = new Set(items.filter((i) => !i.side));
   for (const item of items.filter((i) => !i.side).sort((p, q) => q.lane - p.lane || q.layer - p.layer || p.index - q.index)) {
+    pendingLane.delete(item);
+    const risers = [...pendingLane].map((q) => riserOf.get(q)!);
     const job = jobs[item.index]!;
     const exit = item.exit!;
     const run = laneZ(item) - Math.max(exit.z + exit.lead, job.box.max.z + CABLE_R + 0.15);
@@ -570,18 +636,40 @@ export function routeCables(jobs: readonly CableJob[], ctx: RouteContext): Route
       for (const d of lengths) {
         for (const r of DROP_RADII) {
           const path = build(item, { d, r, ahead });
-          if (!path || path.minRadius < CABLE_BEND_MIN || hitsBody(path.points, job.box)) continue;
+          if (!path || path.minRadius < CABLE_BEND_MIN || tooSteep(path.points, layerY(item.layer)) || hitsBody(path.points, job.box)) continue;
           const body = wholeCable(path.points);
-          if (built.every((o) => pathDistance(body, o, CLEAR) >= CLEAR)) {
+          if (built.every((o) => pathDistance(body, o, CLEAR) >= CLEAR) && risers.every((o) => pathDistance(body, o, CLEAR) >= CLEAR)) {
             chosen = path;
             break search;
           }
         }
       }
     }
-    if (!chosen) steep++;
+    if (!chosen) steep.push(item);
     keep(item, chosen ?? build(item, null)!);
   }
+    return steep;
+  };
+  // Çapraz inişe yer bulamayan kablo (şeridi cihazın önüne çok yakın) bir şerit öne alınıp şeritler yeniden atanır.
+  chooseLanes();
+  let steepItems = buildAll();
+  for (let round = 0; round < 6 && steepItems.length > 0; round++) {
+    const before = { lanes: items.map((i) => ({ lane: i.lane, layer: i.layer, limit: i.limit })), routes: [...routes], overflow, mode, joined, steep: steepItems };
+    for (const item of steepItems) item.limit = Math.max(0, item.lane - 1);
+    chooseLanes();
+    const again = buildAll();
+    if (overflow > before.overflow || again.length >= before.steep.length) {
+      items.forEach((i, k) => Object.assign(i, before.lanes[k]));
+      before.routes.forEach((r, k) => (routes[k] = r));
+      overflow = before.overflow;
+      mode = before.mode;
+      joined = before.joined;
+      steepItems = before.steep;
+      break;
+    }
+    steepItems = again;
+  }
+  const steep = steepItems.length;
   // --- Tepeden görünüm: cihaz kabloları kartın soketinden direğe kemer ---
   // Kemer soketin üstünden öne yatık kalkar, düz gider, fişe yatık iner (köşeler yuvarlak). Her kemer, öncekilere ve
   // tahta dışı kablolara değmeyen en alçak yükseklikten geçer: tepeden bakınca kesişen kablolar farklı yükseklikte,
