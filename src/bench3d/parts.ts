@@ -47,6 +47,11 @@ const X_AXIS = Math.PI / 2;
 // Ayak izi kuralı ("3B: okunurluk önce", docs/KARARLAR.md): tahtadaki parçanın gövdesi bacak deliklerinin her yönde
 // en çok yarım delik ötesine taşar, yüksekliği en çok 4 delik aralığı (kondansatörde 6). Gerçek parça daha büyükse
 // küçültülür ve sadeleştirilir; kılıfın biçimi (TO-18, TO-220, D kesitli TO-92…) kalır.
+//
+// Yuvarlak gövdeler (LED, elektrolitik kondansatör, TO-18, NTC boncuğu, buzzer) bu kurala sığsın diye EZİLMEZ
+// ("yuvarlak gövde", 2026-11-16): x ve z ölçekleri aynıdır, daire daire kalır. Çapları derinlikte yarım delik
+// kuralını aşabilir; kural onlar için "gövdeler birbirine ve başka parçaların bacaklarına değmesin"dir. Çap
+// yerleşime göre seçilir (roundBody.ts) ve modele `diameter` olarak verilir.
 /** Gövdenin bacak deliklerinden taşması (birim): yarım deliğin biraz altı, komşu sıradaki parçaya değmesin. */
 export const OVER = 0.45;
 /** Gövdenin altı kartın en az bu kadar üstünde (bacaklarının üstünde durur): yatık teller ve köprüler iki kat hâlinde altından geçer. */
@@ -120,26 +125,27 @@ export function electrolyticHeight(farads: number): number {
   return Math.min(2.6, Math.max(1.5, 2.0 + 0.3 * Math.log10(Math.max(farads, 1e-9) / 10e-6)));
 }
 
-export function capacitorModel(props: Props): PartModel {
+/** `diameter`: elektrolitik kutunun çapı (delik aralığı; yerleşime göre, roundBody.ts). */
+export function capacitorModel(props: Props, diameter = 1.5): PartModel {
   const kind = strProp(props, 'kind', ['electrolytic', 'film'], 'electrolytic');
   const C = numProp(props, 'capacitance', 1e-6);
   const body = new Group();
   if (kind === 'electrolytic') {
-    // Yassı kutu: iki bacak deliğinin ayak izine sığar (2 × 1 delik); boyu kapasiteyle büyür.
-    const rx = 0.5 + OVER - 0.02;
-    const rz = OVER - 0.01;
+    // Silindir kutu: x ve z ölçeği aynı (daire); boyu kapasiteyle büyür.
+    const r = diameter / 2;
     const h = electrolyticHeight(C);
-    const can = mesh(new CylinderGeometry(1, 1, h, 20), mat('#20325c', 0.45), 0, CLEAR + h / 2, 0);
-    can.scale.set(rx, 1, rz);
+    const can = named('elektrolitik', mesh(new CylinderGeometry(1, 1, h, 24), mat('#20325c', 0.45), 0, CLEAR + h / 2, 0));
+    can.scale.set(r, 1, r);
     body.add(can);
     // − ucunu gösteren açık şerit (sağdaki pin −).
     const stripe = mesh(new CylinderGeometry(1.012, 1.012, h * 0.96, 8, 1, true, -0.35 + X_AXIS, 0.7), mat('#c9ced6', 0.5), 0, CLEAR + h / 2, 0);
-    stripe.scale.set(rx, 1, rz);
+    stripe.scale.set(r, 1, r);
     body.add(stripe);
-    const top = mesh(new CylinderGeometry(0.92, 0.92, 0.05, 20), M.steel(), 0, CLEAR + h + 0.02, 0);
-    top.scale.set(rx, 1, rz);
+    const top = mesh(new CylinderGeometry(0.92, 0.92, 0.05, 24), M.steel(), 0, CLEAR + h + 0.02, 0);
+    top.scale.set(r, 1, r);
     body.add(top);
-    return radial('capacitor', body, 1, CLEAR);
+    // Bacaklar kutunun altından çıkar (dar kutuda birbirine yakın), deliklere açılır.
+    return radial('capacitor', body, 2 * Math.min(0.5, r - 0.15), CLEAR);
   }
   // Kutupsuz: kapasiteye göre seramik disk (≤ 10 nF), radyal çok katmanlı seramik (≤ 1 µF) ya da kutu film.
   const pack = nonPolarPackage(C);
@@ -244,12 +250,14 @@ export function ldrModel(): PartModel {
   return radial('ldr', body, 1, CLEAR + 0.1);
 }
 
-export function ntcModel(): PartModel {
+/** `diameter`: boncuğun çapı (delik aralığı). */
+export function ntcModel(diameter = 1): PartModel {
   const body = new Group();
-  const bead = mesh(new SphereGeometry(0.5, 16, 12), mat('#262a30', 0.35), 0, CLEAR + 0.75, 0);
-  bead.scale.set(1.1, 1.3, 0.8);
+  // Damla biçimli boncuk: üstten bakınca daire (x ve z ölçeği aynı), biraz uzun.
+  const bead = named('ntc', mesh(new SphereGeometry(0.5, 16, 12), mat('#262a30', 0.35), 0, CLEAR + 0.75, 0));
+  bead.scale.set(diameter, 1.3, diameter);
   body.add(bead);
-  return radial('ntc', body, 0.6, CLEAR + 0.2);
+  return radial('ntc', body, 0.6 * diameter, CLEAR + 0.2);
 }
 
 // --- Sigorta (cam sigorta, yuvada) ---------------------------------------------------------------------
@@ -337,12 +345,13 @@ export function zenerModel(): PartModel {
   return axial('zener', body, 0.75, CLEAR + OVER);
 }
 
-// --- LED (oval mercek: iki bacak deliğinin ayak izine sığar) -------------------------------------------------------
+// --- LED (yuvarlak mercek: flanş, silindir, kubbe) ------------------------------------------------------------------
 
 /** LED merceğinin silindir kısmının boyu (birim). */
 const LED_TUBE = 0.7;
 
-export function ledModel(props: Props): PartModel {
+/** `diameter`: flanşın çapı (delik aralığı; yerleşime göre, roundBody.ts). Mercek flanştan biraz dardır. */
+export function ledModel(props: Props, diameter = 1.5): PartModel {
   const color = strProp(props, 'color', LED_COLORS, 'red');
   const light = LED_MODELS[color]?.lightColor ?? '#ff3b30';
   const body = new Group();
@@ -350,15 +359,16 @@ export function ledModel(props: Props): PartModel {
   const lens = new MeshStandardMaterial({ color: light, roughness: 0.15, transparent: true, opacity: 0.82, emissive: light, emissiveIntensity: 0 });
   const dome = new Group();
   dome.userData.live = true;
-  const rx = 0.5 + OVER - 0.1;
-  const rz = OVER - 0.05;
-  const flange = mesh(new CylinderGeometry(1, 1, 0.22, 22), lens, 0, CLEAR + 0.11, 0);
-  flange.scale.set(rx + 0.07, 1, rz + 0.04);
+  // Üstten bakınca daire: x ve z ölçeği aynı (eskiden iki deliğin ayak izine sığsın diye oval eziliyordu).
+  const rf = diameter / 2;
+  const r = rf - 0.07;
+  const flange = named('led-flans', mesh(new CylinderGeometry(1, 1, 0.22, 24), lens, 0, CLEAR + 0.11, 0));
+  flange.scale.set(rf, 1, rf);
   // Kısa mercek (boyu 0,7): öndeki LED arkasındaki LED'i ya da kondansatörü örtmesin.
-  const tube = mesh(new CylinderGeometry(1, 1, LED_TUBE, 22), lens, 0, CLEAR + 0.22 + LED_TUBE / 2, 0);
-  tube.scale.set(rx, 1, rz);
-  const cap = mesh(new SphereGeometry(1, 22, 12, 0, Math.PI * 2, 0, Math.PI / 2), lens, 0, CLEAR + 0.22 + LED_TUBE, 0);
-  cap.scale.set(rx, 0.7, rz);
+  const tube = named('led-mercek', mesh(new CylinderGeometry(1, 1, LED_TUBE, 24), lens, 0, CLEAR + 0.22 + LED_TUBE / 2, 0));
+  tube.scale.set(r, 1, r);
+  const cap = mesh(new SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), lens, 0, CLEAR + 0.22 + LED_TUBE, 0);
+  cap.scale.set(r, 0.9 * r, r);
   dome.add(flange, tube, cap);
   body.add(dome);
   const glow = glowSprite(light, 6);
@@ -367,7 +377,9 @@ export function ledModel(props: Props): PartModel {
   const root = new Group();
   const anchors = pinAnchors('led');
   root.add(body);
-  root.add(legDown(new Vector3(-0.5, CLEAR, 0), anchors[0]!), legDown(new Vector3(0.5, CLEAR, 0), anchors[1]!));
+  // Bacaklar merceğin altından çıkar (dar mercekte birbirine yakın), deliklere açılır.
+  const legX = Math.min(0.5, r - 0.15);
+  root.add(legDown(new Vector3(-legX, CLEAR, 0), anchors[0]!), legDown(new Vector3(legX, CLEAR, 0), anchors[1]!));
   const model: PartModel = { root, anchors };
   return {
     ...model,
@@ -440,15 +452,16 @@ function to92Leg(k: number, sign = 1): Vector3 {
   return new Vector3(0, STANDOFF, (k - 1) * mm(TO92.pitch) * sign);
 }
 
-/** TO-18'in ölçeği: genişlik (bacak sırası boyunca), yükseklik ve derinlik; flanş ve sekme ayak izine sığar. */
-const TO18_SCALE = { along: 0.62, up: 0.8, deep: 0.42 } as const;
+/** TO-18'in yükseklik ölçeği (gerçek kılıftan alçak). Genişlik ve derinlik aynı ölçekle: flanşın çapı `diameter`. */
+const TO18_UP = 0.8;
 
 /**
  * TO-18 metal kılıf (BC107: NXP/Philips SOT18/13): alt flanş, silindir kapak, flanşta emetörün yanında sekme;
  * üç bacak (E ve C karşılıklı, B aralarında, arkada). Yazı kapağın yanında. Ayak izine sığsın diye gerçek kılıf
- * küçültülür ve derinliği yassılır (TO18_SCALE). `emitter`: emetör ucunun sırası (BJT'de 2).
+ * küçültülür ama yassılmaz (kapak ve flanş daire kalır). `emitter`: emetör ucunun sırası (BJT'de 2); `diameter`:
+ * flanşın çapı (delik aralığı).
  */
-export function to18Model(type: DeviceType, text: string, emitter = 2): PartModel {
+export function to18Model(type: DeviceType, text: string, emitter = 2, diameter = 1.4): PartModel {
   const root = new Group();
   const anchors = pinAnchors(type);
   const rc = mm(TO18.can) / 2;
@@ -460,7 +473,9 @@ export function to18Model(type: DeviceType, text: string, emitter = 2): PartMode
   const body = new Group();
   body.userData.body = true;
   body.position.y = STANDOFF;
-  body.scale.set(TO18_SCALE.deep, TO18_SCALE.up, TO18_SCALE.along);
+  // Kapak ve flanş daire kalır: x ve z ölçeği aynı (eskiden derinliği yassılıyordu).
+  const flat = diameter / (2 * rf);
+  body.scale.set(flat, TO18_UP, flat);
   body.add(named('to18-flans', mesh(new CylinderGeometry(rf, rf, tf, 18), metal, 0, tf / 2, 0)));
   body.add(named('to18-kapak', mesh(new CylinderGeometry(rc, rc, H - tf - chamfer, 18, 1, true), metal, 0, tf + (H - tf - chamfer) / 2, 0)));
   body.add(named('to18-tepe', mesh(new CylinderGeometry(rc - chamfer, rc, chamfer, 18), metal, 0, H - chamfer / 2, 0)));
@@ -492,17 +507,18 @@ export function to18Model(type: DeviceType, text: string, emitter = 2): PartMode
   root.add(body);
   const r = mm(TO18.lead) / 2;
   order.forEach(({ a }, k) => {
-    const from = k === 1 ? new Vector3(lc * TO18_SCALE.deep, STANDOFF, 0) : new Vector3(0, STANDOFF, (k - 1) * lc * TO18_SCALE.along);
+    const from = k === 1 ? new Vector3(lc * flat, STANDOFF, 0) : new Vector3(0, STANDOFF, (k - 1) * lc * flat);
     root.add(legDown(from, a, r));
   });
   return { root, anchors };
 }
 
-export function transistorModel(type: DeviceType, props: Props): PartModel {
+/** `diameter`: TO-18 kılıfta flanşın çapı (delik aralığı; yerleşime göre, roundBody.ts). */
+export function transistorModel(type: DeviceType, props: Props, diameter?: number): PartModel {
   const model = typeof props.model === 'string' ? props.model : '';
   const text = model && model !== 'genel' ? model.replace(/B$/, '') : (TRANSISTOR_TEXT[type] ?? '');
   const pack = transistorPackage(model);
-  if (pack === 'to18') return to18Model(type, text);
+  if (pack === 'to18') return to18Model(type, text, 2, diameter);
   if (pack === 'to220') return to220Model(type, text, '', null, 'z');
   const root = new Group();
   const anchors = pinAnchors(type);
@@ -1000,18 +1016,22 @@ export function speakerModel(): PartModel {
   };
 }
 
-/** Aktif buzzer: siyah oval gövde (bacak deliklerinin ayak izinde: 4 × 1 delik), üstte ses deliği ve + işareti. */
-export function buzzerModel(): PartModel {
+/**
+ * Aktif buzzer: siyah yuvarlak disk, üstte ses deliği ve + işareti. `diameter`: diskin çapı (delik aralığı; yerleşime
+ * göre, roundBody.ts). Disk bacak aralığından (3 delik) darsa bacaklar altından çıkıp deliklere açılır.
+ */
+export function buzzerModel(diameter = 2.2): PartModel {
   const body = new Group();
   const h = 1.5;
-  const puck = named('buzzer', mesh(new CylinderGeometry(1, 1, h, 24), mat('#16171a', 0.45), 0, CLEAR + h / 2, 0));
-  puck.scale.set(1.5 + OVER - 0.02, 1, OVER - 0.01);
+  const r = diameter / 2;
+  const puck = named('buzzer', mesh(new CylinderGeometry(1, 1, h, 28), mat('#16171a', 0.45), 0, CLEAR + h / 2, 0));
+  puck.scale.set(r, 1, r);
   body.add(puck);
   body.add(mesh(new CylinderGeometry(0.2, 0.2, 0.02, 12), mat('#050505', 0.9), 0, CLEAR + h + 0.011, 0));
   const plus = labelPlate('+', 0.7, 0.7, { fg: '#d4d7db' });
-  plus.position.set(-1.2, CLEAR + h + 0.02, 0);
+  plus.position.set(-0.62 * r, CLEAR + h + 0.02, 0);
   body.add(plus);
-  const model = radial('buzzer', body, 3, CLEAR);
+  const model = radial('buzzer', body, Math.min(3, 2 * (r - 0.25)), CLEAR);
   let phase = 0;
   return {
     ...model,

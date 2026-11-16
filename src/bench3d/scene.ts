@@ -39,7 +39,7 @@ import { dotSpeed, type SimFrame } from '../editor/useSimulation';
 import { pinKey } from '../model/connectivity';
 import { Dwell, floatSpot, type FloatSpot } from './hover';
 import type { CircuitDoc, Part } from '../model/types';
-import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BoardPart, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
+import { BB, boardWidth, boardZ, holeXZ, netColors, planBreadboard, type BreadboardPlan, type Hole, type TablePart } from './breadboard';
 import { HOLE_DEPTH, breadboardMesh, jumperMesh } from './breadboardModel';
 import { collisions, type Obstacle } from './leadRoute';
 import { PolyCurve, tubeGeometry } from './cablePath';
@@ -50,7 +50,7 @@ import { BANANA, INSTRUMENTS, PLATE, POST, holesUsed, instrumentLeads, layoutPos
 import { bananaMesh, plateMesh, postMesh, postWireMesh } from './postModel';
 import { M, mat, mergeStatic, mesh, rod } from './kit';
 import type { PartModel } from './model';
-import { holeAt, placeBoardPart, placeTablePart, type Placement } from './placement';
+import { holeAt, placeBoardParts, placeTablePart, type Placement } from './placement';
 import { BACKGROUND, createControls, createRenderer, lightScene, radialTexture } from './stage';
 
 export interface BenchCallbacks {
@@ -870,10 +870,12 @@ export class BenchScene {
     }
     // Taban plakası: tahtalar ince bir levhaya oturur; arka kenarında bağlantı direkleri (posts.ts).
     this.boards.add(plateMesh(plan.cols, boardZ(plan.boards - 1) + BB.depth / 2));
+    // Tahtadaki parçalar birlikte yerleşir: yuvarlak gövdelerin çapı komşularına göre seçilir (placement.ts).
+    const onBoard = placeBoardParts(doc, plan).placements;
     for (const part of doc.parts) {
-      const onBoard = plan.onBoard.get(part.id);
+      const placed = onBoard.get(part.id);
       const table = plan.table.get(part.id);
-      if (onBoard) this.parts.set(part.id, this.placeOnBoard(part, onBoard, plan.cols));
+      if (placed) this.parts.set(part.id, this.finishPlacement(part, placed));
       else if (table) this.parts.set(part.id, this.placeOnTable(part, table));
     }
     this.compactInstruments(plan);
@@ -1031,11 +1033,6 @@ export class BenchScene {
     this.cableAmps = new Float64Array(this.cablePaths.length);
     this.cablePhases = new Float64Array(this.cablePaths.length);
     this.dirty = true;
-  }
-
-  /** Breadboard'a takılan parça: gövde deliklerin arasında, bacaklar deliklere. */
-  private placeOnBoard(part: Part, at: BoardPart, cols: number): Placed {
-    return this.finishPlacement(part, placeBoardPart(part, at, cols));
   }
 
   /** Masadaki parça: plandaki yerde; bacakları/uçları kendi modelinde. */

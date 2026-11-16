@@ -129,7 +129,7 @@ describe('3B modeller: kılıflar', () => {
     }
   });
 
-  it('TO-18 (BC107): metal kapak, flanş ve sekme durur; ayak izine sığacak kadar küçültülmüş', () => {
+  it('TO-18 (BC107): metal kapak, flanş ve sekme durur; küçültülmüş ama yassılmamış (kapak ve flanş daire)', () => {
     const root = build('npn', { model: 'BC107' });
     for (const name of ['to18-kapak', 'to18-flans', 'to18-tepe', 'to18-sekme']) expect(has(root, name), name).toBe(true);
     const can = sizeMm(root, 'to18-kapak');
@@ -137,6 +137,9 @@ describe('3B modeller: kılıflar', () => {
     // Flanş kapaktan geniş (gerçek oran 5,4 / 4,65); ikisi de gerçek ölçüden küçük.
     expect(flange[2] / can[2]).toBeCloseTo(TO18.flange / TO18.can, 1);
     expect(Math.max(...flange)).toBeLessThan(TO18.flange);
+    // Daire: derinlik ve genişlik aynı (18 kenarlı çokgenin kutusu iki yönde % 1,5 farklı ölçülür).
+    expect(Math.abs(flange[0] / flange[2] - 1)).toBeLessThan(0.02);
+    expect(Math.abs(can[0] / can[2] - 1)).toBeLessThan(0.02);
   });
 
   it('TO-92: D kesitli (düz yüz), gerçeğinden ince', () => {
@@ -183,9 +186,10 @@ describe('3B modeller: kılıflar', () => {
     expect(block[0] / block[1]).toBeCloseTo(PP3.length / PP3.height, 1);
   });
 
-  it('buzzer: tahtada alçak, oval bir disk (ayak izine sığar)', () => {
+  it('buzzer: tahtada alçak, yuvarlak bir disk (x ve z ölçüsü eşit; gerçek çapından küçük)', () => {
     const buzzer = sizeMm(build('buzzer'), 'buzzer');
     expect(buzzer[1]).toBeLessThan(BUZZER.height);
+    expect(buzzer[0]).toBeCloseTo(buzzer[2], 6);
     expect(Math.max(buzzer[0], buzzer[2])).toBeLessThan(BUZZER.diameter);
   });
 

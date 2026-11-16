@@ -47,12 +47,12 @@ import {
  * `holes`: breadboard'a takılıyorsa bacakların bittiği yerel konumlar (pin sırasıyla); `extra`: DIP'in
  * boş bacakları. Verilmezse parça masada, bacakları şema pinleri × SPREAD'de.
  */
-export function buildPartModel(part: Part, holes: readonly Vector3[] | null = null, extra: readonly Vector3[] = []): PartModel {
+export function buildPartModel(part: Part, holes: readonly Vector3[] | null = null, extra: readonly Vector3[] = [], round?: number): PartModel {
   if (holes && (part.type === 'opamp' || part.type === 'timer555')) return dipChipModel(part.type === 'opamp' ? 'LM741' : 'NE555', holes, extra);
   if (holes && isLogicChip(part.type)) return dipChipModel(chipModel(part), holes, extra, holes[0]);
   if (holes && part.type === 'seg7') return sevenSegmentBoardModel(holes, extra);
   if (holes && part.type === 'pushbutton') return withAnchors(holes, () => pushButtonModel(extra));
-  const model = withAnchors(holes, () => build(part));
+  const model = withAnchors(holes, () => build(part, round));
   return !holes && isSidePart(part.type) ? fitSide(model) : model;
 }
 
@@ -75,13 +75,14 @@ function chipModel(part: Part): string {
   return String(partProp(part.type, part.props, 'model'));
 }
 
-function build(part: Part): PartModel {
+/** `round`: yuvarlak gövdenin çapı (roundBody.ts; verilmezse modelin olağan çapı). */
+function build(part: Part, round?: number): PartModel {
   const p = part.props;
   switch (part.type) {
     case 'resistor':
       return resistorModel(p);
     case 'capacitor':
-      return capacitorModel(p);
+      return capacitorModel(p, round);
     case 'inductor':
       return inductorModel();
     case 'potentiometer':
@@ -89,7 +90,7 @@ function build(part: Part): PartModel {
     case 'ldr':
       return ldrModel();
     case 'ntc':
-      return ntcModel();
+      return ntcModel(round);
     case 'fuse':
       return fuseModel();
     case 'diode':
@@ -97,14 +98,14 @@ function build(part: Part): PartModel {
     case 'zener':
       return zenerModel();
     case 'led':
-      return ledModel(p);
+      return ledModel(p, round);
     case 'npn':
     case 'pnp':
     case 'njfet':
     case 'pjfet':
     case 'nmos':
     case 'pmos':
-      return transistorModel(part.type, p);
+      return transistorModel(part.type, p, round);
     case 'opamp':
       return icModuleModel('opamp', ['−', '+', 'OUT', 'V+', 'V−']);
     case 'timer555':
@@ -148,7 +149,7 @@ function build(part: Part): PartModel {
     case 'speaker':
       return speakerModel();
     case 'buzzer':
-      return buzzerModel();
+      return buzzerModel(round);
     case 'motor':
       return motorModel();
     case 'relay':

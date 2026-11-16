@@ -16,7 +16,7 @@ import { PolyCurve, pathDistance, roundPath, segmentDistance, trimPath, tubeGeom
 import { CABLE_BEND_MIN, CABLE_PITCH, CABLE_TABLE, cableJobs, compactSockets, routeArches, routeCables, wholeCable, type CableJob } from '../src/bench3d/cableRoutes';
 import { CABLE_RADIUS, jumperShapes, type BoardBody } from '../src/bench3d/jumpers';
 import { collisions } from '../src/bench3d/leadRoute';
-import { placeBoardPart, placeTablePart } from '../src/bench3d/placement';
+import { placeBoardParts, placeTablePart } from '../src/bench3d/placement';
 import { INSTRUMENTS, PLATE, POST_WIRE, WIRE_BEND_MIN, instrumentLeads, layoutPosts, plugEntry } from '../src/bench3d/posts';
 import { EXAMPLE_IDS, exampleDoc } from '../src/examples';
 
@@ -96,7 +96,7 @@ function linesOf(id: (typeof EXAMPLE_IDS)[number], top = false) {
   routeArches(direct, routed.routes.map((r) => r.points)).forEach((a, i) => lines.push({ name: `atlama ${i}`, kind: 'cable', r: CABLE_RADIUS, points: a.points, skip: CABLE_SKIP }));
   // Köprü telleri ve direk telleri.
   const bodies = new Map<string, BoardBody>(
-    [...plan.onBoard].map(([pid, at]) => [pid, { body: placeBoardPart(doc.parts.find((p) => p.id === pid)!, at, plan.cols).body }] as const),
+    [...placeBoardParts(doc, plan).placements].map(([pid, placed]) => [pid, { body: placed.body }] as const),
   );
   const wires = layout.wires.map((w) => w.points);
   const shapes = jumperShapes(plan, new Set(instrumentLeads(doc, plan)), undefined, wires, bodies);

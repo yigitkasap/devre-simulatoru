@@ -2648,6 +2648,49 @@ direncin boştaki ucunda, ray ve köprü yok, direkler sütun sırasında; eskid
 kur (telefon, T6 öğrenci)" (kilitli güç kaynağı kablosu seçiliyken Çıkar pasif; eskiden kilitli ray köprüsünde Sil).
 Gerçek iPhone'da denenmedi.
 
+### 3B: yuvarlak gövdeler ezilmez (2026-11-16)
+
+Hata düzeltmesi (kod dondurma sırasında). Sorun (kullanıcı): LED'ler, elektrolitik kondansatörler ve öbür yuvarlak
+gövdeler bütün devrelerde oval görünüyordu (`baraj-cubuk`'ta çok belirgin). Neden: ayak izi kuralına sığsın diye
+gövde x'te 0,5 + OVER, z'de OVER ile ölçekleniyordu (`ledModel`, `capacitorModel`…); daire ≈ 2:1 eziliyordu. Dal
+`yuvarlak-govde`.
+
+**1. Eşit ölçek.** LED, elektrolitik kondansatör, TO-18 (BC107), NTC boncuğu ve buzzer artık x ve z'de aynı ölçekle
+çizilir (`parts.ts`; modele `diameter` verilir). TO-92 gerçekte de D kesitli olduğu için kendi biçiminde kaldı;
+daldırma kaplı çok katmanlı seramik kondansatör gerçekte de yassı bir damladır, o da değişmedi. Seramik disk ve LDR
+zaten dik duran yassı disklerdi.
+
+**2. Kural gevşedi.** Yuvarlak gövde derinlikte yarım delik kuralını aşabilir; onun kuralı "gövdeler birbirine ve
+başka parçaların bacaklarına değmesin". Öbür gövdelerde yarım delik kuralı duruyor (`tests/tezgah-sade.test.ts`).
+
+**3. Çap yerleşime göre** (`src/bench3d/roundBody.ts`, `placement.ts` → `placeBoardParts`). Önce yuvarlak olmayan
+parçalar kurulur; her yuvarlak gövde olağan çapından başlar ve komşu gövde kutusuna, başka parçanın bacağına
+(deliğine), Arduino kablosunun fişine ve öbür yuvarlak gövdelere 0,04 birimden yakın olmayacak kadar küçülür. İki
+yuvarlak gövde yakınsa ikisi eşit küçülür.
+
+| Gövde | Olağan çap | En küçük |
+| --- | --- | --- |
+| LED (flanş), elektrolitik, TO-18 (flanş) | 1,5 delik | 0,96 |
+| NTC boncuğu | 1,0 | 0,8 |
+| Buzzer | 2,2 | 1,6 |
+
+- **Yorum (istek: "çap 1,0 deliğe kadar küçült"):** komşu satırdaki iki gövdenin merkezleri tam 1 delik arayla
+  durur; çap 1,0'da birbirine teğet kalırlardı. Aralarında boşluk kalsın diye en küçük çap 0,96.
+- En küçük çapta da değen gövde `placeBoardParts(...).conflicts`'te bildirilir; tahta planına dokunulmaz. 81 örnekte
+  böyle bir çift yok.
+- 81 örnekteki çaplar: LED 1,5 (32), 1,37 (12), 1,04 (2); elektrolitik 1,5 (16), 1,37 (2), 1,04 (5); TO-18 1,5 (15);
+  NTC 1,0 (3); buzzer 2,2 (1). 1,37: çaprazındaki yuvarlak gövdeyle (√2 delik arayla) paylaşır; 1,04: komşu satırda
+  bir direnç ya da anahtar gövdesi var.
+- **Buzzer (yorum):** bacakları 3 delik arayla. Bacaklarını örten disk (Ø 3,6) komşu satırlardaki delikleri
+  kapatırdı; Tahtada kur'da o deliklere tel takılır. Disk bacaklarının arasında durur (Ø 2,2), bacaklar altından
+  çıkıp deliklere açılır. Gerçek buzzer Ø 12 mm (4,7 delik).
+- Dar gövdede (çap < 1,3) bacaklar gövdenin altından birbirine yakın çıkar, deliklere açılır.
+
+**Denetim.** `tests/yuvarlak-govde.test.ts` (6 test, 81 örnek): yuvarlak gövdelerin x ve z ölçeği eşit, çapı
+yerleşimin seçtiği çap; tahtadaki hiçbir silindir ya da küre eşit olmayan ölçekle ezilmiyor (çok katmanlı seramik
+dışında); hiçbir iki gövde kesişmiyor (yuvarlak gövde daire olarak; komşu gövde, yabancı bacak, fiş, TO-18'in flanş
+sekmesi). `tezgah-sade` testinde çakışma denetimi yuvarlak gövdeleri daire sayar (eskiden kutu).
+
 ### 3B: kablo uçları — soketten çapraz iniş, şeride sırayla katılma (2026-11-15)
 
 Sorun (kullanıcı): `diyot-dc`'de multimetrelerin önünde kablolar hâlâ bozuktu. Kablo soketten masaya inip şeride

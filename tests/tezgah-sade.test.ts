@@ -1,7 +1,10 @@
 // 3B tezgâh, "okunurluk önce" (2026-11-12): parçalar sade, tanınır ve birbirine değmez. Bütün örnekler (81).
 //   1. Ayak izi: tahtadaki her parçanın gövdesi, bacaklarının kapladığı deliklerin her yönde en çok yarım delik
-//      (1,27 mm) ötesine taşar; yüksekliği en çok 4 delik aralığı (kondansatörde 6).
-//   2. Çakışma yok: hiçbir iki parçanın gövde kutusu birbirine değmez (tahtadakiler, masadakiler, direkler).
+//      (1,27 mm) ötesine taşar; yüksekliği en çok 4 delik aralığı (kondansatörde 6). Yuvarlak gövdeler (LED,
+//      elektrolitik, TO-18, NTC, buzzer) ezilmez, derinlikte yarım deliği aşabilir ("yuvarlak gövde", 2026-11-16;
+//      onların kuralı "hiçbir şeye değmesin": tests/yuvarlak-govde.test.ts).
+//   2. Çakışma yok: hiçbir iki parçanın gövdesi birbirine değmez (tahtadakiler, masadakiler, direkler; yuvarlak
+//      gövdeler daire, öbürleri kutu olarak).
 //   3. Tahta dışı parçalar tahtanın solunda ya da sağında (önünde değil); en büyük boyutları yarım boy tahtanın
 //      genişliğinin dörtte birini geçmez (cihazlar ve Arduino dışında).
 //   4. Bağlantı direkleri: bağlı her alet ucuna bir direk ("tahta düzeni", 2026-11-14; ayrıntısı tahta-duzen.test.ts),
@@ -30,7 +33,7 @@ const ctx2d: unknown = new Proxy(
 );
 (globalThis as { document?: unknown }).document ??= { createElement: () => ({ width: 0, height: 0, style: {}, getContext: () => ctx2d }) };
 
-const { placeBoardPart, placeTablePart } = await import('../src/bench3d/placement');
+const { placeBoardParts, placeTablePart } = await import('../src/bench3d/placement');
 
 /** Yarım delik (birim) ve değmeme payı. */
 const HALF = 0.5;
@@ -46,23 +49,26 @@ interface Placed {
   readonly body: Box3;
   readonly box: Box3;
   readonly holes: Vector3[];
+  /** Yuvarlak gövde (placement.ts): merkezi ve yarıçapı. */
+  readonly round: { readonly x: number; readonly z: number; readonly r: number } | null;
 }
 
 function place(doc: CircuitDoc, plan: BreadboardPlan): Placed[] {
   const out: Placed[] = [];
+  const board = placeBoardParts(doc, plan).placements;
   for (const part of doc.parts) {
     const at = plan.onBoard.get(part.id);
     const table = plan.table.get(part.id);
     if (at) {
-      const p = placeBoardPart(part, at, plan.cols);
+      const p = board.get(part.id)!;
       const holes = [...at.holes, ...(at.extraHoles ?? [])].map((h) => {
         const { x, z } = holeXZ(h, plan.cols);
         return new Vector3(x, BB.height, z);
       });
-      out.push({ id: part.id, label: part.label, type: part.type, onBoard: true, body: p.body, box: p.box, holes });
+      out.push({ id: part.id, label: part.label, type: part.type, onBoard: true, body: p.body, box: p.box, holes, round: p.round });
     } else if (table) {
       const p = placeTablePart(part, table);
-      out.push({ id: part.id, label: part.label, type: part.type, onBoard: false, body: p.box, box: p.box, holes: [] });
+      out.push({ id: part.id, label: part.label, type: part.type, onBoard: false, body: p.box, box: p.box, holes: [], round: null });
     }
   }
   return out;
@@ -71,6 +77,23 @@ function place(doc: CircuitDoc, plan: BreadboardPlan): Placed[] {
 /** İki kutu birbirine değiyor ya da iç içe mi (aralarında boşluk yoksa). */
 const touch = (a: Box3, b: Box3) => a.min.x <= b.max.x + EPS && b.min.x <= a.max.x + EPS && a.min.y <= b.max.y + EPS && b.min.y <= a.max.y + EPS && a.min.z <= b.max.z + EPS && b.min.z <= a.max.z + EPS;
 
+interface Shape {
+  readonly name: string;
+  readonly box: Box3;
+  readonly round?: Placed['round'];
+}
+
+/** İki gövde birbirine değiyor mu: yuvarlak gövde daire (yükseklikleri örtüşüyorsa), öbürleri kutu. */
+function meets(a: Shape, b: Shape): boolean {
+  if (!a.round && !b.round) return touch(a.box, b.box);
+  if (!(a.box.min.y <= b.box.max.y + EPS && b.box.min.y <= a.box.max.y + EPS)) return false;
+  const [disc, other] = a.round ? [a.round, b] : [b.round!, a];
+  const gap = other.round
+    ? Math.hypot(disc.x - other.round.x, disc.z - other.round.z) - disc.r - other.round.r
+    : Math.hypot(Math.max(other.box.min.x - disc.x, 0, disc.x - other.box.max.x), Math.max(other.box.min.z - disc.z, 0, disc.z - other.box.max.z)) - disc.r;
+  return gap <= EPS;
+}
+
 const docs = EXAMPLE_IDS.map((id) => {
   const doc = exampleDoc(id)!;
   const plan = planBreadboard(doc);
@@ -78,7 +101,7 @@ const docs = EXAMPLE_IDS.map((id) => {
 });
 
 describe('3B: okunurluk önce', () => {
-  it('ayak izi: tahtadaki parçanın gövdesi bacak deliklerinin her yönde en çok yarım delik ötesine taşar; yükseklik en çok 4 delik (kondansatör 6)', () => {
+  it('ayak izi: tahtadaki parçanın gövdesi bacak deliklerinin her yönde en çok yarım delik ötesine taşar (yuvarlak gövdeler dışında); yükseklik en çok 4 delik (kondansatör 6)', () => {
     const bad: string[] = [];
     for (const { id, parts } of docs) {
       for (const p of parts) {
@@ -86,17 +109,17 @@ describe('3B: okunurluk önce', () => {
         const holes = new Box3().setFromPoints(p.holes);
         const over = Math.max(holes.min.x - p.body.min.x, p.body.max.x - holes.max.x, holes.min.z - p.body.min.z, p.body.max.z - holes.max.z);
         const height = p.body.max.y - BB.height;
-        if (over > HALF + EPS) bad.push(`${id} ${p.label} (${p.type}): gövde deliklerden ${(over * 2.54).toFixed(2)} mm taşıyor`);
+        if (!p.round && over > HALF + EPS) bad.push(`${id} ${p.label} (${p.type}): gövde deliklerden ${(over * 2.54).toFixed(2)} mm taşıyor`);
         if (height > heightLimit(p.type) + EPS) bad.push(`${id} ${p.label} (${p.type}): ${height.toFixed(2)} delik yüksek`);
       }
     }
     expect(bad.slice(0, 40)).toEqual([]);
   });
 
-  it('çakışma yok: hiçbir iki parçanın gövde kutusu birbirine değmez (81 örnek; tahtadakiler, masadakiler, direkler)', () => {
+  it('çakışma yok: hiçbir iki parçanın gövdesi birbirine değmez (81 örnek; tahtadakiler, masadakiler, direkler; yuvarlak gövdeler daire olarak)', () => {
     const bad: string[] = [];
     for (const { id, parts, posts, plan } of docs) {
-      const boxes = parts.map((p) => ({ name: `${p.label} (${p.type})`, box: p.body }));
+      const boxes: Shape[] = parts.map((p) => ({ name: `${p.label} (${p.type})`, box: p.body, round: p.round }));
       for (const post of posts.posts) {
         boxes.push({ name: `direk ${post.name}`, box: new Box3(new Vector3(post.x - POST.radius - 0.18, 0, post.z - POST.radius - 0.18), new Vector3(post.x + POST.radius + 0.18, POST.top, post.z + POST.radius + 0.18)) });
       }
@@ -106,7 +129,7 @@ describe('3B: okunurluk önce', () => {
       for (const p of parts) if (!p.onBoard && touch(p.box, plateBox)) bad.push(`${id}: ${p.label} (${p.type}) taban plakasına değiyor`);
       for (let i = 0; i < boxes.length; i++) {
         for (let k = i + 1; k < boxes.length; k++) {
-          if (touch(boxes[i]!.box, boxes[k]!.box)) bad.push(`${id}: ${boxes[i]!.name} ↔ ${boxes[k]!.name}`);
+          if (meets(boxes[i]!, boxes[k]!)) bad.push(`${id}: ${boxes[i]!.name} ↔ ${boxes[k]!.name}`);
         }
       }
     }
