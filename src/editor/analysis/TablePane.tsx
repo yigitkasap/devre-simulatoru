@@ -13,7 +13,11 @@ import { cursorTime } from './Chart';
 import { niceTicks, tickText } from './format';
 import type { TraceRecorder } from './recorder';
 import { changeStart, errorText, fitLooksLinear, fitPoints, fitTau, linearFit, measuredText, parseTheory, percentError } from './table';
+import { autoUnit, baseOf, isListedUnit, UNIT_GROUPS, unitDef } from './tableUnits';
 import { newId, type AnalysisApi } from './useAnalysis';
+
+/** Birim listesinde "Diğer…" seçeneğinin değeri. */
+const OTHER = '__diger';
 
 export interface TablePaneProps {
   readonly api: AnalysisApi;
@@ -77,7 +81,9 @@ export function TablePane({ api, recorder, version, title, compact = false, stac
         disabled={options.length === 0}
         onChange={(e) => {
           const o = options.find((x) => x.key === e.target.value);
-          if (o) update(r.id, { measured: o.measured, unit: r.unit || o.unit, source: o.source });
+          // Birim kendiliğinden büyüklüğe uygun önek (akım → mA); satırın birimi zaten aynı büyüklükteyse korunur
+          // (öğrencinin seçtiği birim ve yazdığı teorik değer değişmesin).
+          if (o) update(r.id, { measured: o.measured, unit: r.unit !== '' && baseOf(r.unit) === o.unit ? r.unit : autoUnit(o.unit, o.measured), source: o.source });
         }}
         className={`${field} font-sans text-muted`}
       >
@@ -89,6 +95,57 @@ export function TablePane({ api, recorder, version, title, compact = false, stac
         ))}
       </select>
     );
+
+  // Birim: büyüklüğe göre gruplu açılır liste; "Diğer…" seçilince serbest metin. Listede olmayan eski birim "Diğer".
+  const [otherRows, setOtherRows] = useState<ReadonlySet<string>>(() => new Set());
+  const unitCell = (r: TableRow) => {
+    const other = otherRows.has(r.id) || (r.unit.trim() !== '' && !isListedUnit(r.unit));
+    const listed = unitDef(r.unit)?.symbol ?? '';
+    return (
+      <div className="flex min-w-0 flex-col gap-1">
+        <select
+          aria-label={t.unitLabel(plainText(r.name))}
+          value={other ? OTHER : listed}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === OTHER) {
+              setOtherRows((s) => new Set(s).add(r.id));
+              if (isListedUnit(r.unit)) update(r.id, { unit: '' });
+              return;
+            }
+            setOtherRows((s) => {
+              const n = new Set(s);
+              n.delete(r.id);
+              return n;
+            });
+            update(r.id, { unit: v });
+          }}
+          className={`${field} font-sans`}
+        >
+          <option value="">{t.unitNone}</option>
+          {UNIT_GROUPS.map((g) => (
+            <optgroup key={g.key} label={t.unitGroups[g.key]}>
+              {g.units.map((d) => (
+                <option key={d.symbol} value={d.symbol}>
+                  {d.symbol}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+          <option value={OTHER}>{t.unitOther}</option>
+        </select>
+        {other && (
+          <input
+            aria-label={t.unitOtherLabel(plainText(r.name))}
+            value={r.unit}
+            placeholder={t.unitOtherPlaceholder}
+            onChange={(e) => update(r.id, { unit: e.target.value })}
+            className={field}
+          />
+        )}
+      </div>
+    );
+  };
 
   const errorCell = (r: TableRow) => {
     const e = percentError(r.measured, parseTheory(r.theory, r.unit));
@@ -127,6 +184,10 @@ export function TablePane({ api, recorder, version, title, compact = false, stac
                   <Icon name="trash" className="h-4 w-4" />
                 </button>
               </div>
+              <div className="flex flex-col gap-1 text-label text-muted">
+                {t.unit}
+                {unitCell(r)}
+              </div>
               <label className="flex flex-col gap-1 text-label text-muted">
                 {t.theoryHint}
                 <input aria-label={t.theoryLabel(plainText(r.name))} value={r.theory} placeholder={r.unit} onChange={(e) => update(r.id, { theory: e.target.value })} className={field} />
@@ -154,6 +215,7 @@ export function TablePane({ api, recorder, version, title, compact = false, stac
             <thead className="text-label text-muted">
               <tr className="border-b border-line">
                 <th scope="col" className="py-1.5 pr-3 font-medium">{t.name}</th>
+                <th scope="col" className="w-[96px] py-1.5 pr-3 font-medium">{t.unit}</th>
                 <th scope="col" className="w-[120px] py-1.5 pr-3 font-medium">{t.theoryHint}</th>
                 <th scope="col" className="py-1.5 pr-3 font-medium">{t.measuredHint}</th>
                 {lab && <th scope="col" className="w-[110px] py-1.5 pr-3 font-medium">{t.lab}</th>}
@@ -165,6 +227,7 @@ export function TablePane({ api, recorder, version, title, compact = false, stac
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-line align-top">
                   <td className="py-1.5 pr-3">{nameCell(r)}</td>
+                  <td className="py-1.5 pr-3">{unitCell(r)}</td>
                   <td className="py-1.5 pr-3"><input aria-label={t.theoryLabel(plainText(r.name))} value={r.theory} placeholder={r.unit} onChange={(e) => update(r.id, { theory: e.target.value })} className={field} /></td>
                   <td className="py-1.5 pr-3">{measuredCell(r)}</td>
                   {lab && <td className="py-1.5 pr-3"><input aria-label={t.labLabel(plainText(r.name))} value={r.lab} placeholder={r.unit} onChange={(e) => update(r.id, { lab: e.target.value })} className={field} /></td>}

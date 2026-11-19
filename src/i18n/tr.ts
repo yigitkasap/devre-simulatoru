@@ -4552,6 +4552,12 @@ export const tr = {
       graphFile: (name: string, rows: number) => `${name} (${rows} satır)`,
       errorNote: '% Hata = |Ölçülen − Teorik| / Teorik × 100',
       removeColumn: 'Sil',
+      unitLabel: (name: string) => `${name || 'Satır'}: birim`,
+      unitNone: '—',
+      unitOther: 'Diğer…',
+      unitOtherLabel: (name: string) => `${name || 'Satır'}: birim (serbest metin)`,
+      unitOtherPlaceholder: 'birim',
+      unitGroups: { voltage: 'Gerilim', current: 'Akım', resistance: 'Direnç', power: 'Güç', other: 'Diğerleri' },
     },
     curve: {
       part: 'Parça',

@@ -22,6 +22,7 @@ import { quantityKey, quantityOptions, type QuantityOption } from './quantities'
 import { liveTraces, netIndex, nodeName, traceColor, traceLabel, type NetIndex, type TraceLabel } from './traces';
 import { useBode, type BodeApi } from './useBode';
 import { useTracer, type TracerApi } from './useTracer';
+import { autoUnit, unitDef } from './tableUnits';
 
 /** Analizde açık olan: başlangıç ekranı ("Ne çizmek istiyorsun?") ya da açık grafiğin türü. */
 export type AnalysisView = 'start' | GraphKind;
@@ -370,7 +371,9 @@ export function useAnalysis(
   }, [graphTraces, labels, doc.parts, pick, view, tracer.part, bode.input?.at, bode.output?.at]);
 
   const addRows = useCallback((rows: readonly Omit<TableRow, 'id'>[]) => {
-    setDoc((a) => ({ ...a, rows: [...a.rows, ...rows.map((r) => ({ ...r, id: newId('r') }))] }));
+    // Ölçülenin birimi büyüklüğe uygun önekle gelir (0,0044 A → mA; tablo-birim). Teorik henüz boş.
+    const prefixed = (r: Omit<TableRow, 'id'>) => (r.measured !== null && unitDef(r.unit)?.factor === 1 && r.theory === '' && r.lab === '' ? autoUnit(r.unit, r.measured) : r.unit);
+    setDoc((a) => ({ ...a, rows: [...a.rows, ...rows.map((r) => ({ ...r, unit: prefixed(r), id: newId('r') }))] }));
   }, []);
 
   return {

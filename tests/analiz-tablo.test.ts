@@ -100,6 +100,8 @@ describe('Analiz: tablo', () => {
     expect(csv.split('\r\n')[0]).toBe('﻿Büyüklük;Formül;Teorik;Ölçülen;Birim;Kaynak;% Hata;Laboratuvar');
     expect(csv.split('\r\n')[1]).toBe('τ;R·C;0,1;0,1001;s;%63,2 anı;0,1;');
     expect(tableCsv(rows, false, ',').split('\r\n')[1]).toBe('τ,R·C,0.1,0.1001,s,%63,2 anı,0.1'.replace('%63,2 anı', '"%63,2 anı"'));
-    expect(tableTsv(rows, false).split('\n')[1]).toBe('τ (R·C)\t100 ms\t100,1 ms\t0,10');
+    // Ölçülen satırın biriminde yazılır (tablo-birim): s seçiliyse 0,1001 s, ms seçiliyse 100,1 ms.
+    expect(tableTsv(rows, false).split('\n')[1]).toBe('τ (R·C)\t100 ms\t0,1001 s\t0,10');
+    expect(tableTsv([{ ...rows[0]!, unit: 'ms' }], false).split('\n')[1]).toBe('τ (R·C)\t100 ms\t100,1 ms\t0,10');
   });
 });

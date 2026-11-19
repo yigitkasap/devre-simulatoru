@@ -1756,14 +1756,32 @@ try {
     // Tablo (A2, N2): sütunlar, % hata, laboratuvar sütunu, satır ekle ve kaynak seçimi, doğru uydurma, CSV menüsü.
     const heads = await drawer.locator('thead th').allTextContents();
     await drawer.getByRole('textbox', { name: 'V(C1): teorik değer' }).fill('10 V'); await page.waitForTimeout(100);
-    const errText = ((await drawer.locator('tbody tr').first().locator('td').nth(3).textContent()) ?? '').trim();
+    const errText = ((await drawer.locator('tbody tr').first().locator('td').nth(4).textContent()) ?? '').trim();
+    // Birim (tablo-birim): V(C1) satırının birimi kendiliğinden V; mV seçip yalın 10000 yazınca % hata aynı kalıyor;
+    // "Diğer…" serbest metin kutusu açıyor; birim listesi gruplu (Gerilim, Akım, Direnç, Güç, Diğerleri).
+    const unitBox = drawer.getByRole('combobox', { name: 'V(C1): birim' });
+    const unitBefore = await unitBox.inputValue();
+    const unitGroups = await unitBox.locator('optgroup').evaluateAll((gs) => gs.map((g) => g.getAttribute('label')));
+    await unitBox.selectOption('mV'); await page.waitForTimeout(100);
+    await drawer.getByRole('textbox', { name: 'V(C1): teorik değer' }).fill('10000'); await page.waitForTimeout(100);
+    const errMv = ((await drawer.locator('tbody tr').first().locator('td').nth(4).textContent()) ?? '').trim();
+    const measuredMv = ((await drawer.locator('tbody tr').first().locator('td').nth(3).textContent()) ?? '').trim();
+    await unitBox.selectOption({ label: 'Diğer…' }); await page.waitForTimeout(100);
+    const otherBox = drawer.getByRole('textbox', { name: 'V(C1): birim (serbest metin)' });
+    const otherShown = (await otherBox.count()) === 1;
+    await otherBox.fill('V'); await page.waitForTimeout(100);
+    await unitBox.selectOption('V'); await page.waitForTimeout(100);
+    await drawer.getByRole('textbox', { name: 'V(C1): teorik değer' }).fill('10 V'); await page.waitForTimeout(100);
+    check('analiz (Tablo, birim): birim açılır listesi gruplu (Gerilim, Akım, Direnç, Güç, Diğerleri); ölçülenle gelen birim V; mV seçip yalın 10000 yazınca % hata aynı ve ölçülen mV’ta; "Diğer…" serbest metin kutusu açıyor',
+      unitBefore === 'V' && unitGroups.join('|') === 'Gerilim|Akım|Direnç|Güç|Diğerleri' && errMv === errText && /mV/.test(measuredMv) && otherShown,
+      `birim ${unitBefore} · ${unitGroups.join(',')} · hata ${errText} → ${errMv} · ölçülen ${measuredMv} · Diğer ${otherShown}`);
     await drawer.getByRole('button', { name: 'Laboratuvar sütunu' }).click(); await page.waitForTimeout(100);
     const labHead = await drawer.locator('thead th', { hasText: 'Laboratuvar' }).count();
     await drawer.getByRole('button', { name: 'Satır ekle' }).click(); await page.waitForTimeout(100);
     await drawer.getByRole('combobox', { name: 'Yeni büyüklük: ölçülen değerin kaynağı' }).selectOption({ index: 1 }); await page.waitForTimeout(100);
     const newRow = ((await drawer.locator('tbody tr').nth(2).textContent()) ?? '').replace(/\s+/g, ' ');
-    check('analiz (Tablo, N2): Büyüklük | Teorik (sen gir) | Ölçülen (simülasyon) | % Hata; teorik 10 V → % hata; Laboratuvar sütunu; Satır ekle ve ölçüleni imleçten seç',
-      heads.slice(0, 4).join('|') === 'Büyüklük|Teorik (sen gir)|Ölçülen (simülasyon)|% Hata' && /^0,\d\d$/.test(errText) && labHead === 1 && /imleç/.test(newRow),
+    check('analiz (Tablo, N2): Büyüklük | Birim | Teorik (sen gir) | Ölçülen (simülasyon) | % Hata; teorik 10 V → % hata; Laboratuvar sütunu; Satır ekle ve ölçüleni imleçten seç',
+      heads.slice(0, 5).join('|') === 'Büyüklük|Birim|Teorik (sen gir)|Ölçülen (simülasyon)|% Hata' && /^0,\d\d$/.test(errText) && labHead === 1 && /imleç/.test(newRow),
       `${heads.join('|')} · hata ${errText} · ${newRow.slice(0, 40)}`);
     const fitPanel = drawer.getByRole('region', { name: 'Doğru uydur' });
     // Varsayılan (analiz düzeltmeleri, 3): aralık sinyalin değişmeye başladığı andan; dönüşümsüz doğru
@@ -1824,10 +1842,15 @@ try {
     const theoryInput = sheet.getByRole('textbox', { name: 'Yeni büyüklük: teorik değer' });
     const inputBox = await theoryInput.boundingBox();
     const inputFont = await theoryInput.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    const phoneUnit = sheet.getByRole('combobox', { name: 'Yeni büyüklük: birim' });
+    const phoneUnitBox = await phoneUnit.boundingBox();
+    const phoneUnitFont = await phoneUnit.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    await phoneUnit.selectOption('mA'); await page.waitForTimeout(100);
+    const phoneUnitValue = await phoneUnit.inputValue();
     const tableButtons = await Promise.all(['Kopyala', 'CSV paylaş'].map((n) => sheet.getByRole('button', { name: n, exact: true }).boundingBox()));
-    check('analiz (telefon, Tablo): satırlar kart; girdiler ≥ 44 px ve 16 px yazı (iOS yakınlaştırmaz); altta Kopyala ve CSV paylaş; doğru uydurma altında',
-      inputBox !== null && inputBox.height >= 43.5 && inputFont >= 16 && tableButtons.every((b) => b !== null && b.height >= 44) && (await sheet.getByRole('region', { name: 'Doğru uydur' }).count()) === 1,
-      `${Math.round(inputBox?.height ?? 0)} px · ${inputFont} px`);
+    check('analiz (telefon, Tablo): satırlar kart; girdiler ve birim listesi ≥ 44 px ve 16 px yazı (iOS yakınlaştırmaz); birim mA seçiliyor; altta Kopyala ve CSV paylaş; doğru uydurma altında',
+      inputBox !== null && inputBox.height >= 43.5 && inputFont >= 16 && phoneUnitBox !== null && phoneUnitBox.height >= 43.5 && phoneUnitFont >= 16 && phoneUnitValue === 'mA' && tableButtons.every((b) => b !== null && b.height >= 44) && (await sheet.getByRole('region', { name: 'Doğru uydur' }).count()) === 1,
+      `${Math.round(inputBox?.height ?? 0)} px · ${inputFont} px · birim ${Math.round(phoneUnitBox?.height ?? 0)} px ${phoneUnitFont} px ${phoneUnitValue}`);
     await page.context().close();
   }
   // --- Analiz v2: başlangıç ekranı, föy kartları, eğri ailesi, büyüklük seçici, tarama iptali, çipler, telefon ---
@@ -2516,8 +2539,8 @@ try {
     // Otomatik kayıt 0,4 s gecikmeyle yazar.
     await page.waitForTimeout(700);
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('devre-simulatoru:devre')).analysis?.rows ?? []);
-    check('Bode: "Tabloya aktar" orta bant kazancını (kat, dB) ve f_H’yi tabloya geçiriyor; CSV (f, genlikler, kazanç, dB, faz, oturdu, teori kazanç ve faz)',
-      saved.some((r) => r.name === 'Orta bant kazancı' && r.measured > 200) && saved.some((r) => r.name === 'f_{H} (−3 dB)' && r.unit === 'Hz') &&
+    check('Bode: "Tabloya aktar" orta bant kazancını (kat, dB) ve f_H’yi (Hz ya da kHz, büyüklüğe göre) tabloya geçiriyor; CSV (f, genlikler, kazanç, dB, faz, oturdu, teori kazanç ve faz)',
+      saved.some((r) => r.name === 'Orta bant kazancı' && r.measured > 200) && saved.some((r) => r.name === 'f_{H} (−3 dB)' && (r.unit === 'Hz' || r.unit === 'kHz')) &&
       /^bode-.*\.csv$/.test(csv.suggestedFilename()) && csvText.startsWith('﻿f (Hz);giriş genliği (V);çıkış genliği (V);kazanç (kat);kazanç (dB);faz (°);oturdu;teori kazanç (kat);teori faz (°)') && csvText.split('\r\n').length >= 17,
       `${saved.length} satır · ${csv.suggestedFilename()}`);
     // Çekmece alçalınca (tutamak): iki grafik 140 px'e sığmıyor → faz gizli, "Fazı göster" ile geliyor.

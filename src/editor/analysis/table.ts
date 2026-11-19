@@ -2,21 +2,19 @@
 // tablonun CSV'si. Saf işlevler (testler doğrudan çağırır).
 
 import type { FitSpec, TableRow } from '../../model/analysis';
-import { formatNumber, formatSI, parseValue, type UnitSymbol } from '../../sim/units';
+import { formatNumber } from '../../sim/units';
 import { tr } from '../../i18n/tr';
 import { plainText } from '../Rich';
 import { toCsv, type CsvSeparator } from './format';
 import type { TraceRecorder } from './recorder';
+import { formatInUnit, inUnit, parseInUnit } from './tableUnits';
 
-const UNITS: ReadonlySet<string> = new Set(['Ω', 'V', 'A', 'F', 'H', 'J', 'W', 's', 'Hz', '%']);
-
-/** Öğrencinin yazdığı teorik değer ("100 ms", "6,32 V", "3,68m"); okunamazsa null. */
+/**
+ * Öğrencinin yazdığı teorik değer SI olarak ("100 ms", "6,32 V", "3,68m"); yalın sayı satırın birimindedir
+ * (mA + "4,3" → 0,0043 A). Okunamazsa null.
+ */
 export function parseTheory(text: string, unit: string): number | null {
-  if (text.trim() === '') return null;
-  const withUnit = UNITS.has(unit) ? parseValue(text, unit as UnitSymbol) : parseValue(text);
-  if (withUnit.ok) return withUnit.value;
-  const bare = parseValue(text);
-  return bare.ok ? bare.value : null;
+  return parseInUnit(text, unit);
 }
 
 /** % Hata = |Ölçülen − Teorik| / |Teorik| × 100; teorik sıfır ya da yoksa null. */
@@ -125,17 +123,18 @@ export function fitTau(spec: FitSpec, fit: LineFit | null): number | null {
   return -1 / fit.slope;
 }
 
-/** Ölçülen değerin yazısı (birimli, 4 anlamlı basamak). */
-export const measuredText = (row: TableRow): string => (row.measured === null ? '—' : formatSI(row.measured, row.unit, { digits: 4 }));
+/** Ölçülen değerin yazısı satırın biriminde (4 anlamlı basamak). */
+export const measuredText = (row: TableRow): string => (row.measured === null ? '—' : formatInUnit(row.measured, row.unit));
 
-/** Tablonun CSV'si: Büyüklük, Formül, Teorik, Ölçülen, Birim, Kaynak, % Hata (ve Laboratuvar). */
+/** Tablonun CSV'si: Büyüklük, Formül, Teorik, Ölçülen, Birim, Kaynak, % Hata (ve Laboratuvar); sayılar Birim sütunundaki birimde. */
 export function tableCsv(rows: readonly TableRow[], labColumn: boolean, sep: CsvSeparator): string {
   const t = tr.analysis.table;
   const header = [t.name, t.formula, t.theory, t.measured, t.unit, t.source, t.error, ...(labColumn ? [t.lab] : [])];
   const body = rows.map((r) => {
     const theory = parseTheory(r.theory, r.unit);
     const e = percentError(r.measured, theory);
-    return [plainText(r.name), plainText(r.formula), theory ?? r.theory, r.measured ?? '', r.unit, r.source, e ?? '', ...(labColumn ? [parseTheory(r.lab, r.unit) ?? r.lab] : [])];
+    const lab = parseTheory(r.lab, r.unit);
+    return [plainText(r.name), plainText(r.formula), theory === null ? r.theory : inUnit(theory, r.unit), r.measured === null ? '' : inUnit(r.measured, r.unit), r.unit, r.source, e ?? '', ...(labColumn ? [lab === null ? r.lab : inUnit(lab, r.unit)] : [])];
   });
   return toCsv(header, body, sep);
 }
