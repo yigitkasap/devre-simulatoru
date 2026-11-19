@@ -3523,8 +3523,8 @@ try {
     const hadBack = (await backButton.count()) === 1;
     if (hadBack) { await backButton.tap(); await page.waitForTimeout(300); }
     const backHome = (await moreSheet.getByRole('button', { name: 'Ayarlar', exact: true }).count()) === 1;
-    check('telefonda ⋯ (v4): kutular Analiz, Geri al, Yinele, Sığdır; satırlar Son devreler, Ayarlar, Yardım, Kısa turu başlat (Örnekler, Dosya ve Klavye kısayolları yok); Yardım sayfasında dokunma hareketleri, "Daha fazla" ile geri (P14)',
-      tiles.join('|') === 'Analiz|Geri al|Yinele|Sığdır' && rows.join('|') === 'Son devreler|Ayarlar|Yardım|Kısa turu başlat' && more.includes('Uca dokun') && hadBack && backHome &&
+    check('telefonda ⋯ (v4): kutular Analiz, Geri al, Yinele, Sığdır; satırlar Son devreler, Ayarlar, Yardım, Kısa turu başlat, Tanıtım turu (Örnekler, Dosya ve Klavye kısayolları yok); Yardım sayfasında dokunma hareketleri, "Daha fazla" ile geri (P14)',
+      tiles.join('|') === 'Analiz|Geri al|Yinele|Sığdır' && rows.join('|') === 'Son devreler|Ayarlar|Yardım|Kısa turu başlat|Tanıtım turu' && more.includes('Uca dokun') && hadBack && backHome &&
         (await moreSheet.getByRole('button', { name: 'Örnekler', exact: true }).count()) === 0 && (await moreSheet.getByRole('button', { name: 'Dosya', exact: true }).count()) === 0,
       `${tiles.join('|')} · ${rows.join('|')} · ${more.slice(0, 40)}`);
     await ctx.close();
@@ -3676,8 +3676,8 @@ try {
     check('arayüz v4: devre menüsü "Devre": Yeni devre, Bilgisayardan aç… (Ctrl+O), Bilgisayara indir (Ctrl+S), Şemayı indir / yazdır… (Ctrl+P), Paylaş…, Görev oluştur…, Karta aktar (PCB, lehim)…; altta "Her değişiklik bu tarayıcıya kaydedilir"; menüde "JSON" yok; Esc kapatıp odağı düğmeye döndürüyor',
       devreRows === 'Yeni devre|Bilgisayardan aç… [Ctrl+O]|Bilgisayara indir [Ctrl+S]|Şemayı indir / yazdır… [Ctrl+P]|Paylaş…|Görev oluştur…|Karta aktar (PCB, lehim)…' && devreText.includes('Her değişiklik bu tarayıcıya kaydedilir') && !/JSON/i.test(devreText) && devreBack,
       `${devreRows} · Esc ${devreBack}`);
-    check('arayüz v4: Daha fazla menüsü: en üstte Tema (Sistem, Açık, Koyu); Son devreler…, Ayarlar…, Klavye kısayolları (?), Yardım (F1), Kısa turu başlat, Tam ekran (F11); Esc kapatıp odağı düğmeye döndürüyor',
-      themes.join('|') === 'Sistem|Açık|Koyu' && moreRows === 'Son devreler…|Ayarlar…|Klavye kısayolları [?]|Yardım [F1]|Kısa turu başlat|Tam ekran [F11]' && moreBack,
+    check('arayüz v4: Daha fazla menüsü: en üstte Tema (Sistem, Açık, Koyu); Son devreler…, Ayarlar…, Klavye kısayolları (?), Yardım (F1), Kısa turu başlat, Tanıtım turu, Tam ekran (F11); Esc kapatıp odağı düğmeye döndürüyor',
+      themes.join('|') === 'Sistem|Açık|Koyu' && moreRows === 'Son devreler…|Ayarlar…|Klavye kısayolları [?]|Yardım [F1]|Kısa turu başlat|Tanıtım turu|Tam ekran [F11]' && moreBack,
       `${themes.join('|')} · ${moreRows} · Esc ${moreBack}`);
     // Ayarlar… düğmenin altında açılır; Klavye kısayolları ve Yardım yardım penceresini ilgili sekmede açar.
     await (await openMore(page)).getByRole('menuitem', { name: 'Ayarlar…' }).click(); await page.waitForTimeout(150);
@@ -3876,7 +3876,7 @@ try {
       const last = await dlg.getByRole('button', { name: lastName, exact: true }).boundingBox();
       return { h: box ? box.height : 0, top: box ? box.y : 0, gap: box && last ? box.y + box.height - (last.y + last.height) : -1 };
     };
-    const moreSize = await sizeOf(sheet, 'Kısa turu başlat');
+    const moreSize = await sizeOf(sheet, 'Tanıtım turu');
     await sheet.getByRole('button', { name: 'Yardım', exact: true }).tap(); await page.waitForTimeout(300);
     const helpBox = await sheet.boundingBox();
     const helpScroll = await sheet.evaluate((d) => [...d.querySelectorAll('div')].some((e) => e.scrollHeight > e.clientHeight + 4 && getComputedStyle(e).overflowY === 'auto'));
