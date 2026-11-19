@@ -73,6 +73,7 @@ import type { DeviceHooks } from './DeviceCards';
 import { ExamplesDialog } from './ExamplesDialog';
 import { HelpDialog, type HelpTab } from './HelpDialog';
 import { markWelcomeSeen, Tour, welcomeSeen, WelcomeDialog, type TourStep } from './Welcome';
+import { PRESENTATION_STEPS, PresentationTour } from './PresentationTour';
 import type { PartPatch } from './InspectTab';
 import { clearHash, downloadDoc, readDocFile } from './fileActions';
 import { RecentDialog } from './RecentDialog';
@@ -410,6 +411,8 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
   /** Karta aktar'ın açılacağı sekme (Tahtada kur → Lehim rehberine geç: delikli plaket). */
   const [kartaTab, setKartaTab] = useState<'perf' | undefined>(undefined);
   const [tour, setTour] = useState<{ step: TourStep; parts: number; wires: number } | null>(null);
+  // Sunum turu (sınıfta canlı anlatım): adres ?tur=sunum ya da "…" → Tanıtım turu. null: kapalı.
+  const [presentation, setPresentation] = useState<number | null>(() => (new URLSearchParams(window.location.search).get('tur') === 'sunum' ? 0 : null));
   const canvasRef = useRef<CanvasHandle>(null);
   const [viewMode, setViewMode] = useViewMode();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2047,6 +2050,37 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     setTour(null);
     showToast(tr.tour.done);
   };
+  const startPresentation = () => {
+    closeWelcome();
+    setHelpTab(null);
+    setModal(null);
+    setTour(null);
+    setPresentation(0);
+  };
+  // Sunum turunun adımı görünümü kendisi kurar: Örnekler penceresi, örnek devre, şema / 3B; Deney 1'de güç
+  // kaynağından itibaren simülasyon bir kez başlatılır (sunucu durdurursa yeniden başlatılmaz).
+  const presentationPlayed = useRef<number | null>(null);
+  useEffect(() => {
+    if (presentation === null) return;
+    const scene = PRESENTATION_STEPS[presentation]?.scene;
+    if (!scene) return;
+    if (welcomeOpen) closeWelcome();
+    setExamplesOpen(scene.examples === true);
+    if (scene.examples !== true) setRecentOpen(false);
+    if (scene.example && activeExample !== scene.example) loadExample(scene.example);
+    if (scene.view) setViewMode(scene.view);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presentation]);
+  useEffect(() => {
+    if (presentation === null || presentation < 5 || presentation > 12) return;
+    const scene = PRESENTATION_STEPS[presentation]?.scene;
+    if (!scene?.example || activeExample !== scene.example || presentationPlayed.current === presentation) return;
+    // Örnek yeni yüklendiyse önceki devrenin simülasyonu önce durur; durunca başlatılır.
+    if (sim.status !== 'stopped') return;
+    presentationPlayed.current = presentation;
+    play();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presentation, activeExample, doc, sim.status]);
   const overlays = (
     <>
       {welcomeOpen && (
@@ -2094,6 +2128,9 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
         </Suspense>
       )}
       {helpTab !== null && <HelpDialog scale={settings.wireScale} initialTab={helpTab} onTour={startTour} onClose={() => setHelpTab(null)} />}
+      {presentation !== null && (
+        <PresentationTour step={presentation} phone={variant === 'phone'} onStep={setPresentation} onClose={() => setPresentation(null)} />
+      )}
       {tour && !welcomeOpen && (
         <Tour
           step={tour.step}
@@ -2322,6 +2359,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
               setModal(null);
               setWelcomeOpen(true);
             }}
+            onPresentation={startPresentation}
             onTheme={(choice) => updateSettings({ theme: choice })}
             recent={recent}
             onOpenRecent={openRecent}
@@ -2641,7 +2679,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
           onShortcuts={() => setHelpTab('keys')}
           onHelp={() => setHelpTab('pointer')}
           onWelcome={() => setWelcomeOpen(true)}
-          {...(embed === null ? { onRecent: () => setRecentOpen(true) } : {})}
+          {...(embed === null ? { onRecent: () => setRecentOpen(true), onPresentation: startPresentation } : {})}
           view={boardMode ? null : { mode: viewMode, onChange: setViewMode }}
           touch={tablet}
           theme={settings.theme}

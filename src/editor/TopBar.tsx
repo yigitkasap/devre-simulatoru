@@ -222,6 +222,8 @@ function MoreMenu(props: {
   onShortcuts: () => void;
   onHelp: () => void;
   onWelcome: () => void;
+  /** Sunum turu (sınıfta canlı anlatım). */
+  onPresentation?: () => void;
   /** Son devreler penceresi (yoksa menüde satır yok: gömülü görünüm). */
   onRecent?: () => void;
   fullscreen: FullscreenControls;
@@ -284,6 +286,7 @@ function MoreMenu(props: {
             <MenuItem icon="keyboard" label={t.shortcuts} shortcut="?" touch={props.touch} onSelect={pick(props.onShortcuts)} />
             <MenuItem icon="help" label={t.help} shortcut="F1" touch={props.touch} onSelect={pick(props.onHelp)} />
             <MenuItem icon="flag" label={t.tour} touch={props.touch} onSelect={pick(props.onWelcome)} />
+            {props.onPresentation && <MenuItem icon="flag" label={t.presentation} touch={props.touch} onSelect={pick(props.onPresentation)} />}
             <MenuItem
               icon={props.fullscreen.on ? 'fullscreenExit' : 'fullscreen'}
               label={props.fullscreen.on ? t.fullscreenExit : t.fullscreen}
@@ -501,6 +504,8 @@ export interface DeskTopBarProps {
   readonly onShortcuts: () => void;
   readonly onHelp: () => void;
   readonly onWelcome: () => void;
+  /** Sunum turu ("…" → Tanıtım turu). */
+  readonly onPresentation?: () => void;
   /** Daha fazla → Son devreler… (yerine başka devre açılan devrelerin kaydı). */
   readonly onRecent?: () => void;
   /** Şema / 3B tezgâh seçimi; null: gösterilmez (Tahtada kur). */
@@ -674,6 +679,7 @@ export function DeskTopBar(props: DeskTopBarProps) {
           onShortcuts={props.onShortcuts}
           onHelp={props.onHelp}
           onWelcome={props.onWelcome}
+          {...(props.onPresentation ? { onPresentation: props.onPresentation } : {})}
           {...(props.onRecent ? { onRecent: props.onRecent } : {})}
           fullscreen={props.fullscreen}
         />

@@ -95,5 +95,5 @@ export default function Bench3D(props: Bench3DProps) {
     if (zoom.n > 0) scene.current?.zoom(zoom.factor);
   }, [zoom]);
 
-  return <div ref={host} className="absolute inset-0 overflow-hidden" role="img" aria-label={tr.bench.label} />;
+  return <div ref={host} data-tour="bench" className="absolute inset-0 overflow-hidden" role="img" aria-label={tr.bench.label} />;
 }

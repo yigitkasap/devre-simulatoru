@@ -307,7 +307,7 @@ export function Notebook(props: NotebookProps) {
         <span className="rounded-full bg-panel-2 px-2 font-mono text-label leading-5 text-ink-2 tabular" aria-label={t.count(doc.parts.length)}>
           {doc.parts.length}
         </span>
-        <span className={`flex min-w-0 items-center gap-1 truncate text-small ${props.liveHidden ? 'text-muted' : problems.length === 0 ? 'text-ok-ink' : errors > 0 ? 'text-danger-ink' : 'text-warn'}`}>
+        <span data-tour="problems" className={`flex min-w-0 items-center gap-1 truncate text-small ${props.liveHidden ? 'text-muted' : problems.length === 0 ? 'text-ok-ink' : errors > 0 ? 'text-danger-ink' : 'text-warn'}`}>
           {props.liveHidden ? (
             t.liveHidden
           ) : problems.length === 0 ? (

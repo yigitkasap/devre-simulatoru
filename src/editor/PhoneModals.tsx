@@ -197,6 +197,8 @@ export interface MoreSheetProps {
   readonly onFit: () => void;
   readonly onTour: () => void;
   readonly onWelcome: () => void;
+  /** Sunum turu ("…" → Tanıtım turu). */
+  readonly onPresentation?: () => void;
   /** Renk teması: Sistem / Açık / Koyu. */
   readonly onTheme: (choice: ThemeChoice) => void;
   /** Son devreler: kayıtlar ve birini geri yükleme. */
@@ -211,7 +213,7 @@ const THEME_CHOICES = ['system', 'light', 'dark'] as const;
  * Tema (Sistem / Açık / Koyu), Son devreler, Ayarlar, Yardım, Kısa turu başlat. Son devreler, ayarlar ve
  * yardım aynı sayfada açılır (geri düğmesiyle döner). Klavye kısayolları telefonda yok (tablette masaüstünün Daha fazla menüsünde).
  */
-export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, canRedo, onUndo, onRedo, onFit, onTour, onWelcome, onTheme, recent, onOpenRecent }: MoreSheetProps) {
+export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, canRedo, onUndo, onRedo, onFit, onTour, onWelcome, onPresentation, onTheme, recent, onOpenRecent }: MoreSheetProps) {
   const [view, setView] = useState<'menu' | 'settings' | 'help' | 'recent'>('menu');
   const t = tr.topbar.more;
   const quick: Array<{ icon: IconName; label: string; run: () => void; disabled?: boolean }> = [
@@ -279,6 +281,12 @@ export function MoreSheet({ settings, onSettings, onClose, onAnalysis, canUndo, 
               <Icon name="flag" className="h-5 w-5 shrink-0" />
               <span className="flex-1">{t.tour}</span>
             </button>
+            {onPresentation && (
+              <button type="button" onClick={onPresentation} className={row}>
+                <Icon name="flag" className="h-5 w-5 shrink-0" />
+                <span className="flex-1">{t.presentation}</span>
+              </button>
+            )}
           </div>
         </div>
       ) : (

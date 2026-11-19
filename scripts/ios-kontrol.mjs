@@ -7251,6 +7251,69 @@ try {
       rows.map((r) => `${r.id} ${Math.round(r.fps ?? 0)} kare/s · ${r.triangles} üçgen · ${r.calls} çizim`).join('; ') + ` · en yavaş ${slowest?.id}`);
     await phoneCtx.close();
   }
+  // --- Sunum turu baştan sona (sunum-turu, 2026-11-19) ---------------------------------------------------
+  // ?tur=sunum ile açılan 15 adımlı tanıtım turu masaüstünde (1920×1080) ve telefonda (iPhone 13) klavyeyle
+  // baştan sona gezilir: her adımda kart ekranın içinde, çerçeve varsa kart onu örtmüyor; çerçeveli adımların
+  // hepsinde hedef bulunuyor (1. ve 15. adım ortada, çerçevesiz). Sol ok geri, Esc kapatır; karanlık alana
+  // tıklamak turu kapatmaz. "…" menüsünde "Tanıtım turu" var.
+  {
+    const rows = [];
+    for (const isPhone of [false, true]) {
+      const ctx = await browser.newContext(isPhone
+        ? { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR' }
+        : { viewport: { width: 1920, height: 1080 }, locale: 'tr-TR' });
+      const page = await ctx.newPage();
+      page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+      await page.goto(URL0 + '?tur=sunum', { waitUntil: 'networkidle' });
+      const ok = await page.waitForSelector('[data-presentation-card]', { timeout: 15000 }).then(() => true).catch(() => false);
+      const bad = [];
+      let framed = 0;
+      for (let i = 1; ok && i <= 15; i++) {
+        await page.waitForTimeout(i >= 10 && i <= 12 ? 2000 : 900);
+        const r = await page.evaluate(() => {
+          const card = document.querySelector('[data-presentation-card]')?.getBoundingClientRect();
+          const f = document.querySelector('[data-presentation-frame]')?.getBoundingClientRect();
+          const step = Number(document.querySelector('[data-presentation-step]')?.getAttribute('data-presentation-step'));
+          if (!card) return { step, card: false };
+          const inside = card.left >= 0 && card.top >= 0 && card.right <= innerWidth + 0.5 && card.bottom <= innerHeight + 0.5;
+          const overlap = f ? Math.max(0, Math.min(card.right, f.right) - Math.max(card.left, f.left)) * Math.max(0, Math.min(card.bottom, f.bottom) - Math.max(card.top, f.top)) : 0;
+          return { step, card: true, inside, frame: !!f, overlap, scrolled: scrollX !== 0 || scrollY !== 0 };
+        });
+        const wantFrame = i !== 1 && i !== 15;
+        if (r.step !== i || !r.card || !r.inside || r.overlap > 0 || r.scrolled || r.frame !== wantFrame) bad.push(`${i}:${JSON.stringify(r)}`);
+        if (r.frame) framed += 1;
+        if (i === 6) {
+          // Karanlık alana tıklama turu kapatmaz.
+          await page.mouse.click(5, isPhone ? 420 : 1070);
+          await page.waitForTimeout(200);
+          if (!(await page.locator('[data-presentation-card]').count())) bad.push('karanlık tıklama kapattı');
+        }
+        if (i < 15) await page.keyboard.press(i % 3 === 0 ? 'Space' : i % 3 === 1 ? 'ArrowRight' : 'Enter');
+      }
+      await page.keyboard.press('ArrowLeft');
+      await page.waitForTimeout(250);
+      const back = await page.evaluate(() => document.querySelector('[data-presentation-step]')?.getAttribute('data-presentation-step'));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(250);
+      const closed = (await page.locator('[data-presentation-card]').count()) === 0;
+      // "…" menüsünde Tanıtım turu
+      let menu = false;
+      await page.getByRole('button', { name: /^Daha fazla/ }).first().click();
+      await page.waitForTimeout(300);
+      const entry = isPhone ? page.getByRole('button', { name: 'Tanıtım turu' }) : page.getByRole('menuitem', { name: 'Tanıtım turu' });
+      menu = (await entry.count()) > 0;
+      if (menu) {
+        await entry.first().click();
+        await page.waitForTimeout(400);
+        menu = (await page.locator('[data-presentation-step="1"]').count()) === 1;
+      }
+      rows.push({ isPhone, ok, bad, framed, back, closed, menu });
+      await ctx.close();
+    }
+    check('Sunum turu baştan sona (masaüstü 1920×1080 ve iPhone 13): 15 adım klavyeyle; kart ekranın içinde ve çerçeveyi örtmüyor; 13 adımda hedef çerçevede; Sol ok geri, Esc kapatır, karanlık alana tıklama kapatmaz; "…" → Tanıtım turu',
+      rows.length === 2 && rows.every((r) => r.ok && r.bad.length === 0 && r.framed === 13 && r.back === '14' && r.closed && r.menu),
+      rows.map((r) => `${r.isPhone ? 'telefon' : 'masaüstü'}: çerçeveli ${r.framed}/13, geri ${r.back}, esc ${r.closed ? 'kapattı' : 'KAPATMADI'}, menü ${r.menu ? 'var' : 'YOK'}${r.bad.length ? ' · sorun ' + r.bad.join(' ') : ''}`).join('; '));
+  }
 } finally {
   await browser.close();
 }

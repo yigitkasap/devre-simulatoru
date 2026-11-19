@@ -367,14 +367,14 @@ function DesktopExamples(props: ExamplesDialogProps) {
         </header>
         <div className="flex min-h-0 flex-1">
           <nav ref={navRef} aria-label={t().nav} onKeyDown={onNavKey} className="flex w-[264px] shrink-0 flex-col gap-1 overflow-y-auto overscroll-contain border-r border-line bg-panel-2 px-3 py-4">
-            <div className="mb-2 flex items-center gap-2.5 px-1.5">
+            <div data-tour="folder" className="mb-2 flex items-center gap-2.5 px-1.5">
               <FolderLogo folder={folder} size={36} />
               <span className="min-w-0 leading-tight">
                 <span className="block text-sm font-semibold">{t().folderName}</span>
                 <span className="block text-[12px] text-muted">{t().folderLine}</span>
               </span>
             </div>
-            <ul className="m-0 flex list-none flex-col gap-0.5 p-0">{folderSections.map(navRow)}</ul>
+            <ul data-tour="folder" className="m-0 flex list-none flex-col gap-0.5 p-0">{folderSections.map(navRow)}</ul>
             <hr className="my-3 border-line" />
             <p className="m-0 mb-1 px-2.5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">{t().general}</p>
             <ul className="m-0 flex list-none flex-col gap-0.5 p-0">{generalSections.map(navRow)}</ul>
@@ -560,7 +560,7 @@ function PhoneExamples(props: ExamplesDialogProps) {
             <Icon name="chevron" className="h-[18px] w-[18px] shrink-0" />
           </button>
         )}
-        <section aria-label={t().folderName} className="overflow-hidden rounded-2xl border border-line">
+        <section data-tour="folder" aria-label={t().folderName} className="overflow-hidden rounded-2xl border border-line">
           <div className="flex items-center gap-3 border-b border-line bg-panel-2 px-4 py-3">
             <FolderLogo folder={folder} size={40} />
             <span className="min-w-0 leading-tight">
