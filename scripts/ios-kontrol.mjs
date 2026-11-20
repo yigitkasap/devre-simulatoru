@@ -965,7 +965,7 @@ try {
     await ctx.close();
   }
 
-  // --- Telefonda kablo silme: dokun → Kablo kartında Sil; basılı tut → menüde Sil; Ölç'te Sil yok ----------
+  // --- Telefonda kablo silme: dokun → Kablo kartında Sil (dokunulan parça); basılı tut → menüde Sil ve Kablonun tamamını sil; Ölç'te Sil yok
   {
     const { page, cdp } = await phone();
     await openExample(page, 'RC dolma');
@@ -982,24 +982,26 @@ try {
     const toast = page.getByRole('status').filter({ hasText: 'silindi' });
     const toastText = (await toast.textContent().catch(() => '')) ?? '';
     const toastUndo = toast.getByRole('button', { name: 'Geri al' });
-    check('telefon: kabloya dokununca Kablo kartında Sil var (en az 44 px); basınca kablo siliniyor, "silindi · Geri al" bildirimi çıkıyor',
-      shownCard && box !== null && box.width >= 44 && box.height >= 44 && afterCard.wires.length === before.wires.length - 1 && !afterCard.wires.some((w) => w.id === 'w4') && (await toastUndo.count()) === 1,
-      `${before.wires.length} → ${afterCard.wires.length} kablo · Sil ${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)} px · ${toastText}`);
+    // w4 iki parçalı: dokunulan yatay parça silinir, dikey parça kalır (kablo-duzen).
+    const w4After = afterCard.wires.find((w) => w.id === 'w4');
+    check('telefon: kabloya dokununca Kablo kartında Sil var (en az 44 px); basınca yalnızca dokunulan parça siliniyor, "silindi · Geri al" bildirimi çıkıyor',
+      shownCard && box !== null && box.width >= 44 && box.height >= 44 && afterCard.wires.length === before.wires.length && w4After?.points.length === 2 && (await toastUndo.count()) === 1,
+      `${before.wires.length} → ${afterCard.wires.length} kablo · w4 ${w4After?.points.length ?? 0} nokta · Sil ${Math.round(box?.width ?? 0)}×${Math.round(box?.height ?? 0)} px · ${toastText}`);
     if ((await toastUndo.count()) === 1) await toastUndo.tap();
-    check('telefon: bildirimdeki Geri al silinen kabloyu geri getiriyor', afterCard.wires.length === before.wires.length - 1 && (await doc(page)).wires.length === before.wires.length);
+    check('telefon: bildirimdeki Geri al silinen parçayı geri getiriyor', w4After?.points.length === 2 && (await doc(page)).wires.find((w) => w.id === 'w4')?.points.length === 3);
     await tap(page, cdp, await screen(page, ...at.w5), 750);
     const menu = page.getByRole('menu', { name: 'Kablo menüsü' });
     const items = await menu.getByRole('menuitem').allTextContents();
     const wireShortcuts = await menu.locator('[role=menuitem] > span:nth-child(2)').count();
     const magnifier = await page.locator('use[href^="#scene-"]').count();
     await shot(page, 'ios-kablo-menu.png');
-    if (items.length > 0) await menu.getByRole('menuitem', { name: /^Sil/ }).tap();
+    if (items.length > 0) await menu.getByRole('menuitem', { name: 'Kablonun tamamını sil' }).tap();
     const afterMenu = await doc(page);
-    check('telefon: Kur’da kabloyu basılı tutunca menü ve büyüteç açılıyor, içinde Sil; basınca kablo siliniyor, bildirim çıkıyor',
-      items.length === 1 && items[0].startsWith('Sil') && magnifier === 1 && afterMenu.wires.length === before.wires.length - 1 && !afterMenu.wires.some((w) => w.id === 'w5') && (await page.getByRole('status').filter({ hasText: 'silindi' }).count()) === 1,
+    check('telefon: Kur’da kabloyu basılı tutunca menü ve büyüteç açılıyor, içinde Sil ve Kablonun tamamını sil; ikincisi bütün kabloyu siliyor, bildirim çıkıyor',
+      items.join('|') === 'Sil|Kablonun tamamını sil' && magnifier === 1 && afterMenu.wires.length === before.wires.length - 1 && !afterMenu.wires.some((w) => w.id === 'w5') && (await page.getByRole('status').filter({ hasText: 'silindi' }).count()) === 1,
       `menü: ${items.join('|')} · büyüteç ${magnifier} · ${before.wires.length} → ${afterMenu.wires.length} kablo`);
     const menuToast = (await page.getByRole('status').filter({ hasText: 'silindi' }).textContent().catch(() => '')) ?? '';
-    check('telefon: tek kablo silinince bildirim "Kablo silindi." (karttan da menüden de)', toastText.startsWith('Kablo silindi.') && menuToast.startsWith('Kablo silindi.'), `${toastText} · ${menuToast}`);
+    check('telefon: bildirim parça silinince "Kablo parçası silindi.", bütün kablo silinince "Kablo silindi."', toastText.startsWith('Kablo parçası silindi.') && menuToast.startsWith('Kablo silindi.'), `${toastText} · ${menuToast}`);
     // Parçanın basılı tutma menüsündeki Sil de bildirimli (deleteSelection); bildirimin Geri al'ı parçayı geri getirir.
     const r1 = before.parts.find((x) => x.label === 'R1');
     await tap(page, cdp, await screen(page, r1.x, r1.y), 750);
@@ -1016,7 +1018,7 @@ try {
       afterPart.parts.length === before.parts.length - 1 && partToast && restored.parts.length === before.parts.length,
       `menü: ${partItems.join('|')} · ${before.parts.length} → ${afterPart.parts.length} → ${restored.parts.length} parça · bildirim ${partToast}`);
     check('telefon: bağlam menülerinde (kablo ve parça) klavye kısayolu yazısı yok (Delete, R)',
-      wireShortcuts === 0 && partShortcuts === 0 && items.join('|') === 'Sil' && partItems.join('|') === 'Değer|Döndür|Sil', `kablo: ${items.join('|')} · R1: ${partItems.join('|')}`);
+      wireShortcuts === 0 && partShortcuts === 0 && items.join('|') === 'Sil|Kablonun tamamını sil' && partItems.join('|') === 'Değer|Döndür|Sil', `kablo: ${items.join('|')} · R1: ${partItems.join('|')}`);
     // Ölç kipinde yapı kilitli: kablonun kartında da (parça kartındaki gibi) Sil yok.
     await phoneMoreTile(page, 'Geri al', { close: true });
     await page.getByRole('button', { name: 'Oynat', exact: true }).tap(); await page.waitForTimeout(600);
@@ -1054,6 +1056,75 @@ try {
     await ctx.close();
   }
 
+  // --- Kablo düzenleme (kablo-duzen): ortadaki parçayı sil → iki kablo; boşta ucu bacağa sürükle → sorun yok (masaüstü, iPhone 13)
+  for (const where of ['masaüstü', 'telefon']) {
+    const isPhone = where === 'telefon';
+    const devre = readFileSync(new URL('../src/examples/rc-dolma.json', import.meta.url), 'utf8');
+    const ctx = await browser.newContext(isPhone
+      ? {
+        viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'tr-TR',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1',
+      }
+      : { viewport: { width: 1440, height: 900 }, locale: 'tr-TR' });
+    await ctx.addInitScript((d) => { if (!sessionStorage.getItem('yuklendi')) { localStorage.setItem('devre-simulatoru:devre', d); sessionStorage.setItem('yuklendi', '1'); } }, devre);
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => problems.push('pageerror: ' + e.message));
+    page.on('console', (m) => { if (m.type() === 'error') problems.push('console: ' + m.text()); });
+    const cdp = isPhone ? await ctx.newCDPSession(page) : null;
+    await page.goto(URL0, { waitUntil: 'networkidle' }); await page.waitForTimeout(400);
+    const pts = (d, id) => (d.wires.find((w) => w.id === id)?.points ?? []).map((p) => (Array.isArray(p) ? p.join(',') : `${p.x},${p.y}`)).join(' ');
+    const status = async () => (await page.locator('[data-tour="problems"]').allTextContents()).join(' ').trim();
+    const undo = async () => {
+      if (isPhone) await phoneMoreTile(page, 'Geri al', { close: true });
+      else { await page.keyboard.press('Control+z'); await page.waitForTimeout(200); }
+    };
+    const before = await doc(page);
+    const okBefore = await status();
+    // w5: V1 → (44,8) → (0,8) → B1; ortadaki yatay parçası (44,8)–(0,8) seçilip silinir.
+    const mid = await screen(page, 16, 8);
+    if (isPhone) await tap(page, cdp, mid); else { await page.mouse.click(mid.x, mid.y); }
+    await page.waitForTimeout(300);
+    const marked = await page.locator('svg.schematic [data-wire-segment]').evaluateAll((els) => els.map((e) => e.getAttribute('data-wire-segment')).join(','));
+    if (isPhone) await phoneNotebook(page).getByRole('button', { name: 'Sil', exact: true }).tap();
+    else await page.keyboard.press('Delete');
+    await page.waitForTimeout(300);
+    const toast = (await page.getByRole('status').filter({ hasText: 'silindi' }).textContent().catch(() => '')) ?? '';
+    const cut = await doc(page);
+    const halves = cut.wires.filter((w) => !before.wires.some((b) => b.id === w.id));
+    check(`${where}: köşeli kablonun ortadaki parçasına ${isPhone ? 'dokunup Sil' : 'tıklayıp Delete'} → yalnızca o parça vurgulu, o parça siliniyor, iki kablo kalıyor ("Kablo parçası silindi.")`,
+      marked === '1' && cut.wires.length === before.wires.length + 1 && pts(cut, 'w5') === '44,4 44,8' && halves.length === 1 && pts(cut, halves[0].id) === '0,8 0,4' && toast.startsWith('Kablo parçası silindi.'),
+      `vurgu [${marked}] · ${before.wires.length} → ${cut.wires.length} kablo · w5 ${pts(cut, 'w5')} · yeni ${halves.map((w) => pts(cut, w.id)).join(' | ')} · ${toast}`);
+    // Boşta kablo ucu tek başına uyarı değil (V1'in ucu kabloya bağlı): kesilmiş hâl bilgi olarak yazılır.
+    const okCut = await status();
+    // Boşta kalan ucu (44,8) GND'nin bacağına (0,8) sürükle.
+    const from = await screen(page, 44, 8);
+    const to = await screen(page, 0, 8);
+    if (isPhone) await drag(page, cdp, from, to, 320);
+    else {
+      await page.mouse.move(from.x, from.y); await page.mouse.down();
+      for (let i = 1; i <= 12; i++) { await page.mouse.move(from.x + ((to.x - from.x) * i) / 12, from.y + ((to.y - from.y) * i) / 12); await page.waitForTimeout(16); }
+      await page.mouse.up();
+    }
+    await page.waitForTimeout(400);
+    const joined = await doc(page);
+    const okJoined = await status();
+    let handle = null;
+    if (isPhone) handle = await page.locator('svg.schematic [data-handle-area]').first().boundingBox().catch(() => null);
+    const handles = await page.locator('svg.schematic [data-wire-handle]').count();
+    check(`${where}: boşta ucu ${isPhone ? 'parmakla' : 'fareyle'} sürükleyip bacağa bağla → kablo dik açıyla uzuyor, bacağa bağlanıyor, "sorun yok"${isPhone ? '; tutma noktası en az 44 px' : ''}`,
+      pts(joined, 'w5') === '44,4 44,8 0,8' && /sorun yok/.test(okJoined) && handles === 2 && (!isPhone || (handle && handle.width >= 44 && handle.height >= 44)),
+      `w5 ${pts(joined, 'w5')} · önce "${okBefore}" · kesince "${okCut}" · sonra "${okJoined}" · tutma ${handles}${handle ? ` (${Math.round(handle.width)}×${Math.round(handle.height)} px)` : ''}`);
+    await undo();
+    const back1 = await doc(page);
+    await undo();
+    const back2 = await doc(page);
+    check(`${where}: her işlem tek adımda geri alınıyor (uç sürükleme, sonra parça silme)`,
+      pts(back1, 'w5') === '44,4 44,8' && back1.wires.length === cut.wires.length && pts(back2, 'w5') === pts(before, 'w5') && back2.wires.length === before.wires.length,
+      `${pts(back1, 'w5')} · ${pts(back2, 'w5')} · ${back2.wires.length} kablo`);
+    await shot(page, `kablo-duzen-${isPhone ? 'telefon' : 'masa'}.png`);
+    await ctx.close();
+  }
+
   // --- Klavyeyle silme (masaüstü): Delete / Backspace deleteSelection'dan (bildirim, Geri al, takılı ampermetre) --
   {
     const devre = readFileSync(new URL('../src/examples/rc-dolma.json', import.meta.url), 'utf8');
@@ -1069,8 +1140,8 @@ try {
       if ((await b.count()) === 1) await b.click();
       await page.waitForTimeout(200);
     };
-    // Tek kablo (C1 ile V1 arasındaki üst kablo) → Delete.
-    let pt = await screen(page, 38, -8); await page.mouse.click(pt.x, pt.y); await page.waitForTimeout(200);
+    // Tek kablo (C1 ile V1 arasındaki üst kablo; çift tıklama kablonun tamamını seçer) → Delete.
+    let pt = await screen(page, 38, -8); await page.mouse.dblclick(pt.x, pt.y); await page.waitForTimeout(200);
     await page.keyboard.press('Delete');
     const wireGone = await doc(page);
     const wireToast = await toastText();

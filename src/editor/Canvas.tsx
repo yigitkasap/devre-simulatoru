@@ -38,6 +38,7 @@ import { GRID, type CircuitDoc, type Part, type Point, type Rotation } from '../
 import { routeWire, type RouteObstacles } from '../model/route';
 import { unexpectedLinks } from '../model/wireCheck';
 import { moveSegment } from '../model/wires';
+import { moveWireEnd } from '../model/wireEdit';
 import { boolProp, type DeviceType } from '../sim/netlist';
 import { formatSI } from '../sim/units';
 import {
@@ -67,7 +68,7 @@ import { describeUnexpected, wireObstacles, type UnexpectedLink } from './wireRo
 import { HintText } from './HintStrip';
 import { SymbolIcon } from './symbols';
 import type { Settings } from './settings';
-import { EMPTY_SELECTION, type EditorAction, type Selection, type Tool } from './state';
+import { EMPTY_SELECTION, segmentSelection, type EditorAction, type Selection, type Tool } from './state';
 import { MIN_ANIMATED_CURRENT, type SimFrame } from './useSimulation';
 import { circuitShapes, fitAvoiding, phoneCornerRect, readableAvoiding, type Rect } from './legendFit';
 import { clampScale, fitView, PHONE_READABLE_SCALE, screenToGrid, snap, zoomAt, type View } from './view';
@@ -333,6 +334,17 @@ type Interaction =
       readonly delta: Point;
     }
   | {
+      /** Kablonun ucu sürükleniyor (kablo-duzen): son parça uzar/kısalır, bırakınca yapışır ve birleşebilir. */
+      readonly kind: 'drag-end';
+      readonly pointerId: number;
+      readonly before: CircuitDoc;
+      readonly wireId: string;
+      readonly which: 'start' | 'end';
+      /** Ucun şu anki (yapışmış) yeri; başlangıçta eski yeri. */
+      readonly to: Point;
+      readonly moved: boolean;
+    }
+  | {
       readonly kind: 'rubber';
       readonly pointerId: number;
       readonly start: Point;
@@ -351,7 +363,7 @@ type Interaction =
 type PickOption =
   | { readonly kind: 'part'; readonly partId: string }
   | { readonly kind: 'pin'; readonly partId: string; readonly index: number; readonly pos: Point }
-  | { readonly kind: 'wire'; readonly wireId: string };
+  | { readonly kind: 'wire'; readonly wireId: string; readonly segment: number };
 
 /** Ekran pikseli cinsinden isabet toleransları (parmakla dokunurken daha geniş). */
 const PIN_TOLERANCE_PX = 8;
@@ -363,6 +375,11 @@ const TOUCH_PART_PADDING_PX = 12;
 /** Dokunmatik: gövdenin içindeyken pin ancak bu kadar yakınsa seçilir (yoksa parça tutulur). */
 const TOUCH_PIN_INSIDE_PX = 12;
 const DRAG_THRESHOLD_PX = 5;
+/** Seçili kablonun ucundaki tutma noktası: çizilen kare (px) ve tutma yarıçapı (fare; telefonda 22 px = 44 px alan). */
+const END_HANDLE_PX = 8;
+const END_HANDLE_PHONE_PX = 12;
+const END_GRAB_PX = 7;
+const END_GRAB_TOUCH_PX = 22;
 /** Dokunmatik: bu süre kıpırdamadan basılı tutmak sağ tık menüsünü açar (iOS'ta contextmenu olayı yok). */
 const LONG_PRESS_MS = 550;
 /**
@@ -380,6 +397,20 @@ const MAGNIFIER_PX = 140;
 const MAGNIFY = 2.6;
 
 const ZOOM_STEP = 1.25;
+
+/** Kablonun noktaya en yakın düz parçası (sırası). */
+function nearestSegment(points: readonly Point[], g: Point): number {
+  let best = 0;
+  let bestDist = Infinity;
+  for (let s = 0; s + 1 < points.length; s++) {
+    const d = distanceToSegment(g, points[s]!, points[s + 1]!);
+    if (d < bestDist) {
+      bestDist = d;
+      best = s;
+    }
+  }
+  return best;
+}
 
 export function Canvas({
   doc,
@@ -483,6 +514,7 @@ export function Canvas({
   /** Uzun basışla açılan menü: parmak kıpırdarsa kapanır ve sürükleme sürer. */
   const menuFromLongPress = useRef(false);
   const lastTap = useRef<{ partId: string; time: number } | null>(null);
+  const lastWireTap = useRef<{ wireId: string; time: number } | null>(null);
   const cancelLongPress = () => {
     if (longPress.current) window.clearTimeout(longPress.current.timer);
     longPress.current = null;
@@ -773,6 +805,90 @@ export function Canvas({
     return { point: snap(g), finishes: false };
   };
 
+  /**
+   * Tutulan kablo ucu (kablo-duzen): seçili kablonun iki ucu (tutma noktası) ya da, `free` ise, seçili olmasa da
+   * hiçbir yere bağlı olmayan uç. Kablolar kilitliyse (görev) yok.
+   */
+  const endGrab = (g: Point, free: boolean): { wireId: string; which: 'start' | 'end'; at: Point } | null => {
+    if (wiringLocked || tool.kind !== 'select') return null;
+    const tol = pxToGrid(pointerType.current !== 'mouse' ? END_GRAB_TOUCH_PX : END_GRAB_PX);
+    let best: { wireId: string; which: 'start' | 'end'; at: Point } | null = null;
+    let bestDist = tol;
+    const consider = (wireId: string, which: 'start' | 'end', at: Point) => {
+      const d = Math.hypot(at.x - g.x, at.y - g.y);
+      if (d <= bestDist) {
+        bestDist = d;
+        best = { wireId, which, at };
+      }
+    };
+    for (const wire of doc.wires) {
+      const ends: ['start' | 'end', Point][] = [['start', wire.points[0]!], ['end', wire.points[wire.points.length - 1]!]];
+      const selected = selection.wires.includes(wire.id);
+      for (const [which, at] of ends) {
+        if (selected || (free && connectivity.danglingEnds.some((d) => samePoint(d, at)))) consider(wire.id, which, at);
+      }
+    }
+    return best;
+  };
+
+  /** Sürüklenen ucun yapışacağı yer: bacak, başka bir kablonun ucu ya da üzerindeki nokta, yoksa ızgara. */
+  const endTarget = (g: Point, wireId: string): Point => {
+    const pin = hitTest(g, { parts: false, wires: false });
+    if (pin?.kind === 'pin') return pin.pos;
+    const tol = pxToGrid(pointerType.current !== 'mouse' ? TOUCH_WIRE_TOLERANCE_PX : WIRE_TOLERANCE_PX);
+    // Başka bir kablonun ucu biraz daha geniş yakalanır (birleştirmek kolay olsun).
+    let best: Point | null = null;
+    let bestDist = tol * 1.5;
+    for (const wire of doc.wires) {
+      if (wire.id === wireId) continue;
+      for (const end of [wire.points[0]!, wire.points[wire.points.length - 1]!]) {
+        const d = Math.hypot(end.x - g.x, end.y - g.y);
+        if (d <= bestDist) {
+          bestDist = d;
+          best = end;
+        }
+      }
+    }
+    if (best) return best;
+    for (let i = doc.wires.length - 1; i >= 0; i--) {
+      const wire = doc.wires[i]!;
+      if (wire.id === wireId) continue;
+      for (let s = 0; s + 1 < wire.points.length; s++) {
+        if (distanceToSegment(g, wire.points[s]!, wire.points[s + 1]!) <= tol) return snapToSegment(g, wire.points[s]!, wire.points[s + 1]!);
+      }
+    }
+    return snap(g);
+  };
+
+  const startEndDrag = (pointerId: number, grab: { wireId: string; which: 'start' | 'end'; at: Point }) => {
+    const wire = doc.wires.find((w) => w.id === grab.wireId)!;
+    const segment = grab.which === 'start' ? 0 : wire.points.length - 2;
+    dispatch({ type: 'select', selection: segmentSelection(grab.wireId, segment) });
+    setInteraction({ kind: 'drag-end', pointerId, before: doc, wireId: grab.wireId, which: grab.which, to: grab.at, moved: false });
+  };
+
+  /** Uç bırakıldı: yapışır, gerekirse kabloyla birleşir; tek geri alma adımı. */
+  const finishEndDrag = (state: Extract<Interaction, { kind: 'drag-end' }>) => {
+    setInteraction({ kind: 'idle' });
+    if (!state.moved) {
+      dispatch({ type: 'preview', doc: state.before });
+      return;
+    }
+    const next = moveWireEnd(state.before, state.wireId, state.which, state.to, true);
+    dispatch({ type: 'preview', doc: next });
+    dispatch({ type: 'end-preview', before: state.before });
+    const wire = next.wires.find((w) => w.id === state.wireId);
+    if (!wire) {
+      dispatch({ type: 'select', selection: EMPTY_SELECTION });
+      return;
+    }
+    const end = state.which === 'start' ? wire.points[0]! : wire.points[wire.points.length - 1]!;
+    const segment = samePoint(end, state.to) ? (state.which === 'start' ? 0 : wire.points.length - 2) : nearestSegment(wire.points, state.to);
+    dispatch({ type: 'select', selection: segmentSelection(wire.id, segment) });
+    const groups = unexpectedLinks(state.before, next, wire.id);
+    if (groups.length > 0) onUnexpectedLink?.({ ...describeUnexpected(next, wire.points, groups), wireId: wire.id });
+  };
+
   const horizontalFirst = (points: readonly Point[], to: Point): boolean => {
     const last = points[points.length - 1]!;
     const prev = points[points.length - 2];
@@ -887,7 +1003,7 @@ export function Canvas({
     for (const wire of doc.wires) {
       const near = wire.points.some((pt, i) => i > 0 && distanceToSegment(g, wire.points[i - 1]!, pt) <= pxToGrid(10));
       if (!near) continue;
-      wires.push({ kind: 'wire', wireId: wire.id });
+      wires.push({ kind: 'wire', wireId: wire.id, segment: nearestSegment(wire.points, g) });
       const ends = [wire.points[0]!, wire.points[wire.points.length - 1]!];
       if (!ends.some((end) => ownerPins.some((pin) => samePoint(pin, end)))) owners.add(`w:${wire.id}`);
     }
@@ -904,7 +1020,7 @@ export function Canvas({
       dispatch({ type: 'select', selection: { parts: [option.partId], wires: [] } });
       if (phone.mode === 'olc') phone.onInspect(option.partId);
     } else {
-      dispatch({ type: 'select', selection: { parts: [], wires: [option.wireId] } });
+      dispatch({ type: 'select', selection: segmentSelection(option.wireId, option.segment) });
     }
   };
 
@@ -980,7 +1096,15 @@ export function Canvas({
       return;
     }
     if (hit?.kind === 'wire') {
-      dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+      // Dokunulan düz parça seçilir; aynı kabloya çift dokunuş bütün kabloyu seçer (kablo-duzen).
+      const previous = lastWireTap.current;
+      if (previous && previous.wireId === hit.wireId && time - previous.time < DOUBLE_TAP_MS) {
+        lastWireTap.current = null;
+        dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+      } else {
+        lastWireTap.current = { wireId: hit.wireId, time };
+        dispatch({ type: 'select', selection: segmentSelection(hit.wireId, hit.segment) });
+      }
       return;
     }
     setMenu(null);
@@ -1014,6 +1138,13 @@ export function Canvas({
     }
     capture(e.pointerId);
     const pointerId = e.pointerId;
+    // Kur: seçili kablonun tutma noktası hemen sürüklenir; boşta uç (seçili değilse) basılı tutunca (kablo-duzen).
+    const handle = mode === 'kur' ? endGrab(g, false) : null;
+    if (handle) {
+      startEndDrag(pointerId, handle);
+      return;
+    }
+    const freeEnd = mode === 'kur' && hit?.kind === 'wire' ? endGrab(g, true) : null;
     setInteraction({ kind: 'press', pointerId, sx: local.x, sy: local.y, view, hit, g });
     if (mode === 'kur' && (hit?.kind === 'part' || (hit?.kind === 'wire' && !wiringLocked))) {
       // 150 ms kıpırdamadan basılı tutulursa sürükleme başlar (öncesinde kayarsa tuval kayar).
@@ -1034,8 +1165,10 @@ export function Canvas({
             wires: new Set(sel.wires),
             delta: { x: 0, y: 0 },
           });
+        } else if (freeEnd) {
+          startEndDrag(pointerId, freeEnd);
         } else {
-          dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+          dispatch({ type: 'select', selection: segmentSelection(hit.wireId, hit.segment) });
           setInteraction({ kind: 'drag-segment', pointerId, start: g, before: doc, wireId: hit.wireId, segment: hit.segment, delta: { x: 0, y: 0 } });
         }
       }, PHONE_HOLD_MS);
@@ -1067,7 +1200,8 @@ export function Canvas({
         const state = interactionRef.current;
         const still =
           (state.kind === 'press' && state.pointerId === pointerId) ||
-          (state.kind === 'drag-segment' && state.pointerId === pointerId && state.delta.x === 0 && state.delta.y === 0);
+          (state.kind === 'drag-segment' && state.pointerId === pointerId && state.delta.x === 0 && state.delta.y === 0) ||
+          (state.kind === 'drag-end' && state.pointerId === pointerId && !state.moved);
         if (!still) return;
         phoneLongFired.current = true;
         if (mode === 'olc') {
@@ -1075,7 +1209,8 @@ export function Canvas({
           phone?.onEditAttempt();
           return;
         }
-        dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+        if (state.kind === 'drag-end') setInteraction({ kind: 'idle' });
+        dispatch({ type: 'select', selection: segmentSelection(hit.wireId, hit.segment) });
         menuFromLongPress.current = true;
         setMenu({ wireId: hit.wireId, x: local.x, y: local.y });
         setMagnifier({ x: local.x, y: local.y, g });
@@ -1095,7 +1230,7 @@ export function Canvas({
       // silinir; yoksa tek parmak iki parmak sanılır ve tuval kıstırma kipinde takılı kalır.
       pointers.current.clear();
       const stale = interactionRef.current;
-      if (stale.kind === 'drag-parts' || stale.kind === 'drag-segment') {
+      if (stale.kind === 'drag-parts' || stale.kind === 'drag-segment' || stale.kind === 'drag-end') {
         dispatch({ type: 'end-preview', before: stale.before });
         setInteraction({ kind: 'idle' });
       } else if (stale.kind === 'pinch' || stale.kind === 'pan' || stale.kind === 'rubber' || stale.kind === 'press') {
@@ -1111,7 +1246,7 @@ export function Canvas({
       cancelLongPress();
       clearPhoneTimers();
       const [a, b] = [...pointers.current.values()] as [{ x: number; y: number }, { x: number; y: number }];
-      if (current.kind === 'drag-parts' || current.kind === 'drag-segment') dispatch({ type: 'end-preview', before: current.before });
+      if (current.kind === 'drag-parts' || current.kind === 'drag-segment' || current.kind === 'drag-end') dispatch({ type: 'end-preview', before: current.before });
       const center = localPoint((a.x + b.x) / 2, (a.y + b.y) / 2);
       pinchRef.current = { distance: Math.hypot(a.x - b.x, a.y - b.y), view, cx: center.x, cy: center.y };
       setInteraction({ kind: 'pinch' });
@@ -1197,6 +1332,13 @@ export function Canvas({
       return;
     }
 
+    // Kablonun ucu (seçili kablonun tutma noktası ya da boşta uç): ucu sürükle (kablo-duzen).
+    const grab = e.shiftKey ? null : endGrab(g, true);
+    if (grab) {
+      capture(e.pointerId);
+      startEndDrag(e.pointerId, grab);
+      return;
+    }
     const hit = hitTest(g, wiringLocked ? { pins: false } : undefined);
     if (hit?.kind === 'pin') {
       capture(e.pointerId);
@@ -1281,8 +1423,9 @@ export function Canvas({
         dispatch({ type: 'select', selection: { ...selection, wires } });
         return;
       }
-      if (!selection.wires.includes(hit.wireId) || selection.parts.length > 0 || selection.wires.length > 1) {
-        dispatch({ type: 'select', selection: { parts: [], wires: [hit.wireId] } });
+      // Tıklanan düz parça seçilir (Delete yalnızca onu siler; çift tıklama bütün kabloyu seçer).
+      if (selection.parts.length > 0 || selection.wires.length !== 1 || selection.wires[0] !== hit.wireId || selection.segments?.[hit.wireId] !== hit.segment) {
+        dispatch({ type: 'select', selection: segmentSelection(hit.wireId, hit.segment) });
       }
       if (wiringLocked) return;
       capture(e.pointerId);
@@ -1382,6 +1525,14 @@ export function Canvas({
         });
         return;
       }
+      case 'drag-end': {
+        if (current.pointerId !== e.pointerId) return;
+        const to = endTarget(g, current.wireId);
+        if (samePoint(to, current.to)) return;
+        setInteraction({ ...current, to, moved: true });
+        dispatch({ type: 'preview', doc: moveWireEnd(current.before, current.wireId, current.which, to, false) });
+        return;
+      }
       case 'rubber':
         setInteraction({ ...current, current: g });
         return;
@@ -1432,12 +1583,15 @@ export function Canvas({
       // Telefon: kıpırdamadan kalkan parmak bir dokunuştur (150 ms'den sonra da, taşınmadıysa).
       const tap =
         (current.kind === 'press' && current.pointerId === e.pointerId) ||
-        ((current.kind === 'drag-parts' || current.kind === 'drag-segment') && current.pointerId === e.pointerId && current.delta.x === 0 && current.delta.y === 0);
+        ((current.kind === 'drag-parts' || current.kind === 'drag-segment') && current.pointerId === e.pointerId && current.delta.x === 0 && current.delta.y === 0) ||
+        (current.kind === 'drag-end' && current.pointerId === e.pointerId && !current.moved);
       if (tap) {
         clearPhoneTimers();
         setInteraction({ kind: 'idle' });
         menuFromLongPress.current = false;
         if (phoneLongFired.current) return;
+        // Tutma noktasına dokunup kaldırmak: seçim kalır (bacaktan bağlantı başlamasın).
+        if (current.kind === 'drag-end') return;
         const local = localPoint(e.clientX, e.clientY);
         const g = toGrid(e.clientX, e.clientY);
         phoneTap(current.kind === 'press' ? current.hit : hitTest(g), g, local, e.timeStamp);
@@ -1469,11 +1623,22 @@ export function Canvas({
         }
         return;
       }
+      case 'drag-end':
+        if (current.pointerId === e.pointerId) finishEndDrag(current);
+        return;
       case 'drag-parts':
       case 'drag-segment': {
         setInteraction({ kind: 'idle' });
         const moved = current.delta.x !== 0 || current.delta.y !== 0;
         if (moved) dispatch({ type: 'end-preview', before: current.before });
+        if (moved && current.kind === 'drag-segment') {
+          // Parça kaydırılınca köşe sayısı değişebilir: seçim kaydırılan parçada kalsın.
+          const wire = current.before.wires.find((w) => w.id === current.wireId);
+          if (wire) {
+            const points = moveSegment(wire.points, current.segment, current.delta);
+            dispatch({ type: 'select', selection: segmentSelection(wire.id, nearestSegment(points, toGrid(e.clientX, e.clientY))) });
+          }
+        }
         // Dokunmatik çift dokunuş: özellik penceresi.
         menuFromLongPress.current = false;
         if (current.kind === 'drag-parts' && e.pointerType !== 'mouse' && !moved && !longPressFired) {
@@ -1521,13 +1686,21 @@ export function Canvas({
   const onContextMenu = (e: ReactMouseEvent<SVGSVGElement>) => {
     e.preventDefault();
     if (interactionRef.current.kind !== 'idle' || tool.kind !== 'select') return;
-    const hit = hitTest(toGrid(e.clientX, e.clientY), { pins: false, wires: false });
+    const g = toGrid(e.clientX, e.clientY);
+    const hit = hitTest(g, { pins: false, wires: false }) ?? (wiringLocked ? null : hitTest(g, { pins: false, parts: false }));
+    const local = localPoint(e.clientX, e.clientY);
+    if (hit?.kind === 'wire') {
+      // Kablo: tıklanan parça seçilir; menüde Sil (o parça) ve Kablonun tamamını sil.
+      const whole = selection.wires.length === 1 && selection.wires[0] === hit.wireId && selection.segments?.[hit.wireId] === undefined;
+      if (!whole) dispatch({ type: 'select', selection: segmentSelection(hit.wireId, hit.segment) });
+      setMenu({ wireId: hit.wireId, x: local.x, y: local.y });
+      return;
+    }
     if (hit?.kind !== 'part') {
       setMenu(null);
       return;
     }
     if (!selection.parts.includes(hit.partId)) dispatch({ type: 'select', selection: { parts: [hit.partId], wires: [] } });
-    const local = localPoint(e.clientX, e.clientY);
     setMenu({ partId: hit.partId, x: local.x, y: local.y });
   };
 
@@ -1538,8 +1711,14 @@ export function Canvas({
       return;
     }
     if (phone) return;
-    const hit = hitTest(toGrid(e.clientX, e.clientY), { pins: false, wires: false });
+    const g = toGrid(e.clientX, e.clientY);
+    const hit = hitTest(g, { pins: false, wires: false });
     if (hit?.kind === 'part') onOpenProperties(hit.partId);
+    else {
+      // Kabloya çift tıklama: kablonun tamamı seçilir.
+      const wireHit = hitTest(g, { pins: false, parts: false });
+      if (wireHit?.kind === 'wire') dispatch({ type: 'select', selection: { parts: [], wires: [wireHit.wireId] } });
+    }
   };
 
   // --- Kütüphaneden sürükle-bırak ------------------------------------------------------
@@ -1682,9 +1861,32 @@ export function Canvas({
     if (tool.kind === 'place' && interactionRef.current.kind === 'wiring') setInteraction({ kind: 'idle' });
   }, [tool]);
 
+  /**
+   * Kablo menüsü: Sil seçili düz parçayı (kablo ikiye bölünür; tek parçalı kabloda bütün kabloyu), Kablonun
+   * tamamını sil bütün kabloyu siler.
+   */
+  const wireMenuItems = (wireId: string): MenuItem[] => {
+    const wire = doc.wires.find((w) => w.id === wireId);
+    const segment = selection.wires.length === 1 && selection.wires[0] === wireId ? selection.segments?.[wireId] : undefined;
+    const items: MenuItem[] = [
+      {
+        label: tr.contextMenu.remove,
+        shortcut: 'Delete',
+        onSelect: () => onDelete(segment !== undefined ? segmentSelection(wireId, segment) : { parts: [], wires: [wireId] }),
+        tone: 'danger',
+      },
+    ];
+    if (wire && wire.points.length > 2 && segment !== undefined) {
+      items.push({ label: tr.contextMenu.removeWire, onSelect: () => onDelete({ parts: [], wires: [wireId] }), tone: 'danger' });
+    }
+    return items;
+  };
+
   // --- Çizim ---------------------------------------------------------------------------
   const selectedParts = new Set(selection.parts);
   const selectedWires = new Set(selection.wires);
+  // Tutma noktaları: seçme aracında, kablolar kilitli değilken; telefonda Kur'da.
+  const showHandles = selection.wires.length > 0 && !wiringLocked && tool.kind === 'select' && (!phone || phone.mode === 'kur') && !onPick && !onProbe && !onLocate;
   const visible = {
     x: -view.x / view.scale,
     y: -view.y / view.scale,
@@ -1873,26 +2075,45 @@ export function Canvas({
             />
           ))}
           {doc.wires.map((wire) => {
-            const selected = selectedWires.has(wire.id);
-            const hovered = hover?.kind === 'wire' && hover.wireId === wire.id;
-            let stroke = selected ? 'var(--color-select)' : hovered ? '#3d63b8' : 'var(--color-symbol)';
+            // Kablonun yalnızca bir düz parçası seçiliyse (ya da fare bir parçanın üzerindeyse) vurgu o parçada.
+            const segment = selection.segments?.[wire.id];
+            const selected = selectedWires.has(wire.id) && segment === undefined;
+            const hovered = hover?.kind === 'wire' && hover.wireId === wire.id && !selectedWires.has(wire.id);
+            let stroke = selected ? 'var(--color-select)' : 'var(--color-symbol)';
             let dash: string | undefined;
             if (frame && !selected) {
               const v = frame.wireVoltages.get(wire.id);
               stroke = v === undefined ? UNKNOWN_WIRE_COLOR : voltageColor(v / frame.vmax, settings.wireScale);
               if (v === undefined) dash = UNKNOWN_WIRE_DASH;
             }
+            const part = selectedWires.has(wire.id) && segment !== undefined ? segment : hovered && hover.kind === 'wire' ? hover.segment : null;
+            const a = part !== null ? wire.points[part] : undefined;
+            const b = part !== null ? wire.points[part + 1] : undefined;
             return (
-              <polyline
-                key={wire.id}
-                points={wire.points.map((p) => `${p.x * GRID},${p.y * GRID}`).join(' ')}
-                fill="none"
-                stroke={stroke}
-                strokeWidth={selected || frame ? 3 : 2}
-                strokeDasharray={dash}
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
+              <g key={wire.id} data-wire={wire.id}>
+                <polyline
+                  points={wire.points.map((p) => `${p.x * GRID},${p.y * GRID}`).join(' ')}
+                  fill="none"
+                  stroke={stroke}
+                  strokeWidth={selected || frame ? 3 : 2}
+                  strokeDasharray={dash}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+                {a && b && (
+                  <line
+                    data-wire-segment={selectedWires.has(wire.id) ? part : undefined}
+                    x1={a.x * GRID}
+                    y1={a.y * GRID}
+                    x2={b.x * GRID}
+                    y2={b.y * GRID}
+                    stroke={selectedWires.has(wire.id) ? 'var(--color-select)' : '#3d63b8'}
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    pointerEvents="none"
+                  />
+                )}
+              </g>
             );
           })}
           {connectivity.junctions.map((p) => (
@@ -1909,6 +2130,31 @@ export function Canvas({
               strokeWidth={1.4}
             />
           ))}
+          {showHandles &&
+            doc.wires
+              .filter((w) => selectedWires.has(w.id))
+              .flatMap((w) => [
+                ['start', w.points[0]!] as const,
+                ['end', w.points[w.points.length - 1]!] as const,
+              ].map(([which, p]) => {
+                // Tutma noktası: ekranda sabit boyutlu kare; telefonda çevresinde 44 px dokunma alanı (görünmez).
+                const side = (phone ? END_HANDLE_PHONE_PX : END_HANDLE_PX) / view.scale;
+                const area = (2 * END_GRAB_TOUCH_PX) / view.scale;
+                return (
+                  <g key={`h${w.id}${which}`} data-wire-handle={`${w.id}:${which}`} pointerEvents="none">
+                    {phone && <rect x={p.x * GRID - area / 2} y={p.y * GRID - area / 2} width={area} height={area} fill="transparent" data-handle-area="" />}
+                    <rect
+                      x={p.x * GRID - side / 2}
+                      y={p.y * GRID - side / 2}
+                      width={side}
+                      height={side}
+                      fill="var(--color-paper)"
+                      stroke="var(--color-select)"
+                      strokeWidth={1.6 / view.scale}
+                    />
+                  </g>
+                );
+              }))}
 
           {earthSegments.length > 0 && (
             <g className="earth-line" pointerEvents="none" aria-hidden="true">
@@ -2422,7 +2668,7 @@ export function Canvas({
         <ContextMenu
           x={menu.x}
           y={menu.y}
-          items={[{ label: tr.contextMenu.remove, shortcut: 'Delete', onSelect: () => onDelete({ parts: [], wires: [menu.wireId] }), tone: 'danger' }]}
+          items={wireMenuItems(menu.wireId)}
           area={size}
           label={tr.contextMenu.menu(tr.inspector.wire)}
           touch={phone !== null}

@@ -11,6 +11,11 @@ export type Tool =
 export interface Selection {
   readonly parts: readonly string[];
   readonly wires: readonly string[];
+  /**
+   * Tıklanan kabloda yalnızca bir düz parça seçili (kablo kimliği → parça sırası; kablo-duzen). Burada olmayan
+   * seçili kablonun tamamı seçilidir (çift tıklama, seçim kutusu, Ctrl+A).
+   */
+  readonly segments?: Readonly<Record<string, number>>;
 }
 
 export const EMPTY_SELECTION: Selection = { parts: [], wires: [] };
@@ -46,8 +51,20 @@ function pushPast(past: readonly CircuitDoc[], doc: CircuitDoc): CircuitDoc[] {
 function pruneSelection(selection: Selection, doc: CircuitDoc): Selection {
   const parts = selection.parts.filter((id) => doc.parts.some((p) => p.id === id));
   const wires = selection.wires.filter((id) => doc.wires.some((w) => w.id === id));
-  return parts.length === selection.parts.length && wires.length === selection.wires.length ? selection : { parts, wires };
+  let segments = selection.segments;
+  if (segments) {
+    const kept = Object.entries(segments).filter(([id, i]) => {
+      const wire = doc.wires.find((w) => w.id === id);
+      return wire !== undefined && wires.includes(id) && i >= 0 && i < wire.points.length - 1;
+    });
+    if (kept.length !== Object.keys(segments).length) segments = kept.length > 0 ? Object.fromEntries(kept) : undefined;
+  }
+  if (parts.length === selection.parts.length && wires.length === selection.wires.length && segments === selection.segments) return selection;
+  return segments ? { parts, wires, segments } : { parts, wires };
 }
+
+/** Tek kablonun tek parçası seçili. */
+export const segmentSelection = (wireId: string, segment: number): Selection => ({ parts: [], wires: [wireId], segments: { [wireId]: segment } });
 
 export function editorReducer(state: EditorState, action: EditorAction): EditorState {
   switch (action.type) {

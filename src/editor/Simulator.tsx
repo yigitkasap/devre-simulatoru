@@ -40,6 +40,7 @@ import { defaultBlack, measureResistance, METER_ID, meterPart, ohmText, onGround
 import { MultimeterPanel, type MeterReading } from './fault/MultimeterPanel';
 import { addEntry, entryName, METER_LIMIT, NEW_SESSION, parseSession, type FaultSession, type Place } from './fault/session';
 import { addPart, addWire, flipParts, removeItems, rotateParts, updatePart } from '../model/docOps';
+import { splitForDelete } from '../model/wireEdit';
 import { buildFlowGraph } from '../model/flow';
 import { partBounds, pinPositions } from '../model/geometry';
 import { docFromHash, sharedFromHash, shareUrl } from '../model/share';
@@ -1010,8 +1011,17 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
     const count = items.parts.length + items.wires.length;
     if (count === 0) return;
     const one = count === 1 ? doc.parts.find((p) => p.id === items.parts[0]) : undefined;
-    // Tek parça adıyla ("R1 silindi."), tek kablo "Kablo silindi.", birden çok öğe "N öğe silindi.".
-    const what = one ? one.label : count === 1 && items.wires.length === 1 ? tr.phone.wire : tr.phone.items(count);
+    // Köşeli kablonun seçili parçası: yalnızca o parça silinir, kablo ikiye bölünür (kablo-duzen).
+    const split = splitForDelete(doc, items.wires, items.segments);
+    // Tek parça adıyla ("R1 silindi."), tek kablo "Kablo silindi.", kablonun parçası "Kablo parçası silindi.",
+    // birden çok öğe "N öğe silindi.".
+    const what = one
+      ? one.label
+      : count === 1 && items.wires.length === 1
+        ? split.cut === 1
+          ? tr.phone.wireSegment
+          : tr.phone.wire
+        : tr.phone.items(count);
     // Takılı ampermetre: kaldırılır, kablo eski hâline döner.
     const meter = one ? plugged.find((m) => m.part === one.id) : undefined;
     if (meter) {
@@ -1019,7 +1029,7 @@ export default function Simulator({ embed: embedPage = false }: { embed?: boolea
       return;
     }
     // Bildirim yalnızca silme kabul edilince (kilitli parçada bekçi "Bu parça görevde kilitli" der).
-    if (dispatch({ type: 'commit', doc: removeItems(doc, items.parts, items.wires), selection: EMPTY_SELECTION })) {
+    if (dispatch({ type: 'commit', doc: removeItems(split.doc, items.parts, split.whole), selection: EMPTY_SELECTION })) {
       showToast(tr.toast.deleted(what), 'info', { label: tr.toast.undo, run: () => dispatch({ type: 'undo' }) });
     }
   };
