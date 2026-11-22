@@ -10,9 +10,9 @@ import { tr } from '../src/i18n/tr';
 const sections = exampleSections();
 
 describe('Örnekler penceresi: gruplar', () => {
-  it('önce Akdeniz klasörü (Deney 1–9, baraj, arıza bulma), sonra genel gruplar; her örnek ve arıza görevi bir kez', () => {
+  it('önce Akdeniz klasörü (Deney 1–9, arıza bulma), sonra genel gruplar; her örnek ve arıza görevi bir kez', () => {
     const folder = sections.filter((s) => s.folder === 'akdeniz');
-    expect(folder.map((s) => s.mark)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', 'P', '!']);
+    expect(folder.map((s) => s.mark)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', '!']);
     expect(folder.map((s) => s.short)).toEqual([
       'Diyot karakteristikleri',
       'Doğrultucular',
@@ -23,22 +23,20 @@ describe('Örnekler penceresi: gruplar', () => {
       'BJT’li yükselteç',
       'MOSFET’li yükselteç',
       'Transistör anahtar',
-      'Baraj projesi',
       'Arıza bulma',
     ]);
     expect(folder.map((s) => s.overline)).toEqual([
       ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `DENEY ${n}`),
-      'PROJE',
       'ARIZA BULMA',
     ]);
     // Föydeki tam ad ve amaç.
     expect(folder[0]!.title).toBe('Diyot karakteristiklerinin incelenmesi');
     expect(folder[0]!.aim).toBe('Diyodun akımının gerilimle nasıl değiştiğini (I-V eğrisini) ölçüp incelemek.');
-    // Genel gruplar klasörden sonra, üst yazısız; Akdeniz klasöründe 31 devre.
+    // Genel gruplar klasörden sonra, üst yazısız (baraj projesi "P · PROJE" ile); Akdeniz klasöründe 19 föy devresi + 4 arıza görevi.
     const general = sections.filter((s) => s.folder === null);
     expect(sections.indexOf(general[0]!)).toBe(folder.length);
-    expect(general.filter((s) => s.mark !== '!').every((s) => s.overline === null && s.mark === '')).toBe(true);
-    expect(entryCount(folder)).toBe(31);
+    expect(general.filter((s) => s.mark !== '!' && s.key !== 'baraj').every((s) => s.overline === null && s.mark === '')).toBe(true);
+    expect(entryCount(folder)).toBe(23);
     const examples = sections.flatMap((s) => s.entries.filter((e) => e.kind === 'example').map((e) => e.id));
     const faults = sections.flatMap((s) => s.entries.filter((e) => e.kind === 'fault').map((e) => e.id));
     expect([...examples].sort()).toEqual([...EXAMPLE_IDS].sort());
@@ -46,10 +44,10 @@ describe('Örnekler penceresi: gruplar', () => {
     expect(entryCount(sections)).toBe(EXAMPLE_IDS.length + FAULT_SCENARIOS.length);
   });
 
-  it('kartta föy örneğinde şekil çipi, ekte "Föyde yok · ek"; tek satırlık cümle tr.examples.cues', () => {
-    expect(entryTexts({ kind: 'example', id: 'alt-kirpici' })).toMatchObject({ chip: 'Şekil-13d', extra: false, title: 'Tek yönlü kırpıcı (3 V ve 2 V)' });
-    expect(entryTexts({ kind: 'example', id: 'schottky-1n4001' })).toMatchObject({ chip: null, extra: true });
-    expect(entryTexts({ kind: 'example', id: 'gerilim-bolucu' })).toMatchObject({ chip: null, extra: false, cue: tr.examples.cues['gerilim-bolucu'] });
+  it('kartta föy örneğinde şekil çipi, öbürlerinde çip yok; tek satırlık cümle tr.examples.cues', () => {
+    expect(entryTexts({ kind: 'example', id: 'alt-kirpici' })).toMatchObject({ chip: 'Şekil-13d', title: 'Tek yönlü kırpıcı (3 V ve 2 V)' });
+    expect(entryTexts({ kind: 'example', id: 'schottky-1n4001' })).toMatchObject({ chip: null });
+    expect(entryTexts({ kind: 'example', id: 'gerilim-bolucu' })).toMatchObject({ chip: null, cue: tr.examples.cues['gerilim-bolucu'] });
     expect(tr.examples.cues['bjt-anahtar']).toContain('kesimdeyken');
   });
 

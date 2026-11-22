@@ -400,20 +400,21 @@ try {
     const navText = (await nav.textContent()) ?? '';
     const marks = await rows.evaluateAll((bs) => bs.map((b) => b.querySelector('span')?.textContent ?? ''));
     const labels = await rows.evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label') ?? ''));
-    const folderShorts = labels.slice(0, 11).map((l) => l.split(',')[0]);
+    const folderShorts = labels.slice(0, 10).map((l) => l.split(',')[0]);
     const navHeights = await rows.evaluateAll((bs) => bs.map((b) => Math.round(b.getBoundingClientRect().height)));
-    check('masaüstü (Örnekler): solda 264 px yan liste (panel-2 zemini, nav): 36 px Akdeniz logosu, "Akdeniz Üniversitesi" / "Fizik · Elektronik Lab föyü"; gruplar tek satır (numara 1–9, P, !; kısa ad; sayı), çizgi, "Genel" ve genel gruplar',
+    check('masaüstü (Örnekler): solda 264 px yan liste (panel-2 zemini, nav): 36 px Akdeniz logosu, "Akdeniz Üniversitesi" / "Fizik · Elektronik Lab föyü"; gruplar tek satır (numara 1–9, !; kısa ad; sayı), çizgi, "Genel" ve genel gruplar (föyde olmayan diyot/transistör devreleri ve baraj projesi de burada)',
       Math.round(navBox?.width ?? 0) === 264 && navBg === panel2 && logoW === 36 && (await logo.getAttribute('alt')) === 'Akdeniz Üniversitesi logosu' &&
         navText.includes('Akdeniz Üniversitesi') && navText.includes('Fizik · Elektronik Lab föyü') && navText.includes('Genel') && (await nav.locator('hr').count()) === 1 &&
-        marks.slice(0, 11).join('') === '123456789P!' &&
-        folderShorts.join('|') === 'Diyot karakteristikleri|Doğrultucular|Kenetleyici ve katlayıcı|Kırpıcılar|FET karakteristikleri|FET yükselteci|BJT’li yükselteç|MOSFET’li yükselteç|Transistör anahtar|Baraj projesi|Arıza bulma' &&
-        labels.slice(11).some((l) => l.startsWith('Temel devreler,')) && labels.every((l) => /, \d+ devre$/.test(l)) && navHeights.every((h) => h === 36),
+        marks.slice(0, 10).join('') === '123456789!' &&
+        folderShorts.join('|') === 'Diyot karakteristikleri|Doğrultucular|Kenetleyici ve katlayıcı|Kırpıcılar|FET karakteristikleri|FET yükselteci|BJT’li yükselteç|MOSFET’li yükselteç|Transistör anahtar|Arıza bulma' &&
+        labels.slice(10).some((l) => l.startsWith('Temel devreler,')) && labels.slice(10).some((l) => l.startsWith('Diyot ve transistör devreleri, 6 devre')) && labels.slice(10).some((l) => l.startsWith('Baraj projesi,')) && labels.every((l) => /, \d+ devre$/.test(l)) && navHeights.every((h) => h === 36),
       `${Math.round(navBox?.width ?? 0)} px · ${navBg}/${panel2} · logo ${logoW} · ${marks.join('')} · ${labels.length} satır`);
 
     // Şemalar yalnızca görünür olunca çizilir.
     const states = await dlg.locator('[data-preview]').evaluateAll((ps) => ps.map((p) => p.dataset.preview));
     const waiting = states.filter((s) => s === 'waiting').length;
-    const arduino = dlg.locator('section[data-section="arduino"] [data-preview]').last();
+    // Listenin en sonundaki kart (2026-11-22'den beri baraj projesi; önceden Arduino).
+    const arduino = dlg.locator('section[data-section] [data-preview]').last();
     const arduinoBefore = await arduino.getAttribute('data-preview');
     await list.evaluate((el) => el.scrollTo({ top: el.scrollHeight })); await page.waitForTimeout(600);
     const arduinoAfter = await arduino.getAttribute('data-preview');
@@ -481,11 +482,11 @@ try {
         boardBox !== null && cardBox !== null && boardBox.x + boardBox.width >= cardBox.x + cardBox.width - 16 && boardBox.y + boardBox.height >= cardBox.y + cardBox.height - 12 &&
         boardBg === 'rgba(0, 0, 0, 0)' && ((await board.textContent()) ?? '').includes('Tahtada kur'),
       `${cardRadius} · şema ${previewH} px ${drawn} · ${shape} · ${titleStyle} · ${cueSize} · tahta ${boardBg}`);
-    const extraCard = (await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).textContent()) ?? '';
+    const extraCard = (await dlg.locator('section[data-section="yariiletken"]').getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).textContent()) ?? '';
     const plainCard = (await dlg.getByRole('button', { name: 'Yarım dalga doğrultmaç', exact: true }).textContent()) ?? '';
     const generalCard = (await dlg.getByRole('button', { name: 'Gerilim bölücü', exact: true }).textContent()) ?? '';
-    check('masaüstü (Örnekler): föyde olmayan ek örnekte "Föyde yok · ek" (Schottky), föy örneğinde şekil çipi (Yarım dalga: Şekil-4), genel örnekte çip yok',
-      extraCard.includes('Föyde yok · ek') && !extraCard.includes('Şekil-') && /Şekil-\d/.test(plainCard) && !plainCard.includes('Föyde yok') && !generalCard.includes('Şekil-') && !generalCard.includes('Föyde yok'),
+    check('masaüstü (Örnekler): föyde olmayan örnek (Schottky) genel "Diyot ve transistör devreleri" grubunda, çipsiz ("Föyde yok · ek" etiketi yok); föy örneğinde şekil çipi (Yarım dalga: Şekil-4), genel örnekte çip yok',
+      extraCard.length > 0 && !extraCard.includes('Föyde yok') && !extraCard.includes('Şekil-') && /Şekil-\d/.test(plainCard) && !plainCard.includes('Föyde yok') && !generalCard.includes('Şekil-') && !generalCard.includes('Föyde yok'),
       `${extraCard.slice(0, 40)} · ${plainCard.slice(0, 40)}`);
     // Baraj grubunun başlığının yanında sayfa bağlantısı; arıza görevleri aynı kartla.
     const barajLink = dlg.locator('section[data-section="baraj"] > div').first().getByRole('link', { name: /Baraj sayfası/ });
@@ -568,18 +569,18 @@ try {
     const faultInView = faultBox !== null && listBox !== null && faultBox.y >= listBox.y && faultBox.y + faultBox.height <= listBox.y + listBox.height;
     check('masaüstü (Örnekler): açık arıza görevi (JFET) işaretli, liste ona kayıyor, yan listede "Arıza bulma"',
       faultInView && ((await activeFault.textContent()) ?? '').includes('Açık') && (await currentRow()) === 'Arıza bulma', `${faultInView} · ${await currentRow()}`);
-    // Ek örneğin defterdeki örnek kartında da etiket; kartı eski düzende.
+    // Föyde olmayan örneğin defterdeki kartı: grup adı genel grup, etiket yok, eski düzen.
     await dlg.getByRole('button', { name: 'Schottky ile 1N4001’in ileri gerilimi', exact: true }).click(); await page.waitForTimeout(500);
     // v4: örnek şeridi; grubun adı bölgenin adında, şeritte büyük harfli mono üst yazı.
     const exampleCard = (await notebook(page).getByRole('region', { name: /^Örnek ·/ }).textContent()) ?? '';
     const exampleName = (await notebook(page).getByRole('region', { name: /^Örnek ·/ }).getAttribute('aria-label')) ?? '';
-    check('masaüstü (Örnekler): ek örneğin defterdeki örnek şeridinde de "Föyde yok · ek"; grup adı aynı (Örnek · Deney 1 · …; üst yazı DENEY 1 · …)',
-      exampleCard.includes('Föyde yok · ek') && exampleName === 'Örnek · Deney 1 · Diyot karakteristiklerinin incelenmesi' && exampleCard.startsWith('DENEY 1 · DİYOT KARAKTERİSTİKLERİNİN İNCELENMESİ'),
+    check('masaüstü (Örnekler): föyde olmayan örneğin (Schottky) defterdeki şeridinde "Föyde yok · ek" yok; grup adı genel grup (Örnek · Diyot ve transistör devreleri; üst yazı DİYOT VE TRANSİSTÖR DEVRELERİ)',
+      !exampleCard.includes('Föyde yok') && exampleName === 'Örnek · Diyot ve transistör devreleri' && exampleCard.startsWith('DİYOT VE TRANSİSTÖR DEVRELERİ'),
       `${exampleName} · ${exampleCard.slice(0, 80)}`);
     const extraRegion = notebook(page).getByRole('region', { name: /^Örnek ·/ });
     await extraRegion.getByRole('button').first().click(); await page.waitForTimeout(300);
     const extraText = (await extraRegion.textContent()) ?? '';
-    check('masaüstü (Örnekler): ek örneğin (Schottky) kartı eski düzende: "Ne işe yarar?" ve "Günlük hayatta" var; Amaç, Teorik bilgi, Adımlar yok',
+    check('masaüstü (Örnekler): föyde olmayan örneğin (Schottky) kartı eski düzende: "Ne işe yarar?" ve "Günlük hayatta" var; Amaç, Teorik bilgi, Adımlar yok',
       extraText.includes('Ne işe yarar?') && extraText.includes('Günlük hayatta') && !extraText.includes('Amaç') && (await extraRegion.getByRole('button', { name: 'Teorik bilgi' }).count()) === 0 && !extraText.includes('Simülasyonda:'),
       extraText.slice(0, 60));
     // Dar pencerede 2 sütun.
@@ -619,10 +620,10 @@ try {
     const generalRows = await dlg.getByRole('region', { name: 'Genel' }).locator('button[data-group]').count();
     const homeTotal = await headCount();
     const activeRows = await dlg.getByRole('button', { name: /^Açık örneğin grubuna git:/ }).count();
-    check('telefon (Örnekler): ana ekran: başlıkta Kapat (44 px), "Örnekler", toplam sayı; 48 px arama; yuvarlak köşeli Akdeniz kutusu (40 px logo, "Akdeniz Üniversitesi", "Fizik · Elektronik Lab föyü · 31 devre") ve 11 grup satırı; "Genel" ve genel gruplar; satırlar ≥ 48 px (numara, kısa ad, sayı, ok); açık örnek yokken açık satırı yok',
+    check('telefon (Örnekler): ana ekran: başlıkta Kapat (44 px), "Örnekler", toplam sayı; 48 px arama; yuvarlak köşeli Akdeniz kutusu (40 px logo, "Akdeniz Üniversitesi", "Fizik · Elektronik Lab föyü · 23 devre") ve 10 grup satırı (yalnızca föy deneyleri ve arıza bulma); "Genel" ve genel gruplar; satırlar ≥ 48 px (numara, kısa ad, sayı, ok); açık örnek yokken açık satırı yok',
       Math.round(closeBtn?.height ?? 0) === 44 && Math.round(closeBtn?.width ?? 0) === 44 && (await title()) === 'Örnekler' && homeTotal === rowLabels.reduce((n, l) => n + Number(l.match(/, (\d+) devre$/)?.[1] ?? 0), 0) && searchH === 48 &&
-        logoW === 40 && folderText.includes('Akdeniz Üniversitesi') && folderText.includes('Fizik · Elektronik Lab föyü · 31 devre') && folderRadius === '16px' &&
-        folderRows === 11 && generalRows >= 6 && rowHeights.every((h) => h >= 48) && chevrons && firstRowText.startsWith('1Diyot karakteristikleri') &&
+        logoW === 40 && folderText.includes('Akdeniz Üniversitesi') && folderText.includes('Fizik · Elektronik Lab föyü · 23 devre') && folderRadius === '16px' &&
+        folderRows === 10 && generalRows >= 6 && rowHeights.every((h) => h >= 48) && chevrons && firstRowText.startsWith('1Diyot karakteristikleri') &&
         rowLabels[0].startsWith('Diyot karakteristikleri,') && activeRows === 0,
       `kapat ${Math.round(closeBtn?.height ?? 0)} · arama ${searchH} · logo ${logoW} · ${folderRadius} · ${folderRows}+${generalRows} satır · en kısa ${Math.min(...rowHeights)} · toplam ${homeTotal}`);
     // 2. Grup ekranı.
@@ -737,7 +738,7 @@ try {
     check('föy kartı (masaüstü): 3. adımda föydeki metin, altında "Simülasyonda:" ve adımın içinde kapalı "Cevabı göster"; tıklayınca cevap açılıyor (5 V genliğin neden kırmadığı)',
       rows === '3+' && stepText.includes('Simülasyonda:') && stepText.includes('zener olayını gözleyiniz') && before === 0 && answer.includes('5 V genlik bu zeneri kırmaya yetmez') && answer.includes('4,87 V'),
       `${rows} · ${before} · ${answer.slice(0, 40)}`);
-    // Deney 6'nın 4. sorusunun cevabı ek örneği (kuplajlı JFET yükselteç) açıyor.
+    // Deney 6'nın 4. sorusunun cevabı föyde olmayan kuplajlı JFET yükselteci açıyor (genel listede).
     await page.getByRole('button', { name: 'Örnekler', exact: true }).click(); await page.waitForTimeout(300);
     await (await pickExample(page, (p) => p.getByRole('button', { name: 'BF245A ile ortak kaynaklı yükselteç (kazanç 10)', exact: true }))).click(); await page.waitForTimeout(500);
     const fetCard = notebook(page).getByRole('region', { name: 'Örnek · Deney 6 · Şekil-17' });
@@ -749,9 +750,9 @@ try {
     const linkText = (await link.textContent()) ?? '';
     await link.click(); await page.waitForTimeout(700);
     const opened = (await notebook(page).getByRole('region', { name: /^Örnek ·/ }).textContent()) ?? '';
-    check('föy kartı (masaüstü): Deney 6’da adımlar 1, 2, 2a, 2b, 3, 4 (2a ve 2b ayrı satır; 2’nin sorusu yok); 4. adımın cevabındaki "Örneği aç" kuplajlı ek devreyi açıyor (kartı eski düzende, "Föyde yok · ek")',
-      fetRows === '1+|2-|2a+|2b+|3+|4+' && linkText.includes('kuplajlı') && opened.includes('Föyde yok · ek') && (await page.title()).length > 0 &&
-        (await notebook(page).getByRole('region', { name: 'Örnek · Deney 6 · FET yükselteci' }).count()) === 1,
+    check('föy kartı (masaüstü): Deney 6’da adımlar 1, 2, 2a, 2b, 3, 4 (2a ve 2b ayrı satır; 2’nin sorusu yok); 4. adımın cevabındaki "Örneği aç" kuplajlı devreyi açıyor (genel "Diyot ve transistör devreleri" grubundan, "Föyde yok · ek" etiketi yok)',
+      fetRows === '1+|2-|2a+|2b+|3+|4+' && linkText.includes('kuplajlı') && opened.startsWith('DİYOT VE TRANSİSTÖR DEVRELERİ') && !opened.includes('Föyde yok') && (await page.title()).length > 0 &&
+        (await notebook(page).getByRole('region', { name: 'Örnek · Diyot ve transistör devreleri' }).count()) === 1,
       `${fetRows} · ${linkText.slice(0, 40)} · ${opened.slice(0, 50)}`);
     await ctx.close();
   }

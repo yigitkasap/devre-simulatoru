@@ -32,7 +32,7 @@ import { LogicDetails, SegmentDetails } from './LogicCard';
 import { isLogicChip } from '../model/logicChips';
 import { spdtThrow } from '../sim/devices/spdt';
 import { DeviceControls, deviceSummary, ScopeStatus, type DeviceHooks } from './DeviceCards';
-import { ExampleDetails, ExtraTag, groupOf, labBadge } from './ExampleTab';
+import { ExampleDetails, groupOf, labBadge } from './ExampleTab';
 import { Icon, type IconName } from './icons';
 import { FieldError, fieldTone, LabelField, MultiSelection, NoteField, PropField, RACK_DEVICES, selectionActions, useCommitField, WireDetails, type InspectTabProps, type PartPatch, type TaskParts } from './InspectTab';
 import { lm317Note } from './lm317Divider';
@@ -545,7 +545,6 @@ function ExampleCard({ id, onOpen, onClose }: { id: ExampleId; onOpen: (id: Exam
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 font-mono text-[11px] font-medium tracking-[0.06em] text-accent-ink">
           {(lab ?? groupOf(id)).toLocaleUpperCase('tr-TR')}
-          <ExtraTag id={id} className="ml-1.5" />
         </span>
         {open && (
           <button

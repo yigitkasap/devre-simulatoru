@@ -2214,6 +2214,7 @@ export const tr = {
     groups: {
       temel: 'Temel devreler',
       aletler: 'Laboratuvar cihazları',
+      yariiletken: 'Diyot ve transistör devreleri',
       elektromanyetizma: 'Elektromanyetizma',
       sensorler: 'Ayarlı parçalar ve sensörler',
       ses: 'Ses ve koruma',
@@ -2236,8 +2237,6 @@ export const tr = {
         logoAlt: 'Akdeniz Üniversitesi logosu',
       },
     } as Record<ExampleFolderId, { logoAlt: string }>,
-    /** Föyde olmayan ek örneğin etiketi (pencerede ve örnek kartında). */
-    extra: 'Föyde yok · ek',
     showAnswer: 'Cevabı göster',
     hideAnswer: 'Cevabı gizle',
     /** Föy deneylerinin kartı (amaç, teorik bilgi, adımlar ve sorular). */

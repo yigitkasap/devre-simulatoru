@@ -1,7 +1,7 @@
 // Örnekler penceresinin içeriği: gruplar (yan listedeki sırayla), kısa adları, üst yazıları ve
 // arama. Saf modül: pencere (ExamplesDialog) ve testler kullanır.
 
-import { EXAMPLE_FOLDERS, EXTRA_EXAMPLES, exampleDoc, folderGroups, labExperiment, type ExampleFolderId, type ExampleGroupId, type ExampleId } from '../examples';
+import { EXAMPLE_FOLDERS, exampleDoc, folderGroups, labExperiment, type ExampleFolderId, type ExampleGroupId, type ExampleId } from '../examples';
 import { FAULT_SCENARIOS, faultFolder, type FaultScenarioId } from '../examples/faultScenarios';
 import { LAB_EXPERIMENT_TEXTS, labAim, labFigure } from '../i18n/foy';
 import { tr } from '../i18n/tr';
@@ -49,7 +49,7 @@ function faultSection(folder: ExampleFolderId | null): ExampleSection | null {
   return { key: folder ? `ariza:${folder}` : 'ariza', folder, mark: '!', short: b().short.ariza!, overline: b().faults, title: b().faultTitle, aim: tr.fault.groupNote, entries: ids };
 }
 
-/** Bütün gruplar pencerenin sırasıyla: önce klasörler (Akdeniz: Deney 1–9, baraj, arıza bulma), sonra genel gruplar. */
+/** Bütün gruplar pencerenin sırasıyla: önce klasörler (Akdeniz: Deney 1–9, arıza bulma), sonra genel gruplar. */
 export function exampleSections(): ExampleSection[] {
   const sections: ExampleSection[] = [];
   for (const f of EXAMPLE_FOLDERS) {
@@ -92,17 +92,16 @@ function partsText(id: ExampleId): string {
 }
 
 /** Kartın başlığı, tek satırlık cümlesi ve aramada bakılan öbür metinleri. */
-export function entryTexts(entry: ExampleEntry): { title: string; cue: string; chip: string | null; extra: boolean; haystack: string } {
+export function entryTexts(entry: ExampleEntry): { title: string; cue: string; chip: string | null; haystack: string } {
   if (entry.kind === 'fault') {
     const t = tr.fault.scenarios[entry.id];
     const base = FAULT_SCENARIOS.find((s) => s.id === entry.id)!.base;
-    return { title: t.title, cue: t.symptom, chip: null, extra: false, haystack: normalize([t.title, t.symptom, t.experiment].join(' ')) + ' ' + partsText(base) };
+    return { title: t.title, cue: t.symptom, chip: null, haystack: normalize([t.title, t.symptom, t.experiment].join(' ')) + ' ' + partsText(base) };
   }
   const t = tr.examples.texts[entry.id];
-  const extra = EXTRA_EXAMPLES.has(entry.id);
-  const figure = extra ? null : labFigure(entry.id);
+  const figure = labFigure(entry.id);
   const cue = tr.examples.cues[entry.id];
-  return { title: t.title, cue, chip: figure ? figure.figure : null, extra, haystack: normalize([t.title, cue, t.description].join(' ')) + ' ' + partsText(entry.id) };
+  return { title: t.title, cue, chip: figure ? figure.figure : null, haystack: normalize([t.title, cue, t.description].join(' ')) + ' ' + partsText(entry.id) };
 }
 
 /** Kartın küçük şemasının devresi: örneğin kendisi, arıza görevinde dayandığı örnek. */

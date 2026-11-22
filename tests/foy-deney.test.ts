@@ -3,7 +3,7 @@
 // biçiminde yazdığı sayıyı içermiyorsa test düşer.
 
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE_GROUPS, EXTRA_EXAMPLES, LAB_EXPERIMENTS, type ExampleId, type LabExperimentNo } from '../src/examples';
+import { EXAMPLE_GROUPS, LAB_EXPERIMENTS, type ExampleId, type LabExperimentNo } from '../src/examples';
 import { LAB_EXPERIMENT_TEXTS, LAB_FIGURE_TEXTS, labAim } from '../src/i18n/foy';
 import { tr } from '../src/i18n/tr';
 import type { CircuitDoc } from '../src/model/types';
@@ -190,10 +190,9 @@ describe('Föy kartları: iskelet', () => {
       expect(tr.examples.groups[group]).toBe(`Deney ${n} · ${experiment.title.charAt(0).toUpperCase()}${experiment.title.slice(1)}`);
       expect(labAim(group)).toBe(experiment.aim);
 
-      // Grubun föydeki bütün örneklerinin şekli var; ek örneklerin yok (eski kart düzeni).
+      // Deney grubunda yalnızca föydeki şekiller var, föydeki sırayla (föyde olmayan devreler ana listede).
       const ids = EXAMPLE_GROUPS.find((g) => g.id === group)!.ids as readonly ExampleId[];
-      expect(ids.filter((id) => !EXTRA_EXAMPLES.has(id))).toEqual(Object.keys(deney.figures));
-      for (const id of ids.filter((x) => EXTRA_EXAMPLES.has(x))) expect(LAB_FIGURE_TEXTS[id], id).toBeUndefined();
+      expect(ids).toEqual(Object.keys(deney.figures));
 
       const covered = new Set<string>();
       for (const [id, sekil] of Object.entries(deney.figures) as [ExampleId, FoySekil][]) {

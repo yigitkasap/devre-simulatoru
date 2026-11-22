@@ -622,7 +622,7 @@ export const LAB_FIGURE_TEXTS: Partial<Record<ExampleId, LabFigure>> = {
   },
 };
 
-/** Örneğin föydeki şekli; föy deneyi olmayan ve ek örneklerde null. */
+/** Örneğin föydeki şekli; föy deneyi olmayan örneklerde null. */
 export function labFigure(id: ExampleId): LabFigure | null {
   return LAB_FIGURE_TEXTS[id] ?? null;
 }

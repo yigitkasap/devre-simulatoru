@@ -90,7 +90,7 @@ import fetYukseltecKuplajli from './fet-yukseltec-kuplajli.json';
 /**
  * Örnekler penceresindeki klasörler: grupları genel gruplardan önce gelir (yan listede logonun altında,
  * telefonda logolu ayrı bir kutuda). Akdeniz Üniversitesi Fizik Bölümü'nün Temel Elektronik Laboratuvarı (site bu ders için yapıldı):
- * föyün dokuz deneyi, baraj projesi ve föye dayanan arıza bulma görevleri. Adı tr.ts → examples.browser.folderName.
+ * yalnızca föyün dokuz deneyinin devreleri ve föye dayanan arıza bulma görevleri (föyde olmayan devreler ana listede). Adı tr.ts → examples.browser.folderName.
  */
 export const EXAMPLE_FOLDERS = [{ id: 'akdeniz', logo: 'akdeniz-universitesi-96.png' }] as const;
 
@@ -100,7 +100,7 @@ export type ExampleFolderId = (typeof EXAMPLE_FOLDERS)[number]['id'];
  * Örnek grupları (pencerede bu sırayla). Grup adları tr.ts → examples.groups içindedir; `folder` olan
  * gruplar o klasörde gösterilir (?ornek= adresleri ve örnek kimlikleri klasörden bağımsız).
  * "Deney" grupları Fizik 2. sınıf Elektronik Laboratuvarı föyünün dokuz deneyidir; devreler föydeki
- * parçalar ve değerlerle kuruludur. Föyde olmayan ek örnekler (EXTRA_EXAMPLES) deney grubunun sonunda.
+ * parçalar ve değerlerle kuruludur; klasörde yalnızca föydeki şekiller vardır.
  */
 export const EXAMPLE_GROUPS = [
   {
@@ -119,6 +119,9 @@ export const EXAMPLE_GROUPS = [
     ],
   },
   { id: 'aletler', ids: ['toprak-tuzagi'] },
+  // Föyde olmayan diyot ve transistör devreleri (Parça Dalga 1'in Schottky, KBP307 köprü ve tristör örnekleri,
+  // föy yükselteçlerinin kuplajlı ve R_S'li biçimleri); 2026-11-22'ye kadar Akdeniz klasöründe "ek" etiketiyleydi.
+  { id: 'yariiletken', ids: ['schottky-1n4001', 'kopru-diyot', 'tristor-mandal', 'fet-yukseltec-kuplajli', 'bjt-yukseltec-kuplajli', 'mosfet-yukseltec-rs'] },
   { id: 'elektromanyetizma', ids: ['transformator', 'adaptor', 'transformator-dc', 'role', 'role-transistor', 'role-muhurleme', 'dc-motor', 'motor-jenerator', 'motor-h-koprusu'] },
   { id: 'sensorler', ids: ['potansiyometre', 'ldr-gece-lambasi', 'ntc-termometre', 'lamba-ani-akim'] },
   { id: 'ses', ids: ['hoparlor', 'buzzer-sicaklik', 'sigorta'] },
@@ -127,33 +130,26 @@ export const EXAMPLE_GROUPS = [
   { id: 'lojik', ids: ['ve-kapisi', 'nand-kapilar', 'yarim-toplayici', 'sr-mandal', 'frekans-bolucu', 'yuruyen-isik', 'bcd-7-segment'] },
   // Arduino Uno: önceden derlenmiş örnek programlar (src/arduino/sketches).
   { id: 'arduino', ids: ['ard-blink', 'ard-dugme', 'ard-sayac', 'ard-trafik-isigi', 'ard-fade', 'ard-potansiyometre', 'ard-gece-lambasi', 'ard-termometre', 'ard-pwm-filtre', 'ard-melodi', 'ard-role'] },
-  { id: 'diyot-karakteristigi', folder: 'akdeniz', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi', 'schottky-1n4001'] },
-  { id: 'dogrultucu', folder: 'akdeniz', ids: ['yarim-dalga', 'kopru-dogrultmac', 'kopru-diyot'] },
+  // Proje: baraj su seviyesi uyarısı (ayrı sayfası da var: /baraj); föyde olmadığı için klasörde değil.
+  { id: 'baraj', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
+  { id: 'diyot-karakteristigi', folder: 'akdeniz', ids: ['diyot-dc', 'diyot-karakteristigi', 'zener-karakteristigi', 'led-karakteristigi'] },
+  { id: 'dogrultucu', folder: 'akdeniz', ids: ['yarim-dalga', 'kopru-dogrultmac'] },
   { id: 'kenetleyici', folder: 'akdeniz', ids: ['negatif-kenetleyici', 'pozitif-kenetleyici', 'gerilim-katlayici'] },
   // Föydeki sıra: Şekil-13a, 13b, 13c, 13d.
   { id: 'kirpici', folder: 'akdeniz', ids: ['seri-kirpici', 'paralel-kirpici', 'cift-kirpici', 'alt-kirpici'] },
   { id: 'fet-karakteristigi', folder: 'akdeniz', ids: ['jfet-karakteristik'] },
-  { id: 'fet-yukseltec', folder: 'akdeniz', ids: ['fet-yukseltec', 'fet-yukseltec-kuplajli'] },
-  { id: 'bjt-yukseltec', folder: 'akdeniz', ids: ['bjt-yukseltec', 'bjt-yukseltec-kuplajli'] },
-  { id: 'mosfet-yukseltec', folder: 'akdeniz', ids: ['mosfet-yukseltec', 'mosfet-yukseltec-rs'] },
-  { id: 'anahtar', folder: 'akdeniz', ids: ['bjt-anahtar', 'bjt-anahtar-emetor', 'tristor-mandal'] },
-  // Proje: baraj su seviyesi uyarısı (ayrı sayfası da var: /baraj).
-  { id: 'baraj', folder: 'akdeniz', ids: ['baraj-cubuk', 'baraj-tek-isik'] },
+  { id: 'fet-yukseltec', folder: 'akdeniz', ids: ['fet-yukseltec'] },
+  { id: 'bjt-yukseltec', folder: 'akdeniz', ids: ['bjt-yukseltec'] },
+  { id: 'mosfet-yukseltec', folder: 'akdeniz', ids: ['mosfet-yukseltec'] },
+  { id: 'anahtar', folder: 'akdeniz', ids: ['bjt-anahtar', 'bjt-anahtar-emetor'] },
 ] as const;
 
 export type ExampleGroupId = (typeof EXAMPLE_GROUPS)[number]['id'];
 export type ExampleId = (typeof EXAMPLE_GROUPS)[number]['ids'][number];
 
 /**
- * Föyde olmayan ama deneyin konusunu sürdüren ek örnekler: pencerede ve örnek kartında "Föyde yok · ek"
- * etiketiyle, deney grubunun sonunda (Parça Dalga 1'in Schottky, KBP307 köprü ve tristör örnekleri).
- */
-export const EXTRA_EXAMPLES: ReadonlySet<ExampleId> = new Set<ExampleId>(['schottky-1n4001', 'kopru-diyot', 'tristor-mandal', 'mosfet-yukseltec-rs', 'bjt-yukseltec-kuplajli', 'fet-yukseltec-kuplajli']);
-
-/**
  * Föyün dokuz deneyi: grup → deney numarası. Deneyin metinleri (amaç, teorik bilgi) ve her şeklin
- * adımlarıyla soruları i18n/foy.ts içindedir; ek örnekler (EXTRA_EXAMPLES) föyde olmadığı için
- * şekil metinleri yoktur ve eski kart düzeninde kalır.
+ * adımlarıyla soruları i18n/foy.ts içindedir.
  */
 export const LAB_EXPERIMENTS = {
   'diyot-karakteristigi': 1,

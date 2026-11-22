@@ -1,13 +1,14 @@
-// Örnekler penceresinin Akdeniz Üniversitesi klasörü: föyün dokuz deneyi ve baraj projesi klasörde,
-// genel gruplar ana listede; föye dayanan arıza senaryoları klasörde, dayanmayan ana listede. Örnek
+// Örnekler penceresinin Akdeniz Üniversitesi klasörü: yalnızca föyün dokuz deneyi klasörde; föyde olmayan
+// devreler (diyot ve transistör ekleri, baraj projesi) ve genel gruplar ana listede; föye dayanan arıza senaryoları klasörde, dayanmayan ana listede. Örnek
 // kimlikleri (?ornek= adresleri) ve sırası klasörden bağımsız.
 
 import { describe, expect, it } from 'vitest';
-import { EXAMPLE_GROUPS, EXAMPLE_IDS, EXTRA_EXAMPLES, exampleGroup, folderGroups, groupFolder, type ExampleId } from '../src/examples';
+import { EXAMPLE_GROUPS, EXAMPLE_IDS, exampleGroup, folderGroups, groupFolder, type ExampleId } from '../src/examples';
 import { FAULT_SCENARIOS, faultFolder } from '../src/examples/faultScenarios';
+import { LAB_FIGURE_TEXTS } from '../src/i18n/foy';
 
 describe('Örnek klasörleri', () => {
-  it('Deney 1–9 ve baraj Akdeniz klasöründe, genel gruplar ana listede', () => {
+  it('Akdeniz klasöründe yalnızca Deney 1–9; baraj ve föyde olmayan ekler ana listede', () => {
     expect(folderGroups('akdeniz').map((g) => g.id)).toEqual([
       'diyot-karakteristigi',
       'dogrultucu',
@@ -18,9 +19,8 @@ describe('Örnek klasörleri', () => {
       'bjt-yukseltec',
       'mosfet-yukseltec',
       'anahtar',
-      'baraj',
     ]);
-    expect(folderGroups(null).map((g) => g.id)).toEqual(['temel', 'aletler', 'elektromanyetizma', 'sensorler', 'ses', 'entegreler', 'lojik', 'arduino']);
+    expect(folderGroups(null).map((g) => g.id)).toEqual(['temel', 'aletler', 'yariiletken', 'elektromanyetizma', 'sensorler', 'ses', 'entegreler', 'lojik', 'arduino', 'baraj']);
   });
 
   it('her grup tam bir yerde; örnek kimlikleri ve sırası değişmedi', () => {
@@ -29,7 +29,7 @@ describe('Örnek klasörleri', () => {
     expect(EXAMPLE_IDS).toEqual(EXAMPLE_GROUPS.flatMap((g) => g.ids));
     expect(exampleGroup('bjt-yukseltec')).toBe('bjt-yukseltec');
     expect(groupFolder(exampleGroup('rc-dolma')!)).toBeNull();
-    expect(groupFolder(exampleGroup('baraj-tek-isik')!)).toBe('akdeniz');
+    expect(groupFolder(exampleGroup('baraj-tek-isik')!)).toBeNull();
   });
 
   it('föye dayanan arıza senaryoları klasörde, temel devredeki (LED) ana listede', () => {
@@ -40,14 +40,11 @@ describe('Örnek klasörleri', () => {
   });
 });
 
-describe('Föyde olmayan ek örnekler', () => {
-  it('her ek örnek bir deney grubunda ve grubunun sonunda (föydekilerden sonra)', () => {
-    for (const id of EXTRA_EXAMPLES) {
-      const group = EXAMPLE_GROUPS.find((g) => (g.ids as readonly string[]).includes(id))!;
-      expect(groupFolder(group.id), id).toBe('akdeniz');
-      const ids = group.ids as readonly ExampleId[];
-      const firstExtra = ids.findIndex((x) => EXTRA_EXAMPLES.has(x));
-      expect(ids.slice(firstExtra).every((x) => EXTRA_EXAMPLES.has(x)), group.id).toBe(true);
-    }
+describe('Föyde olmayan devreler', () => {
+  it('klasördeki her örneğin föyde şekli var; eski ekler ana listedeki "Diyot ve transistör devreleri" grubunda', () => {
+    for (const g of folderGroups('akdeniz')) for (const id of g.ids as readonly ExampleId[]) expect(LAB_FIGURE_TEXTS[id], id).toBeDefined();
+    const moved: ExampleId[] = ['schottky-1n4001', 'kopru-diyot', 'tristor-mandal', 'fet-yukseltec-kuplajli', 'bjt-yukseltec-kuplajli', 'mosfet-yukseltec-rs'];
+    for (const id of moved) expect(exampleGroup(id), id).toBe('yariiletken');
+    expect(groupFolder('yariiletken')).toBeNull();
   });
 });

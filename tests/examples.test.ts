@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { LOGIC_CHIPS, isLogicChip } from '../src/model/logicChips';
-import { EXAMPLE_IDS, EXTRA_EXAMPLES, exampleDoc, type ExampleId } from '../src/examples';
+import { EXAMPLE_IDS, exampleDoc, type ExampleId } from '../src/examples';
 import { LAB_FIGURE_TEXTS } from '../src/i18n/foy';
 import { tr } from '../src/i18n/tr';
 import { buildConnectivity } from '../src/model/connectivity';
@@ -64,7 +64,7 @@ describe('Örnekler', () => {
       const texts = tr.examples.texts[id];
       for (const text of [texts.title, texts.description, texts.everyday]) expect(text.length).toBeGreaterThan(5);
       // "Ne işe yarar?" eski düzendeki kartlarda var; föy kartlarında yerini amaç ve teorik bilgi aldı.
-      const lab = !EXTRA_EXAMPLES.has(id) && LAB_FIGURE_TEXTS[id] !== undefined;
+      const lab = LAB_FIGURE_TEXTS[id] !== undefined;
       if (lab) expect(texts.purpose, id).toBeUndefined();
       else expect(texts.purpose?.length ?? 0, id).toBeGreaterThan(5);
     });

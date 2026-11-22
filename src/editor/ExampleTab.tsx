@@ -4,7 +4,7 @@
 // metin, "Simülasyonda:" ve katlı cevap) ve günlük hayatta; metinleri i18n/foy.ts.
 
 import { useId, useState, type ReactNode } from 'react';
-import { EXAMPLE_GROUPS, EXAMPLE_IDS, EXTRA_EXAMPLES, type ExampleId } from '../examples';
+import { EXAMPLE_GROUPS, EXAMPLE_IDS, type ExampleId } from '../examples';
 import { LAB_EXPERIMENT_TEXTS, labFigure, type LabExperiment, type LabFigure } from '../i18n/foy';
 import { tr } from '../i18n/tr';
 import { Icon } from './icons';
@@ -16,15 +16,9 @@ export function groupOf(id: ExampleId): string {
   return group ? tr.examples.groups[group.id] : '';
 }
 
-/** Föyde olmayan ek örneğin etiketi ("Föyde yok · ek"); öbür örneklerde yok. */
-export function ExtraTag({ id, className = '' }: { id: ExampleId; className?: string }) {
-  if (!EXTRA_EXAMPLES.has(id)) return null;
-  return <span className={`inline-block rounded-xs border border-line-2 px-1.5 py-px align-[2px] text-[11px] font-semibold whitespace-nowrap text-ink-2 ${className}`}>{tr.examples.extra}</span>;
-}
-
-/** Föy kartının başlığı ("Deney 1 · Şekil-3"); föy deneyi olmayan ve ek örneklerde null. */
+/** Föy kartının başlığı ("Deney 1 · Şekil-3"); föy deneyi olmayan örneklerde null. */
 export function labBadge(id: ExampleId): string | null {
-  const figure = EXTRA_EXAMPLES.has(id) ? null : labFigure(id);
+  const figure = labFigure(id);
   return figure ? tr.examples.lab.badge(figure.experiment, figure.figure) : null;
 }
 
@@ -210,7 +204,7 @@ export function ExampleDetails({ id, onOpen, onClose }: { id: ExampleId; onOpen:
   const index = EXAMPLE_IDS.indexOf(id);
   const previous = index > 0 ? EXAMPLE_IDS[index - 1] : undefined;
   const next = index < EXAMPLE_IDS.length - 1 ? EXAMPLE_IDS[index + 1] : undefined;
-  const figure = EXTRA_EXAMPLES.has(id) ? null : labFigure(id);
+  const figure = labFigure(id);
   return (
     <>
       {(id === 'baraj-cubuk' || id === 'baraj-tek-isik') && (

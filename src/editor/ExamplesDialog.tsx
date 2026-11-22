@@ -113,16 +113,15 @@ function isActive(entry: ExampleEntry, activeExample: ExampleId | null, activeFa
   return entry.kind === 'example' ? entry.id === activeExample : entry.id === activeFault;
 }
 
-/** Kartın çipleri: föy örneğinde şekil, föyde olmayan ekte "Föyde yok · ek", arıza görevinde "Arıza", açık örnekte "Açık". */
+/** Kartın çipleri: föy örneğinde şekil, arıza görevinde "Arıza", açık örnekte "Açık". */
 function Chips({ entry, active, className = '' }: { entry: ExampleEntry; active: boolean; className?: string }) {
   const texts = entryTexts(entry);
   const chip = 'inline-flex h-5 items-center rounded-md px-1.5 text-[11px] font-semibold whitespace-nowrap';
-  if (entry.kind === 'example' && !texts.chip && !texts.extra && !active) return null;
+  if (entry.kind === 'example' && !texts.chip && !active) return null;
   return (
     <span className={`flex flex-wrap items-center gap-1.5 ${className}`}>
       {entry.kind === 'fault' && <span className={`${chip} border border-warn-line bg-warn-soft text-warn`}>{t().fault}</span>}
       {texts.chip && <span className={`${chip} border border-line-2 bg-panel font-mono text-ink-2`}>{texts.chip}</span>}
-      {texts.extra && <span className={`${chip} border border-line-2 bg-panel text-ink-2`}>{tr.examples.extra}</span>}
       {active && <span className={`${chip} bg-accent text-white`}>{t().open}</span>}
     </span>
   );
